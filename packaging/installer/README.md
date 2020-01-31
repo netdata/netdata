@@ -58,75 +58,121 @@ operating systems.
 
 <div class="installer-grid">
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install with .deb or .rpm packages" />Packages</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install with .deb or .rpm packages" />
+      <h3>Packages</h3>
+    </div>
     <ul>
       <li><a href="methods/packages/">Install with <code>.deb</code> or <code>.rpm</code> packages</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png" alt="Install with a pre-built static binary for 64-bit systems" />Static binary</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png" alt="Install with a pre-built static binary for 64-bit systems" />
+      <h3>Static binary</h3>
+    </div>
     <ul>
       <li><a href="methods/kickstart-64/">Install with a pre-built static binary for 64-bit systems</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />
+      <h3>Docker</h3>
+    </div>
     <ul>
       <li><a href="../docker/#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
-      <li><a href="../docker/#run-netdata-with-the-docker-command">Using a `docker-compose.yml` file</a></li>
+      <li><a href="../docker/#run-netdata-with-the-docker-command">Using a <code>docker-compose.yml</code> file</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71960868-c1236d00-31fe-11ea-859e-902d36233e38.png" alt="Install Netdata on Kubernetes" />Kubernetes</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/71960868-c1236d00-31fe-11ea-859e-902d36233e38.png" alt="Install Netdata on Kubernetes" />
+      <h3>Kubernetes</h3>
+    </div>
     <ul>
       <li><a href="https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments">Using a Helm chart</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71961672-8cb0b080-3200-11ea-84f8-9139c7434110.png" alt="Install Netdata on macOS" />macOS</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install Netdata on cloud providers (GCP/AWS/Azure)" />
+      <h3>Cloud providers (GCP/AWS/Azure)</h3>
+    </div>
+    <ul>
+      <li><a href="methods/cloud-providers/#recommended-installation-method-for-cloud-providers">Recommended installation methods for cloud providers</a></li>
+      <li><a href="methods/cloud-providers/#post-installation-configuration">Post-installation configuration</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/71961672-8cb0b080-3200-11ea-84f8-9139c7434110.png" alt="Install Netdata on macOS" />
+      <h3>macOS</h3>
+    </div>
     <ul>
       <li><a href="methods/macos/#with-homebrew">Homebrew</a></li>
       <li><a href="methods/macos/#from-source">Manual installation from source</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />FreeBSD</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />
+      <h3>FreeBSD</h3>
+    </div>
     <ul>
       <li><a href="methods/freebsd/">Installation on FreeBSD</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png" alt="Install manually from source" />Manual</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png" alt="Install manually from source" />
+      <h3>Manual</h3>
+    </div>
     <ul>
       <li><a href="methods/manual/">Install manually from source</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png" alt="Install on offline/air-gapped systems" />Offline</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png" alt="Install on offline/air-gapped systems" />
+      <h3>Offline</h3>
+    </div>
     <ul>
       <li><a href="methods/offline/">Install on offline/air-gapped systems</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71961918-13fe2400-3201-11ea-9a91-fe6f5b27df0c.png" alt="Install Netdata on PFSense" />PFSense</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/71961918-13fe2400-3201-11ea-9a91-fe6f5b27df0c.png" alt="Install Netdata on PFSense" />
+      <h3>PFSense</h3>
+    </div>
     <ul>
       <li><a href="methods/pfsense/">Installation on PFSense</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71962148-853dd700-3201-11ea-9a09-16fdb39e9ee4.png" alt="Install Netdata on Synology" />Synology</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/71962148-853dd700-3201-11ea-9a09-16fdb39e9ee4.png" alt="Install Netdata on Synology" />
+      <h3>Synology</h3>
+    </div>
     <ul>
       <li><a href="methods/synology/">Installation on Synology</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/72070923-543dcf00-32f3-11ea-8053-d61bc96529b5.png" alt="Install Netdata on Alpine FreeNAS" />FreeNAS</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/72070923-543dcf00-32f3-11ea-8053-d61bc96529b5.png" alt="Install Netdata on Alpine FreeNAS" />
+      <h3>FreeNAS</h3>
+    </div>
     <ul>
       <li><a href="methods/freenas/">Manual installation on FreeNAS</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/72070921-53a53880-32f3-11ea-80f1-7d00cd8a7906.png" alt="Install Netdata on Alpine Linux" />Alpine</h3>
+    <div class="item-title">
+      <img src="https://user-images.githubusercontent.com/1153921/72070921-53a53880-32f3-11ea-80f1-7d00cd8a7906.png" alt="Install Netdata on Alpine Linux" />
+      <h3>Alpine</h3>
+    </div>
     <ul>
       <li><a href="methods/alpine/">Manual installation on Alpine</a></li>
     </ul>

@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Set ownership correctly for plugins in netdata-installer.sh [\#7923](https://github.com/netdata/netdata/pull/7923) ([Ferroin](https://github.com/Ferroin))
+- Add doc with post-install instructions for GCP [\#7912](https://github.com/netdata/netdata/pull/7912) ([joelhans](https://github.com/joelhans))
+- Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
+- Clarify editing health config files in health quickstart [\#7883](https://github.com/netdata/netdata/pull/7883) ([joelhans](https://github.com/joelhans))
 - Missing extern [\#7877](https://github.com/netdata/netdata/pull/7877) ([thiagoftsm](https://github.com/thiagoftsm))
 - collectors/python.d/phpfpm: fix readme and per process chart titles [\#7876](https://github.com/netdata/netdata/pull/7876) ([ilyam8](https://github.com/ilyam8))
 - .travis.yml: Add -fno-common to CFLAGS [\#7870](https://github.com/netdata/netdata/pull/7870) ([candrews](https://github.com/candrews))
@@ -25,6 +29,7 @@
 - node.d/snmp.node.js: format code [\#7816](https://github.com/netdata/netdata/pull/7816) ([ilyam8](https://github.com/ilyam8))
 - Improve the system-info.sh script to report CPU and RAM meta-data. [\#7815](https://github.com/netdata/netdata/pull/7815) ([Ferroin](https://github.com/Ferroin))
 - Attempt to use system service manager to shut down Netdata. [\#7814](https://github.com/netdata/netdata/pull/7814) ([Ferroin](https://github.com/Ferroin))
+- add possibility to change badge text font color [\#7809](https://github.com/netdata/netdata/pull/7809) ([underhood](https://github.com/underhood))
 - bug\_report improvements [\#7805](https://github.com/netdata/netdata/pull/7805) ([ilyam8](https://github.com/ilyam8))
 - node.d/snmp: snmpv3 support [\#7802](https://github.com/netdata/netdata/pull/7802) ([ilyam8](https://github.com/ilyam8))
 - Fixes install on FreeBSD systems with non GNU sed \(do't use -i\) [\#7796](https://github.com/netdata/netdata/pull/7796) ([prologic](https://github.com/prologic))
@@ -100,9 +105,7 @@
 - Docs: add configuration details for vhost about DOSPageCount to Apache proxy guide [\#7582](https://github.com/netdata/netdata/pull/7582) ([kkoomen](https://github.com/kkoomen))
 - CODEOWNERS: Replace @netdata/automation with individual team members [\#7581](https://github.com/netdata/netdata/pull/7581) ([knatsakis](https://github.com/knatsakis))
 - Fix not detecting more than one adapter in hpssa collector [\#7580](https://github.com/netdata/netdata/pull/7580) ([gnoddep](https://github.com/gnoddep))
-- Docs: Add notice about mod\_evasive to Apache proxy guide [\#7578](https://github.com/netdata/netdata/pull/7578) ([joelhans](https://github.com/joelhans))
 - installer: include go.d.plugin version v0.13.0 [\#7574](https://github.com/netdata/netdata/pull/7574) ([ilyam8](https://github.com/ilyam8))
-- Fix race condition in dbengine [\#7565](https://github.com/netdata/netdata/pull/7565) ([thiagoftsm](https://github.com/thiagoftsm))
 - Move the script for installing required packages into the main repo. [\#7563](https://github.com/netdata/netdata/pull/7563) ([Ferroin](https://github.com/Ferroin))
 - Skip unit testing during CI when it's not needed. [\#7559](https://github.com/netdata/netdata/pull/7559) ([Ferroin](https://github.com/Ferroin))
 - Send host labels via exporting connectors  [\#7554](https://github.com/netdata/netdata/pull/7554) ([vlvkobal](https://github.com/vlvkobal))
@@ -113,7 +116,6 @@
 - Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
 - Agent claiming [\#7525](https://github.com/netdata/netdata/pull/7525) ([mfundul](https://github.com/mfundul))
 - The step-by-step Netdata tutorial [\#7489](https://github.com/netdata/netdata/pull/7489) ([joelhans](https://github.com/joelhans))
-- silencers\_info: Change error to info [\#7479](https://github.com/netdata/netdata/pull/7479) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add anon tracking notice for installers [\#7437](https://github.com/netdata/netdata/pull/7437) ([ncmans](https://github.com/ncmans))
 - Docs: Tweaks and linter fixes to contributing guidelines [\#7407](https://github.com/netdata/netdata/pull/7407) ([joelhans](https://github.com/joelhans))
 - packaging: Set default release channel to stable for gh releases [\#7399](https://github.com/netdata/netdata/pull/7399) ([ncmans](https://github.com/ncmans))
@@ -161,10 +163,6 @@
 - database: include limits.h before using LONG\_MAX [\#7224](https://github.com/netdata/netdata/pull/7224) ([mniestroj](https://github.com/mniestroj))
 - UrlService: allow to skip tls\_verify for http scheme [\#7223](https://github.com/netdata/netdata/pull/7223) ([ilyam8](https://github.com/ilyam8))
 - Fix counter reset detection [\#7220](https://github.com/netdata/netdata/pull/7220) ([mfundul](https://github.com/mfundul))
-- .travis.yml: Increase timeout for docker image builds to 20 minutes [\#7214](https://github.com/netdata/netdata/pull/7214) ([knatsakis](https://github.com/knatsakis))
-- Building a fuzzer against the API \(issue \#7163\) [\#7210](https://github.com/netdata/netdata/pull/7210) ([amoss](https://github.com/amoss))
-- Suggest using /var/run/netdata for the unix socket [\#7206](https://github.com/netdata/netdata/pull/7206) ([CtrlAltDel64](https://github.com/CtrlAltDel64))
-- netdata-installer.sh follow-up based on \#7060 review [\#7200](https://github.com/netdata/netdata/pull/7200) ([knatsakis](https://github.com/knatsakis))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
