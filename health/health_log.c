@@ -72,6 +72,7 @@ inline void health_label_log_save(RRDHOST *host) {
 
     if(likely(host->health_log_fp)) {
         BUFFER *wb = buffer_create(1024);
+        rrdhost_check_rdlock(host);
         netdata_rwlock_rdlock(&host->labels_rwlock);
         struct label *l=localhost->labels;
         while (l != NULL) {

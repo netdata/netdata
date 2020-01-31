@@ -87,6 +87,7 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
+    rrdhost_check_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
         if (!should_send_label(instance, label))

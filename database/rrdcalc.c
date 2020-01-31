@@ -662,6 +662,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
 }
 
 void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
+    rrdhost_check_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
 
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms);
