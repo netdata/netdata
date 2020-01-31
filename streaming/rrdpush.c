@@ -1396,7 +1396,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
-    uint32_t stream_version = 0;
+    uint32_t stream_version = UINT_MAX;
     char buf[GUID_LEN + 1];
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
@@ -1428,7 +1428,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "ver")) {
             stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
         } else {
-            if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
+            if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && stream_version == UINT_MAX)
                 stream_version = 1;
             else {
                 // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
@@ -1451,6 +1451,9 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             }
         }
     }
+
+    if (stream_version == UINT_MAX)
+        stream_version = 0;
 
     if(!key || !*key) {
         rrdhost_system_info_free(system_info);
