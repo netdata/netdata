@@ -223,7 +223,6 @@ These are all the data collection plugins currently available.
 | nsd|python<br/>v2 or v3|Charts the nsd received queries and zones.<br/> <br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [nsd.chart.py](../collectors/python.d.plugin/nsd)<br/>configuration file: [python.d/nsd.conf](../collectors/python.d.plugin/nsd)|
 | powerdns|python<br/>v2 or v3|Monitors powerdns performance and health metrics <br/> <br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [powerdns.chart.py](../collectors/python.d.plugin/powerdns)<br/>configuration file: [python.d/powerdns.conf](../collectors/python.d.plugin/powerdns)|
 | dnsdist|python<br/>v2 or v3|Monitors dnsdist performance and health metrics <br/> <br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [dnsdist.chart.py](../collectors/python.d.plugin/dnsdist)<br/>configuration file: [python.d/dnsdist.conf](../collectors/python.d.plugin/dnsdist)|
-| unbound|python<br/>v2 or v3|Monitors Unbound performance and resource usage metrics <br/> <br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [unbound.chart.py](../collectors/python.d.plugin/unbound)<br/>configuration file: [python.d/unbound.conf](../collectors/python.d.plugin/unbound)|
 
 ---
 

@@ -57,9 +57,9 @@ command to run (/bin/bash) and then chooses the base container images (centos:la
 sitting inside the shell of the container.
 
 After we have entered the shell we can install Netdata. This process could not be easier. If you take a look at [this
-link](../packaging/installer/#installation), the Netdata devs give us several one-liners to install Netdata. I have not
-had any issues with these one liners and their bootstrapping scripts so far (If you guys run into anything do share).
-Run the following command in your container.
+link](../packaging/installer/README.md), the Netdata devs give us several one-liners to install Netdata. I have not had
+any issues with these one liners and their bootstrapping scripts so far (If you guys run into anything do share). Run
+the following command in your container.
 
 ```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait

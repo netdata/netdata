@@ -13,4 +13,4 @@ char *netdata_configured_varlib_dir          = VARLIB_DIR;
 char *netdata_configured_home_dir            = CACHE_DIR;
 char *netdata_configured_host_prefix         = NULL;
 char *netdata_configured_timezone            = NULL;
-
+int netdata_ready;
