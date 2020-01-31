@@ -440,7 +440,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     margin-top: -8px;
     padding: 0.5rem;
     border-width: 0 1px 1px 1px;
-    border-color: black;
+    border-color: #AEB3B7;
     border-style: solid;
 }
 
@@ -458,7 +458,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 .grid-item {
     grid-column: span 2;
     border-radius: 2px;
-    border: 1px solid black;
+    border: 1px solid #AEB3B7;
     padding: 1rem;
 }
 
