@@ -58,7 +58,7 @@ Skip ahead to the [What's next?](#whats-next) section to find links to helpful p
 
 While RHEL, CentOS, and Open SuSE all support `.rpm` packages, full support via these packages is still a
 work-in-progress. See our [distribution matrix](../../DISTRIBUTIONS.md) to understand whether you can install Netdata
-via `.rpm` packages, and then use your package manager to add the packagecloud repository and install Netdata.
+via these `.rpm` packages, and then use your package manager to add the packagecloud repository and install Netdata.
 
 ## Using caching proxies with packagecloud repositories
 
