@@ -1,7 +1,8 @@
 # How to monitor CockroadchDB metrics with Netdata
 
 [CockroachDB](https://github.com/cockroachdb/cockroach) is an open-source that project brings SQL databases into
-scalable, disaster-resilient cloud deployments. Thanks to a new collector released in
+scalable, disaster-resilient cloud deployments. Thanks to a [new CockroachDB
+collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/cockroachdb/) released in
 [v1.20](https://blog.netdata.cloud/posts/release-1.20/), you can now monitor any number of CockroachDB databases with
 maximum granularity using Netdata. Collect more than 50 unique metrics and put them on interactive visualizations
 designed for better visual anomaly detection.
@@ -22,7 +23,7 @@ complete. Restart Netdata with `service netdata restart`, or use the [appropriat
 method](../getting-started.md#start-stop-and-restart-netdata) for your system, and refresh your browser. You should see
 CockroachDB metrics in your Netdata dashboard!
 
-![CPU utilization charts from a CockrochDB database monitored by Netdata](https://user-images.githubusercontent.com/1153921/73558809-2a1e8f00-4411-11ea-80cc-b66953d572e0.png)
+![CPU utilization charts from a CockrochDB database monitored by Netdata](https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png)
 
 > Note: Netdata collects metrics from CockroachDB every 10 seconds, instead of our usual 1 second, because CockroachDB
 > only updates `_status/vars` every 10 seconds. You can't change this setting in CockroachDB.
@@ -58,17 +59,19 @@ jobs:
     url: http://cockroachdb.example.com:8080/_status/vars
 ```
 
-For a secure cluster, use `https` instead.
+For a secure cluster, use `https` in the `url` field instead.
 
 ```yaml
 # [ JOBS ]
 jobs:
   - name: remote
     url: https://203.0.113.0:8080/_status/vars
+    tls_skip_verify: yes # If your certificate is self-signed
 
 jobs:
   - name: remote_hostname
     url: https://cockroachdb.example.com:8080/_status/vars
+    tls_skip_verify: yes # If your certificate is self-signed
 ```
 
 You can add as many jobs as you'd like based on how many CockroachDB databases you have—Netdata will create separate
@@ -76,7 +79,7 @@ charts for each job. Once you've edited `cockroachdb.conf` according to the need
 Netdata to see your new charts.
 
 <figure>
-  <img src="(https://user-images.githubusercontent.com/1153921/73558811-2a1e8f00-4411-11ea-9a65-56ac44dc7092.png" alt="Charts showing a node failure during a simulated test">
+  <img src="https://user-images.githubusercontent.com/1153921/73564469-d7e36b00-441c-11ea-8333-02ba0e1c294c.png" alt="Charts showing a node failure during a simulated test">
   <figcaption>Charts showing a node failure during a simulated test</figcaption>
 </figure>
 
@@ -105,6 +108,7 @@ thoughts.
 
 Also, be sure to check out these useful resources:
 
+-   [Netdata's CockroachDB documentation](https://docs.netdata.cloud/collectors/go.d.plugin/modules/cockroachdb/)
 -   [Netdata's CockroachDB
     configuration](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/cockroachdb.conf)
 -   [Netdata's CockroachDB
