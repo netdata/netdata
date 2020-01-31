@@ -1182,11 +1182,15 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
 
 int    aclk_update_chart(RRDHOST *host, char *chart_name)
 {
+#ifndef ACLK_ENABLE
+    return 0;
+#else
     if (host != localhost)
         return 0;
 
     aclk_queue_query("_chart", host->hostname, NULL, chart_name, 2, 1);
     return 0;
+#endif
 }
 
 int    aclk_update_alarm(RRDHOST *host, char *alarm_name)

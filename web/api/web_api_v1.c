@@ -842,6 +842,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\n\t]\n");
 
     buffer_strcat(wb, "}");
+    return 0;
 }
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
