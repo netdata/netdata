@@ -887,9 +887,9 @@ should_install_go() {
 
   govercomp "$latest_version" "$actual_version"
   case $? in
-  1) return 0 ;; # >
-  3) return 0 ;; # error
-  *) return 1 ;; # =,<
+  0) return 1 ;; # =
+  2) return 1 ;; # <
+  *) return 0 ;; # >, error
   esac
 }
 
