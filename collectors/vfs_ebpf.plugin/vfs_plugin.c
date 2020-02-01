@@ -37,7 +37,7 @@ void netdata_cleanup_and_exit(int ret) {
 // ----------------------------------------------------------------------
 //Netdata eBPF library
 void *libnetdata = NULL;
-int (*load_bpf_file)(char *) = NULL;
+int (*load_bpf_file)(char *, int) = NULL;
 int *map_fd = NULL;
 
 //Libbpf (It is necessary to have at least kernel 4.10)
@@ -57,7 +57,7 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
-static int kretprobe = 1;
+static int kretprobe = 0;
 struct config collector_config;
 
 pthread_mutex_t lock;
@@ -512,7 +512,7 @@ int process_load_ebpf()
     char *name = (!kretprobe)?"pnetdata_ebpf_process.o":"rnetdata_ebpf_process.o";
 
     build_complete_path(lpath, 4096, plugin_dir,  name);
-    if (load_bpf_file(lpath) ) {
+    if (load_bpf_file(lpath, getppid()) ) {
         error("[EBPF_PROCESS] Cannot load program: %s.", lpath);
         return -1;
     } else {
@@ -541,10 +541,25 @@ void set_global_variables() {
         netdata_configured_log_dir = LOG_DIR;
 }
 
-static void set_global_values(char *ptr) {
-    if(!strcmp(ptr, "entry"))
-        kretprobe = 0;
+static void what_to_load(char *ptr) {
+    if (!strcmp(ptr, "return"))
+        kretprobe = 1;
+}
 
+static void set_global_values() {
+    struct section *sec = collector_config.sections;
+    while(sec) {
+        if(sec && !strcmp(sec->name, "global")) {
+            struct config_option *values = sec->values;
+            while(values) {
+                if(!strcmp(values->name, "load"))
+                    what_to_load(values->value);
+
+                values = values->next;
+            }
+        }
+        sec = sec->next;
+    }
 }
 
 static int load_collector_file(char *path) {
@@ -555,26 +570,7 @@ static int load_collector_file(char *path) {
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return 1;
 
-    struct section *sec = collector_config.sections;
-    while(sec) {
-        error("KILLME SEC %s\n", sec->name);
-        if(sec) {
-            struct config_option *values = sec->values;
-            while(values) {
-                error("KILLME OPT %s\n", values->name);
-                values = values->next;
-            }
-        }
-        sec = sec->next;
-    }
-    char *def = { "entry" };
-    char *s = appconfig_get(&collector_config, CONFIG_SECTION_GLOBAL, "load", def);
-    if(s)
-    /*
-    if (s)
-        select_collector_mode(s);
-     */
-
+    set_global_values();
 
     return 0;
 }
