@@ -818,7 +818,7 @@ govercomp() {
   read -ra ver1 <<<"$1"
   read -ra ver2 <<<"$2"
 
-  if [[ ! $ver1 ]] || [[ ! $ver2 ]]; then
+  if [[ ${#ver1[@]} -eq 0 ]] || [[ ${#ver2[@]} -eq 0 ]]; then
     return 3
   fi
 
