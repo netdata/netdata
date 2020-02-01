@@ -222,7 +222,7 @@ freebsd*)
 darwin*)
     build_target=macos
     build_target_id=3
-    LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
+    LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit -Wl,-dead_strip,-bind_at_load"
     ;;
 *)
     build_target=linux
