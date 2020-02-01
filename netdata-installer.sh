@@ -802,7 +802,102 @@ fi
 
 # -----------------------------------------------------------------------------
 
+# govercomp compares two versions. This function exit codes:
+# 0 - version1 == version2
+# 1 - version1 > version2
+# 2 - version2 > version1
+# 3 - error
+# Expected version format: dot separated numbers.
+govercomp() {
+  if [[ "$1" == "$2" ]]; then
+    return 0
+  fi
+
+  local IFS=.
+  local i ver1 ver2
+  read -ra ver1 <<<"$1"
+  read -ra ver2 <<<"$2"
+
+  if [[ ! $ver1 ]] || [[ ! $ver2 ]]; then
+    return 3
+  fi
+
+  for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
+    ver1[i]=0
+  done
+
+  for ((i = ${#ver2[@]}; i < ${#ver1[@]}; i++)); do
+    ver2[i]=0
+  done
+
+  for ((i = 0; i < ${#ver1[@]}; i++)); do
+    if ((10#${ver1[i]} > 10#${ver2[i]})); then
+      return 1
+    fi
+    if ((10#${ver1[i]} < 10#${ver2[i]})); then
+      return 2
+    fi
+  done
+
+  return 0
+}
+
+should_install_go() {
+  # 'go.d.plugin -v' output variants:
+  # - go.d.plugin, version: unknown
+  # - go.d.plugin, version: v0.14.1
+  # - go.d.plugin, version: v0.14.1-dirty
+  # - go.d.plugin, version: v0.14.1-1-g4c5f98c
+  # - go.d.plugin, version: v0.14.1-1-g4c5f98c-dirty
+  #
+  # we download if:
+  # - error during determining latest/actual version and parsing
+  # - actual version > latest version
+  #
+  # we dont if:
+  # - actual version = latest version
+  # - actual version > latest version
+  #
+  # we need to compare only MAJOR.MINOR.PATCH part
+
+  local latest_version
+  local binary
+  local binary_output
+  local actual_version
+
+  latest_version="$(grep -E -o "[0-9]+\.[0-9]+\.[0-9]+" packaging/go.d.version 2>/dev/null)"
+  if [[ ! $latest_version ]]; then
+    return 0
+  fi
+
+  binary="${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  if [[ ! -f $binary ]] || [[ ! -x $binary ]]; then
+    return 0
+  fi
+
+  binary_output=$($binary -v 2>/dev/null)
+  if [[ ! $binary_output ]]; then
+    return 0
+  fi
+
+  actual_version=$(echo "$binary_output" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
+  if [[ ! $actual_version ]]; then
+    return 0
+  fi
+
+  govercomp "$latest_version" "$actual_version"
+  case $? in
+  1) return 0 ;; # >
+  3) return 0 ;; # error
+  *) return 1 ;; # =,<
+  esac
+}
+
 install_go() {
+  if ! should_install_go; then
+    return 0
+  fi
+
   # When updating this value, ensure correct checksums in packaging/go.d.checksums
   GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
   ARCH_MAP=(
