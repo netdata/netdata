@@ -852,7 +852,7 @@ should_install_go() {
   #
   # we download if:
   # - error during determining latest/actual version and parsing
-  # - actual version > latest version
+  # - actual version < latest version
   #
   # we dont if:
   # - actual version = latest version
