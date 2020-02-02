@@ -1255,7 +1255,7 @@ install_dnf() {
   # installing whatever is available
   # even if a package is not found
   opts="$opts --setopt=strict=0"
-  run ${sudo} dnf "${opts}" install "${@}"
+  run ${sudo} dnf "${opts[@]}" install "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1286,7 +1286,7 @@ install_emerge() {
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} emerge "${opts}" -v --noreplace "${pkg}"
+    run ${sudo} emerge "${opts[@]}" -v --noreplace "${pkg}"
   done
 }
 
@@ -1314,7 +1314,7 @@ install_apk() {
   fi
 
   # install the required packages
-  run ${sudo} apk add "${opts}" "${@}"
+  run ${sudo} apk add "${opts[@]}" "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1343,7 +1343,7 @@ install_equo() {
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} equo i ${opts} "${pkg}"
+    run ${sudo} equo i ${opts[@]} "${pkg}"
   done
 }
 
@@ -1438,7 +1438,7 @@ install_zypper() {
   fi
 
   # install the required packages
-  run ${sudo} zypper "${opts}" install "${@}"
+  run ${sudo} zypper "${opts[@]}" install "${@}"
 }
 
 install_failed() {
