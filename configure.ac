@@ -1264,6 +1264,7 @@ AC_CONFIG_FILES([
     libnetdata/clocks/Makefile
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
+    libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile

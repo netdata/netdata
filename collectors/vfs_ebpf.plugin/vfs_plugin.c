@@ -62,6 +62,30 @@ struct config collector_config;
 
 pthread_mutex_t lock;
 
+int event_pid = 0;
+netdata_ebpf_events_t collector_events[] = {
+        { .type = 'r', .name = "vfs_write" },
+        { .type = 'r', .name = "vfs_writev" },
+        { .type = 'r', .name = "vfs_read" },
+        { .type = 'r', .name = "vfs_readv" },
+        { .type = 'r', .name = "do_sys_open" },
+        { .type = 'r', .name = "vfs_unlink" },
+        { .type = 'p', .name = "do_exit" },
+        { .type = 'p', .name = "release_task" },
+        { .type = 'r', .name = "_do_fork" },
+        { .type = 'r', .name = "__x64_sys_clone" },
+        { .type = 'r', .name = "__close_fd" },
+        { .type = 0, .name = NULL }
+};
+
+void open_developer_log() {
+    char filename[FILENAME_MAX+1];
+    int tot = sprintf(filename, "%s/%s",  netdata_configured_log_dir, NETDATA_DEVELOPER_LOG_FILE);
+
+    if(tot > 0)
+        developer_log = fopen(filename, "a");
+}
+
 static void int_exit(int sig)
 {
     close_plugin = 1;
@@ -73,18 +97,62 @@ static void int_exit(int sig)
 
     if (aggregated_data) {
         free(aggregated_data);
+        aggregated_data = NULL;
     }
 
     if (publish_aggregated) {
         free(publish_aggregated);
-    }
-
-    if (developer_log) {
-        fclose(developer_log);
+        publish_aggregated = NULL;
     }
 
     if (libnetdata) {
         dlclose(libnetdata);
+        libnetdata = NULL;
+    }
+
+    if (developer_log) {
+        fclose(developer_log);
+        developer_log = NULL;
+    }
+
+    if (event_pid) {
+        int ret = fork();
+        if (ret < 0) //error
+            error("[EBPF PROCESS] Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
+        else if (!ret) { //child
+            int i;
+            for ( i=getdtablesize(); i>=0; --i)
+                close(i);
+
+            int fd = open("/dev/null",O_RDWR, 0);
+            if (fd != -1) {
+                dup2 (fd, STDIN_FILENO);
+                dup2 (fd, STDOUT_FILENO);
+                dup2 (fd, STDERR_FILENO);
+
+                if (fd > 2)
+                    close (fd);
+            }
+
+            int sid = setsid();
+            if(sid >= 0) {
+                sleep(1);
+                open_developer_log();
+                if(developer_log) {
+                    debug(D_EXIT, "Wait for father %d die", event_pid);
+                    clean_kprobe_events(developer_log, event_pid, collector_events);
+                }
+            } else {
+                error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
+            }
+        } else { //parent
+            exit(0);
+        }
+
+        if (developer_log) {
+            fclose(developer_log);
+            developer_log = NULL;
+        }
     }
 
     exit(sig);
@@ -512,7 +580,8 @@ int process_load_ebpf()
     char *name = (!kretprobe)?"pnetdata_ebpf_process.o":"rnetdata_ebpf_process.o";
 
     build_complete_path(lpath, 4096, plugin_dir,  name);
-    if (load_bpf_file(lpath, getppid()) ) {
+    event_pid = getpid();
+    if (load_bpf_file(lpath, event_pid) ) {
         error("[EBPF_PROCESS] Cannot load program: %s.", lpath);
         return -1;
     } else {
@@ -573,14 +642,6 @@ static int load_collector_file(char *path) {
     set_global_values();
 
     return 0;
-}
-
-void open_developer_log() {
-    char filename[FILENAME_MAX+1];
-    int tot = sprintf(filename, "%s/%s",  netdata_configured_log_dir, NETDATA_DEVELOPER_LOG_FILE);
-
-    if(tot > 0)
-        developer_log = fopen(filename, "a");
 }
 
 int main(int argc, char **argv)

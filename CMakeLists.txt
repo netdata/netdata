@@ -298,6 +298,8 @@ set(LIBNETDATA_FILES
         libnetdata/clocks/clocks.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
+        libnetdata/ebpf/ebpf.c
+        libnetdata/ebpf/ebpf.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
         libnetdata/inlined.h
