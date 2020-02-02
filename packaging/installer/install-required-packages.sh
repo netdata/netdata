@@ -288,7 +288,7 @@ user_picks_distribution() {
   REPLY=
   while [ -z "${REPLY}" ]; do
     echo "To proceed please write one of these:"
-    echo "${opts// /,/}"
+    echo "${opts// /,/ }"
     if ! read -r -p ">" REPLY; then
       continue
     fi
