@@ -1191,10 +1191,12 @@ install_apt_get() {
     opts="${opts} -yq"
   fi
 
+  read -r -a apt_opts <<< "$opts"
+
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} apt-get "${opts[@]}" install "${pkg}"
+    run ${sudo} apt-get "${apt_opts[@]}" install "${pkg}"
   done
 }
 
@@ -1222,8 +1224,10 @@ install_yum() {
     opts="-y"
   fi
 
+  read -r -a yum_opts <<< "${opts}"
+
   # install the required packages
-  run ${sudo} yum ${opts} install "${@}" # --enablerepo=epel-testing
+  run ${sudo} yum "${yum_opts[@]}" install "${@}" # --enablerepo=epel-testing
 }
 
 # -----------------------------------------------------------------------------
@@ -1255,7 +1259,8 @@ install_dnf() {
   # installing whatever is available
   # even if a package is not found
   opts="$opts --setopt=strict=0"
-  run ${sudo} dnf "${opts[@]}" install "${@}"
+  read -r -a dnf_opts <<< "$opts"
+  run ${sudo} dnf "${dnf_opts[@]}" install "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1283,10 +1288,12 @@ install_emerge() {
     opts=""
   fi
 
+  read -r -a emerge_opts <<< "$opts"
+
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} emerge "${opts[@]}" -v --noreplace "${pkg}"
+    run ${sudo} emerge "${emerge_opts[@]}" -v --noreplace "${pkg}"
   done
 }
 
@@ -1313,8 +1320,10 @@ install_apk() {
     opts="${opts} -i"
   fi
 
+  read -r -a apk_opts <<< "$opts"
+
   # install the required packages
-  run ${sudo} apk add "${opts[@]}" "${@}"
+  run ${sudo} apk add "${apk_opts[@]}" "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1340,10 +1349,12 @@ install_equo() {
     opts="-v"
   fi
 
+  read -r -a equo_opts <<< "$opts"
+
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} equo i ${opts[@]} "${pkg}"
+    run ${sudo} equo i "${equo_opts[@]}" "${pkg}"
   done
 }
 
@@ -1437,8 +1448,10 @@ install_zypper() {
     opts="${opts} --non-interactive"
   fi
 
+  read -r -a zypper_opts <<< "$opts"
+
   # install the required packages
-  run ${sudo} zypper "${opts[@]}" install "${@}"
+  run ${sudo} zypper "${zypper_opts[@]}" install "${@}"
 }
 
 install_failed() {
