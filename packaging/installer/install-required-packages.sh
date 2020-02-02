@@ -141,7 +141,7 @@ release2lsb_release() {
   local file="${1}" x DISTRIB_ID="" DISTRIB_RELEASE="" DISTRIB_CODENAME=""
   echo >&2 "Loading ${file} ..."
 
-  x="$(grep -v "^$" < "${file}" | head -n 1)"
+  x="$(grep -v "^$" "${file}" | head -n 1)"
 
   if [[ "${x}" =~ ^.*[[:space:]]+Linux[[:space:]]+release[[:space:]]+.*[[:space:]]+(.*)[[:space:]]*$ ]]; then
     eval "$(echo "${x}" | sed "s|^\(.*\)[[:space:]]\+Linux[[:space:]]\+release[[:space:]]\+\(.*\)[[:space:]]\+(\(.*\))[[:space:]]*$|DISTRIB_ID=\"\1\"\nDISTRIB_RELEASE=\"\2\"\nDISTRIB_CODENAME=\"\3\"|g" | grep "^DISTRIB")"
@@ -175,7 +175,7 @@ get_os_release() {
   if [ -f "/etc/os-release" ]; then
     echo >&2 "Loading /etc/os-release ..."
 
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" < /etc/os-release)"
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" /etc/os-release)"
     for x in "${ID}" ${ID_LIKE}; do
       case "${x,,}" in
         alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
@@ -210,7 +210,7 @@ get_lsb_release() {
   if [ -f "/etc/lsb-release" ]; then
     echo >&2 "Loading /etc/lsb-release ..."
     local DISTRIB_ID="" DISTRIB_RELEASE="" DISTRIB_CODENAME=""
-    eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" < /etc/lsb-release)"
+    eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" /etc/lsb-release)"
     distribution="${DISTRIB_ID}"
     version="${DISTRIB_RELEASE}"
     codename="${DISTRIB_CODENAME}"
