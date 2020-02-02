@@ -1194,7 +1194,7 @@ install_apt_get() {
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} apt-get "${opts}" install "${pkg}"
+    run ${sudo} apt-get "${opts[@]}" install "${pkg}"
   done
 }
 
