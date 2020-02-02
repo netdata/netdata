@@ -833,9 +833,9 @@ govercomp() {
 
   local i
   for ((i = 0; i < ${#ver1[@]}; i++)); do
-    if ((10#${ver1[i]} > 10#${ver2[i]})); then
+    if [[ ${ver1[i]} > ${ver2[i]} ]]; then
       return 1
-    elif ((10#${ver1[i]} < 10#${ver2[i]})); then
+    elif [[ ${ver1[i]} < ${ver2[i]} ]]; then
       return 2
     fi
   done
