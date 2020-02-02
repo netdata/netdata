@@ -852,7 +852,7 @@ should_install_go() {
   local binary_version
 
   version_in_file="$(cat packaging/go.d.version 2>/dev/null)"
-  binary_version=$(${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin -v 2>/dev/null)
+  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2>/dev/null)
 
   govercomp "$version_in_file" "$binary_version"
   case $? in
