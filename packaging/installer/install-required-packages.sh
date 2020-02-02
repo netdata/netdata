@@ -1233,7 +1233,7 @@ validate_tree_centos() {
 
   echo >&2 " > Checking for epel ..."
   if ! rpm -qa | grep epel > /dev/null; then
-    if prompt "epel not  found, shall I install it?"; then
+    if prompt "epel not found, shall I install it?"; then
       run ${sudo} yum ${opts} install epel-release
     fi
   fi
