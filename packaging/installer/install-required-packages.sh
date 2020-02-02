@@ -849,8 +849,7 @@ declare -A pkg_python_requests=(
   ['rhel']="python-requests"
   ['suse']="python-requests"
   ['default']="python-requests"
-  [\
-  'alpine-3.1.4']="WARNING|"
+  ['alpine-3.1.4']="WARNING|"
   ['alpine-3.2.3']="WARNING|"
 )
 
