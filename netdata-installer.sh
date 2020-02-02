@@ -817,7 +817,7 @@ govercomp() {
   # - go.d.plugin, version: v0.14.1-dirty
   # - go.d.plugin, version: v0.14.1-1-g4c5f98c
   # - go.d.plugin, version: v0.14.1-1-g4c5f98c-dirty
-  #
+
   # we need to compare only MAJOR.MINOR.PATCH part
   local ver1 ver2
   ver1=$(echo "$1" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
@@ -832,19 +832,10 @@ govercomp() {
   fi
 
   local i
-  for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
-    ver1[i]=0
-  done
-
-  for ((i = ${#ver2[@]}; i < ${#ver1[@]}; i++)); do
-    ver2[i]=0
-  done
-
   for ((i = 0; i < ${#ver1[@]}; i++)); do
     if ((10#${ver1[i]} > 10#${ver2[i]})); then
       return 1
-    fi
-    if ((10#${ver1[i]} < 10#${ver2[i]})); then
+    elif ((10#${ver1[i]} < 10#${ver2[i]})); then
       return 2
     fi
   done
