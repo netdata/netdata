@@ -64,7 +64,7 @@ typedef struct netdata_publish_vfs_common {
     long read;
 }netdata_publish_vfs_common_t;
 
-# define NETDATA_EBPF_FAMILY "eBPF"
+# define NETDATA_EBPF_FAMILY "ebpf"
 # define NETDATA_FILE_GROUP "file"
 # define NETDATA_PROCESS_GROUP "process"
 

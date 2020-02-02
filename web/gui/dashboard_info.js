@@ -540,8 +540,13 @@ netdataDashboard.menu = {
         title: 'CockroachDB',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance and health statistics for various <code>CockroachDB</code> components.'
-    }
+    },
 
+    'ebpf': {
+        title: 'eBPF',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Monitor system calls, bytes read and written and errors using <code>eBPF</code>.'
+    }
 };
 
 
@@ -3012,4 +3017,10 @@ netdataDashboard.context = {
         info: 'Size of metric samples written to disk.'
     },
 
+    // ------------------------------------------------------------------------
+    // eBPF
+
+    'ebpf.file_descriptor': {
+        info: 'This chart shows the number of calls to open and close file descriptors on Linux. The open dimension is attached to the kernel internal function \'do_sys_open\' that is called from some system calls (open(2) and openat(2)). The close dimension is attached to the function \'__close_fd\' that is called from system call close(2).'
+    }
 };
