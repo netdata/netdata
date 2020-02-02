@@ -17,7 +17,9 @@ static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netda
     if (length > 0) {
         ssize_t written = write(fd, cmd, strlen(cmd));
         if (written < 0) {
-            fprintf(out, "Cannot remove the event (%d, %d) '%s' from %s : %s\n", getppid(), getpid(), cmd, filename, strerror((int)errno));
+            fprintf(out
+                    , "Cannot remove the event (%d, %d) '%s' from %s : %s\n"
+                    , getppid(), getpid(), cmd, filename, strerror((int)errno));
             ret = 1;
         }
     }
@@ -44,4 +46,47 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr) {
     }
 
     return 0;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+static int has_ebpf_kernel_version() {
+    char major[16], minor[16], patch[16];
+    char ver[256];
+    char *version = ver;
+
+    int fd = open("/proc/sys/kernel/osrelease", O_RDONLY);
+    if (fd < 0)
+        return 0;
+
+    ssize_t len = read(fd, version, sizeof(version));
+    if (len < 0)
+        return 0;
+
+    close(fd);
+
+    char *move = major;
+    while (*version && *version != '.') *move++ = *version++;
+    *move = '\0';
+
+    version++;
+    move = minor;
+    while (*version && *version != '.') *move++ = *version++;
+    *move = '\0';
+
+    if (*version)
+        version++;
+    move = patch;
+    while (*version) *move++ = *version++;
+    *move = '\0';
+
+    size_t test = (size_t)(str2l(major)*65536) + (size_t)(str2l(minor)*256) + (size_t)str2l(patch);
+    return (test >= 264960);
+}
+
+int has_condition_to_run() {
+    if(!has_ebpf_kernel_version())
+        return 0;
+
+    return 1;
 }

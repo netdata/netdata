@@ -10,5 +10,6 @@ typedef struct netdata_ebpf_events {
 } netdata_ebpf_events_t;
 
 int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr);
+int has_condition_to_run();
 
 #endif

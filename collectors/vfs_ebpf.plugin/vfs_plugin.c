@@ -649,6 +649,9 @@ int main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
+    if(!has_condition_to_run())
+        return 1;
+
     //set name
     program_name = "vfs.plugin";
 
@@ -666,7 +669,7 @@ int main(int argc, char **argv)
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("[EBPF PROCESS] setrlimit(RLIMIT_MEMLOCK)");
-        return 1;
+        return 2;
     }
 
     set_global_variables();
@@ -678,7 +681,7 @@ int main(int argc, char **argv)
     if(ebpf_load_libraries()) {
         error("[EBPF_PROCESS] Cannot load library.");
         thread_finished++;
-        int_exit(2);
+        int_exit(3);
     }
 
     signal(SIGINT, int_exit);
@@ -686,13 +689,13 @@ int main(int argc, char **argv)
 
     if (process_load_ebpf()) {
         thread_finished++;
-        int_exit(3);
+        int_exit(4);
     }
 
     if(allocate_global_vectors()) {
         thread_finished++;
         error("[EBPF_PROCESS] Cannot allocate necessary vectors.");
-        int_exit(4);
+        int_exit(5);
     }
 
     set_global_labels();
@@ -701,7 +704,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
-        int_exit(5);
+        int_exit(6);
     }
 
     pthread_attr_t attr;
@@ -718,7 +721,7 @@ int main(int argc, char **argv)
         if ( ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot create threads.");
             thread_finished++;
-            int_exit(6);
+            int_exit(7);
         }
     }
 
@@ -726,7 +729,7 @@ int main(int argc, char **argv)
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot join threads.");
             thread_finished++;
-            int_exit(7);
+            int_exit(8);
         }
     }
 
