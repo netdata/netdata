@@ -106,8 +106,6 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         );
         health_alarm_log(host, ae);
     }
-    //info("Adding CHART for alarm %s - %s", st->id, rc->name);
-    //aclk_queue_query("_chart", host->hostname, "chart", st->id, 2, 0, 0);
 }
 
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
