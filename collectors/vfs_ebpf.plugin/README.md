@@ -1,161 +1,160 @@
 # ebpf_process.plugin
 
-This plugin uses eBPF to monitor some system calls inside the kernel, for while, the main goal of this plugin is to monitor
-IO and process management on the host where it is running.
+This plugin uses eBPF to monitor system calls inside your operating system's kernel. For now, the main goal of this
+plugin is to monitor IO and process management on the host where it is running. 
 
-This plugin has different configuration modes that can be adjusted with its file called `ebpf_process.conf`. It always starts
-using the less expensive mode (`entry`) that is useful to have a general vision about what the software are doing on the
-computer, but you can change according your necessity (`/etc/netdata/edit-config ebpf_process.conf`).
+This plugin has different configuration modes, all of which can be adjusted with its configuration file at
+`ebpf_process.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
+plugin works using `entry` by reading this configuration file.
 
-## Linux configuration
+You can always edit this file with `edit-config`:
 
-This collector only works on Linux, but there is already a work to bring eBPF for FreeBSD. 
-
-To run the collector on Linux distribution the kernel must be at least the version `4.11.0` and the kernel needs to compiled
-with the option `CONFIG_KPROBES=y`.
-
-Another requirement to run this plugin is to have the `tracefs` and `debugfs` mounted on your system.
-
-### Compiling Kernel
-
-The first step before to run the collector is to enable `kprobes` on Linux, you can verify whether your kernel has this option
-enabled running the following command:
-
+```bash
+cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config ebpf_process.conf
 ```
+
+## Enable the plugin on Linux
+
+Currently, `ebpf_process` only works on Linux systems. 
+
+To enable this plugin and its collector, your operating system's kernel must be more recent than `4.11.0`, and it must
+be compiled with the option `CONFIG_KPROBES=y`. You can verify whether your kernel has this option enabled by running
+the following commands:
+
+```bash
+# grep CONFIG_KPROBES=y /boot/config-$(uname -r)
 # zgrep CONFIG_KPROBES=y /proc/config.gz
-CONFIG_KPROBES=y
 ```
 
-case you have an output different of the previous, it will be necessary to recompile your kernel and enable it. The next 
-instructions to compile the kernel assumes that you already have a `.config` file inside your kernel source, case this is
-not your case, you will need to do more steps to compile your kernel.
+If `Kprobes` is enabled, you will see `CONFIG_KPROBES=y` as the command's output. If you don't see `CONFIG_KPROBES=y`
+for any of the commands above, you will have to recompile your kernel to enable it. See the next step, [Recompiling your
+kernel](#recompile-your-kernel), for details.
 
--   Move to the kernel source directory: 
-    -   ```# cd /usr/src/linux```
--   Open the menu to configure the kernel:
-    -   ```# make menuconfig ```
--   This step depends of your kernel version, we want to enable the option `Kprobes`, it can be present inside one of 
-the menu options:
-    -   `General setup`: For old kernels
-    -   `General architecture-dependent options`: More recent kernels
--   Use the `Save` option to store the changes inside `.config`.
--   Exit the menu with the option `Exit`.
--   Compile your kernel running
-    -   ```# make bzImage```
--   Copy your kernel to the directory configured inside your boot loader, for example, case you are using elilo the destination
-could be:
-    -    ```# cp arch/x86_64/boot/bzImage /boot/efi/EFI/Linux/`    
--   Case you are using efi this would be sufficient, but for others boot loaders it will be necessary to execute other steps
-before to reboot your computer.    
+You also need to have both the `tracefs` and `debugfs` filesystems mounted on your system.
+
+### Recompile your kernel
+
+The process of recompiling Linux kernels varies based on your distribution and version. Read the documentation for your
+system's distribution to learn more about the specific workflow for 
+
+-   [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
+-   [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
+-   [Fedora](https://fedoraproject.org/wiki/Building_a_custom_kernel)
+-   [CentOS](https://wiki.centos.org/HowTos/Custom_Kernel)
+-   [Arch Linux](https://wiki.archlinux.org/index.php/Kernel/Traditional_compilation)
+-   [Slackware](https://docs.slackware.com/howtos:slackware_admin:kernelbuilding)
 
 ### Mount `debugfs` and `tracefs`
 
-Case your distribution is not mouting the `tracefs` and `debugfs` filesystems, it will be necessary to mount them either 
-using command line
+Try mounting the `tracefs` and `debugfs` filesystems using the commands below:
 
-```
+```bash
 # mount -t debugfs nodev /sys/kernel/debug
 # mount -t tracefs nodev /sys/kernel/tracing
 ```
-
-or configuring your `/etc/fstab`. 
+​
+If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to 
+mount these filesystems.
 
 ## Charts
 
-The first version of `ebpf_process.plugin` gives a general vision about process running on computer. The charts related to
-this plugin are inside `eBPF` option on dashboard menu, this option is divided in three groups `file`, `vfs` and 
+The first version of `ebpf_process.plugin` gives a general vision about process running on computer. The charts related
+to this plugin are inside the **eBPF** option on dashboard menu and divided in three groups `file`, `vfs`, and
 `process`.
 
-All the collector charts demonstrate values per second, the total value is kept inside the collector and the eBPF program,
-but we only draw the difference between the previous moment and current time.
+All the collector charts show values per second. The collector retains the total value, but charts only show the
+difference between the previous and current metrics collections.
 
 ### File
 
-This group has two charts to demonstrate how the software are interacting with the Linux kernel to open and close file 
+This group has two charts to demonstrate how software interacts with the Linux kernel to open and close file 
 descriptors.
 
 #### File descriptor
 
-This chart contain two dimensions that demonstrates the number of calls to the functions `do_sys_open` and `__close_fd`. 
-These functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)` and
- `close(2)`.
+This chart contain two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
+functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)`, and
+`close(2)`. ​
 
 #### File error
 
-This charts demonstrate the number of times that there was an error to try to open or close a file descriptor on the
- Operate System,
+This charts demonstrate the number of times some software tried and failed to open or close a file descriptor.
  
 ### VFS
 
-Virtual Function is a layer above file systems, the functions present inside this API are not obligatory for all file systems,
-so it possible that the charts in this group won't demonstrate all actions happened on your computer.
+A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is an layer on top of regular
+filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
+group won't show _all_ the actions that occured on your system.
 
 #### Deleted objects
 
-This chart monitors calls for `vfs_unlink`, this function is responsible to remove an object from the file system. 
+This chart monitors calls for `vfs_unlink`. This function is responsible for removing object from the file system. 
 
 #### IO
 
-On this chart Netdata demonstrates the number of calls to the functions `vfs_read` and `vfs_write`.
+This chart shows the number of calls to the functions `vfs_read` and `vfs_write`.
 
-#### IO Bytes
+#### IO bytes
 
-This is another chart that monitor the functions `vfs_read` and `vfs_write`, but instead to show the number of calls, it 
- shows the total of bytes read and written with these functions.
+This chart also monitors `vfs_read` and `vfs_write`, but instead shows the total of bytes read and written with these
+functions.
  
-We demonstrate the number of bytes written as negative, because they are moving down to disk.
+Netdata displays the number of bytes written as negative, because they are moving down to disk. 
  
-#### IO Errors
+#### IO errors
 
-When there is an error to read or write information on a file system, Netdata counts these events and do not count the total
-of bytes given as argument to the functions. 
+Netdata counts and shows the number of instances where a running program experiences a read or write error.
 
 ### Process
 
-On this group of charts Netdata is monitoring the process/thread creation and process end, here we also monitor possible
-errors when some of these actions happened. 
+For this group, the eBPF collector monitors process/thread creation and process end, and then displays any errors in the
+following charts.
  
-#### Process Thread
+#### Process thread
 
-Internally the linux Kernel treats both process and thread as `tasks`. To create a thread the Linux give us different
-system calls (`fork(2)`, `vfork(2)` and `clone(2)`), but these system calls will call only one function given different
-arguments to it, the function `_do_fork`. To generate this chart Netdata monitors `_do_fork` to populate the dimension
-`process` and it also monitors `sys_clone` to identify the threads.
+Internally, the Linux kernel treats both process and threads as `tasks`. To create a thread, the kernel offers a few
+system calls: `fork(2)`, `vfork(2)` and `clone(2)`. Each of these system calls in turn use the function `_do_fork`. To
+generate this chart, Netdata monitors `_do_fork` to populate the `process` dimension, and monitors `sys_clone` to
+identify threads
 
 #### Exit
 
-The task end is basically split in two steps, the first is a called for the internal function `do_exit` that notifies the operate
-system that the task is finishing its work, the next step is the release of the information on the kernel side done with the
-internal function `release_task`. The difference between the two dimensions can indicate that the process is running zombie
-process.
+Ending a task is actually two steps. The first is a call to the internal function `do_exit`, which notifies the
+operating system that the task is finishing its work. The second step is the release of kernel information, which is
+done with the internal function `release_task`. The difference between the two dimensions can help you discover [zombie
+processes](https://en.wikipedia.org/wiki/Zombie_process).
 
 #### Task error
 
-The functions responsible to end tasks do not return values, so this chart only contains information about failures on process
-and thread creation.
+The functions responsible for ending tasks do not return values, so this chart contains information about failures on
+process and thread creation.
 
 ## Configuration
 
-The collector configuration file follows the same structure present in `netdata.conf`. It is divided in different sections
-with each one of them having the internal variables.
+The collector configuration file follows the same structure as `netdata.conf`. It is divided in different sections, with
+each one of them having the internal variables.
 
-### Global
+### `[global]`
 
 In this section we define variables applied to the whole collector and the other subsections.
 
 #### load
 
-The collector has three different eBPF programs, these programs monitor the same functions inside the kernel, but they bring 
-different kind of information. You need to take care with your selection, because some programs will add a big overhead
-on your operate system, on the other hand this overhead brings an important information when you debugging or developing 
-some software. This option accepts the following value:
+The collector has three different eBPF programs. These programs monitor the same functions inside the kernel, but they
+monitor, process, and display different kinds of information.
 
--   entry: This is the default mode. In this mode Netdata monitors only calls for the functions previous described. When
- this mode is selected Netdata does not show charts related to errors.
--   return: In this mode, Netdata also monitors the calls to function. The difference for the previos mode starts with
- the place that Netdata attaches the trace functions to the kernel functions, here we attach them to the function return, 
- this allow us to monitor the return of each function. This mode brings more additional charts for Netdata, but it also
- brings an overhead around 110 nanoseconds for each function call.
--   dev: The development mode is the most expensive mode of the collector. This happens because every error detected when
-a system call is called, the plugin will move messages from kernel side to user side and store the information inside
-`/var/log/netdata/developer.log`. Never uses this mode in production, this mode was created to development.
+By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
+system, but also offer important information if you are developing or debugging software. The `load` option accepts the
+following values: ​
+
+-   `entry`: This is the default mode. In this mode, Netdata monitors only calls for the functions described in the
+    sections above. When this mode is selected, Netdata does not show charts related to errors.
+-   `return`: In this mode, Netdata also monitors the calls to function. In the `entry` mode, Netdata only traces kernel
+    functions, but with `return`, Netdata also monitors the return of each function. This mode creates more charts, but
+    also creates an overhead of roughly 110 nanosections for each function call.
+-   `dev`: The development mode is the most expensive mode of the collector, and **should not be used in production**.
+    Whenever Netdata detects that a system call resulted in an error, it moves messages from the kernel side to the user
+    side, and stores the information inside `/var/log/netdata/developer.log`. `dev` is designed only for development and
+    debugging purposes.
+
