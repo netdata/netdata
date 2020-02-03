@@ -339,8 +339,7 @@ set(LIBNETDATA_FILES
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
 set(APPS_PLUGIN_FILES
-        collectors/apps.plugin/apps_plugin.c
-        aclk/agent_cloud_link.c aclk/agent_cloud_link.h aclk/mqtt.c aclk/mqtt.h)
+        collectors/apps.plugin/apps_plugin.c)
 
 set(CHECKS_PLUGIN_FILES
         collectors/checks.plugin/plugin_checks.c
@@ -609,7 +608,10 @@ set(CLAIM_PLUGIN_FILES
 set(ACLK_PLUGIN_FILES
         aclk/agent_cloud_link.c
         aclk/agent_cloud_link.h
-       )
+        aclk/agent_cloud_link.c
+        aclk/mqtt.c
+        aclk/mqtt.h
+        )
 
 set(EXPORTING_ENGINE_FILES
         exporting/exporting_engine.c
