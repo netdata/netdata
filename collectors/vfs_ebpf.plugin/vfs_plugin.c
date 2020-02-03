@@ -551,7 +551,7 @@ static int netdata_store_bpf(void *data, int size) {
         return 0;
 
     netdata_error_report_t *e = data;
-    fprintf(developer_log,"%s (%s): %u \n", e->comm, dimension_names[e->type], e->pid);
+    fprintf(developer_log,"%s %u: %s, %d\n", e->comm, e->pid, dimension_names[e->type], e->err);
     fflush(developer_log);
 
     return -2; //LIBBPF_PERF_EVENT_CONT;

@@ -69,6 +69,7 @@ typedef struct netdata_error_report {
     __u32 pid;
 
     int type;
+    int err;
 }netdata_error_report_t;
 
 # define NETDATA_EBPF_FAMILY "ebpf"
