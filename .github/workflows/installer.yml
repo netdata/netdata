@@ -18,9 +18,7 @@ jobs:
           - 'alpine:3.11'
           - 'alpine:3.10'
           - 'alpine:3.9'
-          - 'archlinux:20200106'
-          - 'archlinux:20191205'
-          - 'archlinux:20191105'
+          - 'archlinux:latest'
           - 'centos:8'
           - 'centos:7'
           - 'centos:6'
@@ -45,11 +43,7 @@ jobs:
           - distro: 'alpine:3.9'
             pre: 'apk add -U bash'
 
-          - distro: 'archlinux:20200106'
-            pre: 'pacman --noconfirm -Sy grep'
-          - distro: 'archlinux:20191205'
-            pre: 'pacman --noconfirm -Sy grep'
-          - distro: 'archlinux:20191105'
+          - distro: 'archlinux:latest'
             pre: 'pacman --noconfirm -Sy grep'
 
           - distro: 'debian:buster'
