@@ -45,7 +45,6 @@ include ap/Makefile.inc
 include apcupsd/Makefile.inc
 include example/Makefile.inc
 include libreswan/Makefile.inc
-include mysql/Makefile.inc
 include nginx/Makefile.inc
 include nut/Makefile.inc
 include opensips/Makefile.inc
