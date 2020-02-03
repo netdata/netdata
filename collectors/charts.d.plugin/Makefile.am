@@ -47,7 +47,6 @@ include example/Makefile.inc
 include libreswan/Makefile.inc
 include nut/Makefile.inc
 include opensips/Makefile.inc
-include phpfpm/Makefile.inc
 include postfix/Makefile.inc
 include sensors/Makefile.inc
 include squid/Makefile.inc
