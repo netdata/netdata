@@ -767,7 +767,7 @@ int aclk_init(ACLK_INIT_ACTION action)
     aclk_recv_maximum = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link receive maximum", 20);
 
     aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", "localhost");
-    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", 1883);
+    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", 9002);
 
     info("Maximum parallel outgoing messages %d", aclk_send_maximum);
     info("Maximum parallel incoming messages %d", aclk_recv_maximum);
