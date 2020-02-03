@@ -103,10 +103,10 @@ void load_claiming_state(void)
                 claimed_id = callocz(1, statbuf.st_size + 1);
                 size_t bytes_read = fread(claimed_id, 1, statbuf.st_size, f);
                 claimed_id[bytes_read] = 0;
-                info("File '%s' was found. Setting state to AGENT_CLAIMED", filename);
+                info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
                 fclose(f);
             } else
-                info("File '%s' was found. Setting state to AGENT_CLAIMED", filename);
+                error("File '%s' cannot be read. Setting state to AGENT_UNCLAIMED.", filename);
         } else
             info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
     }
