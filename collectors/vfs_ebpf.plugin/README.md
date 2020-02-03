@@ -111,3 +111,18 @@ When there is an error to read or write information on a file system, Netdata co
 of bytes given as argument to the functions. 
 
 ### Process
+
+On this group of charts Netdata is monitoring the process/thread creation and process end, here we also monitor possible
+errors when some of these actions happened. 
+ 
+#### Process Thread
+
+Internally the linux Kernel treats both process and thread as `tasks`. To create a thread the Linux give us different
+system calls (`fork(2)`, `vfork(2)` and `clone(2)`), but these system calls will call only one function given different
+arguments to it, the function `_do_fork`. To generate this chart Netdata monitors `_do_fork` to populate the dimension
+`process` and it also monitors `sys_clone` to identify the threads.
+
+#### Exit
+
+
+## Configuration
