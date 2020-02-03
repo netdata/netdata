@@ -44,7 +44,6 @@ dist_chartsconfig_DATA = \
 include ap/Makefile.inc
 include apcupsd/Makefile.inc
 include example/Makefile.inc
-include hddtemp/Makefile.inc
 include libreswan/Makefile.inc
 include load_average/Makefile.inc
 include mem_apps/Makefile.inc
