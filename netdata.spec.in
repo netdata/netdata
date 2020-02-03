@@ -99,7 +99,7 @@ URL:		http://my-netdata.io
 BuildRequires: gcc
 BuildRequires: gcc-c++
 BuildRequires: make
-BuildRequires: git
+BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
@@ -116,12 +116,10 @@ BuildRequires: openssl-devel
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
-BuildRequires: netcat-openbsd
 BuildRequires: json-glib-devel
 %else
 BuildRequires: Judy-devel
 BuildRequires: lz4-devel
-BuildRequires: nc
 BuildRequires: json-c-devel
 %endif
 
@@ -283,6 +281,11 @@ install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 # ###########################################################
 # Install slabinfo.plugin
 install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/slabinfo.plugin"
+
+# ###########################################################
+# Install cache and log directories
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/cache/%{name}"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/log/%{name}"
 
 # ###########################################################
 # Install registry directory
@@ -514,6 +517,9 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Thu Jan 01 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-12
+- Add explicit installation of log and cache directories
+- Clean up build dependencies.
 * Thu Dec 19 2019 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-11
 - Fix remaining ownership and permissions issues.
 * Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
