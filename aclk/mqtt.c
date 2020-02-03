@@ -280,7 +280,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
         // we will connect when WebSocket connection is up
         // based on callback
         if(!lws_wss_client_initialized) {
-            lws_engine_instance = aclk_lws_wss_client_init(&aclk_lws_engine_callbacks);
+            lws_engine_instance = aclk_lws_wss_client_init(&aclk_lws_engine_callbacks, aclk_hostname, aclk_port);
             aclk_lws_wss_service_loop(lws_engine_instance);
             lws_wss_client_initialized = 1;
         }
