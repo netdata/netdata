@@ -1447,7 +1447,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
                 stream_version = 1;
             }
 
-            if (unlikely(rrdhost_set_system_info_variable(system_info, name, value)) && stream_version != 1) {
+            if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
                 info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
                      w->client_ip, w->client_port, key, value);
             }

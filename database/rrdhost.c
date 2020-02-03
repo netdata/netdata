@@ -1312,7 +1312,9 @@ restart_after_removal:
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
 
-    if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
+    if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
+        return res;
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
         freez(system_info->container_os_name);
         system_info->container_os_name = strdupz(value);
     }
