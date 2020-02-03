@@ -62,4 +62,52 @@ or configuring your `/etc/fstab`.
 
 ## Charts
 
-The first version of `ebpf_process.plugin` gives a general vision about process running on computer, it brings 
+The first version of `ebpf_process.plugin` gives a general vision about process running on computer. The charts related to
+this plugin are inside `eBPF` option on dashboard menu, this option is divided in three groups `file`, `vfs` and 
+`process`.
+
+All the collector charts demonstrate values per second, the total value is kept inside the collector and the eBPF program,
+but we only draw the difference between the previous moment and current time.
+
+### File
+
+This group has two charts to demonstrate how the software are interacting with the Linux kernel to open and close file 
+descriptors.
+
+#### File descriptor
+
+This chart contain two dimensions that demonstrates the number of calls to the functions `do_sys_open` and `__close_fd`. 
+These functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)` and
+ `close(2)`.
+
+#### File error
+
+This charts demonstrate the number of times that there was an error to try to open or close a file descriptor on the
+ Operate System,
+ 
+### VFS
+
+Virtual Function is a layer above file systems, the functions present inside this API are not obligatory for all file systems,
+so it possible that the charts in this group won't demonstrate all actions happened on your computer.
+
+#### Deleted objects
+
+This chart monitors calls for `vfs_unlink`, this function is responsible to remove an object from the file system. 
+
+#### IO
+
+On this chart Netdata demonstrates the number of calls to the functions `vfs_read` and `vfs_write`.
+
+#### IO Bytes
+
+This is another chart that monitor the functions `vfs_read` and `vfs_write`, but instead to show the number of calls, it 
+ shows the total of bytes read and written with these functions.
+ 
+We demonstrate the number of bytes written as negative, because they are moving down to disk.
+ 
+#### IO Errors
+
+When there is an error to read or write information on a file system, Netdata counts these events and do not count the total
+of bytes given as argument to the functions. 
+
+### Process

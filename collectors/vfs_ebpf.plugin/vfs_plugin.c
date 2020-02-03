@@ -38,7 +38,16 @@ void netdata_cleanup_and_exit(int ret) {
 //Netdata eBPF library
 void *libnetdata = NULL;
 int (*load_bpf_file)(char *, int) = NULL;
+int (*set_bpf_perf_event)(int, int);
+int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
+int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
+void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
 int *map_fd = NULL;
+
+//Perf event variables
+static int pmu_fd[NETDATA_MAX_PROCESSOR];
+static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
+int page_cnt = 8;
 
 //Libbpf (It is necessary to have at least kernel 4.10)
 int (*bpf_map_lookup_elem)(int, const void *, void *);
@@ -57,10 +66,12 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
-static int kretprobe = 0;
+static int kretprobe = 2;
 struct config collector_config;
 
 pthread_mutex_t lock;
+
+static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "unlink", "read", "write", "exit", "release_task", "process", "thread" };
 
 int event_pid = 0;
 netdata_ebpf_events_t collector_events[] = {
@@ -222,7 +233,7 @@ static void netdata_create_io_chart(char *family, char *name, char *msg, char *a
 
 static void netdata_global_charts_create() {
     netdata_create_chart(NETDATA_EBPF_FAMILY
-            ,NETDATA_FILE_OPEN_CLOSE_COUNT
+            , NETDATA_FILE_OPEN_CLOSE_COUNT
             , "Count the total of calls made to the operate system per period to open a file descriptor."
             , "Number of calls"
             , NETDATA_FILE_GROUP
@@ -231,12 +242,24 @@ static void netdata_global_charts_create() {
             , publish_aggregated
             , 2);
 
+    if(kretprobe < 2) {
+        netdata_create_chart(NETDATA_EBPF_FAMILY
+                , NETDATA_FILE_OPEN_ERR_COUNT
+                , "Count the total of errors per period when it tries to open a file descriptor."
+                , "Number of calls"
+                , NETDATA_FILE_GROUP
+                , 971
+                , netdata_create_global_dimension
+                , publish_aggregated
+                , 2);
+    }
+
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_CLEAN_COUNT
             , "Count the total of calls made to the operate system per period to delete a file from the operate system."
             , "Number of calls"
-            , NETDATA_FILE_GROUP
-            , 971
+            , NETDATA_VFS_GROUP
+            , 972
             , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_DEL_START]
             , 1);
@@ -245,8 +268,8 @@ static void netdata_global_charts_create() {
             , NETDATA_VFS_FILE_IO_COUNT
             , "Count the total of calls made to the operate system per period to write inside a file descriptor."
             , "Number of calls"
-            , NETDATA_FILE_GROUP
-            , 972
+            , NETDATA_VFS_GROUP
+            , 973
             , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_IN_START_BYTE]
             , 2);
@@ -255,19 +278,19 @@ static void netdata_global_charts_create() {
             , NETDATA_VFS_IO_FILE_BYTES
             , "Total of bytes read or written with success per period."
             , "bytes/s"
-            , NETDATA_FILE_GROUP
+            , NETDATA_VFS_GROUP
             , 974);
 
-    if(kretprobe) {
+    if(kretprobe < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_FILE_ERR_COUNT
                 , "Count the total of errors"
                 , "Number of calls"
-                , NETDATA_FILE_GROUP
+                , NETDATA_VFS_GROUP
                 , 975
                 , netdata_create_global_dimension
-                , publish_aggregated
-                , NETDATA_FILE_ERRORS);
+                , &publish_aggregated[2]
+                , NETDATA_VFS_ERRORS);
 
     }
 
@@ -291,13 +314,13 @@ static void netdata_global_charts_create() {
             , &publish_aggregated[NETDATA_EXIT_START]
             , 2);
 
-    if(kretprobe) {
+    if(kretprobe < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
                 , "Count the number of errors related to process"
                 , "Number of calls"
                 , NETDATA_PROCESS_GROUP
-                , 979
+                , 978
                 , netdata_create_global_dimension
                 , &publish_aggregated[NETDATA_EXIT_START]
                 , NETDATA_PROCESS_ERRORS);
@@ -407,8 +430,9 @@ static void netdata_publish_data() {
     write_global_count_chart(NETDATA_VFS_FILE_IO_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 2);
     write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], 2);
     write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
-    if(kretprobe) {
-        write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, NETDATA_FILE_ERRORS);
+    if(kretprobe < 2) {
+        write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
+        write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
         write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], NETDATA_PROCESS_ERRORS);
     }
 
@@ -451,8 +475,8 @@ static void move_from_kernel2user_global() {
     aggregated_data[0].call = res[0]; //open
     aggregated_data[1].call = res[14]; //close
     aggregated_data[2].call = res[8]; //unlink
-    aggregated_data[3].call = res[2]; //write
-    aggregated_data[4].call = res[5]; //read
+    aggregated_data[3].call = res[5]; //read
+    aggregated_data[4].call = res[2]; //write
     aggregated_data[5].call = res[10]; //exit
     aggregated_data[6].call = res[11]; //release
     aggregated_data[7].call = res[12]; //fork
@@ -461,8 +485,8 @@ static void move_from_kernel2user_global() {
     aggregated_data[0].ecall = res[1]; //open
     aggregated_data[1].ecall = res[15]; //close
     aggregated_data[2].ecall = res[9]; //unlink
-    aggregated_data[3].ecall = res[3]; //write
-    aggregated_data[4].ecall = res[6]; //read
+    aggregated_data[3].ecall = res[6]; //read
+    aggregated_data[4].ecall = res[3]; //write
     aggregated_data[7].ecall = res[13]; //fork
     aggregated_data[8].ecall = res[17]; //thread
 
@@ -494,10 +518,9 @@ void *process_collector(void *ptr)
     return NULL;
 }
 
+
 void set_global_labels() {
     int i;
-
-    static char *file_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "unlink", "write", "read", "exit", "release_task", "process", "thread" };
 
     netdata_syscall_stat_t *is = aggregated_data;
     netdata_syscall_stat_t *prev = NULL;
@@ -510,7 +533,7 @@ void set_global_labels() {
         }
         prev = &is[i];
 
-        pio[i].dimension = file_names[i];
+        pio[i].dimension = dimension_names[i];
         if(publish_prev) {
             publish_prev->next = &pio[i];
         }
@@ -540,9 +563,31 @@ static void build_complete_path(char *out, size_t length,char *path, char *filen
     }
 }
 
+/*
+static int map_memory() {
+int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+
+if ( nprocs >NETDATA_MAX_PROCESSOR ) {
+    nprocs =NETDATA_MAX_PROCESSOR;
+}
+
+int i;
+for ( i = 0 ; i < nprocs ; i++ )
+{
+    pmu_fd[i] = set_bpf_perf_event(i, 2);
+
+    if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0)
+    {
+        return -1;
+    }
+}
+    return 0;
+}
+*/
+
 static int ebpf_load_libraries()
 {
-    char *error = NULL;
+    char *err = NULL;
     char lpath[4096];
 
     build_complete_path(lpath, 4096, plugin_dir, "libnetdata_ebpf.so");
@@ -552,37 +597,74 @@ static int ebpf_load_libraries()
         return -1;
     } else {
         load_bpf_file = dlsym(libnetdata, "load_bpf_file");
-        if ((error = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", error);
+        if ((err = dlerror()) != NULL) {
+            error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
             return -1;
         }
 
         map_fd =  dlsym(libnetdata, "map_fd");
-        if ((error = dlerror()) != NULL) {
-            fputs(error, stderr);
+        if ((err = dlerror()) != NULL) {
+            error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
             return -1;
         }
 
         bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
-        if ((error = dlerror()) != NULL) {
-            fputs(error, stderr);
+        if ((err = dlerror()) != NULL) {
+            error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
             return -1;
+        }
+
+        if(kretprobe == 1) {
+            /*
+            set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
+                return -1;
+            }
+
+            perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
+                return -1;
+            }
+
+            perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
+                return -1;
+            }
+
+            netdata_perf_loop_multi = dlsym(libnetdata, "netdata_perf_loop_multi");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find : %s", err);
+                return -1;
+            }
+            */
         }
     }
 
     return 0;
 }
 
+char *select_file() {
+    if(!kretprobe)
+        return "rnetdata_ebpf_process.o";
+    if(kretprobe == 1)
+        return "dnetdata_ebpf_process.o";
+
+    return "pnetdata_ebpf_process.o";
+}
+
 int process_load_ebpf()
 {
     char lpath[4096];
 
-    char *name = (!kretprobe)?"pnetdata_ebpf_process.o":"rnetdata_ebpf_process.o";
+    char *name = select_file();
 
     build_complete_path(lpath, 4096, plugin_dir,  name);
     event_pid = getpid();
     if (load_bpf_file(lpath, event_pid) ) {
-        error("[EBPF_PROCESS] Cannot load program: %s.", lpath);
+        error("[EBPF_PROCESS] Cannot load program: %s", lpath);
         return -1;
     } else {
         info("[EBPF PROCESS]: The eBPF program %s was loaded with success.", name);
@@ -608,10 +690,14 @@ void set_global_variables() {
     netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
     if(!netdata_configured_log_dir)
         netdata_configured_log_dir = LOG_DIR;
+
+    page_cnt *= sysconf(_SC_NPROCESSORS_ONLN);
 }
 
 static void what_to_load(char *ptr) {
-    if (!strcmp(ptr, "return"))
+    if (!strcasecmp(ptr, "return"))
+        kretprobe = 0;
+    else if (!strcasecmp(ptr, "dev"))
         kretprobe = 1;
 }
 
@@ -698,22 +784,32 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
+    if(kretprobe == 1) {
+        /*
+        if(map_memory()) {
+            thread_finished++;
+            error("[EBPF_PROCESS] Cannot map memory used with perf events.");
+            int_exit(6);
+        }
+         */
+    }
+
     set_global_labels();
 
     open_developer_log();
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
-        int_exit(6);
+        int_exit(7);
     }
 
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_t thread[NETDATA_VFS_THREAD];
+    pthread_t thread[NETDATA_EBPF_PROCESS_THREADS];
 
     int i;
-    int end = NETDATA_VFS_THREAD;
+    int end = NETDATA_EBPF_PROCESS_THREADS;
 
     void * (*function_pointer[])(void *) = {process_publisher, process_collector };
 
@@ -721,7 +817,7 @@ int main(int argc, char **argv)
         if ( ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot create threads.");
             thread_finished++;
-            int_exit(7);
+            int_exit(8);
         }
     }
 
@@ -729,7 +825,7 @@ int main(int argc, char **argv)
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot join threads.");
             thread_finished++;
-            int_exit(8);
+            int_exit(9);
         }
     }
 

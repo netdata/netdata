@@ -18,7 +18,7 @@
 
 # define NETDATA_GLOBAL_VECTOR 18
 # define NETDATA_MAX_MONITOR_VECTOR 9
-# define NETDATA_FILE_ERRORS 5
+# define NETDATA_VFS_ERRORS 3
 # define NETDATA_PROCESS_ERRORS 4
 
 # define NETDATA_DEL_START 2
@@ -27,7 +27,7 @@
 # define NETDATA_PROCESS_START 7
 # define NETDATA_PROCESS_RUNNING_COUNT 9
 
-# define NETDATA_VFS_THREAD (uint32_t)2
+# define NETDATA_EBPF_PROCESS_THREADS (uint32_t)2
 
 # include <fcntl.h>
 # include <ctype.h>
@@ -64,12 +64,24 @@ typedef struct netdata_publish_vfs_common {
     long read;
 }netdata_publish_vfs_common_t;
 
+typedef struct netdata_error_report {
+    __u32 pid;
+
+    int type;
+    int error;
+    int fd;
+
+    char name[24];
+}netdata_error_report_t;
+
 # define NETDATA_EBPF_FAMILY "ebpf"
-# define NETDATA_FILE_GROUP "file"
-# define NETDATA_PROCESS_GROUP "process"
+# define NETDATA_FILE_GROUP "File"
+# define NETDATA_VFS_GROUP "VFS"
+# define NETDATA_PROCESS_GROUP "Process"
 
 # define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
-# define NETDATA_VFS_FILE_CLEAN_COUNT "delete_files"
+# define NETDATA_FILE_OPEN_ERR_COUNT "file_error"
+# define NETDATA_VFS_FILE_CLEAN_COUNT "deleted_objects"
 # define NETDATA_VFS_FILE_IO_COUNT "io"
 # define NETDATA_VFS_FILE_ERR_COUNT "io_error"
 
@@ -78,7 +90,7 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_PROCESS_ERROR_NAME "task_error"
 # define NETDATA_PROCESS_RUNNING "running"
 
-# define NETDATA_VFS_IO_FILE_BYTES "file_IO_Bytes"
+# define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
 # define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
 
