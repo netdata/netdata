@@ -414,7 +414,7 @@ all_enabled_charts() {
 		MODULE_NAME="${chart}"
 
 		if [ -n "${obsolete_charts["$MODULE_NAME"]}" ]; then
-		  debug "is obsolete by ${obsolete_charts["$MODULE_NAME"]}, skipping it"
+		  debug "is obsolete by ${obsolete_charts["$MODULE_NAME"]}, skipping it."
 		  continue
 		fi
 
