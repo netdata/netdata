@@ -43,7 +43,6 @@ dist_chartsconfig_DATA = \
 
 include ap/Makefile.inc
 include apcupsd/Makefile.inc
-include cpu_apps/Makefile.inc
 include cpufreq/Makefile.inc
 include example/Makefile.inc
 include exim/Makefile.inc
