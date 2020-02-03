@@ -8,8 +8,6 @@ struct aclk_lws_wss_perconnect_data {
     int todo;
 };
 
-struct lws_context *lws_context;
-
 //TODO config??
 int aclk_lws_wss_use_ssl = 1;
 
@@ -128,7 +126,6 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 	
 	inst->lws_context = lws_create_context(&info);
 	inst->callbacks = *callbacks;
-	lws_context = inst->lws_context;
 
 	aclk_lws_wss_read_ringbuffer = lws_ring_create(1, ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES, NULL);
 	if(!aclk_lws_wss_read_ringbuffer)
@@ -146,7 +143,7 @@ void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
 	struct lws_client_connect_info i;
 
 	memset(&i, 0, sizeof(i));
-	i.context = lws_context;
+	i.context = inst->lws_context;
 	i.port = inst->port;
 	i.address = inst->host;
 	i.path = "/mqtt";
