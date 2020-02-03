@@ -12,6 +12,10 @@ struct aclk_lws_wss_engine_callbacks {
 };
 
 struct aclk_lws_wss_engine_instance {
+	//target host/port for connection
+	const char *host;
+	int port;
+
 	//internal data
 	struct lws_context *lws_context;
 	struct lws *lws_wsi;
@@ -25,7 +29,7 @@ struct aclk_lws_wss_engine_instance {
 	int upstream_reconnect_request;
 };
 
-struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks);
+struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port);
 
 int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);
 int aclk_lws_wss_client_read (struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);

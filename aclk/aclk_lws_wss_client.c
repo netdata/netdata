@@ -106,16 +106,19 @@ static const struct lws_protocols protocols[] = {
  *
  * @return always NULL
  */
-struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks) {
+struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port) {
 	struct lws_context_creation_info info;
 	struct aclk_lws_wss_engine_instance *inst;
 
-	if(!callbacks)
+	if(!callbacks || !target_hostname)
 		return NULL;
 
 	inst = callocz(1, sizeof(struct aclk_lws_wss_engine_instance));
 	if(!inst)
 		return NULL;
+
+	inst->host = target_hostname;
+	inst->port = target_port;
 
 	memset(&info, 0, sizeof(struct lws_context_creation_info));
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
@@ -139,16 +142,15 @@ failure_cleanup:
 	return NULL;
 }
 
-void _aclk_wss_connect(){
+void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
 	struct lws_client_connect_info i;
 
-	//TODO make configurable
 	memset(&i, 0, sizeof(i));
 	i.context = lws_context;
-	i.port = 9002;
-	i.address = "127.0.0.1";
+	i.port = inst->port;
+	i.address = inst->host;
 	i.path = "/mqtt";
-	i.host = "127.0.0.1";
+	i.host = inst->host;
 	i.protocol = "mqtt";
 	if(aclk_lws_wss_use_ssl)
 //TODO!!!!!! REMOVE ME 
@@ -212,7 +214,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		//initial connection here
 		//later we will reconnect with delay od ACLK_LWS_WSS_RECONNECT_TIMEOUT
 		//in case this connection fails or drops
-		_aclk_wss_connect();
+		_aclk_wss_connect(inst);
 		break;
 	case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
 		//TODO if already active make some error noise
@@ -221,7 +223,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		break;
 	case LWS_CALLBACK_USER:
 		inst->reconnect_timeout_running = 0;
-		_aclk_wss_connect();
+		_aclk_wss_connect(inst);
 		break;
 	case LWS_CALLBACK_CLIENT_CLOSED:
 	case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
