@@ -124,5 +124,38 @@ arguments to it, the function `_do_fork`. To generate this chart Netdata monitor
 
 #### Exit
 
+The task end is basically split in two steps, the first is a called for the internal function `do_exit` that notifies the operate
+system that the task is finishing its work, the next step is the release of the information on the kernel side done with the
+internal function `release_task`. The difference between the two dimensions can indicate that the process is running zombie
+process.
+
+#### Task error
+
+The functions responsible to end tasks do not return values, so this chart only contains information about failures on process
+and thread creation.
 
 ## Configuration
+
+The collector configuration file follows the same structure present in `netdata.conf`. It is divided in different sections
+with each one of them having the internal variables.
+
+### Global
+
+In this section we define variables applied to the whole collector and the other subsections.
+
+#### load
+
+The collector has three different eBPF programs, these programs monitor the same functions inside the kernel, but they bring 
+different kind of information. You need to take care with your selection, because some programs will add a big overhead
+on your operate system, on the other hand this overhead brings an important information when you debugging or developing 
+some software. This option accepts the following value:
+
+-   entry: This is the default mode. In this mode Netdata monitors only calls for the functions previous described. When
+ this mode is selected Netdata does not show charts related to errors.
+-   return: In this mode, Netdata also monitors the calls to function. The difference for the previos mode starts with
+ the place that Netdata attaches the trace functions to the kernel functions, here we attach them to the function return, 
+ this allow us to monitor the return of each function. This mode brings more additional charts for Netdata, but it also
+ brings an overhead around 110 nanoseconds for each function call.
+-   dev: The development mode is the most expensive mode of the collector. This happens because every error detected when
+a system call is called, the plugin will move messages from kernel side to user side and store the information inside
+`/var/log/netdata/developer.log`. Never uses this mode in production, this mode was created to development.

@@ -66,7 +66,7 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
-static int kretprobe = 2;
+static int mode = 2;
 struct config collector_config;
 
 pthread_mutex_t lock;
@@ -138,7 +138,7 @@ static void int_exit(int sig)
         publish_aggregated = NULL;
     }
 
-    if(kretprobe == 1) {
+    if(mode == 1) {
         unmap_memory();
     }
 
@@ -268,7 +268,7 @@ static void netdata_global_charts_create() {
             , publish_aggregated
             , 2);
 
-    if(kretprobe < 2) {
+    if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_FILE_OPEN_ERR_COUNT
                 , "Count the total of errors per period when it tries to open a file descriptor."
@@ -307,7 +307,7 @@ static void netdata_global_charts_create() {
             , NETDATA_VFS_GROUP
             , 974);
 
-    if(kretprobe < 2) {
+    if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_FILE_ERR_COUNT
                 , "Count the total of errors"
@@ -340,7 +340,7 @@ static void netdata_global_charts_create() {
             , &publish_aggregated[NETDATA_EXIT_START]
             , 2);
 
-    if(kretprobe < 2) {
+    if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
                 , "Count the number of errors related to process"
@@ -348,8 +348,8 @@ static void netdata_global_charts_create() {
                 , NETDATA_PROCESS_GROUP
                 , 978
                 , netdata_create_global_dimension
-                , &publish_aggregated[NETDATA_EXIT_START]
-                , NETDATA_PROCESS_ERRORS);
+                , &publish_aggregated[NETDATA_PROCESS_START]
+                , 2);
     }
 }
 
@@ -456,10 +456,10 @@ static void netdata_publish_data() {
     write_global_count_chart(NETDATA_VFS_FILE_IO_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 2);
     write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], 2);
     write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
-    if(kretprobe < 2) {
+    if(mode < 2) {
         write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
         write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
-        write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], NETDATA_PROCESS_ERRORS);
+        write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
     }
 
     write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
@@ -561,7 +561,7 @@ void *process_log(void *ptr)
 {
     (void) ptr;
 
-    if (kretprobe == 1) {
+    if (mode == 1) {
         int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
 
         netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
@@ -661,7 +661,7 @@ static int ebpf_load_libraries()
             return -1;
         }
 
-        if(kretprobe == 1) {
+        if(mode == 1) {
             set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
             if ((err = dlerror()) != NULL) {
                 error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
@@ -692,9 +692,9 @@ static int ebpf_load_libraries()
 }
 
 char *select_file() {
-    if(!kretprobe)
+    if(!mode)
         return "rnetdata_ebpf_process.o";
-    if(kretprobe == 1)
+    if(mode == 1)
         return "dnetdata_ebpf_process.o";
 
     return "pnetdata_ebpf_process.o";
@@ -741,9 +741,9 @@ void set_global_variables() {
 
 static void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
-        kretprobe = 0;
+        mode = 0;
     else if (!strcasecmp(ptr, "dev"))
-        kretprobe = 1;
+        mode = 1;
 }
 
 static void set_global_values() {
@@ -829,7 +829,7 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
-    if(kretprobe == 1) {
+    if(mode == 1) {
         if(map_memory()) {
             thread_finished++;
             error("[EBPF_PROCESS] Cannot map memory used with perf events.");
