@@ -42,7 +42,6 @@ dist_chartsconfig_DATA = \
     $(NULL)
 
 include ap/Makefile.inc
-include apache/Makefile.inc
 include apcupsd/Makefile.inc
 include cpu_apps/Makefile.inc
 include cpufreq/Makefile.inc
