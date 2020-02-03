@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <stdbool.h>
 #include "common.h"
 
 int netdata_zero_metrics_enabled;
