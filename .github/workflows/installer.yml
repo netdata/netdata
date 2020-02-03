@@ -34,7 +34,9 @@ jobs:
           - 'opensuse/tumbleweed:latest'
           - 'ubuntu:20.04'
           - 'ubuntu:19.10'
+          - 'ubuntu:19.04'
           - 'ubuntu:18.04'
+          - 'ubuntu:16.04'
         include:
           - distro: 'alpine:3.11'
             pre: 'apk add -U bash'
@@ -57,7 +59,11 @@ jobs:
             pre: 'apt-get update'
           - distro: 'ubuntu:19.10'
             pre: 'apt-get update'
+          - distro: 'ubuntu:19.04'
+            pre: 'apt-get update'
           - distro: 'ubuntu:18.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:16.04'
             pre: 'apt-get update'
     runs-on: ubuntu-latest
     steps:
