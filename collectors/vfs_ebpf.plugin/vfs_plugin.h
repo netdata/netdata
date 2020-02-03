@@ -27,7 +27,7 @@
 # define NETDATA_PROCESS_START 7
 # define NETDATA_PROCESS_RUNNING_COUNT 9
 
-# define NETDATA_EBPF_PROCESS_THREADS (uint32_t)2
+# define NETDATA_EBPF_PROCESS_THREADS (uint32_t)3
 
 # include <fcntl.h>
 # include <ctype.h>
@@ -65,13 +65,10 @@ typedef struct netdata_publish_vfs_common {
 }netdata_publish_vfs_common_t;
 
 typedef struct netdata_error_report {
+    char comm[16];
     __u32 pid;
 
     int type;
-    int error;
-    int fd;
-
-    char name[24];
 }netdata_error_report_t;
 
 # define NETDATA_EBPF_FAMILY "ebpf"
