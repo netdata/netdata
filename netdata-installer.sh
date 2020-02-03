@@ -827,15 +827,15 @@ govercomp() {
   read -ra ver1 <<<"$ver1"
   read -ra ver2 <<<"$ver2"
 
-  if [[ ${#ver1[@]} -eq 0 ]] || [[ ${#ver2[@]} -eq 0 ]]; then
+  if [ ${#ver1[@]} -eq 0 ] || [ ${#ver2[@]} -eq 0 ]; then
     return 3
   fi
 
   local i
   for ((i = 0; i < ${#ver1[@]}; i++)); do
-    if [[ ${ver1[i]} > ${ver2[i]} ]]; then
+    if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
       return 1
-    elif [[ ${ver1[i]} < ${ver2[i]} ]]; then
+    elif [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
       return 2
     fi
   done
@@ -844,7 +844,7 @@ govercomp() {
 }
 
 should_install_go() {
-  if [[ -n "${NETDATA_DISABLE_GO+x}" ]]; then
+  if [ -n "${NETDATA_DISABLE_GO+x}" ]; then
     return 1
   fi
 
