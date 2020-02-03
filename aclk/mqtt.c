@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <libnetdata/json/json.h>
-#include "../daemon/common.h"
+//#include "../daemon/common.h"
 #include "mqtt.h"
 
 void (*_on_connect)(void *ptr) = NULL;

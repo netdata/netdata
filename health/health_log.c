@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
-#include "../aclk/agent_cloud_link.h"
 
 // ----------------------------------------------------------------------------
 // health alarm log load/save
