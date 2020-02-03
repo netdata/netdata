@@ -47,4 +47,3 @@ include example/Makefile.inc
 include libreswan/Makefile.inc
 include nut/Makefile.inc
 include opensips/Makefile.inc
-include tomcat/Makefile.inc
