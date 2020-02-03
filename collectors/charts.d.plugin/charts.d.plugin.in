@@ -402,7 +402,6 @@ declare -A obsolete_charts=(
 	['nginx']="python.d.plugin module"
 	['phpfpm']="python.d.plugin module"
 	['postfix']="python.d.plugin module"
-	['sensors']="python.d.plugin module"
 	['squid']="python.d.plugin module"
 	['tomcat']="python.d.plugin module"
 )
