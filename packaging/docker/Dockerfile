@@ -89,7 +89,10 @@ RUN \
         /var/lib/netdata \
         /var/log/netdata && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
-    chmod 4755 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
+    chmod 4755 \
+        /usr/libexec/netdata/plugins.d/cgroup-network \
+        /usr/libexec/netdata/plugins.d/apps.plugin \
+        /usr/libexec/netdata/plugins.d/freeipmi.plugin && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
