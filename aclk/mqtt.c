@@ -256,10 +256,21 @@ int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
     return rc;
 }
 
+static inline void _link_mosquitto_write()
+{
+    if(!mqtt_over_websockets)
+        return;
+
+    mosquitto_loop_misc(mosq);
+    if(likely( mosquitto_want_write(mosq) ))
+        mosquitto_loop_write(mosq, 1);
+}
+
 void aclk_lws_connect_notif_callback(){
     //the connection is done by LWS so this parameters dont matter
     //ig MQTT over LWS is used
     _link_mqtt_connect("doesntmatter", 12345);
+    _link_mosquitto_write();
 }
 
 void aclk_lws_data_received_callback(){
@@ -302,30 +313,9 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
 static inline int _link_event_loop_wss()
 {
-    int rc = MOSQ_ERR_SUCCESS;
-    if(lws_engine_instance->websocket_connection_up) { //this is where we send connect to mosquitto
-        //mosquitto_loop is not working with our patch
-        //which allows custom send/recv functions
-        //but it doesn't matter anyway as we need
-        // mosquitto_loop_write and mosquitto_loop_read anyway
-        // to integrate with lws event loop
-        //rc = mosquitto_loop(mosq, timeout, 1);
-
-        mosquitto_loop_misc(mosq);
-        if(mosquitto_want_write(mosq))
-            rc = mosquitto_loop_write(mosq, 1);
-
-        if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
-            errno = 0;
-            error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
-            //TODO TODO !!!!!!
-            // TBD: Using delay
-            sleep_usec(USEC_PER_SEC * 10);
-        }
-    }
-
+    _link_mosquitto_write();
     aclk_lws_wss_service_loop(lws_engine_instance);
-    return rc;
+    return MOSQ_ERR_SUCCESS;
 }
 
 static inline int _link_event_loop_plain_mqtt(int timeout)
@@ -391,6 +381,8 @@ int _link_subscribe(char  *topic, int qos)
         return 1;
     }
 
+    _link_mosquitto_write();
+
     return 0;
 }
 
@@ -422,6 +414,8 @@ int _link_send_message(char *topic, char *message)
     if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
         error("MQTT message failed : %s", mosquitto_strerror(rc));
     }
+
+    _link_mosquitto_write();
 
     return rc;
 }
