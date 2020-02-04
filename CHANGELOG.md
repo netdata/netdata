@@ -6,12 +6,15 @@
 
 **Merged pull requests:**
 
+- Fixes static builds and nightlies [\#7971](https://github.com/netdata/netdata/pull/7971) ([prologic](https://github.com/prologic))
 - Indicate FreeIPMI supported in Docker image [\#7964](https://github.com/netdata/netdata/pull/7964) ([lassebm](https://github.com/lassebm))
 - Fix cmake build error [\#7960](https://github.com/netdata/netdata/pull/7960) ([mfundul](https://github.com/mfundul))
 - /pythond.d/UrlService.py: add body [\#7956](https://github.com/netdata/netdata/pull/7956) ([ilyam8](https://github.com/ilyam8))
 - netdata-updater.sh: explicitly return 0 from update [\#7955](https://github.com/netdata/netdata/pull/7955) ([ilyam8](https://github.com/ilyam8))
 - update httpcheck.conf [\#7952](https://github.com/netdata/netdata/pull/7952) ([yasharne](https://github.com/yasharne))
 - Fix wrong code fragments in signing in [\#7950](https://github.com/netdata/netdata/pull/7950) ([cakrit](https://github.com/cakrit))
+- Adds a GHA workflow to test install-required-packages [\#7949](https://github.com/netdata/netdata/pull/7949) ([prologic](https://github.com/prologic))
+- install go.d.plugin only if there is new version [\#7946](https://github.com/netdata/netdata/pull/7946) ([ilyam8](https://github.com/ilyam8))
 - Fixes a typo in ./packaging/installer/functions.sh with wrong message for updater cron script [\#7934](https://github.com/netdata/netdata/pull/7934) ([prologic](https://github.com/prologic))
 - Fixes a bug in DO\_NOT\_TRACK expression [\#7929](https://github.com/netdata/netdata/pull/7929) ([prologic](https://github.com/prologic))
 - Assorted cleanup items in the RPM spec file. [\#7927](https://github.com/netdata/netdata/pull/7927) ([Ferroin](https://github.com/Ferroin))
@@ -155,8 +158,6 @@
 - Remove documentation about kickstart-static64.sh and netdata updater [\#7262](https://github.com/netdata/netdata/pull/7262) ([knatsakis](https://github.com/knatsakis))
 - Upgraded swagger docs from Dolphin tool. [\#7257](https://github.com/netdata/netdata/pull/7257) ([amoss](https://github.com/amoss))
 - web\_log: treat 401 Unauthorized requests as successful [\#7256](https://github.com/netdata/netdata/pull/7256) ([amichelic](https://github.com/amichelic))
-- Makefile.am files indentation [\#7252](https://github.com/netdata/netdata/pull/7252) ([knatsakis](https://github.com/knatsakis))
-- Update SYN cookie alarm to be less aggressive. [\#7250](https://github.com/netdata/netdata/pull/7250) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
