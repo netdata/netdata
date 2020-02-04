@@ -130,10 +130,11 @@ update() {
   if [ ${RUN_INSTALLER} -eq 1 ]; then
     # signal netdata to start saving its database
     # this is handy if your database is big
-    pids=$(pidof netdata)
+    possible_pids=$(pidof netdata)
     do_not_start=
-    if [ -n "${pids}" ]; then
-      kill -USR1 "${pids}"
+    if [ -n "${possible_pids}" ]; then
+      read -r -a pids_to_kill <<< "${possible_pids}"
+      kill -USR1 "${pids_to_kill[@]}"
     else
       # netdata is currently not running, so do not start it after updating
       do_not_start="--dont-start-it"
