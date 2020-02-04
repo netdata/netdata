@@ -158,6 +158,7 @@ update() {
     rm netdata-latest.tar.gz >&3 2>&3
     cd netdata-* || exit 1
     RUN_INSTALLER=1
+    cd "${NETDATA_LOCAL_TARBAL_OVERRIDE}" || exit 1
   fi
 
   # We got the sources, run the update now
