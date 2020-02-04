@@ -1,0 +1,71 @@
+---
+name: Builder
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        distro:
+          - 'alpine:3.11'
+          - 'alpine:3.10'
+          - 'alpine:3.9'
+          - 'archlinux:latest'
+            #- 'centos:8'
+          - 'centos:7'
+          - 'centos:6'
+          - 'debian:bullseye'
+          - 'debian:buster'
+          - 'debian:stretch'
+          - 'fedora:31'
+          - 'fedora:30'
+          - 'fedora:29'
+            #- 'opensuse/leap:15.2'
+            #- 'opensuse/leap:15.1'
+            #- 'opensuse/leap:15.0'
+            #- 'opensuse/tumbleweed:latest'
+          - 'ubuntu:20.04'
+          - 'ubuntu:19.10'
+          - 'ubuntu:19.04'
+          - 'ubuntu:18.04'
+          - 'ubuntu:16.04'
+        include:
+          - distro: 'alpine:3.11'
+            pre: 'apk add -U bash'
+          - distro: 'alpine:3.10'
+            pre: 'apk add -U bash'
+          - distro: 'alpine:3.9'
+            pre: 'apk add -U bash'
+
+          - distro: 'archlinux:latest'
+            pre: 'pacman --noconfirm -Sy grep'
+
+          - distro: 'debian:bullseye'
+            pre: 'apt-get update'
+          - distro: 'debian:buster'
+            pre: 'apt-get update'
+          - distro: 'debian:stretch'
+            pre: 'apt-get update'
+
+          - distro: 'ubuntu:20.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:19.10'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:19.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:18.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:16.04'
+            pre: 'apt-get update'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Build on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
+        run: |
+          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && ${PRE}; ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive all && ./netdata-installer.sh -u --dont-wait --dont-start-it --disable-go'
