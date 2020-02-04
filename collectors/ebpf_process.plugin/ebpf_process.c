@@ -291,13 +291,13 @@ static void netdata_global_charts_create() {
             , &publish_aggregated[NETDATA_IN_START_BYTE]
             , 2);
 
-    netdata_create_io_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_VFS_IO_FILE_BYTES
-            , "bytes/s"
-            , NETDATA_VFS_GROUP
-            , 974);
-
     if(mode < 2) {
+        netdata_create_io_chart(NETDATA_EBPF_FAMILY
+                , NETDATA_VFS_IO_FILE_BYTES
+                , "bytes/s"
+                , NETDATA_VFS_GROUP
+                , 974);
+
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_FILE_ERR_COUNT
                 , "Number of calls"
@@ -446,9 +446,9 @@ static void netdata_publish_data() {
         write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
         write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
         write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
-    }
 
-    write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
+        write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
+    }
 }
 
 void *process_publisher(void *ptr)
