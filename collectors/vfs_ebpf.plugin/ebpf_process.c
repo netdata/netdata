@@ -3,7 +3,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#include "vfs_plugin.h"
+#include "ebpf_process.h"
 
 // callback required by eval()
 int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
