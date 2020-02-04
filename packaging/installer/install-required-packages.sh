@@ -163,37 +163,43 @@ release2lsb_release() {
 }
 
 get_os_release() {
-  # Loads the /etc/os-release file
+  # Loads the /etc/os-release or /usr/lib/os-release file(s)
   # Only the required fields are loaded
   #
-  # If it manages to load /etc/os-release, it returns 0
+  # If it manages to load a valid os-release, it returns 0
   # otherwise it returns 1
   #
   # It searches the ID_LIKE field for a compatible distribution
 
-  local x
-  if [ -f "/etc/os-release" ]; then
-    echo >&2 "Loading /etc/os-release ..."
-
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" /etc/os-release)"
-    for x in "${ID}" ${ID_LIKE}; do
-      case "${x,,}" in
-        alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
-          distribution="${x}"
-          version="${VERSION_ID}"
-          codename="${VERSION}"
-          detection="/etc/os-release"
-          break
-          ;;
-        *)
-          echo >&2 "Unknown distribution ID: ${x}"
-          ;;
-      esac
-    done
-    [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
+  os_release_file=
+  if [ -s "/etc/os-release" ]; then
+    os_release_file="/etc/os-release"
+  elif [ -s "/usr/lib/os-release" ]; then
+    os_release_file="/usr/lib/os-release"
   else
-    echo >&2 "Cannot find /etc/os-release" && return 1
+    echo >&2 "Cannot find an os-release file ..."
+    return 1
   fi
+
+  local x
+  echo >&2 "Loading ${os_release_file} ..."
+
+  eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
+  for x in "${ID}" ${ID_LIKE}; do
+    case "${x,,}" in
+      alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
+        distribution="${x}"
+        version="${VERSION_ID}"
+        codename="${VERSION}"
+        detection="${os_release_file}"
+        break
+        ;;
+      *)
+        echo >&2 "Unknown distribution ID: ${x}"
+        ;;
+    esac
+  done
+  [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
 
   [ -z "${distribution}" ] && return 1
   return 0
@@ -266,6 +272,13 @@ user_picks_distribution() {
   echo >&2
   echo >&2 "I NEED YOUR HELP"
   echo >&2 "It seems I cannot detect your system automatically."
+
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    echo >&2 " > Bailing out..."
+    exit 1
+  fi
+
   if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ]; then
     echo >&2 "And it seems I cannot find a known package manager in this system."
     echo >&2 "Please open a github issue to help us support your system too."
@@ -961,6 +974,10 @@ declare -A pkg_zip=(
   ['default']="zip"
 )
 
+validate_package_trees() {
+  validate_tree_${tree}
+}
+
 validate_installed_package() {
   validate_${package_installer} "${p}"
 }
@@ -1202,6 +1219,61 @@ install_apt_get() {
 
 # -----------------------------------------------------------------------------
 # centos / rhel
+
+prompt() {
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode, assuming yes (y)"
+    echo >&2 " > Would have promptedfor ${1} ..."
+    return 0
+  fi
+
+  while true; do
+    read -r -p "${1} [y/n] " yn
+    case $yn in
+      [Yy]*) return 0 ;;
+      [Nn]*) return 1 ;;
+      *) echo >&2 "Please answer with yes (y) or no (n)." ;;
+    esac
+  done
+}
+
+validate_tree_centos() {
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  echo >&2 " > Checking for epel ..."
+  if ! rpm -qa | grep epel > /dev/null; then
+    if prompt "epel not found, shall I install it?"; then
+      run ${sudo} yum ${opts} install epel-release
+    fi
+  fi
+
+  if [ "$VERSION_ID" -eq 8 ]; then
+    echo >&2 " > Checking for config-manager ..."
+    if ! run yum ${sudo} config-manager; then
+      if prompt "config-manager not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
+      fi
+    fi
+
+    echo >&2 " > Checking for PowerTools ..."
+    if ! run yum ${sudo} repolist | grep PowerTools; then
+      if prompt "PowerTools not found, shall I install it?"; then
+        run ${sudo} yum ${opts} config-manager --set-enabled PowerTools
+      fi
+    fi
+
+    echo >&2 " > Checking for getpagespeed-extras ..."
+    if ! run yum ${sudo} repolist | grep 'getpagespeed-extras'; then
+      if prompt "PowerTools not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install https://extras.getpagespeed.com/release-el8-latest.rpm
+      fi
+    fi
+  fi
+}
 
 validate_install_yum() {
   echo >&2 " > Checking if package '${*}' is installed..."
@@ -1646,6 +1718,8 @@ if [ -z "${package_installer}" ] || [ -z "${tree}" ]; then
     detect_package_manager_from_distribution "${distribution}"
   fi
 
+  # Validate package manager trees
+  validate_package_trees
 fi
 
 pv=$(python --version 2>&1)
