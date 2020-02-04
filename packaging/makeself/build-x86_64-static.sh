@@ -2,7 +2,8 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-. $(dirname "$0")/../installer/functions.sh || exit 1
+# shellcheck source=./packaging/installer/functions.sh
+. "$(dirname "$0")"/../installer/functions.sh || exit 1
 
 set -e
 
@@ -22,17 +23,17 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # inside the container and runs the script install-alpine-packages.sh
   # (also inside the container)
   #
-  run docker run -v $(pwd):/usr/src/netdata.git:rw alpine:3.7 \
+  run docker run -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.7 \
     /bin/sh /usr/src/netdata.git/packaging/makeself/install-alpine-packages.sh
 
   # save the changes made permanently
   id=$(docker ps -l -q)
-  run docker commit ${id} "${DOCKER_CONTAINER_NAME}"
+  run docker commit "${id}" "${DOCKER_CONTAINER_NAME}"
 fi
 
 # Run the build script inside the container
 run docker run -a stdin -a stdout -a stderr -i -t -v \
-  $(pwd):/usr/src/netdata.git:rw \
+  "$(pwd)":/usr/src/netdata.git:rw \
   "${DOCKER_CONTAINER_NAME}" \
   /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 
