@@ -17,27 +17,26 @@ To make it easier to develop plugins, and minimize the number of threads and pro
 
 To control which plugins Netdata run, edit `netdata.conf` and check the `[plugins]` section. It looks like this:
 
-```
+```conf
 [plugins]
-	# enable running new plugins = yes
-	# check for new plugins every = 60
+	# PATH environment variable = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/var/lib/snapd/snap/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+	# PYTHONPATH environment variable = 
 	# proc = yes
 	# diskspace = yes
 	# cgroups = yes
-	# cups = yes
 	# tc = yes
-	# nfacct = yes
 	# idlejitter = yes
-	# freeipmi = yes
-	# node.d = yes
-	# python.d = yes
+	# enable running new plugins = yes
+	# check for new plugins every = 60
+	# slabinfo = no
 	# fping = yes
 	# ioping = yes
-	# charts.d = yes
+	# node.d = yes
+	# python.d = yes
+	# go.d = yes
 	# apps = yes
-	# xenstat = yes
-	# perf = no
-	# slabinfo = no
+	# perf = yes
+	# charts.d = yes
 ```
 
 The default for all plugins is the option `enable running new plugins`. So, setting this to `no` will disable all the plugins, except the ones specifically enabled.
