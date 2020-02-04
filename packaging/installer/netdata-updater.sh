@@ -164,10 +164,11 @@ update() {
   if [ ${RUN_INSTALLER} -eq 1 ]; then
     # signal netdata to start saving its database
     # this is handy if your database is big
-    pids=$(pidof netdata)
+    possible_pids=$(pidof netdata)
     do_not_start=
-    if [ -n "${pids}" ]; then
-      kill -USR1 "${pids}"
+    if [ -n "${possible_pids}" ]; then
+      read -r -a pids_to_kill <<< "${possible_pids}"
+      kill -USR1 "${pids_to_kill[@]}"
     else
       # netdata is currently not running, so do not start it after updating
       do_not_start="--dont-start-it"
@@ -240,7 +241,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
     echo >&2 "NOTE: did not remove: ${TMPDIR}"
   fi
   echo >&2 "Switching back to ${PREVDIR}"
-  cd "${PREVDIR}" || exit
+  cd "${PREVDIR}" || exit 1
 else
   # the installer updates this script - so we run and exit in a single line
   update && exit 0
