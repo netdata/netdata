@@ -162,7 +162,7 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 
 |make/make install|netdata-installer.sh|kickstart.sh|kickstart-static64.sh|Docker image|RPM packaging|DEB packaging|
 |:---------------:|:------------------:|:----------:|:-------------------:|:----------:|:-----------:|:-----------:|
-|Auto-detect|Auto-detect|Auto-detect|Auto-detect|No|YES|YES|
+|Auto-detect|Auto-detect|Auto-detect|Auto-detect|YES|YES|YES|
 
 -   **Flags/instructions to enable**: None
 -   **Flags to disable from source**: --disable-plugin-freeipmi
