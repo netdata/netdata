@@ -163,37 +163,43 @@ release2lsb_release() {
 }
 
 get_os_release() {
-  # Loads the /etc/os-release file
+  # Loads the /etc/os-release or /usr/lib/os-release file(s)
   # Only the required fields are loaded
   #
-  # If it manages to load /etc/os-release, it returns 0
+  # If it manages to load a valid os-release, it returns 0
   # otherwise it returns 1
   #
   # It searches the ID_LIKE field for a compatible distribution
 
-  local x
-  if [ -f "/etc/os-release" ]; then
-    echo >&2 "Loading /etc/os-release ..."
-
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" /etc/os-release)"
-    for x in "${ID}" ${ID_LIKE}; do
-      case "${x,,}" in
-        alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
-          distribution="${x}"
-          version="${VERSION_ID}"
-          codename="${VERSION}"
-          detection="/etc/os-release"
-          break
-          ;;
-        *)
-          echo >&2 "Unknown distribution ID: ${x}"
-          ;;
-      esac
-    done
-    [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
+  os_release_file=
+  if [ -s "/etc/os-release" ]; then
+    os_release_file="/etc/os-release"
+  elif [ -s "/usr/lib/os-release" ]; then
+    os_release_file="/usr/lib/os-release"
   else
-    echo >&2 "Cannot find /etc/os-release" && return 1
+    echo >&2 "Cannot find an os-release file ..."
+    return 1
   fi
+
+  local x
+  echo >&2 "Loading ${os_release_file} ..."
+
+  eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
+  for x in "${ID}" ${ID_LIKE}; do
+    case "${x,,}" in
+      alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
+        distribution="${x}"
+        version="${VERSION_ID}"
+        codename="${VERSION}"
+        detection="${os_release_file}"
+        break
+        ;;
+      *)
+        echo >&2 "Unknown distribution ID: ${x}"
+        ;;
+    esac
+  done
+  [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
 
   [ -z "${distribution}" ] && return 1
   return 0
@@ -266,6 +272,13 @@ user_picks_distribution() {
   echo >&2
   echo >&2 "I NEED YOUR HELP"
   echo >&2 "It seems I cannot detect your system automatically."
+
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    echo >&2 " > Bailing out..."
+    exit 1
+  fi
+
   if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ]; then
     echo >&2 "And it seems I cannot find a known package manager in this system."
     echo >&2 "Please open a github issue to help us support your system too."
@@ -498,12 +511,11 @@ require_cmd() {
 
   local wanted found
   for wanted in "${@}"; do
-    if command -v "${wanted}" 2> /dev/null; then
+    if command -v "${wanted}" > /dev/null 2>&1; then
       found="$(command -v "$wanted" 2> /dev/null)"
     fi
     [ -n "${found}" ] && [ -x "${found}" ] && return 0
   done
-
   return 1
 }
 
