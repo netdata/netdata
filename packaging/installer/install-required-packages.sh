@@ -32,19 +32,20 @@ PACKAGES_NETDATA_SENSORS=${PACKAGES_NETDATA_SENSORS-0}
 PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-0}
 
 # needed commands
-lsb_release=$(which lsb_release 2> /dev/null || command -v lsb_release 2> /dev/null)
+lsb_release=$(command -v lsb_release 2> /dev/null)
 
 # Check which package managers are available
-apk=$(which apk 2> /dev/null || command -v apk 2> /dev/null)
-apt_get=$(which apt-get 2> /dev/null || command -v apt-get 2> /dev/null)
-dnf=$(which dnf 2> /dev/null || command -v dnf 2> /dev/null)
-emerge=$(which emerge 2> /dev/null || command -v emerge 2> /dev/null)
-equo=$(which equo 2> /dev/null || command -v equo 2> /dev/null)
-pacman=$(which pacman 2> /dev/null || command -v pacman 2> /dev/null)
-yum=$(which yum 2> /dev/null || command -v yum 2> /dev/null)
-zypper=$(which zypper 2> /dev/null || command -v zypper 2> /dev/null)
+apk=$(command -v apk 2> /dev/null)
+apt_get=$(command -v apt-get 2> /dev/null)
+dnf=$(command -v dnf 2> /dev/null)
+emerge=$(command -v emerge 2> /dev/null)
+equo=$(command -v equo 2> /dev/null)
+pacman=$(command -v pacman 2> /dev/null)
+yum=$(command -v yum 2> /dev/null)
+zypper=$(command -v zypper 2> /dev/null)
 
 distribution=
+release=
 version=
 codename=
 package_installer=
@@ -137,10 +138,10 @@ release2lsb_release() {
   # If it succeeds, it returns 0
   # otherwise it returns 1
 
-  local file="${1}" x DISTRIB_ID= DISTRIB_RELEASE= DISTRIB_CODENAME= DISTRIB_DESCRIPTION=
+  local file="${1}" x DISTRIB_ID="" DISTRIB_RELEASE="" DISTRIB_CODENAME=""
   echo >&2 "Loading ${file} ..."
 
-  x="$(cat "${file}" | grep -v "^$" | head -n 1)"
+  x="$(grep -v "^$" "${file}" | head -n 1)"
 
   if [[ "${x}" =~ ^.*[[:space:]]+Linux[[:space:]]+release[[:space:]]+.*[[:space:]]+(.*)[[:space:]]*$ ]]; then
     eval "$(echo "${x}" | sed "s|^\(.*\)[[:space:]]\+Linux[[:space:]]\+release[[:space:]]\+\(.*\)[[:space:]]\+(\(.*\))[[:space:]]*$|DISTRIB_ID=\"\1\"\nDISTRIB_RELEASE=\"\2\"\nDISTRIB_CODENAME=\"\3\"|g" | grep "^DISTRIB")"
@@ -162,37 +163,43 @@ release2lsb_release() {
 }
 
 get_os_release() {
-  # Loads the /etc/os-release file
+  # Loads the /etc/os-release or /usr/lib/os-release file(s)
   # Only the required fields are loaded
   #
-  # If it manages to load /etc/os-release, it returns 0
+  # If it manages to load a valid os-release, it returns 0
   # otherwise it returns 1
   #
   # It searches the ID_LIKE field for a compatible distribution
 
-  local x
-  if [ -f "/etc/os-release" ]; then
-    echo >&2 "Loading /etc/os-release ..."
-
-    eval "$(cat /etc/os-release | grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=")"
-    for x in "${ID}" ${ID_LIKE}; do
-      case "${x,,}" in
-        alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
-          distribution="${x}"
-          version="${VERSION_ID}"
-          codename="${VERSION}"
-          detection="/etc/os-release"
-          break
-          ;;
-        *)
-          echo >&2 "Unknown distribution ID: ${x}"
-          ;;
-      esac
-    done
-    [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
+  os_release_file=
+  if [ -s "/etc/os-release" ]; then
+    os_release_file="/etc/os-release"
+  elif [ -s "/usr/lib/os-release" ]; then
+    os_release_file="/usr/lib/os-release"
   else
-    echo >&2 "Cannot find /etc/os-release" && return 1
+    echo >&2 "Cannot find an os-release file ..."
+    return 1
   fi
+
+  local x
+  echo >&2 "Loading ${os_release_file} ..."
+
+  eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
+  for x in "${ID}" ${ID_LIKE}; do
+    case "${x,,}" in
+      alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
+        distribution="${x}"
+        version="${VERSION_ID}"
+        codename="${VERSION}"
+        detection="${os_release_file}"
+        break
+        ;;
+      *)
+        echo >&2 "Unknown distribution ID: ${x}"
+        ;;
+    esac
+  done
+  [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
 
   [ -z "${distribution}" ] && return 1
   return 0
@@ -208,15 +215,15 @@ get_lsb_release() {
 
   if [ -f "/etc/lsb-release" ]; then
     echo >&2 "Loading /etc/lsb-release ..."
-    local DISTRIB_ID= ISTRIB_RELEASE= DISTRIB_CODENAME= DISTRIB_DESCRIPTION=
-    eval "$(cat /etc/lsb-release | grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=")"
+    local DISTRIB_ID="" DISTRIB_RELEASE="" DISTRIB_CODENAME=""
+    eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" /etc/lsb-release)"
     distribution="${DISTRIB_ID}"
     version="${DISTRIB_RELEASE}"
     codename="${DISTRIB_CODENAME}"
     detection="/etc/lsb-release"
   fi
 
-  if [ -z "${distribution}" -a ! -z "${lsb_release}" ]; then
+  if [ -z "${distribution}" ] && [ -n "${lsb_release}" ]; then
     echo >&2 "Cannot find distribution with /etc/lsb-release"
     echo >&2 "Running command: lsb_release ..."
     eval "declare -A release=( $(lsb_release -a 2> /dev/null | sed -e "s|^\(.*\):[[:space:]]*\(.*\)$|[\1]=\"\2\"|g") )"
@@ -265,7 +272,14 @@ user_picks_distribution() {
   echo >&2
   echo >&2 "I NEED YOUR HELP"
   echo >&2 "It seems I cannot detect your system automatically."
-  if [ -z "${equo}" -a -z "${emerge}" -a -z "${apt_get}" -a -z "${yum}" -a -z "${dnf}" -a -z "${pacman}" -a -z "${apk}" ]; then
+
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    echo >&2 " > Bailing out..."
+    exit 1
+  fi
+
+  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ]; then
     echo >&2 "And it seems I cannot find a known package manager in this system."
     echo >&2 "Please open a github issue to help us support your system too."
     exit 1
@@ -274,28 +288,30 @@ user_picks_distribution() {
   local opts=
   echo >&2 "I found though that the following installers are available:"
   echo >&2
-  [ ! -z "${apt_get}" ] && echo >&2 " - Debian/Ubuntu based (installer is: apt-get)" && opts="apt-get ${opts}"
-  [ ! -z "${yum}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: yum)" && opts="yum ${opts}"
-  [ ! -z "${dnf}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: dnf)" && opts="dnf ${opts}"
-  [ ! -z "${zypper}" ] && echo >&2 " - SuSe based (installer is: zypper)" && opts="zypper ${opts}"
-  [ ! -z "${pacman}" ] && echo >&2 " - Arch Linux based (installer is: pacman)" && opts="pacman ${opts}"
-  [ ! -z "${emerge}" ] && echo >&2 " - Gentoo based (installer is: emerge)" && opts="emerge ${opts}"
-  [ ! -z "${equo}" ] && echo >&2 " - Sabayon based (installer is: equo)" && opts="equo ${opts}"
-  [ ! -z "${apk}" ] && echo >&2 " - Alpine Linux based (installer is: apk)" && opts="apk ${opts}"
+  [ -n "${apt_get}" ] && echo >&2 " - Debian/Ubuntu based (installer is: apt-get)" && opts="apt-get ${opts}"
+  [ -n "${yum}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: yum)" && opts="yum ${opts}"
+  [ -n "${dnf}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: dnf)" && opts="dnf ${opts}"
+  [ -n "${zypper}" ] && echo >&2 " - SuSe based (installer is: zypper)" && opts="zypper ${opts}"
+  [ -n "${pacman}" ] && echo >&2 " - Arch Linux based (installer is: pacman)" && opts="pacman ${opts}"
+  [ -n "${emerge}" ] && echo >&2 " - Gentoo based (installer is: emerge)" && opts="emerge ${opts}"
+  [ -n "${equo}" ] && echo >&2 " - Sabayon based (installer is: equo)" && opts="equo ${opts}"
+  [ -n "${apk}" ] && echo >&2 " - Alpine Linux based (installer is: apk)" && opts="apk ${opts}"
   echo >&2
 
   REPLY=
   while [ -z "${REPLY}" ]; do
     echo "To proceed please write one of these:"
-    echo "${opts}" | sed -e 's/ /, /g'
-    read -p ">" REPLY
-    [ $? -ne 0 ] && REPLY= && continue
+    echo "${opts// /, }"
+    if ! read -r -p ">" REPLY; then
+      continue
+    fi
 
-    if [ "${REPLY}" = "yum" -a -z "${distribution}" ]; then
+    if [ "${REPLY}" = "yum" ] && [ -z "${distribution}" ]; then
       REPLY=
       while [ -z "${REPLY}" ]; do
-        read -p "yum in centos, rhel or fedora? > "
-        [ $? -ne 0 ] && continue
+        if ! read -r -p "yum in centos, rhel or fedora? > "; then
+          continue
+        fi
 
         case "${REPLY,,}" in
           fedora | rhel)
@@ -321,7 +337,7 @@ detect_package_manager_from_distribution() {
     arch* | manjaro*)
       package_installer="install_pacman"
       tree="arch"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${pacman}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${pacman}" ]; then
         echo >&2 "command 'pacman' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -330,7 +346,7 @@ detect_package_manager_from_distribution() {
     sabayon*)
       package_installer="install_equo"
       tree="sabayon"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${equo}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${equo}" ]; then
         echo >&2 "command 'equo' is required to install packages on a '${distribution} ${version}' system."
         # Maybe offer to fall back on emerge? Both installers exist in Sabayon...
         exit 1
@@ -340,7 +356,7 @@ detect_package_manager_from_distribution() {
     alpine*)
       package_installer="install_apk"
       tree="alpine"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${apk}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${apk}" ]; then
         echo >&2 "command 'apk' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -349,7 +365,7 @@ detect_package_manager_from_distribution() {
     gentoo*)
       package_installer="install_emerge"
       tree="gentoo"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${emerge}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${emerge}" ]; then
         echo >&2 "command 'emerge' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -358,7 +374,7 @@ detect_package_manager_from_distribution() {
     debian* | ubuntu*)
       package_installer="install_apt_get"
       tree="debian"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${apt_get}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${apt_get}" ]; then
         echo >&2 "command 'apt-get' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -369,7 +385,7 @@ detect_package_manager_from_distribution() {
       echo >&2 "Check: http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/"
       package_installer="install_yum"
       tree="centos"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${yum}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
         echo >&2 "command 'yum' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -378,9 +394,9 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ ! -z "${yum}" ] && package_installer="install_yum"
-      [ ! -z "${dnf}" ] && package_installer="install_dnf"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${package_installer}" ]; then
+      [ -n "${yum}" ] && package_installer="install_yum"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -389,7 +405,7 @@ detect_package_manager_from_distribution() {
     suse* | opensuse* | sles*)
       package_installer="install_zypper"
       tree="suse"
-      if [ ${IGNORE_INSTALLED} -eq 0 -a -z "${zypper}" ]; then
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${zypper}" ]; then
         echo >&2 "command 'zypper' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -410,7 +426,7 @@ check_package_manager() {
 
   case "${1}" in
     apt-get)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${apt_get}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${apt_get}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_apt_get"
       tree="debian"
       detection="user-input"
@@ -418,7 +434,7 @@ check_package_manager() {
       ;;
 
     dnf)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${dnf}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${dnf}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_dnf"
       tree="rhel"
       detection="user-input"
@@ -426,7 +442,7 @@ check_package_manager() {
       ;;
 
     apk)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${apk}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${apk}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_apk"
       tree="alpine"
       detection="user-input"
@@ -434,7 +450,7 @@ check_package_manager() {
       ;;
 
     equo)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${equo}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${equo}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_equo"
       tree="sabayon"
       detection="user-input"
@@ -442,7 +458,7 @@ check_package_manager() {
       ;;
 
     emerge)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${emerge}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${emerge}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_emerge"
       tree="gentoo"
       detection="user-input"
@@ -450,7 +466,7 @@ check_package_manager() {
       ;;
 
     pacman)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${pacman}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${pacman}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_pacman"
       tree="arch"
       detection="user-input"
@@ -459,7 +475,7 @@ check_package_manager() {
       ;;
 
     zypper)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${zypper}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${zypper}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_zypper"
       tree="suse"
       detection="user-input"
@@ -467,7 +483,7 @@ check_package_manager() {
       ;;
 
     yum)
-      [ ${IGNORE_INSTALLED} -eq 0 -a -z "${yum}" ] && echo >&2 "${1} is not available." && return 1
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_yum"
       if [ "${distribution}" = "centos" ]; then
         tree="centos"
@@ -491,13 +507,14 @@ require_cmd() {
   # If any of them is available, it returns 0
   # otherwise 1
 
-  [ ${IGNORE_INSTALLED} -eq 1 ] && return 1
+  [ "${IGNORE_INSTALLED}" -eq 1 ] && return 1
 
   local wanted found
   for wanted in "${@}"; do
-    found="$(which "${wanted}" 2> /dev/null)"
-    [ -z "${found}" ] && found="$(command -v "${wanted}" 2> /dev/null)"
-    [ ! -z "${found}" -a -x "${found}" ] && return 0
+    if command -v "${wanted}" 2> /dev/null; then
+      found="$(command -v "$wanted" 2> /dev/null)"
+    fi
+    [ -n "${found}" ] && [ -x "${found}" ] && return 0
   done
 
   return 1
@@ -957,14 +974,18 @@ declare -A pkg_zip=(
   ['default']="zip"
 )
 
+validate_package_trees() {
+  validate_tree_${tree}
+}
+
 validate_installed_package() {
   validate_${package_installer} "${p}"
 }
 
 suitable_package() {
-  local package="${1//-/_}" p= v="${version//.*/}"
+  local package="${1//-/_}" p="" v="${version//.*/}"
 
-  # echo >&2 "Searching for ${package}..."
+  echo >&2 "Searching for ${package} ..."
 
   eval "p=\${pkg_${package}['${distribution,,}-${version,,}']}"
   [ -z "${p}" ] && eval "p=\${pkg_${package}['${distribution,,}-${v,,}']}"
@@ -992,7 +1013,7 @@ suitable_package() {
     echo >&2
     return 1
   else
-    if [ ${IGNORE_INSTALLED} -eq 0 ]; then
+    if [ "${IGNORE_INSTALLED}" -eq 0 ]; then
       validate_installed_package "${p}"
     else
       echo "${p}"
@@ -1025,12 +1046,12 @@ packages() {
   # -------------------------------------------------------------------------
   # debugging tools for development
 
-  if [ ${PACKAGES_DEBUG} -ne 0 ]; then
+  if [ "${PACKAGES_DEBUG}" -ne 0 ]; then
     require_cmd traceroute || suitable_package traceroute
     require_cmd tcpdump || suitable_package tcpdump
     require_cmd screen || suitable_package screen
 
-    if [ ${PACKAGES_NETDATA} -ne 0 ]; then
+    if [ "${PACKAGES_NETDATA}" -ne 0 ]; then
       require_cmd gdb || suitable_package gdb
       require_cmd valgrind || suitable_package valgrind
     fi
@@ -1039,7 +1060,7 @@ packages() {
   # -------------------------------------------------------------------------
   # common command line tools
 
-  if [ ${PACKAGES_NETDATA} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA}" -ne 0 ]; then
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
@@ -1049,11 +1070,11 @@ packages() {
   # -------------------------------------------------------------------------
   # firehol/fireqos/update-ipsets command line tools
 
-  if [ ${PACKAGES_FIREQOS} -ne 0 ]; then
+  if [ "${PACKAGES_FIREQOS}" -ne 0 ]; then
     require_cmd ip || suitable_package iproute2
   fi
 
-  if [ ${PACKAGES_FIREHOL} -ne 0 ]; then
+  if [ "${PACKAGES_FIREHOL}" -ne 0 ]; then
     require_cmd iptables || suitable_package iptables
     require_cmd ipset || suitable_package ipset
     require_cmd ulogd ulogd2 || suitable_package ulogd
@@ -1061,7 +1082,7 @@ packages() {
     require_cmd bridge || suitable_package bridge-utils
   fi
 
-  if [ ${PACKAGES_UPDATE_IPSETS} -ne 0 ]; then
+  if [ "${PACKAGES_UPDATE_IPSETS}" -ne 0 ]; then
     require_cmd ipset || suitable_package ipset
     require_cmd zip || suitable_package zip
     require_cmd funzip || suitable_package unzip
@@ -1070,7 +1091,7 @@ packages() {
   # -------------------------------------------------------------------------
   # netdata libraries
 
-  if [ ${PACKAGES_NETDATA} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA}" -ne 0 ]; then
     suitable_package libz-dev
     suitable_package libuuid-dev
     suitable_package libmnl-dev
@@ -1079,13 +1100,13 @@ packages() {
   # -------------------------------------------------------------------------
   # sensors
 
-  if [ ${PACKAGES_NETDATA_SENSORS} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA_SENSORS}" -ne 0 ]; then
     require_cmd sensors || suitable_package lm_sensors
   fi
 
   # -------------------------------------------------------------------------
   # sensors
-  if [ ${PACKAGES_NETDATA_DATABASE} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA_DATABASE}" -ne 0 ]; then
     suitable_package libuv
     suitable_package lz4
     suitable_package openssl
@@ -1095,43 +1116,43 @@ packages() {
   # -------------------------------------------------------------------------
   # scripting interpreters for netdata plugins
 
-  if [ ${PACKAGES_NETDATA_NODEJS} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA_NODEJS}" -ne 0 ]; then
     require_cmd nodejs node js || suitable_package nodejs
   fi
 
   # -------------------------------------------------------------------------
   # python2
 
-  if [ ${PACKAGES_NETDATA_PYTHON} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA_PYTHON}" -ne 0 ]; then
     require_cmd python || suitable_package python
 
-    [ ${PACKAGES_NETDATA_PYTHON_MONGO} -ne 0 ] && suitable_package python-pymongo
+    [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python-pymongo
     # suitable_package python-requests
     # suitable_package python-pip
 
-    [ ${PACKAGES_NETDATA_PYTHON_MYSQL} -ne 0 ] && suitable_package python-mysqldb
-    [ ${PACKAGES_NETDATA_PYTHON_POSTGRES} -ne 0 ] && suitable_package python-psycopg2
+    [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python-mysqldb
+    [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python-psycopg2
   fi
 
   # -------------------------------------------------------------------------
   # python3
 
-  if [ ${PACKAGES_NETDATA_PYTHON3} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA_PYTHON3}" -ne 0 ]; then
     require_cmd python3 || suitable_package python3
 
     suitable_package python3-pymongo
-    [ ${PACKAGES_NETDATA_PYTHON_MONGO} -ne 0 ] && suitable_package python3-pymongo
+    [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python3-pymongo
     # suitable_package python3-requests
     # suitable_package python3-pip
 
-    [ ${PACKAGES_NETDATA_PYTHON_MYSQL} -ne 0 ] && suitable_package python3-mysqldb
-    [ ${PACKAGES_NETDATA_PYTHON_POSTGRES} -ne 0 ] && suitable_package python3-psycopg2
+    [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python3-mysqldb
+    [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python3-psycopg2
   fi
 
   # -------------------------------------------------------------------------
   # applications needed for the netdata demo sites
 
-  if [ ${PACKAGES_NETDATA_DEMO_SITE} -ne 0 ]; then
+  if [ "${PACKAGES_NETDATA_DEMO_SITE}" -ne 0 ]; then
     require_cmd sudo || suitable_package sudo
     require_cmd jq || suitable_package jq
     require_cmd nginx || suitable_package nginx
@@ -1180,22 +1201,79 @@ install_apt_get() {
   fi
 
   local opts=""
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://serverfault.com/questions/227190/how-do-i-ask-apt-get-to-skip-any-interactive-post-install-configuration-steps
     export DEBIAN_FRONTEND="noninteractive"
     opts="${opts} -yq"
   fi
 
+  read -r -a apt_opts <<< "$opts"
+
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} apt-get ${opts} install "${pkg}"
+    run ${sudo} apt-get "${apt_opts[@]}" install "${pkg}"
   done
 }
 
 # -----------------------------------------------------------------------------
 # centos / rhel
+
+prompt() {
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode, assuming yes (y)"
+    echo >&2 " > Would have promptedfor ${1} ..."
+    return 0
+  fi
+
+  while true; do
+    read -r -p "${1} [y/n] " yn
+    case $yn in
+      [Yy]*) return 0 ;;
+      [Nn]*) return 1 ;;
+      *) echo >&2 "Please answer with yes (y) or no (n)." ;;
+    esac
+  done
+}
+
+validate_tree_centos() {
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  echo >&2 " > Checking for epel ..."
+  if ! rpm -qa | grep epel > /dev/null; then
+    if prompt "epel not found, shall I install it?"; then
+      run ${sudo} yum ${opts} install epel-release
+    fi
+  fi
+
+  if [ "$VERSION_ID" -eq 8 ]; then
+    echo >&2 " > Checking for config-manager ..."
+    if ! run yum ${sudo} config-manager; then
+      if prompt "config-manager not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
+      fi
+    fi
+
+    echo >&2 " > Checking for PowerTools ..."
+    if ! run yum ${sudo} repolist | grep PowerTools; then
+      if prompt "PowerTools not found, shall I install it?"; then
+        run ${sudo} yum ${opts} config-manager --set-enabled PowerTools
+      fi
+    fi
+
+    echo >&2 " > Checking for getpagespeed-extras ..."
+    if ! run yum ${sudo} repolist | grep 'getpagespeed-extras'; then
+      if prompt "PowerTools not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install https://extras.getpagespeed.com/release-el8-latest.rpm
+      fi
+    fi
+  fi
+}
 
 validate_install_yum() {
   echo >&2 " > Checking if package '${*}' is installed..."
@@ -1212,14 +1290,16 @@ install_yum() {
   fi
 
   local opts=
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://unix.stackexchange.com/questions/87822/does-yum-have-an-equivalent-to-apt-aptitudes-debian-frontend-noninteractive
     opts="-y"
   fi
 
+  read -r -a yum_opts <<< "${opts}"
+
   # install the required packages
-  run ${sudo} yum ${opts} install "${@}" # --enablerepo=epel-testing
+  run ${sudo} yum "${yum_opts[@]}" install "${@}" # --enablerepo=epel-testing
 }
 
 # -----------------------------------------------------------------------------
@@ -1240,7 +1320,7 @@ install_dnf() {
   fi
 
   local opts=
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # man dnf
     opts="-y"
@@ -1251,7 +1331,8 @@ install_dnf() {
   # installing whatever is available
   # even if a package is not found
   opts="$opts --setopt=strict=0"
-  run ${sudo} dnf ${opts} install "${@}"
+  read -r -a dnf_opts <<< "$opts"
+  run ${sudo} dnf "${dnf_opts[@]}" install "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1274,15 +1355,17 @@ install_emerge() {
   fi
 
   local opts="--ask"
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     opts=""
   fi
 
+  read -r -a emerge_opts <<< "$opts"
+
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} emerge ${opts} -v --noreplace "${pkg}"
+    run ${sudo} emerge "${emerge_opts[@]}" -v --noreplace "${pkg}"
   done
 }
 
@@ -1303,14 +1386,16 @@ install_apk() {
   fi
 
   local opts="--force-broken-world"
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
   else
     opts="${opts} -i"
   fi
 
+  read -r -a apk_opts <<< "$opts"
+
   # install the required packages
-  run ${sudo} apk add ${opts} "${@}"
+  run ${sudo} apk add "${apk_opts[@]}" "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1331,15 +1416,17 @@ install_equo() {
   fi
 
   local opts="-av"
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     opts="-v"
   fi
 
+  read -r -a equo_opts <<< "$opts"
+
   # install the required packages
   for pkg in "${@}"; do
     [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} equo i ${opts} "${pkg}"
+    run ${sudo} equo i "${equo_opts[@]}" "${pkg}"
   done
 }
 
@@ -1351,8 +1438,9 @@ validate_install_pacman() {
 
   if [ ${PACMAN_DB_SYNCED} -eq 0 ]; then
     echo >&2 " > Running pacman -Sy to sync the database"
-    local x=$(pacman -Sy)
-    [ ! -n "${x}" ] && echo "${*}"
+    local x
+    x=$(pacman -Sy)
+    [ -z "${x}" ] && echo "${*}"
     PACMAN_DB_SYNCED=1
   fi
   echo >&2 " > Checking if package '${*}' is installed..."
@@ -1379,7 +1467,7 @@ validate_install_pacman() {
       ;;
   esac
 
-  [ ! -n "${x}" ] && echo "${*}"
+  [ -z "${x}" ] && echo "${*}"
 }
 
 install_pacman() {
@@ -1392,7 +1480,7 @@ install_pacman() {
   fi
 
   # install the required packages
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://unix.stackexchange.com/questions/52277/pacman-option-to-assume-yes-to-every-question/52278
     for pkg in "${@}"; do
@@ -1426,14 +1514,16 @@ install_zypper() {
   fi
 
   local opts="--ignore-unknown"
-  if [ ${NON_INTERACTIVE} -eq 1 ]; then
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://unix.stackexchange.com/questions/82016/how-to-use-zypper-in-bash-scripts-for-someone-coming-from-apt-get
     opts="${opts} --non-interactive"
   fi
 
+  read -r -a zypper_opts <<< "$opts"
+
   # install the required packages
-  run ${sudo} zypper ${opts} install "${@}"
+  run ${sudo} zypper "${zypper_opts[@]}" install "${@}"
 }
 
 install_failed() {
@@ -1462,14 +1552,14 @@ What to do now:
 
 
 EOF
-  remote_log "FAILED" ${ret}
+  remote_log "FAILED" "${ret}"
   exit 1
 }
 
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGE_NETDATA_DATABASE}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -1481,7 +1571,7 @@ fi
 DONT_WAIT=0
 NON_INTERACTIVE=0
 IGNORE_INSTALLED=0
-while [ ! -z "${1}" ]; do
+while [ -n "${1}" ]; do
   case "${1}" in
     distribution)
       distribution="${2}"
@@ -1617,7 +1707,7 @@ if ! command -v grep > /dev/null 2>&1; then
   exit 1
 fi
 
-if [ -z "${package_installer}" -o -z "${tree}" ]; then
+if [ -z "${package_installer}" ] || [ -z "${tree}" ]; then
   if [ -z "${distribution}" ]; then
     # we dont know the distribution
     autodetect_distribution || user_picks_distribution
@@ -1628,6 +1718,8 @@ if [ -z "${package_installer}" -o -z "${tree}" ]; then
     detect_package_manager_from_distribution "${distribution}"
   fi
 
+  # Validate package manager trees
+  validate_package_trees
 fi
 
 pv=$(python --version 2>&1)
@@ -1659,27 +1751,27 @@ Codename        : ${codename}
 Package Manager : ${package_installer}
 Packages Tree   : ${tree}
 Detection Method: ${detection}
-Default Python v: ${pv} $([ ${pv} -eq 2 -a ${PACKAGES_NETDATA_PYTHON3} -eq 1 ] && echo "(will install python3 too)")
+Default Python v: ${pv} $([ ${pv} -eq 2 ] && [ "${PACKAGES_NETDATA_PYTHON3}" -eq 1 ] && echo "(will install python3 too)")
 
 EOF
 
-PACKAGES_TO_INSTALL=($(packages | sort -u))
+mapfile -t PACKAGES_TO_INSTALL < <(packages | sort -u)
 
 if [ ${#PACKAGES_TO_INSTALL[@]} -gt 0 ]; then
   echo >&2
   echo >&2 "The following command will be run:"
   echo >&2
   DRYRUN=1
-  ${package_installer} "${PACKAGES_TO_INSTALL[@]}"
+  "${package_installer}" "${PACKAGES_TO_INSTALL[@]}"
   DRYRUN=0
   echo >&2
   echo >&2
 
-  if [ ${DONT_WAIT} -eq 0 -a ${NON_INTERACTIVE} -eq 0 ]; then
-    read -p "Press ENTER to run it > " || exit 1
+  if [ "${DONT_WAIT}" -eq 0 ] && [ "${NON_INTERACTIVE}" -eq 0 ]; then
+    read -r -p "Press ENTER to run it > " || exit 1
   fi
 
-  ${package_installer} "${PACKAGES_TO_INSTALL[@]}" || install_failed $?
+  "${package_installer}" "${PACKAGES_TO_INSTALL[@]}" || install_failed $?
 
   echo >&2
   echo >&2 "All Done! - Now proceed to the next step."
