@@ -24,7 +24,6 @@
 #define ACLK_QOS 1
 #define ACLK_PING_INTERVAL 60
 #define ACLK_LOOP_TIMEOUT 5        // seconds to wait for operations in the library loop
-#define ACLK_HEARTBEAT_INTERVAL 60 // Send heart beat interval (in seconds)
 
 #define ACLK_MAX_TOPIC  255
 
@@ -87,7 +86,6 @@ void aclk_shutdown();
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
-int aclk_heartbeat();
 void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents);
 int aclk_send_metadata();
 int aclk_wait_for_initialization();

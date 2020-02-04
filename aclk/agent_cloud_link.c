@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "../daemon/common.h"
+//#include "../daemon/common.h"
 #include "agent_cloud_link.h"
 
 // Read from the config file -- new section [agent_cloud_link]
@@ -18,6 +18,7 @@ int waiting_init = 1;
 int cmdpause = 0; // Used to pause query processing
 
 BUFFER *aclk_buffer = NULL;
+char *global_base_topic = NULL;
 
 int cloud_to_agent_parse(JSON_ENTRY *e)
 {
@@ -363,6 +364,19 @@ char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
     return topic;
 }
 
+char *get_topic(char *sub_topic, char *final_topic, int max_size)
+{
+    if (unlikely(!global_base_topic))
+        global_base_topic = GET_PUBLISH_BASE_TOPIC;
+
+    if (unlikely(!global_base_topic))
+        return sub_topic;
+
+    snprintfz(final_topic, max_size, "%s/%s", global_base_topic, sub_topic);
+
+    return final_topic;
+}
+
 // Wait for ACLK connection to be established
 int aclk_wait_for_initialization()
 {
@@ -645,7 +659,6 @@ int aclk_send_message(char *sub_topic, char *message)
 {
     int rc;
     static int skip_due_to_shutdown = 0;
-    static char *global_base_topic = NULL;
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
@@ -668,16 +681,7 @@ int aclk_send_message(char *sub_topic, char *message)
     if (unlikely(aclk_wait_for_initialization()))
         return 1;
 
-    if (unlikely(!global_base_topic))
-        global_base_topic = GET_PUBLISH_BASE_TOPIC;
-
-    //if (unlikely(!base_topic)) {
-    if (unlikely(!global_base_topic))
-        final_topic = sub_topic;
-    else {
-        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", global_base_topic, sub_topic);
-        final_topic = topic;
-    }
+    final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
 
     ACLK_LOCK;
     rc = _link_send_message(final_topic, message);
@@ -698,7 +702,7 @@ int aclk_send_message(char *sub_topic, char *message)
 int aclk_subscribe(char *sub_topic, int qos)
 {
     int rc;
-    static char *global_base_topic = NULL;
+    //static char *global_base_topic = NULL;
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
@@ -712,17 +716,8 @@ int aclk_subscribe(char *sub_topic, int qos)
     if (unlikely(aclk_wait_for_initialization()))
         return 1;
 
-    if (unlikely(!global_base_topic))
-        global_base_topic = GET_PUBLISH_BASE_TOPIC;
+    final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
 
-    if (unlikely(!global_base_topic))
-        final_topic = sub_topic;
-    else {
-        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", global_base_topic, sub_topic);
-        final_topic = topic;
-    }
-
-    //info("Sending message: (%s) - (%s)", final_topic, message);
     ACLK_LOCK;
     rc = _link_subscribe(final_topic, qos);
     ACLK_UNLOCK;
@@ -747,7 +742,6 @@ void aclk_disconnect(void *ptr)
     info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
-    return;
 }
 
 void aclk_shutdown()
@@ -786,28 +780,9 @@ int aclk_init(ACLK_INIT_ACTION action)
         error("Failed to initialize the agent cloud link library");
         return 1;
     }
+    global_base_topic = GET_PUBLISH_BASE_TOPIC;
     init = 1;
 
-    return 0;
-}
-
-int aclk_heartbeat()
-{
-    static time_t last_beat = 0;
-    time_t current_beat;
-
-    current_beat = now_realtime_sec();
-
-    // Skip the first time and initialize the time mark instead
-    if (unlikely(!last_beat)) {
-        last_beat = current_beat;
-        return 0;
-    }
-
-    if (unlikely(current_beat - last_beat >= ACLK_HEARTBEAT_INTERVAL)) {
-        last_beat = current_beat;
-        aclk_send_message("heartbeat", "ping");
-    }
     return 0;
 }
 
@@ -979,7 +954,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
 //rrd_stats_api_v1_chart
 // This is modeled after void charts2json(RRDHOST *host, BUFFER *wb) {
 
-int aclk_send_charts(RRDHOST *current_host, BUFFER *wb) {
+int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
     static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
@@ -989,37 +964,17 @@ int aclk_send_charts(RRDHOST *current_host, BUFFER *wb) {
     if(unlikely(!custom_dashboard_info_js_filename))
         custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
-    buffer_sprintf(wb, "{\n"
-                       "\t\"hostname\": \"%s\""
-                       ",\n\t\"version\": \"%s\""
-                       ",\n\t\"release_channel\": \"%s\""
-                       ",\n\t\"os\": \"%s\""
-                       ",\n\t\"timezone\": \"%s\""
-                       ",\n\t\"update_every\": %d"
-                       ",\n\t\"history\": %ld"
-                       ",\n\t\"memory_mode\": \"%s\""
-                       ",\n\t\"custom_info\": \"%s\""
-                       ",\n\t\"charts\": {"
-        , current_host->hostname
-        , current_host->program_version
-        , get_release_channel()
-        , current_host->os
-        , current_host->timezone
-        , current_host->rrd_update_every
-        , current_host->rrd_history_entries
-        , rrd_memory_mode_name(current_host->rrd_memory_mode)
-        , custom_dashboard_info_js_filename
-    );
+    charts2json_add_host_data(host, wb, custom_dashboard_info_js_filename);
 
     c = 0;
-    rrdhost_rdlock(current_host);
-    rrdset_foreach_read(st, current_host) {
+    rrdhost_rdlock(host);
+    rrdset_foreach_read(st, host) {
         if(rrdset_is_available_for_viewers(st)) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, st->id);
             buffer_strcat(wb, "\": ");
-            aclk_rrdset2json(st, wb, current_host->hostname, current_host == localhost ? 0 : 1);
+            aclk_rrdset2json(st, wb, host->hostname, host == localhost ? 0 : 1);
 
             c++;
             st->last_accessed_time = now;
@@ -1027,11 +982,11 @@ int aclk_send_charts(RRDHOST *current_host, BUFFER *wb) {
     }
 
     RRDCALC *rc;
-    for(rc = current_host->alarms; rc ; rc = rc->next) {
+    for(rc = host->alarms; rc ; rc = rc->next) {
         if(rc->rrdset)
             alarms++;
     }
-    rrdhost_unlock(current_host);
+    rrdhost_unlock(host);
 
     buffer_sprintf(wb
         , "\n\t}"
@@ -1054,7 +1009,7 @@ int aclk_send_charts(RRDHOST *current_host, BUFFER *wb) {
         size_t found = 0;
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, current_host, now)) {
+            if(!rrdhost_should_be_removed(h, host, now)) {
                 buffer_sprintf(wb
                     , "%s\n\t\t{"
                       "\n\t\t\t\"hostname\": \"%s\""
@@ -1074,7 +1029,7 @@ int aclk_send_charts(RRDHOST *current_host, BUFFER *wb) {
             , "\n\t\t{"
               "\n\t\t\t\"hostname\": \"%s\""
               "\n\t\t}"
-            , current_host->hostname
+            , host->hostname
         );
     }
 
@@ -1087,44 +1042,8 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
 {
     rrdset_rdlock(st);
 
-    //time_t first_entry_t = rrdset_first_entry_t(st);
-    //time_t last_entry_t = rrdset_last_entry_t(st);
-
-    buffer_sprintf(
-        wb,
-        "\t\t{\n"
-        //"\t\t\t\"hostname\": \"%s\",\n"
-        //"\t\t\t\"is_slave\": \"%d\",\n"
-        "\t\t\t\"id\": \"%s\",\n"
-        "\t\t\t\"name\": \"%s\",\n"
-        "\t\t\t\"type\": \"%s\",\n"
-        "\t\t\t\"family\": \"%s\",\n"
-        "\t\t\t\"context\": \"%s\",\n"
-        "\t\t\t\"title\": \"%s (%s)\",\n"
-        "\t\t\t\"priority\": %ld,\n"
-        "\t\t\t\"plugin\": \"%s\",\n"
-        "\t\t\t\"module\": \"%s\",\n"
-        "\t\t\t\"enabled\": %s,\n"
-        "\t\t\t\"units\": \"%s\",\n"
-        "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
-        "\t\t\t\"chart_type\": \"%s\",\n"
-        //"\t\t\t\"duration\": %ld,\n"
-        //"\t\t\t\"first_entry\": %ld,\n"
-        //"\t\t\t\"last_entry\": %ld,\n"
-        "\t\t\t\"update_every\": %d,\n"
-        "\t\t\t\"dimensions\": {\n",
-        //hostname, is_slave,
-        st->id, st->name, st->type, st->family, st->context, st->title, st->name, st->priority,
-        st->plugin_name ? st->plugin_name : "", st->module_name ? st->module_name : "",
-        rrdset_flag_check(st, RRDSET_FLAG_ENABLED) ? "true" : "false", st->units, st->name,
-        rrdset_type_name(st->chart_type),
-        //last_entry_t - first_entry_t + st->update_every //st->entries * st->update_every
-        //,
-        //first_entry_t //rrdset_first_entry_t(st)
-        //,
-        //last_entry_t //rrdset_last_entry_t(st)
-        //,
-        st->update_every);
+    // generate header with no volatile info
+    rrdset2json_header(st, wb, 0);
 
     size_t dimensions = 0;
     RRDDIM *rd;
