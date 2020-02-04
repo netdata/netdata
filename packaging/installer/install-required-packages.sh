@@ -1244,6 +1244,8 @@ validate_tree_centos() {
     opts="-y"
   fi
 
+  echo >&2 " > CentOS Version: ${version} ..."
+
   echo >&2 " > Checking for epel ..."
   if ! rpm -qa | grep epel > /dev/null; then
     if prompt "epel not found, shall I install it?"; then
@@ -1272,8 +1274,8 @@ validate_tree_centos() {
         run ${sudo} yum ${opts} install https://extras.getpagespeed.com/release-el8-latest.rpm
       fi
     fi
-  elif [[ "${version}" =~ /6\..*/ ]]; then
-    echo >&2 " > Detected CentOX 6.x ..."
+  elif [[ "${version}" =~ ^6\..*$ ]]; then
+    echo >&2 " > Detected CentOS 6.x ..."
     echo >&2 " > Checking for Okay ..."
     if ! rpm -qa | grep okay > /dev/null; then
       if prompt "okay not found, shall I install it?"; then
