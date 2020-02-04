@@ -727,11 +727,20 @@ void set_global_variables() {
     page_cnt *= sysconf(_SC_NPROCESSORS_ONLN);
 }
 
+static void set_type_to_probe() {
+    int i;
+    for (i = 0; collector_events[i].name ; i++ ) {
+        collector_events[i].type = 'p';
+    }
+}
+
 static void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
         mode = 0;
     else if (!strcasecmp(ptr, "dev"))
         mode = 1;
+    else
+        set_type_to_probe();
 }
 
 static void set_global_values() {
