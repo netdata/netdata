@@ -383,6 +383,18 @@ same range on all charts._
 
 ## What does it monitor
 
+Netdata can collect metrics from 200+ popular services and applications, on top of dozens of system-related metrics
+jocs, such as CPU, memory, disks, filesystems, networking, and more. We call these **collectors**, and they're managed
+by [**plugins**](collectors/plugins.d/), which support a variety of programming languages, including Go and Python.
+
+Popular collectors include **Nginx**, **Apache**, **MySQL**, **statsd**, **cgroups** (containers, Docker, Kubernetes,
+LXC, and more), **Traefik**, **web server `access.log` files**, and much more. 
+
+See the **full list of [supported collectors](collectors/COLLECTORS.md)**.
+
+Netdata's data collection is **extensible**, which means you can monitor anything you can get a metric for. You can even
+write your own collector 
+
 Netdata data collection is **extensible**. You can monitor anything you can get a metric for. Our [plugin
 API](collectors/plugins.d/) supports a variety of programming languages to make nearly anything a Netdata plugin: Go,
 Python, Node.js, Ruby, Java, Bash, Perl, and more!

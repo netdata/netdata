@@ -1,4 +1,6 @@
-# Data collection plugins
+# Data collection
+
+
 
 Netdata supports **internal** and **external** data collection plugins:
 
