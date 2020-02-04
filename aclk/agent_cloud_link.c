@@ -979,7 +979,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
 //rrd_stats_api_v1_chart
 // This is modeled after void charts2json(RRDHOST *host, BUFFER *wb) {
 
-int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
+int aclk_send_charts(RRDHOST *current_host, BUFFER *wb) {
     static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
@@ -1000,26 +1000,26 @@ int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
-        , host->hostname
-        , host->program_version
+        , current_host->hostname
+        , current_host->program_version
         , get_release_channel()
-        , host->os
-        , host->timezone
-        , host->rrd_update_every
-        , host->rrd_history_entries
-        , rrd_memory_mode_name(host->rrd_memory_mode)
+        , current_host->os
+        , current_host->timezone
+        , current_host->rrd_update_every
+        , current_host->rrd_history_entries
+        , rrd_memory_mode_name(current_host->rrd_memory_mode)
         , custom_dashboard_info_js_filename
     );
 
     c = 0;
-    rrdhost_rdlock(host);
-    rrdset_foreach_read(st, host) {
+    rrdhost_rdlock(current_host);
+    rrdset_foreach_read(st, current_host) {
         if(rrdset_is_available_for_viewers(st)) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, st->id);
             buffer_strcat(wb, "\": ");
-            aclk_rrdset2json(st, wb, host->hostname, host == localhost ? 0 : 1);
+            aclk_rrdset2json(st, wb, current_host->hostname, current_host == localhost ? 0 : 1);
 
             c++;
             st->last_accessed_time = now;
@@ -1027,11 +1027,11 @@ int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
     }
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    for(rc = current_host->alarms; rc ; rc = rc->next) {
         if(rc->rrdset)
             alarms++;
     }
-    rrdhost_unlock(host);
+    rrdhost_unlock(current_host);
 
     buffer_sprintf(wb
         , "\n\t}"
@@ -1054,7 +1054,7 @@ int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
         size_t found = 0;
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now)) {
+            if(!rrdhost_should_be_removed(h, current_host, now)) {
                 buffer_sprintf(wb
                     , "%s\n\t\t{"
                       "\n\t\t\t\"hostname\": \"%s\""
@@ -1074,7 +1074,7 @@ int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
             , "\n\t\t{"
               "\n\t\t\t\"hostname\": \"%s\""
               "\n\t\t}"
-            , host->hostname
+            , current_host->hostname
         );
     }
 
@@ -1087,8 +1087,8 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
 {
     rrdset_rdlock(st);
 
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t = rrdset_last_entry_t(st);
+    //time_t first_entry_t = rrdset_first_entry_t(st);
+    //time_t last_entry_t = rrdset_last_entry_t(st);
 
     buffer_sprintf(
         wb,
@@ -1126,16 +1126,12 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
         //,
         st->update_every);
 
-    unsigned long memory = st->memsize;
-
     size_t dimensions = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st)
     {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
             continue;
-
-        memory += rd->memsize;
 
         buffer_sprintf(
             wb,
@@ -1145,9 +1141,6 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
 
         dimensions++;
     }
-
-    //if(dimensions_count) *dimensions_count += dimensions;
-    //if(memory_used) *memory_used += memory;
 
     buffer_sprintf(wb, "\n\t\t\t},\n\t\t\t\"chart_variables\": ");
     health_api_v1_chart_custom_variables2json(st, wb);
