@@ -15,7 +15,7 @@ jobs:
           - 'alpine:3.10'
           - 'alpine:3.9'
           - 'archlinux:latest'
-          - 'centos:8'
+            #- 'centos:8'
           - 'centos:7'
           - 'centos:6'
           - 'debian:buster'
