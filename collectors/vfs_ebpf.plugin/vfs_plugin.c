@@ -197,15 +197,13 @@ static void int_exit(int sig)
 
 static inline void netdata_write_chart_cmd(char *family
                                     , char *name
-                                    , char *msg
                                     , char *axis
                                     , char *web
                                     , int order)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d 1 ''\n"
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
             , family
             , name
-            , msg
             , axis
             , web
             , order);
@@ -230,7 +228,6 @@ static void netdata_create_global_dimension(void *ptr, int end)
 }
 static inline void netdata_create_chart(char *family
                                 , char *name
-                                , char *msg
                                 , char *axis
                                 , char *web
                                 , int order
@@ -238,17 +235,15 @@ static inline void netdata_create_chart(char *family
                                 , void *move
                                 , int end)
 {
-
-    netdata_write_chart_cmd(family, name, msg, axis, web, order);
+    netdata_write_chart_cmd(family, name, axis, web, order);
 
     ncd(move, end);
 }
 
-static void netdata_create_io_chart(char *family, char *name, char *msg, char *axis, char *web, int order) {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d 1 ''\n"
+static void netdata_create_io_chart(char *family, char *name, char *axis, char *web, int order) {
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
             , family
             , name
-            , msg
             , axis
             , web
             , order);
@@ -260,7 +255,6 @@ static void netdata_create_io_chart(char *family, char *name, char *msg, char *a
 static void netdata_global_charts_create() {
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_FILE_OPEN_CLOSE_COUNT
-            , "Count the total of calls made to the operate system per period to open a file descriptor."
             , "Number of calls"
             , NETDATA_FILE_GROUP
             , 970
@@ -271,7 +265,6 @@ static void netdata_global_charts_create() {
     if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_FILE_OPEN_ERR_COUNT
-                , "Count the total of errors per period when it tries to open a file descriptor."
                 , "Number of calls"
                 , NETDATA_FILE_GROUP
                 , 971
@@ -282,7 +275,6 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_CLEAN_COUNT
-            , "Count the total of calls made to the operate system per period to delete a file from the operate system."
             , "Number of calls"
             , NETDATA_VFS_GROUP
             , 972
@@ -292,7 +284,6 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_IO_COUNT
-            , "Count the total of calls made to the operate system per period to write inside a file descriptor."
             , "Number of calls"
             , NETDATA_VFS_GROUP
             , 973
@@ -302,7 +293,6 @@ static void netdata_global_charts_create() {
 
     netdata_create_io_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_IO_FILE_BYTES
-            , "Total of bytes read or written with success per period."
             , "bytes/s"
             , NETDATA_VFS_GROUP
             , 974);
@@ -310,7 +300,6 @@ static void netdata_global_charts_create() {
     if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_FILE_ERR_COUNT
-                , "Count the total of errors"
                 , "Number of calls"
                 , NETDATA_VFS_GROUP
                 , 975
@@ -322,7 +311,6 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_PROCESS_SYSCALL
-            , "Count the total of calls made to the operate system per period to start a process."
             , "Number of calls"
             , NETDATA_PROCESS_GROUP
             , 976
@@ -332,7 +320,6 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_EXIT_SYSCALL
-            , "Count the total of calls made to the operate system per period to finish a process."
             , "Number of calls"
             , NETDATA_PROCESS_GROUP
             , 977
@@ -343,7 +330,6 @@ static void netdata_global_charts_create() {
     if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
-                , "Count the number of errors related to process"
                 , "Number of calls"
                 , NETDATA_PROCESS_GROUP
                 , 978
@@ -551,7 +537,9 @@ static int netdata_store_bpf(void *data, int size) {
         return 0;
 
     netdata_error_report_t *e = data;
-    fprintf(developer_log,"%s %u: %s, %d\n", e->comm, e->pid, dimension_names[e->type], e->err);
+    fprintf(developer_log
+            ,"%s %u: %s, %d\n"
+            , e->comm, e->pid, dimension_names[e->type], e->err);
     fflush(developer_log);
 
     return -2; //LIBBPF_PERF_EVENT_CONT;
