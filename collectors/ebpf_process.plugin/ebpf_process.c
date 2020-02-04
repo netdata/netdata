@@ -68,6 +68,7 @@ static int thread_finished = 0;
 static int close_plugin = 0;
 static int mode = 2;
 struct config collector_config;
+static int mykernel = 0;
 
 pthread_mutex_t lock;
 
@@ -727,11 +728,15 @@ void set_global_variables() {
     page_cnt *= sysconf(_SC_NPROCESSORS_ONLN);
 }
 
-static void set_type_to_probe() {
+static void change_collector_event() {
+    static char *old_sys_calls[] = { "sys_clone" };
     int i;
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
+
+    if (mykernel < 266496) // < 4.17.0
+        collector_events[9].name = old_sys_calls[0];
 }
 
 static void what_to_load(char *ptr) {
@@ -740,7 +745,7 @@ static void what_to_load(char *ptr) {
     else if (!strcasecmp(ptr, "dev"))
         mode = 1;
     else
-        set_type_to_probe();
+        change_collector_event();
 }
 
 static void set_global_values() {
@@ -777,7 +782,8 @@ int main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
-    if(!has_condition_to_run())
+    mykernel =  get_kernel_version();
+    if(!has_condition_to_run(mykernel))
         return 1;
 
     //set name
