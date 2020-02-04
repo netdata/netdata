@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-#shellcheck disable=SC2164
-#
+
 # Netdata updater utility
 #
 # Variables needed by script:
@@ -32,9 +31,9 @@ safe_sha256sum() {
   # Within the contexct of the installer, we only use -c option that is common between the two commands
   # We will have to reconsider if we start non-common options
   if command -v sha256sum > /dev/null 2>&1; then
-    sha256sum $@
+    sha256sum "$@"
   elif command -v shasum > /dev/null 2>&1; then
-    shasum -a 256 $@
+    shasum -a 256 "$@"
   else
     fatal "I could not find a suitable checksum binary to use"
   fi
@@ -77,7 +76,7 @@ download() {
 set_tarball_urls() {
   local extension="tar.gz"
 
-  if [ ! -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
+  if [ -n "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
     info "Not fetching remote tarballs, local override was given"
     return
   fi
@@ -104,7 +103,7 @@ update() {
 
   RUN_INSTALLER=0
   tmpdir=$(create_tmp_directory)
-  cd "$tmpdir"
+  cd "$tmpdir" || exit 1
 
   if [ -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
@@ -118,24 +117,24 @@ update() {
       NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
-      cd netdata-*
+      cd netdata-* || exit 1
       RUN_INSTALLER=1
     fi
   else
     info "!!Local tarball override detected!! - Entering directory ${NETDATA_LOCAL_TARBAL_OVERRIDE} for installation, not downloading anything"
     RUN_INSTALLER=1
-    cd ${NETDATA_LOCAL_TARBAL_OVERRIDE}
+    cd "${NETDATA_LOCAL_TARBAL_OVERRIDE}" || exit 1
   fi
 
   # We got the sources, run the update now
   if [ ${RUN_INSTALLER} -eq 1 ]; then
     # signal netdata to start saving its database
     # this is handy if your database is big
-    pids=$(pidof netdata)
+    possible_pids=$(pidof netdata)
     do_not_start=
-    if [ -n "${pids}" ]; then
-      #shellcheck disable=SC2086
-      kill -USR1 ${pids}
+    if [ -n "${possible_pids}" ]; then
+      read -r -a pids_to_kill <<< "${possible_pids}"
+      kill -USR1 "${pids_to_kill[@]}"
     else
       # netdata is currently not running, so do not start it after updating
       do_not_start="--dont-start-it"
@@ -181,7 +180,7 @@ if [ -t 2 ]; then
 else
   # we are headless
   # create a temporary file for the log
-  logfile=$(mktemp ${logfile}/netdata-updater.log.XXXXXX)
+  logfile="$(mktemp "${logfile}"/netdata-updater.log.XXXXXX)"
   # open fd 3 and send it to logfile
   exec 3> "${logfile}"
 fi
@@ -193,7 +192,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   PREVDIR="$(pwd)"
 
   echo >&2 "Entering ${TMPDIR}"
-  cd "${TMPDIR}"
+  cd "${TMPDIR}" || exit 1
 
   download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
   download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
@@ -202,16 +201,13 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   fi
 
   # Do not pass any options other than the accept, for now
-  sh "${TMPDIR}/netdata-latest.gz.run" --accept ${REINSTALL_OPTIONS}
-
-  #shellcheck disable=SC2181
-  if [ $? -eq 0 ]; then
+  if sh "${TMPDIR}/netdata-latest.gz.run" --accept "${REINSTALL_OPTIONS}"; then
     rm -r "${TMPDIR}"
   else
     echo >&2 "NOTE: did not remove: ${TMPDIR}"
   fi
   echo >&2 "Switching back to ${PREVDIR}"
-  cd "${PREVDIR}"
+  cd "${PREVDIR}" || exit 1
 else
   # the installer updates this script - so we run and exit in a single line
   update && exit 0
