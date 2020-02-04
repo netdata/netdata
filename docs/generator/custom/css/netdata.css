@@ -453,16 +453,23 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     }
 }
 
-.md-typeset .grid-item img {
+.item-title {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+}
+
+.md-typeset .item-title img {
     border: 0;
     display: inline;
     margin: 0 1rem 0 0;
-    max-height: 52px;
+    max-height: 64px;
     vertical-align: middle;
 }
 
 .grid-item h3 {
     margin-top: 0;
+    margin-bottom: 0;
 }
 
 .grid-item ul {

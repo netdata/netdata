@@ -135,6 +135,44 @@ CHARTS = {
     }
 }
 
+
+def backend_charts_template(name):
+    order = [
+        '{0}_response_statistics'.format(name),
+    ]
+
+    charts = {
+        order[0]: {
+            'options': [None, 'Backend "{0}"'.format(name), 'kilobits/s', 'backend response statistics',
+                        'varnish.backend', 'area'],
+            'lines': [
+                ['{0}_beresp_hdrbytes'.format(name), 'header', 'incremental', 8, 1000],
+                ['{0}_beresp_bodybytes'.format(name), 'body', 'incremental', -8, 1000]
+            ]
+        },
+    }
+
+    return order, charts
+
+
+def disk_charts_template(name):
+    order = [
+        'disk_{0}_usage'.format(name),
+    ]
+
+    charts = {
+        order[0]: {
+            'options': [None, 'Disk "{0}" Usage'.format(name), 'KiB', 'disk usage', 'varnish.disk_usage', 'stacked'],
+            'lines': [
+                ['{0}.g_space'.format(name), 'free', 'absolute', 1, 1 << 10],
+                ['{0}.g_bytes'.format(name), 'allocated', 'absolute', 1, 1 << 10]
+            ]
+        },
+    }
+
+    return order, charts
+
+
 VARNISHSTAT = 'varnishstat'
 
 re_version = re.compile(r'varnish-(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)')
@@ -188,6 +226,8 @@ class Service(ExecutableService):
         self.instance_name = configuration.get('instance_name')
         self.parser = Parser()
         self.command = None
+        self.collected_vbe = set()
+        self.collected_smf = set()
 
     def create_command(self):
         varnishstat = find_binary(VARNISHSTAT)
@@ -206,10 +246,7 @@ class Service(ExecutableService):
         ver = parse_varnish_version(reply)
         if not ver:
             self.error("failed to parse reply from '{0}', used regex :'{1}', reply : {2}".format(
-                ' '.join(command),
-                re_version.pattern,
-                reply,
-            ))
+                ' '.join(command), re_version.pattern, reply))
             return False
 
         if self.instance_name:
@@ -241,9 +278,6 @@ class Service(ExecutableService):
             self.error('cant parse the output...')
             return False
 
-        if self.parser.re_backend:
-            backends = [b[0] for b in self.parser.backend_stats(reply)[::2]]
-            self.create_backends_charts(backends)
         return True
 
     def get_data(self):
@@ -260,11 +294,11 @@ class Service(ExecutableService):
         if not server_stats:
             return None
 
-        if self.parser.re_backend:
-            backend_stats = self.parser.backend_stats(raw)
-            data.update(dict(('_'.join([name, param]), value) for name, param, value in backend_stats))
+        stats = dict((param, value) for _, param, value in server_stats)
+        data.update(stats)
 
-        data.update(dict((param, value) for _, param, value in server_stats))
+        self.get_vbe_backends(data, raw)
+        self.get_smf_disks(server_stats)
 
         # varnish 5 uses default.g_bytes and default.g_space
         data['memory_allocated'] = data.get('s0.g_bytes') or data.get('default.g_bytes')
@@ -272,27 +306,57 @@ class Service(ExecutableService):
 
         return data
 
-    def create_backends_charts(self, backends):
-        for backend in backends:
-            chart_name = ''.join([backend, '_response_statistics'])
-            title = 'Backend "{0}"'.format(backend.capitalize())
-            hdr_bytes = ''.join([backend, '_beresp_hdrbytes'])
-            body_bytes = ''.join([backend, '_beresp_bodybytes'])
+    def get_vbe_backends(self, data, raw):
+        if not self.parser.re_backend:
+            return
+        stats = self.parser.backend_stats(raw)
+        if not stats:
+            return
 
-            chart = {
-                chart_name:
-                    {
-                        'options': [None, title, 'kilobits/s', 'backend response statistics',
-                                    'varnish.backend', 'area'],
-                        'lines': [
-                            [hdr_bytes, 'header', 'incremental', 8, 1000],
-                            [body_bytes, 'body', 'incremental', -8, 1000]
-                        ]
-                    }
-            }
+        for (name, param, value) in stats:
+            data['_'.join([name, param])] = value
+            if name in self.collected_vbe:
+                continue
+            self.collected_vbe.add(name)
+            self.add_backend_charts(name)
 
-            self.order.insert(0, chart_name)
-            self.definitions.update(chart)
+    def get_smf_disks(self, server_stats):
+        #  [('SMF.', 'ssdStorage.c_req', '47686'),
+        #  ('SMF.', 'ssdStorage.c_fail', '0'),
+        #  ('SMF.', 'ssdStorage.c_bytes', '668102656'),
+        #  ('SMF.', 'ssdStorage.c_freed', '140980224'),
+        #  ('SMF.', 'ssdStorage.g_alloc', '39753'),
+        #  ('SMF.', 'ssdStorage.g_bytes', '527122432'),
+        #  ('SMF.', 'ssdStorage.g_space', '53159968768'),
+        #  ('SMF.', 'ssdStorage.g_smf', '40130'),
+        #  ('SMF.', 'ssdStorage.g_smf_frag', '311'),
+        #  ('SMF.', 'ssdStorage.g_smf_large', '66')]
+        disks = [name for typ, name, _ in server_stats if typ.startswith('SMF') and name.endswith('g_space')]
+        if not disks:
+            return
+        for disk in disks:
+            disk = disk.split('.')[0]  # ssdStorage
+            if disk in self.collected_smf:
+                continue
+            self.collected_smf.add(disk)
+            self.add_disk_charts(disk)
+
+    def add_backend_charts(self, backend_name):
+        self.add_charts(backend_name, backend_charts_template)
+
+    def add_disk_charts(self, disk_name):
+        self.add_charts(disk_name, disk_charts_template)
+
+    def add_charts(self, name, charts_template):
+        order, charts = charts_template(name)
+
+        for chart_name in order:
+            params = [chart_name] + charts[chart_name]['options']
+            dimensions = charts[chart_name]['lines']
+
+            new_chart = self.charts.add_chart(params)
+            for dimension in dimensions:
+                new_chart.add_dimension(dimension)
 
 
 def parse_varnish_version(lines):
