@@ -1,13 +1,34 @@
-# Data collection
+# Collecting metrics
 
+Netdata can collect metrics from hundreds of different sources, be they internal data created by the system itself, or
+external data created by services or applications. To see _all_ of the sources Netdata collects from, view our [list of
+supported collectors](COLLECTORS.md).
+
+There are two essential points to understand about how collecting metrics works in Netdata:
+
+-   All collectors are **installed by default** with every installation of Netdata. You do not need to install
+    collectors manually to collect metrics from new sources.
+-   Upon startup, Netdata will **auto-detect** any service and application that has a [collector](COLLECTORS.md), as
+    long as both the collector and the service/application are configured correctly. If Netdata fails to show charts for
+    a service that's running on your system, it's due to a misconfiguration.
+
+
+
+There are also different types of collectors:
+
+-   **Internal** collectors gather metrics from `/proc`, `/sys` and other Linux kernel sources. They are written in `C`,
+    and run as threads within the Netdata daemon.
+-   **External** collectors gather metrics from external processes, such as a MySQL database or Nginx web server. They
+    can be written in any language, and the `netdata` daemon spawns them as long-running independent processes. They
+    communicate with the daemon via pipes.
+-   **Plugin orchestrators** 
 
 
 Netdata supports **internal** and **external** data collection plugins:
 
--   **internal** plugins are written in `C` and run as threads inside the `netdata` daemon.
-
--   **external** plugins may be written in any computer language and are spawn as independent long-running processes by the `netdata` daemon.
-     They communicate with the `netdata` daemon via `pipes` (`stdout` communication).
+-   **Internal** plugins are written in `C` and run as threads inside the `netdata` daemon.
+-   **External** plugins may be written in any computer language and are spawn as independent long-running processes by
+     the `netdata` daemon. They communicate with the `netdata` daemon via `pipes` (`stdout` communication). Some 
 
 To minimize the number of processes spawn for data collection, Netdata also supports **plugin orchestrators**.
 
@@ -21,32 +42,6 @@ To minimize the number of processes spawn for data collection, Netdata also supp
      node.js [node.d.plugin](node.d.plugin/) and
      python v2+ (including v3) [python.d.plugin](python.d.plugin/).
 
-## Netdata Plugins
-
-|plugin|lang|O/S|runs as|modular|description|
-|:----:|:--:|:-:|:-----:|:-----:|:----------|
-|[apps.plugin](apps.plugin/)|`C`|linux, freebsd|external|-|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
-|[cgroups.plugin](cgroups.plugin/)|`C`|linux|internal|-|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems|
-|[charts.d.plugin](charts.d.plugin/)|`BASH` v4+|any|external|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
-|[checks.plugin](checks.plugin/)|`C`|any|internal|-|a debugging plugin (by default it is disabled)|
-|[cups.plugin](cups.plugin/)|`C`|any|external|-|monitors **CUPS**|
-|[diskspace.plugin](diskspace.plugin/)|`C`|linux|internal|-|collects disk space usage metrics on Linux mount points|
-|[fping.plugin](fping.plugin/)|`C`|any|external|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.|
-|[ioping.plugin](ioping.plugin/)|`C`|any|external|-|measures disk read/write latency.|
-|[freebsd.plugin](freebsd.plugin/)|`C`|freebsd|internal|yes|collects resource usage and performance data on FreeBSD systems|
-|[freeipmi.plugin](freeipmi.plugin/)|`C`|linux, freebsd|external|-|collects metrics from enterprise hardware sensors, on Linux and FreeBSD servers.|
-|[idlejitter.plugin](idlejitter.plugin/)|`C`|any|internal|-|measures CPU latency and jitter on all operating systems|
-|[macos.plugin](macos.plugin/)|`C`|macos|internal|yes|collects resource usage and performance data on MacOS systems|
-|[nfacct.plugin](nfacct.plugin/)|`C`|linux|external|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`|
-|[xenstat.plugin](xenstat.plugin/)|`C`|linux|external|-|collects XenServer and XCP-ng metrics using `libxenstat`|
-|[perf.plugin](perf.plugin/)|`C`|linux|external|-|collects CPU performance metrics using performance monitoring units (PMU).|
-|[node.d.plugin](node.d.plugin/)|`node.js`|any|external|yes|a **plugin orchestrator** for data collection modules written in `node.js`.|
-|[plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins|
-|[proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems|
-|[python.d.plugin](python.d.plugin/)|`python` v2+|any|external|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
-|[slabinfo.plugin](slabinfo.plugin/)|`C`|linux|external|-|collects kernel SLAB details on Linux systems|
-|[statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for Netdata|
-|[tc.plugin](tc.plugin/)|`C`|linux|internal|-|collects traffic QoS metrics (`tc`) of Linux network interfaces|
 
 ## Enabling and Disabling plugins
 
