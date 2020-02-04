@@ -372,10 +372,10 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 AC_CHECK_LIB(
     [dl],
     [dlopen],
-    [VFS_LIBS="-ldl"]
+    [EBPF_LIBS="-ldl"]
 )
 
-OPTIONAL_VFS_LIBS="${VFS_LIBS}"
+OPTIONAL_EBPF_LIBS="${EBPF_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS
@@ -818,13 +818,13 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # ebpf_process.plugin
 
 AC_MSG_CHECKING([if ebpf_process.plugin should be enabled])
-if test "${build_target}" == "linux" -a "${VFS_LIBS}"; then
+if test "${build_target}" == "linux" -a "${EBPF_LIBS}"; then
     enable_vfs="yes"
 else
     enable_vfs="no"
 fi
 AC_MSG_RESULT([${enable_vfs}])
-AM_CONDITIONAL([ENABLE_PLUGIN_VFS], [test "${enable_vfs}" = "yes"])
+AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_vfs}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1161,7 +1161,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
-AC_SUBST([OPTIONAL_VFS_LIBS])
+AC_SUBST([OPTIONAL_EBPF_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])

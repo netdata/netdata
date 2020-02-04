@@ -408,7 +408,7 @@ set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
         )
 
-set(VFS_PLUGIN_FILES
+set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf_process.plugin/ebpf_process.c
         )
 
@@ -776,7 +776,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
-    SET(ENABLE_PLUGIN_VFS True)
+    SET(ENABLE_PLUGIN_EBPF True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -787,7 +787,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
-    SET(ENABLE_PLUGIN_VFS False)
+    SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -798,7 +798,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
-    SET(ENABLE_PLUGIN_VFS False)
+    SET(ENABLE_PLUGIN_EBPF False)
 
 ENDIF()
 
@@ -908,9 +908,9 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # ebpf_process.plugin
 
-IF(ENABLE_PLUGIN_VFS)
+IF(ENABLE_PLUGIN_EBPF)
     message(STATUS "ebpf_process.plugin: enabled")
-    add_executable(ebpf_process.plugin config.h ${VFS_PLUGIN_FILES})
+    add_executable(ebpf_process.plugin config.h ${EBPF_PROCESS_PLUGIN_FILES})
     target_link_libraries (ebpf_process.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})

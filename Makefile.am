@@ -252,7 +252,7 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-VFS_PLUGIN_FILES = \
+EBPF_PROCESS_PLUGIN_FILES = \
     collectors/ebpf_process.plugin/ebpf_process.c \
     collectors/ebpf_process.plugin/ebpf_process.h \
     $(LIBNETDATA_FILES) \
@@ -572,7 +572,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
-    $(OPTIONAL_VFS_LIBS) \
+    $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
 
 NETDATACLI_FILES = \
@@ -630,9 +630,9 @@ if ENABLE_PLUGIN_FREEIPMI
         $(NULL)
 endif
 
-if ENABLE_PLUGIN_VFS
+if ENABLE_PLUGIN_EBPF
     plugins_PROGRAMS += ebpf_process.plugin
-    ebpf_process_plugin_SOURCES = $(VFS_PLUGIN_FILES)
+    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
     ebpf_process_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
