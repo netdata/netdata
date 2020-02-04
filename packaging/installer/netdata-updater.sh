@@ -154,7 +154,8 @@ update() {
 
 	rm -rf "${tmpdir}" >&3 2>&3
 	[ -n "${logfile}" ] && rm "${logfile}" && logfile=
-	return
+
+	return 0
 }
 
 # Usually stored in /etc/netdata/.environment
