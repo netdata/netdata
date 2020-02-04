@@ -1251,7 +1251,7 @@ validate_tree_centos() {
     fi
   fi
 
-  if [ "$VERSION_ID" -eq 8 ]; then
+  if [ "$version" -eq 8 ]; then
     echo >&2 " > Checking for config-manager ..."
     if ! run yum ${sudo} config-manager; then
       if prompt "config-manager not found, shall I install it?"; then
