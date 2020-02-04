@@ -772,7 +772,7 @@ int main(int argc, char **argv)
         return 1;
 
     //set name
-    program_name = "vfs.plugin";
+    program_name = "ebpf_process.plugin";
 
     //disable syslog
     error_log_syslog = 0;

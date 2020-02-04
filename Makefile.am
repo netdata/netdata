@@ -631,9 +631,9 @@ if ENABLE_PLUGIN_FREEIPMI
 endif
 
 if ENABLE_PLUGIN_VFS
-    plugins_PROGRAMS += vfs.plugin
-    vfs_plugin_SOURCES = $(VFS_PLUGIN_FILES)
-    vfs_plugin_LDADD = \
+    plugins_PROGRAMS += ebpf_process.plugin
+    ebpf_process_plugin_SOURCES = $(VFS_PLUGIN_FILES)
+    ebpf_process_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif

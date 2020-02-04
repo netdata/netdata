@@ -815,9 +815,9 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# vfs.plugin
+# ebpf_process.plugin
 
-AC_MSG_CHECKING([if vfs.plugin should be enabled])
+AC_MSG_CHECKING([if ebpf_process.plugin should be enabled])
 if test "${build_target}" == "linux" -a "${VFS_LIBS}"; then
     enable_vfs="yes"
 else

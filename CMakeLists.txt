@@ -906,16 +906,16 @@ ENDIF()
 
 
 # -----------------------------------------------------------------------------
-# vfs.plugin
+# ebpf_process.plugin
 
 IF(ENABLE_PLUGIN_VFS)
-    message(STATUS "vfs.plugin: enabled")
-    add_executable(vfs.plugin config.h ${VFS_PLUGIN_FILES})
-    target_link_libraries (vfs.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
-    target_include_directories(vfs.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
-    target_compile_options(vfs.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+    message(STATUS "ebpf_process.plugin: enabled")
+    add_executable(ebpf_process.plugin config.h ${VFS_PLUGIN_FILES})
+    target_link_libraries (ebpf_process.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
-    message(STATUS "vfs.plugin: disabled")
+    message(STATUS "ebpf_process.plugin: disabled")
 ENDIF()
 
 
