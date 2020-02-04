@@ -511,12 +511,11 @@ require_cmd() {
 
   local wanted found
   for wanted in "${@}"; do
-    if command -v "${wanted}" 2> /dev/null; then
+    if command -v "${wanted}" > /dev/null 2>&1; then
       found="$(command -v "$wanted" 2> /dev/null)"
     fi
     [ -n "${found}" ] && [ -x "${found}" ] && return 0
   done
-
   return 1
 }
 
