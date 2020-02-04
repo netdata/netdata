@@ -409,7 +409,7 @@ set(SLABINFO_PLUGIN_FILES
         )
 
 set(VFS_PLUGIN_FILES
-        collectors/vfs_ebpf.plugin/vfs_plugin.c
+        collectors/ebpf_process.plugin/ebpf_process.c
         )
 
 set(PROC_PLUGIN_FILES

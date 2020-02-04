@@ -253,8 +253,8 @@ PERF_PLUGIN_FILES = \
     $(NULL)
 
 VFS_PLUGIN_FILES = \
-    collectors/vfs_ebpf.plugin/ebpf_process.c \
-    collectors/vfs_ebpf.plugin/ebpf_process.h \
+    collectors/ebpf_process.plugin/ebpf_process.c \
+    collectors/ebpf_process.plugin/ebpf_process.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
