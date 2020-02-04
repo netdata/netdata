@@ -1272,6 +1272,14 @@ validate_tree_centos() {
         run ${sudo} yum ${opts} install https://extras.getpagespeed.com/release-el8-latest.rpm
       fi
     fi
+  elif [[ "${version}" =~ /6\..*/ ]]; then
+    echo >&2 " > Detected CentOX 6.x ..."
+    echo >&2 " > Checking for Okay ..."
+    if ! rpm -qa | grep okay > /dev/null; then
+      if prompt "okay not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm
+      fi
+    fi
   fi
 }
 
