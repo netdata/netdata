@@ -673,7 +673,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
             rrdpush_set_flags_to_newest_stream(host);
-            host->stream_version = (uint32_t)strtol(version_start, NULL, 10);
+            host->stream_version = version;
         }
     } else {
         answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
@@ -1449,7 +1449,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
             if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
                 info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
-                     w->client_ip, w->client_port, key, value);
+                     w->client_ip, w->client_port, name, value);
             }
         }
     }
