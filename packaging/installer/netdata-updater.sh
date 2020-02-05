@@ -73,13 +73,44 @@ download() {
   fi
 }
 
+function parse_version() {
+  r="${1}"
+  if echo "${r}" | grep -q '^v.*'; then
+    # shellcheck disable=SC2001
+    # XXX: Need a regex group subsitutation here.
+    r="$(echo "${r}" | sed -e 's/^v\(.*\)/\1/')"
+  fi
+
+  read -r -a p <<< "$(echo "${r}" | tr '-' ' ')"
+
+  v="${p[0]}"
+  b="${p[1]}"
+  _="${p[2]}" # ignore the SHA
+
+  if [[ ! "${b}" =~ ^[0-9]+$ ]]; then
+    b="0"
+  fi
+
+  read -r -a pp <<< "$(echo "${v}" | tr '.' ' ')"
+  printf "%03d%03d%03d%03d" "${pp[0]}" "${pp[1]}" "${pp[2]}" "${b}"
+}
+
+get_latest_version() {
+  shasums="${1}"
+
+  tarball="$(grep -o 'netdata-v.*\.tar\.gz' "${shasums}")"
+  if [ -n "${tarball}" ]; then
+    # shellcheck disable=SC2001
+    # XXX: Need to use regex group substitution here.
+    version="$(echo "${tarball}" | sed -e 's/^netdata-\(.*\)\.tar.gz/\1/')"
+    parse_version "${version}"
+  else
+    echo "000000000000"
+  fi
+}
+
 set_tarball_urls() {
   local extension="tar.gz"
-
-  if [ -n "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
-    info "Not fetching remote tarballs, local override was given"
-    return
-  fi
 
   if [ "$2" == "yes" ]; then
     extension="gz.run"
@@ -105,23 +136,27 @@ update() {
   tmpdir=$(create_tmp_directory)
   cd "$tmpdir" || exit 1
 
-  if [ -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
-    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
-    if [[ -n "${NETDATA_TARBALL_CHECKSUM}" ]] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
-      info "Newest version is already installed"
-    else
-      download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.tar.gz"
-      if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-        fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${tmpdir}"
-      fi
-      NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
-      tar -xf netdata-latest.tar.gz >&3 2>&3
-      rm netdata-latest.tar.gz >&3 2>&3
-      cd netdata-* || exit 1
-      RUN_INSTALLER=1
-    fi
+  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
+
+  current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
+  latest_version="$(get_latest_version "${tmpdir}/sha256sum.txt")"
+
+  info "Current Version: ${current_version}"
+  info "Latest Version: ${latest_version}"
+
+  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${current_version}" ]; then
+    info "Newest version ${current_version} <= ${latest_version} is already installed"
+  elif [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+    info "Newest version is already installed"
   else
-    info "!!Local tarball override detected!! - Entering directory ${NETDATA_LOCAL_TARBAL_OVERRIDE} for installation, not downloading anything"
+    download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.tar.gz"
+    if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
+      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${tmpdir}"
+    fi
+    NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
+    tar -xf netdata-latest.tar.gz >&3 2>&3
+    rm netdata-latest.tar.gz >&3 2>&3
+    cd netdata-* || exit 1
     RUN_INSTALLER=1
     cd "${NETDATA_LOCAL_TARBAL_OVERRIDE}" || exit 1
   fi
