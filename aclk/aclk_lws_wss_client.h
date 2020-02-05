@@ -5,11 +5,15 @@
 
 #define ACLK_LWS_WSS_RECONNECT_TIMEOUT 5
 
+#define ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES 128*1024
+
 struct aclk_lws_wss_engine_callbacks {
 	void (*connection_established_callback)();
 	void (*data_rcvd_callback)();
 	void (*data_writable_callback)();
 };
+
+struct lws_wss_packet_buffer;
 
 struct aclk_lws_wss_engine_instance {
 	//target host/port for connection
@@ -19,6 +23,9 @@ struct aclk_lws_wss_engine_instance {
 	//internal data
 	struct lws_context *lws_context;
 	struct lws *lws_wsi;
+
+	struct lws_wss_packet_buffer *write_buffer_head;
+	struct lws_ring *read_ringbuffer;
 
 	struct aclk_lws_wss_engine_callbacks callbacks;
 
