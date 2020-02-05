@@ -12,7 +12,7 @@ Dockerfile=$Base/clean_install_"$Distro"_"$Version".Dockerfile
 
 if [ ! -e "$Dockerfile" ]; then
     echo "Can't run installer on $Distro/$Version - $Dockerfile not found"
-    exit -1
+    exit 1
 fi
 
 if [ "$Arch" == "Linux" ]; then
