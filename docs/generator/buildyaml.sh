@@ -219,7 +219,9 @@ navpart 1 web "README" "Dashboards"
 navpart 2 web/gui "" "" 3
 
 navpart 1 collectors "" "Data collection" 1
-echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
+navpart 1 health README "Health monitoring and alerts"
+echo -ne "    - 'collectors/QUICKSTART.md'
+    - 'collectors/REFERENCE.md'
     - Internal plugins:
 "
 
