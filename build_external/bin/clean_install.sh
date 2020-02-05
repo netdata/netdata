@@ -3,7 +3,7 @@
 # Basic setup, check we have a legal Distro / Version combo
 Distro=$1
 Version=$2
-Repo="$(cd $(dirname "$0") && cd ../.. && pwd)"
+Repo="$(cd "$(dirname "$0")" && cd ../.. && pwd)"
 Base=$Repo/build_external
 Arch=$(uname)
 
