@@ -207,6 +207,8 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		aclk_lws_mutex_unlock(&inst->read_buf_mutex);
 
 		if(likely(inst->callbacks.data_rcvd_callback))
+			// to future myself -> do not call this while read lock is active as it will eventually
+			// want to acquire same lock later in aclk_lws_wss_client_read() function
 			inst->callbacks.data_rcvd_callback();
 		else
 			inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
