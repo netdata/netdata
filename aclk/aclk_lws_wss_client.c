@@ -73,8 +73,12 @@ static inline void _aclk_lws_wss_write_buffer_clear(struct lws_wss_packet_buffer
 
 static inline void aclk_lws_wss_clear_io_buffers(struct aclk_lws_wss_engine_instance *inst)
 {
+	aclk_lws_mutex_lock(&inst->read_buf_mutex);
 	_aclk_lws_wss_read_buffer_clear(inst->read_ringbuffer);
+	aclk_lws_mutex_unlock(&inst->read_buf_mutex);
+	aclk_lws_mutex_lock(&inst->write_buf_mutex);
 	_aclk_lws_wss_write_buffer_clear(&inst->write_buffer_head);
+	aclk_lws_mutex_unlock(&inst->write_buf_mutex);
 }
 
 static const struct lws_protocols protocols[] = {
@@ -118,6 +122,9 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 	
 	inst->lws_context = lws_create_context(&info);
 	inst->callbacks = *callbacks;
+
+	aclk_lws_mutex_init(&inst->write_buf_mutex);
+	aclk_lws_mutex_init(&inst->read_buf_mutex);
 
 	inst->read_ringbuffer = lws_ring_create(1, ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES, NULL);
 	if(!inst->read_ringbuffer)
@@ -183,6 +190,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 
 	switch (reason) {
 	case LWS_CALLBACK_CLIENT_WRITEABLE:
+		aclk_lws_mutex_lock(&inst->write_buf_mutex);
 		data = lws_wss_packet_buffer_pop(&inst->write_buffer_head);
 		if(likely(data)) {
 			lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
@@ -190,10 +198,14 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 			if(inst->write_buffer_head)
 				lws_callback_on_writable(inst->lws_wsi);
 		}
+		aclk_lws_mutex_unlock(&inst->write_buf_mutex);
 		break;
 	case LWS_CALLBACK_CLIENT_RECEIVE:
+		aclk_lws_mutex_lock(&inst->read_buf_mutex);
 		if(!received_data_to_ringbuff(inst->read_ringbuffer, in, len))
 			retval = 1;
+		aclk_lws_mutex_unlock(&inst->read_buf_mutex);
+
 		if(likely(inst->callbacks.data_rcvd_callback))
 			inst->callbacks.data_rcvd_callback();
 		else
@@ -242,7 +254,10 @@ int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *b
 {
 	if(inst && inst->lws_wsi && inst->websocket_connection_up)
 	{
+		aclk_lws_mutex_lock(&inst->write_buf_mutex);
 		lws_wss_packet_buffer_push(&inst->write_buffer_head, lws_wss_packet_buffer_new(buf, count));
+		aclk_lws_mutex_unlock(&inst->write_buf_mutex);
+
 		lws_callback_on_writable(inst->lws_wsi);
 		return count;
 	}
@@ -252,10 +267,13 @@ int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *b
 int aclk_lws_wss_client_read(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count)
 {
 	size_t data_to_be_read = count;
+
+	aclk_lws_mutex_lock(&inst->read_buf_mutex);
 	size_t readable_byte_count = lws_ring_get_count_waiting_elements(inst->read_ringbuffer, NULL);
 	if(unlikely(readable_byte_count <= 0)) {
 		errno = EAGAIN;
-		return -1;
+		data_to_be_read = -1;
+		goto abort;
 	}
 
 	if( readable_byte_count < data_to_be_read )
@@ -265,6 +283,8 @@ int aclk_lws_wss_client_read(struct aclk_lws_wss_engine_instance *inst, void *bu
 	if(data_to_be_read == readable_byte_count)
 		inst->data_to_read = 0;
 
+abort:
+	aclk_lws_mutex_unlock(&inst->read_buf_mutex);
 	return data_to_be_read;
 }
 

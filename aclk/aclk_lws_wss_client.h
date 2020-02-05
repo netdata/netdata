@@ -3,9 +3,28 @@
 
 #include <libwebsockets.h>
 
+#include "libnetdata/libnetdata.h"
+
 #define ACLK_LWS_WSS_RECONNECT_TIMEOUT 5
 
+// This is as define because ideally the ACLK at high level
+// can do mosqitto writes and reads only from one thread
+// which is cleaner implementation IMHO
+// in such case this mutexes are not necessarry and life
+// is simpler
+#define ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED 1
+
 #define ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES 128*1024
+
+#ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
+	#define aclk_lws_mutex_init(x) netdata_mutex_init(x)
+	#define aclk_lws_mutex_lock(x) netdata_mutex_lock(x)
+	#define aclk_lws_mutex_unlock(x) netdata_mutex_unlock(x)
+#else
+	#define aclk_lws_mutex_init(x)
+	#define aclk_lws_mutex_lock(x)
+	#define aclk_lws_mutex_unlock(x)
+#endif
 
 struct aclk_lws_wss_engine_callbacks {
 	void (*connection_established_callback)();
@@ -23,6 +42,11 @@ struct aclk_lws_wss_engine_instance {
 	//internal data
 	struct lws_context *lws_context;
 	struct lws *lws_wsi;
+
+#ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
+	netdata_mutex_t write_buf_mutex;
+	netdata_mutex_t read_buf_mutex;
+#endif
 
 	struct lws_wss_packet_buffer *write_buffer_head;
 	struct lws_ring *read_ringbuffer;
