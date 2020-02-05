@@ -96,7 +96,7 @@ void load_claiming_state(void)
 
     // check if the file exists
     if (lstat(filename, &statbuf) != 0) {
-        info("File '%s' was not found. Setting state to AGENT_UNCLAIMED.", filename);
+        info("lstat on File '%s' failed reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
         return;
     }
     if (unlikely(statbuf.st_size == 0)) {
@@ -106,7 +106,7 @@ void load_claiming_state(void)
 
     FILE *f = fopen(filename, "rt");
     if (unlikely(f == NULL)) {
-        error("File '%s' cannot be read. Setting state to AGENT_UNCLAIMED.", filename);
+        error("File '%s' cannot be opened reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
         return;
     }
 
