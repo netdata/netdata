@@ -1,6 +1,8 @@
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
+#include "../daemon/common.h"
+#include "aclk_common.h"
 
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
@@ -158,19 +160,127 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_ins
 #endif
 }
 
+static int _aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
+{
+	char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+
+	if(!proxy)
+		return -1;
+
+	proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+
+	if(!*proxy)
+		return -1;
+
+	return lws_set_socks(vhost, proxy);
+}
+
+// helper function to censor user&password
+// for logging purposes
+static void safe_log_proxy_censor(char *proxy) {
+    size_t length = strlen(proxy);
+    char *auth = proxy+length-1;
+    char *cur;
+
+    while( (auth >= proxy) && (*auth != '@') )
+        auth--;
+
+    //if not found or @ is first char do nothing
+    if(auth<=proxy)
+        return;
+
+    cur = strstr(proxy, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+    if(!cur)
+        cur = proxy;
+    else
+        cur += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+
+    while(cur < auth) {
+        *cur='X';
+        cur++;
+    }
+}
+
+static inline void safe_log_proxy_error(char *str, const char *proxy) {
+    char *log = strdupz(proxy);
+    safe_log_proxy_censor(log);
+    error("%s Provided Value:\"%s\"", str, log);
+    freez(log);
+}
+
+static inline int check_socks_enviroment(const char **proxy) {
+    char *tmp = getenv("socks_proxy");
+
+    if(!tmp)
+        return 1;
+
+    if(strnlen(tmp, ACLK_PROXY_MAXLEN) == ACLK_PROXY_MAXLEN)
+        return 1;
+
+    if(aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
+        *proxy = tmp;
+        return 0;
+    }
+
+    safe_log_proxy_error("Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", tmp);
+    return 1;
+}
+
+static const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
+    const char *proxy = config_get(CONFIG_SECTION_ACLK, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
+    *type = PROXY_DISABLED;
+
+    if(strcmp(proxy, "none") == 0)
+        return proxy;
+
+    if(strcmp(proxy, ACLK_PROXY_ENV) == 0) {
+        if(check_socks_enviroment(&proxy) == 0)
+            *type = PROXY_TYPE_SOCKS5;
+        return proxy;
+    }
+
+    if(strnlen(proxy, ACLK_PROXY_MAXLEN) == ACLK_PROXY_MAXLEN)
+        return proxy;
+
+    *type = aclk_verify_proxy(proxy);
+    if(*type == PROXY_TYPE_UNKNOWN) {
+        *type = PROXY_DISABLED;
+        safe_log_proxy_error("Config var \"" ACLK_PROXY_CONFIG_VAR "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", proxy);
+    }
+
+    return proxy;
+}
+
 // Return code indicates if connection attempt has started async.
 int aclk_lws_wss_connect(char *host, int port)
 {
     struct lws_client_connect_info i;
+    struct lws_vhost *vhost;
+    static const char *proxy = NULL;
+    static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
+    char *log;
+
     if (!engine_instance) {
         return aclk_lws_wss_client_init(host, port);
         // PROTOCOL_INIT callback will call again.
     }
 
+    if(proxy_type == PROXY_NOT_SET)
+        proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
+
     if (engine_instance->lws_wsi) {
         error("Already Connected. Only one connection supported at a time.");
         return 0;
     }
+
+    // from LWS docu:
+    // If option LWS_SERVER_OPTION_EXPLICIT_VHOSTS is given, no vhost is
+    // created; you're expected to create your own vhosts afterwards using
+    // lws_create_vhost().  Otherwise a vhost named "default" is also created
+    // using the information in the vhost-related members, for compatibility.
+    vhost = lws_get_vhost_by_name(engine_instance->lws_context, "default");
+    if(!vhost)
+        fatal("Could not find the default LWS vhost.");
 
     memset(&i, 0, sizeof(i));
     i.context = engine_instance->lws_context;
@@ -179,6 +289,24 @@ int aclk_lws_wss_connect(char *host, int port)
     i.path = "/mqtt";
     i.host = engine_instance->host;
     i.protocol = "mqtt";
+
+    switch (proxy_type) {
+    case PROXY_DISABLED:
+        lws_set_socks(vhost, ":");
+        lws_set_proxy(vhost, ":");
+        break;
+    case PROXY_TYPE_SOCKS5:
+        log = strdupz(proxy);
+        safe_log_proxy_censor(log);
+        info("Connecting using SOCKS5 proxy:\"%s\"", log);
+        freez(log);
+        if(_aclk_wss_set_socks(vhost, proxy))
+            error("LWS failed to accept socks proxy.");
+        break;
+    default:
+        error("The proxy could not be set. Unknown proxy type.");
+    }
+
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
     i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 #else
