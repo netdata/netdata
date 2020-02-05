@@ -263,20 +263,23 @@ void cancel_main_threads() {
 }
 
 struct option_def option_definitions[] = {
-    // opt description                                    arg name       default value
-    { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
-    { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
-    { 'd', "Fork. Run in the background.",                NULL,          "run in the background"},
-    { 'h', "Display this help message.",                  NULL,          NULL},
-    { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
-    { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
-    { 'p', "API/Web port to use.",                        "port",        "19999"},
-    { 's', "Prefix for /proc and /sys (for containers).", "path",        "no prefix"},
-    { 't', "The internal clock of netdata.",              "seconds",     "1"},
-    { 'u', "Run as user.",                                "username",    "netdata"},
-    { 'v', "Print netdata version and exit.",             NULL,          NULL},
-    { 'V', "Print netdata version and exit.",             NULL,          NULL},
-    { 'W', "See Advanced options below.",                 "options",     NULL},
+    // opt description                                        arg name       default value
+    { 'c', "Configuration file to load.",                     "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
+    { 'D', "Do not fork. Run in the foreground.",             NULL,          "run in the background"},
+    { 'd', "Fork. Run in the background.",                    NULL,          "run in the background"},
+    { 'h', "Display this help message.",                      NULL,          NULL},
+    { 'P', "File to save a pid while running.",               "filename",    "do not save pid to a file"},
+    { 'i', "The IP address to listen to.",                    "IP",          "all IP addresses IPv4 and IPv6"},
+    { 'p', "API/Web port to use.",                            "port",        "19999"},
+    { 's', "Prefix for /proc and /sys (for containers).",     "path",        "no prefix"},
+    { 't', "The internal clock of netdata.",                  "seconds",     "1"},
+    { 'u', "Run as user.",                                    "username",    "netdata"},
+    { 'v', "Print netdata version and exit.",                 NULL,          NULL},
+    { 'V', "Print netdata version and exit.",                 NULL,          NULL},
+#ifdef ENABLE_ACLK
+    { 'x', "Socks5 or http proxy for outbound connections",   "proxy",       NULL},
+#endif
+    { 'W', "See Advanced options below.",                     "options",     NULL},
 };
 
 int help(int exitcode) {
@@ -931,6 +934,14 @@ int main(int argc, char **argv) {
                 case 'u':
                     config_set(CONFIG_SECTION_GLOBAL, "run as user", optarg);
                     break;
+#ifdef ENABLE_ACLK
+                case 'x':
+                    if(aclk_verify_proxy(optarg) < 0)
+                        fatal("Unknown proxy type \"%s\"", optarg);
+
+                    config_set(CONFIG_SECTION_ACLK, ACLK_PROXY_CONFIG_VAR_NAME, optarg);
+                    break;
+#endif
                 case 'v':
                 case 'V':
                     printf("%s %s\n", program_name, program_version);

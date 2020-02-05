@@ -13,6 +13,10 @@
 #define ACLK_JSON_IN_VERSION "version"
 #define ACLK_JSON_IN_TOPIC "callback-topic"
 #define ACLK_JSON_IN_URL "payload"
+
+#define ACLK_PROXY_ENV_VAR_SOCKS   "socks_proxy"
+#define ACLK_PROXY_CONFIG_VAR_NAME "proxy"
+
 #define ACLK_CHART_TOPIC "chart"
 #define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
@@ -33,8 +37,6 @@
 #define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
 #define ACLK_DEFAULT_PORT  9002
 #define ACLK_DEFAULT_HOST "localhost"
-
-#define CONFIG_SECTION_ACLK "agent_cloud_link"
 
 struct aclk_request {
     char    *type_id;

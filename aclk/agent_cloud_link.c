@@ -8,6 +8,7 @@
 
 int aclk_port = ACLK_DEFAULT_PORT;
 char *aclk_hostname = ACLK_DEFAULT_HOST;
+const char *aclk_proxy = NULL;
 int aclk_subscribed = 0;
 int aclk_disable_single_updates = 0;
 
@@ -27,6 +28,12 @@ char *create_uuid()
     uuid_unparse(uuid, uuid_str);
 
     return uuid_str;
+}
+
+static const char *aclk_get_proxy_env() {
+    // this will read also http_proxy and https_proxy
+    // in the next PR
+    return getenv(ACLK_PROXY_ENV_VAR_SOCKS);
 }
 
 int cloud_to_agent_parse(JSON_ENTRY *e)
@@ -1128,8 +1135,15 @@ int aclk_init(ACLK_INIT_ACTION action)
     aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
     aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
+    aclk_proxy = config_get(CONFIG_SECTION_ACLK, ACLK_PROXY_CONFIG_VAR_NAME, "");
+    if(aclk_verify_proxy(aclk_proxy) < 0)
+        aclk_proxy = aclk_get_proxy_env();
+
+    if(aclk_proxy)
+        info("Aclk proxy set to \"%s\"", aclk_proxy);
+
     // initialize the low level link to the cloud
-    rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);
+    rc = _link_lib_init(aclk_hostname, aclk_port, aclk_proxy, aclk_connect, aclk_disconnect);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
         return 1;

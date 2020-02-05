@@ -1,6 +1,7 @@
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
+#include "aclk_common.h"
 
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
@@ -102,7 +103,7 @@ static void aclk_lws_wss_log_divert(int level, const char *line) {
 	}
 }
 
-struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port) {
+struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port, const char *proxy) {
 	static int lws_logging_initialized = 0;
 	struct lws_context_creation_info info;
 	struct aclk_lws_wss_engine_instance *inst;
@@ -119,6 +120,7 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 
 	inst->host = target_hostname;
 	inst->port = target_port;
+	inst->proxy = proxy;
 
 	memset(&info, 0, sizeof(struct lws_context_creation_info));
 	info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
@@ -161,7 +163,21 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance* inst) {
 #endif
 }
 
-void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
+static inline int _aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
+{
+	// this is kind of annoying lws_set_proxy
+	// will accept string starting with "http://"
+	// but lws_set_socks currently doesnt accept "socks5://"
+	// in the beggining :/ meh
+	char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+
+	if(!proxy)
+		return -1;
+
+	return lws_set_socks(vhost, proxy + strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR));
+}
+
+void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst, struct lws_vhost *vhost) {
 	struct lws_client_connect_info i;
 
 	memset(&i, 0, sizeof(i));
@@ -171,6 +187,17 @@ void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
 	i.path = "/mqtt";
 	i.host = inst->host;
 	i.protocol = "mqtt";
+
+	if(inst->proxy)
+		switch (aclk_verify_proxy(inst->proxy)) {
+		case SOCKS5:
+			if(_aclk_wss_set_socks(vhost, inst->proxy))
+				error("LWS failed to accept socks proxy.");
+			break;
+		default:
+			error("The proxy could not be set. Unknown proxy type.");
+		}
+
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
 	i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 #else
@@ -238,7 +265,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		//initial connection here
 		//later we will reconnect with delay od ACLK_LWS_WSS_RECONNECT_TIMEOUT
 		//in case this connection fails or drops
-		_aclk_wss_connect(inst);
+		_aclk_wss_connect(inst, lws_get_vhost(wsi));
 		break;
 	case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
 		//TODO if already active make some error noise
@@ -248,7 +275,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 #ifdef AUTO_RECONNECT_ON_LWS_LAYER
 	case LWS_CALLBACK_USER:
 		inst->reconnect_timeout_running = 0;
-		_aclk_wss_connect(inst);
+		_aclk_wss_connect(inst, lws_get_vhost(wsi));
 		break;
 #endif
 	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:

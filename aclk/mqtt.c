@@ -42,7 +42,7 @@ void _link_shutdown()
     return;
 }
 
-int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
+int _link_lib_init(char *aclk_hostname, int aclk_port, const char *aclk_proxy, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
     UNUSED(aclk_hostname);
     UNUSED(aclk_port);
@@ -269,7 +269,7 @@ static const struct aclk_lws_wss_engine_callbacks aclk_lws_engine_callbacks = {
     .data_writable_callback = NULL
 };
 
-int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
+int _link_lib_init(char *aclk_hostname, int aclk_port, const char *aclk_proxy, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
     int rc;
     static int lws_wss_client_initialized = 0;
@@ -278,7 +278,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
         // we will connect when WebSocket connection is up
         // based on callback
         if(!lws_wss_client_initialized) {
-            lws_engine_instance = aclk_lws_wss_client_init(&aclk_lws_engine_callbacks, aclk_hostname, aclk_port);
+            lws_engine_instance = aclk_lws_wss_client_init(&aclk_lws_engine_callbacks, aclk_hostname, aclk_port, aclk_proxy);
             aclk_lws_wss_service_loop(lws_engine_instance);
             lws_wss_client_initialized = 1;
         }
