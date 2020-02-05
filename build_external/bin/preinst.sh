@@ -2,7 +2,7 @@
 
 Distro=$1
 Version=$2
-OutBase=$(cd $(dirname $0) && cd .. && pwd)
+OutBase="$(cd "$(dirname "$0")" && cd .. && pwd)"
 Dockerfile=$OutBase/"$Distro"_"$Version"_preinst.Dockerfile
 ImageName="$Distro"_"$Version"_preinst
 
