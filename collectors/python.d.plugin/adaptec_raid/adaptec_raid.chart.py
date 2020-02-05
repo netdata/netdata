@@ -12,7 +12,7 @@ from bases.collection import find_binary
 
 disabled_by_default = True
 
-update_every = 5
+update_every = 4
 
 ORDER = [
     'ld_status',
