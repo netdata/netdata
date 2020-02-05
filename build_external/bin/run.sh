@@ -17,7 +17,7 @@ fi
 
 docker rm "$ImageName" 2>/dev/null
 
-docker run -it --mount type=bind,source="$AbsSrc",target="$InBase/source" \
+docker run -it --mount "type=bind,source=$AbsSrc,target=$InBase/source" \
            --name "$ImageName" \
            -w "$InBase/source" "$ImageName" \
            "$InBase/install/netdata/usr/sbin/netdata" -D

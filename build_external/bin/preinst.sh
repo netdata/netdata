@@ -9,8 +9,8 @@ ImageName="$Distro"_"$Version"_preinst
 if [ ! -e "$Dockerfile" ]
 then
   echo "Can't build preinstaller from $Dockerfile"
-  return -1
+  return 1
 fi
 
-docker build -t $ImageName -f $Dockerfile $OutBase/empty
+docker build -t "$ImageName" -f "$Dockerfile" "$OutBase/empty"
 
