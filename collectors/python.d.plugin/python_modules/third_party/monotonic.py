@@ -42,9 +42,7 @@
 """
 import time
 
-
 __all__ = ('monotonic',)
-
 
 try:
     monotonic = time.monotonic
@@ -54,16 +52,19 @@ except AttributeError:
     import os
     import sys
     import threading
+
     try:
         if sys.platform == 'darwin':  # OS X, iOS
             # See Technical Q&A QA1398 of the Mac Developer Library:
             #  <https://developer.apple.com/library/mac/qa/qa1398/>
             libc = ctypes.CDLL('/usr/lib/libc.dylib', use_errno=True)
 
+
             class mach_timebase_info_data_t(ctypes.Structure):
                 """System timebase info. Defined in <mach/mach_time.h>."""
                 _fields_ = (('numer', ctypes.c_uint32),
                             ('denom', ctypes.c_uint32))
+
 
             mach_absolute_time = libc.mach_absolute_time
             mach_absolute_time.restype = ctypes.c_uint64
@@ -71,6 +72,7 @@ except AttributeError:
             timebase = mach_timebase_info_data_t()
             libc.mach_timebase_info(ctypes.byref(timebase))
             ticks_per_second = timebase.numer / timebase.denom * 1.0e9
+
 
             def monotonic():
                 """Monotonic clock, cannot go backward."""
@@ -103,6 +105,7 @@ except AttributeError:
                 # Windows Vista / Windows Server 2008 or newer.
                 GetTickCount64.restype = ctypes.c_ulonglong
 
+
                 def monotonic():
                     """Monotonic clock, cannot go backward."""
                     return GetTickCount64() / 1000.0
@@ -115,6 +118,7 @@ except AttributeError:
                 get_tick_count_lock = threading.Lock()
                 get_tick_count_last_sample = 0
                 get_tick_count_wraparounds = 0
+
 
                 def monotonic():
                     """Monotonic clock, cannot go backward."""
@@ -139,10 +143,12 @@ except AttributeError:
                 clock_gettime = ctypes.CDLL(ctypes.util.find_library('rt'),
                                             use_errno=True).clock_gettime
 
+
             class timespec(ctypes.Structure):
                 """Time specification, as described in clock_gettime(3)."""
                 _fields_ = (('tv_sec', ctypes.c_long),
                             ('tv_nsec', ctypes.c_long))
+
 
             if sys.platform.startswith('linux'):
                 CLOCK_MONOTONIC = 1
@@ -154,6 +160,7 @@ except AttributeError:
                 CLOCK_MONOTONIC = 3
             elif sys.platform.startswith('aix'):
                 CLOCK_MONOTONIC = ctypes.c_longlong(10)
+
 
             def monotonic():
                 """Monotonic clock, cannot go backward."""
