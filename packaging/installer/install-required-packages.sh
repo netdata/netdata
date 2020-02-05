@@ -1243,6 +1243,8 @@ validate_tree_centos() {
     opts="-y"
   fi
 
+  echo >&2 " > CentOS Version: ${version} ..."
+
   echo >&2 " > Checking for epel ..."
   if ! rpm -qa | grep epel > /dev/null; then
     if prompt "epel not found, shall I install it?"; then
@@ -1250,7 +1252,7 @@ validate_tree_centos() {
     fi
   fi
 
-  if [ "$VERSION_ID" -eq 8 ]; then
+  if [ "$version" -eq 8 ]; then
     echo >&2 " > Checking for config-manager ..."
     if ! run yum ${sudo} config-manager; then
       if prompt "config-manager not found, shall I install it?"; then
@@ -1269,6 +1271,14 @@ validate_tree_centos() {
     if ! run yum ${sudo} repolist | grep 'getpagespeed-extras'; then
       if prompt "PowerTools not found, shall I install it?"; then
         run ${sudo} yum ${opts} install https://extras.getpagespeed.com/release-el8-latest.rpm
+      fi
+    fi
+  elif [[ "${version}" =~ ^6\..*$ ]]; then
+    echo >&2 " > Detected CentOS 6.x ..."
+    echo >&2 " > Checking for Okay ..."
+    if ! rpm -qa | grep okay > /dev/null; then
+      if prompt "okay not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm
       fi
     fi
   fi
