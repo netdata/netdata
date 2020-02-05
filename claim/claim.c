@@ -106,7 +106,7 @@ void load_claiming_state(void)
 
     FILE *f = fopen(filename, "rt");
     if (unlikely(f == NULL)) {
-        error("File '%s' cannot be opened reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
+        error("File '%s' cannot be opened. Setting state to AGENT_UNCLAIMED.", filename);
         return;
     }
 
