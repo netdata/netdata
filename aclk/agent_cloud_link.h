@@ -3,6 +3,7 @@
 #ifndef NETDATA_AGENT_CLOUD_LINK_H
 #define NETDATA_AGENT_CLOUD_LINK_H
 
+#include "../daemon/common.h"
 #include "mqtt.h"
 
 #define ACLK_JSON_IN_MSGID "msg-id"
@@ -89,11 +90,11 @@ void aclk_connect(void *conn);
 void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents);
 int aclk_send_metadata();
 int aclk_wait_for_initialization();
-int aclk_send_charts(RRDHOST *host, BUFFER *wb);
+//int aclk_send_charts(RRDHOST *host, BUFFER *wb);
 int aclk_send_single_chart(char *host, char *chart);
 int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal);
 struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query);
-void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
+//void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
 int aclk_update_alarm(RRDHOST *host, char *alarm_name);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);

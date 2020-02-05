@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-//#include "../daemon/common.h"
 #include "agent_cloud_link.h"
 
 // Read from the config file -- new section [agent_cloud_link]
@@ -900,7 +899,7 @@ int aclk_send_metadata()
     buffer_sprintf(aclk_buffer,"{\n\t \"info\" : ");
     web_client_api_request_v1_info_fill_buffer(localhost, aclk_buffer);
     buffer_sprintf(aclk_buffer,", \n\t \"charts\" : ");
-    aclk_send_charts(localhost, aclk_buffer);
+    charts2json(localhost, aclk_buffer);
     buffer_sprintf(aclk_buffer,"\n}\n}");
     aclk_buffer->contenttype = CT_APPLICATION_JSON;
 
@@ -942,154 +941,13 @@ int aclk_send_single_chart(char *hostname, char *chart)
 
     aclk_create_header(aclk_buffer, "chart", NULL);
 
-    aclk_rrdset2json(st, aclk_buffer, hostname, target_host == localhost ? 0 : 1);
+    rrdset2json(st, aclk_buffer, NULL, NULL);
     buffer_sprintf(aclk_buffer,"\n}\n}");
 
 
     ACLK_UNLOCK;
     aclk_send_message(ACLK_METADATA_TOPIC, aclk_buffer->buffer);
     return 0;
-}
-
-//rrd_stats_api_v1_chart
-// This is modeled after void charts2json(RRDHOST *host, BUFFER *wb) {
-
-int aclk_send_charts(RRDHOST *host, BUFFER *wb) {
-    static char *custom_dashboard_info_js_filename = NULL;
-    size_t c, dimensions = 0, memory = 0, alarms = 0;
-    RRDSET *st;
-
-    time_t now = now_realtime_sec();
-
-    if(unlikely(!custom_dashboard_info_js_filename))
-        custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
-
-    charts2json_add_host_data(host, wb, custom_dashboard_info_js_filename);
-
-    c = 0;
-    rrdhost_rdlock(host);
-    rrdset_foreach_read(st, host) {
-        if(rrdset_is_available_for_viewers(st)) {
-            if(c) buffer_strcat(wb, ",");
-            buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, st->id);
-            buffer_strcat(wb, "\": ");
-            aclk_rrdset2json(st, wb, host->hostname, host == localhost ? 0 : 1);
-
-            c++;
-            st->last_accessed_time = now;
-        }
-    }
-
-    RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
-        if(rc->rrdset)
-            alarms++;
-    }
-    rrdhost_unlock(host);
-
-    buffer_sprintf(wb
-        , "\n\t}"
-          ",\n\t\"charts_count\": %zu"
-          ",\n\t\"dimensions_count\": %zu"
-          ",\n\t\"alarms_count\": %zu"
-          ",\n\t\"rrd_memory_bytes\": %zu"
-          ",\n\t\"hosts_count\": %zu"
-          ",\n\t\"hosts\": ["
-        , c
-        , dimensions
-        , alarms
-        , memory
-        , rrd_hosts_available
-    );
-
-    if(unlikely(rrd_hosts_available > 1)) {
-        rrd_rdlock();
-
-        size_t found = 0;
-        RRDHOST *h;
-        rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now)) {
-                buffer_sprintf(wb
-                    , "%s\n\t\t{"
-                      "\n\t\t\t\"hostname\": \"%s\""
-                      "\n\t\t}"
-                    , (found > 0) ? "," : ""
-                    , h->hostname
-                );
-
-                found++;
-            }
-        }
-
-        rrd_unlock();
-    }
-    else {
-        buffer_sprintf(wb
-            , "\n\t\t{"
-              "\n\t\t\t\"hostname\": \"%s\""
-              "\n\t\t}"
-            , host->hostname
-        );
-    }
-
-    buffer_sprintf(wb, "\n\t]\n}\n");
-    return 0;
-}
-
-
-void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
-{
-    rrdset_rdlock(st);
-
-    // generate header with no volatile info
-    rrdset2json_header(st, wb, 0);
-
-    size_t dimensions = 0;
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st)
-    {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
-            continue;
-
-        buffer_sprintf(
-            wb,
-            "%s"
-            "\t\t\t\t\"%s\": { \"name\": \"%s\" }",
-            dimensions ? ",\n" : "", rd->id, rd->name);
-
-        dimensions++;
-    }
-
-    buffer_sprintf(wb, "\n\t\t\t},\n\t\t\t\"chart_variables\": ");
-    health_api_v1_chart_custom_variables2json(st, wb);
-
-    buffer_strcat(wb, ",\n\t\t\t\"green\": ");
-    buffer_rrd_value(wb, st->green);
-    buffer_strcat(wb, ",\n\t\t\t\"red\": ");
-    buffer_rrd_value(wb, st->red);
-
-//    buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
-//    size_t alarms = 0;
-//    RRDCALC *rc;
-//    for (rc = st->alarms; rc; rc = rc->rrdset_next) {
-//        buffer_sprintf(
-//            wb,
-//            "%s"
-//            "\t\t\t\t\"%s\": {\n"
-//            "\t\t\t\t\t\"id\": %u,\n"
-//            "\t\t\t\t\t\"status\": \"%s\",\n"
-//            "\t\t\t\t\t\"units\": \"%s\",\n"
-//            "\t\t\t\t\t\"update_every\": %d\n"
-//            "\t\t\t\t}",
-//            (alarms) ? ",\n" : "", rc->name, rc->id, rrdcalc_status2string(rc->status), rc->units, rc->update_every);
-//
-//        alarms++;
-//    }
-
-    buffer_sprintf(wb, "\n\t\t\t}\n\t\t}");
-
-    rrdset_unlock(st);
 }
 
 int    aclk_update_chart(RRDHOST *host, char *chart_name)
