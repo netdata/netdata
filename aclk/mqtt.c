@@ -13,21 +13,27 @@ extern int cmdpause;
 
 inline const char *_link_strerror(int rc)
 {
+    (void) rc;
     return "no error";
 }
 
 int _link_event_loop(int timeout)
 {
+    (void) timeout;
     return 0;
 }
 
 int _link_send_message(char *topic, char *message)
 {
+    (void) topic;
+    (void) message;
     return 0;
 }
 
 int _link_subscribe(char  *topic, int qos)
 {
+    (void) topic;
+    (void) qos;
     return 0;
 }
 
@@ -38,6 +44,10 @@ void _link_shutdown()
 
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
+    (void) aclk_hostname;
+    (void) aclk_port;
+    (void) on_connect;
+    (void) on_disconnect;
     return 0;
 }
 

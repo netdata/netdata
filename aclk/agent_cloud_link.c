@@ -425,8 +425,8 @@ int aclk_process_query()
 
     query_count++;
     info(
-        "Query #%ld (%s) (%s) in queue %ld seconds", query_count, this_query->topic, this_query->query,
-        now_realtime_sec() - this_query->created);
+        "Query #%d (%s) (%s) in queue %d seconds", (int) query_count, this_query->topic, this_query->query,
+        (int) (now_realtime_sec() - this_query->created));
 
     if (strncmp((char *)this_query->query, "/api/v1/", 8) == 0) {
         struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
@@ -490,7 +490,7 @@ int aclk_process_queries()
     if (likely(!aclk_queue.count))
         return 0;
 
-    info("Processing %ld queries", aclk_queue.count);
+    info("Processing %d queries", (int ) aclk_queue.count);
 
     while (aclk_process_query()) {
         //rc = _link_event_loop(0);
@@ -596,7 +596,6 @@ void *aclk_main(void *ptr)
     waiting_init = 0;
 
     while (!netdata_exit) {
-
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
         // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
         if (likely(!is_agent_claimed())) {
@@ -612,7 +611,7 @@ void *aclk_main(void *ptr)
                 _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
                 continue;
             }
-            initializing=1;
+            initializing = 1;
             info("Initializing connection");
             //send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
             if (unlikely(aclk_init(ACLK_INIT))) {
@@ -629,10 +628,11 @@ void *aclk_main(void *ptr)
         if (unlikely(!aclk_subscribed)) {
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
         }
-
-        if (unlikely(!query_thread.thread))
-            netdata_thread_create(&(query_thread.thread) , "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT,
-                aclk_query_main_thread, &query_thread);
+        if (unlikely(!query_thread.thread)) {
+            query_thread.thread = mallocz(sizeof(netdata_thread_t));
+            netdata_thread_create(
+                query_thread.thread, "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, &query_thread);
+        }
 
         //TODO: Check if there is a return code
         _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
@@ -950,6 +950,8 @@ int aclk_send_single_chart(char *hostname, char *chart)
 
 int    aclk_update_chart(RRDHOST *host, char *chart_name)
 {
+    (void) host;
+    (void) chart_name;
 #ifndef ACLK_ENABLE
     return 0;
 #else
