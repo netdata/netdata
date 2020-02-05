@@ -38,5 +38,5 @@ run docker run -a stdin -a stdout -a stderr -i -t -v \
   /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 
 if [ "${USER}" ]; then
-  chown -R "${USER}" .
+  sudo chown -R "${USER}" .
 fi
