@@ -803,7 +803,7 @@ void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         dest,
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
-        "\t\"version\": %d,\n"
+        "\t\"version\": %s,\n"
         "\t\"payload\": ",
         type, msg_id, ACLK_VERSION);
 }
