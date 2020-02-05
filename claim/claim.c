@@ -21,8 +21,7 @@ static char *claiming_errors[] = {
         "internal server error"                         // 12
 };
 
-#define AGENT_UNCLAIMED 0
-#define AGENT_CLAIMED 1
+
 static char *claimed_id = NULL;
 
 char *is_agent_claimed(void)

@@ -58,8 +58,10 @@ inline const char *_link_strerror(int rc)
 
 
 void mqtt_message_callback(
-    struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg)
+    struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
+    (void) mosq;
+    (void) obj;
 
     // TODO: handle commands in a more efficient way, if we have many
 
@@ -92,8 +94,11 @@ void mqtt_message_callback(
 
 }
 
-void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
+void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
+    (void) obj;
+    (void) rc;
+
     info("Connection to cloud estabilished");
 
     aclk_connection_initialized = 1;
@@ -103,8 +108,11 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
 }
 
 
-void disconnect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
+void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
+    (void) obj;
+    (void) rc;
+
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.
 

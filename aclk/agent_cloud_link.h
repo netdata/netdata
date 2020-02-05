@@ -100,10 +100,4 @@ int aclk_update_alarm(RRDHOST *host, char *alarm_name);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);
 int aclk_submit_request(struct aclk_request *);
-
-
-
-extern const char* get_release_channel();
-
-
 #endif //NETDATA_AGENT_CLOUD_LINK_H

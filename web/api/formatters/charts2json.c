@@ -4,7 +4,7 @@
 
 // generate JSON for the /api/v1/charts API call
 
-inline const char* get_release_channel() {
+static inline const char* get_release_channel() {
     static int use_stable = -1;
 
     if (use_stable == -1) {

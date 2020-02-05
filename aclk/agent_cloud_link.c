@@ -194,7 +194,7 @@ struct aclk_query *aclk_query_find(char *topic, char *data, char *msg_id, char *
 
 int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run_after, int internal)
 {
-    struct aclk_query *new_query, *tmp_query, *last_query;
+    struct aclk_query *new_query, *tmp_query;
 
     // Ignore all commands while we wait for the agent to initialize
     if (unlikely(waiting_init))
@@ -402,9 +402,8 @@ int aclk_wait_for_initialization()
 int aclk_process_query()
 {
     struct aclk_query *this_query;
-    static time_t last_beat = 0;
     static u_int64_t query_count = 0;
-    int rc;
+    //int rc;
 
     if (unlikely(cmdpause))
         return 0;
@@ -426,7 +425,7 @@ int aclk_process_query()
 
     query_count++;
     info(
-        "Query #%d (%s) (%s) in queue %d seconds", query_count, this_query->topic, this_query->query,
+        "Query #%ld (%s) (%s) in queue %ld seconds", query_count, this_query->topic, this_query->query,
         now_realtime_sec() - this_query->created);
 
     if (strncmp((char *)this_query->query, "/api/v1/", 8) == 0) {
@@ -446,7 +445,8 @@ int aclk_process_query()
 
         mysep = strrchr(this_query->query, '/');
 
-        rc = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        // TODO: ignore return code for now
+        web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
 
         //TODO: handle bad response perhaps in a different way. For now it does to the payload
         //if (rc == HTTP_RESP_OK || 1) {
@@ -483,8 +483,6 @@ int aclk_process_query()
 
 int aclk_process_queries()
 {
-    int rc;
-
     if (unlikely(cmdpause))
         return 0;
 
@@ -511,7 +509,6 @@ static void aclk_query_thread_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-#define QUERY_LOCK
 /**
  * MAin query processing thread
  *
@@ -521,7 +518,6 @@ void *aclk_query_main_thread(void *ptr)
     netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
 
     while (!netdata_exit) {
-        int rc;
 
         QUERY_THREAD_LOCK;
 
@@ -600,7 +596,6 @@ void *aclk_main(void *ptr)
     waiting_init = 0;
 
     while (!netdata_exit) {
-        int rc;
 
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
         // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
@@ -636,10 +631,11 @@ void *aclk_main(void *ptr)
         }
 
         if (unlikely(!query_thread.thread))
-            netdata_thread_create(&query_thread.thread , "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT,
+            netdata_thread_create(&(query_thread.thread) , "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT,
                 aclk_query_main_thread, &query_thread);
 
-        rc = _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+        //TODO: Check if there is a return code
+        _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
 
     } // forever
     aclk_shutdown();
@@ -731,6 +727,7 @@ int aclk_subscribe(char *sub_topic, int qos)
 // This is called from a callback when the link goes up
 void aclk_connect(void *ptr)
 {
+    (void) ptr;
     info("Connection detected");
     return;
 }
@@ -738,6 +735,7 @@ void aclk_connect(void *ptr)
 // This is called from a callback when the link goes down
 void aclk_disconnect(void *ptr)
 {
+    (void) ptr;
     info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
@@ -745,8 +743,6 @@ void aclk_disconnect(void *ptr)
 
 void aclk_shutdown()
 {
-    int rc;
-
     info("Shutdown initiated");
     aclk_connection_initialized = 0;
     _link_shutdown();
@@ -755,6 +751,8 @@ void aclk_shutdown()
 
 int aclk_init(ACLK_INIT_ACTION action)
 {
+    (void) action;
+
     static int init = 0;
     int rc;
 
