@@ -342,7 +342,6 @@ AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
-
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
 
@@ -1146,6 +1145,7 @@ AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CFLAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
+AC_SUBST([OPTIONAL_MQTT_LIBS])
 AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
 AC_SUBST([OPTIONAL_LIBCAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
@@ -1284,6 +1284,7 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
+    aclk/Makefile
 ])
 AC_OUTPUT
 
