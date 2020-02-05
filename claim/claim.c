@@ -93,22 +93,28 @@ void load_claiming_state(void)
     struct stat statbuf;
 
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
+
     // check if the file exists
     if (lstat(filename, &statbuf) != 0) {
-        info("File '%s' was not found. Setting state to AGENT_UNCLAIMED.", filename);
-    } else {
-        if (likely(statbuf.st_size)) {
-            FILE *f = fopen(filename, "rt");
-            if (likely(f)) {
-                claimed_id = callocz(1, statbuf.st_size + 1);
-                size_t bytes_read = fread(claimed_id, 1, statbuf.st_size, f);
-                claimed_id[bytes_read] = 0;
-                info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-                fclose(f);
-            } else
-                error("File '%s' cannot be read. Setting state to AGENT_UNCLAIMED.", filename);
-        } else
-            info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
+        info("lstat on File '%s' failed reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
+        return;
     }
+    if (unlikely(statbuf.st_size == 0)) {
+        info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
+        return;
+    }
+
+    FILE *f = fopen(filename, "rt");
+    if (unlikely(f == NULL)) {
+        error("File '%s' cannot be opened reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
+        return;
+    }
+
+    claimed_id = callocz(1, statbuf.st_size + 1);
+    size_t bytes_read = fread(claimed_id, 1, statbuf.st_size, f);
+    claimed_id[bytes_read] = 0;
+    info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+    fclose(f);
+
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 }
