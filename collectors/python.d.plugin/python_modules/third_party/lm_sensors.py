@@ -11,6 +11,7 @@ see example.py for high level API usage.
 @copyright: LGPLv2 (same as libsensors) <http://opensource.org/licenses/LGPL-2.1>
 """
 
+
 from ctypes import *
 import ctypes.util
 
