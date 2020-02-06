@@ -610,9 +610,10 @@ static void aclk_main_cleanup(void *ptr)
 void *aclk_main(void *ptr)
 {
     //netdata_thread_t *query_thread;
-    struct netdata_static_thread query_thread;
 
-    memset(&query_thread, 0, sizeof(query_thread));
+    struct netdata_static_thread *query_thread;
+
+    query_thread = callocz(1, sizeof(query_thread));
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
@@ -621,8 +622,6 @@ void *aclk_main(void *ptr)
 
     assert(aclk_buffer != NULL);
 
-    //netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
-    //netdata_thread_create(&query_thread.thread , "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, &query_thread);
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
         sleep_usec(USEC_PER_MS * 300);
@@ -667,10 +666,10 @@ void *aclk_main(void *ptr)
         if (unlikely(!aclk_subscribed)) {
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
         }
-        if (unlikely(!query_thread.thread)) {
-            query_thread.thread = mallocz(sizeof(netdata_thread_t));
+        if (unlikely(!query_thread->thread)) {
+            query_thread->thread = mallocz(sizeof(netdata_thread_t));
             netdata_thread_create(
-                query_thread.thread, "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, &query_thread);
+                query_thread->thread, "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, query_thread);
         }
 
         //TODO: Check if there is a return code
