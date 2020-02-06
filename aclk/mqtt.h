@@ -3,7 +3,7 @@
 #ifndef NETDATA_MQTT_H
 #define NETDATA_MQTT_H
 
-#ifdef ACLK_ENABLE
+#ifdef ENABLE_ACLK
 #include "mosquitto/lib/mosquitto.h"
 #endif
 

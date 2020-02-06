@@ -9,7 +9,7 @@ void (*_on_disconnect)(void *ptr) = NULL;
 extern int cmdpause;
 
 
-#ifndef ACLK_ENABLE
+#ifndef ENABLE_ACLK
 
 inline const char *_link_strerror(int rc)
 {

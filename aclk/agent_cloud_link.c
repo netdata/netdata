@@ -559,7 +559,7 @@ void *aclk_query_main_thread(void *ptr)
         QUERY_THREAD_UNLOCK;
 
     } // forever
-    info("Shuttign down query processing thread");
+    info("Shutting down query processing thread");
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
@@ -973,7 +973,7 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
 {
     (void) host;
     (void) chart_name;
-#ifndef ACLK_ENABLE
+#ifndef ENABLE_ACLK
     return 0;
 #else
     if (host != localhost)

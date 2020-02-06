@@ -535,7 +535,7 @@ NETDATA_FILES = \
     $(CLAIM_PLUGIN_FILES) \
     $(NULL)
 
-if ACLK_ENABLE
+if ENABLE_ACLK
     NETDATA_FILES += \
         $(ACLK_PLUGIN_FILES) \
         $(NULL)
@@ -592,7 +592,7 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 
-if ACLK_ENABLE
+if ENABLE_ACLK
 netdata_LDADD = \
     mosquitto/lib/libmosquitto.a \
     $(NETDATA_COMMON_LIBS) \
