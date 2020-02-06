@@ -86,6 +86,7 @@ netdata_ebpf_events_t collector_events[] = {
         { .type = 'p', .name = "release_task" },
         { .type = 'r', .name = "_do_fork" },
         { .type = 'r', .name = "__close_fd" },
+        { .type = 'r', .name = "__x64_sys_clone" },
         { .type = 0, .name = NULL }
 };
 
@@ -732,6 +733,9 @@ static void change_collector_event() {
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
+
+    if (mykernel < 328448)
+        collector_events[i].name = NULL;
 }
 
 static void what_to_load(char *ptr) {
