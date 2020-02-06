@@ -35,6 +35,11 @@ sed -i -e '0,/# Netdata /s//# Netdata Documentation\n\n/' ${SRC_DIR}/README.md
 # Remove all GA tracking code
 find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
 
+# Remove "monitoring" suffix from collectors readme
+if [ -d ${SRC_DIR}/collectors/ ]; then
+  find ${SRC_DIR}/collectors/ -type f -name 'README.md' -exec sed -i -e '1 s|\(^#.*\) [Mm]onitoring|\1|' {} \;
+fi
+
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
 	"HISTORICAL_CHANGELOG.md"
