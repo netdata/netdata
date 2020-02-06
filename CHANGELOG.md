@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Fixes static builds and nightlies [\#7971](https://github.com/netdata/netdata/pull/7971) ([prologic](https://github.com/prologic))
+- Adds GHA Workflow to actually Build the Agent across all the OS/Distro\(s\) we support today [\#7969](https://github.com/netdata/netdata/pull/7969) ([prologic](https://github.com/prologic))
 - Indicate FreeIPMI supported in Docker image [\#7964](https://github.com/netdata/netdata/pull/7964) ([lassebm](https://github.com/lassebm))
 - Fix cmake build error [\#7960](https://github.com/netdata/netdata/pull/7960) ([mfundul](https://github.com/mfundul))
 - /pythond.d/UrlService.py: add body [\#7956](https://github.com/netdata/netdata/pull/7956) ([ilyam8](https://github.com/ilyam8))
@@ -15,7 +16,12 @@
 - Fix wrong code fragments in signing in [\#7950](https://github.com/netdata/netdata/pull/7950) ([cakrit](https://github.com/cakrit))
 - Adds a GHA workflow to test install-required-packages [\#7949](https://github.com/netdata/netdata/pull/7949) ([prologic](https://github.com/prologic))
 - install go.d.plugin only if there is new version [\#7946](https://github.com/netdata/netdata/pull/7946) ([ilyam8](https://github.com/ilyam8))
+- Adds support for only performing updates if there is a newer version [\#7939](https://github.com/netdata/netdata/pull/7939) ([prologic](https://github.com/prologic))
+- Fixes error/warnings found by shellcheck for ./packaging/installer/netdata-updater.sh [\#7938](https://github.com/netdata/netdata/pull/7938) ([prologic](https://github.com/prologic))
+- Re-formatts ./packaging/installer/netdata-updater.sh with shfmt -w -i 2 -ci -sr [\#7937](https://github.com/netdata/netdata/pull/7937) ([prologic](https://github.com/prologic))
 - Fixes a typo in ./packaging/installer/functions.sh with wrong message for updater cron script [\#7934](https://github.com/netdata/netdata/pull/7934) ([prologic](https://github.com/prologic))
+- Fixes support for editing configuration when NetData is installed to a symlinked /opt [\#7933](https://github.com/netdata/netdata/pull/7933) ([prologic](https://github.com/prologic))
+- Re-formats ./system/edit-config.in with shfmt -w -i 2 -ci -sr [\#7932](https://github.com/netdata/netdata/pull/7932) ([prologic](https://github.com/prologic))
 - Fixes a bug in DO\_NOT\_TRACK expression [\#7929](https://github.com/netdata/netdata/pull/7929) ([prologic](https://github.com/prologic))
 - Assorted cleanup items in the RPM spec file. [\#7927](https://github.com/netdata/netdata/pull/7927) ([Ferroin](https://github.com/Ferroin))
 - /collectors/python.d/varnish: collect smf metrics [\#7926](https://github.com/netdata/netdata/pull/7926) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +32,7 @@
 - Adds new simpler \(Alpine based\) Dockerfile for quick dev and testing [\#7914](https://github.com/netdata/netdata/pull/7914) ([prologic](https://github.com/prologic))
 - Add doc with post-install instructions for GCP [\#7912](https://github.com/netdata/netdata/pull/7912) ([joelhans](https://github.com/joelhans))
 - Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
+- Adds docs for how to build/install NetData on CentOS 8.x [\#7890](https://github.com/netdata/netdata/pull/7890) ([prologic](https://github.com/prologic))
 - Clarify editing health config files in health quickstart [\#7883](https://github.com/netdata/netdata/pull/7883) ([joelhans](https://github.com/joelhans))
 - installer: include go.d.plugin version v0.15.0 [\#7882](https://github.com/netdata/netdata/pull/7882) ([ilyam8](https://github.com/ilyam8))
 - Missing extern [\#7877](https://github.com/netdata/netdata/pull/7877) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -114,7 +121,6 @@
 - Clean up host labels in API responses [\#7616](https://github.com/netdata/netdata/pull/7616) ([vlvkobal](https://github.com/vlvkobal))
 - python.d logger: do not unicode decode if it is already unicode [\#7614](https://github.com/netdata/netdata/pull/7614) ([ilyam8](https://github.com/ilyam8))
 - Fix a warning in prometheus remote write backend [\#7609](https://github.com/netdata/netdata/pull/7609) ([vlvkobal](https://github.com/vlvkobal))
-- python.d.plugin: UrlService bytes decode, logger unicode encoding fix [\#7601](https://github.com/netdata/netdata/pull/7601) ([ilyam8](https://github.com/ilyam8))
 - Adjust alarm labels [\#7600](https://github.com/netdata/netdata/pull/7600) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Improve documentation of opting out of anonymous statistics [\#7597](https://github.com/netdata/netdata/pull/7597) ([joelhans](https://github.com/joelhans))
 - Update handling of shutdown of the Netdata agent on update and uninstall. [\#7595](https://github.com/netdata/netdata/pull/7595) ([Ferroin](https://github.com/Ferroin))
@@ -154,10 +160,6 @@
 - Fix missing streaming when slave has SSL activated. [\#7306](https://github.com/netdata/netdata/pull/7306) ([thiagoftsm](https://github.com/thiagoftsm))
 - apps.plugin: add process group for git-related processes [\#7289](https://github.com/netdata/netdata/pull/7289) ([nodiscc](https://github.com/nodiscc))
 - container-engines: add balena\* to apps\_group.conf [\#7287](https://github.com/netdata/netdata/pull/7287) ([xginn8](https://github.com/xginn8))
-- Initial CMocka testing against web\_client.c \(issue \#7229\). [\#7264](https://github.com/netdata/netdata/pull/7264) ([amoss](https://github.com/amoss))
-- Remove documentation about kickstart-static64.sh and netdata updater [\#7262](https://github.com/netdata/netdata/pull/7262) ([knatsakis](https://github.com/knatsakis))
-- Upgraded swagger docs from Dolphin tool. [\#7257](https://github.com/netdata/netdata/pull/7257) ([amoss](https://github.com/amoss))
-- web\_log: treat 401 Unauthorized requests as successful [\#7256](https://github.com/netdata/netdata/pull/7256) ([amichelic](https://github.com/amichelic))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
