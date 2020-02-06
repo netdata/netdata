@@ -10,12 +10,37 @@ quickstart](QUICKSTART.md).
 
 ## What's in this reference guide
 
+-   [Netdata's collector architecture](#netdatas-collector-architecture)
 -   [Enable and disable plugins](#enable-and-disable-plugins)
 -   [Enable, configure, and disable modules](#enable-configure-and-disable-modules)
 -   [Internal plugins](#internal-plugins)
     -   [Internal plugins API](#internal-plugins-api)
 -   [External plugins](#external-plugins)
 -   [Write a custom collector](#write-a-custom-collector)
+
+## Netdata's collector architecture
+
+Netdata has a intricate system for organizing and managing its collectors. **Collectors** are the processes/programs
+that actually gather metrics from various sources. Collectors are organized by **plugins**, which help manage all the
+independent processes in a variety of programming languages based on their purpose and performance requirements.
+**Modules** are a type of collector, used primarily to connect to external applications, such as an Nginx web server or
+MySQL database, among many others.
+
+For most users, enabling individual collectors for the application/service you're interested in is far more important
+than knowing which plugin it uses. See our [collectors list](COLLECTORS.md) to see whether your favorite app/service has
+a collector, and then read the [collectors quickstart](QUICKSTART.md) and the documentation for that specific collector
+to figure out how to enable it.
+
+There are three types of plugins:
+
+-   **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
+    They are written in `C`, and run as threads within the Netdata daemon.
+-   **External** plugins organize collecotrs that gather metrics from external processes, such as a MySQL database or
+    Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
+    independent processes. They communicate with the daemon via pipes.
+-   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
+    type of collector. We have a few plugin orchestrators available for those who want to develop their own collectors,
+    but focus most of our efforts on the [Go plugin](go.d.plugin/).
 
 ## Enable and disable plugins
 
@@ -82,8 +107,8 @@ Each file should provide plenty of examples and documentation about each module 
 
 ## Internal plugins
 
-Each of the internal plugins runs as a thread inside the `netdata` daemon.
-Once this thread has started, the plugin may spawn additional threads according to its design.
+Each of the internal plugins runs as a thread inside the `netdata` daemon. Once this thread has started, the plugin may
+spawn additional threads according to its design.
 
 ### Internal plugins API
 
@@ -144,4 +169,4 @@ through this, is to examine what other similar plugins do.
 
 ## Write a custom collector
 
-You can add custom collectors by following the [external plugins guide](../collectors/plugins.d/).
+You can add custom collectors by following the [external plugins documentation](../collectors/plugins.d/).

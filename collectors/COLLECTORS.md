@@ -14,7 +14,11 @@ collector—we may be looking for contributions from users such as yourself!
 
 -   [Internal plugins](#internal-plugins)
 -   [External plugins](#external-plugins)
+-   [Collector modules (via plugin orchestrators)](#collector-modules-via-plugin-orchestrators)
     -   [charts.d.plugin (Bash)](#chartsdplugin-bash)
+    -   [go.d.plugin (Go)](#godplugin-go)
+    -   [node.d.plugin (NodeJS)](#nodedplugin-nodejs)
+    -   [python.d.plugin (Python)](#pythondplugin-python)
 -   [Third-party plugins](#third-party-plugins)
 
 ## Internal plugins
@@ -51,7 +55,7 @@ collector—we may be looking for contributions from users such as yourself!
 
 ## Collector modules (via plugin orchestrators)
 
-### charts.d.plugin Bash
+### charts.d.plugin (Bash)
 
 | name                                             | monitors                                | description                                                                                                  |
 | :----------------------------------------------- | :-------------------------------------- | :------------------------------------------------------------------------------------------------------------|
