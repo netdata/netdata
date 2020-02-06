@@ -106,7 +106,11 @@ void mqtt_message_callback(
 }
 
 int lws_wss_client_initialized = 0;
-int mqtt_over_websockets = 1; //TODO read this from config in future??
+
+// This is not define because in future we might want to try plain
+// MQTT as fallback ?
+// e.g. try 1st MQTT-WSS, 2nd MQTT plain, 3rd https fallback...
+int mqtt_over_websockets = 1;
 struct aclk_lws_wss_engine_instance *lws_engine_instance = NULL;
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
