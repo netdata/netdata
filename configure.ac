@@ -342,7 +342,6 @@ AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
-
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
 
@@ -407,6 +406,19 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# ACLK
+AC_MSG_CHECKING([if netdata ACLK should be enabled])
+if test "${ACLK}" = "yes"; then
+    enable_aclk="yes"
+    AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+    CFLAGS="${CFLAGS} -DENABLE_ACLK"
+else
+    enable_aclk="no"
+fi
+AC_MSG_RESULT([${enable_aclk}])
+AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # Exporting engine
@@ -1146,6 +1158,7 @@ AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CFLAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
+AC_SUBST([OPTIONAL_MQTT_LIBS])
 AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
 AC_SUBST([OPTIONAL_LIBCAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
@@ -1284,6 +1297,7 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
+    aclk/Makefile
 ])
 AC_OUTPUT
 

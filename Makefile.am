@@ -100,6 +100,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+    aclk \
     $(NULL)
 
 
@@ -108,6 +109,7 @@ AM_CFLAGS = \
     $(OPTIONAL_NFACCT_CFLAGS) \
     $(OPTIONAL_ZLIB_CFLAGS) \
     $(OPTIONAL_UUID_CFLAGS) \
+    $(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
@@ -456,6 +458,13 @@ CLAIM_PLUGIN_FILES = \
     claim/claim.h \
     $(NULL)
 
+ACLK_PLUGIN_FILES = \
+    aclk/agent_cloud_link.c \
+    aclk/agent_cloud_link.h \
+    aclk/mqtt.c \
+    aclk/mqtt.h \
+    $(NULL)
+
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
     exporting/exporting_engine.h \
@@ -526,6 +535,12 @@ NETDATA_FILES = \
     $(CLAIM_PLUGIN_FILES) \
     $(NULL)
 
+if ENABLE_ACLK
+    NETDATA_FILES += \
+        $(ACLK_PLUGIN_FILES) \
+        $(NULL)
+endif
+
 if FREEBSD
     NETDATA_FILES += \
         $(FREEBSD_PLUGIN_FILES) \
@@ -559,6 +574,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_ZLIB_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_UUID_LIBS) \
+    $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
     $(OPTIONAL_JUDY_LIBS) \
@@ -575,9 +591,18 @@ NETDATACLI_FILES = \
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
+
+if ENABLE_ACLK
+netdata_LDADD = \
+    mosquitto/lib/libmosquitto.a \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+else
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
+endif
+
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else

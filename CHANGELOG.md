@@ -6,9 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix permissions issues caused by 986bc2052. [\#7984](https://github.com/netdata/netdata/pull/7984) ([Ferroin](https://github.com/Ferroin))
+- collectors: apps.plugin: apps\_groups: update ceph & samba collections. [\#7982](https://github.com/netdata/netdata/pull/7982) ([k0ste](https://github.com/k0ste))
+- /collectors/python.d.plugin/third\_party: patch monotonic synology6 [\#7980](https://github.com/netdata/netdata/pull/7980) ([ilyam8](https://github.com/ilyam8))
+- Fix typos in docs/step-by-step/step-06.md [\#7978](https://github.com/netdata/netdata/pull/7978) ([joelhans](https://github.com/joelhans))
 - Fixes static builds and nightlies [\#7971](https://github.com/netdata/netdata/pull/7971) ([prologic](https://github.com/prologic))
 - Adds GHA Workflow to actually Build the Agent across all the OS/Distro\(s\) we support today [\#7969](https://github.com/netdata/netdata/pull/7969) ([prologic](https://github.com/prologic))
 - Indicate FreeIPMI supported in Docker image [\#7964](https://github.com/netdata/netdata/pull/7964) ([lassebm](https://github.com/lassebm))
+- CODEOWNERS: change collectors/charts.d.plugin/ owners [\#7963](https://github.com/netdata/netdata/pull/7963) ([ilyam8](https://github.com/ilyam8))
 - Fix cmake build error [\#7960](https://github.com/netdata/netdata/pull/7960) ([mfundul](https://github.com/mfundul))
 - /pythond.d/UrlService.py: add body [\#7956](https://github.com/netdata/netdata/pull/7956) ([ilyam8](https://github.com/ilyam8))
 - netdata-updater.sh: explicitly return 0 from update [\#7955](https://github.com/netdata/netdata/pull/7955) ([ilyam8](https://github.com/ilyam8))
@@ -40,6 +45,7 @@
 - .travis.yml: Add -fno-common to CFLAGS [\#7870](https://github.com/netdata/netdata/pull/7870) ([candrews](https://github.com/candrews))
 - Add disk size detection to system-info.sh. [\#7866](https://github.com/netdata/netdata/pull/7866) ([Ferroin](https://github.com/Ferroin))
 - /collectors/python.d: remove unbound module [\#7853](https://github.com/netdata/netdata/pull/7853) ([ilyam8](https://github.com/ilyam8))
+- Stream with version [\#7851](https://github.com/netdata/netdata/pull/7851) ([thiagoftsm](https://github.com/thiagoftsm))
 - python.d/retroshare: add readme [\#7849](https://github.com/netdata/netdata/pull/7849) ([ilyam8](https://github.com/ilyam8))
 - Fixes and improves the installer/updater shell scripts. [\#7847](https://github.com/netdata/netdata/pull/7847) ([prologic](https://github.com/prologic))
 - Adds support for opting out of telemetry via the DO\_NOT\_TRACK envirnment variable [\#7846](https://github.com/netdata/netdata/pull/7846) ([prologic](https://github.com/prologic))
@@ -95,6 +101,7 @@
 - Fix PR labeling GitHub Action. [\#7697](https://github.com/netdata/netdata/pull/7697) ([Ferroin](https://github.com/Ferroin))
 - Fixes \#7680 Remote write [\#7694](https://github.com/netdata/netdata/pull/7694) ([Ehekatl](https://github.com/Ehekatl))
 - Fix unclosed brackets in softnet alarm [\#7693](https://github.com/netdata/netdata/pull/7693) ([Ehekatl](https://github.com/Ehekatl))
+- Support static builds for Prometheus remote write [\#7691](https://github.com/netdata/netdata/pull/7691) ([Ehekatl](https://github.com/Ehekatl))
 - Adds a Dockerfile.docs for more easily and reproducibly building/rebuilding docs [\#7688](https://github.com/netdata/netdata/pull/7688) ([prologic](https://github.com/prologic))
 - Fix a syntax error in the packaging functions. [\#7686](https://github.com/netdata/netdata/pull/7686) ([Ferroin](https://github.com/Ferroin))
 - Add missing quoting in shell scripts. [\#7685](https://github.com/netdata/netdata/pull/7685) ([Ferroin](https://github.com/Ferroin))
@@ -119,8 +126,6 @@
 - Add Ubuntu 19.10 to packaging and lifecycle checks. [\#7629](https://github.com/netdata/netdata/pull/7629) ([Ferroin](https://github.com/Ferroin))
 - Remove EOL distros from CI jobs. [\#7628](https://github.com/netdata/netdata/pull/7628) ([Ferroin](https://github.com/Ferroin))
 - Clean up host labels in API responses [\#7616](https://github.com/netdata/netdata/pull/7616) ([vlvkobal](https://github.com/vlvkobal))
-- python.d logger: do not unicode decode if it is already unicode [\#7614](https://github.com/netdata/netdata/pull/7614) ([ilyam8](https://github.com/ilyam8))
-- Fix a warning in prometheus remote write backend [\#7609](https://github.com/netdata/netdata/pull/7609) ([vlvkobal](https://github.com/vlvkobal))
 - Adjust alarm labels [\#7600](https://github.com/netdata/netdata/pull/7600) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Improve documentation of opting out of anonymous statistics [\#7597](https://github.com/netdata/netdata/pull/7597) ([joelhans](https://github.com/joelhans))
 - Update handling of shutdown of the Netdata agent on update and uninstall. [\#7595](https://github.com/netdata/netdata/pull/7595) ([Ferroin](https://github.com/Ferroin))
@@ -158,8 +163,6 @@
 - Updating the Travis pipeline \(issue 7189\) [\#7312](https://github.com/netdata/netdata/pull/7312) ([amoss](https://github.com/amoss))
 - CMocka tests for Issue 7274 [\#7308](https://github.com/netdata/netdata/pull/7308) ([amoss](https://github.com/amoss))
 - Fix missing streaming when slave has SSL activated. [\#7306](https://github.com/netdata/netdata/pull/7306) ([thiagoftsm](https://github.com/thiagoftsm))
-- apps.plugin: add process group for git-related processes [\#7289](https://github.com/netdata/netdata/pull/7289) ([nodiscc](https://github.com/nodiscc))
-- container-engines: add balena\* to apps\_group.conf [\#7287](https://github.com/netdata/netdata/pull/7287) ([xginn8](https://github.com/xginn8))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
