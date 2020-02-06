@@ -12,7 +12,7 @@ struct aclk_lws_wss_perconnect_data {
 int aclk_lws_wss_use_ssl = 1;
 
 struct lws_wss_packet_buffer {
-	void* data;
+	char* data;
 	size_t data_size;
 	struct lws_wss_packet_buffer *next;
 };
@@ -285,7 +285,7 @@ int aclk_lws_wss_client_read(struct aclk_lws_wss_engine_instance *inst, void *bu
 
 	aclk_lws_mutex_lock(&inst->read_buf_mutex);
 	size_t readable_byte_count = lws_ring_get_count_waiting_elements(inst->read_ringbuffer, NULL);
-	if(unlikely(readable_byte_count <= 0)) {
+	if(unlikely(readable_byte_count == 0)) {
 		errno = EAGAIN;
 		data_to_be_read = -1;
 		goto abort;
