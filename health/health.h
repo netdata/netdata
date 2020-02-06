@@ -52,7 +52,7 @@ extern unsigned int default_health_enabled;
 
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
-char *silencers_filename;
+extern char *silencers_filename;
 
 extern void health_init(void);
 extern void *health_main(void *ptr);

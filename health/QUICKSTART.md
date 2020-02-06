@@ -8,18 +8,43 @@ To learn about more advanced health configurations, visit the [health reference 
 
 ## What's in this getting started guide
 
--   [Locate health configuration files](#locate-health-configuration-files)
--   [Edit existing health configuration files](#edit-existing-health-configuration-files)
+-   [Edit health configuration files](#edit-health-configuration-files)
+-   [Reference Netdata's stock health configuration files](#reference-netdatas-stock-health-configuration-files)
 -   [Write a new health entity](#write-a-new-health-entity)
 -   [Reload health configuration](#reload-health-configuration)
 
-## Locate health configuration files
+## Edit health configuration files
 
-By default, Netdata will put health configuration files in `/usr/lib/netdata/conf.d/health.d`.
+You should use `edit-config` to edit Netdata's health configuration files. `edit-config` will open your system's default
+terminal editor for you to make your changes. Once you've saved and closed the editor, `edit-config` will copy your
+edited file into `/etc/netdata/health.d/`, which will override the stock file in `/usr/lib/netdata/conf.d/health.d/` and
+ensure your customizations are persistent between updates.
 
-However, you can double-check the location of these files by navigating to `http://HOST:19999/netdata.conf` in your
-browser and looking for the `stock health configuration directory` option. The value here will show the correct path for
-your installation.
+For example, to edit the `cpu.conf` health configuration file, you would run:
+
+```bash
+cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config health.d/cpu.conf
+```
+
+> You may need to use `sudo` or another method of elevating your privileges: `sudo ./edit-config health.d/cpu.conf`.
+>
+> You can also use the `$EDITOR` environment variable to use your preferred terminal editor with `edit-config`. See 
+> [this page](../docs/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
+
+Each health configuration file contains one or more health entities, which always begin with an `alarm:` or `template:`
+line. You can edit these entities based on your needs. To make any changes live, be sure to [reload your health
+configuration](#reload-health-configuration).
+
+## Reference Netdata's stock health configuration files
+
+While you should always [use `edit-config`](#edit-health-configuration-files), you might also want to view the stock
+health configuration files Netdata ships with. Stock files can be useful as reference material, or to determine which
+file you should edit with `edit-config`.
+
+By default, Netdata will put health configuration files in `/usr/lib/netdata/conf.d/health.d`.  However, you can
+double-check the location of these files by navigating to `http://HOST:19999/netdata.conf` in your browser and looking
+for the `stock health configuration directory` option. The value here will show the correct path for your installation.
 
 ```conf
 [health]
@@ -27,7 +52,7 @@ your installation.
  # stock health configuration directory = /usr/lib/netdata/conf.d/health.d
 ```
 
-Navigate to the health configuration directory to see all the available files.
+Navigate to the health configuration directory to see all the available files and open them for reading.
 
 ```bash
 cd /usr/lib/netdata/conf.d/health.d/
@@ -38,26 +63,8 @@ apache.conf fronius.conf mysql.conf swap.conf
 ...
 ```
 
-## Edit existing health configuration files
-
-You should use `edit-config` to edit Netdata's health configuration files.
-
-For example, to edit the `cpu.conf` health configuration file, you would run:
-
-```bash
-cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config health.d/cpu.conf
-```
-
-> You may need to use `sudo` or another method of elevating your privileges.
-
-`edit-config` will open a text editor for you to make your changes. Once you've saved and closed the editor,
-`edit-config` will copy your edited file into `/etc/netdata/health.d/`, and it will now override the default in
-`/usr/lib/netdata/conf.d/health.d/`.
-
-Each health configuration file contains one or more health entities, which always begin with an `alarm:` or `template:`
-line. You can edit these entities based on your needs. To make any changes live, be sure to [reload your health
-configuration](#reload-health-configuration).
+> ⚠️ If you edit configuration files in your stock health configuration directory, Netdata will overwrite them during
+> any updates. Please use `edit-config` as described in the [section above](#edit-health-configuration-files).
 
 ## Write a new health entity
 

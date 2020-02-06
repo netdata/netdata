@@ -15,6 +15,7 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
 
     int ret;
     if(move) {
+        rrdhost_check_rdlock(host);
         netdata_rwlock_rdlock(&host->labels_rwlock);
         while(move) {
             snprintfz(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);

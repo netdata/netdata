@@ -1,60 +1,43 @@
-#! /bin/sh
+#!/bin/sh
 
 set -e
 
 dpkg-maintscript-helper dir_to_symlink \
-	/var/lib/netdata/www/.well-known /usr/share/netdata/www/.well-known 1.18.1~ netdata -- "$@"
+  /var/lib/netdata/www/.well-known /usr/share/netdata/www/.well-known 1.18.1~ netdata -- "$@"
 dpkg-maintscript-helper dir_to_symlink \
-	/var/lib/netdata/www/css /usr/share/netdata/www/css 1.18.1~ netdata -- "$@"
+  /var/lib/netdata/www/css /usr/share/netdata/www/css 1.18.1~ netdata -- "$@"
 dpkg-maintscript-helper dir_to_symlink \
-	/var/lib/netdata/www/fonts /usr/share/netdata/www/fonts 1.18.1~ netdata -- "$@"
+  /var/lib/netdata/www/fonts /usr/share/netdata/www/fonts 1.18.1~ netdata -- "$@"
 dpkg-maintscript-helper dir_to_symlink \
-	/var/lib/netdata/www/images /usr/share/netdata/www/images 1.18.1~ netdata -- "$@"
+  /var/lib/netdata/www/images /usr/share/netdata/www/images 1.18.1~ netdata -- "$@"
 dpkg-maintscript-helper dir_to_symlink \
-	/var/lib/netdata/www/lib /usr/share/netdata/www/lib 1.18.1~ netdata -- "$@"
+  /var/lib/netdata/www/lib /usr/share/netdata/www/lib 1.18.1~ netdata -- "$@"
 dpkg-maintscript-helper dir_to_symlink \
-	/var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"
+  /var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"
 
 case "$1" in
-	remove)
-		;;
+  remove) ;;
 
-	purge)
-		if dpkg-statoverride --list | grep -qw /var/cache/netdata; then
-			dpkg-statoverride --remove /var/cache/netdata
-		fi
+  purge)
+    if dpkg-statoverride --list | grep -qw /var/cache/netdata; then
+      dpkg-statoverride --remove /var/cache/netdata
+    fi
 
-		if dpkg-statoverride --list | grep -qw /var/lib/netdata/www; then
-			dpkg-statoverride --remove /var/lib/netdata/www
-		fi
+    if dpkg-statoverride --list | grep -qw /var/lib/netdata/www; then
+      dpkg-statoverride --remove /var/lib/netdata/www
+    fi
 
-		if dpkg-statoverride --list | grep -qw /var/lib/netdata/registry; then
-			dpkg-statoverride --remove /var/lib/netdata/registry
-		fi
+    if dpkg-statoverride --list | grep -qw /var/lib/netdata/registry; then
+      dpkg-statoverride --remove /var/lib/netdata/registry
+    fi
 
-		if dpkg-statoverride --list | grep -qw /var/lib/netdata; then
-			dpkg-statoverride --remove /var/lib/netdata
-		fi
+    if dpkg-statoverride --list | grep -qw /var/lib/netdata; then
+      dpkg-statoverride --remove /var/lib/netdata
+    fi
+    ;;
 
-		if getent passwd netdata >/dev/null; then
-			if [ -x /usr/sbin/deluser ]; then
-				deluser --quiet --system netdata || echo "Unable to remove netdata user"
-			fi
-		fi
+  *) ;;
 
-		if getent group netdata >/dev/null; then
-			if [ -x /usr/sbin/delgroup ]; then
-				delgroup --quiet --system netdata || echo "Unable to remove netdata group"
-			fi
-		fi
-
-		;;
-
-	*)
-		;;
 esac
 
-#DEBHELPER#
-
 exit 0
-

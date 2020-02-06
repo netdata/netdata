@@ -3,10 +3,8 @@
 # Author: Pawel Krupa (paulfantom)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from third_party import lm_sensors as sensors
-
 from bases.FrameworkServices.SimpleService import SimpleService
-
+from third_party import lm_sensors as sensors
 
 ORDER = [
     'temperature',

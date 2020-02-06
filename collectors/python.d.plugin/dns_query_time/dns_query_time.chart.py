@@ -11,6 +11,7 @@ try:
     import dns.message
     import dns.query
     import dns.name
+
     DNS_PYTHON = True
 except ImportError:
     DNS_PYTHON = False
@@ -21,7 +22,6 @@ except ImportError:
     from Queue import Queue
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 
 update_every = 5
 

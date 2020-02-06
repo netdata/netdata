@@ -138,9 +138,9 @@ The above command will:
 -   Install any required packages on your system (it will ask you to confirm before doing so)
 -   Compile it, install it, and start it.
 
-More installation methods and additional options can be found at the [installation page](packaging/installer/README.md).
+More installation methods and additional options can be found at the [installation page](packaging/installer/).
 
-To try Netdata in a docker container, run this:
+To try Netdata in a Docker container, run this:
 
 ```sh
 docker run -d --name=netdata \
@@ -155,7 +155,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running Netdata with Docker, check the [docker installation page](packaging/docker/).
+For more information about running Netdata in Docker, check the [docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -552,7 +552,6 @@ Python, Node.js, Ruby, Java, Bash, Perl, and more!
     queries, updates, failures and several per view metrics. All versions of bind after 9.9.10 are supported.
 -   **[NSD](collectors/python.d.plugin/nsd/)** - queries, zones, protocols, query types, transfers, etc.
 -   **[PowerDNS](collectors/python.d.plugin/powerdns/)** - queries, answers, cache, latency, etc.
--   **[unbound](collectors/python.d.plugin/unbound/)** - performance and resource usage metrics.
 -   **[dns_query_time](collectors/python.d.plugin/dns_query_time/)** - DNS query time statistics.
 
 ### Time Servers
