@@ -91,15 +91,6 @@ static const struct lws_protocols protocols[] = {
 	{ NULL, NULL, 0, 0 }
 };
 
-/**
- * libwebsockets WSS client code thread entry point
- *
- * 
- *
- * @param ptr is a pointer to the netdata_static_thread structure.
- *
- * @return always NULL
- */
 struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port) {
 	struct lws_context_creation_info info;
 	struct aclk_lws_wss_engine_instance *inst;
