@@ -237,19 +237,23 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		//currently we expect only one connection per netdata
 		inst->lws_wsi = wsi;
 		break;
+#ifdef AUTO_RECONNECT_ON_LWS_LAYER
 	case LWS_CALLBACK_USER:
 		inst->reconnect_timeout_running = 0;
 		_aclk_wss_connect(inst);
 		break;
+#endif
 	case LWS_CALLBACK_CLIENT_CLOSED:
 	case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
 	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+#ifdef AUTO_RECONNECT_ON_LWS_LAYER
 		if(!inst->reconnect_timeout_running) {
 			lws_timed_callback_vh_protocol(lws_get_vhost(wsi),
 						   lws_get_protocol(wsi),
 					       LWS_CALLBACK_USER, ACLK_LWS_WSS_RECONNECT_TIMEOUT);
 			inst->reconnect_timeout_running = 1;
 		}
+#endif
 		//no break here on purpose we want to continue with LWS_CALLBACK_WSI_DESTROY
 	case LWS_CALLBACK_WSI_DESTROY:
 		aclk_lws_wss_clear_io_buffers(inst);
