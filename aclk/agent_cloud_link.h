@@ -31,6 +31,7 @@
 #define ACLK_RECONNECT_DELAY 1          // reconnect delay -- with backoff stragegy fow now
 #define ACLK_MAX_RECONNECT_DELAY 120
 #define ACLK_VERSION "1"
+#define ACLK_STABLE_TIMEOUT 8
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
 

@@ -13,6 +13,8 @@ char *aclk_hostname = NULL; //default localhost
 int aclk_subscribed = 0;
 
 int aclk_metadata_submitted = 0;
+int agent_state = 0;
+time_t last_init_sequence = 0;
 int waiting_init = 1;
 int cmdpause = 0; // Used to pause query processing
 
@@ -199,6 +201,12 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     // Ignore all commands while we wait for the agent to initialize
     if (unlikely(waiting_init))
         return 0;
+
+    // Ignore all commands if agent not stable
+    if (agent_state == 0) {
+        last_init_sequence = now_realtime_sec();
+        return 0;
+    }
 
     run_after = now_realtime_sec() + run_after;
 
@@ -519,6 +527,16 @@ void *aclk_query_main_thread(void *ptr)
 
     while (!netdata_exit) {
 
+        while (!agent_state) {
+            if ((now_realtime_sec() - last_init_sequence) > ACLK_STABLE_TIMEOUT) {
+                agent_state = 1;
+                info("AGENT is stable");
+                break;
+            }
+            info("Waiting for agent to get to stable state");
+            sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
+        }
+
         QUERY_THREAD_LOCK;
 
         if (unlikely(!aclk_metadata_submitted)) {
@@ -589,11 +607,12 @@ void *aclk_main(void *ptr)
     while (!netdata_ready) {
         sleep_usec(USEC_PER_MS * 300);
     }
-    info("Waiting %d seconds for the agent to initialize", ACLK_STARTUP_WAIT);
-    sleep_usec(USEC_PER_SEC * ACLK_STARTUP_WAIT);
+    //info("Waiting %d seconds for the agent to initialize", ACLK_STARTUP_WAIT);
+    //sleep_usec(USEC_PER_SEC * ACLK_STARTUP_WAIT);
 
     // Ok mark we are ready to accept incoming requests
-    waiting_init = 0;
+    //waiting_init = 0;
+    last_init_sequence = now_realtime_sec();
 
     while (!netdata_exit) {
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
@@ -729,6 +748,7 @@ void aclk_connect(void *ptr)
 {
     (void) ptr;
     info("Connection detected");
+    waiting_init = 0;
     return;
 }
 
@@ -739,6 +759,7 @@ void aclk_disconnect(void *ptr)
     info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
+    waiting_init = 1;
 }
 
 void aclk_shutdown()
