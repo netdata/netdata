@@ -702,6 +702,7 @@ struct rrdhost {
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
 
+    uint32_t stream_version;                             //Set the current version of the stream.
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush
