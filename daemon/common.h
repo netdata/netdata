@@ -63,6 +63,9 @@
 // netdata agent claiming
 #include "claim/claim.h"
 
+// netdata agent cloud link
+#include "aclk/agent_cloud_link.h"
+
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"
