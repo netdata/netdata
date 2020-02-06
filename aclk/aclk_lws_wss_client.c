@@ -138,6 +138,19 @@ failure_cleanup:
 	return NULL;
 }
 
+void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance* inst) {
+	lws_context_destroy(inst->lws_context);
+	inst->lws_context = NULL;
+	inst->lws_wsi = NULL;
+
+	aclk_lws_wss_clear_io_buffers(inst);
+
+	#ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
+		pthread_mutex_destroy(&inst->write_buf_mutex);
+		pthread_mutex_destroy(&inst->read_buf_mutex);
+	#endif
+}
+
 void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
 	struct lws_client_connect_info i;
 

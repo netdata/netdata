@@ -365,6 +365,12 @@ void _link_shutdown()
 
     mosquitto_destroy(mosq);
     mosq = NULL;
+
+    if(lws_engine_instance) {
+        aclk_lws_wss_client_destroy(lws_engine_instance);
+        lws_engine_instance = NULL;
+    }
+
     return;
 }
 
