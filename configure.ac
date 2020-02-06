@@ -408,6 +408,19 @@ AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# ACLK
+AC_MSG_CHECKING([if netdata ACLK should be enabled])
+if test "${ACLK}" = "yes"; then
+    enable_aclk="yes"
+    AC_DEFINE([ACLK_ENABLE], [1], [netdata ACLK])
+    CFLAGS="${CFLAGS} -DACLK_ENABLE"
+else
+    enable_aclk="no"
+fi
+AC_MSG_RESULT([${enable_aclk}])
+AM_CONDITIONAL([ACLK_ENABLE], [test "${enable_aclk}" = "yes"])
+
+# -----------------------------------------------------------------------------
 # Exporting engine
 AC_MSG_CHECKING([if netdata exporting engine should be used])
 if test "${UV_LIBS}"; then

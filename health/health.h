@@ -4,7 +4,6 @@
 #define NETDATA_HEALTH_H 1
 
 #include "../daemon/common.h"
-#include "../aclk/agent_cloud_link.h"
 
 #define NETDATA_PLUGIN_HOOK_HEALTH \
     { \

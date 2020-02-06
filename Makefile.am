@@ -533,8 +533,13 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_PLUGIN_FILES) \
-    $(ACLK_PLUGIN_FILES) \
     $(NULL)
+
+if ACLK_ENABLE
+    NETDATA_FILES += \
+        $(ACLK_PLUGIN_FILES) \
+        $(NULL)
+endif
 
 if FREEBSD
     NETDATA_FILES += \
@@ -586,9 +591,18 @@ NETDATACLI_FILES = \
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
+
+if ACLK_ENABLE
+netdata_LDADD = \
+    mosquitto/lib/libmosquitto.a \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+else
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
+endif
+
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else

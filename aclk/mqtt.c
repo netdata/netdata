@@ -13,21 +13,27 @@ extern int cmdpause;
 
 inline const char *_link_strerror(int rc)
 {
+    (void) rc;
     return "no error";
 }
 
 int _link_event_loop(int timeout)
 {
+    (void) timeout;
     return 0;
 }
 
 int _link_send_message(char *topic, char *message)
 {
+    (void) topic;
+    (void) message;
     return 0;
 }
 
 int _link_subscribe(char  *topic, int qos)
 {
+    (void) topic;
+    (void) qos;
     return 0;
 }
 
@@ -38,6 +44,10 @@ void _link_shutdown()
 
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
+    (void) aclk_hostname;
+    (void) aclk_port;
+    (void) on_connect;
+    (void) on_disconnect;
     return 0;
 }
 
@@ -58,8 +68,10 @@ inline const char *_link_strerror(int rc)
 
 
 void mqtt_message_callback(
-    struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg)
+    struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
+    (void) mosq;
+    (void) obj;
 
     // TODO: handle commands in a more efficient way, if we have many
 
@@ -92,8 +104,11 @@ void mqtt_message_callback(
 
 }
 
-void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
+void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
+    (void) obj;
+    (void) rc;
+
     info("Connection to cloud estabilished");
 
     aclk_connection_initialized = 1;
@@ -103,8 +118,11 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
 }
 
 
-void disconnect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
+void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
+    (void) obj;
+    (void) rc;
+
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.
 
