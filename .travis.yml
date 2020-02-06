@@ -216,10 +216,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 10 (buster)"
 
       # openSuSE runs
-    - name: Run netdata lifecycle, on openSuSE 15.0
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.0" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.0"
-
     - name: Run netdata lifecycle, on openSuSE 15.1
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.1" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.1"
@@ -448,14 +444,6 @@ jobs:
       if: commit_message =~ /\[Package (amd64|arm64) RPM( openSuSE)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for OpenSuSE 15.0"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( openSuSE)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
         - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
         - ALLOW_SOFT_FAILURE_HERE=true
     # ###### End of packaging workflow section ###### #
