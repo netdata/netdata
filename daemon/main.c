@@ -73,7 +73,7 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
 
-#ifdef ACLK_ENABLE
+#ifdef ENABLE_ACLK
     NETDATA_ACLK_HOOK
 #endif
 

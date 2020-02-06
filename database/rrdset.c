@@ -761,7 +761,7 @@ RRDSET *rrdset_create_custom(
     rrdhost_cleanup_obsolete_charts(host);
 
     rrdhost_unlock(host);
-#ifdef ACLK_ENABLE
+#ifdef ENABLE_ACLK
     aclk_update_chart(host, st->id);
 #endif
     return(st);
