@@ -2,7 +2,7 @@
 
 Netdata can collect metrics from hundreds of different sources, be they internal data created by the system itself, or
 external data created by services or applications. To see _all_ of the sources Netdata collects from, view our [list of
-supported collectors](COLLECTORS.md).
+supported collectors](COLLECTORS.md), and then view our [quickstart guide](QUICKSTART.md) to get up-and-running.
 
 There are two essential points to understand about how collecting metrics works in Netdata:
 
@@ -26,6 +26,7 @@ Netdata uses **plugins** to organize its collectors.
 ## Take your next steps with collectors
 
 [Collectors quickstart](QUICKSTART.md)
+[Supported collectors list](COLLECTORS.md)
 [Collectors configuration reference](REFERENCE.md)
 
 ## Related features

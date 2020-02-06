@@ -1,6 +1,23 @@
-# Collector configuration reference
+# Collectors configuration reference
 
-## Enabling and disabling plugins
+Welcome to the collector configuration reference guide.
+
+This guide contains detailed information about enabling/disabling plugins or modules, in addition a quick reference to
+the internal plugins API.
+
+To learn the basics of collecting metrics from other applications and services, see the [collector
+quickstart](QUICKSTART.md).
+
+## What's in this reference guide
+
+-   [Enable and disable plugins](#enable-and-disable-plugins)
+-   [Enable, configure, and disable modules](#enable-configure-and-disable-modules)
+-   [Internal plugins](#internal-plugins)
+    -   [Internal plugins API](#internal-plugins-api)
+-   [External plugins](#external-plugins)
+-   [Write a custom collector](#write-a-custom-collector)
+
+## Enable and disable plugins
 
 You can enable or disable individual plugins by opening `netdata.conf` and scrolling down to the `[plugins]` section.
 This section features a list of Netdata's plugins, with a boolean setting to enable or disable them. The exception is
@@ -33,7 +50,7 @@ disable any specific plugin, remove the comment (`#`) and change the boolean set
 
 All **external plugins** are managed by [plugins.d](plugins.d/), which provides additional management options.
 
-## Enabling, configuring, and disabling modules
+## Enable, configure, and disable modules
 
 Most **modules** come with **auto-detection**, configured to work out-of-the-box on popular operating systems with the
 default settings.

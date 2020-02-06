@@ -208,19 +208,10 @@ echo -ne "    - 'docs/Performance.md'
     - 'docs/high-performance-netdata.md'
 "
 
-navpart 1 . netdata-cloud "Netdata Cloud"
+navpart 1 collectors README "Collecting metrics"
 echo -ne "
-    - 'docs/netdata-cloud/README.md'
-    - 'docs/netdata-cloud/signing-in.md'
-    - 'docs/netdata-cloud/nodes-view.md'
-"
-
-navpart 1 web "README" "Dashboards"
-navpart 2 web/gui "" "" 3
-
-navpart 1 collectors "" "Data collection" 1
-navpart 1 health README "Health monitoring and alerts"
-echo -ne "    - 'collectors/QUICKSTART.md'
+    - 'collectors/QUICKSTART.md'
+    - 'collectors/COLLECTORS.md'
     - 'collectors/REFERENCE.md'
     - Internal plugins:
 "
@@ -275,9 +266,15 @@ navpart 3 collectors/xenstat.plugin
 navpart 3 collectors/perf.plugin
 navpart 3 collectors/slabinfo.plugin
 
-
-echo -ne "    - 'docs/Third-Party-Plugins.md'
+navpart 1 . netdata-cloud "Netdata Cloud"
+echo -ne "
+    - 'docs/netdata-cloud/README.md'
+    - 'docs/netdata-cloud/signing-in.md'
+    - 'docs/netdata-cloud/nodes-view.md'
 "
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
 
 navpart 1 health README "Health monitoring and alerts"
 echo -ne "    - 'health/QUICKSTART.md'
