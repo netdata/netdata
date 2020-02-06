@@ -85,7 +85,6 @@ netdata_ebpf_events_t collector_events[] = {
         { .type = 'p', .name = "do_exit" },
         { .type = 'p', .name = "release_task" },
         { .type = 'r', .name = "_do_fork" },
-        { .type = 'r', .name = "__x64_sys_clone" },
         { .type = 'r', .name = "__close_fd" },
         { .type = 0, .name = NULL }
 };
@@ -729,14 +728,10 @@ void set_global_variables() {
 }
 
 static void change_collector_event() {
-    static char *old_sys_calls[] = { "sys_clone" };
     int i;
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
-
-    if (mykernel < 266496) // < 4.17.0
-        collector_events[9].name = old_sys_calls[0];
 }
 
 static void what_to_load(char *ptr) {
