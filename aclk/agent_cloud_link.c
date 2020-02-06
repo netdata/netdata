@@ -307,7 +307,27 @@ struct aclk_query *aclk_queue_pop()
 
     this_query = aclk_queue.aclk_query_head;
 
-    if (this_query->run_after > now_realtime_sec()) {
+    // Get rid of the deleted entries
+    while (this_query && this_query->deleted) {
+        aclk_queue.count--;
+
+        aclk_queue.aclk_query_head = aclk_queue.aclk_query_head->next;
+
+        if (likely(!aclk_queue.aclk_query_head)) {
+            aclk_queue.aclk_query_tail = NULL;
+        }
+
+        aclk_query_free(this_query);
+
+        this_query = aclk_queue.aclk_query_head;
+    }
+
+    if (likely(!this_query)) {
+        QUERY_UNLOCK;
+        return NULL;
+    }
+
+    if (!this_query->deleted && this_query->run_after > now_realtime_sec()) {
         info("Query %s will run in %ld seconds", this_query->query, this_query->run_after - now_realtime_sec());
         QUERY_UNLOCK;
         return NULL;
