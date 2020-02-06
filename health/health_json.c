@@ -115,9 +115,6 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
 
 static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
     (void)host;
-    char value_string[100 + 1];
-    format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
-
     buffer_sprintf(wb,
                    "\t\t\"%s.%s\": {\n"
                    "\t\t\t\"id\": %lu,\n"

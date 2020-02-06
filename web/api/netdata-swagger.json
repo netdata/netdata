@@ -861,7 +861,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/alarms"
+                  "$ref": "#/components/schemas/alarms_values"
                 }
               }
             }
