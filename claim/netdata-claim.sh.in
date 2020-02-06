@@ -211,6 +211,6 @@ if [ "${HTTP_STATUS_CODE}" -ne 200 ] ; then
 fi
 
 rm -f "${CLAIMING_DIR}/tmpout.txt"
-touch "${CLAIMING_DIR}/is_claimed"
+echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id"
 rm -f "${CLAIMING_DIR}/token"
 echo >&2 "Agent was successfully claimed."
