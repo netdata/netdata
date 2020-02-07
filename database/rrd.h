@@ -624,6 +624,10 @@ struct rrdhost_system_info {
     char *host_os_version;
     char *host_os_version_id;
     char *host_os_detection;
+    char *host_cores;
+    char *host_cpu_freq;
+    char *host_ram_total;
+    char *host_disk_space;
     char *container_os_name;
     char *container_os_id;
     char *container_os_id_like;
