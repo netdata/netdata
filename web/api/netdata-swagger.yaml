@@ -679,6 +679,13 @@ paths:
           allowEmptyValue: true
           schema:
             type: boolean
+        - name: active
+          in: query
+          description: If passed, the raised alarms in state WARNING or CRITICAL are returned.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: boolean
       responses:
         "200":
           description: An object containing general info and a linked list of alarms.
@@ -699,6 +706,13 @@ paths:
         - name: all
           in: query
           description: If passed, all enabled alarms are returned.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: boolean
+        - name: active
+          in: query
+          description: If passed, the raised alarms in state WARNING or CRITICAL are returned.
           required: false
           allowEmptyValue: true
           schema:
