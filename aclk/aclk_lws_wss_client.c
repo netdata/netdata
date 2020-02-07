@@ -2,6 +2,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define UNUSED(x) (void)(x)
+
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
 struct aclk_lws_wss_perconnect_data {
@@ -12,7 +14,7 @@ struct aclk_lws_wss_perconnect_data {
 int aclk_lws_wss_use_ssl = 1;
 
 struct lws_wss_packet_buffer {
-	char* data;
+	unsigned char* data;
 	size_t data_size;
 	struct lws_wss_packet_buffer *next;
 };
@@ -65,7 +67,7 @@ static inline void _aclk_lws_wss_read_buffer_clear(struct lws_ring *ringbuffer)
 static inline void _aclk_lws_wss_write_buffer_clear(struct lws_wss_packet_buffer **list)
 {
 	struct lws_wss_packet_buffer *i;
-	while(i = lws_wss_packet_buffer_pop(list)) {
+	while((i = lws_wss_packet_buffer_pop(list)) != NULL) {
 		lws_wss_packet_buffer_free(i);
 	}
 	*list = NULL;
@@ -86,9 +88,9 @@ static const struct lws_protocols protocols[] = {
 		"aclk-wss",
 		aclk_lws_wss_callback,
 		sizeof(struct aclk_lws_wss_perconnect_data),
-		0,
+		0, 0, 0, 0
 	},
-	{ NULL, NULL, 0, 0 }
+	{ NULL, NULL, 0, 0, 0, 0, 0 }
 };
 
 struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port) {
@@ -173,6 +175,7 @@ static int
 aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
+	UNUSED(user);
 	struct aclk_lws_wss_engine_instance *inst = lws_context_user(lws_get_context(wsi));
 	struct lws_wss_packet_buffer *data;
 	int retval = 0;
@@ -185,7 +188,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 	if( inst->upstream_reconnect_request ) {
 		error("Closing lws connectino due to libmosquitto error.");
 		char *upstream_connection_error = "MQTT protocol error. Closing underlying wss connection.";
-		lws_close_reason(wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, upstream_connection_error, strlen(upstream_connection_error));
+		lws_close_reason(wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, (unsigned char*)upstream_connection_error, strlen(upstream_connection_error));
 		retval = -1;
 		inst->upstream_reconnect_request = 0;
 	}
@@ -306,7 +309,7 @@ int aclk_lws_wss_service_loop(struct aclk_lws_wss_engine_instance *inst)
 // in case the MQTT connection disconnect while lws transport is still operational
 // we should drop connection and reconnect
 // this function should be called when that happens to notify lws of that situation
-int aclk_lws_wss_mqtt_layer_disconect_notif(struct aclk_lws_wss_engine_instance *inst)
+void aclk_lws_wss_mqtt_layer_disconect_notif(struct aclk_lws_wss_engine_instance *inst)
 {
 	if(inst->lws_wsi && inst->websocket_connection_up) {
 		inst->upstream_reconnect_request = 1;
