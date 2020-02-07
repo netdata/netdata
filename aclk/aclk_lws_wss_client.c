@@ -21,7 +21,7 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void* data
 {
 	struct lws_wss_packet_buffer *new = callocz(1, sizeof(struct lws_wss_packet_buffer));
 	if(data) {
-		new->data = malloc(LWS_PRE+size);
+		new->data = mallocz(LWS_PRE+size);
     	memcpy(new->data+LWS_PRE, data, size);
 		new->data_size = size;
 	}
@@ -52,8 +52,8 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_pop(struct lws
 
 static inline void lws_wss_packet_buffer_free(struct lws_wss_packet_buffer *item)
 {
-	free(item->data);
-	free(item);
+	freez(item->data);
+	freez(item);
 }
 
 static inline void _aclk_lws_wss_read_buffer_clear(struct lws_ring *ringbuffer)
@@ -99,8 +99,6 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 		return NULL;
 
 	inst = callocz(1, sizeof(struct aclk_lws_wss_engine_instance));
-	if(!inst)
-		return NULL;
 
 	inst->host = target_hostname;
 	inst->port = target_port;
@@ -136,10 +134,10 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance* inst) {
 
 	aclk_lws_wss_clear_io_buffers(inst);
 
-	#ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
-		pthread_mutex_destroy(&inst->write_buf_mutex);
-		pthread_mutex_destroy(&inst->read_buf_mutex);
-	#endif
+#ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
+	pthread_mutex_destroy(&inst->write_buf_mutex);
+	pthread_mutex_destroy(&inst->read_buf_mutex);
+#endif
 }
 
 void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
@@ -255,6 +253,8 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		inst->websocket_connection_up = 1;
 		if(inst->callbacks.connection_established_callback)
 			inst->callbacks.connection_established_callback();
+		break;
+	default:
 		break;
 	}
 	return retval; //0-OK, other connection should be closed!
