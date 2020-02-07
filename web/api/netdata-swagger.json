@@ -812,7 +812,7 @@
     "/alarms": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned.",
+        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the Netdata agent. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned, the same response is delivered when \"?active\" is passed in the URL. By passing \"?all\", all the enabled alarms are returned.",
         "parameters": [
           {
             "name": "all",
