@@ -1328,7 +1328,7 @@ restart_after_removal:
 
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
-
+// system_info fields must be heap allocated or NULL
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
 
