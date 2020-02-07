@@ -37,6 +37,7 @@ dist_healthconfig_DATA = \
     health.d/ceph.conf \
     health.d/cgroups.conf \
     health.d/cpu.conf \
+    health.d/cockroachdb.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
     health.d/dnsmasq_dhcp.conf \

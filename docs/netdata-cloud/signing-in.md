@@ -20,7 +20,7 @@ From here, you need to register for a Netdata Cloud account. Click on the **Sign
 ??? note "Alternative registration routes"
     While we recommend the **Sign in** button, the Netdata dashboard has one other direct route registering for or signing in to a Netdata Cloud account.
 
-```
+
 The text **Please sign in to netdata.cloud to view your nodes!** contains a link to access Netdata Cloud.
 
 ![A screenshot of the Netdata Cloud sign in link](https://user-images.githubusercontent.com/1153921/59644958-2f4df880-9124-11e9-946c-bb30c8735e0a.png)
@@ -34,16 +34,16 @@ One route can be found in the **Nodes Beta** button the left side of the navigat
 A second route can be found in the Nodes List—the drop-down menu in the top-left corner of the Netdata dashboard:
 
  ![A screenshot of a second link to the Nodes View in Netdata Cloud](https://user-images.githubusercontent.com/1153921/59644973-3d9c1480-9124-11e9-9a1d-33c412578a9f.png)
-```
+
 
 ??? note "Registration route when using a private registry"
     If you're using a private registry, clicking the **Sign in** button will display a modal window warning you about the process of migrating away from your private registry and to Netdata Cloud's registry.
 
-```
+
 ![A screenshot of the private registry warning modal](https://user-images.githubusercontent.com/1153921/59782901-ca091d00-9273-11e9-9f9a-0cb18f78ca26.png)
 
 If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again. If not, click the **Cancel** button to continue using your private registry.
-```
+
 
 ### Choosing your registration or sign in method
 

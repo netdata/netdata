@@ -203,6 +203,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 
     BUFFER *wb = buffer_create(10);
 
+    rrdhost_rdlock(localhost);
     netdata_rwlock_rdlock(&localhost->labels_rwlock);
     struct label *l=localhost->labels;
     while (l != NULL) {
@@ -210,6 +211,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
         l = l->next;
     }
     netdata_rwlock_unlock(&localhost->labels_rwlock);
+    rrdhost_unlock(localhost);
 
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);

@@ -31,6 +31,7 @@ should be installed on your system to build and run Netdata. It supports most ma
         [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
         In addition, RHEL/CentOS version 6 also need
         [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
+    -   CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
 -   **SuSe** Linux and its derivatives (including **openSuSe**)
 
@@ -113,6 +114,40 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 | `openssl`| Cryptography and SSL/TLS toolkit|
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
+
+### CentOS / RHEL 8.x
+
+For CentOS / RHEL 8.x a lot of development packages have moved out into their
+own separate repositories. Some other dependeicies are either missing completely
+or have to be sourced by 3rd-parties.
+
+CentOS 8.x:
+
+- Enable the PowerTools repo
+- Enable the EPEL repo
+- Enable the Extra repo from [extra.getpagespeed.com](https://extras.getpagespeed.com/release-el8-latest.rpm)
+
+And install the minimum required dependencies:
+
+```sh
+# Enable config-manager
+yum install -y 'dnf-command(config-manager)'
+
+# Enable PowerTools
+yum config-manager --set-enabled PowerTools
+
+# Enable EPEL
+yum install -y epel-release
+
+# Install Repo for libuv-devl (NEW)
+yum install -y https://extras.getpagespeed.com/release-el8-latest.rpm
+
+# Install Devel Packages
+yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
+
+# Install Judy-Devel directly
+yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
+```
 
 ---
 

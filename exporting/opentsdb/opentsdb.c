@@ -119,6 +119,7 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
+    rrdhost_check_rdlock(localhost);
     netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
         if (!should_send_label(instance, label))
@@ -261,6 +262,7 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
+    rrdhost_check_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
         if (!should_send_label(instance, label))

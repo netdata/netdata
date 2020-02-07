@@ -9,7 +9,7 @@ However, auto-detection only works if you installed the source using its standar
 procedure. If Netdata isn't collecting metrics after a restart, your source probably isn't configured
 correctly.
 
-Check out the [available data collection modulues](../Add-more-charts-to-netdata.md#available-data-collection-modules)
+Check out the [available data collection modules](../Add-more-charts-to-netdata.md#available-data-collection-modules)
 to find the module for the source you want to monitor.
 
 ## What you'll learn in this step
@@ -40,7 +40,7 @@ You don't need to explicitly enable plugins to auto-detect properly configured s
 enable or disable them.
 
 One reason you might want to _disable_ plugins is to improve Netdata's performance on low-resource systems, like
-ephemeral nodes or edge devices. Disabling orchestrator plugins like `python.d` can save significant resources—if you're
+ephemeral nodes or edge devices. Disabling orchestrator plugins like `python.d` can save significant resources if you're
 not using any of its data collector modules.
 
 You can enable or disable plugins in the `[plugin]` section of `netdata.conf`. This section features a list of all the
@@ -65,7 +65,7 @@ When you explicitly disable a plugin this way, it won't auto-collect metrics usi
 
 ## Example: Enable the Nginx module
 
-To help explain how the auto-dectection process works, let's use an Nginx web server as an example. 
+To help explain how the auto-detection process works, let's use an Nginx web server as an example. 
 
 Even if you don't have Nginx installed on your system, we recommend you read through the following section so you can
 apply the process to other data sources, such as Apache, Redis, Memcached, and more.
@@ -103,8 +103,7 @@ itself by editing its configuration file:
 ./edit-config python.d/nginx.conf
 ```
 
-After configuring any source, or changing the configration files for their respective modules, always
-restart Netdata.
+After configuring any source, or changing the configuration files for their respective modules, always restart Netdata.
 
 ## What's next?
 

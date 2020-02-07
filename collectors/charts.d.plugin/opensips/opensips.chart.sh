@@ -14,40 +14,40 @@ opensips_timeout=2
 opensips_priority=80000
 
 opensips_get_stats() {
-	run -t $opensips_timeout "$opensips_cmd" $opensips_opts |
-		grep "^\(core\|dialog\|net\|registrar\|shmem\|siptrace\|sl\|tm\|uri\|usrloc\):[a-zA-Z0-9_-]\+[[:space:]]*[=:]\+[[:space:]]*[0-9]\+[[:space:]]*$" |
-		sed \
-			-e "s|[[:space:]]*[=:]\+[[:space:]]*\([0-9]\+\)[[:space:]]*$|=\1|g" \
-			-e "s|[[:space:]:-]\+|_|g" \
-			-e "s|^|opensips_|g"
+  run -t $opensips_timeout "$opensips_cmd" $opensips_opts |
+    grep "^\(core\|dialog\|net\|registrar\|shmem\|siptrace\|sl\|tm\|uri\|usrloc\):[a-zA-Z0-9_-]\+[[:space:]]*[=:]\+[[:space:]]*[0-9]\+[[:space:]]*$" |
+    sed \
+      -e "s|[[:space:]]*[=:]\+[[:space:]]*\([0-9]\+\)[[:space:]]*$|=\1|g" \
+      -e "s|[[:space:]:-]\+|_|g" \
+      -e "s|^|opensips_|g"
 
-	local ret=$?
-	[ $ret -ne 0 ] && echo "opensips_command_failed=1"
-	return $ret
+  local ret=$?
+  [ $ret -ne 0 ] && echo "opensips_command_failed=1"
+  return $ret
 }
 
 opensips_check() {
-	# if the user did not provide an opensips_cmd
-	# try to find it in the system
-	if [ -z "$opensips_cmd" ]; then
-		require_cmd opensipsctl || return 1
-	fi
+  # if the user did not provide an opensips_cmd
+  # try to find it in the system
+  if [ -z "$opensips_cmd" ]; then
+    require_cmd opensipsctl || return 1
+  fi
 
-	# check once if the command works
-	local x
-	x="$(opensips_get_stats | grep "^opensips_core_")"
-	# shellcheck disable=SC2181
-	if [ ! $? -eq 0 ] || [ -z "$x" ]; then
-		error "cannot get global status. Please set opensips_opts='options' whatever needed to get connected to opensips server, in $confd/opensips.conf"
-		return 1
-	fi
+  # check once if the command works
+  local x
+  x="$(opensips_get_stats | grep "^opensips_core_")"
+  # shellcheck disable=SC2181
+  if [ ! $? -eq 0 ] || [ -z "$x" ]; then
+    error "cannot get global status. Please set opensips_opts='options' whatever needed to get connected to opensips server, in $confd/opensips.conf"
+    return 1
+  fi
 
-	return 0
+  return 0
 }
 
 opensips_create() {
-	# create the charts
-	cat <<EOF
+  # create the charts
+  cat << EOF
 CHART opensips.dialogs_active '' "OpenSIPS Active Dialogs" "dialogs" dialogs '' area $((opensips_priority + 1)) $opensips_update_every
 DIMENSION dialog_active_dialogs active absolute 1 1
 DIMENSION dialog_early_dialogs early absolute -1 1
@@ -141,91 +141,91 @@ CHART opensips.shmem_fragments '' "OpenSIPS Shared Memory Fragmentation" "fragme
 DIMENSION shmem_fragments fragments absolute 1 1
 EOF
 
-	return 0
+  return 0
 }
 
 opensips_update() {
-	# the first argument to this function is the microseconds since last update
-	# pass this parameter to the BEGIN statement (see bellow).
+  # the first argument to this function is the microseconds since last update
+  # pass this parameter to the BEGIN statement (see bellow).
 
-	# do all the work to collect / calculate the values
-	# for each dimension
+  # do all the work to collect / calculate the values
+  # for each dimension
 
-	# 1. get the counters page from opensips
-	# 2. sed to remove spaces; replace . with _; remove spaces around =; prepend each line with: local opensips_
-	# 3. egrep lines starting with:
-	#    local opensips_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
-	#    local opensips_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
-	# 4. then execute this as a script with the eval
-	#    be very carefull with eval:
-	#    prepare the script and always grep at the end the lines that are usefull, so that
-	#    even if something goes wrong, no other code can be executed
+  # 1. get the counters page from opensips
+  # 2. sed to remove spaces; replace . with _; remove spaces around =; prepend each line with: local opensips_
+  # 3. egrep lines starting with:
+  #    local opensips_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
+  #    local opensips_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
+  # 4. then execute this as a script with the eval
+  #    be very carefull with eval:
+  #    prepare the script and always grep at the end the lines that are usefull, so that
+  #    even if something goes wrong, no other code can be executed
 
-	unset \
-		opensips_dialog_active_dialogs \
-		opensips_dialog_early_dialogs \
-		opensips_usrloc_registered_users \
-		opensips_usrloc_location_users \
-		opensips_usrloc_location_contacts \
-		opensips_usrloc_location_expires \
-		opensips_registrar_accepted_regs \
-		opensips_registrar_rejected_regs \
-		opensips_tm_UAS_transactions \
-		opensips_tm_UAC_transactions \
-		opensips_core_rcv_requests \
-		opensips_core_rcv_replies \
-		opensips_core_fwd_requests \
-		opensips_core_fwd_replies \
-		opensips_core_drop_requests \
-		opensips_core_drop_replies \
-		opensips_core_err_requests \
-		opensips_core_err_replies \
-		opensips_core_bad_URIs_rcvd \
-		opensips_core_unsupported_methods \
-		opensips_core_bad_msg_hdr \
-		opensips_tm_received_replies \
-		opensips_tm_relayed_replies \
-		opensips_tm_local_replies \
-		opensips_tm_2xx_transactions \
-		opensips_tm_3xx_transactions \
-		opensips_tm_4xx_transactions \
-		opensips_tm_5xx_transactions \
-		opensips_tm_6xx_transactions \
-		opensips_tm_inuse_transactions \
-		opensips_sl_1xx_replies \
-		opensips_sl_2xx_replies \
-		opensips_sl_3xx_replies \
-		opensips_sl_4xx_replies \
-		opensips_sl_5xx_replies \
-		opensips_sl_6xx_replies \
-		opensips_sl_sent_replies \
-		opensips_sl_sent_err_replies \
-		opensips_sl_received_ACKs \
-		opensips_dialog_processed_dialogs \
-		opensips_dialog_expired_dialogs \
-		opensips_dialog_failed_dialogs \
-		opensips_net_waiting_udp \
-		opensips_net_waiting_tcp \
-		opensips_uri_positive_checks \
-		opensips_uri_negative_checks \
-		opensips_siptrace_traced_requests \
-		opensips_siptrace_traced_replies \
-		opensips_shmem_total_size \
-		opensips_shmem_used_size \
-		opensips_shmem_real_used_size \
-		opensips_shmem_max_used_size \
-		opensips_shmem_free_size \
-		opensips_shmem_fragments
+  unset \
+    opensips_dialog_active_dialogs \
+    opensips_dialog_early_dialogs \
+    opensips_usrloc_registered_users \
+    opensips_usrloc_location_users \
+    opensips_usrloc_location_contacts \
+    opensips_usrloc_location_expires \
+    opensips_registrar_accepted_regs \
+    opensips_registrar_rejected_regs \
+    opensips_tm_UAS_transactions \
+    opensips_tm_UAC_transactions \
+    opensips_core_rcv_requests \
+    opensips_core_rcv_replies \
+    opensips_core_fwd_requests \
+    opensips_core_fwd_replies \
+    opensips_core_drop_requests \
+    opensips_core_drop_replies \
+    opensips_core_err_requests \
+    opensips_core_err_replies \
+    opensips_core_bad_URIs_rcvd \
+    opensips_core_unsupported_methods \
+    opensips_core_bad_msg_hdr \
+    opensips_tm_received_replies \
+    opensips_tm_relayed_replies \
+    opensips_tm_local_replies \
+    opensips_tm_2xx_transactions \
+    opensips_tm_3xx_transactions \
+    opensips_tm_4xx_transactions \
+    opensips_tm_5xx_transactions \
+    opensips_tm_6xx_transactions \
+    opensips_tm_inuse_transactions \
+    opensips_sl_1xx_replies \
+    opensips_sl_2xx_replies \
+    opensips_sl_3xx_replies \
+    opensips_sl_4xx_replies \
+    opensips_sl_5xx_replies \
+    opensips_sl_6xx_replies \
+    opensips_sl_sent_replies \
+    opensips_sl_sent_err_replies \
+    opensips_sl_received_ACKs \
+    opensips_dialog_processed_dialogs \
+    opensips_dialog_expired_dialogs \
+    opensips_dialog_failed_dialogs \
+    opensips_net_waiting_udp \
+    opensips_net_waiting_tcp \
+    opensips_uri_positive_checks \
+    opensips_uri_negative_checks \
+    opensips_siptrace_traced_requests \
+    opensips_siptrace_traced_replies \
+    opensips_shmem_total_size \
+    opensips_shmem_used_size \
+    opensips_shmem_real_used_size \
+    opensips_shmem_max_used_size \
+    opensips_shmem_free_size \
+    opensips_shmem_fragments
 
-	opensips_command_failed=0
-	eval "local $(opensips_get_stats)"
-	# shellcheck disable=SC2181
-	[ $? -ne 0 ] && return 1
+  opensips_command_failed=0
+  eval "local $(opensips_get_stats)"
+  # shellcheck disable=SC2181
+  [ $? -ne 0 ] && return 1
 
-	[ $opensips_command_failed -eq 1 ] && error "failed to get values, disabling." && return 1
+  [ $opensips_command_failed -eq 1 ] && error "failed to get values, disabling." && return 1
 
-	# write the result of the work.
-	cat <<VALUESEOF
+  # write the result of the work.
+  cat << VALUESEOF
 BEGIN opensips.dialogs_active $1
 SET dialog_active_dialogs = $opensips_dialog_active_dialogs
 SET dialog_early_dialogs = $opensips_dialog_early_dialogs
@@ -320,5 +320,5 @@ SET shmem_fragments = $opensips_shmem_fragments
 END
 VALUESEOF
 
-	return 0
+  return 0
 }

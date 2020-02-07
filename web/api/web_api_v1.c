@@ -776,6 +776,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     }
 
     int count = 0;
+    rrdhost_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
         if(count > 0) buffer_strcat(wb, ",\n");
@@ -789,15 +790,11 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     }
     buffer_strcat(wb, "\n");
     netdata_rwlock_unlock(&host->labels_rwlock);
+    rrdhost_unlock(host);
 }
 
-inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
-
+inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
+{
     buffer_strcat(wb, "{\n");
     buffer_sprintf(wb, "\t\"version\": \"%s\",\n", host->program_version);
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
@@ -851,6 +848,18 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_strcat(wb, "\n\t]\n");
 
     buffer_strcat(wb, "}");
+    return 0;
+}
+
+inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
+    (void)url;
+    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+
+    web_client_api_request_v1_info_fill_buffer(host, wb);
+
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
