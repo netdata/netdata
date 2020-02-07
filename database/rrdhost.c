@@ -1335,144 +1335,95 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
         return res;
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
-        if (system_info->container_os_name)
-            freez(system_info->container_os_name);
-
+        freez(system_info->container_os_name);
         system_info->container_os_name = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID")){
-        if (system_info->container_os_id)
-            freez(system_info->container_os_id);
-
+        freez(system_info->container_os_id);
         system_info->container_os_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID_LIKE")){
-        if (system_info->container_os_id)
-            freez(system_info->container_os_id);
-
         freez(system_info->container_os_id_like);
         system_info->container_os_id_like = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION")){
-        if (system_info->container_os_id)
-            freez(system_info->container_os_id);
-
         freez(system_info->container_os_version);
         system_info->container_os_version = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION_ID")){
-        if (system_info->container_os_id)
-            freez(system_info->container_os_id);
-
         freez(system_info->container_os_version_id);
         system_info->container_os_version_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_DETECTION")){
-        if (system_info->host_os_detection)
-            freez(system_info->host_os_detection);
-
+        freez(system_info->host_os_detection);
         system_info->host_os_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
-        if (system_info->host_os_name)
-            freez(system_info->host_os_name);
-
+        freez(system_info->host_os_name);
         system_info->host_os_name = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_ID")){
-        if (system_info->host_os_id)
-            freez(system_info->host_os_id);
-
+        freez(system_info->host_os_id);
         system_info->host_os_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_ID_LIKE")){
-        if (system_info->host_os_id_like)
-            freez(system_info->host_os_id_like);
-
+        freez(system_info->host_os_id_like);
         system_info->host_os_id_like = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_VERSION")){
-        if (system_info->host_os_version)
-            freez(system_info->host_os_version);
-
+        freez(system_info->host_os_version);
         system_info->host_os_version = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_VERSION_ID")){
-        if (system_info->host_os_version_id)
-            freez(system_info->host_os_version_id);
-
+        freez(system_info->host_os_version_id);
         system_info->host_os_version_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_DETECTION")){
-        if (system_info->host_os_detection)
-            freez(system_info->host_os_detection);
-
+        freez(system_info->host_os_detection);
         system_info->host_os_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
-        if (system_info->kernel_name)
-            freez(system_info->kernel_name);
-
+        freez(system_info->kernel_name);
         system_info->kernel_name = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT")){
-        if (system_info->host_cores)
-            freez(system_info->host_cores);
-
+        freez(system_info->host_cores);
         system_info->host_cores = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_CPU_FREQ")){
-        if (system_info->host_cpu_freq)
-            freez(system_info->host_cpu_freq);
-
+        freez(system_info->host_cpu_freq);
         system_info->host_cpu_freq = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_RAM")){
-        if (system_info->host_ram_total)
-            freez(system_info->host_ram_total);
-
+        freez(system_info->host_ram_total);
         system_info->host_ram_total = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_DISK_SIZE")){
-        if (system_info->host_disk_space)
-            freez(system_info->host_disk_space);
-
+        freez(system_info->host_disk_space);
         system_info->host_disk_space = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
-        if (system_info->kernel_version)
-            freez(system_info->kernel_version);
-
+        freez(system_info->kernel_version);
         system_info->kernel_version = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_ARCHITECTURE")){
-        if (system_info->architecture)
-            freez(system_info->architecture);
-
+        freez(system_info->architecture);
         system_info->architecture = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_VIRTUALIZATION")){
-        if (system_info->virtualization)
-            freez(system_info->virtualization);
-
+        freez(system_info->virtualization);
         system_info->virtualization = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_VIRT_DETECTION")){
-        if (system_info->virt_detection)
-            freez(system_info->virt_detection);
-
+        freez(system_info->virt_detection);
         system_info->virt_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER")){
-        if (system_info->container)
-            freez(system_info->container);
-
+        freez(system_info->container);
         system_info->container = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
-        if (system_info->container_detection)
-            freez(system_info->container_detection);
-
+        freez(system_info->container_detection);
         system_info->container_detection = strdupz(value);
     }
     else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
