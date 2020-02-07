@@ -262,12 +262,20 @@ int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
 
 static inline void _link_mosquitto_write()
 {
+    int rc;
+
     if(!mqtt_over_websockets)
         return;
 
-    mosquitto_loop_misc(mosq);
-    if(likely( mosquitto_want_write(mosq) ))
-        mosquitto_loop_write(mosq, 1);
+    rc = mosquitto_loop_misc(mosq);
+    if(unlikely( rc != MOSQ_ERR_SUCCESS ))
+        debug(D_ACLK, "ACLK: failure during mosquitto_loop_misc %s", mosquitto_strerror(rc));
+
+    if(likely( mosquitto_want_write(mosq) )) {
+        rc = mosquitto_loop_write(mosq, 1);
+        if( rc != MOSQ_ERR_SUCCESS )
+            debug(D_ACLK, "ACLK: failure during mosquitto_loop_write %s", mosquitto_strerror(rc));
+    }
 }
 
 void aclk_lws_connect_notif_callback(){
@@ -278,7 +286,9 @@ void aclk_lws_connect_notif_callback(){
 }
 
 void aclk_lws_data_received_callback(){
-    mosquitto_loop_read(mosq, 1);
+    int rc = mosquitto_loop_read(mosq, 1);
+    if(rc != MOSQ_ERR_SUCCESS)
+        debug(D_ACLK, "ACLK: failure during mosquitto_loop_read %s", mosquitto_strerror(rc));       
 }
 
 static const struct aclk_lws_wss_engine_callbacks aclk_lws_engine_callbacks = {
@@ -317,8 +327,12 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
 static inline int _link_event_loop_wss()
 {
-    _link_mosquitto_write();
+    if(lws_engine_instance && lws_engine_instance->websocket_connection_up)
+        _link_mosquitto_write();
+
     aclk_lws_wss_service_loop(lws_engine_instance);
+    // this is because if use LWS we don't want
+    // mqtt to reconnect by itself
     return MOSQ_ERR_SUCCESS;
 }
 
