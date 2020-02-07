@@ -196,8 +196,8 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
     return DATASOURCE_JSON;
 }
 
-int web_client_api_request_v1_alarms_select (char *url, int def) {
-    int all = def;
+int web_client_api_request_v1_alarms_select (char *url) {
+    int all = 0;
     while(url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
@@ -210,7 +210,7 @@ int web_client_api_request_v1_alarms_select (char *url, int def) {
 }
 
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
-    int all = web_client_api_request_v1_alarms_select(url, 0);
+    int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -220,7 +220,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
 }
 
 inline int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url) {
-    int all = web_client_api_request_v1_alarms_select(url, 1);
+    int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
