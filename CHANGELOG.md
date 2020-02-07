@@ -6,10 +6,13 @@
 
 **Merged pull requests:**
 
+- Docs: Change sed to allow parentheses in heading links [\#7995](https://github.com/netdata/netdata/pull/7995) ([joelhans](https://github.com/joelhans))
+- Fix CentOS 7 RPM build failures. [\#7993](https://github.com/netdata/netdata/pull/7993) ([Ferroin](https://github.com/Ferroin))
 - Fix permissions issues caused by 986bc2052. [\#7984](https://github.com/netdata/netdata/pull/7984) ([Ferroin](https://github.com/Ferroin))
 - collectors: apps.plugin: apps\_groups: update ceph & samba collections. [\#7982](https://github.com/netdata/netdata/pull/7982) ([k0ste](https://github.com/k0ste))
 - /collectors/python.d.plugin/third\_party: patch monotonic synology6 [\#7980](https://github.com/netdata/netdata/pull/7980) ([ilyam8](https://github.com/ilyam8))
 - Fix typos in docs/step-by-step/step-06.md [\#7978](https://github.com/netdata/netdata/pull/7978) ([joelhans](https://github.com/joelhans))
+- /collectors/charts.d.plugin: format modules [\#7973](https://github.com/netdata/netdata/pull/7973) ([ilyam8](https://github.com/ilyam8))
 - Fixes static builds and nightlies [\#7971](https://github.com/netdata/netdata/pull/7971) ([prologic](https://github.com/prologic))
 - Adds GHA Workflow to actually Build the Agent across all the OS/Distro\(s\) we support today [\#7969](https://github.com/netdata/netdata/pull/7969) ([prologic](https://github.com/prologic))
 - Indicate FreeIPMI supported in Docker image [\#7964](https://github.com/netdata/netdata/pull/7964) ([lassebm](https://github.com/lassebm))
@@ -37,6 +40,7 @@
 - Adds new simpler \(Alpine based\) Dockerfile for quick dev and testing [\#7914](https://github.com/netdata/netdata/pull/7914) ([prologic](https://github.com/prologic))
 - Add doc with post-install instructions for GCP [\#7912](https://github.com/netdata/netdata/pull/7912) ([joelhans](https://github.com/joelhans))
 - Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
+- ACLK agent 1 [\#7894](https://github.com/netdata/netdata/pull/7894) ([stelfrag](https://github.com/stelfrag))
 - Adds docs for how to build/install NetData on CentOS 8.x [\#7890](https://github.com/netdata/netdata/pull/7890) ([prologic](https://github.com/prologic))
 - Clarify editing health config files in health quickstart [\#7883](https://github.com/netdata/netdata/pull/7883) ([joelhans](https://github.com/joelhans))
 - installer: include go.d.plugin version v0.15.0 [\#7882](https://github.com/netdata/netdata/pull/7882) ([ilyam8](https://github.com/ilyam8))
@@ -72,6 +76,7 @@
 - Fix CSV -\> SSV in docs [\#7782](https://github.com/netdata/netdata/pull/7782) ([cosmix](https://github.com/cosmix))
 - Fix a Coverity issue [\#7780](https://github.com/netdata/netdata/pull/7780) ([vlvkobal](https://github.com/vlvkobal))
 - Fix libuv IPC pipe cleanup problem [\#7778](https://github.com/netdata/netdata/pull/7778) ([mfundul](https://github.com/mfundul))
+- Drop dirty dbengine pages if disk cannot keep up [\#7777](https://github.com/netdata/netdata/pull/7777) ([mfundul](https://github.com/mfundul))
 - Add a missing parameter to the allmetrics endpoint in Swagger Editor [\#7776](https://github.com/netdata/netdata/pull/7776) ([vlvkobal](https://github.com/vlvkobal))
 - Issue 7488 docker labels [\#7770](https://github.com/netdata/netdata/pull/7770) ([amoss](https://github.com/amoss))
 - Limit PR labeler runs to the main repo. [\#7768](https://github.com/netdata/netdata/pull/7768) ([Ferroin](https://github.com/Ferroin))
