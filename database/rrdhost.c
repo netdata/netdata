@@ -1475,6 +1475,16 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 
         system_info->container_detection = strdupz(value);
     }
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_MODEL"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_DETECTION"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_RAM_DETECTION"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_DISK_DETECTION"))
+        return res;
     else {
         res = 1;
     }
