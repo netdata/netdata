@@ -235,9 +235,11 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		_aclk_wss_connect(inst);
 		break;
 #endif
+	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+		error("Could not connect MQTT over WSS server \"%s:%d\". LwsReason:\"%s\"", inst->host, inst->port, (in ? (char*)in : "not given"));
+		/* FALLTHRU */
 	case LWS_CALLBACK_CLIENT_CLOSED:
 	case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
-	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
 #ifdef AUTO_RECONNECT_ON_LWS_LAYER
 		if(!inst->reconnect_timeout_running) {
 			lws_timed_callback_vh_protocol(lws_get_vhost(wsi),
@@ -245,6 +247,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 					       LWS_CALLBACK_USER, ACLK_LWS_WSS_RECONNECT_TIMEOUT);
 			inst->reconnect_timeout_running = 1;
 		}
+		/* FALLTHRU */
 #endif
 		//no break here on purpose we want to continue with LWS_CALLBACK_WSI_DESTROY
 	case LWS_CALLBACK_WSI_DESTROY:
