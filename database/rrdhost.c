@@ -573,6 +573,10 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->host_os_version);
         freez(system_info->host_os_version_id);
         freez(system_info->host_os_detection);
+        freez(system_info->host_cores);
+        freez(system_info->host_cpu_freq);
+        freez(system_info->host_ram_total);
+        freez(system_info->host_disk_space);
         freez(system_info->container_os_name);
         freez(system_info->container_os_id);
         freez(system_info->container_os_id_like);
@@ -785,6 +789,22 @@ struct label *load_auto_labels()
     if (localhost->system_info->kernel_version)
         label_list =
             add_label_to_list(label_list, "_kernel_version", localhost->system_info->kernel_version, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_cores)
+        label_list =
+                add_label_to_list(label_list, "_system_cores", localhost->system_info->host_cores, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_cpu_freq)
+        label_list =
+                add_label_to_list(label_list, "_system_cpu_freq", localhost->system_info->host_cpu_freq, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_ram_total)
+        label_list =
+                add_label_to_list(label_list, "_system_ram_total", localhost->system_info->host_ram_total, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_disk_space)
+        label_list =
+                add_label_to_list(label_list, "_system_disk_space", localhost->system_info->host_disk_space, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->architecture)
         label_list =
@@ -1308,7 +1328,7 @@ restart_after_removal:
 
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
-
+// system_info fields must be heap allocated or NULL
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
 
@@ -1366,6 +1386,22 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         freez(system_info->kernel_name);
         system_info->kernel_name = strdupz(value);
     }
+    else if(!strcmp(name, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT")){
+        freez(system_info->host_cores);
+        system_info->host_cores = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_CPU_FREQ")){
+        freez(system_info->host_cpu_freq);
+        system_info->host_cpu_freq = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_RAM")){
+        freez(system_info->host_ram_total);
+        system_info->host_ram_total = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_DISK_SIZE")){
+        freez(system_info->host_disk_space);
+        system_info->host_disk_space = strdupz(value);
+    }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
         freez(system_info->kernel_version);
         system_info->kernel_version = strdupz(value);
@@ -1390,6 +1426,16 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         freez(system_info->container_detection);
         system_info->container_detection = strdupz(value);
     }
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_MODEL"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_DETECTION"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_RAM_DETECTION"))
+        return res;
+    else if (!strcmp(name, "NETDATA_SYSTEM_DISK_DETECTION"))
+        return res;
     else {
         res = 1;
     }
