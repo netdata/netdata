@@ -161,6 +161,14 @@ AC_ARG_ENABLE(
     ,
     [enable_jsonc="detect"]
 )
+if test "${ACLK}" = "yes"; then
+AC_ARG_ENABLE(
+    [aclk],
+    ,
+    [aclk_required="${enableval}"],
+    [aclk_required="detect"]
+)
+fi
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -420,15 +428,41 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # ACLK
-AC_MSG_CHECKING([if netdata ACLK should be enabled])
+
+#currenlty env var ACLK must be set to 'yes' to even consider building ACLK
 if test "${ACLK}" = "yes"; then
-    enable_aclk="yes"
-    AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-    CFLAGS="${CFLAGS} -DENABLE_ACLK"
-else
-    enable_aclk="no"
+    AC_MSG_CHECKING([if libmosquitto static lib is present])
+    if test -f "mosquitto/lib/libmosquitto.a"; then
+        HAVE_libmosquitto_a="yes"
+    else 
+        HAVE_libmosquitto_a="no"
+    fi
+    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
+
+    AC_MSG_CHECKING([if netdata ACLK can be enabled])
+    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}"; then
+        can_enable_aclk="yes"
+    else
+        can_enable_aclk="no"
+    fi
+    AC_MSG_RESULT([${can_enable_aclk}])
+
+    test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
+        AC_MSG_ERROR([User required ACLK but it can't be built!])
+
+    AC_MSG_CHECKING([if netdata ACLK should be enabled])
+    if test "${aclk_required}" = "detect"; then
+        enable_aclk=$can_enable_aclk
+    else
+        enable_aclk=$aclk_required
+    fi
+
+    if test "${enable_aclk}" = "yes"; then
+        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+    fi
+
+    AC_MSG_RESULT([${enable_aclk}])
 fi
-AC_MSG_RESULT([${enable_aclk}])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
