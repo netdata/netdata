@@ -196,10 +196,8 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
     return DATASOURCE_JSON;
 }
 
-
-inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_alarms_select (char *url) {
     int all = 0;
-
     while(url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
@@ -208,9 +206,25 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
         else if(!strcmp(value, "active")) all = 0;
     }
 
+    return all;
+}
+
+inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
+    int all = web_client_api_request_v1_alarms_select(url);
+
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     health_alarms2json(host, w->response.data, all);
+    buffer_no_cacheable(w->response.data);
+    return HTTP_RESP_OK;
+}
+
+inline int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url) {
+    int all = web_client_api_request_v1_alarms_select(url);
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarms_values2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
     return HTTP_RESP_OK;
 }
@@ -878,6 +892,7 @@ static struct api_command {
         { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
 
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms_values   },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
