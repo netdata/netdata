@@ -18,6 +18,7 @@ SRC_DIR="${GENERATOR_DIR}/src"
 GO_D_DIR="collectors/go.d.plugin"
 rm -rf ${GO_D_DIR}
 git clone https://github.com/netdata/go.d.plugin.git ${GO_D_DIR}
+find "${GO_D_DIR}" -maxdepth 1 -mindepth 1 -type d ! -name modules -exec rm -rf '{}' \;
 
 # Copy all Netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
