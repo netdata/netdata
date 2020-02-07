@@ -8,11 +8,12 @@ language="${3}"
 
 cd ${GENERATOR_DIR}/${docs_dir}
 
-# getlastdir parses path and returns last directory name. It expects path to be not empty and '/' as a delimeter.
+# getlastdir parses file path and returns last directory name.
+# It expects path to be not empty , '/' as a delimeter and at least one '/' in the path.
 getlastdir() {
   local IFS=/
   read -ra array <<< "$1"
-  echo "${array[-2]}"
+  echo "${array[((${#array[@]} - 2))]}"
 }
 
 # create yaml nav subtree with all the files directly under a specific directory
