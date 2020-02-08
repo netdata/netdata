@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- Update database servers group in apps\_groups.conf [\#8004](https://github.com/netdata/netdata/pull/8004) ([DefauIt](https://github.com/DefauIt))
 - Docs: Change sed to allow parentheses in heading links [\#7995](https://github.com/netdata/netdata/pull/7995) ([joelhans](https://github.com/joelhans))
 - Fix CentOS 7 RPM build failures. [\#7993](https://github.com/netdata/netdata/pull/7993) ([Ferroin](https://github.com/Ferroin))
+- Don't pretend we're building i386 RPM packages when we aren't. [\#7989](https://github.com/netdata/netdata/pull/7989) ([Ferroin](https://github.com/Ferroin))
 - Fix permissions issues caused by 986bc2052. [\#7984](https://github.com/netdata/netdata/pull/7984) ([Ferroin](https://github.com/Ferroin))
 - collectors: apps.plugin: apps\_groups: update ceph & samba collections. [\#7982](https://github.com/netdata/netdata/pull/7982) ([k0ste](https://github.com/k0ste))
 - /collectors/python.d.plugin/third\_party: patch monotonic synology6 [\#7980](https://github.com/netdata/netdata/pull/7980) ([ilyam8](https://github.com/ilyam8))
@@ -48,6 +50,7 @@
 - collectors/python.d/phpfpm: fix readme and per process chart titles [\#7876](https://github.com/netdata/netdata/pull/7876) ([ilyam8](https://github.com/ilyam8))
 - .travis.yml: Add -fno-common to CFLAGS [\#7870](https://github.com/netdata/netdata/pull/7870) ([candrews](https://github.com/candrews))
 - Add disk size detection to system-info.sh. [\#7866](https://github.com/netdata/netdata/pull/7866) ([Ferroin](https://github.com/Ferroin))
+- Update `api/v1/info ` [\#7862](https://github.com/netdata/netdata/pull/7862) ([thiagoftsm](https://github.com/thiagoftsm))
 - /collectors/python.d: remove unbound module [\#7853](https://github.com/netdata/netdata/pull/7853) ([ilyam8](https://github.com/ilyam8))
 - Stream with version [\#7851](https://github.com/netdata/netdata/pull/7851) ([thiagoftsm](https://github.com/thiagoftsm))
 - python.d/retroshare: add readme [\#7849](https://github.com/netdata/netdata/pull/7849) ([ilyam8](https://github.com/ilyam8))
@@ -55,6 +58,7 @@
 - Adds support for opting out of telemetry via the DO\_NOT\_TRACK envirnment variable [\#7846](https://github.com/netdata/netdata/pull/7846) ([prologic](https://github.com/prologic))
 - Fixed typo in README [\#7843](https://github.com/netdata/netdata/pull/7843) ([Jiab77](https://github.com/Jiab77))
 - Docs: Overhaul of installation documentation [\#7841](https://github.com/netdata/netdata/pull/7841) ([joelhans](https://github.com/joelhans))
+- alarms\_values: New endpoint [\#7836](https://github.com/netdata/netdata/pull/7836) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update collect-apache-nginx-web-logs.md to deprecated [\#7835](https://github.com/netdata/netdata/pull/7835) ([joelhans](https://github.com/joelhans))
 - collectors/python.d: format modules code [\#7832](https://github.com/netdata/netdata/pull/7832) ([ilyam8](https://github.com/ilyam8))
 - Remove all refernces to .keep files [\#7829](https://github.com/netdata/netdata/pull/7829) ([prologic](https://github.com/prologic))
@@ -124,7 +128,6 @@
 - python.d logger: unicode\_str handle TypeError [\#7645](https://github.com/netdata/netdata/pull/7645) ([ilyam8](https://github.com/ilyam8))
 - Redirect when url =~ \/host\/hostname$ \(\#7539\) [\#7643](https://github.com/netdata/netdata/pull/7643) ([underhood](https://github.com/underhood))
 - redis: populate `keys\_redis` chart in runtime [\#7639](https://github.com/netdata/netdata/pull/7639) ([ilyam8](https://github.com/ilyam8))
-- Minor: Documentation Typo alamrs -\> alarms [\#7637](https://github.com/netdata/netdata/pull/7637) ([underhood](https://github.com/underhood))
 - Update the distribution support matrix to represent reality. [\#7636](https://github.com/netdata/netdata/pull/7636) ([Ferroin](https://github.com/Ferroin))
 - Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
 - Switch PR labeling to use GitHub Actions. [\#7630](https://github.com/netdata/netdata/pull/7630) ([Ferroin](https://github.com/Ferroin))
@@ -165,9 +168,6 @@
 - installer: add missing trailing backslash [\#7326](https://github.com/netdata/netdata/pull/7326) ([oxplot](https://github.com/oxplot))
 - Fine tune various alarm values. [\#7322](https://github.com/netdata/netdata/pull/7322) ([Ferroin](https://github.com/Ferroin))
 - - Retrieve current affinity of the process and make sure not to [\#7318](https://github.com/netdata/netdata/pull/7318) ([stelfrag](https://github.com/stelfrag))
-- Updating the Travis pipeline \(issue 7189\) [\#7312](https://github.com/netdata/netdata/pull/7312) ([amoss](https://github.com/amoss))
-- CMocka tests for Issue 7274 [\#7308](https://github.com/netdata/netdata/pull/7308) ([amoss](https://github.com/amoss))
-- Fix missing streaming when slave has SSL activated. [\#7306](https://github.com/netdata/netdata/pull/7306) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
