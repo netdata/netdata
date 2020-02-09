@@ -586,6 +586,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                  "&NETDATA_CONTAINER_OS_VERSION=%s"
                  "&NETDATA_CONTAINER_OS_VERSION_ID=%s"
                  "&NETDATA_CONTAINER_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=%s"
+                 "&NETDATA_SYSTEM_CPU_FREQ=%s"
+                 "&NETDATA_SYSTEM_TOTAL_RAM=%s"
+                 "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
                  "&NETDATA_PROTOCOL_VERSION=%s"
                  " HTTP/1.1\r\n"
                  "User-Agent: %s/%s\r\n"
@@ -618,6 +622,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                  , (host->system_info->container_os_version) ? host->system_info->container_os_version : ""
                  , (host->system_info->container_os_version_id) ? host->system_info->container_os_version_id : ""
                  , (host->system_info->container_os_detection) ? host->system_info->container_os_detection : ""
+                 , (host->system_info->host_cores) ? host->system_info->host_cores : ""
+                 , (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : ""
+                 , (host->system_info->host_ram_total) ? host->system_info->host_ram_total : ""
+                 , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
                  , STREAMING_PROTOCOL_VERSION
                  , host->program_name
                  , host->program_version
