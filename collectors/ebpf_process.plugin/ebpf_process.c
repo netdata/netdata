@@ -488,8 +488,8 @@ static void move_from_kernel2user_global() {
     aggregated_data[0].call = res[0]; //open
     aggregated_data[1].call = res[14]; //close
     aggregated_data[2].call = res[8]; //unlink
-    aggregated_data[3].call = res[5]; //read
-    aggregated_data[4].call = res[2]; //write
+    aggregated_data[3].call = res[5] + res[21]; //read + readv
+    aggregated_data[4].call = res[2] + res[18]; //write + writev
     aggregated_data[5].call = res[10]; //exit
     aggregated_data[6].call = res[11]; //release
     aggregated_data[7].call = res[12]; //fork
@@ -498,13 +498,13 @@ static void move_from_kernel2user_global() {
     aggregated_data[0].ecall = res[1]; //open
     aggregated_data[1].ecall = res[15]; //close
     aggregated_data[2].ecall = res[9]; //unlink
-    aggregated_data[3].ecall = res[6]; //read
-    aggregated_data[4].ecall = res[3]; //write
+    aggregated_data[3].ecall = res[6] + res[22];  //read + readv
+    aggregated_data[4].ecall = res[3] + res[19]; //write + writev
     aggregated_data[7].ecall = res[13]; //fork
     aggregated_data[8].ecall = res[17]; //thread
 
-    aggregated_data[2].bytes = (uint64_t)res[4]; //write
-    aggregated_data[3].bytes = (uint64_t)res[7]; //read
+    aggregated_data[2].bytes = (uint64_t)res[4] + (uint64_t)res[20]; //write + writev
+    aggregated_data[3].bytes = (uint64_t)res[7] + (uint64_t)res[23];//read + readv
 }
 
 static void move_from_kernel2user()

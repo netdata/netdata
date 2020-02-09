@@ -16,7 +16,7 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
-# define NETDATA_GLOBAL_VECTOR 18
+# define NETDATA_GLOBAL_VECTOR 24
 # define NETDATA_MAX_MONITOR_VECTOR 9
 # define NETDATA_VFS_ERRORS 3
 # define NETDATA_PROCESS_ERRORS 4
