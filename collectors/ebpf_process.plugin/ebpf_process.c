@@ -72,7 +72,8 @@ static int mykernel = 0;
 
 pthread_mutex_t lock;
 
-static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "unlink", "read", "write", "exit", "release_task", "process", "thread" };
+static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write", "process", "task", "process", "thread" };
+static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write", "do_exit", "release_task", "_do_fork", "sys_clone" };
 
 int event_pid = 0;
 netdata_ebpf_events_t collector_events[] = {
@@ -196,23 +197,23 @@ static void int_exit(int sig)
     exit(sig);
 }
 
-static inline void netdata_write_chart_cmd(char *family
-                                    , char *name
+static inline void netdata_write_chart_cmd(char *type
+                                    , char *id
                                     , char *axis
                                     , char *web
                                     , int order)
 {
     printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-            , family
-            , name
+            , type
+            , id
             , axis
             , web
             , order);
 }
 
-static void netdata_write_global_dimension(char *dim)
+static void netdata_write_global_dimension(char *dimension, char *name)
 {
-    printf("DIMENSION %s '' absolute 1 1\n", dim);
+    printf("DIMENSION %s %s absolute 1 1\n", dimension, name);
 }
 
 static void netdata_create_global_dimension(void *ptr, int end)
@@ -221,7 +222,7 @@ static void netdata_create_global_dimension(void *ptr, int end)
 
     int i = 0;
     while (move && i < end) {
-        netdata_write_global_dimension(move->dimension);
+        netdata_write_global_dimension(move->name, move->dimension);
 
         move = move->next;
         i++;
@@ -249,8 +250,8 @@ static void netdata_create_io_chart(char *family, char *name, char *axis, char *
             , web
             , order);
 
-    printf("DIMENSION %s '' absolute 1 1\n", NETDATA_VFS_DIM_OUT_FILE_BYTES );
-    printf("DIMENSION %s '' absolute 1 1\n", NETDATA_VFS_DIM_IN_FILE_BYTES );
+    printf("DIMENSION %s %s absolute 1 1\n", id_names[3], NETDATA_VFS_DIM_OUT_FILE_BYTES);
+    printf("DIMENSION %s %s absolute 1 1\n", id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
 }
 
 static void netdata_global_charts_create() {
@@ -400,7 +401,7 @@ static void write_global_count_chart(char *name, char *family, netdata_publish_s
 
     int i = 0;
     while (move && i < end) {
-        write_chart_dimension(move->dimension, move->ncall);
+        write_chart_dimension(move->name, move->ncall);
 
         move = move->next;
         i++;
@@ -414,7 +415,7 @@ static void write_global_err_chart(char *name, char *family, netdata_publish_sys
 
     int i = 0;
     while (move && i < end) {
-        write_chart_dimension(move->dimension, move->nerr);
+        write_chart_dimension(move->name, move->nerr);
 
         move = move->next;
         i++;
@@ -428,8 +429,8 @@ static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
             , family
             , NETDATA_VFS_IO_FILE_BYTES);
 
-    printf("SET %s = %lld\n", NETDATA_VFS_DIM_IN_FILE_BYTES , (long long) pvc->write);
-    printf("SET %s = %lld\n", NETDATA_VFS_DIM_OUT_FILE_BYTES , (long long) pvc->read);
+    printf("SET %s = %lld\n", id_names[3] , (long long) pvc->write);
+    printf("SET %s = %lld\n", id_names[4] , (long long) pvc->read);
 
     printf("END\n");
 }
@@ -574,6 +575,7 @@ void set_global_labels() {
         prev = &is[i];
 
         pio[i].dimension = dimension_names[i];
+        pio[i].name = id_names[i];
         if(publish_prev) {
             publish_prev->next = &pio[i];
         }

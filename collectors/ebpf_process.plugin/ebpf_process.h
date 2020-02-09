@@ -50,6 +50,7 @@ typedef struct netdata_syscall_stat {
 
 typedef struct netdata_publish_syscall {
     char *dimension;
+    char *name;
     unsigned long nbyte;
     unsigned long pbyte;
     uint64_t ncall;
@@ -94,6 +95,6 @@ typedef struct netdata_error_report {
 
 # define NETDATA_DEVELOPER_LOG_FILE "developer.log"
 
-# define NETDATA_MAX_PROCESSOR 128
+# define NETDATA_MAX_PROCESSOR 512
 
 #endif
