@@ -19,7 +19,10 @@
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
-#define ACLK_STARTUP_WAIT 30             // Seconds to wait before establishing initialization process
+
+#define ACLK_DELAY_SEED 1.61803
+#define ACLK_MAX_BACKOFF_DELAY 1024000      // maximum backoff delay in milliseconds
+
 #define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1 // Wait time @ spin lock for MQTT initialization in seconds
 #define ACLK_QOS 1
@@ -31,6 +34,7 @@
 #define ACLK_RECONNECT_DELAY 1          // reconnect delay -- with backoff stragegy fow now
 #define ACLK_MAX_RECONNECT_DELAY 120
 #define ACLK_VERSION "1"
+#define ACLK_STABLE_TIMEOUT 8
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
 
@@ -48,6 +52,19 @@ typedef enum publish_topic_action {
     PUBLICH_TOPIC_FREE,
     PUBLICH_TOPIC_REBUILD
 } PUBLISH_TOPIC_ACTION;
+
+typedef enum aclk_cmd {
+    ACLK_CMD_NORMAL,
+    ACLK_CMD_WAIT,
+    ACLK_CMD_CLOUD,
+    ACLK_CMD_CONNECT,
+    ACLK_CMD_ONCONNECT,
+    ACLK_CMD_INFO,
+    ACLK_CMD_CHARTS,
+    ACLK_CMD_ALARMS_LOG,
+    ACLK_CMD_ALARMS_ACTIVE,
+    ACLK_CMD_MAX
+} ACLK_CMD;
 
 typedef enum aclk_init_action {
     ACLK_INIT,
@@ -92,12 +109,15 @@ int aclk_send_metadata();
 int aclk_wait_for_initialization();
 //int aclk_send_charts(RRDHOST *host, BUFFER *wb);
 int aclk_send_single_chart(char *host, char *chart);
-int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal);
-struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query);
+int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal, ACLK_CMD cmd);
+struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 //void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
 int aclk_update_alarm(RRDHOST *host, char *alarm_name);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);
 int aclk_submit_request(struct aclk_request *);
+void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
+void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
+
 #endif //NETDATA_AGENT_CLOUD_LINK_H
