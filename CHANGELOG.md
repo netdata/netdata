@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- /docs/generator: use h1 heading as page title for collectors pages [\#8009](https://github.com/netdata/netdata/pull/8009) ([ilyam8](https://github.com/ilyam8))
+- /docs/generator: build docs only for go.d itself and its modules [\#8005](https://github.com/netdata/netdata/pull/8005) ([ilyam8](https://github.com/ilyam8))
 - Update database servers group in apps\_groups.conf [\#8004](https://github.com/netdata/netdata/pull/8004) ([DefauIt](https://github.com/DefauIt))
+- /docs/generator: add an option to use last dir name for page name  [\#7997](https://github.com/netdata/netdata/pull/7997) ([ilyam8](https://github.com/ilyam8))
 - Docs: Change sed to allow parentheses in heading links [\#7995](https://github.com/netdata/netdata/pull/7995) ([joelhans](https://github.com/joelhans))
 - Fix CentOS 7 RPM build failures. [\#7993](https://github.com/netdata/netdata/pull/7993) ([Ferroin](https://github.com/Ferroin))
 - Don't pretend we're building i386 RPM packages when we aren't. [\#7989](https://github.com/netdata/netdata/pull/7989) ([Ferroin](https://github.com/Ferroin))
@@ -26,6 +29,7 @@
 - Fix wrong code fragments in signing in [\#7950](https://github.com/netdata/netdata/pull/7950) ([cakrit](https://github.com/cakrit))
 - Adds a GHA workflow to test install-required-packages [\#7949](https://github.com/netdata/netdata/pull/7949) ([prologic](https://github.com/prologic))
 - install go.d.plugin only if there is new version [\#7946](https://github.com/netdata/netdata/pull/7946) ([ilyam8](https://github.com/ilyam8))
+- Fix variety of linter errors across docs [\#7944](https://github.com/netdata/netdata/pull/7944) ([joelhans](https://github.com/joelhans))
 - Adds support for only performing updates if there is a newer version [\#7939](https://github.com/netdata/netdata/pull/7939) ([prologic](https://github.com/prologic))
 - Fixes error/warnings found by shellcheck for ./packaging/installer/netdata-updater.sh [\#7938](https://github.com/netdata/netdata/pull/7938) ([prologic](https://github.com/prologic))
 - Re-formatts ./packaging/installer/netdata-updater.sh with shfmt -w -i 2 -ci -sr [\#7937](https://github.com/netdata/netdata/pull/7937) ([prologic](https://github.com/prologic))
@@ -41,6 +45,7 @@
 - Reformats ./packaging/installer/install-required-packages.sh with: shfmt -w -i 2 -ci -sr [\#7915](https://github.com/netdata/netdata/pull/7915) ([prologic](https://github.com/prologic))
 - Adds new simpler \(Alpine based\) Dockerfile for quick dev and testing [\#7914](https://github.com/netdata/netdata/pull/7914) ([prologic](https://github.com/prologic))
 - Add doc with post-install instructions for GCP [\#7912](https://github.com/netdata/netdata/pull/7912) ([joelhans](https://github.com/joelhans))
+- health\_doc\_name: Clarify the rules to create an alarm name [\#7911](https://github.com/netdata/netdata/pull/7911) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
 - ACLK agent 1 [\#7894](https://github.com/netdata/netdata/pull/7894) ([stelfrag](https://github.com/stelfrag))
 - Adds docs for how to build/install NetData on CentOS 8.x [\#7890](https://github.com/netdata/netdata/pull/7890) ([prologic](https://github.com/prologic))
@@ -127,7 +132,6 @@
 - \[libnetdata/threads\] Change log level on error [\#7653](https://github.com/netdata/netdata/pull/7653) ([Saruspete](https://github.com/Saruspete))
 - python.d logger: unicode\_str handle TypeError [\#7645](https://github.com/netdata/netdata/pull/7645) ([ilyam8](https://github.com/ilyam8))
 - Redirect when url =~ \/host\/hostname$ \(\#7539\) [\#7643](https://github.com/netdata/netdata/pull/7643) ([underhood](https://github.com/underhood))
-- redis: populate `keys\_redis` chart in runtime [\#7639](https://github.com/netdata/netdata/pull/7639) ([ilyam8](https://github.com/ilyam8))
 - Update the distribution support matrix to represent reality. [\#7636](https://github.com/netdata/netdata/pull/7636) ([Ferroin](https://github.com/Ferroin))
 - Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
 - Switch PR labeling to use GitHub Actions. [\#7630](https://github.com/netdata/netdata/pull/7630) ([Ferroin](https://github.com/Ferroin))
@@ -165,9 +169,6 @@
 - Update plugins.d/README.md [\#7335](https://github.com/netdata/netdata/pull/7335) ([OdysLam](https://github.com/OdysLam))
 - collectors: apps.plugin: apps\_groups: added new frr daemons. [\#7333](https://github.com/netdata/netdata/pull/7333) ([k0ste](https://github.com/k0ste))
 - Update README.md [\#7330](https://github.com/netdata/netdata/pull/7330) ([cakrit](https://github.com/cakrit))
-- installer: add missing trailing backslash [\#7326](https://github.com/netdata/netdata/pull/7326) ([oxplot](https://github.com/oxplot))
-- Fine tune various alarm values. [\#7322](https://github.com/netdata/netdata/pull/7322) ([Ferroin](https://github.com/Ferroin))
-- - Retrieve current affinity of the process and make sure not to [\#7318](https://github.com/netdata/netdata/pull/7318) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 

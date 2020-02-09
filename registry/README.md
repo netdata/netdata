@@ -1,22 +1,27 @@
 # Registry
 
-The Netdata registry implements the node menu on the top left corner of the Netdata dashboards and enables the Netdata cloud features, such as the node view.
-The node menu lists the Netdata servers you have visited. The node view offers a lot of additional features on top of the menu, 
-[with many more to come](https://blog.netdata.cloud/posts/netdata-cloud-announcement/). 
-To enable the global Netdata registry and the cloud features, you need to Sign In to Netdata cloud. By signing in, you opt in to let the registry receive and store 
-the information described [here](#what-data-does-the-registry-store). 
-You can still get the node menu, but not the cloud features, if you [run your own registry](#run-your-own-registry).
+The Netdata registry implements the node menu on the top left corner of the Netdata dashboards and enables the Netdata
+cloud features, such as the node view. The node menu lists the Netdata servers you have visited. The node view offers a
+lot of additional features on top of the menu, [with many more to
+come](https://blog.netdata.cloud/posts/netdata-cloud-announcement/). To enable the global Netdata registry and the cloud
+features, you need to Sign In to Netdata cloud. By signing in, you opt in to let the registry receive and store the
+information described [here](#what-data-does-the-registry-store). You can still get the node menu, but not the cloud
+features, if you [run your own registry](#run-your-own-registry).
 
 ## Why?
 
 Netdata provides distributed monitoring.
 
-Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before Netdata, this was the standard practice. However it has a few issues:
+Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before
+Netdata, this was the standard practice. However it has a few issues:
 
 1.  due to the resources required, the number of metrics collected is limited.
-2.  for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds, at worst every 5 or 10 mins.
-3.  the central monitoring solution needs dedicated resources, thus becoming "another bottleneck" in the whole ecosystem. It also requires maintenance, administration, etc.
-4.  most centralized monitoring solutions are usually only good for presenting _statistics of past performance_ (i.e. cannot be used for real-time performance troubleshooting).
+2.  for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds,
+    at worst every 5 or 10 mins.
+3.  the central monitoring solution needs dedicated resources, thus becoming "another bottleneck" in the whole
+    ecosystem. It also requires maintenance, administration, etc.
+4.  most centralized monitoring solutions are usually only good for presenting _statistics of past performance_ (i.e.
+    cannot be used for real-time performance troubleshooting).
 
 Netdata follows a different approach:
 
@@ -26,38 +31,50 @@ Netdata follows a different approach:
 4.  Netdata servers do not talk to each other
 5.  your browser connects all the Netdata servers
 
-Using Netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional resources. Netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are spare (on each server). This allows **scaling out** the monitoring infrastructure.
+Using Netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional
+resources. Netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are
+spare (on each server). This allows **scaling out** the monitoring infrastructure.
 
-However, the Netdata approach introduces a few new issues that need to be addressed, one being **the list of Netdata we have installed**, i.e. the URLs our Netdata servers are listening.
+However, the Netdata approach introduces a few new issues that need to be addressed, one being **the list of Netdata we
+have installed**, i.e. the URLs our Netdata servers are listening.
 
-To solve this, Netdata utilizes a **central registry**. This registry, together with certain browser features, allow Netdata to provide unified cross-server dashboards. 
-For example, when you jump from server to server using the node menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts, etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view.
-Netdata cloud has a roadmap to [offer many more features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) over and above the simple node menu.
+To solve this, Netdata utilizes a **central registry**. This registry, together with certain browser features, allow
+Netdata to provide unified cross-server dashboards. For example, when you jump from server to server using the node
+menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts,
+etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view. Netdata cloud
+has a roadmap to [offer many more features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) over and above
+the simple node menu.
 
 ## What data does the registry store?
 
 The registry keeps track of 4 entities:
 
-1.  **machines**: i.e. the Netdata installations (a random GUID generated by each Netdata the first time it starts; we call this **machine_guid**)
+1.  **machines**: i.e. the Netdata installations (a random GUID generated by each Netdata the first time it starts; we
+    call this **machine_guid**)
 
   For each Netdata installation (each `machine_guid`) the registry keeps track of the different URLs it is accessed.
 
-2.  **persons**: i.e. the web browsers accessing the Netdata installations (a random GUID generated by the registry the first time it sees a new web browser; we call this **person_guid**)
+2.  **persons**: i.e. the web browsers accessing the Netdata installations (a random GUID generated by the registry the
+    first time it sees a new web browser; we call this **person_guid**)
 
   For each person, the registry keeps track of the Netdata installations it has accessed and their URLs. 
 
 3.  **URLs** of Netdata installations (as seen by the web browsers)
 
-  For each URL, the registry keeps the URL and nothing more. Each URL is linked to _persons_ and _machines_. The only way to find a URL is to know its **machine_guid** or have a **person_guid** it is linked to it.
+  For each URL, the registry keeps the URL and nothing more. Each URL is linked to _persons_ and _machines_. The only
+  way to find a URL is to know its **machine_guid** or have a **person_guid** it is linked to it.
 
-4.  **accounts**: i.e. the information used to sign-in via one of the available sign-in methods. Depending on the method, this may include an email, an email and a profile picture.
+4.  **accounts**: i.e. the information used to sign-in via one of the available sign-in methods. Depending on the
+    method, this may include an email, an email and a profile picture.
 
-For _persons_/_accounts_ and _machines_, the registry keeps links to _URLs_, each link with 2 timestamps (first time seen, last time seen) and a counter (number of times it has been seen).
-*machines_, _persons_ and timestamps are stored in the Netdata registry regardless of whether you sign in or not. 
+For _persons_/_accounts_ and _machines_, the registry keeps links to _URLs_, each link with 2 timestamps (first time
+seen, last time seen) and a counter (number of times it has been seen). *machines_, _persons_ and timestamps are stored
+in the Netdata registry regardless of whether you sign in or not. 
 
 ## Who talks to the registry?
 
-Your web browser **only**! If sending this information is against your policies, you can [run your own registry](#run-your-own-registry)
+Your web browser **only**! If sending this information is against your policies, you can [run your own
+registry](#run-your-own-registry)
 
 Your Netdata servers do not talk to the registry. This is a UML diagram of its operation:
 
@@ -65,12 +82,14 @@ Your Netdata servers do not talk to the registry. This is a UML diagram of its o
 
 ## Which is the default registry?
 
-`https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to both HTTP and HTTPS requests but the default is HTTPS.
-`https://netdata.cloud` is the additional registry endpoint, that enables [the cloud features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/). It only accepts HTTPS.
+`https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to
+both HTTP and HTTPS requests but the default is HTTPS. `https://netdata.cloud` is the additional registry endpoint, that
+enables [the cloud features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/). It only accepts HTTPS.
 
 ### Can this registry handle the global load of Netdata installations?
 
-Yeap! The registry can handle 50.000 - 100.000 requests **per second per core** (depending on the type of CPU, the computer's memory bandwidth, etc). 50.000 is on J1900 (celeron 2Ghz).
+Yeap! The registry can handle 50.000 - 100.000 requests **per second per core** (depending on the type of CPU, the
+computer's memory bandwidth, etc). 50.000 is on J1900 (celeron 2Ghz).
 
 We believe, it can do it...
 
@@ -80,7 +99,7 @@ We believe, it can do it...
 
 **To turn any Netdata into a registry**, edit `/etc/netdata/netdata.conf` and set:
 
-```
+```conf
 [registry]
     enabled = yes
     registry to announce = http://your.registry:19999
@@ -88,21 +107,24 @@ We believe, it can do it...
 
 Restart your Netdata to activate it.
 
-Then, you need to tell **all your other Netdata servers to advertise your registry**, instead of the default. To do this, on each of your Netdata servers, edit `/etc/netdata/netdata.conf` and set:
+Then, you need to tell **all your other Netdata servers to advertise your registry**, instead of the default. To do
+this, on each of your Netdata servers, edit `/etc/netdata/netdata.conf` and set:
 
-```
+```conf
 [registry]
     enabled = no
     registry to announce = http://your.registry:19999
 ```
 
-Note that we have not enabled the registry on the other servers. Only one Netdata (the registry) needs `[registry].enabled = yes`.
+Note that we have not enabled the registry on the other servers. Only one Netdata (the registry) needs
+`[registry].enabled = yes`.
 
 This is it. You have your registry now.
 
-You may also want to give your server different names under the node menu (i.e. to have them sorted / grouped). You can change its registry name, by setting on each Netdata server:
+You may also want to give your server different names under the node menu (i.e. to have them sorted / grouped). You can
+change its registry name, by setting on each Netdata server:
 
-```
+```conf
 [registry]
     registry hostname = Group1 - Master DB
 ```
@@ -113,31 +135,35 @@ So this server will appear in the node menu as `Group1 - Master DB`. The max nam
 
 Netdata v1.9+ support limiting access to the registry from given IPs, like this:
 
-```
+```conf
 [registry]
     allow from = *
 ```
 
-`allow from` settings are [Netdata simple patterns](../libnetdata/simple_pattern/): string matches that use `*` as wildcard (any number of times) and a `!` prefix for a negative match. So: `allow from = !10.1.2.3 10.*` will allow all IPs in `10.*` except `10.1.2.3`. The order is important: left to right, the first positive or negative match is used.
+`allow from` settings are [Netdata simple patterns](../libnetdata/simple_pattern/): string matches that use `*` as
+wildcard (any number of times) and a `!` prefix for a negative match. So: `allow from = !10.1.2.3 10.*` will allow all
+IPs in `10.*` except `10.1.2.3`. The order is important: left to right, the first positive or negative match is used.
 
-Keep in mind that connections to Netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by `[registry].allow from` should also be allowed by `[web].allow connection from`.
+Keep in mind that connections to Netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by
+`[registry].allow from` should also be allowed by `[web].allow connection from`.
 
-The patterns can be matches over IP addresses or FQDN of the host.
-In order to check the FQDN of the connection without opening the Netdata agent to DNS-spoofing, a reverse-dns record
-must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
-a forward DNS resolution is made to validate the IP address against the name-pattern.
+The patterns can be matches over IP addresses or FQDN of the host. In order to check the FQDN of the connection without
+opening the Netdata agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection
+time the reverse-dns of the peer IP address is resolved, and a forward DNS resolution is made to validate the IP address
+against the name-pattern.
 
-Please note that this process can be expensive on a machine that is serving many connections. The behaviour of
-the pattern matching can be controlled with the following setting:
-```
+Please note that this process can be expensive on a machine that is serving many connections. The behaviour of the
+pattern matching can be controlled with the following setting:
+
+```conf
 [registry]
     allow by dns = heuristic
 ```
 
 The settings are:
-* `yes` allows the pattern to match DNS names.
-* `no` disables DNS matching for the patterns (they only match IP addresses).
-* `heuristic` will estimate if the patterns should match FQDNs by the presence or absence of `:`s or alpha-characters.
+-   `yes` allows the pattern to match DNS names.
+-   `no` disables DNS matching for the patterns (they only match IP addresses).
+-   `heuristic` will estimate if the patterns should match FQDNs by the presence or absence of `:`s or alpha-characters.
 
 ### Where is the registry database stored?
 
@@ -151,21 +177,30 @@ There can be up to 2 files:
 
 -   `registry.db`, the database
 
-      every `[registry].registry save db every new entries` entries in `registry-log.db`, Netdata will save its database to `registry.db` and empty `registry-log.db`.
+      every `[registry].registry save db every new entries` entries in `registry-log.db`, Netdata will save its database
+      to `registry.db` and empty `registry-log.db`.
 
 Both files are machine readable text files.
 
 ## The future
 
-The registry opens a whole world of new possibilities for Netdata. Check here what we think: <https://github.com/netdata/netdata/issues/416>
+The registry opens a whole world of new possibilities for Netdata. Check here what we think:
+<https://github.com/netdata/netdata/issues/416>
 
 ## Troubleshooting the registry
 
-The registry URL should be set to the URL of a Netdata dashboard. This server has to have `[registry].enabled = yes`. So, accessing the registry URL directly with your web browser, should present the dashboard of the Netdata operating the registry.
+The registry URL should be set to the URL of a Netdata dashboard. This server has to have `[registry].enabled = yes`.
+So, accessing the registry URL directly with your web browser, should present the dashboard of the Netdata operating the
+registry.
 
-To use the registry, your web browser needs to support **third party cookies**, since the cookies are set by the registry while you are browsing the dashboard of another Netdata server. The registry, the first time it sees a new web browser it tries to figure if the web browser has cookies enabled or not. It does this by setting a cookie and redirecting the browser back to itself hoping that it will receive the cookie. If it does not receive the cookie, the registry will keep redirecting your web browser back to itself, which after a few redirects will fail with an error like this:
+To use the registry, your web browser needs to support **third party cookies**, since the cookies are set by the
+registry while you are browsing the dashboard of another Netdata server. The registry, the first time it sees a new web
+browser it tries to figure if the web browser has cookies enabled or not. It does this by setting a cookie and
+redirecting the browser back to itself hoping that it will receive the cookie. If it does not receive the cookie, the
+registry will keep redirecting your web browser back to itself, which after a few redirects will fail with an error like
+this:
 
-```
+```conf
 ERROR 409: Cannot ACCESS netdata registry: https://registry.my-netdata.io responded with: {"status":"redirect","registry":"https://registry.my-netdata.io"}
 ```
 
