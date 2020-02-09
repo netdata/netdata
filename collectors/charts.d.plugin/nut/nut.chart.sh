@@ -28,59 +28,59 @@ declare -A nut_ids=()
 declare -A nut_names=()
 
 nut_get_all() {
-	run -t $nut_timeout upsc -l
+  run -t $nut_timeout upsc -l
 }
 
 nut_get() {
-	run -t $nut_timeout upsc "$1"
+  run -t $nut_timeout upsc "$1"
 
-	if [ "${nut_clients_chart}" -eq "1" ]; then
-		printf "ups.connected_clients: "
-		run -t $nut_timeout upsc -c "$1" | wc -l
-	fi
+  if [ "${nut_clients_chart}" -eq "1" ]; then
+    printf "ups.connected_clients: "
+    run -t $nut_timeout upsc -c "$1" | wc -l
+  fi
 }
 
 nut_check() {
 
-	# this should return:
-	#  - 0 to enable the chart
-	#  - 1 to disable the chart
+  # this should return:
+  #  - 0 to enable the chart
+  #  - 1 to disable the chart
 
-	local x
+  local x
 
-	require_cmd upsc || return 1
+  require_cmd upsc || return 1
 
-	[ -z "$nut_ups" ] && nut_ups="$(nut_get_all)"
+  [ -z "$nut_ups" ] && nut_ups="$(nut_get_all)"
 
-	for x in $nut_ups; do
-		nut_get "$x" >/dev/null
-		# shellcheck disable=SC2181
-		if [ $? -eq 0 ]; then
-			if [ ! -z "${nut_names[${x}]}" ]; then
-				nut_ids[$x]="$(fixid "${nut_names[${x}]}")"
-			else
-				nut_ids[$x]="$(fixid "$x")"
-			fi
-			continue
-		fi
-		error "cannot get information for NUT UPS '$x'."
-	done
+  for x in $nut_ups; do
+    nut_get "$x" > /dev/null
+    # shellcheck disable=SC2181
+    if [ $? -eq 0 ]; then
+      if [ -n "${nut_names[${x}]}" ]; then
+        nut_ids[$x]="$(fixid "${nut_names[${x}]}")"
+      else
+        nut_ids[$x]="$(fixid "$x")"
+      fi
+      continue
+    fi
+    error "cannot get information for NUT UPS '$x'."
+  done
 
-	if [ ${#nut_ids[@]} -eq 0 ]; then
-		# shellcheck disable=SC2154
-		error "Cannot find UPSes - please set nut_ups='ups_name' in $confd/nut.conf"
-		return 1
-	fi
+  if [ ${#nut_ids[@]} -eq 0 ]; then
+    # shellcheck disable=SC2154
+    error "Cannot find UPSes - please set nut_ups='ups_name' in $confd/nut.conf"
+    return 1
+  fi
 
-	return 0
+  return 0
 }
 
 nut_create() {
-	# create the charts
-	local x
+  # create the charts
+  local x
 
-	for x in "${nut_ids[@]}"; do
-		cat <<EOF
+  for x in "${nut_ids[@]}"; do
+    cat << EOF
 CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $((nut_priority + 1)) $nut_update_every
 DIMENSION battery_charge charge absolute 1 100
 
@@ -115,30 +115,30 @@ CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $(
 DIMENSION temp temp absolute 1 100
 EOF
 
-		if [ "${nut_clients_chart}" = "1" ]; then
-			cat <<EOF2
+    if [ "${nut_clients_chart}" = "1" ]; then
+      cat << EOF2
 CHART nut_$x.clients '' "UPS Connected Clients" "clients" ups nut.clients area $((nut_priority + 9)) $nut_update_every
 DIMENSION clients '' absolute 1 1
 EOF2
-		fi
+    fi
 
-	done
+  done
 
-	return 0
+  return 0
 }
 
 nut_update() {
-	# the first argument to this function is the microseconds since last update
-	# pass this parameter to the BEGIN statement (see bellow).
+  # the first argument to this function is the microseconds since last update
+  # pass this parameter to the BEGIN statement (see bellow).
 
-	# do all the work to collect / calculate the values
-	# for each dimension
-	# remember: KEEP IT SIMPLE AND SHORT
+  # do all the work to collect / calculate the values
+  # for each dimension
+  # remember: KEEP IT SIMPLE AND SHORT
 
-	local i x
-	for i in "${!nut_ids[@]}"; do
-		x="${nut_ids[$i]}"
-		nut_get "$i" | awk "
+  local i x
+  for i in "${!nut_ids[@]}"; do
+    x="${nut_ids[$i]}"
+    nut_get "$i" | awk "
 BEGIN {
 	battery_charge = 0;
     battery_runtime = 0;
@@ -223,10 +223,10 @@ END {
 		print \"END\"
 	}
 }"
-		# shellcheck disable=2181
-		[ $? -ne 0 ] && unset "nut_ids[$i]" && error "failed to get values for '$i', disabling it."
-	done
+    # shellcheck disable=2181
+    [ $? -ne 0 ] && unset "nut_ids[$i]" && error "failed to get values for '$i', disabling it."
+  done
 
-	[ ${#nut_ids[@]} -eq 0 ] && error "no UPSes left active." && return 1
-	return 0
+  [ ${#nut_ids[@]} -eq 0 ] && error "no UPSes left active." && return 1
+  return 0
 }

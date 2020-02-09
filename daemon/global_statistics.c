@@ -544,7 +544,7 @@ void global_statistics_charts(void) {
         if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             ++hosts_with_dbengine;
             /* get localhost's DB engine's statistics */
-            rrdeng_get_35_statistics(host->rrdeng_ctx, local_stats_array);
+            rrdeng_get_37_statistics(host->rrdeng_ctx, local_stats_array);
             for (i = 0 ; i < RRDENG_NR_STATS ; ++i) {
                 /* aggregate statistics across hosts */
                 stats_array[i] += local_stats_array[i];
@@ -558,6 +558,8 @@ void global_statistics_charts(void) {
         stats_array[30] = local_stats_array[30];
         stats_array[31] = local_stats_array[31];
         stats_array[32] = local_stats_array[32];
+        stats_array[34] = local_stats_array[34];
+        stats_array[36] = local_stats_array[36];
 
         // ----------------------------------------------------------------
 
@@ -642,7 +644,6 @@ void global_statistics_charts(void) {
             old_misses = misses;
 
             if (hits_delta + misses_delta) {
-                // allow negative savings
                 ratio = (hits_delta * 100 * 1000) / (hits_delta + misses_delta);
             } else {
                 ratio = 0;
@@ -658,11 +659,10 @@ void global_statistics_charts(void) {
             static RRDSET *st_pg_cache_pages = NULL;
             static RRDDIM *rd_descriptors = NULL;
             static RRDDIM *rd_populated = NULL;
-            static RRDDIM *rd_committed = NULL;
-            static RRDDIM *rd_insertions = NULL;
-            static RRDDIM *rd_deletions = NULL;
+            static RRDDIM *rd_dirty = NULL;
             static RRDDIM *rd_backfills = NULL;
             static RRDDIM *rd_evictions = NULL;
+            static RRDDIM *rd_used_by_collectors = NULL;
 
             if (unlikely(!st_pg_cache_pages)) {
                 st_pg_cache_pages = rrdset_create_localhost(
@@ -671,7 +671,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine page statistics"
+                        , "NetData dbengine page cache statistics"
                         , "pages"
                         , "netdata"
                         , "stats"
@@ -682,23 +682,64 @@ void global_statistics_charts(void) {
 
                 rd_descriptors = rrddim_add(st_pg_cache_pages, "descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_populated = rrddim_add(st_pg_cache_pages, "populated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_committed = rrddim_add(st_pg_cache_pages, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_insertions = rrddim_add(st_pg_cache_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_deletions = rrddim_add(st_pg_cache_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_dirty = rrddim_add(st_pg_cache_pages, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_backfills = rrddim_add(st_pg_cache_pages, "backfills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rd_evictions = rrddim_add(st_pg_cache_pages, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_used_by_collectors = rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, 1, 1,
+                                                   RRD_ALGORITHM_ABSOLUTE);
             }
             else
                 rrdset_next(st_pg_cache_pages);
 
             rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_committed, (collected_number)stats_array[4]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_insertions, (collected_number)stats_array[5]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_deletions, (collected_number)stats_array[6]);
+            rrddim_set_by_pointer(st_pg_cache_pages, rd_dirty, (collected_number)stats_array[0] + stats_array[4]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_backfills, (collected_number)stats_array[9]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_evictions, (collected_number)stats_array[10]);
+            rrddim_set_by_pointer(st_pg_cache_pages, rd_used_by_collectors, (collected_number)stats_array[0]);
             rrdset_done(st_pg_cache_pages);
+        }
+
+        // ----------------------------------------------------------------
+
+        {
+            static RRDSET *st_long_term_pages = NULL;
+            static RRDDIM *rd_total = NULL;
+            static RRDDIM *rd_insertions = NULL;
+            static RRDDIM *rd_deletions = NULL;
+            static RRDDIM *rd_flushing_pressure_deletions = NULL;
+
+            if (unlikely(!st_long_term_pages)) {
+                st_long_term_pages = rrdset_create_localhost(
+                        "netdata"
+                , "dbengine_long_term_page_stats"
+                , NULL
+                , "dbengine"
+                , NULL
+                , "NetData dbengine long-term page statistics"
+                , "pages"
+                , "netdata"
+                , "stats"
+                , 130505
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+                );
+
+                rd_total = rrddim_add(st_long_term_pages, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_insertions = rrddim_add(st_long_term_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_flushing_pressure_deletions = rrddim_add(st_long_term_pages, "flushing_pressure_deletions", NULL, -1,
+                                                            1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else
+                rrdset_next(st_long_term_pages);
+
+            rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
+            rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
+            rrddim_set_by_pointer(st_long_term_pages, rd_deletions, (collected_number)stats_array[6]);
+            rrddim_set_by_pointer(st_long_term_pages, rd_flushing_pressure_deletions,
+                                  (collected_number)stats_array[36]);
+            rrdset_done(st_long_term_pages);
         }
 
         // ----------------------------------------------------------------
@@ -719,7 +760,7 @@ void global_statistics_charts(void) {
                 , "MiB/s"
                 , "netdata"
                 , "stats"
-                , 130505
+                , 130506
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
                 );
@@ -753,7 +794,7 @@ void global_statistics_charts(void) {
                         , "operations/s"
                         , "netdata"
                         , "stats"
-                        , 130506
+                        , 130507
                         , localhost->rrd_update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -775,7 +816,7 @@ void global_statistics_charts(void) {
             static RRDSET *st_errors = NULL;
             static RRDDIM *rd_fs_errors = NULL;
             static RRDDIM *rd_io_errors = NULL;
-            static RRDDIM *rd_flushing_errors = NULL;
+            static RRDDIM *pg_cache_over_half_dirty_events = NULL;
 
             if (unlikely(!st_errors)) {
                 st_errors = rrdset_create_localhost(
@@ -788,21 +829,22 @@ void global_statistics_charts(void) {
                         , "errors/s"
                         , "netdata"
                         , "stats"
-                        , 130507
+                        , 130508
                         , localhost->rrd_update_every
                         , RRDSET_TYPE_LINE
                 );
 
-                rd_io_errors = rrddim_add(st_errors, "I/O errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fs_errors = rrddim_add(st_errors, "FS errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_flushing_errors = rrddim_add(st_errors, "flushing errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                pg_cache_over_half_dirty_events = rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1,
+                                                             RRD_ALGORITHM_INCREMENTAL);
             }
             else
                 rrdset_next(st_errors);
 
             rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
             rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
-            rrddim_set_by_pointer(st_errors, rd_flushing_errors, (collected_number)stats_array[34]);
+            rrddim_set_by_pointer(st_errors, pg_cache_over_half_dirty_events, (collected_number)stats_array[34]);
             rrdset_done(st_errors);
         }
 
@@ -824,7 +866,7 @@ void global_statistics_charts(void) {
                         , "descriptors"
                         , "netdata"
                         , "stats"
-                        , 130508
+                        , 130509
                         , localhost->rrd_update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -863,7 +905,7 @@ void global_statistics_charts(void) {
                 , "MiB"
                 , "netdata"
                 , "stats"
-                , 130509
+                , 130510
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_STACKED
                 );
