@@ -15,7 +15,9 @@ int _link_subscribe(char *topic, int qos);
 int _link_send_message(char *topic, char *message);
 const char *_link_strerror(int rc);
 
-extern int aclk_connection_initialized;
 int aclk_handle_cloud_request(char *);
+
+extern int aclk_connection_initialized;
+extern int aclk_mqtt_connected;
 
 #endif //NETDATA_MQTT_H

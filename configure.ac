@@ -295,6 +295,17 @@ AC_CHECK_LIB(
     [LZ4_LIBS="-llz4"]
 )
 
+# -----------------------------------------------------------------------------
+# libwebsockets pure C library for implementing modern network protocols
+
+if test "${ACLK}" = "yes"; then
+    AC_CHECK_LIB(
+        [websockets],
+        [lws_create_context],
+        [LWS_LIBS="-lwebsockets"]
+    )
+fi
+
 
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
@@ -419,6 +430,9 @@ else
 fi
 AC_MSG_RESULT([${enable_aclk}])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
+
+test "${enable_aclk}" = "yes" -a -z "${LWS_LIBS}" && \
+    AC_MSG_ERROR([libwebsockets required for ACLK but not found. Try installing 'libwebsockets-dev' or 'libwebsockets-devel'.])
 
 # -----------------------------------------------------------------------------
 # Exporting engine
@@ -1129,7 +1143,7 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_LIBS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
