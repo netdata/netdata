@@ -285,6 +285,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
 
         info("Removing double entry");
         aclk_query_free(tmp_query);
+        aclk_queue.count--;
         //tmp_query->deleted = 1;
     }
 
