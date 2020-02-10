@@ -45,9 +45,11 @@ else
   source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
-download_go() {
+download_tarball() {
   url="${1}"
   dest="${2}"
+  name="${3}"
+  opt="${4}"
 
   if command -v curl > /dev/null 2>&1; then
     run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
@@ -55,12 +57,16 @@ download_go() {
     run wget -T 15 -O - "${url}" > "${dest}"
   else
     echo >&2
-    echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
-    echo >&2 "Either add packages or disable it by issuing '--disable-go' in the installer"
+    echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
+    echo >&2 "Either add packages or disable it by issuing '--disable-${opt}' in the installer"
     echo >&2
 
     run_failed "I need curl or wget to proceed, but neither is available on this system."
   fi
+}
+
+download_go() {
+  download_tarball "${1}" "${2}" "go.d plugin" "go"
 }
 
 # make sure we save all commands we run
@@ -157,6 +163,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
+  --disable-mosquitto        Don't build with libmosquitto (this limits Netdata Cloud functionality).
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -241,6 +248,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
+    "--disable-mosquitto") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-libmosquitto/} --disable-libmosquitto" ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -412,6 +420,74 @@ if [ ${LIBS_ARE_HERE} -eq 1 ]; then
 fi
 
 trap build_error EXIT
+
+# -----------------------------------------------------------------------------
+
+fetch_libmosquitto() {
+  download_tarball "${1}" "${2}" "libmosquitto" "mosquitto"
+}
+
+build_libmosquitto() {
+  run make -C "${1}/lib"
+}
+
+copy_libmosquitto() {
+  target_dir="${PWD}/mosquitto"
+
+  run mkdir -p "${target_dir}"
+
+  run cp "${1}/lib/libmosquitto.a" "${target_dir}"
+  run cp "${1}/lib/*.h" "${target_dir}"
+}
+
+bundle_libmosquitto() {
+  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ] ; then
+    return 0
+  fi
+
+  progress "Prepare custom libmosquitto version"
+
+  MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
+
+  tmp=$(mktemp -d /tmp/netdata-mosquitto-XXXXXX)
+  MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
+
+  if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}" ]; then
+    fetch_libmosquitto "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}"
+  else
+    progress "Using provided mosquitto tarball ${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"
+    run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}" "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}"
+  fi
+
+  if [ ! -f "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ] || [ ! -s "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ]; then
+    run_failed "mosquitto download failed, MQTT ACLK will not be available"
+    echo >&2 "Either check the error or consider disabling it by issuing '--disable-mosquitto' in the installer"
+    echo >&2
+    return 0
+  fi
+
+  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" >"${tmp}/sha256sums.txt" 2>/dev/null
+
+  cp packaging/mosquitto.checksums "${tmp}/sha256sums.txt"
+
+  # Checksum validation
+  if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+
+    echo >&2 "mosquitto checksum validation failure."
+    echo >&2 "Either check the error or consider disabling it by issuing '--disable-mosquitto' in the installer"
+    echo >&2
+
+    run_failed "mosquitto files checksum validation failed."
+    return 0
+  fi
+
+  run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}"
+
+  build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}"
+  copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}"
+}
+
+bundle_libmosquitto
 
 # -----------------------------------------------------------------------------
 echo >&2
