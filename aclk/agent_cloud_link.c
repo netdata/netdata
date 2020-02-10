@@ -494,11 +494,13 @@ static void _free_collector(struct _collector *collector)
 }
 
 /*
- * This will cleanup the collector list
+ * This will report the collector list
  *
  */
+#ifdef ACLK_DEBUG
 static void _dump_connector_list()
 {
+
     struct _collector  *tmp_collector;
 
     COLLECTOR_LOCK;
@@ -526,6 +528,7 @@ static void _dump_connector_list()
     info("DUMPING ALL COLLECTORS DONE");
     COLLECTOR_UNLOCK;
 }
+#endif
 
 /*
  * This will cleanup the collector list
@@ -639,9 +642,8 @@ static struct _collector *_del_collector(const char *hostname, const char *plugi
 static struct _collector  *_add_collector(const char *hostname, const char *plugin_name, const char *module_name)
 {
     struct _collector  *tmp_collector;
-    //info("Adding [%s:%s]", plugin_name?plugin_name:"*", module_name?module_name:"*");
 
-    info("Delay in case of failure = %llu", aclk_delay(1));
+    //info("Delay in case of failure = %llu", aclk_delay(1));
 
     tmp_collector = _find_collector(hostname, plugin_name, module_name, NULL);
 
@@ -660,8 +662,9 @@ static struct _collector  *_add_collector(const char *hostname, const char *plug
         collector_list->next = tmp_collector;
     }
     tmp_collector->count++;
+#ifdef ACLK_DEBUG
     info("ADD COLLECTOR %s [%s:%s] -- count %u", hostname, plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
-
+#endif
     return tmp_collector;
 }
 
@@ -708,11 +711,12 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
         COLLECTOR_UNLOCK;
         return;
     }
-
+#ifdef ACLK_DEBUG
     if (tmp_collector)
         info("DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
+#endif
 
-    // Queue command for update to the cloud
+    // TODO: Queue command for update to the cloud
 
     COLLECTOR_UNLOCK;
 
@@ -888,7 +892,9 @@ void *aclk_query_main_thread(void *ptr)
             if ((now_realtime_sec() - last_init_sequence) > ACLK_STABLE_TIMEOUT) {
                 agent_state = 1;
                 info("AGENT is stable");
+#ifdef ACLK_DEBUG
                 _dump_connector_list();
+#endif
             }
         }
 
@@ -900,6 +906,11 @@ void *aclk_query_main_thread(void *ptr)
             // Queue commands that need to run after agent stable
 
             aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 0, 1, ACLK_CMD_ONCONNECT);
+
+            //TODO: Rewrite to remove this part of the code since we already do it in the
+            // the loop below
+            if (likely(aclk_connection_initialized && !netdata_exit))
+                aclk_process_queries();
 
         }
 
@@ -1117,6 +1128,7 @@ void aclk_disconnect(void *ptr)
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
     waiting_init = 1;
+    aclk_delay(0);
 }
 
 void aclk_shutdown()
