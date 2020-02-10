@@ -21,7 +21,7 @@ quickstart](QUICKSTART.md).
 
 ## Netdata's collector architecture
 
-Netdata has a intricate system for organizing and managing its collectors. **Collectors** are the processes/programs
+Netdata has an intricate system for organizing and managing its collectors. **Collectors** are the processes/programs
 that actually gather metrics from various sources. Collectors are organized by **plugins**, which help manage all the
 independent processes in a variety of programming languages based on their purpose and performance requirements.
 **Modules** are a type of collector, used primarily to connect to external applications, such as an Nginx web server or
@@ -36,7 +36,7 @@ There are three types of plugins:
 
 -   **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
     They are written in `C`, and run as threads within the Netdata daemon.
--   **External** plugins organize collecotrs that gather metrics from external processes, such as a MySQL database or
+-   **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
     Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
     independent processes. They communicate with the daemon via pipes.
 -   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
@@ -45,9 +45,9 @@ There are three types of plugins:
 
 ## Troubleshoot a collector
 
-First, naviagate to your plugins directory, which is usually at `/usr/libexec/netdata/plugins.d/`. If that's not
-the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the plugins
-directory, switch to the `netdata` user.
+First, navigate to your plugins directory, which is usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case
+on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the plugins directory,
+switch to the `netdata` user.
 
 ```bash
 cd /usr/libexec/netdata/plugins.d/
@@ -105,17 +105,17 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# charts.d = yes
 ```
 
-By default, most plugins are enabled, so you don't need to explicity enable them to use their collectors. To enable or
+By default, most plugins are enabled, so you don't need to enable them explicity to use their collectors. To enable or
 disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
 
 All **external plugins** are managed by [plugins.d](plugins.d/), which provides additional management options.
 
 ## Enable, configure, and disable modules
 
-Most **modules** come with **auto-detection**, configured to work out-of-the-box on popular operating systems with the
-default settings.
+Most collector modules come with **auto-detection**, configured to work out-of-the-box on popular operating systems with
+the default settings.
 
-However, there are cases that auto-detection fails. Usually the reason is that the applications to be monitored do not
+However, there are cases that auto-detection fails. Usually, the reason is that the applications to be monitored do not
 allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
 metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
 
@@ -134,9 +134,9 @@ Similarly, you can use `charts.d.plugin` for BASH plugins and `node.d.plugin` fo
 `apps.plugin`, `freeipmi.plugin`, `fping.plugin`, `ioping.plugin`, `nfacct.plugin`, `xenstat.plugin`, `perf.plugin`,
 `slabinfo.plugin`) use the native Netdata plugin API and can be run directly.
 
-If you need to configure a Netdata plugin or module, all user supplied configuration is kept at `/etc/netdata` while the
+If you need to configure a Netdata plugin or module, all user-supplied configuration is kept at `/etc/netdata` while the
 stock versions of all files is at `/usr/lib/netdata/conf.d`. To copy a stock file and edit it, run
-`/etc/netdata/edit-config`. Running this command without an argument, will list the available stock files.
+`/etc/netdata/edit-config`. Running this command without an argument will list the available stock files.
 
 Each file should provide plenty of examples and documentation about each module and plugin.
 

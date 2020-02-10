@@ -28,7 +28,7 @@ example to showcase the process of configuring and enabling one of Netdata's pre
 
 ## Configure your application or service for monitoring
 
-Every collector's documentation comes with instructions on how to configure your app/service to make it availble to
+Every collector's documentation comes with instructions on how to configure your app/service to make it available to
 Netdata's collector.
 
 For example, the [Nginx collector documentation](go.d.plugin/modules/nginx/README.md) informs you that it requires that
@@ -61,14 +61,14 @@ your collector.
 ## Edit the configuration file for your collector
 
 This step may not be required based on how you configured your app/service, as each collector comes with a few
-pre-configured jobs that looks for the app/service in common and expected locations. For example, the Nginx collector
+pre-configured jobs that look for the app/service in common and expected locations. For example, the Nginx collector
 looks for a `stub_status` page at `http://localhost/stub_status` and `http://127.0.0.1/stub_status`, which allows it to
 auto-detect almost all local Nginx web servers.
 
 Despite Netdata's auto-detection capabilities, it's important to know how to edit collector configuration files.
 
-All editing should be done using the `edit-config` script that comes with every installation of Netdata. To edit a
-collector configuration file, navigate to your [Netdata configuration
+You should always edit configuration files with the `edit-config` script that comes with every installation of Netdata.
+To edit a collector configuration file, navigate to your [Netdata configuration
 directory](../docs/step-by-step/step-04.md#find-your-netdataconf-file). Launch `edit-config` with the path to the
 collector's configuration file.
 
@@ -81,7 +81,7 @@ sudo ./edit-config go.d.plugin/nginx.conf
 
 This file contains all of the possible job parameters to help you monitor Nginx in all sorts of complex deployments. At
 the bottom of the file is a `[JOB]` section, which contains the two default jobs. Configure these as needed, using those
-parameters as reference, to configure the collector.
+parameters as a reference, to configure the collector.
 
 ### How do I edit the right configuration file?
 
@@ -107,5 +107,5 @@ reference](REFERENCE.md#troubleshoot-a-collector).
 View our [collectors tutorials](README.md#tutorials) to get specific instructions on enabling new and popular
 collectors.
 
-Finally, learn more advanced collector features, such as disabling plugins or developing your own collector, in our
+Finally, learn more advanced collector features, such as disabling plugins or developing a custom collector, in our
 [internal plugin API](REFERENCE.md#internal-plugins-api) or our [external plugin docs](plugins.d/README.md).
