@@ -567,49 +567,69 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
             "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s&ver=%u"
-                    "&NETDATA_SYSTEM_OS_NAME=%s"
-                    "&NETDATA_SYSTEM_OS_ID=%s"
-                    "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
-                    "&NETDATA_SYSTEM_OS_VERSION=%s"
-                    "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
-                    "&NETDATA_SYSTEM_OS_DETECTION=%s"
-                    "&NETDATA_SYSTEM_KERNEL_NAME=%s"
-                    "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
-                    "&NETDATA_SYSTEM_ARCHITECTURE=%s"
-                    "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
-                    "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
-                    "&NETDATA_SYSTEM_CONTAINER=%s"
-                    "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
-                    "&NETDATA_PROTOCOL_VERSION=%s"
-                    " HTTP/1.1\r\n"
-                    "User-Agent: %s/%s\r\n"
-                    "Accept: */*\r\n\r\n"
-              , host->rrdpush_send_api_key
-              , host->hostname
-              , host->registry_hostname
-              , host->machine_guid
-              , default_rrd_update_every
-              , host->os
-              , host->timezone
-              , (host->tags) ? host->tags : ""
-              , STREAMING_PROTOCOL_CURRENT_VERSION
-              , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
-              , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
-              , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
-              , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
-              , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
-              , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
-              , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
-              , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
-              , (host->system_info->architecture) ? host->system_info->architecture : ""
-              , (host->system_info->virtualization) ? host->system_info->virtualization : ""
-              , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
-              , (host->system_info->container) ? host->system_info->container : ""
-              , (host->system_info->container_detection) ? host->system_info->container_detection : ""
-              , STREAMING_PROTOCOL_VERSION
-              , host->program_name
-              , host->program_version
-    );
+                 "&NETDATA_SYSTEM_OS_NAME=%s"
+                 "&NETDATA_SYSTEM_OS_ID=%s"
+                 "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
+                 "&NETDATA_SYSTEM_OS_VERSION=%s"
+                 "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
+                 "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_KERNEL_NAME=%s"
+                 "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
+                 "&NETDATA_SYSTEM_ARCHITECTURE=%s"
+                 "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
+                 "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CONTAINER=%s"
+                 "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                 "&NETDATA_CONTAINER_OS_NAME=%s"
+                 "&NETDATA_CONTAINER_OS_ID=%s"
+                 "&NETDATA_CONTAINER_OS_ID_LIKE=%s"
+                 "&NETDATA_CONTAINER_OS_VERSION=%s"
+                 "&NETDATA_CONTAINER_OS_VERSION_ID=%s"
+                 "&NETDATA_CONTAINER_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=%s"
+                 "&NETDATA_SYSTEM_CPU_FREQ=%s"
+                 "&NETDATA_SYSTEM_TOTAL_RAM=%s"
+                 "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
+                 "&NETDATA_PROTOCOL_VERSION=%s"
+                 " HTTP/1.1\r\n"
+                 "User-Agent: %s/%s\r\n"
+                 "Accept: */*\r\n\r\n"
+                 , host->rrdpush_send_api_key
+                 , host->hostname
+                 , host->registry_hostname
+                 , host->machine_guid
+                 , default_rrd_update_every
+                 , host->os
+                 , host->timezone
+                 , (host->tags) ? host->tags : ""
+                 , STREAMING_PROTOCOL_CURRENT_VERSION
+                 , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
+                 , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
+                 , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
+                 , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
+                 , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
+                 , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
+                 , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
+                 , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+                 , (host->system_info->architecture) ? host->system_info->architecture : ""
+                 , (host->system_info->virtualization) ? host->system_info->virtualization : ""
+                 , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
+                 , (host->system_info->container) ? host->system_info->container : ""
+                 , (host->system_info->container_detection) ? host->system_info->container_detection : ""
+                 , (host->system_info->container_os_name) ? host->system_info->container_os_name : ""
+                 , (host->system_info->container_os_id) ? host->system_info->container_os_id : ""
+                 , (host->system_info->container_os_id_like) ? host->system_info->container_os_id_like : ""
+                 , (host->system_info->container_os_version) ? host->system_info->container_os_version : ""
+                 , (host->system_info->container_os_version_id) ? host->system_info->container_os_version_id : ""
+                 , (host->system_info->container_os_detection) ? host->system_info->container_os_detection : ""
+                 , (host->system_info->host_cores) ? host->system_info->host_cores : ""
+                 , (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : ""
+                 , (host->system_info->host_ram_total) ? host->system_info->host_ram_total : ""
+                 , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
+                 , STREAMING_PROTOCOL_VERSION
+                 , host->program_name
+                 , host->program_version
+                 );
     http[eol] = 0x00;
 
 #ifdef ENABLE_HTTPS
