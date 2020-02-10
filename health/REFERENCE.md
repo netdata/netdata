@@ -88,7 +88,8 @@ alarm: NAME
 template: NAME
 ```
 
-`NAME` can be anything, with `.` (period) and `_` (underscore) as the only allowed symbols.
+`NAME` can be any alpha character, with `.` (period) and `_` (underscore) as the only allowed symbols, but the names 
+cannot be `chart name`, `dimension name`, `family name`, or `chart variables names`.
 
 #### Alarm line `on`
 

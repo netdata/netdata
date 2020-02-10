@@ -275,13 +275,27 @@ fixid() {
 		tr "[A-Z]" "[a-z]"
 }
 
+isvarset() {
+  [ -n "$1" ] && [ "$1" != "unknown" ] && [ "$1" != "none" ]
+  return $?
+}
+
+getosid() {
+  if isvarset "${NETDATA_CONTAINER_OS_ID}"; then
+    echo "${NETDATA_CONTAINER_OS_ID}"
+  else
+    echo "${NETDATA_SYSTEM_OS_ID}"
+  fi
+}
+
 run() {
 	local ret pid="${BASHPID}" t
 
 	if [ "z${1}" = "z-t" -a "${2}" != "0" ]; then
 		t="${2}"
 		shift 2
-		case "${NETDATA_SYSTEM_OS_ID}" in
+
+		case "$(getosid)" in
 		"alpine")
 			timeout -t ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
 			;;

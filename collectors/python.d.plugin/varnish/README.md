@@ -1,80 +1,41 @@
 # varnish
 
-Module uses the `varnishstat` command to provide varnish cache statistics.
+This module will monitor [`Varnish Cache`](https://varnish-cache.org/) performance metrics.
 
-It produces:
+It uses the `varnishstat` command to provide Varnish Cache statistics.
 
-1.  **Connections Statistics** in connections/s
+## Requirements
 
-    -   accepted
-    -   dropped
+-   `netdata` user must be a member of the `varnish` group 
 
-2.  **Client Requests** in requests/s
+## Charts
 
-    -   received
+This module produces the following charts:
 
-3.  **All History Hit Rate Ratio** in percent
+-   Connections Statistics in `connections/s`
+-   Client Requests in `requests/s`
+-   All History Hit Rate Ratio in `percent`
+-   Current Poll Hit Rate Ratio in `percent`
+-   Expired Objects in `expired/s`
+-   Least Recently Used Nuked Objects in `nuked/s`
+-   Number Of Threads In All Pools in `pools`
+-   Threads Statistics in `threads/s`
+-   Current Queue Length in `requests`
+-   Backend Connections Statistics in `connections/s`
+-   Requests To The Backend in `requests/s`
+-   ESI Statistics in `problems/s`
+-   Memory Usage in `MiB`
+-   Uptime in `seconds`
 
-    -   hit
-    -   miss
-    -   hitpass
+For every backend (VBE):
 
-4.  **Current Poll Hit Rate Ratio** in percent
+-   Backend Response Statistics in `kilobits/s`
 
-    -   hit
-    -   miss
-    -   hitpass
+For every disk (SMF):
 
-5.  **Expired Objects** in expired/s
+-   Disk Usage in `KiB` 
 
-    -   objects
-
-6.  **Least Recently Used Nuked Objects** in nuked/s
-
-    -   objects
-
-7.  **Number Of Threads In All Pools** in threads
-
-    -   threads
-
-8.  **Threads Statistics** in threads/s
-
-    -   created
-    -   failed
-    -   limited
-
-9.  **Current Queue Length** in requests
-
-    -   in queue
-
-10. **Backend Connections Statistics** in connections/s
-
-    -   successful
-    -   unhealthy
-    -   reused
-    -   closed
-    -   resycled
-    -   failed
-
-11. **Requests To The Backend** in requests/s
-
-    -   received
-
-12. **ESI Statistics** in problems/s
-
-    -   errors
-    -   warnings
-
-13. **Memory Usage** in MB
-
-    -   free
-    -   allocated
-
-14. **Uptime** in seconds
-
-    -   uptime
-
-## configuration
+## Configuration
 
 Only one parameter is supported:
 
@@ -82,7 +43,7 @@ Only one parameter is supported:
 instance_name: 'name'
 ```
 
-The name of the varnishd instance to get logs from. If not specified, the host name is used.
+The name of the `varnishd` instance to get logs from. If not specified, the host name is used.
 
 ---
 

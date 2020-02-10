@@ -103,7 +103,6 @@ include squid/Makefile.inc
 include tomcat/Makefile.inc
 include tor/Makefile.inc
 include traefik/Makefile.inc
-include unbound/Makefile.inc
 include uwsgi/Makefile.inc
 include varnish/Makefile.inc
 include w1sensor/Makefile.inc
