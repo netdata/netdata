@@ -163,7 +163,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --disable-mosquitto        Don't build with libmosquitto (this limits Netdata Cloud functionality).
+  --disable-mosquitto        Don't build with libmosquitto (this disables Netdata Cloud functionality).
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
