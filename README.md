@@ -13,13 +13,14 @@ PYTHON](https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm
 
 ---
 
-**Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is a
+**Netdata** is **distributed, real-time performance and health monitoring for systems and applications**. It is a
 highly-optimized monitoring agent you install on all your systems and containers.
 
-Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including
-web servers, databases, applications), using **highly interactive web dashboards**. It can run autonomously, without any
-third-party components, or it can be integrated to existing monitoring toolchains (Prometheus, Graphite, OpenTSDB,
-Kafka, Grafana, and more).
+Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it's running on
+(including web servers, databases, applications), using **highly interactive web dashboards**. A **long-term metrics
+database** helps you efficiently store data with 1-second granularity, which means Netdata can run autonomously, without
+any third-party components. Or, you can integrate Netdata with existing monitoring toolchains (Prometheus, Graphite,
+OpenTSDB, Kafka, Grafana, and more).
 
 Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers,
 **containers**, **IoT** devices), without disrupting their core function.
@@ -171,10 +172,10 @@ Netdata is a monitoring agent you install on all your systems. It is:
 
 -   A **metrics collector** for system and application metrics (including web servers, databases, containers, and much
     more),
--   A custom **database engine** to store recent metrics in memory and "spill" historical metrics to disk for efficient
-    long-term storage,
+-   A **long-term metrics storage database** that stores recent metrics in memory and "spills" historical metrics to
+    disk for efficient long-term storage,
 -   A super fast, interactive, and modern **metrics visualizer** optimized for anomaly detection,
--   And an **alarms notification engine** - an advanced watchdog for detecting performance and availability issues
+-   And an **alarms notification engine** for detecting performance and availability issues.
 
 All the above, are packaged together in a very flexible, extremely modular, distributed application.
 
@@ -282,7 +283,8 @@ This is what you should expect from Netdata:
 -   **1s granularity** - The highest possible resolution for all metrics.
 -   **Unlimited metrics** - Netdata collects all the available metrics—the more, the better.
 -   **1% CPU utilization of a single core** - It's unbelievably optimized.
--   **A few MB of RAM** - The low-memory round-robin option uses 25MB RAM, and you can [resize it](database/).
+-   **A few MB of RAM** - The highly-efficient database engine stores per-second metrics in RAM and then "spills"
+    historical metrics to disk long-term storage.   
 -   **Minimal disk I/O** - While running, Netdata only writes historical metrics and reads `error` and `access` logs.
 -   **Zero configuration** - Netdata auto-detects everything, and can collect up to 10,000 metrics per server out of the
     box.
