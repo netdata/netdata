@@ -2,8 +2,8 @@
 
 **Netdata is real-time health monitoring and performance troubleshooting for systems and applications.** It helps you
 instantly diagnose slowdowns and anomalies in your infrastructure with thousands of metrics, interactive visualizations,
-and insightful health alarms. With long-term metrics storage, you can simplify your monitoring stack and get all the
-benefits of per-granularity metrics at any scale.
+and insightful health alarms. Plus, long-term storage comes ready out-of-the-box, so can collect, monitor, and maintain
+your metrics in one insightful place.
 
 ## Navigating the Netdata documentation
 
