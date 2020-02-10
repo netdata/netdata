@@ -460,7 +460,7 @@ bundle_libmosquitto() {
   fi
 
   if [ ! -f "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ] || [ ! -s "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ]; then
-    run_failed "mosquitto download failed, MQTT ACLK will not be available"
+    run_failed "unable to find a usable libmosquitto source archive, MQTT ACLK will not be available"
     echo >&2 "Either check the error or consider disabling it by issuing '--disable-mosquitto' in the installer"
     echo >&2
     return 0
