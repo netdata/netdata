@@ -13,16 +13,17 @@ PYTHON](https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm
 
 ---
 
-**Netdata** is **distributed, real-time performance and health monitoring for systems and applications**. It is a
+Netdata is **distributed, real-time performance and health monitoring** for systems and applications. It is a
 highly-optimized monitoring agent you install on all your systems and containers.
 
-Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it's running on
-(including web servers, databases, applications), using **highly interactive web dashboards**. A **long-term metrics
-database** helps you efficiently store historical data with 1-second granularity, which means Netdata can run
-autonomously. Or, you can integrate Netdata with existing monitoring toolchains (Prometheus, Graphite, OpenTSDB, Kafka,
-Grafana, and more).
+Netdata provides **unparalleled insights**, in **real-time**, of everything happening on the systems it's running on
+(including web servers, databases, applications), using **highly interactive web dashboards**. 
 
-Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers,
+A highly-efficient database **stores long-term historical metrics for days, weeks, or months**, all at 1-second
+granularity. Run this long-term storage autonomously, or integrate Netdata with your existing monitoring toolchains
+(Prometheus, Graphite, OpenTSDB, Kafka, Grafana, and more).
+
+Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** and **virtual** servers,
 **containers**, **IoT** devices), without disrupting their core function.
 
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**, along with
@@ -172,8 +173,8 @@ Netdata is a monitoring agent you install on all your systems. It is:
 
 -   A **metrics collector** for system and application metrics (including web servers, databases, containers, and much
     more),
--   A **long-term metrics storage database** that stores recent metrics in memory and "spills" historical metrics to
-    disk for efficient long-term storage,
+-   A **long-term metrics database** that stores recent metrics in memory and "spills" historical metrics to disk for
+    efficient long-term storage,
 -   A super fast, interactive, and modern **metrics visualizer** optimized for anomaly detection,
 -   And an **alarms notification engine** for detecting performance and availability issues.
 
@@ -181,16 +182,17 @@ All the above, are packaged together in a very flexible, extremely modular, dist
 
 This is how Netdata compares to other monitoring solutions:
 
-| Netdata                                                         | others (open-source and commercial)                    |
-| :-------------------------------------------------------------- | :----------------------------------------------------- |
-| **High resolution metrics** (1s granularity)                    | Low resolution metrics (10s granularity at best)       |
-| Monitors everything, **thousands of metrics per node**          | Monitor just a few metrics                             |
-| UI is super fast, optimized for **anomaly detection**           | UI is good for just an abstract view                   |
-| **Meaningful presentation**, to help you understand the metrics | You have to know the metrics before you start          |
-| Install and get results **immediately**                         | Long preparation is required to get any useful results |
-| Use it for **troubleshooting** performance problems             | Use them to get _statistics of past performance_       |
-| **Kills the console** for tracing performance issues            | The console is always required for troubleshooting     |
-| Requires **zero dedicated resources**                           | Require large dedicated resources                      |
+| Netdata                                                         | others (open-source and commercial)                              |
+| :-------------------------------------------------------------- | :--------------------------------------------------------------- |
+| **High resolution metrics** (1s granularity)                    | Low resolution metrics (10s granularity at best)                 |
+| Monitors everything, **thousands of metrics per node**          | Monitor just a few metrics                                       |
+| UI is super fast, optimized for **anomaly detection**           | UI is good for just an abstract view                             |
+| **Long-term, autonomous storage** at one-second granularity     | Centralized metrics in an expensive data lake at 10s granularity |
+| **Meaningful presentation**, to help you understand the metrics | You have to know the metrics before you start                    |
+| Install and get results **immediately**                         | Long preparation is required to get any useful results           |
+| Use it for **troubleshooting** performance problems             | Use them to get _statistics of past performance_                 |
+| **Kills the console** for tracing performance issues            | The console is always required for troubleshooting               |
+| Requires **zero dedicated resources**                           | Require large dedicated resources                                |
 
 Netdata is **open-source**, **free**, super **fast**, very **easy**, completely **open**, extremely **efficient**,
 **flexible** and integrate-able.
