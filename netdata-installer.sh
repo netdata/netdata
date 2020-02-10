@@ -481,7 +481,7 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}"
+  run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}"
 
   build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}"
   copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}"
