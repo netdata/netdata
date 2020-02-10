@@ -46,7 +46,7 @@ Please note that your data history will be lost if you have modified `history` p
 | glibc malloc arena max for plugins|`1`|See [Virtual memory](../#virtual-memory).|||
 | glibc malloc arena max for Netdata|`1`|See [Virtual memory](../#virtual-memory).|||
 | hostname|auto-detected|The hostname of the computer running Netdata.|||
-| history|`3996`| Deprecated in favor of `memory mode = dbengine` and `page cache size`/`dbengine disk space` for long-term metrics storage. Only works with `memory mode = save/map`, and changes the number of metrics entries Netdata will store for each chart.|||
+| history|`3996`| Used with `memory mode = save/map/ram/alloc`, not the default `memory mode = dbengine`. This number reflects the number of entries the `netdata` daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](../../database/README.md#database) for more information. |||
 | update every|`1`|The frequency in seconds, for data collection. For more information see [Performance](../../docs/Performance.md#performance).|||
 | config directory|`/etc/netdata`|The directory configuration files are kept.|||
 | stock config directory|`/usr/lib/netdata/conf.d`||||
