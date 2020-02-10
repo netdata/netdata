@@ -115,8 +115,7 @@ static int unmap_memory() {
             return -1;
         }
 
-        if (close(pmu_fd[i]) )
-            fprintf(stderr,"[EBPF PROCESS] CANNOT close pmu_fd.\n");
+        close(pmu_fd[i]);
     }
 
     return 0;
