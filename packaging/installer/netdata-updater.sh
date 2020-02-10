@@ -144,7 +144,7 @@ update() {
   info "Current Version: ${current_version}"
   info "Latest Version: ${latest_version}"
 
-  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${current_version}" ]; then
+  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${latest_version}" -ge "${current_version}" ]; then
     info "Newest version ${current_version} <= ${latest_version} is already installed"
   elif [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
     info "Newest version is already installed"
