@@ -50,8 +50,8 @@ You can select the memory mode by editing `netdata.conf` and setting:
 
 ```conf
 [global]
-    # ram, save (the default, save on exit, load on start), map (swap like)
-    memory mode = save
+    # dbengine (default), ram, save (the default if dbengine not available), map (swap like), none, alloc
+    memory mode = dbengine
 
     # the directory where data are saved
     cache directory = /var/cache/netdata
