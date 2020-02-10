@@ -72,11 +72,11 @@ To edit a collector configuration file, navigate to your [Netdata configuration
 directory](../docs/step-by-step/step-04.md#find-your-netdataconf-file). Launch `edit-config` with the path to the
 collector's configuration file.
 
-For example, the Nginx collector's file is at `go.d.plugin/nginx.conf`.
+For example, the Nginx collector's file is at `go.d/nginx.conf`.
 
 ```bash
 cd /etc/netdata
-sudo ./edit-config go.d.plugin/nginx.conf
+sudo ./edit-config go.d/nginx.conf
 ```
 
 This file contains all of the possible job parameters to help you monitor Nginx in all sorts of complex deployments. At
