@@ -3,8 +3,8 @@
 Thanks for trying Netdata! In this getting started guide, we'll quickly walk you through the first steps you should take
 after getting Netdata installed.
 
-Netdata can collect thousands of metrics in real-time without any configuration, but there are some valuable things to
-know to get the most out of Netdata based on your needs.
+Netdata can collect thousands of metrics in real-time and use its database for long-term metrics storage without any
+configuration, but there are some valuable things to know to get the most out of Netdata based on your needs.
 
 We'll skip right into some technical details, so if you're brand-new to monitoring the health and performance of systems
 and applications, our [**step-by-step tutorial**](step-by-step/step-00.md) might be a better fit.
@@ -52,8 +52,8 @@ Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata) t
 ## Change how long Netdata stores metrics
 
 Netdata can store long-term, historical metrics out of the box. A custom database uses RAM to store recent metrics,
-ensuring dashboards and API queries are extremely responsive, while "spilling" historical metrics to disk, keeping RAM
-usage low.
+ensuring dashboards and API queries are extremely responsive, while "spilling" historical metrics to disk. This
+configuration keeps RAM usage low while allowing for long-term, on-disk metrics storage.
 
 You can tweak this custom _database engine_ to store a much larger dataset than your system's available RAM,
 particularly if you allow Netdata to use slightly more RAM and disk space than the default configuration.

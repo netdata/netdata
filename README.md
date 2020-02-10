@@ -18,9 +18,9 @@ highly-optimized monitoring agent you install on all your systems and containers
 
 Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it's running on
 (including web servers, databases, applications), using **highly interactive web dashboards**. A **long-term metrics
-database** helps you efficiently store data with 1-second granularity, which means Netdata can run autonomously, without
-any third-party components. Or, you can integrate Netdata with existing monitoring toolchains (Prometheus, Graphite,
-OpenTSDB, Kafka, Grafana, and more).
+database** helps you efficiently store historical data with 1-second granularity, which means Netdata can run
+autonomously, without any third-party components. Or, you can integrate Netdata with existing monitoring toolchains
+(Prometheus, Graphite, OpenTSDB, Kafka, Grafana, and more).
 
 Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers,
 **containers**, **IoT** devices), without disrupting their core function.
