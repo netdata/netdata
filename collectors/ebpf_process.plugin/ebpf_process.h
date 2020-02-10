@@ -63,6 +63,9 @@ typedef struct netdata_publish_syscall {
 typedef struct netdata_publish_vfs_common {
     long write;
     long read;
+
+    long running;
+    long zombie;
 }netdata_publish_vfs_common_t;
 
 typedef struct netdata_error_report {
@@ -87,7 +90,7 @@ typedef struct netdata_error_report {
 # define NETDATA_EXIT_SYSCALL "exit"
 # define NETDATA_PROCESS_SYSCALL "process_thread"
 # define NETDATA_PROCESS_ERROR_NAME "task_error"
-# define NETDATA_PROCESS_RUNNING "running"
+# define NETDATA_PROCESS_STATUS_NAME "process_status"
 
 # define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"

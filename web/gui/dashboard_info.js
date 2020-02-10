@@ -3054,6 +3054,10 @@ netdataDashboard.context = {
 
     'ebpf.task_error': {
         info: 'Task error count the number of errors to create a new process or thread.'
+    },
+
+    'ebpf.process_status': {
+        info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
     }
 
 };

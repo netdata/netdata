@@ -74,6 +74,7 @@ pthread_mutex_t lock;
 
 static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write", "process", "task", "process", "thread" };
 static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write", "do_exit", "release_task", "_do_fork", "sys_clone" };
+static char *status[] = { "process", "zombie" };
 
 int event_pid = 0;
 netdata_ebpf_events_t collector_events[] = {
@@ -254,6 +255,18 @@ static void netdata_create_io_chart(char *family, char *name, char *axis, char *
     printf("DIMENSION %s %s absolute 1 1\n", id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
 }
 
+static void netdata_process_status_chart(char *family, char *name, char *axis, char *web, int order) {
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
+            , family
+            , name
+            , axis
+            , web
+            , order);
+
+    printf("DIMENSION %s '' absolute 1 1\n", status[0]);
+    printf("DIMENSION %s '' absolute 1 1\n", status[1]);
+}
+
 static void netdata_global_charts_create() {
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_FILE_OPEN_CLOSE_COUNT
@@ -329,16 +342,23 @@ static void netdata_global_charts_create() {
             , &publish_aggregated[NETDATA_EXIT_START]
             , 2);
 
+    netdata_process_status_chart(NETDATA_EBPF_FAMILY
+            , NETDATA_PROCESS_STATUS_NAME
+            , "Total"
+            , NETDATA_PROCESS_GROUP
+            , 978);
+
     if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
                 , "Number of calls"
                 , NETDATA_PROCESS_GROUP
-                , 978
+                , 979
                 , netdata_create_global_dimension
                 , &publish_aggregated[NETDATA_PROCESS_START]
                 , 2);
     }
+
 }
 
 
@@ -379,6 +399,10 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish
 
     pvc->write = -((long)publish[2].nbyte);
     pvc->read = (long)publish[3].nbyte;
+
+    pvc->running = (long)publish[7].ncall - (long)publish[8].ncall;
+    publish[6].ncall = -publish[6].ncall; // release
+    pvc->zombie = (long)publish[5].ncall + (long)publish[6].ncall;
 }
 
 static inline void write_begin_chart(char *family, char *name)
@@ -425,12 +449,19 @@ static void write_global_err_chart(char *name, char *family, netdata_publish_sys
 }
 
 static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
-    printf( "BEGIN %s.%s\n"
-            , family
-            , NETDATA_VFS_IO_FILE_BYTES);
+    write_begin_chart(family, NETDATA_VFS_IO_FILE_BYTES);
 
-    printf("SET %s = %lld\n", id_names[3] , (long long) pvc->write);
-    printf("SET %s = %lld\n", id_names[4] , (long long) pvc->read);
+    write_chart_dimension(id_names[3], (long long) pvc->write);
+    write_chart_dimension(id_names[4], (long long) pvc->read);
+
+    printf("END\n");
+}
+
+static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc) {
+    write_begin_chart(family, NETDATA_PROCESS_STATUS_NAME);
+
+    write_chart_dimension(status[0], (long long) pvc->running);
+    write_chart_dimension(status[1], (long long) pvc->zombie);
 
     printf("END\n");
 }
@@ -444,6 +475,8 @@ static void netdata_publish_data() {
     write_global_count_chart(NETDATA_VFS_FILE_IO_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 2);
     write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], 2);
     write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
+
+    write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
     if(mode < 2) {
         write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
         write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
