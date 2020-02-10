@@ -513,7 +513,7 @@ def convert_index_store_size_to_bytes(size):
         return round(float(size[:-2]) * 1024 * 1024)
     elif size.endswith('gb'):
         return round(float(size[:-2]) * 1024 * 1024 * 1024)
-    elif size.endswith('t'):
+    elif size.endswith('tb'):
         return round(float(size[:-2]) * 1024 * 1024 * 1024 * 1024)
     elif size.endswith('b'):
         return round(float(size[:-1]))
