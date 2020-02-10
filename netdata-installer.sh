@@ -437,7 +437,7 @@ copy_libmosquitto() {
   run mkdir -p "${target_dir}"
 
   run cp "${1}/lib/libmosquitto.a" "${target_dir}"
-  run cp "${1}/lib/*.h" "${target_dir}"
+  run cp "${1}/lib/mosquitto.h" "${target_dir}"
 }
 
 bundle_libmosquitto() {
