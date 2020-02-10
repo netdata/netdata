@@ -8,9 +8,11 @@ There are two essential points to understand about how collecting metrics works 
 
 -   All collectors are **installed by default** with every installation of Netdata. You do not need to install
     collectors manually to collect metrics from new sources.
--   Upon startup, Netdata will **auto-detect** any service and application that has a [collector](COLLECTORS.md), as
-    long as both the collector and the service/application are configured correctly. If Netdata fails to show charts for
-    a service that's running on your system, it's due to a misconfiguration.
+-   Upon startup, Netdata will **auto-detect** any application or service that has a [collector](COLLECTORS.md), as long
+    as both the collector and the app/service are configured correctly.
+
+Most users will want to enable a new Netdata collector for their app/service. For those details, see our [quickstart
+guide](QUICKSTART.md).
 
 ## Take your next steps with collectors
 
@@ -19,6 +21,14 @@ There are two essential points to understand about how collecting metrics works 
 [Supported collectors list](COLLECTORS.md)
 
 [Collectors configuration reference](REFERENCE.md)
+
+## Tutorials
+
+[Monitor Nginx or Apache web server log files with Netdata](../docs/tutorials/collect-apache-nginx-web-logs.md)
+
+[Monitor Unbound DNS servers with Netdata](../docs/tutorials/collect-unbound-metrics.md)
+
+[Monitor a Hadoop cluster with Netdata](../docs/tutorials/monitor-hadoop-cluster.md)
 
 ## Related features
 

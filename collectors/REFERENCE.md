@@ -11,6 +11,7 @@ quickstart](QUICKSTART.md).
 ## What's in this reference guide
 
 -   [Netdata's collector architecture](#netdatas-collector-architecture)
+-   [Troubleshoot a collector]()
 -   [Enable and disable plugins](#enable-and-disable-plugins)
 -   [Enable, configure, and disable modules](#enable-configure-and-disable-modules)
 -   [Internal plugins](#internal-plugins)
@@ -40,7 +41,41 @@ There are three types of plugins:
     independent processes. They communicate with the daemon via pipes.
 -   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
     type of collector. We have a few plugin orchestrators available for those who want to develop their own collectors,
-    but focus most of our efforts on the [Go plugin](go.d.plugin/).
+    but focus most of our efforts on the [Go plugin](go.d.plugin/README.md).
+
+## Troubleshoot a collector
+
+First, naviagate to your plugins directory, which is usually at `/usr/libexec/netdata/plugins.d/`. If that's not
+the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the plugins
+directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+The next step is based on the collector's orchestrator. You can figure out which orchestrator the collector uses either
+by viewing the [collectors list](COLLECTORS.md) and referencing the _configuration file_ field. For example, if that
+field contains `go.d`, that collector uses the Go orchestrator.
+
+```bash
+# Go orchestrator (go.d.plugin)
+./go.d.plugin -d -m <MODULE_NAME>
+
+# Python orchestrator (python.d.plugin)
+./python.d.plugin <MODULE_NAME> debug trace
+
+# Node orchestrator (node.d.plugin)
+./node.d.plugin debug 1 <MODULE_NAME>
+
+# Bash orchestrator (bash.d.plugin)
+./charts.d.plugin debug 1 <MODULE_NAME>
+```
+
+The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
+enable the collector using the details from this output, feel free to [create an issue on our
+GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) to get some
+help from our collectors experts.
 
 ## Enable and disable plugins
 
