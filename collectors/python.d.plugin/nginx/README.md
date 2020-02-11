@@ -30,9 +30,17 @@ It produces following charts:
     -   accepts
     -   handled
 
-## configuration
+## Configuration
 
-Needs only `url` to server's `stub_status`
+Edit the `python.d/nginx.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/nginx.conf
+```
+
+Needs only `url` to server's `stub_status`.
 
 Here is an example for local server:
 
