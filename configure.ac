@@ -432,7 +432,7 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 #currenlty env var ACLK must be set to 'yes' to even consider building ACLK
 if test "${ACLK}" = "yes"; then
     AC_MSG_CHECKING([if libmosquitto static lib is present])
-    if test -f "externaldeps/mosquitto/lib/libmosquitto.a"; then
+    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
         HAVE_libmosquitto_a="yes"
     else 
         HAVE_libmosquitto_a="no"

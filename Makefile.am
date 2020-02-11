@@ -594,7 +594,7 @@ netdata_SOURCES = $(NETDATA_FILES)
 
 if ENABLE_ACLK
 netdata_LDADD = \
-    externaldeps/mosquitto/lib/libmosquitto.a \
+    externaldeps/mosquitto/libmosquitto.a \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 else
