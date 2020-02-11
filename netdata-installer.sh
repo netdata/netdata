@@ -169,7 +169,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --disable-aclk             Disable the agent-cloud link, required for Netdata Cloud functionality.
+  --disable-cloud            Disable the agent-cloud link, required for Netdata Cloud functionality.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -254,7 +254,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--disable-aclk") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk" ;;
+    "--disable-cloud") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk" ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -430,7 +430,7 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 fetch_libmosquitto() {
-  download_tarball "${1}" "${2}" "libmosquitto" "aclk"
+  download_tarball "${1}" "${2}" "libmosquitto" "cloud"
 }
 
 build_libmosquitto() {
@@ -466,7 +466,7 @@ bundle_libmosquitto() {
   fi
 
   if [ ! -f "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ] || [ ! -s "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ]; then
-    run_failed "unable to find a usable libmosquitto source archive, MQTT ACLK will not be available"
+    run_failed "unable to find a usable libmosquitto source archive, Netdata Cloud will not be available"
     return 0
   fi
 
