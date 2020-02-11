@@ -26,6 +26,12 @@ if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" ] && [ "${INSTALLER_DIR}" != 
 fi
 
 # -----------------------------------------------------------------------------
+# Pull in OpenSSL properly if on macOS
+if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ] ; then
+    export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+fi
+
+# -----------------------------------------------------------------------------
 # reload the user profile
 
 # shellcheck source=/dev/null
