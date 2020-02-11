@@ -16,9 +16,9 @@ declare -A ap_devs=()
 
 # _check is called once, to find out if this chart should be enabled or not
 ap_check() {
-	require_cmd iw || return 1
-	local ev
-	ev=$(run iw dev | awk '
+  require_cmd iw || return 1
+  local ev
+  ev=$(run iw dev | awk '
 		BEGIN {
 			i = "";
 			ssid = "";
@@ -41,26 +41,26 @@ ap_check() {
 			}
 		}
 	')
-	eval "${ev}"
+  eval "${ev}"
 
-	# this should return:
-	#  - 0 to enable the chart
-	#  - 1 to disable the chart
+  # this should return:
+  #  - 0 to enable the chart
+  #  - 1 to disable the chart
 
-	[ ${#ap_devs[@]} -gt 0 ] && return 0
-	error "no devices found in AP mode, with 'iw dev'"
-	return 1
+  [ ${#ap_devs[@]} -gt 0 ] && return 0
+  error "no devices found in AP mode, with 'iw dev'"
+  return 1
 }
 
 # _create is called once, to create the charts
 ap_create() {
-	local ssid dev
+  local ssid dev
 
-	for dev in "${!ap_devs[@]}"; do
-		ssid="${ap_devs[${dev}]}"
+  for dev in "${!ap_devs[@]}"; do
+    ssid="${ap_devs[${dev}]}"
 
-		# create the chart with 3 dimensions
-		cat <<EOF
+    # create the chart with 3 dimensions
+    cat << EOF
 CHART ap_clients.${dev} '' "Connected clients to ${ssid} on ${dev}" "clients" ${dev} ap.clients line $((ap_priority + 1)) $ap_update_every
 DIMENSION clients '' absolute 1 1
 
@@ -84,25 +84,25 @@ DIMENSION receive '' absolute 1 1000
 DIMENSION transmit '' absolute -1 1000
 DIMENSION expected 'expected throughput' absolute 1 1000
 EOF
-	done
+  done
 
-	return 0
+  return 0
 }
 
 # _update is called continuously, to collect the values
 ap_update() {
-	# the first argument to this function is the microseconds since last update
-	# pass this parameter to the BEGIN statement (see bellow).
+  # the first argument to this function is the microseconds since last update
+  # pass this parameter to the BEGIN statement (see bellow).
 
-	# do all the work to collect / calculate the values
-	# for each dimension
-	# remember: KEEP IT SIMPLE AND SHORT
+  # do all the work to collect / calculate the values
+  # for each dimension
+  # remember: KEEP IT SIMPLE AND SHORT
 
-	for dev in "${!ap_devs[@]}"; do
-		echo
-		echo "DEVICE ${dev}"
-		iw "${dev}" station dump
-	done | awk '
+  for dev in "${!ap_devs[@]}"; do
+    echo
+    echo "DEVICE ${dev}"
+    iw "${dev}" station dump
+  done | awk '
         function zero_data() {
             dev = "";
             c = 0;
@@ -175,5 +175,5 @@ ap_update() {
         }
     '
 
-	return 0
+  return 0
 }

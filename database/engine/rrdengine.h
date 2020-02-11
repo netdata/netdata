@@ -49,6 +49,7 @@ enum rrdeng_opcode {
     RRDENG_COMMIT_PAGE,
     RRDENG_FLUSH_PAGES,
     RRDENG_SHUTDOWN,
+    RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
 
     RRDENG_MAX_OPCODE
 };
@@ -102,7 +103,16 @@ struct rrdengine_worker_config {
     uv_thread_t thread;
     uv_loop_t* loop;
     uv_async_t async;
-    uv_work_t now_deleting;
+
+    /* file deletion thread */
+    uv_thread_t *now_deleting_files;
+    unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
+
+    /* dirty page deletion thread */
+    uv_thread_t *now_invalidating_dirty_pages;
+    /* set to 0 when now_invalidating_dirty_pages is still running */
+    unsigned long cleanup_thread_invalidating_dirty_pages;
+    unsigned inflight_dirty_pages;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -145,7 +155,8 @@ struct rrdengine_statistics {
     rrdeng_stats_t page_cache_descriptors;
     rrdeng_stats_t io_errors;
     rrdeng_stats_t fs_errors;
-    rrdeng_stats_t flushing_errors;
+    rrdeng_stats_t pg_cache_over_half_dirty_events;
+    rrdeng_stats_t flushing_pressure_page_deletions;
 };
 
 /* I/O errors global counter */
@@ -154,13 +165,15 @@ extern rrdeng_stats_t global_io_errors;
 extern rrdeng_stats_t global_fs_errors;
 /* number of File-Descriptors that have been reserved by dbengine */
 extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
-/* inability to flush global counter */
-extern rrdeng_stats_t global_flushing_errors;
+/* inability to flush global counters */
+extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
+extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
 
 struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
+    uint8_t drop_metrics_under_page_cache_pressure; /* boolean */
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
     struct rrdengine_datafile_list datafiles;
