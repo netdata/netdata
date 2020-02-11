@@ -920,6 +920,10 @@ void *aclk_query_main_thread(void *ptr)
                 aclk_process_queries();
         }
 
+#ifdef ACLK_SLEEP_LOOP
+        aclk_process_queries();
+        sleep_usec(USEC_PER_SEC * 1);
+#else
         QUERY_THREAD_LOCK;
 
         // TODO: Need to check if there are queries awaiting already
@@ -931,6 +935,7 @@ void *aclk_query_main_thread(void *ptr)
         }
 
         QUERY_THREAD_UNLOCK;
+#endif
 
     } // forever
     info("Shutting down query processing thread");
