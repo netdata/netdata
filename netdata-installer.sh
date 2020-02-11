@@ -432,7 +432,7 @@ build_libmosquitto() {
 }
 
 copy_libmosquitto() {
-  target_dir="${PWD}/mosquitto"
+  target_dir="${PWD}/externaldeps/mosquitto"
 
   run mkdir -p "${target_dir}"
 
