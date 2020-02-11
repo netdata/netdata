@@ -769,8 +769,18 @@ int aclk_process_query()
             aclk_query_free(this_query);
             return 1;
         case ACLK_CMD_CHART:
-            info("EXECUTING a chart command");
+            info("EXECUTING a chart update command");
             aclk_send_single_chart(this_query->data, this_query->query);
+            aclk_query_free(this_query);
+            return 1;
+        case ACLK_CMD_ALARM:
+            info("EXECUTING an alarm update command");
+            //aclk_send_single_chart(this_query->data, this_query->query);
+            aclk_query_free(this_query);
+            return 1;
+        case ACLK_CMD_ALARMS:
+            info("EXECUTING an alarm update command");
+            aclk_send_alarm_metadata();
             aclk_query_free(this_query);
             return 1;
         default:
@@ -908,13 +918,11 @@ void *aclk_query_main_thread(void *ptr)
             // the loop below
             if (likely(aclk_connection_initialized && !netdata_exit))
                 aclk_process_queries();
-
         }
 
         QUERY_THREAD_LOCK;
 
-        // Need to check if there are queries awaiting already
-
+        // TODO: Need to check if there are queries awaiting already
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
             sleep_usec(USEC_PER_SEC * 1);
 
@@ -1242,7 +1250,7 @@ void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER
 
 //TODO: this has been changed in the latest specs. We need to pack the data in one MQTT
 //message with a payload and has a list of json objects
-int aclk_send_alarm_metadata()
+void aclk_send_alarm_metadata()
 {
     //TODO: improve locking on the buffer -- same lock is used for the message send
     //improve error handling
@@ -1263,8 +1271,6 @@ int aclk_send_alarm_metadata()
     buffer_sprintf(aclk_buffer,"\n}");
     ACLK_UNLOCK;
     aclk_send_message(ACLK_ALARMS_TOPIC, aclk_buffer->buffer);
-
-    return 0;
 }
 
 
@@ -1293,6 +1299,14 @@ int aclk_send_metadata()
     return 0;
 }
 
+// Trigged by a health reload, sends the alarm metadata
+void aclk_alarm_reload()
+{
+    if (unlikely(!agent_state))
+        return;
+
+    aclk_queue_query("_alarm", localhost->hostname, NULL, "alarms", 2, 1, ACLK_CMD_ALARMS);
+}
 //rrd_stats_api_v1_chart(RRDSET *st, BUFFER *buf)
 
 int aclk_send_single_chart(char *hostname, char *chart)
@@ -1346,12 +1360,13 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
 #endif
 }
 
-int    aclk_update_alarm(RRDHOST *host, char *alarm_name)
+int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
     if (host != localhost)
         return 0;
 
-    aclk_queue_query("_alarm", host->hostname, NULL, alarm_name, 2, 1, 0);
+    //TODO: Build the payload message
+    //aclk_queue_query("_alarm", host->hostname, NULL, ae->name ? ae->name : "unknown", 2, 1, ACLK_CMD_ALARM);
     return 0;
 }
 

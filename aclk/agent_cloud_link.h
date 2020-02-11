@@ -59,6 +59,8 @@ typedef enum aclk_cmd {
     ACLK_CMD_ONCONNECT,
     ACLK_CMD_INFO,
     ACLK_CMD_CHART,
+    ACLK_CMD_ALARM,
+    ACLK_CMD_ALARMS,
     ACLK_CMD_CHARTS,
     ACLK_CMD_ALARMS_LOG,
     ACLK_CMD_ALARMS_ACTIVE,
@@ -112,11 +114,13 @@ int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int r
 struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 //void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
-int aclk_update_alarm(RRDHOST *host, char *alarm_name);
+int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);
 int aclk_submit_request(struct aclk_request *);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
+void aclk_alarm_reload();
+void aclk_send_alarm_metadata();
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
