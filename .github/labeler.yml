@@ -12,7 +12,7 @@
 
 area/backends:
   - backends/*
-  - backends/**
+  - backends/**/*
   - exporting/*
   - exporting/**/*
 

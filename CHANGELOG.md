@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix: Documentation states in one place default is dbengine and in another save is default [\#8017](https://github.com/netdata/netdata/pull/8017) ([underhood](https://github.com/underhood))
+- invalid literal for float\(\): NN.NNt [\#8013](https://github.com/netdata/netdata/pull/8013) ([blaines](https://github.com/blaines))
+- Fix missing variables on stream [\#8011](https://github.com/netdata/netdata/pull/8011) ([thiagoftsm](https://github.com/thiagoftsm))
 - /docs/generator: use h1 heading as page title for collectors pages [\#8009](https://github.com/netdata/netdata/pull/8009) ([ilyam8](https://github.com/ilyam8))
 - /docs/generator: build docs only for go.d itself and its modules [\#8005](https://github.com/netdata/netdata/pull/8005) ([ilyam8](https://github.com/ilyam8))
 - Update database servers group in apps\_groups.conf [\#8004](https://github.com/netdata/netdata/pull/8004) ([DefauIt](https://github.com/DefauIt))
+- /collectors/charts.d.plugin: fix `os\_id` detection in `run` [\#8002](https://github.com/netdata/netdata/pull/8002) ([ilyam8](https://github.com/ilyam8))
 - /docs/generator: add an option to use last dir name for page name  [\#7997](https://github.com/netdata/netdata/pull/7997) ([ilyam8](https://github.com/ilyam8))
 - Docs: Change sed to allow parentheses in heading links [\#7995](https://github.com/netdata/netdata/pull/7995) ([joelhans](https://github.com/joelhans))
 - Fix CentOS 7 RPM build failures. [\#7993](https://github.com/netdata/netdata/pull/7993) ([Ferroin](https://github.com/Ferroin))
@@ -130,7 +134,6 @@
 - samba: properly check if it is allowed to run smbstatus with sudo [\#7655](https://github.com/netdata/netdata/pull/7655) ([ilyam8](https://github.com/ilyam8))
 - Bump handlebars from 4.2.0 to 4.5.3 [\#7654](https://github.com/netdata/netdata/pull/7654) ([dependabot[bot]](https://github.com/apps/dependabot))
 - \[libnetdata/threads\] Change log level on error [\#7653](https://github.com/netdata/netdata/pull/7653) ([Saruspete](https://github.com/Saruspete))
-- python.d logger: unicode\_str handle TypeError [\#7645](https://github.com/netdata/netdata/pull/7645) ([ilyam8](https://github.com/ilyam8))
 - Redirect when url =~ \/host\/hostname$ \(\#7539\) [\#7643](https://github.com/netdata/netdata/pull/7643) ([underhood](https://github.com/underhood))
 - Update the distribution support matrix to represent reality. [\#7636](https://github.com/netdata/netdata/pull/7636) ([Ferroin](https://github.com/Ferroin))
 - Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
@@ -152,7 +155,6 @@
 - Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
 - Docs: Tweaks and linter fixes to contributing guidelines [\#7407](https://github.com/netdata/netdata/pull/7407) ([joelhans](https://github.com/joelhans))
 - network interface speed, duplex, operstate \#5989 [\#7395](https://github.com/netdata/netdata/pull/7395) ([stelfrag](https://github.com/stelfrag))
-- Fix typos in documentation [\#7375](https://github.com/netdata/netdata/pull/7375) ([rex4539](https://github.com/rex4539))
 - Add release channel customization to docker build [\#7373](https://github.com/netdata/netdata/pull/7373) ([ncmans](https://github.com/ncmans))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
@@ -164,11 +166,6 @@
 - installer: include go.d.plugin version v0.11.0 [\#7365](https://github.com/netdata/netdata/pull/7365) ([ilyam8](https://github.com/ilyam8))
 - Minor grammar change in /web/gui documentation [\#7363](https://github.com/netdata/netdata/pull/7363) ([eviemsrs](https://github.com/eviemsrs))
 - Correct versions of FreeNAS that Netdata is available on [\#7355](https://github.com/netdata/netdata/pull/7355) ([knatsakis](https://github.com/knatsakis))
-- Update netdata-security.md [\#7343](https://github.com/netdata/netdata/pull/7343) ([cakrit](https://github.com/cakrit))
-- 7232: Fix Debian dependencies [\#7342](https://github.com/netdata/netdata/pull/7342) ([andyundso](https://github.com/andyundso))
-- Update plugins.d/README.md [\#7335](https://github.com/netdata/netdata/pull/7335) ([OdysLam](https://github.com/OdysLam))
-- collectors: apps.plugin: apps\_groups: added new frr daemons. [\#7333](https://github.com/netdata/netdata/pull/7333) ([k0ste](https://github.com/k0ste))
-- Update README.md [\#7330](https://github.com/netdata/netdata/pull/7330) ([cakrit](https://github.com/cakrit))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 

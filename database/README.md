@@ -1,60 +1,40 @@
 # Database
 
-Although `netdata` does all its calculations using `long double`, it stores all values using a [custom-made 32-bit
-number](../libnetdata/storage_number/).
+Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
+(`dbengine`). But to remain as flexible as possible, Netdata supports a number of types of metrics storage:
 
-So, for each dimension of a chart, Netdata will need: `4 bytes for the value * the entries of its history`. It will not
-store any other data for each value in the time series database. Since all its values are stored in a time series with
-fixed step, the time each value corresponds can be calculated at run time, using the position of a value in the round
-robin database.
-
-The default history is 3.600 entries, thus it will need 14.4KB for each chart dimension. If you need 1.000 dimensions,
-they will occupy just 14.4MB.
-
-Of course, 3.600 entries is a very short history, especially if data collection frequency is set to 1 second. You will
-have just one hour of data.
-
-For a day of data and 1.000 dimensions, you will need: `86.400 seconds * 4 bytes * 1.000 dimensions = 345MB of RAM`.
-
-One option you have to lower this number is to use **[Memory Deduplication - Kernel Same Page Merging - KSM](#ksm)**.
-Another possibility is to use the **[Database Engine](engine/)**.
-
-## Memory modes
-
-Currently Netdata supports 6 memory modes:
-
-1.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
-
-2.  `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata
-    restart. It also uses `mmap()` and supports [KSM](#ksm).
-
-3.  `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this will have a constant
-    write on your disk. When Netdata writes data on its memory, the Linux kernel marks the related memory pages as dirty
-    and automatically starts updating them on disk. Unfortunately we cannot control how frequently this works. The Linux
-    kernel uses exactly the same algorithm it uses for its swap memory. Check below for additional information on
-    running a dedicated central Netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
-
-4.  `none`, without a database (collected metrics can only be streamed to another Netdata).
-
-5.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all
-    others except `none`.
-
-6.  `dbengine`, (the default) data are in database files. The [Database Engine](engine/) works like a traditional
+1. `dbengine`, (the default) data are in database files. The [Database Engine](engine/) works like a traditional
     database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data reside
     compressed on disk. The number of history entries is not fixed in this case, but depends on the configured disk
     space and the effective compression ratio of the data stored. This is the **only mode** that supports changing the
     data collection update frequency (`update_every`) **without losing** the previously stored metrics. For more details
     see [here](engine/).
 
+2.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
+
+3.  `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata
+    restart. It also uses `mmap()` and supports [KSM](#ksm).
+
+4.  `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this will have a constant
+    write on your disk. When Netdata writes data on its memory, the Linux kernel marks the related memory pages as dirty
+    and automatically starts updating them on disk. Unfortunately we cannot control how frequently this works. The Linux
+    kernel uses exactly the same algorithm it uses for its swap memory. Check below for additional information on
+    running a dedicated central Netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
+
+5.  `none`, without a database (collected metrics can only be streamed to another Netdata).
+
+6.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all
+    others except `none`.
+
 You can select the memory mode by editing `netdata.conf` and setting:
 
 ```conf
 [global]
-    # dbengine (default), ram, save (the default if dbengine not available), map (swap like), none, alloc
-    memory mode = dbengine
+  # dbengine (default), ram, save (the default if dbengine not available), map (swap like), none, alloc
+  memory mode = dbengine
 
-    # the directory where data are saved
-    cache directory = /var/cache/netdata
+  # the directory where data are saved
+  cache directory = /var/cache/netdata
 ```
 
 ## Running Netdata in embedded devices
