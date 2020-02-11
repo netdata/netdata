@@ -1,8 +1,8 @@
-# phpfpm
+# PHP-FPM monitoring with Netdata
 
-This module will monitor one or more php-fpm instances depending on configuration.
+Monitors one or more PHP-FPM instances depending on configuration.
 
-**Requirements:**
+## Requirements
 
 -   php-fpm with enabled `status` page
 -   access to `status` page via web server
@@ -24,7 +24,7 @@ It produces following charts:
     -   reached
     -   slow
 
-## configuration
+## Configuration
 
 Needs only `url` to server's `status`
 

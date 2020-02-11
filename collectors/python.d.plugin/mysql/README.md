@@ -1,8 +1,8 @@
-# mysql
+# MySQL monitoring with Netdata
 
-Module monitors one or more mysql servers
+Monitors one or more MySQL servers.
 
-**Requirements:**
+## Requirements
 
 -   python library [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
 -   `netdata` local user to connect to the MySQL server. 
@@ -328,7 +328,7 @@ This module will produce following charts (if data is available):
     -   update
     -   other
 
-## configuration
+## Configuration
 
 You can provide, per server, the following:
 

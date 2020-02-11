@@ -1,12 +1,18 @@
-# adaptec raid
+# Adaptec RAID monitoring with Netdata
 
-Module collects logical and physical devices health metrics.
+Collects health metrics on logical and physical devices.
 
-**Requirements:**
+## Requirements
 
--   `arcconf` program
--   `sudo` program
--   `netdata` user needs to be able to sudo the `arcconf` program without password
+The module uses `arcconf`, which can only be executed by root.  It uses
+`sudo` and assumes that it is configured such that the `netdata` user can
+execute `arcconf` as root without password.
+
+Add to `sudoers`:
+
+```
+netdata ALL=(root)       NOPASSWD: /path/to/arcconf
+```
 
 To grab stats it executes:
 
@@ -23,19 +29,7 @@ It produces:
 
 4.  **Physical Device Temperature**
 
-## prerequisite
-
-This module uses `arcconf` which can only be executed by root.  It uses
-`sudo` and assumes that it is configured such that the `netdata` user can
-execute `arcconf` as root without password.
-
-Add to `sudoers`:
-
-```
-netdata ALL=(root)       NOPASSWD: /path/to/arcconf
-```
-
-## configuration
+## Configuration
 
  **adaptec_raid** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 

@@ -1,6 +1,6 @@
-# dovecot
+# Dovecot monitoring with Netdata
 
-This module provides statistics information from Dovecot server.
+Provides statistics information from Dovecot server.
 
 Statistics are taken from dovecot socket by executing `EXPORT global` command.
 More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
@@ -69,7 +69,7 @@ Module gives information with following charts:
     -   hit
     -   miss
 
-## configuration
+## Configuration
 
 Sample:
 

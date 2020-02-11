@@ -1,6 +1,6 @@
-# elasticsearch
+# Elasticsearch monitoring with Netdata
 
-This module monitors [Elasticsearch](https://www.elastic.co/products/elasticsearch) performance and health metrics.
+Monitors [Elasticsearch](https://www.elastic.co/products/elasticsearch) performance and health metrics.
 
 It produces:
 
@@ -58,7 +58,7 @@ It produces:
     -   Num of replicas
     -   Health status
 
-## configuration
+## Configuration
 
 Sample:
 

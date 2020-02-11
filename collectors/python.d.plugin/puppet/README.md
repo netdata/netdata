@@ -1,4 +1,4 @@
-# puppet
+# Puppet monitoring with Netdata
 
 Monitor status of Puppet Server and Puppet DB.
 
@@ -24,7 +24,7 @@ Following charts are drawn:
     -   max
     -   used
 
-## configuration
+## Configuration
 
 ```yaml
 puppetdb:

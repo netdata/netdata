@@ -1,8 +1,8 @@
-# samba
+# Samba monitoring with Netdata
 
-Performance metrics of Samba file sharing.
+Monitors the performance metrics of Samba file sharing.
 
-**Requirements:**
+## Requirements
 
 -   `smbstatus` program
 -   `sudo` program
@@ -67,7 +67,7 @@ Add to `sudoers`:
 netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
 ```
 
-## configuration
+## Configuration
 
  **samba** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 

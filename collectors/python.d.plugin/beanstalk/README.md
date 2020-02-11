@@ -1,8 +1,8 @@
-# beanstalk
+# Beanstalk monitoring with Netdata
 
-Module provides server and tube-level statistics:
+Provides server and tube-level statistics.
 
-**Requirements:**
+## Requirements
 
 -   `python-beanstalkc`
 
@@ -103,7 +103,7 @@ Module provides server and tube-level statistics:
     -   since
     -   left
 
-## configuration
+## Configuration
 
 Sample:
 

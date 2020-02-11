@@ -1,6 +1,6 @@
-# powerdns
+# PowerDNS monitoring with Netdata
 
-Module monitor powerdns performance and health metrics.
+Monitors the performance and health metrics of PowerDNS.
 
 Powerdns charts:
 
@@ -75,7 +75,7 @@ Powerdns charts:
     -   packetcache-entries
     -   negcache-entries
 
-## configuration
+## Configuration
 
 ```yaml
 local:

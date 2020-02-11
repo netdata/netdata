@@ -1,8 +1,8 @@
-# smartd_log
+# smartd log monitoring with Netdata
 
-Module monitor `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
+Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
 
-**Requirements:**
+## Requirements
 
 -   `smartmontools`
 
@@ -97,7 +97,7 @@ Otherwise, all the smartd `.csv` files may get written to `/var/lib/smartmontool
 
 `smartd` appends logs at every run. It's strongly recommended to use `logrotate` for smartd files.
 
-## configuration
+## Configuration
 
 ```yaml
 local:

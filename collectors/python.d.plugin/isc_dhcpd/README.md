@@ -1,8 +1,8 @@
-# isc_dhcpd
+# ISC DHCPD monitoring with Netdata
 
-Module monitor leases database to show all active leases for given pools.
+Monitors the leases database to show all active leases for given pools.
 
-**Requirements:**
+## Requirements
 
 -   dhcpd leases file MUST BE readable by Netdata
 -   pools MUST BE in CIDR format
@@ -21,7 +21,7 @@ It produces:
 
     -   leases (number of active leases in pool)
 
-## configuration
+## Configuration
 
 Sample:
 

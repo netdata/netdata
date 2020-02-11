@@ -1,6 +1,6 @@
-# varnish
+# Varnish monitoring with Netdata
 
-Module uses the `varnishstat` command to provide varnish cache statistics.
+Uses the `varnishstat` command to provide varnish cache statistics.
 
 It produces:
 
@@ -74,7 +74,7 @@ It produces:
 
     -   uptime
 
-## configuration
+## Configuration
 
 Only one parameter is supported:
 

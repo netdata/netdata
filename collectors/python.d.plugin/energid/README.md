@@ -1,7 +1,7 @@
-# energid
+# Energid monitoring with Netdata
 
-A collector for [Energi Core](https://github.com/energicryptocurrency/energi)
-node instance monitoring.
+Monitors the [Energi Core](https://github.com/energicryptocurrency/energi) node instance.
+
 
 As Energi Core Gen 1 & 2 are based on the original Bitcoin code and
 supports very similar JSON RPC, there is quite high chance the module works

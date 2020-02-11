@@ -1,6 +1,6 @@
-# uwsgi
+# uWSGI monitoring with Netdata
 
-Module monitor uwsgi performance metrics.
+Monitors the performance metrics of uWSGI.
 
 <https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html>
 
@@ -23,7 +23,7 @@ Following charts are drawn:
 4.  **Harakiris**
 5.  **Respawns**
 
-## configuration
+## Configuration
 
 ```yaml
 socket:

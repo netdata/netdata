@@ -1,6 +1,6 @@
-# portcheck
+# PortCheck monitoring with Netdata
 
-Module monitors a remote TCP service.
+Monitors a remote TCP service.
 
 Following charts are drawn per host:
 
@@ -16,7 +16,7 @@ Following charts are drawn per host:
     -   Connection refused: port not listening or blocked
     -   Connection timed out: host or port unreachable
 
-## configuration
+## Configuration
 
 ```yaml
 server:

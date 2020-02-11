@@ -1,6 +1,6 @@
-# litespeed
+# Litespeed monitoring with Netdata
 
-Module monitor litespeed web server performance metrics.
+Monitors litespeed web server performance metrics.
 
 It produces:
 
@@ -44,7 +44,7 @@ It produces:
 
     -   hits
 
-## configuration
+## Configuration
 
 ```yaml
 local:

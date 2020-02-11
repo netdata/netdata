@@ -1,4 +1,4 @@
-# go_expvar
+# Go Expvar monitoring with Netdata
 
 The `go_expvar` module can monitor any Go application that exposes its metrics with the use of
 `expvar` package from the Go standard library.
@@ -36,7 +36,7 @@ For the memory statistics, it produces the following charts:
 
     -   avg: average duration of all GC stop-the-world pauses
 
-## Monitoring Go Applications
+## Monitoring Go applications
 
 Netdata can be used to monitor running Go applications that expose their metrics with
 the use of the [expvar package](https://golang.org/pkg/expvar/) included in Go standard library.

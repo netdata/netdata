@@ -1,6 +1,6 @@
-# openldap
+# OpenLDAP monitoring with Netdata
 
-This module provides statistics information from openldap (slapd) server.
+Provides statistics information from openldap (slapd) server.
 Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(5) is available.
 
 **Requirement:**
@@ -47,7 +47,7 @@ Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(
     -   read
     -   write
 
-### configuration
+### Configuration
 
 Sample:
 

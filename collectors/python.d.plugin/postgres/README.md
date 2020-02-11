@@ -1,8 +1,8 @@
-# postgres
+# Postgres monitoring with Netdata
 
-Module monitors one or more postgres servers.
+Monitors one or more postgres servers.
 
-**Requirements:**
+## Requirements
 
 -   `python-psycopg2` package. You have to install it manually.
 
@@ -57,7 +57,7 @@ Following charts are drawn:
 
     -   locks
 
-## configuration
+## Configuration
 
 For all available options please see module [configuration file](postgres.conf).
 

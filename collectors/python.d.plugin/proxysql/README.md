@@ -1,6 +1,6 @@
-# proxysql
+# ProxySQL monitoring with Netdata
 
-This module monitors proxysql backend and frontend performance metrics.
+Monitors ProxySQL backend and frontend performance metrics.
 
 It produces:
 
@@ -65,7 +65,7 @@ It produces:
     -   Commands
         -   100us, 500us, ..., 10s, inf: the total number of commands of the given type which executed within the specified time limit and the previous one.
 
-## configuration
+## Configuration
 
 ```yaml
 tcpipv4:

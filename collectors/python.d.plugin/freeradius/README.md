@@ -1,4 +1,4 @@
-# freeradius
+# FreeRADIUS monitoring with Netdata
 
 Uses the `radclient` command to provide freeradius statistics. It is not recommended to run it every second.
 
@@ -44,7 +44,7 @@ It produces:
     -   proxy-acct-malformed-requests
     -   proxy-acct-unknown-typesa
 
-## configuration
+## Configuration
 
 Sample:
 

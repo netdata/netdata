@@ -1,6 +1,6 @@
-# unbound
+# Unbound monitoring with Netdata
 
-## Deprecation Notes
+## Deprecation notes
 
 This module is deprecated. Please use [new version](https://github.com/netdata/go.d.plugin/tree/master/modules/unbound) instead.
 

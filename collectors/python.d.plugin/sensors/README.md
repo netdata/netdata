@@ -1,10 +1,10 @@
-# sensors
+# Sensors monitoring with Netdata
 
 System sensors information.
 
 Charts are created dynamically.
 
-## configuration
+## Configuration
 
 For detailed configuration information please read [`sensors.conf`](sensors.conf) file.
 

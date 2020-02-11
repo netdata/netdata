@@ -1,4 +1,4 @@
-# redis
+# Redis monitoring with Netdata
 
 Get INFO data from redis instance.
 
@@ -30,7 +30,7 @@ Following charts are drawn:
 
     -   connected
 
-## configuration
+## Configuration
 
 ```yaml
 socket:

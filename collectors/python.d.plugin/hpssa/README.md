@@ -1,6 +1,6 @@
-# hpssa
+# HPSSA monitoring with Netdata
 
-This module collects controller, logical, and physical device health metrics from HP Smart Storage Arrays.
+Collects controller, logical, and physical device health metrics from HP Smart Storage Arrays.
 
 ## Requirements:
 

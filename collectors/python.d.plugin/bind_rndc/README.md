@@ -1,8 +1,8 @@
-# bind_rndc
+# Bind RNDC monitoring with Netdata
 
-Module parses bind dump file to collect real-time performance metrics
+Parses bind dump file to collect real-time performance metrics.
 
-**Requirements:**
+## Requirements
 
 -   Version of bind must be 9.6 +
 -   Netdata must have permissions to run `rndc stats`
@@ -49,7 +49,7 @@ It produces:
 
 -   Same as Incoming queries
 
-## configuration
+## Configuration
 
 Sample:
 

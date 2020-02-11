@@ -1,6 +1,6 @@
-# dockerd
+# Dockerd monitoring with Netdata
 
-Module monitor docker health metrics.
+Monitors docker health metrics.
 
 **Requirement:**
 
@@ -20,7 +20,7 @@ Following charts are drawn:
 
     -   count
 
-## configuration
+## Configuration
 
 ```yaml
  update_every : 1

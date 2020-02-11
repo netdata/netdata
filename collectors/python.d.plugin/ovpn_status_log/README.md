@@ -1,8 +1,8 @@
-# ovpn_status_log
+# OVPN status log monitoring with Netdata
 
-Module monitor openvpn-status log file.
+Monitors the openvpn-status log file.
 
-**Requirements:**
+## Requirements
 
 -   If you are running multiple OpenVPN instances out of the same directory, MAKE SURE TO EDIT DIRECTIVES which create output files
     so that multiple instances do not overwrite each other's output files.
@@ -22,7 +22,7 @@ It produces:
     -   in
     -   out
 
-## configuration
+## Configuration
 
 Sample:
 
