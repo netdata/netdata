@@ -163,7 +163,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --disable-mosquitto        Don't build with libmosquitto (this disables Netdata Cloud functionality).
+  --disable-aclk             Disable the agent-cloud link, required for Netdata Cloud functionality.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -248,7 +248,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--disable-mosquitto") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-libmosquitto/} --disable-libmosquitto" ;;
+    "--disable-aclk") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-libmosquitto/} --disable-libmosquitto" ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -424,7 +424,7 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 fetch_libmosquitto() {
-  download_tarball "${1}" "${2}" "libmosquitto" "mosquitto"
+  download_tarball "${1}" "${2}" "libmosquitto" "aclk"
 }
 
 build_libmosquitto() {
@@ -461,8 +461,6 @@ bundle_libmosquitto() {
 
   if [ ! -f "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ] || [ ! -s "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ]; then
     run_failed "unable to find a usable libmosquitto source archive, MQTT ACLK will not be available"
-    echo >&2 "Either check the error or consider disabling it by issuing '--disable-mosquitto' in the installer"
-    echo >&2
     return 0
   fi
 
@@ -472,11 +470,6 @@ bundle_libmosquitto() {
 
   # Checksum validation
   if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
-
-    echo >&2 "mosquitto checksum validation failure."
-    echo >&2 "Either check the error or consider disabling it by issuing '--disable-mosquitto' in the installer"
-    echo >&2
-
     run_failed "mosquitto files checksum validation failed."
     return 0
   fi
