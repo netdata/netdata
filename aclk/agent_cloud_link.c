@@ -283,7 +283,9 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         else
             aclk_queue.aclk_query_head = tmp_query->next;
 
+#ifdef ACLK_DEBUG
         info("Removing double entry");
+#endif
         aclk_query_free(tmp_query);
         aclk_queue.count--;
         //tmp_query->deleted = 1;
@@ -307,7 +309,9 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     new_query->created = now_realtime_sec();
     new_query->run_after = run_after;
 
+#ifdef ACLK_DEBUG
     info("Added query (%s) (%s)", topic, query);
+#endif
 
     tmp_query = aclk_query_find_position(run_after);
 
@@ -329,29 +333,11 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     QUERY_UNLOCK;
     QUERY_THREAD_WAKEUP;
     return 0;
-
-//    if (likely(aclk_queue.aclk_query_tail)) {
-//        aclk_queue.aclk_query_tail->next = new_query;
-//        aclk_queue.aclk_query_tail = new_query;
-//        aclk_queue.count++;
-//        QUERY_UNLOCK;
-//        return 0;
-//    }
-//
-//    if (likely(!aclk_queue.aclk_query_head)) {
-//        aclk_queue.aclk_query_head = new_query;
-//        aclk_queue.aclk_query_tail = new_query;
-//        aclk_queue.count++;
-//        QUERY_UNLOCK;
-//        return 0;
-//    }
-//    QUERY_UNLOCK;
-//    return 0;
 }
 
 inline int aclk_submit_request(struct aclk_request *request)
 {
-    return aclk_queue_query(request->topic, NULL, request->msg_id, request->url, 0, 0, 0);
+    return aclk_queue_query(request->topic, NULL, request->msg_id, request->url, 0, 0, ACLK_CMD_CLOUD);
 }
 
 /*
@@ -685,8 +671,8 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
         return;
     }
 
-    // QUEUE command to update the cloud here
-    //aclk_queue_query("_collector","none"
+    // TODO: QUEUE command to update the cloud here
+    // aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 2, 1, ACLK_CMD_ONCONNECT);
 
     COLLECTOR_UNLOCK;
 }
@@ -712,13 +698,14 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
         return;
     }
 #ifdef ACLK_DEBUG
-    if (tmp_collector)
-        info("DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
+    info("DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
 #endif
 
     // TODO: Queue command for update to the cloud
 
     COLLECTOR_UNLOCK;
+    // TODO: Queue command for update to the cloud
+    // aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 2, 1, ACLK_CMD_ONCONNECT);
 
     _free_collector(tmp_collector);
 }
@@ -766,26 +753,35 @@ int aclk_process_query()
     }
 
     if (unlikely(this_query->deleted)) {
+#ifdef ACLK_DEBUG
         info("Garbage collect query %s:%s", this_query->topic, this_query->query);
+#endif
         aclk_query_free(this_query);
         return 1;
     }
+    query_count++;
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
             info("EXECUTING on connect metadata command");
             aclk_send_metadata();
             aclk_metadata_submitted = 1;
-
-            break;
+            aclk_query_free(this_query);
+            return 1;
+        case ACLK_CMD_CHART:
+            info("EXECUTING a chart command");
+            aclk_send_single_chart(this_query->data, this_query->query);
+            aclk_query_free(this_query);
+            return 1;
         default:
             break;
     }
 
-    query_count++;
+#ifdef ACLK_DEBUG
     info(
         "Query #%d (%s) (%s) in queue %d seconds", (int) query_count, this_query->topic, this_query->query,
         (int) (now_realtime_sec() - this_query->created));
+#endif
 
     if (strncmp((char *)this_query->query, "/api/v1/", 8) == 0) {
         struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
@@ -823,9 +819,9 @@ int aclk_process_query()
         return 1;
     }
 
-    if (strcmp((char *)this_query->topic, "_chart") == 0) {
-        aclk_send_single_chart(this_query->data, this_query->query);
-    }
+//    if (strcmp((char *)this_query->topic, "_chart") == 0) {
+//        aclk_send_single_chart(this_query->data, this_query->query);
+//    }
 
     aclk_query_free(this_query);
 
@@ -851,6 +847,7 @@ int aclk_process_queries()
 
     info("Processing %d queries", (int ) aclk_queue.count);
 
+    //TODO: may consider possible throttling here
     while (aclk_process_query()) {
         //rc = _link_event_loop(0);
     };
@@ -887,7 +884,7 @@ void *aclk_query_main_thread(void *ptr)
     while (!netdata_exit) {
 
         while (!agent_state && !netdata_exit) {
-            info("Waiting for agent to get to stable state");
+            info("Waiting for agent collectors to initialize");
             sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
             if ((now_realtime_sec() - last_init_sequence) > ACLK_STABLE_TIMEOUT) {
                 agent_state = 1;
@@ -922,12 +919,7 @@ void *aclk_query_main_thread(void *ptr)
             sleep_usec(USEC_PER_SEC * 1);
 
         if (likely(aclk_connection_initialized && !netdata_exit)) {
-            while (aclk_process_queries()) {
-                // Sleep for a few ms and retry maybe we have something to process
-                // before going to sleep
-                // TODO: This needs improvement to avoid missed queries
-                sleep_usec(USEC_PER_MS * 100);
-            }
+            aclk_process_queries();
         }
 
         QUERY_THREAD_UNLOCK;
@@ -1192,7 +1184,7 @@ void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
         "\t\"timestamp\": \"%u\",\n"
-        "\t\"version\": %s,\n"
+        "\t\"version\": %d,\n"
         "\t\"payload\": ",
         type, msg_id, now_realtime_sec(), ACLK_VERSION);
 }
@@ -1349,7 +1341,7 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
     if (host != localhost)
         return 0;
 
-    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 2, 1, 0);
+    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 2, 1, ACLK_CMD_CHART);
     return 0;
 #endif
 }
@@ -1367,16 +1359,31 @@ int    aclk_update_alarm(RRDHOST *host, char *alarm_name)
 //TODO: add and check the incoming type e.g http
 int aclk_handle_cloud_request(char *payload)
 {
-    struct aclk_request cloud_to_agent = { .msg_id = NULL, .topic = NULL, .url = NULL, .version = 1};
+    struct aclk_request cloud_to_agent = { .type_id = NULL, .msg_id = NULL, .topic = NULL, .url = NULL, .version = 0};
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
-    if (unlikely(JSON_OK != rc)) {
-        error("Malformed json request (%s)", payload);
-        return 1;
-    }
+    if (unlikely(
+            JSON_OK != rc || !cloud_to_agent.url || !cloud_to_agent.topic || !cloud_to_agent.msg_id ||
+            !cloud_to_agent.type_id || !cloud_to_agent.version > ACLK_VERSION)) {
 
-    if (unlikely(!cloud_to_agent.url || !cloud_to_agent.topic)) {
+        if (cloud_to_agent.version > ACLK_VERSION)
+            error("Unsupported version in JSON request %d", cloud_to_agent.version);
+
+        error("Malformed json request (%s)", payload);
+
+        if (cloud_to_agent.url)
+            freez(cloud_to_agent.url);
+
+        if (cloud_to_agent.type_id)
+            freez(cloud_to_agent.type_id);
+
+        if (cloud_to_agent.msg_id)
+            freez(cloud_to_agent.msg_id);
+
+        if (cloud_to_agent.topic)
+            freez(cloud_to_agent.topic);
+
         return 1;
     }
 

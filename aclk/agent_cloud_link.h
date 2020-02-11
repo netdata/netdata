@@ -19,9 +19,8 @@
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
-
-#define ACLK_DELAY_SEED 1.61803
-#define ACLK_MAX_BACKOFF_DELAY 1024000      // maximum backoff delay in milliseconds
+#define ACLK_DELAY_SEED 1.61803        // Exponential fibonnaci backoff
+#define ACLK_MAX_BACKOFF_DELAY 1024000 // maximum backoff delay in milliseconds
 
 #define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1 // Wait time @ spin lock for MQTT initialization in seconds
@@ -31,10 +30,10 @@
 
 #define ACLK_MAX_TOPIC  255
 
-#define ACLK_RECONNECT_DELAY 1          // reconnect delay -- with backoff stragegy fow now
-#define ACLK_MAX_RECONNECT_DELAY 120
-#define ACLK_VERSION "1"
-#define ACLK_STABLE_TIMEOUT 8
+#define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
+#define ACLK_MAX_RECONNECT_DELAY ACLK_MAX_BACKOFF_DELAY / 1000
+#define ACLK_VERSION 1
+#define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
 
@@ -54,12 +53,12 @@ typedef enum publish_topic_action {
 } PUBLISH_TOPIC_ACTION;
 
 typedef enum aclk_cmd {
-    ACLK_CMD_NORMAL,
-    ACLK_CMD_WAIT,
     ACLK_CMD_CLOUD,
+    ACLK_CMD_WAIT,
     ACLK_CMD_CONNECT,
     ACLK_CMD_ONCONNECT,
     ACLK_CMD_INFO,
+    ACLK_CMD_CHART,
     ACLK_CMD_CHARTS,
     ACLK_CMD_ALARMS_LOG,
     ACLK_CMD_ALARMS_ACTIVE,
