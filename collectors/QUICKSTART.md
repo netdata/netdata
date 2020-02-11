@@ -84,7 +84,7 @@ collector's documentation. Each file contains a short code block with the releva
 For example, the [Nginx collector](go.d.plugin/modules/nginx/README.md) has its configuration file at `go.d/nginx.conf`.
 
 ```bash
-cd /etc/netdata
+cd /etc/netdata # Replace this path with your Netdata config directory
 sudo ./edit-config go.d/nginx.conf
 ```
 
