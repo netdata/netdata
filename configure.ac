@@ -439,7 +439,7 @@ if test "${ACLK}" = "yes"; then
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
 
-    AC_MSG_CHECKING([if netdata ACLK can be enabled])
+    AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
     if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}"; then
         can_enable_aclk="yes"
     else
@@ -448,9 +448,9 @@ if test "${ACLK}" = "yes"; then
     AC_MSG_RESULT([${can_enable_aclk}])
 
     test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
-        AC_MSG_ERROR([User required ACLK but it can't be built!])
+        AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
 
-    AC_MSG_CHECKING([if netdata ACLK should be enabled])
+    AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
     if test "${aclk_required}" = "detect"; then
         enable_aclk=$can_enable_aclk
     else
