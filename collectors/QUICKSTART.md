@@ -9,10 +9,8 @@ This guide will not cover advanced collector features, such as enabling/disablin
 
 -   [Find the collector for your application or service](#find-the-collector-for-your-application-or-service)
 -   [Configure your application or service for monitoring](#configure-your-application-or-service-for-monitoring)
--   [Edit the configuration file for your collector](#edit-the-configuration-file-for-your-collector)
+-   [Edit the collector's configuration file](#edit-the-collectors-configuration-file)
 -   [Enable the collector](#enable-the-collector)
--   [See new charts on your dashboard]()
--   [Troubleshooting a collector]()
 
 ## Find the collector for your application or service
 
@@ -23,17 +21,25 @@ To find whether Netdata has a pre-installed collector for your favorite app/serv
 list](COLLECTORS.md). The only exception is the [third-party collectors](COLLECTORS.md#third-party-plugins), which
 you do need to install yourself. However, this quickstart guide will focus on pre-installed collectors.
 
+When you find a collector you're interested in, take note of its orchestrator. These are in the headings above each
+table, and there are four: Bash, Go, Node, and Python. They go by their respective names: `charts.d`, `go.d`, `node.d`,
+and `python.d`.
+
+> If there is a collector written in both Go and Python, it's better to choose the Go-based version, as we will
+> eventually deprecate most Python-based collectors.
+
 From here on out, this quickstart guide will use the [Nginx collector](go.d.plugin/modules/nginx/README.md) as an
 example to showcase the process of configuring and enabling one of Netdata's pre-installed collectors.
 
 ## Configure your application or service for monitoring
 
 Every collector's documentation comes with instructions on how to configure your app/service to make it available to
-Netdata's collector.
+Netdata's collector. Our [collector support list](COLLECTORS.md) contains links to each collector's documentation page
+so you can learn more.
 
-For example, the [Nginx collector documentation](go.d.plugin/modules/nginx/README.md) informs you that it requires that
-Nginx have the `stub_status` module configured correctly, in addition to an active `stub_status/` page. You can confirm
-whether you have the module enabled with the following command:
+For example, the [Nginx collector documentation](go.d.plugin/modules/nginx/README.md) states that your Nginx
+installation must have the `stub_status` module configured correctly, in addition to an active `stub_status/` page, for
+Netdata to monitor it. You can confirm whether you have the module enabled with the following command:
 
 ```bash
 nginx -V 2>&1 | grep -o with-http_stub_status_module
@@ -58,7 +64,7 @@ server {
 At this point, your Nginx installation is fully configured and ready for Netdata to monitor it. Next, you'll configure
 your collector.
 
-## Edit the configuration file for your collector
+## Edit the collector's configuration file
 
 This step may not be required based on how you configured your app/service, as each collector comes with a few
 pre-configured jobs that look for the app/service in common and expected locations. For example, the Nginx collector
@@ -72,7 +78,10 @@ To edit a collector configuration file, navigate to your [Netdata configuration
 directory](../docs/step-by-step/step-04.md#find-your-netdataconf-file). Launch `edit-config` with the path to the
 collector's configuration file.
 
-For example, the Nginx collector's file is at `go.d/nginx.conf`.
+How do you find that path to the collector's configuration file? Look under the **Configuration** heading in the
+collector's documentation. Each file contains a short code block with the relevant command.
+
+For example, the [Nginx collector](go.d.plugin/modules/nginx/README.md) has its configuration file at `go.d/nginx.conf`.
 
 ```bash
 cd /etc/netdata
@@ -82,11 +91,6 @@ sudo ./edit-config go.d/nginx.conf
 This file contains all of the possible job parameters to help you monitor Nginx in all sorts of complex deployments. At
 the bottom of the file is a `[JOB]` section, which contains the two default jobs. Configure these as needed, using those
 parameters as a reference, to configure the collector.
-
-### How do I edit the right configuration file?
-
-The easiest way to know which path to use with `edit-config` is by referencing the [collector support
-list](COLLECTORS.md). Each row contains a _configuration file_ column containing the configuration file path.
 
 ## Enable the collector
 
