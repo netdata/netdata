@@ -309,7 +309,7 @@ AC_CHECK_LIB(
 if test "${ACLK}" = "yes"; then
     AC_CHECK_LIB(
         [websockets],
-        [lws_create_context],
+        [lws_set_timer_usecs],
         [LWS_LIBS="-lwebsockets"]
     )
 fi
