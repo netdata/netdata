@@ -248,7 +248,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--disable-aclk") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-libmosquitto/} --disable-libmosquitto" ;;
+    "--disable-aclk") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk" ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
