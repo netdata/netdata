@@ -7,7 +7,11 @@ services:
       args:
         ACLK: "yes"
     image: fedora_30_dev
-    command: /usr/sbin/netdata -D
+    command: >
+      sh -c "echo 00000000-0000-0000-0000-000000000000 >/etc/netdata/claim.d/claimed_id &&
+             echo '[agent_cloud_link]' >>/etc/netdata/netdata.conf &&
+             echo '  agent cloud link hostname = vernemq_1' >>/etc/netdata/netdata.conf &&
+             /usr/sbin/netdata -D"
     ports:
     - 20000:19999
     #volumes:

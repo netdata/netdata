@@ -1,11 +1,12 @@
 FROM fedora:30
-ARG ACLK=no
 RUN dnf -y update
 RUN dnf install -y autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python36 zlib-devel libwebsockets-devel findutils
 RUN curl -L https://downloads.sourceforge.net/project/judy/judy/Judy-1.0.5/Judy-1.0.5.tar.gz -o /opt/judy-1.0.5.tgz
 RUN cd /opt && tar xzf judy-1.0.5.tgz && cd judy-1.0.5 && ./configure && make && make install
 RUN cp /usr/local/lib/libJudy* /lib64/
 
+ARG ACLK=no
+ARG EXTRA
 COPY . /opt/netdata/source
 WORKDIR /opt/netdata/source
 
@@ -28,7 +29,7 @@ RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
 RUN ACLK=${ACLK} CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
-    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1" ./netdata-installer.sh --disable-lto
+    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA}" ./netdata-installer.sh --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
