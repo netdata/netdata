@@ -690,7 +690,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
     }
 
     // TODO: QUEUE command to update the cloud here
-    aclk_queue_query("connector", NULL, NULL, NULL, 2, 1, ACLK_CMD_ONCONNECT);
+    aclk_queue_query("connector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
 
     COLLECTOR_UNLOCK;
 }
@@ -1338,7 +1338,7 @@ void aclk_alarm_reload()
     if (unlikely(!agent_state))
         return;
 
-    aclk_queue_query("_alarm", localhost->hostname, NULL, "alarms", 2, 1, ACLK_CMD_ALARMS);
+    aclk_queue_query("_alarm", localhost->hostname, NULL, "alarms", 0, 1, ACLK_CMD_ALARMS);
 }
 //rrd_stats_api_v1_chart(RRDSET *st, BUFFER *buf)
 
@@ -1388,7 +1388,7 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
     if (host != localhost)
         return 0;
 
-    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 2, 1, ACLK_CMD_CHART);
+    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, ACLK_CMD_CHART);
     return 0;
 #endif
 }
@@ -1433,6 +1433,10 @@ int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 int aclk_handle_cloud_request(char *payload)
 {
     struct aclk_request cloud_to_agent = { .type_id = NULL, .msg_id = NULL, .topic = NULL, .url = NULL, .version = 0};
+
+#ifdef ACLK_DEBUG
+    info("ACLK PAYLOAD [%s]", payload);
+#endif
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 

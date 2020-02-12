@@ -12,7 +12,7 @@
 #define ACLK_JSON_IN_TOPIC "callback-topic"
 #define ACLK_JSON_IN_URL "payload"
 
-#define ACLK_SLEEP_LOOP 1   // query processing thread will sleep, thread wakeup disabled for now
+//#define ACLK_SLEEP_LOOP 1   // query processing thread will sleep, thread wakeup disabled for now
 
 #define ACLK_MSG_TYPE_CHART "chart"
 #define ACLK_CHART_TOPIC "chart"
