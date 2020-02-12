@@ -141,10 +141,16 @@ update() {
   current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
   latest_version="$(get_latest_version "${tmpdir}/sha256sum.txt")"
 
+  # If we can't get the current version for some reason assume `0`
+  current_version="${current_version:-0}"
+
+  # If we can't get the latest version for some reason assume `0`
+  latest_version="${latest_version:-0}"
+
   info "Current Version: ${current_version}"
   info "Latest Version: ${latest_version}"
 
-  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${current_version}" ]; then
+  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
     info "Newest version ${current_version} <= ${latest_version} is already installed"
   elif [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
     info "Newest version is already installed"

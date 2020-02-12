@@ -53,10 +53,12 @@ it there.
 
 ### Change what I see
 
-#### Increase the metrics retention period
+#### Increase the long-term metrics retention period
 
-Increase `history` in [netdata.conf \[global\]](../daemon/config/README.md#global-section-options). Just ensure you
-understand [how much memory will be required](../database/).
+Increase the values for the `page cache size` and `dbengine disk space` settings in the [`[global]`
+section](../daemon/config/README.md#global-section-options) of `netdata.conf`. Read our tutorial on [increasing
+long-term metrics storage](tutorials/longer-metrics-storage.md) and the [memory requirements for the database
+engine](../database/engine/README.md#memory-requirements).
 
 #### Reduce the data collection frequency
 

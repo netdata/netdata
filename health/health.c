@@ -187,6 +187,9 @@ void health_reload(void) {
         health_reload_host(host);
 
     rrd_unlock();
+#ifdef ENABLE_ACLK
+    aclk_alarm_reload();
+#endif
 }
 
 // ----------------------------------------------------------------------------

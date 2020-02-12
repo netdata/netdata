@@ -12,16 +12,17 @@
 #define ACLK_JSON_IN_TOPIC "callback-topic"
 #define ACLK_JSON_IN_URL "payload"
 
+//#define ACLK_SLEEP_LOOP 1   // query processing thread will sleep, thread wakeup disabled for now
 
 #define ACLK_MSG_TYPE_CHART "chart"
+#define ACLK_CHART_TOPIC "chart"
 #define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
-
-#define ACLK_DELAY_SEED 1.61803
-#define ACLK_MAX_BACKOFF_DELAY 1024000      // maximum backoff delay in milliseconds
+#define ACLK_DELAY_SEED 1.61803        // Exponential fibonnaci backoff
+#define ACLK_MAX_BACKOFF_DELAY 1024000 // maximum backoff delay in milliseconds
 
 #define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1 // Wait time @ spin lock for MQTT initialization in seconds
@@ -31,10 +32,10 @@
 
 #define ACLK_MAX_TOPIC  255
 
-#define ACLK_RECONNECT_DELAY 1          // reconnect delay -- with backoff stragegy fow now
-#define ACLK_MAX_RECONNECT_DELAY 120
-#define ACLK_VERSION "1"
-#define ACLK_STABLE_TIMEOUT 8
+#define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
+#define ACLK_MAX_RECONNECT_DELAY ACLK_MAX_BACKOFF_DELAY / 1000
+#define ACLK_VERSION 1
+#define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
 
@@ -54,12 +55,14 @@ typedef enum publish_topic_action {
 } PUBLISH_TOPIC_ACTION;
 
 typedef enum aclk_cmd {
-    ACLK_CMD_NORMAL,
-    ACLK_CMD_WAIT,
     ACLK_CMD_CLOUD,
+    ACLK_CMD_WAIT,
     ACLK_CMD_CONNECT,
     ACLK_CMD_ONCONNECT,
     ACLK_CMD_INFO,
+    ACLK_CMD_CHART,
+    ACLK_CMD_ALARM,
+    ACLK_CMD_ALARMS,
     ACLK_CMD_CHARTS,
     ACLK_CMD_ALARMS_LOG,
     ACLK_CMD_ALARMS_ACTIVE,
@@ -80,7 +83,7 @@ void *aclk_main(void *ptr);
 
 #define NETDATA_ACLK_HOOK \
     { \
-        .name = "ACLK_Main", \
+        .name = "AgentCloudLink", \
         .config_section = NULL, \
         .config_name = NULL, \
         .enabled = 1, \
@@ -113,11 +116,16 @@ int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int r
 struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 //void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
-int aclk_update_alarm(RRDHOST *host, char *alarm_name);
+int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);
 int aclk_submit_request(struct aclk_request *);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
+void aclk_alarm_reload();
+void aclk_send_alarm_metadata();
+int aclk_execute_query(struct aclk_query *query);
+extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
+
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
