@@ -105,6 +105,14 @@ Provides server and tube-level statistics.
 
 ## Configuration
 
+Edit the `python.d/beanstalk.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/beanstalk.conf
+```
+
 Sample:
 
 ```yaml

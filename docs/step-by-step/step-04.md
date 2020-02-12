@@ -57,7 +57,7 @@ Let's give it a shot. Navigate to your Netdata config directory. To use `edit-co
 have permissions to edit the file. On Linux/MacOS systems, you can usually use `sudo` to elevate your permissions.
 
 ```bash
-cd /etc/netdata # Replace this path with your Netdata config directory as found in the steps above
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different as found in the steps above
 sudo ./edit-config netdata.conf
 ```
 
@@ -117,7 +117,9 @@ Once you're done, restart Netdata and refresh the dashboard. Say hello to your r
 ![Animated GIF of editing the hostname option in
 netdata.conf](https://user-images.githubusercontent.com/1153921/65470784-86e5b980-de21-11e9-87bf-fabec7989738.gif)
 
-Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon configuration](../../daemon/config/).
+Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon
+configuration](../../daemon/config/), or hop into our popular tutorial on [increasing long-term metrics
+storage](../tutorials/longer-metrics-storage.md).
 
 ## What's next?
 

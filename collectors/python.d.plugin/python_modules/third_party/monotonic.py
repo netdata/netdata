@@ -54,6 +54,41 @@ except AttributeError:
     import os
     import sys
     import threading
+
+
+    def clock_clock_gettime_c_library():
+        return ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True).clock_gettime
+
+
+    def clock_clock_gettime_rt_library():
+        return ctypes.CDLL(ctypes.util.find_library('rt'), use_errno=True).clock_gettime
+
+
+    def clock_clock_gettime_c_library_synology6():
+        return ctypes.CDLL('/usr/lib/libc.so.6', use_errno=True).clock_gettime
+
+
+    def clock_clock_gettime_rt_library_synology6():
+        return ctypes.CDLL('/usr/lib/librt.so.1', use_errno=True).clock_gettime
+
+
+    def clock_gettime_linux():
+        # see https://github.com/netdata/netdata/issues/7976
+        order = [
+            clock_clock_gettime_c_library,
+            clock_clock_gettime_rt_library,
+            clock_clock_gettime_c_library_synology6,
+            clock_clock_gettime_rt_library_synology6,
+        ]
+
+        for gettime in order:
+            try:
+                return gettime()
+            except (RuntimeError, AttributeError, OSError):
+                continue
+        raise RuntimeError('can not find c and rt libraries')
+
+
     try:
         if sys.platform == 'darwin':  # OS X, iOS
             # See Technical Q&A QA1398 of the Mac Developer Library:
@@ -132,12 +167,7 @@ except AttributeError:
                         return final_milliseconds / 1000.0
 
         else:
-            try:
-                clock_gettime = ctypes.CDLL(ctypes.util.find_library('c'),
-                                            use_errno=True).clock_gettime
-            except Exception:
-                clock_gettime = ctypes.CDLL(ctypes.util.find_library('rt'),
-                                            use_errno=True).clock_gettime
+            clock_gettime = clock_gettime_linux()
 
             class timespec(ctypes.Structure):
                 """Time specification, as described in clock_gettime(3)."""

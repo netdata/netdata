@@ -7,6 +7,9 @@ ARG ARCH=amd64
 # This image contains preinstalled dependecies
 FROM netdata/builder:${ARCH} as builder
 
+# One of 'nightly' or 'stable'
+ARG RELEASE_CHANNEL=nightly
+
 ENV JUDY_VER 1.0.5
 
 # Copy source
@@ -16,7 +19,8 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
-   ./netdata-installer.sh --dont-wait --dont-start-it
+   ./netdata-installer.sh --dont-wait --dont-start-it \
+   $([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -64,7 +68,7 @@ ARG NETDATA_GID=201
 ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
-#ENV DO_NOT_TRACK
+#ENV DO_NOT_TRACK=1
 RUN \
     # fping from alpine apk is on a different location. Moving it.
     mv /usr/sbin/fping /usr/local/bin/fping && \
@@ -85,7 +89,10 @@ RUN \
         /var/lib/netdata \
         /var/log/netdata && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
-    chmod 4755 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
+    chmod 4755 \
+        /usr/libexec/netdata/plugins.d/cgroup-network \
+        /usr/libexec/netdata/plugins.d/apps.plugin \
+        /usr/libexec/netdata/plugins.d/freeipmi.plugin && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \

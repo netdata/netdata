@@ -3,8 +3,9 @@
 # Original Author: ccremer (github.com/ccremer)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import urllib3
 import re
+
+import urllib3
 
 try:
     from time import monotonic as time

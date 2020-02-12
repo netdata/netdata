@@ -47,6 +47,7 @@ class UrlService(SimpleService):
         self.proxy_url = self.configuration.get('proxy_url')
         self.method = self.configuration.get('method', 'GET')
         self.header = self.configuration.get('header')
+        self.body = self.configuration.get('body')
         self.request_timeout = self.configuration.get('timeout', 1)
         self.respect_retry_after_header = self.configuration.get('respect_retry_after_header')
         self.tls_verify = self.configuration.get('tls_verify')
@@ -140,6 +141,9 @@ class UrlService(SimpleService):
         retry = urllib3.Retry(retries)
         if hasattr(retry, 'respect_retry_after_header'):
             retry.respect_retry_after_header = bool(self.respect_retry_after_header)
+
+        if self.body:
+            kwargs['body'] = self.body
 
         response = manager.request(
             method=self.method,

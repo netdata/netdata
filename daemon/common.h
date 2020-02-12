@@ -63,6 +63,9 @@
 // netdata agent claiming
 #include "claim/claim.h"
 
+// netdata agent cloud link
+#include "aclk/agent_cloud_link.h"
+
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"
@@ -84,6 +87,6 @@ extern char *netdata_configured_timezone;
 extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
-int netdata_ready;
+extern int netdata_ready;
 
 #endif /* NETDATA_COMMON_H */

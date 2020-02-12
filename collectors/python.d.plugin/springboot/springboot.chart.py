@@ -4,8 +4,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
-from bases.FrameworkServices.UrlService import UrlService
 
+from bases.FrameworkServices.UrlService import UrlService
 
 DEFAULT_ORDER = [
     'response_code',
@@ -146,7 +146,7 @@ class Service(UrlService):
         }
 
         for line in lines:
-            dimension = line.get('dimension',  None) or self.die('dimension is missing: %s' % chart_id)
+            dimension = line.get('dimension', None) or self.die('dimension is missing: %s' % chart_id)
             name = line.get('name', dimension)
             algorithm = line.get('algorithm', 'absolute')
             multiplier = line.get('multiplier', 1)

@@ -42,9 +42,17 @@ The following charts will be created:
 
 -   current temperature
 
-## configuration
+## Configuration
 
-This is the internal default for `/etc/netdata/nut.conf`
+Edit the `charts.d/nut.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d/nut.conf
+```
+
+This is the internal default for `charts.d/nut.conf`
 
 ```sh
 # a space separated list of UPS names

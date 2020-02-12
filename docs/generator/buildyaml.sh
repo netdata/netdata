@@ -8,6 +8,14 @@ language="${3}"
 
 cd ${GENERATOR_DIR}/${docs_dir}
 
+# getlastdir parses file path and returns last directory name.
+# It expects path to be not empty , '/' as a delimeter and at least one '/' in the path.
+getlastdir() {
+  local IFS=/
+  read -ra array <<< "$1"
+  echo "${array[((${#array[@]} - 2))]}"
+}
+
 # create yaml nav subtree with all the files directly under a specific directory
 # arguments:
 # tabs - how deep do we show it in the hierarchy. Level 1 is the top level, max should probably be 3
@@ -24,6 +32,7 @@ navpart() {
 	section=$4
 	maxdepth=$5
 	excludefirstlevel=$6
+	useLastDirAsPageName=$7
 	spc=""
 
 	i=1
@@ -37,12 +46,18 @@ navpart() {
 	if [ -z "$maxdepth" ]; then maxdepth=1; fi
 	if [[ -n $excludefirstlevel ]]; then mindepth=2; else mindepth=1; fi
 
-	for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h|%d|%p\n' | sort -t '|' -n | awk -F '|' '{print $3}'); do
+  local pagename
+	for f in $(find "$dir" -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h|%d|%p\n' | sort -t '|' -n | awk -F '|' '{print $3}'); do
 		# If I'm adding a section, I need the child links to be one level deeper than the requested level in "tabs"
+		pagename="'$f'"
+		if [ -n "$useLastDirAsPageName" ]; then
+			pagename="'$(getlastdir "$f")' : '$f'"
+		fi
+
 		if [ -z "$section" ]; then
-			echo "$spc- '$f'"
+			echo "$spc- $pagename"
 		else
-			echo "$spc    - '$f'"
+			echo "$spc    - $pagename"
 		fi
 	done
 }
@@ -147,9 +162,22 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'docs/why-netdata/immediate-results.md'
 - Installation:
     - 'packaging/installer/README.md'
-    - 'packaging/docker/README.md'
-    - 'packaging/installer/UPDATE.md'
+    - Other methods:
+        - 'packaging/installer/methods/packages.md'
+        - 'packaging/installer/methods/kickstart.md'
+        - 'packaging/installer/methods/kickstart-64.md'
+        - 'packaging/docker/README.md'
+        - 'packaging/installer/methods/cloud-providers.md'
+        - 'packaging/installer/methods/macos.md'
+        - 'packaging/installer/methods/freebsd.md'
+        - 'packaging/installer/methods/manual.md'
+        - 'packaging/installer/methods/offline.md'
+        - 'packaging/installer/methods/pfsense.md'
+        - 'packaging/installer/methods/synology.md'
+        - 'packaging/installer/methods/freenas.md'
+        - 'packaging/installer/methods/alpine.md'
     - 'packaging/DISTRIBUTIONS.md'
+    - 'packaging/installer/UPDATE.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/getting-started.md'
 "
@@ -180,18 +208,11 @@ echo -ne "    - 'docs/Performance.md'
     - 'docs/high-performance-netdata.md'
 "
 
-navpart 1 . netdata-cloud "Netdata Cloud"
+navpart 1 collectors README "Collecting metrics"
 echo -ne "
-    - 'docs/netdata-cloud/README.md'
-    - 'docs/netdata-cloud/signing-in.md'
-    - 'docs/netdata-cloud/nodes-view.md'
-"
-
-navpart 1 web "README" "Dashboards"
-navpart 2 web/gui "" "" 3
-
-navpart 1 collectors "" "Data collection" 1
-echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
+    - 'collectors/QUICKSTART.md'
+    - 'collectors/COLLECTORS.md'
+    - 'collectors/REFERENCE.md'
     - Internal plugins:
 "
 
@@ -210,12 +231,12 @@ navpart 2 collectors/plugins.d "" "External plugins"
 echo -ne "        - Go:
             - 'collectors/go.d.plugin/README.md'
 "
-navpart 4 collectors/go.d.plugin "" "Modules" 3 excludefirstlevel
+navpart 4 collectors/go.d.plugin "" "Modules" 3 excludefirstlevel useLastDirAsPageName
 
 echo -ne "        - Python:
             - 'collectors/python.d.plugin/README.md'
 "
-navpart 4 collectors/python.d.plugin "" "Modules" 3 excludefirstlevel
+navpart 4 collectors/python.d.plugin "" "Modules" 3 excludefirstlevel useLastDirAsPageName
 
 echo -ne "        - Node.js:
             - 'collectors/node.d.plugin/README.md'
@@ -232,20 +253,7 @@ echo -ne "        - BASH:
                 - 'collectors/charts.d.plugin/nut/README.md'
                 - 'collectors/charts.d.plugin/opensips/README.md'
             - Obsolete Modules:
-                - 'collectors/charts.d.plugin/mem_apps/README.md'
-                - 'collectors/charts.d.plugin/postfix/README.md'
-                - 'collectors/charts.d.plugin/tomcat/README.md'
                 - 'collectors/charts.d.plugin/sensors/README.md'
-                - 'collectors/charts.d.plugin/cpu_apps/README.md'
-                - 'collectors/charts.d.plugin/squid/README.md'
-                - 'collectors/charts.d.plugin/nginx/README.md'
-                - 'collectors/charts.d.plugin/hddtemp/README.md'
-                - 'collectors/charts.d.plugin/cpufreq/README.md'
-                - 'collectors/charts.d.plugin/mysql/README.md'
-                - 'collectors/charts.d.plugin/exim/README.md'
-                - 'collectors/charts.d.plugin/apache/README.md'
-                - 'collectors/charts.d.plugin/load_average/README.md'
-                - 'collectors/charts.d.plugin/phpfpm/README.md'
 "
 
 navpart 3 collectors/apps.plugin
@@ -258,9 +266,15 @@ navpart 3 collectors/xenstat.plugin
 navpart 3 collectors/perf.plugin
 navpart 3 collectors/slabinfo.plugin
 
-
-echo -ne "    - 'docs/Third-Party-Plugins.md'
+navpart 1 . netdata-cloud "Netdata Cloud"
+echo -ne "
+    - 'docs/netdata-cloud/README.md'
+    - 'docs/netdata-cloud/signing-in.md'
+    - 'docs/netdata-cloud/nodes-view.md'
 "
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
 
 navpart 1 health README "Health monitoring and alerts"
 echo -ne "    - 'health/QUICKSTART.md'

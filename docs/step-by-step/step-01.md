@@ -39,9 +39,9 @@ we'll cover throughout this tutorial.
     with hundreds of charts, is your main source of information about the health and performance of your systems/
     applications. We designed the dashboard with anomaly detection and quick analysis in mind. We'll return to
     dashboard-related topics in both [step 7](step-07.md) and [step 8](step-08.md).
--   **Netdata Cloud** is our SaaS toolkit that helps Netdata users monitor the health and performance of entire
-    infrastructures, whether they are two or two thousand (or more!) systems. We'll cover Netdata Cloud in [step
-    3](step-03.md).
+-   **Long-term metrics storage** by default. With our new database engine, you can store days, weeks, or months of
+    per-second historical metrics. Or you can archive metrics to another database, like MongoDB or Prometheus. We'll
+    cover all these options in [step 9](step-09.md).
 -   **No configuration necessary**. Without any configuration, you'll get thousands of real-time metrics and hundreds of
     alarms designed by our community of sysadmin experts. But you _can_ configure Netdata in a lot of ways, some of
     which we'll cover in [step 4](step-04.md).
@@ -53,9 +53,9 @@ we'll cover throughout this tutorial.
     into how you can tune alarms, write your own alarm, and enable two types of notifications.
 -   **High-speed, low-resource collectors** that allow you to collect thousands of metrics every second while using only
     a fraction of your system's CPU resources and a few MiB of RAM.
--   **Long-term metrics storage**. With our new database engine, you can store days, weeks, or months of per-second
-    historical metrics. Or you can archive metrics to another database, like MongoDB or Prometheus. We'll cover all
-    these options in [step 9](step-09.md).
+-   **Netdata Cloud** is our SaaS toolkit that helps Netdata users monitor the health and performance of entire
+    infrastructures, whether they are two or two thousand (or more!) systems. We'll cover Netdata Cloud in [step
+    3](step-03.md).
 
 ## Why you should use Netdata
 
@@ -82,7 +82,8 @@ For example, Netdata can [collect 100,000 metrics](https://github.com/netdata/ne
 using only 9% of a single server-grade CPU core!
 
 By decentralizing monitoring and emphasizing speed at every turn, Netdata helps you scale your health monitoring and
-performance troubleshooting to an infrastructure of every size. _And_ you get to keep per-second metrics.
+performance troubleshooting to an infrastructure of every size. _And_ you get to keep per-second metrics in long-term
+storage thanks to the database engine.
 
 ### Unlimited metrics
 
