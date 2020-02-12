@@ -3,8 +3,8 @@
 Thanks for trying Netdata! In this getting started guide, we'll quickly walk you through the first steps you should take
 after getting Netdata installed.
 
-Netdata can collect thousands of metrics in real-time without any configuration, but there are some valuable things to
-know to get the most out of Netdata based on your needs.
+Netdata can collect thousands of metrics in real-time and use its database for long-term metrics storage without any
+configuration, but there are some valuable things to know to get the most out of Netdata based on your needs.
 
 We'll skip right into some technical details, so if you're brand-new to monitoring the health and performance of systems
 and applications, our [**step-by-step tutorial**](step-by-step/step-00.md) might be a better fit.
@@ -42,12 +42,29 @@ Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata) t
 
 **What's next?**:
 
--   [Change how long Netdata stores metrics](#change-how-long-netdata-stores-metrics) by either increasing the `history`
-    option or switching to the database engine.
+-   [Change how long Netdata stores metrics](#change-how-long-netdata-stores-metrics) by changing the `page cache size`
+    and `dbengine disk space` settings in `netdata.conf`.
 -   Move Netdata's dashboard to a [different port](https://docs.netdata.cloud/web/server/) or enable TLS/HTTPS
     encryption.
 -   See all the `netdata.conf` options in our [daemon configuration documentation](../daemon/config/).
 -   Run your own [registry](../registry/README.md#run-your-own-registry).
+
+## Change how long Netdata stores metrics
+
+Netdata can store long-term, historical metrics out of the box. A custom database uses RAM to store recent metrics,
+ensuring dashboards and API queries are extremely responsive, while "spilling" historical metrics to disk. This
+configuration keeps RAM usage low while allowing for long-term, on-disk metrics storage.
+
+You can tweak this custom _database engine_ to store a much larger dataset than your system's available RAM,
+particularly if you allow Netdata to use slightly more RAM and disk space than the default configuration.
+
+Read our tutorial, [**Changing how long Netdata stores metrics**](../docs/tutorials/longer-metrics-storage.md), to learn
+more.
+
+**What's next?**:
+
+-   Learn more about the [memory requirements for the database engine](../database/engine/README.md#memory-requirements)
+    to understand how much RAM/disk space you should commit to storing historical metrics.
 
 ## Collect data from more sources
 
@@ -161,25 +178,6 @@ Find the `SEND_EMAIL="YES"` line and change it to `SEND_EMAIL="NO"`.
     your own.
 -   See all the alarm options via the [health configuration reference](../health/REFERENCE.md).
 -   Add a new notification method, like [Slack](../health/notifications/slack/).
-
-## Change how long Netdata stores metrics
-
-By default, Netdata uses a custom database which uses both RAM and the disk to store metrics. Recent metrics are stored
-in the system's RAM to keep access fast, while historical metrics are "spilled" to disk to keep RAM usage low.
-
-This custom database, which we call the _database engine_, allows you to store a much larger dataset than your system's
-available RAM.
-
-If you're not sure whether you're using the database engine, or want to tweak the default settings to store even more
-historical metrics, check out our tutorial: [**Changing how long Netdata stores
-metrics**](../docs/tutorials/longer-metrics-storage.md).
-
-**What's next?**:
-
--   Learn more about the [memory requirements for the database engine](../database/engine/README.md#memory-requirements)
-    to understand how much RAM/disk space you should commit to storing historical metrics.
--   Read up on the memory requirements of the [round-robin database](../database/), or figure out whether your system
-    has KSM enabled, which can [reduce the default database's memory usage](../database/README.md#ksm) by about 60%.
 
 ## Monitoring multiple systems with Netdata
 

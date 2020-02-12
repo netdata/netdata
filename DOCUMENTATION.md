@@ -2,7 +2,8 @@
 
 **Netdata is real-time health monitoring and performance troubleshooting for systems and applications.** It helps you
 instantly diagnose slowdowns and anomalies in your infrastructure with thousands of metrics, interactive visualizations,
-and insightful health alarms.
+and insightful health alarms. Plus, long-term storage comes ready out-of-the-box, so can collect, monitor, and maintain
+your metrics in one insightful place.
 
 ## Navigating the Netdata documentation
 
@@ -56,6 +57,8 @@ Add as many nodes as you'd like!
 **Advanced users**: For those who already understand how to access a Netdata dashboard and perform basic configuration,
 feel free to see what's behind any of these other doors.
 
+-   [Tutorial: Change how long Netdata stores metrics](docs/tutorials/longer-metrics-storage.md): Extend Netdata's
+    long-term metrics storage database by allowing Netdata to use more of your system's RAM and disk.
 -   [Netdata Behind Nginx](docs/Running-behind-nginx.md): Use an Nginx web server instead of Netdata's built-in server
     to enable TLS, HTTPS, and basic authentication.
 -   [Add More Charts](docs/Add-more-charts-to-netdata.md): Enable new internal or external plugins and understand when
