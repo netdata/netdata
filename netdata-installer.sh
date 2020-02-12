@@ -455,7 +455,7 @@ bundle_libmosquitto() {
 
   MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
 
-  tmp=$(mktemp -d netdata-mosquitto-XXXXXX)
+  tmp=$(mktemp -t -d netdata-mosquitto-XXXXXX)
   MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
 
   if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}" ]; then
@@ -966,7 +966,7 @@ install_go() {
       break
     fi
   done
-  tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
+  tmp=$(mktemp -t -d netdata-go-XXXXXX)
   GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
   if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" ]; then
