@@ -42,22 +42,9 @@ dist_chartsconfig_DATA = \
     $(NULL)
 
 include ap/Makefile.inc
-include apache/Makefile.inc
 include apcupsd/Makefile.inc
-include cpu_apps/Makefile.inc
-include cpufreq/Makefile.inc
 include example/Makefile.inc
-include exim/Makefile.inc
-include hddtemp/Makefile.inc
 include libreswan/Makefile.inc
-include load_average/Makefile.inc
-include mem_apps/Makefile.inc
-include mysql/Makefile.inc
-include nginx/Makefile.inc
 include nut/Makefile.inc
 include opensips/Makefile.inc
-include phpfpm/Makefile.inc
-include postfix/Makefile.inc
 include sensors/Makefile.inc
-include squid/Makefile.inc
-include tomcat/Makefile.inc
