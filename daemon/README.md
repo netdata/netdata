@@ -4,9 +4,9 @@
 
 -   You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
--   You can stop Netdata by killing it with `killall netdata`. You can stop and start Netdata at any point. Netdata
-    saves on exit its round robbin database to `/var/cache/netdata` so that it will continue from where it stopped the
-    last time.
+-   You can stop Netdata by killing it with `killall netdata`. You can stop and start Netdata at any point. When
+    exiting, the [database engine](../database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
+    it can continue when started again.
 
 Access to the web site, for all graphs, is by default on port `19999`, so go to:
 

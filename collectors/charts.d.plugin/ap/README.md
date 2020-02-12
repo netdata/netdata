@@ -76,8 +76,15 @@ Station 40:b8:37:5a:ed:5e (on wlan0)
 
 ## Configuration
 
-You can only set `ap_update_every=NUMBER` to `/etc/netdata/charts.d/ap.conf`, to give the data collection frequency.
-To edit this file on your system run `/etc/netdata/edit-config charts.d/ap.conf`.
+Edit the `charts.d/ap.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d/ap.conf
+```
+
+You can only set `ap_update_every=NUMBER` to change the data collection frequency.
 
 ## Auto-detection
 

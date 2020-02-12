@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- github/workflow: change labeler [\#8032](https://github.com/netdata/netdata/pull/8032) ([ilyam8](https://github.com/ilyam8))
+- Docs: Promote DB engine/long-term metrics storage more heavily [\#8031](https://github.com/netdata/netdata/pull/8031) ([joelhans](https://github.com/joelhans))
+- Check if ACLK can be built [\#8030](https://github.com/netdata/netdata/pull/8030) ([underhood](https://github.com/underhood))
+- Fixes conditional for NetData Updater when checking for new updates [\#8028](https://github.com/netdata/netdata/pull/8028) ([gmeszaros](https://github.com/gmeszaros))
+- Add support for libmosquitto to netdata-installer.sh for ACLK support. [\#8025](https://github.com/netdata/netdata/pull/8025) ([Ferroin](https://github.com/Ferroin))
 - Fix: Documentation states in one place default is dbengine and in another save is default [\#8017](https://github.com/netdata/netdata/pull/8017) ([underhood](https://github.com/underhood))
 - invalid literal for float\(\): NN.NNt [\#8013](https://github.com/netdata/netdata/pull/8013) ([blaines](https://github.com/blaines))
 - Fix missing variables on stream [\#8011](https://github.com/netdata/netdata/pull/8011) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -92,6 +97,7 @@
 - Drop dirty dbengine pages if disk cannot keep up [\#7777](https://github.com/netdata/netdata/pull/7777) ([mfundul](https://github.com/mfundul))
 - Add a missing parameter to the allmetrics endpoint in Swagger Editor [\#7776](https://github.com/netdata/netdata/pull/7776) ([vlvkobal](https://github.com/vlvkobal))
 - Issue 7488 docker labels [\#7770](https://github.com/netdata/netdata/pull/7770) ([amoss](https://github.com/amoss))
+- Fix notification report [\#7769](https://github.com/netdata/netdata/pull/7769) ([thiagoftsm](https://github.com/thiagoftsm))
 - Limit PR labeler runs to the main repo. [\#7768](https://github.com/netdata/netdata/pull/7768) ([Ferroin](https://github.com/Ferroin))
 - Add an environment variable check to Travis configuration to allow disabling nightlies. [\#7765](https://github.com/netdata/netdata/pull/7765) ([Ferroin](https://github.com/Ferroin))
 - add swagger docu for `fixed\_width\_lbl` and `fixed\_width\_val` [\#7764](https://github.com/netdata/netdata/pull/7764) ([underhood](https://github.com/underhood))
@@ -128,30 +134,23 @@
 - Fix spelling of Prometheus \(\#7673\) [\#7674](https://github.com/netdata/netdata/pull/7674) ([candrews](https://github.com/candrews))
 - installer: include go.d.plugin version v0.14.0 [\#7666](https://github.com/netdata/netdata/pull/7666) ([ilyam8](https://github.com/ilyam8))
 - Fixes for pfSense Installation [\#7665](https://github.com/netdata/netdata/pull/7665) ([prologic](https://github.com/prologic))
-- \[Fix\] remove pthread\_setname\_np segfault on musl [\#7664](https://github.com/netdata/netdata/pull/7664) ([Saruspete](https://github.com/Saruspete))
 - error exit when rrdhost localhost init fails \#7504 [\#7663](https://github.com/netdata/netdata/pull/7663) ([underhood](https://github.com/underhood))
 - Fix buildyaml.sh script so that docs generation works correctly. [\#7662](https://github.com/netdata/netdata/pull/7662) ([Ferroin](https://github.com/Ferroin))
 - samba: properly check if it is allowed to run smbstatus with sudo [\#7655](https://github.com/netdata/netdata/pull/7655) ([ilyam8](https://github.com/ilyam8))
-- Bump handlebars from 4.2.0 to 4.5.3 [\#7654](https://github.com/netdata/netdata/pull/7654) ([dependabot[bot]](https://github.com/apps/dependabot))
-- \[libnetdata/threads\] Change log level on error [\#7653](https://github.com/netdata/netdata/pull/7653) ([Saruspete](https://github.com/Saruspete))
 - Redirect when url =~ \/host\/hostname$ \(\#7539\) [\#7643](https://github.com/netdata/netdata/pull/7643) ([underhood](https://github.com/underhood))
 - Update the distribution support matrix to represent reality. [\#7636](https://github.com/netdata/netdata/pull/7636) ([Ferroin](https://github.com/Ferroin))
 - Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
 - Switch PR labeling to use GitHub Actions. [\#7630](https://github.com/netdata/netdata/pull/7630) ([Ferroin](https://github.com/Ferroin))
-- Add Ubuntu 19.10 to packaging and lifecycle checks. [\#7629](https://github.com/netdata/netdata/pull/7629) ([Ferroin](https://github.com/Ferroin))
 - Remove EOL distros from CI jobs. [\#7628](https://github.com/netdata/netdata/pull/7628) ([Ferroin](https://github.com/Ferroin))
 - Clean up host labels in API responses [\#7616](https://github.com/netdata/netdata/pull/7616) ([vlvkobal](https://github.com/vlvkobal))
-- Adjust alarm labels [\#7600](https://github.com/netdata/netdata/pull/7600) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Improve documentation of opting out of anonymous statistics [\#7597](https://github.com/netdata/netdata/pull/7597) ([joelhans](https://github.com/joelhans))
 - Update handling of shutdown of the Netdata agent on update and uninstall. [\#7595](https://github.com/netdata/netdata/pull/7595) ([Ferroin](https://github.com/Ferroin))
 - Restrict quotes in label values [\#7594](https://github.com/netdata/netdata/pull/7594) ([thiagoftsm](https://github.com/thiagoftsm))
 - Reduce broken pipe errors [\#7588](https://github.com/netdata/netdata/pull/7588) ([thiagoftsm](https://github.com/thiagoftsm))
 - Move the script for installing required packages into the main repo. [\#7563](https://github.com/netdata/netdata/pull/7563) ([Ferroin](https://github.com/Ferroin))
 - Send host labels via exporting connectors  [\#7554](https://github.com/netdata/netdata/pull/7554) ([vlvkobal](https://github.com/vlvkobal))
-- \[github/templates\] Add samples cmds to get OS env [\#7550](https://github.com/netdata/netdata/pull/7550) ([Saruspete](https://github.com/Saruspete))
 - Stream with labels [\#7549](https://github.com/netdata/netdata/pull/7549) ([thiagoftsm](https://github.com/thiagoftsm))
 - Alarm Log labels [\#7548](https://github.com/netdata/netdata/pull/7548) ([thiagoftsm](https://github.com/thiagoftsm))
-- Limit 'support activities on main branch' to main repo. [\#7543](https://github.com/netdata/netdata/pull/7543) ([Ferroin](https://github.com/Ferroin))
 - Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
 - Docs: Tweaks and linter fixes to contributing guidelines [\#7407](https://github.com/netdata/netdata/pull/7407) ([joelhans](https://github.com/joelhans))
 - network interface speed, duplex, operstate \#5989 [\#7395](https://github.com/netdata/netdata/pull/7395) ([stelfrag](https://github.com/stelfrag))
@@ -160,12 +159,6 @@
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.18.1...v1.19.0)
-
-**Merged pull requests:**
-
-- installer: include go.d.plugin version v0.11.0 [\#7365](https://github.com/netdata/netdata/pull/7365) ([ilyam8](https://github.com/ilyam8))
-- Minor grammar change in /web/gui documentation [\#7363](https://github.com/netdata/netdata/pull/7363) ([eviemsrs](https://github.com/eviemsrs))
-- Correct versions of FreeNAS that Netdata is available on [\#7355](https://github.com/netdata/netdata/pull/7355) ([knatsakis](https://github.com/knatsakis))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 

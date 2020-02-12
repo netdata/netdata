@@ -57,9 +57,17 @@ Following charts are drawn:
 
     -   locks
 
-## configuration
+## Configuration
 
-For all available options please see module [configuration file](postgres.conf).
+Edit the `python.d/postgres.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/postgres.conf
+```
+
+When no configuration file is found, the module tries to connect to TCP/IP socket: `localhost:5432`.
 
 ```yaml
 socket:
@@ -75,7 +83,7 @@ tcp:
   port         : 5432
 ```
 
-When no configuration file is found, module tries to connect to TCP/IP socket: `localhost:5432`.
+For all available options please see module [configuration file](postgres.conf).
 
 ---
 
