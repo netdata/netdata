@@ -7,7 +7,7 @@
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
 struct aclk_lws_wss_perconnect_data {
-    int todo;
+	int todo;
 };
 
 //TODO config??
@@ -24,7 +24,7 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void* data
 	struct lws_wss_packet_buffer *new = callocz(1, sizeof(struct lws_wss_packet_buffer));
 	if(data) {
 		new->data = mallocz(LWS_PRE+size);
-    	memcpy(new->data+LWS_PRE, data, size);
+		memcpy(new->data+LWS_PRE, data, size);
 		new->data_size = size;
 	}
 	return new;
@@ -125,9 +125,9 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 	inst->port = target_port;
 
 	memset(&info, 0, sizeof(struct lws_context_creation_info));
-    info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+	info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 	info.port = CONTEXT_PORT_NO_LISTEN;
-    info.protocols = protocols;
+	info.protocols = protocols;
 	info.user = inst;
 	
 	inst->lws_context = lws_create_context(&info);
@@ -262,8 +262,8 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 #ifdef AUTO_RECONNECT_ON_LWS_LAYER
 		if(!inst->reconnect_timeout_running) {
 			lws_timed_callback_vh_protocol(lws_get_vhost(wsi),
-						   lws_get_protocol(wsi),
-					       LWS_CALLBACK_USER, ACLK_LWS_WSS_RECONNECT_TIMEOUT);
+						lws_get_protocol(wsi),
+						LWS_CALLBACK_USER, ACLK_LWS_WSS_RECONNECT_TIMEOUT);
 			inst->reconnect_timeout_running = 1;
 		}
 		/* FALLTHRU */
