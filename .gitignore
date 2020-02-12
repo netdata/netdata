@@ -192,3 +192,6 @@ docs/generator/mkdocs.yml
 
 #CLion files
 netdata.cbp
+
+#custom mosquitto build
+mosquitto

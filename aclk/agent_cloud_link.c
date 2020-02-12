@@ -94,6 +94,10 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 
 // Set when we have connection up and running from the connection callback
 int aclk_connection_initialized = 0;
+// TODO modify previous comment if this stays this way
+// con_initialized means library is initialized and ready to be used
+// acklk_connected means there is actually an established connection
+int aclk_mqtt_connected = 0;
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -625,10 +629,10 @@ void *aclk_main(void *ptr)
             continue;
         }
 
-        if (unlikely(!aclk_subscribed)) {
+        if (unlikely(!aclk_subscribed) && aclk_mqtt_connected) {
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
         }
-        if (unlikely(!query_thread.thread)) {
+        if (unlikely(!query_thread.thread && aclk_mqtt_connected)) {
             query_thread.thread = mallocz(sizeof(netdata_thread_t));
             netdata_thread_create(
                 query_thread.thread, "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, &query_thread);
@@ -763,7 +767,7 @@ int aclk_init(ACLK_INIT_ACTION action)
     aclk_recv_maximum = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link receive maximum", 20);
 
     aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", "localhost");
-    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", 1883);
+    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", 9002);
 
     info("Maximum parallel outgoing messages %d", aclk_send_maximum);
     info("Maximum parallel incoming messages %d", aclk_recv_maximum);
