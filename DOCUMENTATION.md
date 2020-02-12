@@ -61,8 +61,8 @@ feel free to see what's behind any of these other doors.
     long-term metrics storage database by allowing Netdata to use more of your system's RAM and disk.
 -   [Netdata Behind Nginx](docs/Running-behind-nginx.md): Use an Nginx web server instead of Netdata's built-in server
     to enable TLS, HTTPS, and basic authentication.
--   [Add More Charts](docs/Add-more-charts-to-netdata.md): Enable new internal or external plugins and understand when
-    auto-detection works.
+-   [Collect more metrics](collectors/README.md) from other services and applications: Enable new internal
+    or external plugins and understand when auto-detection works.
 -   [Performance](docs/Performance.md): Tips on running Netdata on devices with limited CPU and RAM resources, such as
     embedded devices, IoT, and edge devices.
 -   [Streaming](streaming/): Information for those who want to centralize Netdata metrics from any number of distributed

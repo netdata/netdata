@@ -1804,8 +1804,8 @@ function renderPage(menus, data) {
 
     const isMemoryModeDbEngine = data.memory_mode === "dbengine";
 
-    sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/docs/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
-    sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
+    sidebar += '<li class="" style="padding-top:15px;"><a href="https://docs.netdata.cloud/collectors/quickstart/" target="_blank"><i class="fas fa-plus"></i> Add more charts</a></li>';
+    sidebar += '<li class=""><a href="https://docs.netdata.cloud/health/quickstart/" target="_blank"><i class="fas fa-plus"></i> Add more alarms</a></li>';
     sidebar += '<li class="" style="margin:20px;color:#666;"><small>Every ' +
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
       'Netdata collects <strong>' + data.dimensions_count.toLocaleString() + '</strong> metrics on ' +
