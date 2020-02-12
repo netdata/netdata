@@ -1,4 +1,4 @@
-# puppet
+# Puppet monitoring with Netdata
 
 Monitor status of Puppet Server and Puppet DB.
 

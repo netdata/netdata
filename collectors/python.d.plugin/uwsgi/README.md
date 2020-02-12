@@ -1,6 +1,6 @@
-# uwsgi
+# uWSGI monitoring with Netdata
 
-Module monitor uwsgi performance metrics.
+Monitors the performance metrics of uWSGI.
 
 <https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html>
 

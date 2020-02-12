@@ -1,4 +1,4 @@
-# retroshare
+# RetroShare monitoring with Netdata
 
 [RetroShare](https://retroshare.cc/) is a free and open-source peer-to-peer communication and file sharing app based on a friend-to-friend network.
 

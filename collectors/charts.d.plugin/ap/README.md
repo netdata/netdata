@@ -1,4 +1,4 @@
-# Access Point Plugin (ap)
+# Access Point (ap) monitoring with Netdata
 
 The `ap` collector visualizes data related to access points.
 

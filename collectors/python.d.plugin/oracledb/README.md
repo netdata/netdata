@@ -1,8 +1,8 @@
-# oracledb
+# Oracle database monitoring with Netdata
 
-Module monitor oracledb performance and health metrics.
+Monitors the performance and health metrics of the Oracle database.
 
-**Requirements:**
+## Requirements
 
 -   `cx_Oracle` package.
 -   Oracle Client (using `cx_Oracle` requires Oracle Client libraries to be installed).

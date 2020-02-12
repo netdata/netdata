@@ -1,4 +1,4 @@
-# postfix
+# Postfix monitoring with Netdata
 
 Simple module executing `postfix -p` to grab postfix queue.
 

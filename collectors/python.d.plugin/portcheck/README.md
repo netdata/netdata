@@ -1,6 +1,6 @@
-# portcheck
+# PortCheck monitoring with Netdata
 
-Module monitors a remote TCP service.
+Monitors a remote TCP service.
 
 Following charts are drawn per host:
 

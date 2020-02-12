@@ -1,6 +1,6 @@
-# nvidia_smi
+# NVIDIA SMI monitoring with Netdata
 
-This module monitors the `nvidia-smi` cli tool.
+Monitors the `nvidia-smi` cli tool.
 
 **Requirements and Notes:**
 

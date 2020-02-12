@@ -1,4 +1,4 @@
-# redis
+# Redis monitoring with Netdata
 
 Get INFO data from redis instance.
 

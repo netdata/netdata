@@ -1,7 +1,6 @@
-# nginx_plus
+# NGINX Plus monitoring with Netdata
 
-This module will monitor one or more nginx_plus servers depending on configuration.
-Servers can be either local or remote.
+Monitors one or more NGINX Plus servers depending on configuration. Servers can be either local or remote.
 
 Example nginx_plus configuration can be found in 'python.d/nginx_plus.conf'
 

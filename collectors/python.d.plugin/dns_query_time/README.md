@@ -1,6 +1,6 @@
-# dns_query_time
+# DNS query time monitoring with Netdata
 
-This module provides DNS query time statistics.
+Provides DNS query time statistics.
 
 **Requirement:**
 

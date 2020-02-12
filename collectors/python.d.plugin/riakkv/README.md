@@ -1,8 +1,8 @@
-# riakkv
+# Riak KV monitoring with Netdata
 
 Monitors one or more Riak KV servers.
 
-**Requirements:**
+## Requirements
 
 -   An accessible `/stats` endpoint. See [the Riak KV configuration reference documentation](https://docs.riak.com/riak/kv/2.2.3/configuring/reference/#client-interfaces)
     for how to enable this.

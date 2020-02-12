@@ -1,6 +1,6 @@
-# nut
+# NUT monitoring with Netdata
 
-The plugin will collect UPS data for all UPSes configured in the system.
+Collects UPS data for all UPSes configured in the system.
 
 The following charts will be created:
 

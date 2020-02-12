@@ -1,6 +1,6 @@
-# ipfs
+# IPFS monitoring with Netdata
 
-Module monitors [IPFS](https://ipfs.io) basic information.
+Monitors [IPFS](https://ipfs.io) basic information.
 
 1.  **Bandwidth** in kbits/s
 

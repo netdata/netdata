@@ -1,8 +1,8 @@
-# ntpd
+# NTP daemon monitoring with Netdata
 
-Module monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`, the [standard NTP query program](http://doc.ntp.org/current-stable/ntpq.html).
+Monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`, the [standard NTP query program](http://doc.ntp.org/current-stable/ntpq.html).
 
-**Requirements:**
+## Requirements
 
 -   Version: `NTPv4`
 -   Local interrogation allowed in `/etc/ntp.conf` (default):

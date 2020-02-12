@@ -1,10 +1,10 @@
-# sensors
+# Sensors monitoring with Netdata
 
 System sensors information.
 
 Charts are created dynamically.
 
-## configuration
+## Configuration
 
 Edit the `python.d/sensors.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.

@@ -1,6 +1,6 @@
-# phpfpm
+# PHP-FPM monitoring with Netdata
 
-This module will monitor one or more [`PHP-FPM`](https://php-fpm.org/) instances, depending on your configuration.
+Monitors one or more PHP-FPM instances depending on configuration.
 
 ## Requirements
 

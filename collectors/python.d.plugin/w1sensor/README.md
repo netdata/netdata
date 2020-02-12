@@ -1,4 +1,4 @@
-# w1sensor
+# w1sensor monitoring with Netdata
 
 Data from 1-Wire sensors.
 On Linux these are supported by the wire, w1_gpio, and w1_therm modules.

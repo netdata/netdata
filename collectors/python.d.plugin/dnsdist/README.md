@@ -1,8 +1,6 @@
-# dnsdist
+# dnsdist monitoring with Netdata
 
-This module monitors dnsdist performance and health metrics.
-
-The module draws the following charts:
+Monitors dnsdist performance and health metrics and draws the following charts:
 
 1.  **Response latency**
 

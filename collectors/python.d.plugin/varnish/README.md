@@ -1,6 +1,6 @@
-# varnish
+# Varnish monitoring with Netdata
 
-This module will monitor [`Varnish Cache`](https://varnish-cache.org/) performance metrics.
+Uses the `varnishstat` command to provide varnish cache statistics.
 
 It uses the `varnishstat` command to provide Varnish Cache statistics.
 

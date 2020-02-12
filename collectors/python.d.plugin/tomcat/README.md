@@ -1,6 +1,6 @@
-# tomcat
+# Tomcat monitoring with Netdata
 
-Present tomcat containers memory utilization.
+Presents memory utilization of tomcat containers.
 
 Charts:
 

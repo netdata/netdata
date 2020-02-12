@@ -1,4 +1,4 @@
-# web_log
+# Web log monitoring with Netdata
 
 ## Motivation
 
@@ -59,7 +59,7 @@ You can add one such section for each of your web server log files.
 
 Once you have all log files configured and [**netdata**](https://my-netdata.io/) restarted, **for each log file** you will get a section at the [**netdata**](https://my-netdata.io/) dashboard, with the following charts.
 
-### responses by status
+### Responses by status
 
 In this chart we tried to provide a meaningful status for all responses. So:
 
@@ -106,7 +106,7 @@ Here we show all the response codes in detail.
 
 Number of responses for each response code family individually (requests/s)
 
-### bandwidth
+### Bandwidth
 
 This is a nice view of the traffic the web server is receiving and is sending.
 
@@ -123,7 +123,7 @@ As the legend on the chart suggests, you can use FireQoS to setup QoS on the web
 
 > **Important**<br/>Most web servers do not log the request size by default.<br/>So, [unless you have configured your web server to log the size of requests](https://github.com/netdata/netdata/blob/419cd0a237275e5eeef3f92dcded84e735ee6c58/conf.d/python.d/web_log.conf#L76-L89), the `received` dimension will be always zero.
 
-### timings
+### Timings
 
 [**netdata**](https://my-netdata.io/) will also render the `minimum`, `average` and `maximum` time the web server needed to respond to requests.
 

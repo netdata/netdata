@@ -1,6 +1,6 @@
-# rabbitmq
+# RabbitMQ monitoring with Netdata
 
-This module monitors [RabbitMQ](https://www.rabbitmq.com/) performance and health metrics.
+Monitors the performance and health metrics of [RabbitMQ](https://www.rabbitmq.com/).
 
 Following charts are drawn:
 

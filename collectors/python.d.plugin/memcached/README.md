@@ -1,4 +1,4 @@
-# memcached
+# Memcached monitoring with Netdata
 
 Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
 
