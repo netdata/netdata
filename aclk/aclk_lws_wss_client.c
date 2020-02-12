@@ -61,7 +61,8 @@ static inline void lws_wss_packet_buffer_free(struct lws_wss_packet_buffer *item
 static inline void _aclk_lws_wss_read_buffer_clear(struct lws_ring *ringbuffer)
 {
 	size_t elems = lws_ring_get_count_waiting_elements(ringbuffer, NULL);
-	lws_ring_consume(ringbuffer, NULL, NULL, elems);
+	if(elems > 0)
+		lws_ring_consume(ringbuffer, NULL, NULL, elems);
 }
 
 static inline void _aclk_lws_wss_write_buffer_clear(struct lws_wss_packet_buffer **list)
@@ -131,6 +132,9 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 	info.user = inst;
 	
 	inst->lws_context = lws_create_context(&info);
+	if(!inst->lws_context)
+		goto failure_cleanup_2;
+
 	inst->callbacks = *callbacks;
 
 	aclk_lws_mutex_init(&inst->write_buf_mutex);
@@ -144,7 +148,8 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk
 
 failure_cleanup:
 	lws_context_destroy(inst->lws_context);
-	free(inst);
+failure_cleanup_2:
+	freez(inst);
 	return NULL;
 }
 
