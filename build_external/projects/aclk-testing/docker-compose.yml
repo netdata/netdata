@@ -1,6 +1,11 @@
 version: '3.3'
 services:
   agent_master:
+    build:
+      context: ../../..
+      dockerfile: build_external/make_install_centos_8.Dockerfile
+      args:
+        ACLK: "yes"
     image: centos_8_dev
     command: /usr/sbin/netdata -D
     ports:
