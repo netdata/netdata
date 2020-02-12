@@ -232,6 +232,7 @@ struct aclk_query *aclk_query_find_position(time_t time_to_run)
 struct aclk_query *aclk_query_find(char *topic, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query)
 {
     struct aclk_query *tmp_query, *prev_query;
+    (void) cmd;
 
     tmp_query = aclk_queue.aclk_query_head;
     prev_query = NULL;
@@ -1220,7 +1221,7 @@ void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         dest,
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
-        "\t\"timestamp\": \"%u\",\n"
+        "\t\"timestamp\": \"%ld\",\n"
         "\t\"version\": %d,\n"
         "\t\"payload\": ",
         type, msg_id, now_realtime_sec(), ACLK_VERSION);
