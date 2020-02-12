@@ -15,6 +15,7 @@
 #define ACLK_SLEEP_LOOP 1   // query processing thread will sleep, thread wakeup disabled for now
 
 #define ACLK_MSG_TYPE_CHART "chart"
+#define ACLK_CHART_TOPIC "chart"
 #define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
 #define ACLK_COMMAND_TOPIC "cmd"
@@ -123,5 +124,8 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_alarm_reload();
 void aclk_send_alarm_metadata();
+int aclk_execute_query(struct aclk_query *query);
+extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
+
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
