@@ -10,9 +10,6 @@ struct aclk_lws_wss_perconnect_data {
 	int todo;
 };
 
-//TODO config??
-int aclk_lws_wss_use_ssl = 1;
-
 struct lws_wss_packet_buffer {
 	unsigned char* data;
 	size_t data_size;
@@ -176,9 +173,6 @@ void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
 	i.path = "/mqtt";
 	i.host = inst->host;
 	i.protocol = "mqtt";
-	if(aclk_lws_wss_use_ssl)
-//TODO!!!!!! REMOVE ME 
-#define ACLK_SSL_ALLOW_SELF_SIGNED 1
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
 	i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 #else
