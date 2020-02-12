@@ -193,8 +193,5 @@ docs/generator/mkdocs.yml
 #CLion files
 netdata.cbp
 
-#external dependencies downloaded by installer
-externaldeps
-#currently installer will create folders like netdata-mosquitto-XXXXXX to build mosquitto fork
-#this might get moved in another place in future
-netdata-mosquitto-*
+# External dependencies
+externaldeps/

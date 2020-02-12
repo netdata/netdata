@@ -26,7 +26,15 @@ It produces following charts:
     -   requests
     -   errors
 
-## configuration
+## Configuration
+
+Edit the `python.d/squid.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/squid.conf
+```
 
 ```yaml
 priority     : 50000

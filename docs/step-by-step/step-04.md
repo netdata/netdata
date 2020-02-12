@@ -57,7 +57,7 @@ Let's give it a shot. Navigate to your Netdata config directory. To use `edit-co
 have permissions to edit the file. On Linux/MacOS systems, you can usually use `sudo` to elevate your permissions.
 
 ```bash
-cd /etc/netdata # Replace this path with your Netdata config directory as found in the steps above
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different as found in the steps above
 sudo ./edit-config netdata.conf
 ```
 

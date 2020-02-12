@@ -37,7 +37,7 @@ Add to `sudoers`:
 netdata ALL=(root)       NOPASSWD: /path/to/megacli
 ```
 
-### configuration
+### Configuration
 
 **megacli** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
@@ -45,7 +45,15 @@ netdata ALL=(root)       NOPASSWD: /path/to/megacli
 megacli: yes
 ```
 
-Battery stats disabled by default. To enable them modify `megacli.conf`.
+Edit the `python.d/megacli.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/megacli.conf
+```
+
+Battery stats disabled by default. To enable them, modify `megacli.conf`.
 
 ```yaml
 do_battery: yes
