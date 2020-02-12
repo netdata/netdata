@@ -93,9 +93,28 @@ static const struct lws_protocols protocols[] = {
 	{ NULL, NULL, 0, 0, 0, 0, 0 }
 };
 
+static void aclk_lws_wss_log_divert(int level, const char *line) {
+	switch(level){
+		case LLL_ERR:
+			error("Libwebsockets Error: %s", line);
+			break;
+		case LLL_WARN:
+			debug(D_ACLK, "Libwebsockets Warn: %s", line);
+			break;
+		default:
+			error("Libwebsockets try to log with unknown log level (%d), msg: %s", level, line);
+	}
+}
+
 struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port) {
+	static int lws_logging_initialized = 0;
 	struct lws_context_creation_info info;
 	struct aclk_lws_wss_engine_instance *inst;
+
+	if(unlikely(!lws_logging_initialized)) {
+		lws_set_log_level(LLL_ERR | LLL_WARN, aclk_lws_wss_log_divert);
+		lws_logging_initialized = 1;
+	}
 
 	if(!callbacks || !target_hostname)
 		return NULL;
