@@ -1,4 +1,4 @@
-# apcupsd
+# APCUPSD monitoring with Netdata
 
 ## Configuration
 

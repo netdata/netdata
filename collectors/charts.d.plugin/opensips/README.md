@@ -1,4 +1,4 @@
-# OpenSIPS
+# OpenSIPS monitoring with Netdata
 
 ## Configuration
 
