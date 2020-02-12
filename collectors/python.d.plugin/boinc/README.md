@@ -9,6 +9,14 @@ as well as ones tracking each of the possible states for tasks.
 
 ## configuration
 
+Edit the `python.d/boinc.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/boinc.conf
+```
+
 BOINC requires use of a password to access it's RPC interface.  You can
 find this password in the `gui_rpc_auth.cfg` file in your BOINC directory.
 

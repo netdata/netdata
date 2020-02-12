@@ -94,7 +94,13 @@ Please refer [Spring Boot Actuator: Production-ready Features](https://docs.spri
 
 ## Usage
 
-The springboot module is enabled by default. It looks up `http://localhost:8080/metrics` and `http://127.0.0.1:8080/metrics` to detect Spring Boot application by default. You can change it by editing `/etc/netdata/python.d/springboot.conf` (to edit it on your system run `/etc/netdata/edit-config python.d/springboot.conf`).
+Edit the `python.d/springboot.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/springboot.conf
+```
 
 This module defines some common charts, and you can add custom charts by change the configurations.
 

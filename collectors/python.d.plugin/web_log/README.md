@@ -27,6 +27,14 @@ If Netdata is installed on a system running a web server, it will detect it and 
 
 ## Configuration
 
+Edit the `python.d/web_log.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/web_log.conf
+```
+
 [**netdata**](https://my-netdata.io/) has a powerful `web_log` plugin, capable of incrementally parsing any number of web server log files. This plugin is automatically started with [**netdata**](https://my-netdata.io/) and comes, pre-configured, for finding web server log files on popular distributions. Its configuration is at [`/etc/netdata/python.d/web_log.conf`](web_log.conf), like this:
 
 ```yaml
@@ -42,8 +50,8 @@ apache_log:
       observium : 'observium'
 ```
 
-Theodule has preconfigured jobs for nginx, apache and gunicorn on various distros.
-You can add one such section, for each of your web server log files.
+The module has preconfigured jobs for nginx, apache and gunicorn on various distros.
+You can add one such section for each of your web server log files.
 
 > **Important**<br/>Keep in mind [**netdata**](https://my-netdata.io/) runs as user `netdata`. So, make sure user `netdata` has access to the logs directory and can read the log file.
 

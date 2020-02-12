@@ -22,7 +22,7 @@ It provides the following charts:
 
 ## configuration
 
-This module needs no configuration.  Just make sure the `netdata` user
+This module needs no configuration. Just make sure the `netdata` user
 can run the `loginctl` command and get a session list without having to
 specify a path.
 
@@ -33,6 +33,14 @@ specify it using the `command` key like so:
 
 ```yaml
 command: '/path/to/other/command'
+```
+
+Edit the `python.d/logind.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/logind.conf
 ```
 
 ## notes
