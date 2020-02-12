@@ -3,10 +3,10 @@ services:
   agent_master:
     build:
       context: ../../..
-      dockerfile: build_external/make_install_centos_8.Dockerfile
+      dockerfile: build_external/make_install_fedora_30.Dockerfile
       args:
         ACLK: "yes"
-    image: centos_8_dev
+    image: fedora_30_dev
     command: /usr/sbin/netdata -D
     ports:
     - 20000:19999
