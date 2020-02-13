@@ -241,20 +241,12 @@ navpart 4 collectors/python.d.plugin "" "Modules" 3 excludefirstlevel useLastDir
 echo -ne "        - Node.js:
             - 'collectors/node.d.plugin/README.md'
 "
-navpart 4 collectors/node.d.plugin "" "Modules" 3 excludefirstlevel
+navpart 4 collectors/node.d.plugin "" "Modules" 3 excludefirstlevel useLastDirAsPageName
 
 echo -ne "        - BASH:
             - 'collectors/charts.d.plugin/README.md'
-            - Modules:
-                - 'collectors/charts.d.plugin/ap/README.md'
-                - 'collectors/charts.d.plugin/apcupsd/README.md'
-                - 'collectors/charts.d.plugin/example/README.md'
-                - 'collectors/charts.d.plugin/libreswan/README.md'
-                - 'collectors/charts.d.plugin/nut/README.md'
-                - 'collectors/charts.d.plugin/opensips/README.md'
-            - Obsolete Modules:
-                - 'collectors/charts.d.plugin/sensors/README.md'
 "
+navpart 4 collectors/charts.d.plugin "" "Modules" 3 excludefirstlevel useLastDirAsPageName
 
 navpart 3 collectors/apps.plugin
 navpart 3 collectors/cups.plugin
