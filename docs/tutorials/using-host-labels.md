@@ -34,7 +34,7 @@ violate any of the [host label naming rules](../configuration-guide.md#netdata-l
 [host labels]
     type = webserver
     location = us-seattle
-    provider = aws
+    installed = 20200218
 ```
 
 Once you've written a few host labels, you need to enable them. Instead of restarting the entire Netdata service, you
@@ -50,20 +50,20 @@ read the status of your agent. For example, from a VPS system running Debian 10:
 ```json
 {
   ...
-	"host_labels": {
-	  "_is_master": "false",
-		"_virt_detection": "systemd-detect-virt",
-		"_container_detection": "none",
-		"_container": "unknown",
-		"_virtualization": "kvm",
-		"_architecture": "x86_64",
-		"_kernel_version": "4.19.0-6-amd64",
-		"_os_version": "10 (buster)",
-		"_os_name": "Debian GNU/Linux",
-		"type": "webserver",
+  "host_labels": {
+    "_is_master": "false",
+    "_virt_detection": "systemd-detect-virt",
+    "_container_detection": "none",
+    "_container": "unknown",
+    "_virtualization": "kvm",
+    "_architecture": "x86_64",
+    "_kernel_version": "4.19.0-6-amd64",
+    "_os_version": "10 (buster)",
+    "_os_name": "Debian GNU/Linux",
+    "type": "webserver",
     "location": "seattle",
-    "provider": "aws"
-	},
+    "installed": "20200218"
+  },
   ...
 }
 ```
@@ -73,7 +73,7 @@ You may have noticed a handful of labels that begin with an underscore (`_`). Th
 ### Automatic labels
 
 When Netdata starts, it captures relevant information about the system and converts them into automatically-generated
-host labels. You can these use these to logically organize your systems via health entities, exporting metrics,
+host labels. You can use these to logically organize your systems via health entities, exporting metrics,
 streaming/master status, and more.
 
 They capture the following:
@@ -113,7 +113,7 @@ For example, let's use configuration example from earlier:
 [host labels]
     type = webserver
     location = us-seattle
-    provider = aws
+    installed = 20200218
 ```
 
 You could now create a new health entity (checking if disk space will run out soon) that applies only to any host
