@@ -1,6 +1,6 @@
-# haproxy
+# HAProxy monitoring with Netdata
 
-Module monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.
+Monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.
 And health metrics such as backend servers status (server check should be used).
 
 Plugin can obtain data from url **OR** unix socket.

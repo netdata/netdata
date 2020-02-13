@@ -1,8 +1,8 @@
-# samba
+# Samba monitoring with Netdata
 
-Performance metrics of Samba file sharing.
+Monitors the performance metrics of Samba file sharing.
 
-**Requirements:**
+## Requirements
 
 -   `smbstatus` program
 -   `sudo` program

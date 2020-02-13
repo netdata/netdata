@@ -1,4 +1,6 @@
-# apcupsd
+# APC UPS monitoring with Netdata
+
+Monitors different APC UPS models and retrieves status information using `apcaccess` tool.
 
 ## Configuration
 

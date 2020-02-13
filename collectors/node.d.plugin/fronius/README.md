@@ -1,6 +1,6 @@
-# fronius
+# Fronius Symo monitoring with Netdata
 
-This module collects metrics from the configured solar power installation from Fronius Symo.
+Collects metrics from the configured solar power installation from Fronius Symo.
 
 **Requirements**
 

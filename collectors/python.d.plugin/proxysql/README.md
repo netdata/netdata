@@ -1,6 +1,6 @@
-# proxysql
+# ProxySQL monitoring with Netdata
 
-This module monitors proxysql backend and frontend performance metrics.
+Monitors database backend and frontend performance metrics.
 
 It produces:
 

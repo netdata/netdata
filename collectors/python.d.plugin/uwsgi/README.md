@@ -1,10 +1,7 @@
-# uwsgi
+# uWSGI monitoring with Netdata
 
-Module monitor uwsgi performance metrics.
+Monitors performance metrics exposed by [`Stats Server`](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html).
 
-<https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html>
-
-lines are creates dynamically based on how many workers are there
 
 Following charts are drawn:
 

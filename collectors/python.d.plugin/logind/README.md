@@ -1,6 +1,6 @@
-# logind
+# Systemd-Logind monitoring with Netdata
 
-This module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+Monitors active sessions, users, and seats tracked by `systemd-logind` or `elogind`.
 
 It provides the following charts:
 
@@ -20,7 +20,7 @@ It provides the following charts:
 
     -   Seats
 
-## configuration
+## Configuration
 
 This module needs no configuration. Just make sure the `netdata` user
 can run the `loginctl` command and get a session list without having to
@@ -43,7 +43,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/logind.conf
 ```
 
-## notes
+## Notes
 
 -   This module's ability to track logins is dependent on what PAM services
     are configured to register sessions with logind.  In particular, for

@@ -1,8 +1,8 @@
-# smartd_log
+# Storage devices monitoring with Netdata
 
-Module monitor `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
+Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
 
-**Requirements:**
+## Requirements
 
 -   `smartmontools`
 

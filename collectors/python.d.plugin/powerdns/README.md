@@ -1,6 +1,6 @@
-# powerdns
+# PowerDNS monitoring with Netdata
 
-Module monitor powerdns performance and health metrics.
+Monitors authoritative server and recursor statistics.
 
 Powerdns charts:
 

@@ -1,8 +1,6 @@
-# Gearman
+# Gearman monitoring with Netdata
 
-Module monitors Gearman worker statistics. A chart
-is shown for each job as well as one showing a summary
-of all workers.
+Monitors Gearman worker statistics. A chart is shown for each job as well as one showing a summary of all workers.
 
 Note: Charts may show as a line graph rather than an area 
 graph if you load Netdata with no jobs running. To change 

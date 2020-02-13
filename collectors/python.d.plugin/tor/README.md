@@ -1,8 +1,8 @@
-# tor
+# Tor monitoring with Netdata
 
-Module connects to tor control port to collect traffic statistics.
+Connects to the Tor control port to collect traffic statistics.
 
-**Requirements:**
+## Requirements
 
 -   `tor` program
 -   `stem` python package

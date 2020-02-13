@@ -1,6 +1,6 @@
-# redis
+# Redis monitoring with Netdata
 
-Get INFO data from redis instance.
+Monitors database status. It reads server response to `INFO` command.
 
 Following charts are drawn:
 

@@ -1,6 +1,6 @@
-# litespeed
+# LiteSpeed monitoring with Netdata
 
-Module monitor litespeed web server performance metrics.
+Collects web server performance metrics for network, connection, requests, and cache.  
 
 It produces:
 

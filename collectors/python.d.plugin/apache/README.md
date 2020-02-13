@@ -1,8 +1,8 @@
-# apache
+# Apache monitoring with Netdata
 
-This module will monitor one or more Apache servers depending on configuration.
+Monitors one or more Apache servers depending on configuration.
 
-**Requirements:**
+## Requirements
 
 -   apache with enabled `mod_status`
 
@@ -43,7 +43,7 @@ It produces the following charts:
 
     -   size_req
 
-## configuration
+## Configuration
 
 Edit the `python.d/apache.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
@@ -55,7 +55,7 @@ sudo ./edit-config python.d/apache.conf
 
 Needs only `url` to server's `server-status?auto`
 
-Here is an example for 2 servers:
+Example for two servers:
 
 ```yaml
 update_every : 10
