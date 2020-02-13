@@ -2,8 +2,6 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define UNUSED(x) (void)(x)
-
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
 struct aclk_lws_wss_perconnect_data {
