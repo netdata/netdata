@@ -1,4 +1,4 @@
-# ISC DHCPD monitoring with Netdata
+# ISC DHCP monitoring with Netdata
 
 Monitors the leases database to show all active leases for given pools.
 

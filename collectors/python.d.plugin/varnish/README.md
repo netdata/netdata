@@ -1,4 +1,4 @@
-# Varnish cache monitoring with Netdata
+# Varnish Cache monitoring with Netdata
 
 Provides HTTP accelerator global, backends (VBE) and disks (SMF) statistics using `varnishstat` tool.
 

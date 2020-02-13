@@ -1,6 +1,6 @@
 # Adaptec RAID controller monitoring with Netdata
 
-Collects health metrics on logical and physical devices.
+Collects logical and physical devices metrics.
 
 ## Requirements
 

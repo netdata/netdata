@@ -1,6 +1,6 @@
-# Bind RNDC monitoring with Netdata
+# ISC Bind monitoring with Netdata
 
-Parses the bind dump file to collect real-time performance metrics using `rndc` tool.
+Collects Name server summary performance statistics using `rndc` tool.
 
 ## Requirements
 
