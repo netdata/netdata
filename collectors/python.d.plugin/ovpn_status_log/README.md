@@ -1,6 +1,6 @@
-# OVPN status log monitoring with Netdata
+# OpenVPN monitoring with Netdata
 
-Monitors the openvpn-status log file.
+Parses server log files and provides summary (client, traffic) metrics.
 
 ## Requirements
 

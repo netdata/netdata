@@ -1,4 +1,4 @@
-# Spring Boot monitoring with Netdata
+# Spring Boot2 monitoring with Netdata
 
 Monitors one or more Java Spring-boot applications depending on configuration.
 Netdata can be used to monitor running Java [Spring Boot](https://spring.io/) applications that expose their metrics with the use of the **Spring Boot Actuator** included in Spring Boot library.

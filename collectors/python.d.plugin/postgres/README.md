@@ -1,6 +1,6 @@
-# Postgres monitoring with Netdata
+# PostgreSQL monitoring with Netdata
 
-Monitors one or more postgres servers.
+Collects database health and performance metrics.
 
 ## Requirements
 

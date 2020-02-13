@@ -1,6 +1,6 @@
-# logind monitoring with Netdata
+# Systemd-Logind monitoring with Netdata
 
-Monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+Monitors active sessions, users, and seats tracked by `systemd-logind` or `elogind`.
 
 It provides the following charts:
 

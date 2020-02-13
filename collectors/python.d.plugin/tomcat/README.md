@@ -1,4 +1,4 @@
-# Tomcat monitoring with Netdata
+# Apache Tomcat monitoring with Netdata
 
 Presents memory utilization of tomcat containers.
 

@@ -1,6 +1,6 @@
 # Bind RNDC monitoring with Netdata
 
-Parses bind dump file to collect real-time performance metrics.
+Parses the bind dump file to collect real-time performance metrics using `rndc` tool.
 
 ## Requirements
 

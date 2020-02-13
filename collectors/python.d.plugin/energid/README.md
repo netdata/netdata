@@ -1,9 +1,9 @@
-# Energid monitoring with Netdata
+# Energi Core node monitoring with Netdata
 
-Monitors the [Energi Core](https://github.com/energicryptocurrency/energi) node instance.
+Monitors blockchain, memory, network and unspent transactions statistics.
 
 
-As Energi Core Gen 1 & 2 are based on the original Bitcoin code and
+As [Energi Core](https://github.com/energicryptocurrency/energi) Gen 1 & 2 are based on the original Bitcoin code and
 supports very similar JSON RPC, there is quite high chance the module works
 with many others forks including bitcoind itself.
 

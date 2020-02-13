@@ -1,6 +1,7 @@
-# NVIDIA SMI monitoring with Netdata
+# NVIDIA GPU monitoring with Netdata
 
-Monitors the `nvidia-smi` cli tool.
+Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
+
 
 **Requirements and Notes:**
 

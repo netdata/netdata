@@ -1,4 +1,4 @@
-# Oracle database monitoring with Netdata
+# OracleDB monitoring with Netdata
 
 Monitors the performance and health metrics of the Oracle database.
 

@@ -1,6 +1,6 @@
-# PortCheck monitoring with Netdata
+# TCP endpoint monitoring with Netdata
 
-Monitors a remote TCP service.
+Monitors TCP endpoint availability and response time.
 
 Following charts are drawn per host:
 

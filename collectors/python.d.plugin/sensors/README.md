@@ -1,6 +1,6 @@
-# Sensors monitoring with Netdata
+# Linux machines sensors monitoring with Netdata
 
-System sensors information.
+Reads system sensors information (temperature, voltage, electric current, power, etc.).
 
 Charts are created dynamically.
 

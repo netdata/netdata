@@ -1,4 +1,4 @@
-# Fronius monitoring with Netdata
+# Fronius Symo monitoring with Netdata
 
 Collects metrics from the configured solar power installation from Fronius Symo.
 

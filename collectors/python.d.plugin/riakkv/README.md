@@ -1,6 +1,6 @@
-# Riak KV monitoring with Netdata
+# RiakKV monitoring with Netdata
 
-Monitors one or more Riak KV servers.
+Collects database stats from `/stats` endpoint.
 
 ## Requirements
 

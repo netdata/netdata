@@ -1,6 +1,6 @@
 # PowerDNS monitoring with Netdata
 
-Monitors the performance and health metrics of PowerDNS.
+Monitors authoritative server and recursor statistics.
 
 Powerdns charts:
 

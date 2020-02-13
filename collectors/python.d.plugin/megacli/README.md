@@ -1,4 +1,4 @@
-# MegaCLI monitoring with Netdata
+# MegaRAID controller monitoring with Netdata
 
 Collects adapter, physical drives and battery stats.
 

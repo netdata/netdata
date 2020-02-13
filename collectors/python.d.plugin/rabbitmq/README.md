@@ -1,6 +1,7 @@
 # RabbitMQ monitoring with Netdata
 
-Monitors the performance and health metrics of [RabbitMQ](https://www.rabbitmq.com/).
+Collects message broker global and per virtual host metrics.
+
 
 Following charts are drawn:
 

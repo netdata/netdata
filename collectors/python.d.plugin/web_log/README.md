@@ -1,4 +1,6 @@
-# Web log monitoring with Netdata
+# Apache/NGINX/Squid monitoring with Netdata
+
+Tails access log file and Collects web server/caching proxy metrics.
 
 ## Motivation
 

@@ -1,4 +1,4 @@
-# SNMP monitoring with Netdata
+# SNMP device monitoring with Netdata
 
 Collects data from any SNMP device and uses the [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
 

@@ -1,6 +1,6 @@
 # IPFS monitoring with Netdata
 
-Monitors [IPFS](https://ipfs.io) basic information.
+Collects [IPFS](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics. 
 
 1.  **Bandwidth** in kbits/s
 

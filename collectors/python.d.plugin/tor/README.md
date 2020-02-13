@@ -1,6 +1,6 @@
 # Tor monitoring with Netdata
 
-Connects to tor control port to collect traffic statistics.
+Connects to the Tor control port to collect traffic statistics.
 
 ## Requirements
 

@@ -1,4 +1,4 @@
-# chrony monitoring with Netdata
+# Chrony monitoring with Netdata
 
 Monitors the precision and statistics of a local chronyd server, and produces:
 

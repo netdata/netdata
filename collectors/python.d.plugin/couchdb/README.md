@@ -1,4 +1,4 @@
-# CouchDB monitoring with Netdata
+# Apache CouchDB monitoring with Netdata
 
 Monitors vital statistics of a local Apache CouchDB 2.x server, including:
 

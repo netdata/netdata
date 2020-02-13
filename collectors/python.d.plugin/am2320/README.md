@@ -1,4 +1,4 @@
-# AM2320 monitoring with netdata
+# AM2320 sensor monitoring with netdata
 
 Displays a graph of the temperature and humity from a AM2320 sensor.
 

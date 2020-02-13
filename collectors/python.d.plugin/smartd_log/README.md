@@ -1,4 +1,4 @@
-# smartd log monitoring with Netdata
+# Storage devices monitoring with Netdata
 
 Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
 

@@ -1,6 +1,6 @@
 # ProxySQL monitoring with Netdata
 
-Monitors ProxySQL backend and frontend performance metrics.
+Monitors database backend and frontend performance metrics.
 
 It produces:
 

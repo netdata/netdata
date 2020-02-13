@@ -1,6 +1,6 @@
-# NUT monitoring with Netdata
+# UPS/PDU monitoring with Netdata
 
-Collects UPS data for all UPSes configured in the system.
+Collects UPS data for all power devices configured in the system.
 
 The following charts will be created:
 

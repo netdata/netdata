@@ -1,11 +1,8 @@
-# Go Expvar monitoring with Netdata
+# Go application monitoring with Netdata
 
-The `go_expvar` module can monitor any Go application that exposes its metrics with the use of
-`expvar` package from the Go standard library.
+Monitors Go application that exposes its metrics with the use of `expvar` package from the Go standard library.  The package produces charts for Go runtime memory statistics and optionally any number of custom charts.
 
-`go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts.
-
-For the memory statistics, it produces the following charts:
+The `go_expvar` module produces the following charts:
 
 1.  **Heap allocations** in kB
 

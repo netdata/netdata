@@ -1,4 +1,4 @@
-# Ceph monitoring with Netdata
+# CEPH monitoring with Netdata
 
 Monitors the ceph cluster usage and consumption data of a server, and produces:
 

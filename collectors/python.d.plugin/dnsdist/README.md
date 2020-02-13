@@ -1,6 +1,6 @@
-# dnsdist monitoring with Netdata
+# PowerDNS dnsdist monitoring with Netdata
 
-Monitors dnsdist performance and health metrics and draws the following charts:
+Collects load-balancer performance and health metrics, and draws the following charts:
 
 1.  **Response latency**
 

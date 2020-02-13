@@ -1,4 +1,4 @@
-# LibreSwan monitoring with Netdata
+# Libreswan IPSec tunnel monitoring with Netdata
 
 Collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.
 

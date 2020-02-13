@@ -1,6 +1,6 @@
-# Dockerd monitoring with Netdata
+# Docker engine monitoring with Netdata
 
-Monitors docker health metrics.
+Collects docker container health metrics.
 
 **Requirement:**
 

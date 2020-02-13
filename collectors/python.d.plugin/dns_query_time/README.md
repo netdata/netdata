@@ -1,6 +1,6 @@
-# DNS query time monitoring with Netdata
+# DNS query RTT monitoring with Netdata
 
-Provides DNS query time statistics.
+Measures DNS query round trip time.
 
 **Requirement:**
 
