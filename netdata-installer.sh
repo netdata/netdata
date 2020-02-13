@@ -169,6 +169,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
+  --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
   --disable-cloud            Disable the agent-cloud link, required for Netdata Cloud functionality.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
@@ -254,6 +255,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
+    "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk" ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
@@ -1021,6 +1023,72 @@ install_go() {
 }
 
 install_go
+
+should_install_ebpf() {
+  if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
+    return 1
+  fi
+
+  # TODO: Check for current vs. latest version
+
+  return 0
+}
+
+install_ebpf() {
+  if ! should_install_ebpf; then
+    return 0
+  fi
+
+  # Check Kernel Config
+  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" | bash -; then
+    run_failed "Kernel unsupported or missing required config"
+    return 0
+  fi
+
+  # Mapping of Compiled => Supported
+  # Taken from https://github.com/netdata/kernel-collector/issues/14
+  KERNEL_COMPAT_MAP=(
+    '5.5::5_5'
+    '5.4::5_5'
+    '5.3::5_5'
+    '4.19::4_19'
+    '4.14::4_14'
+  )
+
+  progress "Installing eBPF plugin"
+
+  ARCH=$(uname -m)
+  KERNEL="$(uname -r | cut -f 1 -d '-' | cut -f 1,2 -d '.' | tr '.' '_')"
+  # TODO: Detect this
+  LIBC="glibc"
+
+  COMPAT_KERNEL=
+  for index in "${KERNEL_COMPAT_MAP[@]}"; do
+    KEY="${index%%::*}"
+    VALUE="${index##*::}"
+    if [ "$KEY" = "$KERNEL" ]; then
+      COMPAT_KERNEL="${VALUE}"
+      break
+    fi
+  done
+
+  PACKAGE_TARBALL="netdata_ebpf-${COMPAT_KERNEL}-${LIBC}.tar.xz"
+
+  tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
+
+  pushd "${tmp}" || exit 1
+
+  get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" \
+    | jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url" \
+    | get -i -
+
+  tar -xvf "${PACKAGE_TARBALL}"
+  popd
+
+  return 0
+}
+
+install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
