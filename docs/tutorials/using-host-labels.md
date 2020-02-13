@@ -128,38 +128,23 @@ labeled `webserver`:
  host labels: type = webserver
 ```
 
-Or, by using one of the automatic labels, for only webserver systems running a specific OS and version:
+Or, by using one of the automatic labels, for only webserver systems running a specific OS:
 
 ```yaml
-    template: disk_fill_rate
-          on: disk.space
-      lookup: max -1s at -30m unaligned of avail
-        calc: ($this - $avail) / (30 * 60)
-       every: 15s
- host labels: type = webserver, _os_version = 1*, _os_name = Debian*
+ host labels: _os_name = Debian*
 ```
 
 In a streaming configuration where a master agent is triggering alarms for its slaves, you could create health entities
 that apply only to slaves:
 
 ```yaml
-    template: disk_fill_rate
-          on: disk.space
-      lookup: max -1s at -30m unaligned of avail
-        calc: ($this - $avail) / (30 * 60)
-       every: 15s
  host labels: _is_slave = true
 ```
 
 Or when ephemeral Docker nodes are involved:
 
 ```yaml
-    template: disk_fill_rate
-          on: disk.space
-      lookup: max -1s at -30m unaligned of avail
-        calc: ($this - $avail) / (30 * 60)
-       every: 15s
- host labels: _is_slave = true, _container = docker
+ host labels: _container = docker
 ```
 
 Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
