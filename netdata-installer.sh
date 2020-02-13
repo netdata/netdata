@@ -1080,14 +1080,15 @@ install_ebpf() {
 
   tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
 
-  pushd "${tmp}" || exit 1
+  pushd "${tmp}" || return 1
 
   get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" |
     jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url" |
     get -i -
 
   tar -xvf "${PACKAGE_TARBALL}"
-  popd
+
+  popd || return 1
 
   return 0
 }
