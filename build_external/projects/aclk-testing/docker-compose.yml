@@ -11,6 +11,7 @@ services:
       sh -c "echo 00000000-0000-0000-0000-000000000000 >/etc/netdata/claim.d/claimed_id &&
              echo '[agent_cloud_link]' >>/etc/netdata/netdata.conf &&
              echo '  agent cloud link hostname = vernemq' >>/etc/netdata/netdata.conf &&
+             echo '  agent cloud link port = 8080' >>/etc/netdata/netdata.conf &&
              /usr/sbin/netdata -D"
     ports:
     - 20000:19999
@@ -34,6 +35,8 @@ services:
     image: vernemq_configured
     depends_on: 
       - configure_step
+    ports:
+    - 9002:9002
 
   configure_step:
     image: vernemq_configured
