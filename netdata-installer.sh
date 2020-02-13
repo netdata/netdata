@@ -1036,11 +1036,12 @@ should_install_ebpf() {
   # Check Kernel Config
   if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" | bash -; then
     run_failed "Kernel unsupported or missing required config"
-    return 0
+    return 1
   fi
 
   # TODO: Check for current vs. latest version
 
+  # TODO: Assume we're good for now...
   return 0
 }
 
