@@ -63,6 +63,7 @@ area/packaging:
   - packaging/**/*
   - system/*
   - system/**/*
+  - Dockerfile*
   - netdata-installer.sh
   - CMakeLists.txt
   - configure.ac
