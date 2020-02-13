@@ -5,8 +5,6 @@
 
 // Read from the config file -- new section [agent_cloud_link]
 // Defaults are supplied
-int aclk_recv_maximum = 0; // default 20
-int aclk_send_maximum = 0; // default 20
 
 int aclk_port = 0;          // default 1883
 char *aclk_hostname = NULL; //default localhost
@@ -66,33 +64,6 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
     return 0;
 }
 
-//char *send_http_request(char *host, char *port, char *url, BUFFER *b)
-//{
-//    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-//
-//    buffer_flush(b);
-//    buffer_sprintf(
-//        b,
-//        "GET %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
-//        url, host);
-//    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
-//
-//    if (unlikely(sock == -1)) {
-//        error("Handshake failed");
-//        return NULL;
-//    }
-//
-//    SSL_CTX *ctx = security_initialize_openssl_client();
-//    // Certificate chain: not updating the stores - do we need private CA roots?
-//    // Calls to SSL_CTX_load_verify_locations would go here.
-//    SSL *ssl = SSL_new(ctx);
-//    SSL_set_fd(ssl, sock);
-//    int err = SSL_connect(ssl);
-//    SSL_write(ssl, b->buffer, b->len); // Timeout options?
-//    int bytes_read = SSL_read(ssl, b->buffer, b->len);
-//    SSL_shutdown(ssl);
-//    close(sock);
-//}
 
 // Set when we have connection up and running from the connection callback
 int aclk_connection_initialized = 0;
@@ -176,6 +147,7 @@ unsigned long int aclk_delay(int mode)
         fail++;
         return 0;
     }
+    fail++;
 
     unsigned long int delay = (unsigned long int)((powl(ACLK_DELAY_SEED, fail)) * 1000 + (random() % 1618));
 
@@ -296,7 +268,6 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
 #endif
         aclk_query_free(tmp_query);
         aclk_queue.count--;
-        //tmp_query->deleted = 1;
     }
 
     new_query = callocz(1, sizeof(struct aclk_query));
@@ -415,8 +386,6 @@ struct aclk_query *aclk_queue_pop()
 // Need to check if additional logic should be added to make sure that there
 // is enough information to determine the base topic at init time
 
-// TODO: Locking may be needed, depends on the calculation of the base topic and also if we need to switch
-// that on the fly
 
 char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
 {
@@ -647,8 +616,6 @@ static struct _collector  *_add_collector(const char *hostname, const char *plug
 {
     struct _collector  *tmp_collector;
 
-    //info("Delay in case of failure = %llu", aclk_delay(1));
-
     tmp_collector = _find_collector(hostname, plugin_name, module_name, NULL);
 
     if (unlikely(!tmp_collector)) {
@@ -689,7 +656,6 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
         return;
     }
 
-    // TODO: QUEUE command to update the cloud here
     aclk_queue_query("connector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
 
     COLLECTOR_UNLOCK;
@@ -719,11 +685,10 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     info("DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
 #endif
 
-    // TODO: Queue command for update to the cloud
 
     COLLECTOR_UNLOCK;
     // TODO: Queue command for update to the cloud
-    // aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 2, 1, ACLK_CMD_ONCONNECT);
+    aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 2, 1, ACLK_CMD_ONCONNECT);
 
     _free_collector(tmp_collector);
 }
@@ -771,14 +736,11 @@ int aclk_execute_query(struct aclk_query *this_query)
         web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
 
         //TODO: handle bad response perhaps in a different way. For now it does to the payload
-        //if (rc == HTTP_RESP_OK || 1) {
         buffer_flush(aclk_buffer);
 
         aclk_create_metadata_message(aclk_buffer, mysep ? mysep + 1 : "noop", this_query->msg_id, w->response.data);
         aclk_buffer->contenttype = CT_APPLICATION_JSON;
         aclk_send_message(this_query->topic, aclk_buffer->buffer);
-        //} else
-        //   error("Query RESP: %s", w->response.data->buffer);
 
         buffer_free(w->response.data);
         freez(w);
@@ -854,17 +816,10 @@ int aclk_process_query()
             break;
     }
 
-
-//    if (strcmp((char *)this_query->topic, "_chart") == 0) {
-//        aclk_send_single_chart(this_query->data, this_query->query);
-//    }
-
     aclk_query_free(this_query);
 
     return 1;
 }
-
-// Launch a query processing thread
 
 /*
  * Process all pending queries
@@ -881,11 +836,13 @@ int aclk_process_queries()
     if (likely(!aclk_queue.count))
         return 0;
 
+#ifdef ACLK_DEBUG
     info("Processing %d queries", (int ) aclk_queue.count);
+#endif
 
     //TODO: may consider possible throttling here
     while (aclk_process_query()) {
-        //rc = _link_event_loop(0);
+        // Process all commands
     };
 
     return 1;
@@ -1031,7 +988,7 @@ void *aclk_main(void *ptr)
             }
             initializing = 1;
             info("Initializing connection");
-            //send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
+
             if (unlikely(aclk_init(ACLK_INIT))) {
                 // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
                 sleep_usec(USEC_PER_SEC * 60);
@@ -1115,7 +1072,6 @@ int aclk_send_message(char *sub_topic, char *message)
 int aclk_subscribe(char *sub_topic, int qos)
 {
     int rc;
-    //static char *global_base_topic = NULL;
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
@@ -1180,18 +1136,8 @@ int aclk_init(ACLK_INIT_ACTION action)
     if (likely(init))
         return 0;
 
-    //TODO: Revisit this. Not meaningful at the moment, disabling
-    //aclk_send_maximum = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link send maximum", 20);
-    //aclk_recv_maximum = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link receive maximum", 20);
-
     aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", "localhost");
     aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", 1883);
-
-    //info("Maximum parallel outgoing messages %d", aclk_send_maximum);
-    //info("Maximum parallel incoming messages %d", aclk_recv_maximum);
-
-    // This will setup the base publish topic internally
-    //get_publish_base_topic(PUBLICH_TOPIC_GET);
 
     // initialize the low level link to the cloud
     rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);
@@ -1405,15 +1351,12 @@ int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 
     local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
-    //TODO: Build the payload message
-    //aclk_queue_query("_alarm", host->hostname, NULL, NULL , 0, 1, ACLK_CMD_ALARM);
-
-    // Send the message directly
-
+    //TODO: Use the command queue
+    // Send the message directly for now
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     ACLK_LOCK;
     buffer_flush(local_buffer);
-    // Alarms configuration
+
     aclk_create_header(local_buffer, "alarms", NULL);
     health_alarm_entry2json_nolock(local_buffer, ae, host);
 

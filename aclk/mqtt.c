@@ -99,9 +99,6 @@ void mqtt_message_callback(
     }
 
     aclk_handle_cloud_request(msg->payload);
-
-    //info("Received type=[%s], msg-id=[%s], topic=[%s], url=[%s]",cloud_to_agent.type_id, cloud_to_agent.msg_id, cloud_to_agent.topic, cloud_to_agent.url);
-
 }
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
