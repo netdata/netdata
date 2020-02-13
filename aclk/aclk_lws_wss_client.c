@@ -25,7 +25,7 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void* data
 	return new;
 }
 
-static inline void lws_wss_packet_buffer_push(struct lws_wss_packet_buffer **list, struct lws_wss_packet_buffer *item)
+static inline void lws_wss_packet_buffer_append(struct lws_wss_packet_buffer **list, struct lws_wss_packet_buffer *item)
 {
 	struct lws_wss_packet_buffer *tail = *list;
 	if(!*list) {
@@ -287,7 +287,7 @@ int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *b
 	if(inst && inst->lws_wsi && inst->websocket_connection_up)
 	{
 		aclk_lws_mutex_lock(&inst->write_buf_mutex);
-		lws_wss_packet_buffer_push(&inst->write_buffer_head, lws_wss_packet_buffer_new(buf, count));
+		lws_wss_packet_buffer_append(&inst->write_buffer_head, lws_wss_packet_buffer_new(buf, count));
 		aclk_lws_mutex_unlock(&inst->write_buf_mutex);
 
 		lws_callback_on_writable(inst->lws_wsi);
