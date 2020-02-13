@@ -10,11 +10,14 @@ services:
     command: >
       sh -c "echo 00000000-0000-0000-0000-000000000000 >/etc/netdata/claim.d/claimed_id &&
              echo '[agent_cloud_link]' >>/etc/netdata/netdata.conf &&
-             echo '  agent cloud link hostname = vernemq' >>/etc/netdata/netdata.conf &&
+             echo '  agent cloud link hostname = 172.22.0.100' >>/etc/netdata/netdata.conf &&
              echo '  agent cloud link port = 8080' >>/etc/netdata/netdata.conf &&
              /usr/sbin/netdata -D"
     ports:
     - 20000:19999
+    networks:
+      service1_net:
+        ipv4_address: 172.22.0.99
     #volumes:
     #- ./master_stream.conf:/etc/netdata/stream.conf:ro
 #  agent_slave1:
@@ -32,14 +35,17 @@ services:
 #    volumes:
 #      - ./slave_stream.conf:/etc/netdata/stream.conf:ro
   vernemq:
-    image: vernemq_configured
-    depends_on: 
-      - configure_step
-    ports:
-    - 9002:9002
-
-  configure_step:
-    image: vernemq_configured
     build:
       dockerfile: configureVerneMQ.Dockerfile
       context: .
+    networks:
+      service1_net:
+        ipv4_address: 172.22.0.100
+
+networks:
+  service1_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/16
+
