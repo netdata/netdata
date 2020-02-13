@@ -269,7 +269,7 @@ static void netdata_process_status_chart(char *family, char *name, char *axis, c
 static void netdata_global_charts_create() {
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_FILE_OPEN_CLOSE_COUNT
-            , "Number of calls"
+            , "Calls"
             , NETDATA_FILE_GROUP
             , 970
             , netdata_create_global_dimension
@@ -279,7 +279,7 @@ static void netdata_global_charts_create() {
     if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_FILE_OPEN_ERR_COUNT
-                , "Number of calls"
+                , "Calls"
                 , NETDATA_FILE_GROUP
                 , 971
                 , netdata_create_global_dimension
@@ -289,7 +289,7 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_CLEAN_COUNT
-            , "Number of calls"
+            , "Calls"
             , NETDATA_VFS_GROUP
             , 972
             , netdata_create_global_dimension
@@ -298,7 +298,7 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_IO_COUNT
-            , "Number of calls"
+            , "Calls"
             , NETDATA_VFS_GROUP
             , 973
             , netdata_create_global_dimension
@@ -314,7 +314,7 @@ static void netdata_global_charts_create() {
 
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_FILE_ERR_COUNT
-                , "Number of calls"
+                , "Calls"
                 , NETDATA_VFS_GROUP
                 , 975
                 , netdata_create_global_dimension
@@ -325,7 +325,7 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_PROCESS_SYSCALL
-            , "Number of calls"
+            , "Calls"
             , NETDATA_PROCESS_GROUP
             , 976
             , netdata_create_global_dimension
@@ -334,7 +334,7 @@ static void netdata_global_charts_create() {
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_EXIT_SYSCALL
-            , "Number of calls"
+            , "Calls"
             , NETDATA_PROCESS_GROUP
             , 977
             , netdata_create_global_dimension
@@ -350,7 +350,7 @@ static void netdata_global_charts_create() {
     if(mode < 2) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
-                , "Number of calls"
+                , "Calls"
                 , NETDATA_PROCESS_GROUP
                 , 979
                 , netdata_create_global_dimension
