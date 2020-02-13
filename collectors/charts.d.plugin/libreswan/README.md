@@ -1,6 +1,6 @@
-# libreswan
+# Libreswan IPSec tunnel monitoring with Netdata
 
-The plugin will collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.
+Collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.
 
 The following charts are created, **per tunnel**:
 

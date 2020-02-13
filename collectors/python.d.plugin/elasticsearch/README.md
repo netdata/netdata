@@ -1,6 +1,6 @@
-# elasticsearch
+# Elasticsearch monitoring with Netdata
 
-This module monitors [Elasticsearch](https://www.elastic.co/products/elasticsearch) performance and health metrics.
+Monitors [Elasticsearch](https://www.elastic.co/products/elasticsearch) performance and health metrics.
 
 It produces:
 
@@ -58,7 +58,7 @@ It produces:
     -   Num of replicas
     -   Health status
 
-## configuration
+## Configuration
 
 Edit the `python.d/elasticsearch.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.

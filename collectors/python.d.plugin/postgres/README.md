@@ -1,8 +1,8 @@
-# postgres
+# PostgreSQL monitoring with Netdata
 
-Module monitors one or more postgres servers.
+Collects database health and performance metrics.
 
-**Requirements:**
+## Requirements
 
 -   `python-psycopg2` package. You have to install it manually.
 

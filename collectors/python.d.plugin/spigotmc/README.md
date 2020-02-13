@@ -1,6 +1,6 @@
-# spigotmc
+# SpigotMC monitoring with Netdata
 
-This module does some really basic monitoring for Spigot Minecraft servers.
+Performs basic monitoring for Spigot Minecraft servers.
 
 It provides two charts, one tracking server-side ticks-per-second in
 1, 5 and 15 minute averages, and one tracking the number of currently

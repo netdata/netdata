@@ -1,12 +1,19 @@
-# megacli
+# MegaRAID controller monitoring with Netdata
 
-Module collects adapter, physical drives and battery stats.
+Collects adapter, physical drives and battery stats.
 
-**Requirements:**
+## Requirements
 
--   `megacli` program
--   `sudo` program
--   `netdata` user needs to be able to be able to sudo the `megacli` program without password
+Uses the `megacli` program, which can only be executed by root.  It uses
+`sudo` and assumes that it is configured such that the `netdata` user can
+execute `megacli` as root without password.
+
+Add to `sudoers`:
+
+```
+netdata ALL=(root)       NOPASSWD: /path/to/megacli
+```
+
 
 To grab stats it executes:
 
@@ -25,19 +32,9 @@ It produces:
 
 5.  **Battery Cycle Count**
 
-## prerequisite
 
-This module uses `megacli` which can only be executed by root.  It uses
-`sudo` and assumes that it is configured such that the `netdata` user can
-execute `megacli` as root without password.
 
-Add to `sudoers`:
-
-```
-netdata ALL=(root)       NOPASSWD: /path/to/megacli
-```
-
-### Configuration
+## Configuration
 
 **megacli** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 

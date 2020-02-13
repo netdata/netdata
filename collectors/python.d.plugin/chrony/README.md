@@ -1,8 +1,6 @@
-# chrony
+# Chrony monitoring with Netdata
 
-This module monitors the precision and statistics of a local chronyd server.
-
-It produces:
+Monitors the precision and statistics of a local chronyd server, and produces:
 
 -   frequency
 -   last offset
@@ -13,7 +11,7 @@ It produces:
 -   skew
 -   system time
 
-**Requirements:**
+## Requirements
 Verify that user Netdata can execute `chronyc tracking`. If necessary, update `/etc/chrony.conf`, `cmdallow`.
 
 ## Configuration

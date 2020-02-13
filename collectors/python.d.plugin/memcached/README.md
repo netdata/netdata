@@ -1,6 +1,7 @@
-# memcached
+# Memcached monitoring with Netdata
 
-Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
+Collects memory-caching system performance metrics. It reads server response to stats command ([stats interface](https://github.com/memcached/memcached/wiki/Commands#stats)).
+
 
 1.  **Network** in kilobytes/s
 

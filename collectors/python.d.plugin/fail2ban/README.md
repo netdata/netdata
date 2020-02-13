@@ -1,14 +1,14 @@
-# fail2ban
+# Fail2ban monitoring with Netdata
 
-Module monitor fail2ban log file to show all bans for all active jails
+Monitors the fail2ban log file to show all bans for all active jails.
 
-**Requirements:**
+## Requirements
 
 -   fail2ban.log file MUST BE readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at logrotate.d)
 
 It produces one chart with multiple lines (one line per jail)
 
-## configuration
+## Configuration
 
 Edit the `python.d/fail2ban.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.

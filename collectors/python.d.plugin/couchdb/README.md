@@ -1,6 +1,6 @@
-# couchdb
+# Apache CouchDB monitoring with Netdata
 
-This module monitors vital statistics of a local Apache CouchDB 2.x server, including:
+Monitors vital statistics of a local Apache CouchDB 2.x server, including:
 
 -   Overall server reads/writes
 -   HTTP traffic breakdown

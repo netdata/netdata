@@ -1,8 +1,8 @@
-# nginx
+# NGINX monitoring with Netdata
 
-This module will monitor one or more nginx servers depending on configuration. Servers can be either local or remote.
+Monitors one or more NGINX servers depending on configuration. Servers can be either local or remote.
 
-**Requirements:**
+## Requirements
 
 -   nginx with configured 'ngx_http_stub_status_module'
 -   'location /stub_status'

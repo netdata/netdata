@@ -1,6 +1,6 @@
-# hddtemp
+# Hard drive temperature monitoring with Netdata
 
-Module monitors disk temperatures from one or more hddtemp daemons.
+Monitors disk temperatures from one or more `hddtemp` daemons.
 
 **Requirement:**
 Running `hddtemp` in daemonized mode with access on tcp port

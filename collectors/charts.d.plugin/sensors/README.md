@@ -1,4 +1,4 @@
-# sensors
+# Linux machine sensors monitoring with Netdata
 
 > THIS MODULE IS OBSOLETE.
 > USE [THE PYTHON ONE](../../python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT

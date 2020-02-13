@@ -1,6 +1,6 @@
-# squid
+# Squid monitoring with Netdata
 
-This module will monitor one or more squid instances depending on configuration.
+Monitors one or more squid instances depending on configuration.
 
 It produces following charts:
 

@@ -1,6 +1,7 @@
-# nvidia_smi
+# NVIDIA GPU monitoring with Netdata
 
-This module monitors the `nvidia-smi` cli tool.
+Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
+
 
 **Requirements and Notes:**
 
