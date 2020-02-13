@@ -1,6 +1,8 @@
 # Monitor eBPF metrics with Netdata
 
-eBPF (Extended Berkeley Packet Filter) is a virtual bytecode machine built into the Linux kernel that can used for advanced monitoring and tracing. With eBPF, you can get detailed metrics about I/O and filesystem latency, CPU usage by process, and network performance. You can even use it for tracing, as you might `tcpdump` or `strace`.
+eBPF (Extended Berkeley Packet Filter) is a virtual bytecode machine built into the Linux kernel that can be used for
+advanced monitoring and tracing. With eBPF, you can get detailed metrics about I/O and filesystem latency, CPU usage by
+process, and network performance. You can even use it for tracing, as you might `tcpdump` or `strace`.
 
 Brendan Gregg of Netflix has called eBPF a
 ["superpower"](http://www.brendangregg.com/blog/2016-03-05/linux-bpf-superpowers.html) and claims ["eBPF does to Linux
