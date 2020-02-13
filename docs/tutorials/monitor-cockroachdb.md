@@ -12,6 +12,12 @@ collector and help others use it right away.
 
 Let's dive in and walk through the process of monitoring CockroachDB metrics with Netdata.
 
+## What's in this guide
+
+-   [Configure the CockroachDB collector](#configure-the-cockroachdb-collector)
+    -   [Manual setup for a local CockroachDB database](#manual-setup-for-a-local-cockroachdb-database)
+-   [Tweak CockroachDB alarms](#tweak-cockroachdb-alarms)
+
 ## Configure the CockroachDB collector
 
 Because _all_ of Netdata's collectors can auto-detect the services they monitor, you _shouldn't_ need to worry about
