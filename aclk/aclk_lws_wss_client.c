@@ -43,7 +43,7 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_pop(struct lws
 	struct lws_wss_packet_buffer *ret = *list;
 	if(ret != NULL)
 		*list = ret->next;
-	//ret->next = NULL;
+
 	return ret;
 }
 
