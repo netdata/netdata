@@ -192,3 +192,6 @@ docs/generator/mkdocs.yml
 
 #CLion files
 netdata.cbp
+
+# External dependencies
+externaldeps/

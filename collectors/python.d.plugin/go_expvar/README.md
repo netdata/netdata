@@ -251,7 +251,15 @@ In the above case, the exported variables will be available under `runtime.gorou
 `counters.cnt1` and `counters.cnt2` expvar_keys. If the flattening results in a key collision,
 the first defined key wins and all subsequent keys with the same name are ignored.
 
-**Configuration example**
+## Configuration
+
+Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/go_expvar.conf
+```
 
 The configuration below matches the second Go application described above.
 Netdata will monitor and chart memory stats for the application, as well as a custom chart of

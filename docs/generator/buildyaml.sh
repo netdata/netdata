@@ -208,18 +208,11 @@ echo -ne "    - 'docs/Performance.md'
     - 'docs/high-performance-netdata.md'
 "
 
-navpart 1 . netdata-cloud "Netdata Cloud"
+navpart 1 collectors README "Collecting metrics"
 echo -ne "
-    - 'docs/netdata-cloud/README.md'
-    - 'docs/netdata-cloud/signing-in.md'
-    - 'docs/netdata-cloud/nodes-view.md'
-"
-
-navpart 1 web "README" "Dashboards"
-navpart 2 web/gui "" "" 3
-
-navpart 1 collectors "" "Data collection" 1
-echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
+    - 'collectors/QUICKSTART.md'
+    - 'collectors/COLLECTORS.md'
+    - 'collectors/REFERENCE.md'
     - Internal plugins:
 "
 
@@ -260,20 +253,7 @@ echo -ne "        - BASH:
                 - 'collectors/charts.d.plugin/nut/README.md'
                 - 'collectors/charts.d.plugin/opensips/README.md'
             - Obsolete Modules:
-                - 'collectors/charts.d.plugin/mem_apps/README.md'
-                - 'collectors/charts.d.plugin/postfix/README.md'
-                - 'collectors/charts.d.plugin/tomcat/README.md'
                 - 'collectors/charts.d.plugin/sensors/README.md'
-                - 'collectors/charts.d.plugin/cpu_apps/README.md'
-                - 'collectors/charts.d.plugin/squid/README.md'
-                - 'collectors/charts.d.plugin/nginx/README.md'
-                - 'collectors/charts.d.plugin/hddtemp/README.md'
-                - 'collectors/charts.d.plugin/cpufreq/README.md'
-                - 'collectors/charts.d.plugin/mysql/README.md'
-                - 'collectors/charts.d.plugin/exim/README.md'
-                - 'collectors/charts.d.plugin/apache/README.md'
-                - 'collectors/charts.d.plugin/load_average/README.md'
-                - 'collectors/charts.d.plugin/phpfpm/README.md'
 "
 
 navpart 3 collectors/apps.plugin
@@ -286,9 +266,15 @@ navpart 3 collectors/xenstat.plugin
 navpart 3 collectors/perf.plugin
 navpart 3 collectors/slabinfo.plugin
 
-
-echo -ne "    - 'docs/Third-Party-Plugins.md'
+navpart 1 . netdata-cloud "Netdata Cloud"
+echo -ne "
+    - 'docs/netdata-cloud/README.md'
+    - 'docs/netdata-cloud/signing-in.md'
+    - 'docs/netdata-cloud/nodes-view.md'
 "
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
 
 navpart 1 health README "Health monitoring and alerts"
 echo -ne "    - 'health/QUICKSTART.md'

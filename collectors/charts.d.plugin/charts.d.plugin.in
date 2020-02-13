@@ -404,13 +404,33 @@ declare -A charts_enable_keyword=(
 	['tomcat']="force"
 )
 
+declare -A obsolete_charts=(
+	['apache']="python.d.plugin module"
+	['cpu_apps']="apps.plugin"
+	['cpufreq']="proc plugin"
+	['exim']="python.d.plugin module"
+	['hddtemp']="python.d.plugin module"
+	['load_average']="proc plugin"
+	['mem_apps']="proc plugin"
+	['mysql']="python.d.plugin module"
+	['nginx']="python.d.plugin module"
+	['phpfpm']="python.d.plugin module"
+	['postfix']="python.d.plugin module"
+	['squid']="python.d.plugin module"
+	['tomcat']="python.d.plugin module"
+)
+
 all_enabled_charts() {
-	local charts= enabled= required=
+	local charts enabled required
 
 	# find all enabled charts
-
 	for chart in $(all_charts); do
 		MODULE_NAME="${chart}"
+
+		if [ -n "${obsolete_charts["$MODULE_NAME"]}" ]; then
+		  debug "is replaced by ${obsolete_charts["$MODULE_NAME"]}, skipping it."
+		  continue
+		fi
 
 		eval "enabled=\$$chart"
 		if [ -z "${enabled}" ]; then

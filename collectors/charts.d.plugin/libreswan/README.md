@@ -13,9 +13,15 @@ The following charts are created, **per tunnel**:
 -   bytes in
 -   bytes out
 
-## configuration
+## Configuration
 
-Its config file is `/etc/netdata/charts.d/libreswan.conf`.
+Edit the `charts.d/libreswan.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d/libreswan.conf
+```
 
 The plugin executes 2 commands to collect all the information it needs:
 

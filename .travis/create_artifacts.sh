@@ -62,5 +62,10 @@ cd artifacts
 ln -s "${BASENAME}.tar.gz" netdata-latest.tar.gz
 ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
 sha256sum -b ./* >"sha256sums.txt"
+
+# TODO: Remove this after 1 successfuly nightly or until there are no v1.19.0-432 instances left
+# XXX: See: https://github.com/netdata/netdata/issues/8056
+sed -i -e '/netdata-v/d' sha256sums.txt
+
 echo "checksums:"
 cat sha256sums.txt
