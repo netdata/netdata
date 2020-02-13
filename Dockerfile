@@ -4,8 +4,8 @@ FROM alpine:3.9 AS build
 
 # Install Dependencies
 RUN apk add --no-cache -U alpine-sdk bash curl libuv-dev zlib-dev \
-	                  util-linux-dev libmnl-dev gcc make git autoconf \
-                          automake pkgconfig python logrotate
+                          util-linux-dev libmnl-dev gcc make git autoconf \
+                          automake pkgconfig python logrotate openssl-dev
 
 # Pass optional ./netdata-installer.sh args with --build-arg INSTALLER_ARGS=...
 ARG INSTALLER_ARGS=""
