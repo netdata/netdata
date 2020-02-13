@@ -27,8 +27,8 @@ fi
 
 # -----------------------------------------------------------------------------
 # Pull in OpenSSL properly if on macOS
-if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ] ; then
-    export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
+  export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
 fi
 
 # -----------------------------------------------------------------------------
@@ -256,7 +256,10 @@ while [ -n "${1}" ]; do
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
-    "--disable-cloud") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk" ;;
+    "--disable-cloud")
+      NETDATA_DISABLE_LIBMOSQUITTO=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
+      ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -449,7 +452,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ] ; then
+  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ]; then
     return 0
   fi
 
@@ -472,7 +475,7 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" >"${tmp}/sha256sums.txt" 2>/dev/null
+  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
 
   cp packaging/mosquitto.checksums "${tmp}/sha256sums.txt"
 
@@ -900,8 +903,8 @@ govercomp() {
   ver2=$(echo "$2" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
 
   local IFS=.
-  read -ra ver1 <<<"$ver1"
-  read -ra ver2 <<<"$ver2"
+  read -ra ver1 <<< "$ver1"
+  read -ra ver2 <<< "$ver2"
 
   if [ ${#ver1[@]} -eq 0 ] || [ ${#ver2[@]} -eq 0 ]; then
     return 3
@@ -927,14 +930,14 @@ should_install_go() {
   local version_in_file
   local binary_version
 
-  version_in_file="$(cat packaging/go.d.version 2>/dev/null)"
-  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2>/dev/null)
+  version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
+  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
 
   govercomp "$version_in_file" "$binary_version"
   case $? in
-  0) return 1 ;; # =
-  2) return 1 ;; # <
-  *) return 0 ;; # >, error
+    0) return 1 ;; # =
+    2) return 1 ;; # <
+    *) return 0 ;; # >, error
   esac
 }
 
@@ -992,8 +995,8 @@ install_go() {
     return 0
   fi
 
-  grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" >"${tmp}/sha256sums.txt" 2>/dev/null
-  grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >>"${tmp}/sha256sums.txt" 2>/dev/null
+  grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
+  grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2> /dev/null
 
   # Checksum validation
   if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
@@ -1026,7 +1029,14 @@ install_go
 
 should_install_ebpf() {
   if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
+    run_failed "ebpf not enabled. --enable-ebpf to enable"
     return 1
+  fi
+
+  # Check Kernel Config
+  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" | bash -; then
+    run_failed "Kernel unsupported or missing required config"
+    return 0
   fi
 
   # TODO: Check for current vs. latest version
@@ -1036,12 +1046,6 @@ should_install_ebpf() {
 
 install_ebpf() {
   if ! should_install_ebpf; then
-    return 0
-  fi
-
-  # Check Kernel Config
-  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" | bash -; then
-    run_failed "Kernel unsupported or missing required config"
     return 0
   fi
 
@@ -1078,9 +1082,9 @@ install_ebpf() {
 
   pushd "${tmp}" || exit 1
 
-  get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" \
-    | jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url" \
-    | get -i -
+  get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" |
+    jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url" |
+    get -i -
 
   tar -xvf "${PACKAGE_TARBALL}"
   popd
@@ -1088,6 +1092,7 @@ install_ebpf() {
   return 0
 }
 
+progress "eBPF Kernel Collector (opt-in)"
 install_ebpf
 
 # -----------------------------------------------------------------------------
