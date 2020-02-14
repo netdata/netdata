@@ -1067,10 +1067,10 @@ get_compatible_kernel_for_ebpf() {
   if [ "${kver}" -gt 0 ] && [ "${kver}" -ge 005000000 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 5.4"
     kpkg="5_4"
-  elif [ "${kver}" -gt 0 ] && [ "${kver}" -ge 004015000 ] || [ "${kver}" -le 004019000 ]; then
+  elif [ "${kver}" -gt 0 ] && [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004020017 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
     kpkg="4_19"
-  elif [ "${kver}" -gt 0 ] && [ "${kver}" -le 004014000 ]; then
+  elif [ "${kver}" -gt 0 ] && [ "${kver}" -le 004014999 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.14"
     kpkg="4_14"
   else
