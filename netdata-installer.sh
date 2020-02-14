@@ -1100,14 +1100,28 @@ should_install_ebpf() {
   fi
 
   # Check Kernel Config
-  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" | bash -; then
+
+  tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
+
+  echo >&2 " Downloading check-kernel-config.sh ..."
+  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
+    run_failed "Failed to download check-kernel-config.sh"
+    echo 2>&" Removing temporary directory ${tmp} ..."
+    rm -rf "${tmp}"
+    return 1
+  fi
+
+  run chmod +x "${tmp}"/check-kernel-config.sh
+
+  if ! "${tmp}"/check-kernel-config.sh; then
     run_failed "Kernel unsupported or missing required config"
     return 1
   fi
 
+  rm -rf "${tmp}"
+
   # TODO: Check for current vs. latest version
 
-  # TODO: Assume we're good for now...
   return 0
 }
 
@@ -1146,7 +1160,6 @@ install_ebpf() {
   if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
     run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
     echo 2>&" Removing temporary directory ${tmp} ..."
-    popd || return 1
     rm -rf "${tmp}"
     return 1
   fi
