@@ -1027,6 +1027,33 @@ install_go() {
 
 install_go
 
+function get_kernel_version() {
+  r="$(uname -r | cut -f 1 -d '-')"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+    echo >&2 " ERROR: Cannot detect a valid libc on your system!"
+    return 1
+  fi
+  echo "${libc}"
+  return 0
+}
+
 should_install_ebpf() {
   if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
     run_failed "ebpf not enabled. --enable-ebpf to enable"
@@ -1050,32 +1077,11 @@ install_ebpf() {
     return 0
   fi
 
-  # Mapping of Compiled => Supported
-  # Taken from https://github.com/netdata/kernel-collector/issues/14
-  KERNEL_COMPAT_MAP=(
-    '5.5::5_5'
-    '5.4::5_5'
-    '5.3::5_5'
-    '4.19::4_19'
-    '4.14::4_14'
-  )
-
   progress "Installing eBPF plugin"
 
   ARCH=$(uname -m)
-  KERNEL="$(uname -r | cut -f 1 -d '-' | cut -f 1,2 -d '.' | tr '.' '_')"
-  # TODO: Detect this
-  LIBC="glibc"
-
-  COMPAT_KERNEL=
-  for index in "${KERNEL_COMPAT_MAP[@]}"; do
-    KEY="${index%%::*}"
-    VALUE="${index##*::}"
-    if [ "$KEY" = "$KERNEL" ]; then
-      COMPAT_KERNEL="${VALUE}"
-      break
-    fi
-  done
+  KERNEL="$(get_kernel_version)"
+  LIBC="$(detect_libc)"
 
   PACKAGE_TARBALL="netdata_ebpf-${COMPAT_KERNEL}-${LIBC}.tar.xz"
 
