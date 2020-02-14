@@ -1181,7 +1181,6 @@ install_ebpf() {
 
   run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
   run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/dnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
   run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
   run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
   run ln -v -f -s "${libdir}"/libbpf_kernel.so libbpf_kernel.so.0
