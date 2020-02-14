@@ -434,7 +434,7 @@ if test "${ACLK}" = "yes"; then
     AC_MSG_CHECKING([if libmosquitto static lib is present])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
         HAVE_libmosquitto_a="yes"
-    else 
+    else
         HAVE_libmosquitto_a="no"
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
@@ -1287,6 +1287,7 @@ AC_CONFIG_FILES([
     exporting/graphite/Makefile
     exporting/json/Makefile
     exporting/opentsdb/Makefile
+    exporting/aws_kinesis/Makefile
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile

@@ -10,16 +10,16 @@
 
 using namespace Aws;
 
-SDKOptions options;
+static SDKOptions options;
 
-Kinesis::KinesisClient *client;
+static Kinesis::KinesisClient *client;
 
 struct request_outcome {
     Kinesis::Model::PutRecordOutcomeCallable future_outcome;
     size_t data_len;
 };
 
-Vector<request_outcome> request_outcomes;
+static Vector<request_outcome> request_outcomes;
 
 void backends_kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout) {
     InitAPI(options);

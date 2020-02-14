@@ -482,6 +482,13 @@ EXPORTING_ENGINE_FILES = \
     exporting/send_internal_metrics.c \
     $(NULL)
 
+KINESIS_EXPORTING_FILES = \
+    exporting/aws_kinesis/aws_kinesis.c \
+    exporting/aws_kinesis/aws_kinesis.h \
+    exporting/aws_kinesis/aws_kinesis_put_record.cc \
+    exporting/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
 KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis.c \
     backends/aws_kinesis/aws_kinesis.h \
@@ -687,6 +694,13 @@ if ENABLE_PLUGIN_SLABINFO
     slabinfo_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_EXPORTING
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
 endif
 
 if ENABLE_BACKEND_KINESIS
