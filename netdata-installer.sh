@@ -1147,7 +1147,7 @@ install_ebpf() {
   echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
 
   PACKAGE_TARBALL_URL=
-  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url")"
+  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | grep -o -E "\"browser_download_url\": \".*${PACKAGE_TARBALL}\"" | sed -e 's/"browser_download_url": "\(.*\)"/\1/')"
 
   if [ -z "${PACKAGE_TARBALL_URL}" ]; then
     run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
