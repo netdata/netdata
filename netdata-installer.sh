@@ -1131,17 +1131,46 @@ install_ebpf() {
 
   PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
 
+  echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
+
+  PACKAGE_TARBALL_URL=
+  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url")"
+
+  if [ -z "${PACKAGE_TARBALL_URL}" ]; then
+    run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
+    return 1
+  fi
+
   tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
 
-  pushd "${tmp}" || return 1
+  echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
+  if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
+    run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
+    echo 2>&" Removing temporary directory ${tmp} ..."
+    popd || return 1
+    rm -rf "${tmp}"
+    return 1
+  fi
 
-  get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" |
-    jq -r ".assets[] | select(.name | contains(\"${PACKAGE_TARBALL}\")) | .browser_download_url" |
-    get -i -
+  echo >&2 " Extracting ${PACKAGE_TARBALL} ..."
+  tar -xf "${tmp}/${PACKAGE_TARBALL}" -C "${tmp}"
 
-  tar -xvf "${PACKAGE_TARBALL}"
+  echo >&2 " Finding suitable lib directory ..."
+  libdir=
+  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
+  if [ -z "${libdir}" ]; then
+    run_failed "Could not find a suitable lib directory"
+    return 1
+  fi
 
-  popd || return 1
+  run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
+  run cp -a -v "${tmp}"/dnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run ln -v -s "${libdir}"/libbpf_kernel.so libbpf_kernel.so.0
+
+  echo >&2 "ePBF installation all done!"
+  rm -rf "${tmp}"
 
   return 0
 }
