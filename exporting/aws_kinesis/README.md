@@ -2,10 +2,11 @@
 
 ## Prerequisites
 
-To use AWS Kinesis as a backend AWS SDK for C++ should be
-[installed](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) first. `libcrypto`, `libssl`,
-and `libcurl` are also required to compile Netdata with Kinesis support enabled. Next, Netdata should be re-installed
-from the source. The installer will detect that the required libraries are now available.
+To use AWS Kinesis for metric collecting and processing, AWS SDK for C++ should be
+[installed](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) first. Netdata works with
+the SDK version 1.7.121. Other versions might work correctly as well but they were not tested with Netdata.
+`libcrypto`, `libssl`, and `libcurl` are also required to compile Netdata with Kinesis support enabled. Next, Netdata
+should be re-installed from the source. The installer will detect that the required libraries are now available.
 
 If the AWS SDK for C++ is being installed from source, it is useful to set `-DBUILD_ONLY="kinesis"`. Otherwise, the
 building process could take a very long time. Take a note, that the default installation path for the libraries is
@@ -18,18 +19,18 @@ cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib -DCMAKE_INSTALL_INCLUDEDIR=/usr/include -D
 
 ## Configuration
 
-To enable data sending to the kinesis backend set the following options in `netdata.conf`:
+To enable data sending to the kinesis service run `./edit-config exporting.conf` in the Netdata configuration directory
+and set the following options:
 
 ```conf
-[backend]
+[kinesis:my_instance]
     enabled = yes
-    type = kinesis
     destination = us-east-1
 ```
 
 set the `destination` option to an AWS region.
 
-In the Netdata configuration directory run `./edit-config aws_kinesis.conf` and set AWS credentials and stream name:
+Set AWS credentials and stream name:
 
 ```yaml
 # AWS credentials
