@@ -21,7 +21,6 @@
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
-#define ACLK_DELAY_SEED 1.61803        // Exponential fibonnaci backoff
 #define ACLK_MAX_BACKOFF_DELAY 1024 // maximum backoff delay in milliseconds
 
 #define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
