@@ -1048,6 +1048,7 @@ detect_libc() {
     libc="musl"
   else
     echo >&2 " ERROR: Cannot detect a valid libc on your system!"
+    ldd --version 1>&2
     return 1
   fi
   echo "${libc}"
@@ -1064,15 +1065,15 @@ get_compatible_kernel_for_ebpf() {
 
   kpkg=
 
-  if [ "${kver}" -gt 0 ] && [ "${kver}" -le 004014000 ]; then
-    echo >&2 " Using eBPG Kernel Collector built against Linux 4.14"
-    kpkg="4_14"
-  elif [ "${kver}" -gt 0 ] && [ "${kver}" -le 004019000 ]; then
-    echo >&2 " Using eBPG Kernel Collector built against Linux 4.19"
+  if [ "${kver}" -gt 0 ] && [ "${kver}" -ge 005000000 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 5.4"
+    kpkg="5_4"
+  elif [ "${kver}" -gt 0 ] && [ "${kver}" -ge 004015000 ] || [ "${kver}" -le 004019000 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
     kpkg="4_19"
-  elif [ "${kver}" -gt 0 ] && [ "${kver}" -ge 005000000 ]; then
-    echo >&2 " Using eBPG Kernel Collector built against Linux 5.4"
-    kpkg="4_5"
+  elif [ "${kver}" -gt 0 ] && [ "${kver}" -le 004014000 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.14"
+    kpkg="4_14"
   else
     echo >&2 " ERROR: Cannot detect a valid libc on your system!"
     return 1
