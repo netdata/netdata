@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- Docs: Fix Node and Bash collector module titles [\#8086](https://github.com/netdata/netdata/pull/8086) ([joelhans](https://github.com/joelhans))
+- Fixes text if current version is \>= latest version and already installed [\#8078](https://github.com/netdata/netdata/pull/8078) ([prologic](https://github.com/prologic))
+- Revert "Added hack to sha256sums.txt to force users of NetData on v1.19.0-483 with a broken updater to update to latest" [\#8076](https://github.com/netdata/netdata/pull/8076) ([prologic](https://github.com/prologic))
+- updates for issue 8006 [\#8074](https://github.com/netdata/netdata/pull/8074) ([shortpatti](https://github.com/shortpatti))
+- github/actions: update labeler config and bump version [\#8071](https://github.com/netdata/netdata/pull/8071) ([ilyam8](https://github.com/ilyam8))
 - Adding testing section to the PR template. [\#8068](https://github.com/netdata/netdata/pull/8068) ([amoss](https://github.com/amoss))
 - Update to new release of libmosquitto fork. [\#8067](https://github.com/netdata/netdata/pull/8067) ([Ferroin](https://github.com/Ferroin))
 - Make temporary directories relative to $TEMPDIR. [\#8066](https://github.com/netdata/netdata/pull/8066) ([Ferroin](https://github.com/Ferroin))
 - collectors: apps.plugin: apps\_groups: create 'dns' group. [\#8058](https://github.com/netdata/netdata/pull/8058) ([k0ste](https://github.com/k0ste))
 - Added hack to sha256sums.txt to force users of NetData on v1.19.0-483 with a broken updater to update to latest [\#8057](https://github.com/netdata/netdata/pull/8057) ([prologic](https://github.com/prologic))
 - Add config instructions to each collector module README  [\#8052](https://github.com/netdata/netdata/pull/8052) ([joelhans](https://github.com/joelhans))
+- Add required build dep for ACLK dependencies to Dockerfile. [\#8047](https://github.com/netdata/netdata/pull/8047) ([Ferroin](https://github.com/Ferroin))
 - github/workflow: change labeler [\#8032](https://github.com/netdata/netdata/pull/8032) ([ilyam8](https://github.com/ilyam8))
 - Docs: Promote DB engine/long-term metrics storage more heavily [\#8031](https://github.com/netdata/netdata/pull/8031) ([joelhans](https://github.com/joelhans))
 - Check if ACLK can be built [\#8030](https://github.com/netdata/netdata/pull/8030) ([underhood](https://github.com/underhood))
@@ -138,15 +144,11 @@
 - Fix a syntax error in the packaging functions. [\#7686](https://github.com/netdata/netdata/pull/7686) ([Ferroin](https://github.com/Ferroin))
 - Add missing quoting in shell scripts. [\#7685](https://github.com/netdata/netdata/pull/7685) ([Ferroin](https://github.com/Ferroin))
 - Fix setuid for freeipmi.plugin in Docker images [\#7684](https://github.com/netdata/netdata/pull/7684) ([lassebm](https://github.com/lassebm))
-- Restore support for protobuf 3.0 [\#7683](https://github.com/netdata/netdata/pull/7683) ([vlvkobal](https://github.com/vlvkobal))
-- Fix spelling of Prometheus \(\#7673\) [\#7674](https://github.com/netdata/netdata/pull/7674) ([candrews](https://github.com/candrews))
 - Fixes for pfSense Installation [\#7665](https://github.com/netdata/netdata/pull/7665) ([prologic](https://github.com/prologic))
 - error exit when rrdhost localhost init fails \#7504 [\#7663](https://github.com/netdata/netdata/pull/7663) ([underhood](https://github.com/underhood))
-- Fix buildyaml.sh script so that docs generation works correctly. [\#7662](https://github.com/netdata/netdata/pull/7662) ([Ferroin](https://github.com/Ferroin))
 - Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
 - Switch PR labeling to use GitHub Actions. [\#7630](https://github.com/netdata/netdata/pull/7630) ([Ferroin](https://github.com/Ferroin))
 - Docs: Improve documentation of opting out of anonymous statistics [\#7597](https://github.com/netdata/netdata/pull/7597) ([joelhans](https://github.com/joelhans))
-- Update handling of shutdown of the Netdata agent on update and uninstall. [\#7595](https://github.com/netdata/netdata/pull/7595) ([Ferroin](https://github.com/Ferroin))
 - Restrict quotes in label values [\#7594](https://github.com/netdata/netdata/pull/7594) ([thiagoftsm](https://github.com/thiagoftsm))
 - Reduce broken pipe errors [\#7588](https://github.com/netdata/netdata/pull/7588) ([thiagoftsm](https://github.com/thiagoftsm))
 - Move the script for installing required packages into the main repo. [\#7563](https://github.com/netdata/netdata/pull/7563) ([Ferroin](https://github.com/Ferroin))
@@ -155,7 +157,6 @@
 - Alarm Log labels [\#7548](https://github.com/netdata/netdata/pull/7548) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
 - Docs: Tweaks and linter fixes to contributing guidelines [\#7407](https://github.com/netdata/netdata/pull/7407) ([joelhans](https://github.com/joelhans))
-- network interface speed, duplex, operstate \#5989 [\#7395](https://github.com/netdata/netdata/pull/7395) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
