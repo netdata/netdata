@@ -140,7 +140,7 @@ size_t _mqtt_external_read_hook(void *buf, size_t count)
     return aclk_lws_wss_client_read(lws_engine_instance, buf, count);
 }
 
-int _mqtt_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
+int _mqtt_lib_init(void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
     int rc;
     int libmosq_major, libmosq_minor, libmosq_revision, libmosq_version;
@@ -285,7 +285,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
         }
     }
 
-    rc = _mqtt_lib_init(aclk_hostname, aclk_port, on_connect, on_disconnect);
+    rc = _mqtt_lib_init(on_connect, on_disconnect);
     if(rc != MOSQ_ERR_SUCCESS)
         return rc;
 

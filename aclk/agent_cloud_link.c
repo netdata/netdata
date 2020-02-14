@@ -139,20 +139,21 @@ struct aclk_query_queue {
  */
 unsigned long int aclk_delay(int mode)
 {
-    static int fail = 0;
+    static int fail = -1;
+    unsigned long int delay;
 
-    if (!mode || !fail) {
-        fail = 1;
+    if (!mode || fail == -1) {
         srandom(time(NULL));
+        fail = 0;
         return 0;
     }
 
-    fail = (fail << 1);
+    delay = (1 << fail++);
 
-    if (fail > ACLK_MAX_BACKOFF_DELAY)
+    if (delay >= ACLK_MAX_BACKOFF_DELAY)
         return ACLK_MAX_BACKOFF_DELAY * 1000;
 
-    return (fail * 1000) + (random() % 1000);
+    return (delay * 1000) + (random() % 1000);
 }
 
 /*
