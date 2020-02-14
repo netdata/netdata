@@ -68,6 +68,7 @@ static int thread_finished = 0;
 static int close_plugin = 0;
 static int mode = 2;
 static int debug_log = 0;
+static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
 
@@ -776,7 +777,7 @@ static void change_collector_event() {
         collector_events[i].name = NULL;
 }
 
-static void what_to_load(char *ptr) {
+static inline void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
         mode = 0;
     else if (!strcasecmp(ptr, "dev"))
@@ -785,21 +786,28 @@ static void what_to_load(char *ptr) {
         change_collector_event();
 }
 
-static void enable_debug(char *ptr) {
+static inline void enable_debug(char *ptr) {
     if (!strcasecmp(ptr, "yes"))
         debug_log = 1;
+}
+
+static inline void set_log_file(char *ptr) {
+    if (!strcasecmp(ptr, "yes"))
+        use_stdout = 1;
 }
 
 static void set_global_values() {
     struct section *sec = collector_config.sections;
     while(sec) {
-        if(sec && !strcasecmp(sec->name, "global")) {
+        if(!strcasecmp(sec->name, "global")) {
             struct config_option *values = sec->values;
             while(values) {
                 if(!strcasecmp(values->name, "load"))
                     what_to_load(values->value);
-                if(!strcasecmp(values->name, "debug log"))
+                else if(!strcasecmp(values->name, "debug log"))
                     enable_debug(values->value);
+                else if(!strcasecmp(values->name, "use stdout"))
+                    set_log_file(values->value);
 
                 values = values->next;
             }
