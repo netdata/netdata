@@ -144,7 +144,7 @@ unsigned long int aclk_delay(int mode)
 
     if (!mode || fail == -1) {
         srandom(time(NULL));
-        fail = 0;
+        fail = mode-1;
         return 0;
     }
 

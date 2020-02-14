@@ -123,6 +123,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_alarm_reload();
 void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
+unsigned long int aclk_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 
 
