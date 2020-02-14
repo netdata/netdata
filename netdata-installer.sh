@@ -1054,9 +1054,48 @@ detect_libc() {
   return 0
 }
 
+has_compatible_kernel_for_ebpf() {
+  kver="${1}"
+
+  # XXX: Logic taken from Slack discussion in #ebpf
+  # everything that has a version <= 4.14 can use the code built to 4.14
+  # Continue the logic, everything that has a version <= 4.19 and >= 4.15 can use the code built to 4.19
+  # Finally,  everybody that is using 5.X can use what is compiled with 5.4
+
+  kpkg=
+
+  if [ "${kver}" -gt 0 ] && [ "${kver}" -le 004014000 ]; then
+    echo >&2 "Using eBPG Kernel Collector built against Linux 4.14"
+    kpkg="4_14"
+  elif [ "${kver}" -gt 0 ] && [ "${kver}" -le 004019000 ]; then
+    echo >&2 "Using eBPG Kernel Collector built against Linux 4.19"
+    kpkg="4_19"
+  elif [ "${kver}" -gt 0 ] && [ "${kver}" -ge 005000000 ]; then
+    echo >&2 "Using eBPG Kernel Collector built against Linux 5.4"
+    kpkg="4_5"
+  else
+    echo >&2 " ERROR: Cannot detect a valid libc on your system!"
+    return 1
+  fi
+
+  echo "${kpkg}"
+  return 0
+}
+
 should_install_ebpf() {
   if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
     run_failed "ebpf not enabled. --enable-ebpf to enable"
+    return 1
+  fi
+
+  # Get and Parse Kernel Version
+  kver="$(get_kernel_version)"
+  kver="${kver:-0}"
+
+  # Check Kernel Compatibility
+  if ! get_compatible_kernel_for_ebpf "${kver}"; then
+    echo >&2 "Detect Kernel: ${kver}"
+    run_failed "Kernel incompatible. Please contact NetData support!"
     return 1
   fi
 
@@ -1079,11 +1118,17 @@ install_ebpf() {
 
   progress "Installing eBPF plugin"
 
-  ARCH=$(uname -m)
-  KERNEL="$(get_kernel_version)"
-  LIBC="$(detect_libc)"
+  # Get and Parse Kernel Version
+  kver="$(get_kernel_version)"
+  kver="${kver:-0}"
 
-  PACKAGE_TARBALL="netdata_ebpf-${COMPAT_KERNEL}-${LIBC}.tar.xz"
+  # Get Compatible eBPF Kernel Package
+  kpkg="$(get_compatible_kernel_for_ebpf "${kver}")"
+
+  # Detect libc
+  libc="$(detect_libc)"
+
+  PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
 
   tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
 
