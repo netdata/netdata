@@ -7,7 +7,9 @@
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr) {
     int fd =  open(filename, O_WRONLY | O_APPEND, 0);
     if (fd < 0) {
-        fprintf(out, "Cannot open %s : %s\n", filename, strerror(errno));
+        if(out) {
+            fprintf(out, "Cannot open %s : %s\n", filename, strerror(errno));
+        }
         return 1;
     }
 
@@ -17,9 +19,11 @@ static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netda
     if (length > 0) {
         ssize_t written = write(fd, cmd, strlen(cmd));
         if (written < 0) {
-            fprintf(out
-                    , "Cannot remove the event (%d, %d) '%s' from %s : %s\n"
-                    , getppid(), getpid(), cmd, filename, strerror((int)errno));
+            if(out) {
+                fprintf(out
+                        , "Cannot remove the event (%d, %d) '%s' from %s : %s\n"
+                        , getppid(), getpid(), cmd, filename, strerror((int)errno));
+            }
             ret = 1;
         }
     }

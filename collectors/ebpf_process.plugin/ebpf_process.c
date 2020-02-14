@@ -67,6 +67,7 @@ static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
 static int mode = 2;
+static int debug_log = 0;
 struct config collector_config;
 static int mykernel = 0;
 
@@ -140,7 +141,7 @@ static void int_exit(int sig)
         publish_aggregated = NULL;
     }
 
-    if(mode == 1) {
+    if(mode == 1 && debug_log) {
         unmap_memory();
     }
 
@@ -176,11 +177,11 @@ static void int_exit(int sig)
             int sid = setsid();
             if(sid >= 0) {
                 sleep(1);
-                open_developer_log();
-                if(developer_log) {
-                    debug(D_EXIT, "Wait for father %d die", event_pid);
-                    clean_kprobe_events(developer_log, event_pid, collector_events);
+                if(debug_log) {
+                    open_developer_log();
                 }
+                debug(D_EXIT, "Wait for father %d die", event_pid);
+                clean_kprobe_events(developer_log, event_pid, collector_events);
             } else {
                 error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
             }
@@ -570,6 +571,9 @@ static int netdata_store_bpf(void *data, int size) {
     if (close_plugin)
         return 0;
 
+    if(!debug_log)
+        return -2; //LIBBPF_PERF_EVENT_CONT;
+
     netdata_error_report_t *e = data;
     fprintf(developer_log
             ,"%llu %s %u: %s, %d\n"
@@ -583,7 +587,7 @@ void *process_log(void *ptr)
 {
     (void) ptr;
 
-    if (mode == 1) {
+    if (mode == 1 && debug_log) {
         int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
 
         netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
@@ -781,14 +785,21 @@ static void what_to_load(char *ptr) {
         change_collector_event();
 }
 
+static void enable_debug(char *ptr) {
+    if (!strcasecmp(ptr, "yes"))
+        debug_log = 1;
+}
+
 static void set_global_values() {
     struct section *sec = collector_config.sections;
     while(sec) {
-        if(sec && !strcmp(sec->name, "global")) {
+        if(sec && !strcasecmp(sec->name, "global")) {
             struct config_option *values = sec->values;
             while(values) {
-                if(!strcmp(values->name, "load"))
+                if(!strcasecmp(values->name, "load"))
                     what_to_load(values->value);
+                if(!strcasecmp(values->name, "debug log"))
+                    enable_debug(values->value);
 
                 values = values->next;
             }
@@ -865,7 +876,7 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
-    if(mode == 1) {
+    if(mode == 1 && debug_log) {
         if(map_memory()) {
             thread_finished++;
             error("[EBPF_PROCESS] Cannot map memory used with perf events.");
@@ -875,7 +886,9 @@ int main(int argc, char **argv)
 
     set_global_labels();
 
-    open_developer_log();
+    if(debug_log) {
+        open_developer_log();
+    }
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
