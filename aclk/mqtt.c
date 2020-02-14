@@ -206,7 +206,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
     info("MQTT in flight messages set to 1  -- %s", mosquitto_strerror(rc));
 #endif
 
-    rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_RECONNECT_DELAY, 1);
+    rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_BACKOFF_DELAY, 1);
 
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("Failed to set the reconnect delay (%d) (%s)", rc, mosquitto_strerror(rc));

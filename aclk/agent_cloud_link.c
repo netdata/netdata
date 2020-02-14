@@ -137,21 +137,18 @@ unsigned long int aclk_delay(int mode)
 {
     static int fail = 0;
 
-    if (!mode) {
-        fail = 0;
-        return 0;
-    }
-
-    if (fail == 0) {
+    if (!mode || !fail) {
+        fail = 1;
         srandom(time(NULL));
-        fail++;
         return 0;
     }
-    fail++;
 
-    unsigned long int delay = (unsigned long int)((powl(ACLK_DELAY_SEED, fail)) * 1000 + (random() % 1618));
+    if (fail > ACLK_MAX_BACKOFF_DELAY)
+        return ACLK_MAX_BACKOFF_DELAY * 1000;
 
-    return MIN(delay, ACLK_MAX_BACKOFF_DELAY);
+    fail = (1 << fail);
+
+    return (fail * 1000) + (random() % 1000);
 }
 
 /*
