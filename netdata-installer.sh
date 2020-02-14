@@ -1113,7 +1113,7 @@ should_install_ebpf() {
 
   run chmod +x "${tmp}"/check-kernel-config.sh
 
-  if ! "${tmp}"/check-kernel-config.sh; then
+  if ! run "${tmp}"/check-kernel-config.sh; then
     run_failed "Kernel unsupported or missing required config"
     return 1
   fi
