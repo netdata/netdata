@@ -3,7 +3,7 @@
 Simple module executing `exim -bpc` to grab exim queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.
 
-**Requirements**
+## Requirements
 
 The module uses `exim` binary which can only be executed as root by default. We need to allow other user that can run `exim` binary. We solving that adding `queue_list_requires_admin` statement in exim configuration and set to `false` because is `true` by default. On many Linux OS default location of `exim` configuration was in `/etc/exim.conf`.
 
