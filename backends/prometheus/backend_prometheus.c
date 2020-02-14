@@ -276,8 +276,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         }
     }
 
-    if(host->labels && *(host->labels)) {
-        snprintfz(labels, PROMETHEUS_LABELS_MAX, ",%s", host->labels);
+    if(host->labels_backend && *(host->labels_backend)) {
+        snprintfz(labels, PROMETHEUS_LABELS_MAX, ",%s", host->labels_backend);
     }
 
     // send custom variables set for the host

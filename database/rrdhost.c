@@ -69,6 +69,15 @@ static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
     freez(old);
 }
 
+static inline void rrdhost_init_labels_backend(RRDHOST *host, const char *labels) {
+    if(host->labels_backend && labels && !strcmp(host->labels_backend, labels))
+        return;
+
+    void *old = (void *)host->labels_backend;
+    host->labels_backend = (labels && *labels)?strdupz(labels):NULL;
+    freez(old);
+}
+
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
     if(host->hostname && hostname && !strcmp(host->hostname, hostname))
         return;
@@ -112,6 +121,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         const char *os,
                         const char *timezone,
                         const char *tags,
+                        const char *labels,
                         const char *program_name,
                         const char *program_version,
                         int update_every,
@@ -166,6 +176,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone);
     rrdhost_init_tags(host, tags);
+    rrdhost_init_labels(host, labels);
 
     host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
     host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
@@ -319,6 +330,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                      ", os '%s'"
                      ", timezone '%s'"
                      ", tags '%s'"
+                     ", labels backend '%s'"
                      ", program_name '%s'"
                      ", program_version '%s'"
                      ", update every %d"
@@ -338,6 +350,7 @@ RRDHOST *rrdhost_create(const char *hostname,
              , host->os
              , host->timezone
              , (host->tags)?host->tags:""
+             , (host->labels_backend)?host->labels_backend:""
              , host->program_name
              , host->program_version
              , host->rrd_update_every
@@ -367,6 +380,7 @@ RRDHOST *rrdhost_find_or_create(
         , const char *os
         , const char *timezone
         , const char *tags
+        , const char *labels
         , const char *program_name
         , const char *program_version
         , int update_every
@@ -391,6 +405,7 @@ RRDHOST *rrdhost_find_or_create(
                 , os
                 , timezone
                 , tags
+                , labels
                 , program_name
                 , program_version
                 , update_every
@@ -440,8 +455,9 @@ RRDHOST *rrdhost_find_or_create(
         if(host->rrd_memory_mode != mode)
             error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
 
-        // update host tags
+        // update host tags and labels
         rrdhost_init_tags(host, tags);
+        rrdhost_init_labels(host, labels);
     }
 
     rrdhost_cleanup_orphan_hosts_nolock(host);
@@ -506,6 +522,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , os_type
             , netdata_configured_timezone
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , config_get(CONFIG_SECTION_BACKEND, "host labels", "")
             , program_name
             , program_version
             , default_rrd_update_every
@@ -672,6 +689,7 @@ void rrdhost_free(RRDHOST *host) {
     // free it
 
     freez((void *)host->tags);
+    freez((void *)host->labels_backend);
     free_host_labels(host->labels);
     freez((void *)host->os);
     freez((void *)host->timezone);
@@ -996,11 +1014,8 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
     return label_list;
 }
 
-struct label *load_labels_from_tags()
+struct label *parse_backend_configs_string(char *config_string)
 {
-    if (!localhost->tags)
-        return NULL;
-
     struct label *label_list = NULL;
     BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
 
@@ -1014,30 +1029,46 @@ struct label *load_labels_from_tags()
     switch (type) {
         case BACKEND_TYPE_GRAPHITE:
             label_list = parse_simple_tags(
-                label_list, localhost->tags, '=', ';', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
+                label_list, config_string, '=', ';', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_TELNET:
             label_list = parse_simple_tags(
-                label_list, localhost->tags, '=', ' ', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
+                label_list, config_string, '=', ' ', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_HTTP:
             label_list = parse_simple_tags(
-                label_list, localhost->tags, ':', ',', STRIP_QUOTES, STRIP_QUOTES,
+                label_list, config_string, ':', ',', STRIP_QUOTES, STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
         case BACKEND_TYPE_JSON:
-            label_list = parse_json_tags(label_list, localhost->tags);
+            label_list = parse_json_tags(label_list, config_string);
             break;
         default:
             label_list = parse_simple_tags(
-                label_list, localhost->tags, '=', ',', DO_NOT_STRIP_QUOTES, STRIP_QUOTES,
+                label_list, config_string, '=', ',', DO_NOT_STRIP_QUOTES, STRIP_QUOTES,
                 DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
     }
 
-    return label_list;
+    return label_list
+}
+
+struct label *load_labels_from_tags()
+{
+    if (!localhost->tags)
+        return NULL;
+
+    return parse_backend_configs_string(localhost->tags)
+}
+
+struct label *load_labels_from_labels_backend()
+{
+    if (!localhost->labels_backend)
+        return NULL;
+
+    return parse_backend_configs_string(localhost->labels_backend)
 }
 
 struct label *load_kubernetes_labels()
@@ -1182,9 +1213,11 @@ void reload_host_labels()
     struct label *from_k8s = load_kubernetes_labels();
     struct label *from_config = load_config_labels();
     struct label *from_tags = load_labels_from_tags();
+    struct label *from_labels_back = load_labels_from_labels_backend();
 
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_tags);
+    new_labels = merge_label_lists(new_labels, from_labels_back);
     new_labels = merge_label_lists(new_labels, from_config);
 
     rrdhost_rdlock(localhost);
