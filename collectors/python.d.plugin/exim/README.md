@@ -19,16 +19,9 @@ On the WHM server `exim` we can reconfigure over WHM interface with next steps.
 1. Login to WHM
 2. Navigate to 
 Service Configuration --> Exim Configuration Manager --> tab Advanced Editor
-3. Scroll down to blue button `Add additional configuration setting`and click on it. (picture below)
-
-![Screen Shot 2020-02-14 at 10 20 48 AM](https://user-images.githubusercontent.com/53332414/74518595-6aebcd00-4f14-11ea-8995-e03c168eef0e.png)
-
-4. In the new dropdown above we need to find and choose:
+3. Scroll down to button `Add additional configuration setting`and click on it.
+4. In the new dropdown which will appear above we need to find and choose:
 `queue_list_requires_admin` and set to `false` 
-(picture below)
-
-![Screen Shot 2020-02-14 at 10 20 48 AM](https://user-images.githubusercontent.com/53332414/74518595-6aebcd00-4f14-11ea-8995-e03c168eef0e.png)
-
 5. Scroll to the end and click `Save` button.
 
 
