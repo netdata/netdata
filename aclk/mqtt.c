@@ -14,27 +14,27 @@ extern int cmdpause;
 
 inline const char *_link_strerror(int rc)
 {
-    (void) rc;
+    UNUSED(rc);
     return "no error";
 }
 
 int _link_event_loop(int timeout)
 {
-    (void) timeout;
+    UNUSED(timeout);
     return 0;
 }
 
 int _link_send_message(char *topic, char *message)
 {
-    (void) topic;
-    (void) message;
+    UNUSED(topic);
+    UNUSED(message);
     return 0;
 }
 
 int _link_subscribe(char  *topic, int qos)
 {
-    (void) topic;
-    (void) qos;
+    UNUSED(topic);
+    UNUSED(qos);
     return 0;
 }
 
@@ -45,10 +45,10 @@ void _link_shutdown()
 
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
-    (void) aclk_hostname;
-    (void) aclk_port;
-    (void) on_connect;
-    (void) on_disconnect;
+    UNUSED(aclk_hostname);
+    UNUSED(aclk_port);
+    UNUSED(on_connect);
+    UNUSED(on_disconnect);
     return 0;
 }
 
@@ -71,33 +71,10 @@ inline const char *_link_strerror(int rc)
 void mqtt_message_callback(
     struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
-    (void) mosq;
-    (void) obj;
+    UNUSED(mosq);
+    UNUSED(obj);
 
     // TODO: handle commands in a more efficient way, if we have many
-
-    if (strcmp((char *)msg->payload, "pause") == 0) {
-        cmdpause = 1;
-        return;
-    }
-
-    if (strcmp((char *)msg->payload, "resume") == 0) {
-        cmdpause = 0;
-        return;
-    }
-
-    if (strcmp((char *)msg->payload, "reload") == 0) {
-        error_log_limit_unlimited();
-        info("Reloading health configuration");
-        health_reload();
-        error_log_limit_reset();
-        return;
-    }
-
-    if (strcmp((char *)msg->payload, "info") == 0) {
-        aclk_send_metadata();
-        return;
-    }
 
     aclk_handle_cloud_request(msg->payload);
 }
@@ -112,8 +89,8 @@ struct aclk_lws_wss_engine_instance *lws_engine_instance = NULL;
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
-    (void) obj;
-    (void) rc;
+    UNUSED(obj);
+    UNUSED(rc);
 
     info("Connection to cloud estabilished");
 
@@ -127,8 +104,8 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 
 void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
-    (void) obj;
-    (void) rc;
+    UNUSED(obj);
+    UNUSED(rc);
 
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.

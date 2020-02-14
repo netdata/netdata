@@ -205,7 +205,7 @@ struct aclk_query *aclk_query_find_position(time_t time_to_run)
 struct aclk_query *aclk_query_find(char *topic, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query)
 {
     struct aclk_query *tmp_query, *prev_query;
-    (void) cmd;
+    UNUSED(cmd);
 
     tmp_query = aclk_queue.aclk_query_head;
     prev_query = NULL;
@@ -264,9 +264,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         else
             aclk_queue.aclk_query_head = tmp_query->next;
 
-#ifdef ACLK_DEBUG
-        info("Removing double entry");
-#endif
+        debug(D_ACLK, "Removing double entry");
         aclk_query_free(tmp_query);
         aclk_queue.count--;
     }
@@ -290,9 +288,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     new_query->created = now_realtime_sec();
     new_query->run_after = run_after;
 
-#ifdef ACLK_DEBUG
-    info("Added query (%s) (%s)", topic, query);
-#endif
+    debug(D_ACLK, "Added query (%s) (%s)", topic, query);
 
     tmp_query = aclk_query_find_position(run_after);
 
@@ -682,10 +678,8 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
         COLLECTOR_UNLOCK;
         return;
     }
-#ifdef ACLK_DEBUG
-    info("DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
-#endif
 
+    debug(D_ACLK, "DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
 
     COLLECTOR_UNLOCK;
     // TODO: Queue command for update to the cloud
@@ -758,54 +752,45 @@ int aclk_process_query()
 {
     struct aclk_query *this_query;
     static u_int64_t query_count = 0;
-    //int rc;
-
-    if (unlikely(cmdpause))
-        return 0;
 
     if (!aclk_connection_initialized)
         return 0;
 
     this_query = aclk_queue_pop();
     if (likely(!this_query)) {
-        //info("No pending queries");
         return 0;
     }
 
     if (unlikely(this_query->deleted)) {
-#ifdef ACLK_DEBUG
-        info("Garbage collect query %s:%s", this_query->topic, this_query->query);
-#endif
+        debug(D_ACLK, "Garbage collect query %s:%s", this_query->topic, this_query->query);
         aclk_query_free(this_query);
         return 1;
     }
     query_count++;
 
-#ifdef ACLK_DEBUG
-    info(
-        "Query #%d (%s) (%s) in queue %d seconds", (int) query_count, this_query->topic, this_query->query,
-        (int) (now_realtime_sec() - this_query->created));
-#endif
+    debug(
+        D_ACLK, "Query #%d (%s) (%s) in queue %d seconds", (int)query_count, this_query->topic, this_query->query,
+        (int)(now_realtime_sec() - this_query->created));
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
-            info("EXECUTING on connect metadata command");
+            debug(D_ACLK, "EXECUTING on connect metadata command");
             aclk_send_metadata();
             aclk_metadata_submitted = 1;
             aclk_query_free(this_query);
             return 1;
         case ACLK_CMD_CHART:
-            info("EXECUTING a chart update command");
+            debug(D_ACLK, "EXECUTING a chart update command");
             aclk_send_single_chart(this_query->data, this_query->query);
             aclk_query_free(this_query);
             return 1;
         case ACLK_CMD_ALARM:
-            info("EXECUTING an alarm update command");
-            //aclk_send_single_alarm(this_query->data, this_query->query);
+            debug(D_ACLK, "EXECUTING an alarm update command");
+            // TODO: handle properly
             aclk_query_free(this_query);
             return 1;
         case ACLK_CMD_ALARMS:
-            info("EXECUTING an alarm update command");
+            debug(D_ACLK, "EXECUTING an alarms update command");
             aclk_send_alarm_metadata();
             aclk_query_free(this_query);
             return 1;
@@ -837,9 +822,7 @@ int aclk_process_queries()
     if (likely(!aclk_queue.count))
         return 0;
 
-#ifdef ACLK_DEBUG
-    info("Processing %d queries", (int ) aclk_queue.count);
-#endif
+    debug(D_ACLK, "Processing %d queries", (int ) aclk_queue.count);
 
     //TODO: may consider possible throttling here
     while (aclk_process_query()) {
@@ -1103,7 +1086,7 @@ int aclk_subscribe(char *sub_topic, int qos)
 // This is called from a callback when the link goes up
 void aclk_connect(void *ptr)
 {
-    (void) ptr;
+    UNUSED(ptr);
     info("Connection detected");
     waiting_init = 0;
     return;
@@ -1112,7 +1095,7 @@ void aclk_connect(void *ptr)
 // This is called from a callback when the link goes down
 void aclk_disconnect(void *ptr)
 {
-    (void) ptr;
+    UNUSED(ptr);
     info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
@@ -1130,7 +1113,7 @@ void aclk_shutdown()
 
 int aclk_init(ACLK_INIT_ACTION action)
 {
-    (void) action;
+    UNUSED(action);
 
     static int init = 0;
     int rc;
@@ -1328,9 +1311,9 @@ int aclk_send_single_chart(char *hostname, char *chart)
 
 int    aclk_update_chart(RRDHOST *host, char *chart_name)
 {
-    (void) host;
-    (void) chart_name;
 #ifndef ENABLE_ACLK
+    UNUSED(host);
+    UNUSED(chart_name);
     return 0;
 #else
     if (host != localhost)
@@ -1379,9 +1362,7 @@ int aclk_handle_cloud_request(char *payload)
 {
     struct aclk_request cloud_to_agent = { .type_id = NULL, .msg_id = NULL, .topic = NULL, .url = NULL, .version = 0};
 
-#ifdef ACLK_DEBUG
-    info("ACLK PAYLOAD [%s]", payload);
-#endif
+    debug(D_ACLK, "ACLK PAYLOAD [%s]", payload);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
