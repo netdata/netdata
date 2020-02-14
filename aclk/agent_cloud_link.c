@@ -150,7 +150,7 @@ unsigned long int aclk_delay(int mode)
     if (fail > ACLK_MAX_BACKOFF_DELAY)
         return ACLK_MAX_BACKOFF_DELAY * 1000;
 
-    fail = (1 << fail);
+    fail = (fail << 1);
 
     return (fail * 1000) + (random() % 1000);
 }
