@@ -208,18 +208,11 @@ echo -ne "    - 'docs/Performance.md'
     - 'docs/high-performance-netdata.md'
 "
 
-navpart 1 . netdata-cloud "Netdata Cloud"
+navpart 1 collectors README "Collecting metrics"
 echo -ne "
-    - 'docs/netdata-cloud/README.md'
-    - 'docs/netdata-cloud/signing-in.md'
-    - 'docs/netdata-cloud/nodes-view.md'
-"
-
-navpart 1 web "README" "Dashboards"
-navpart 2 web/gui "" "" 3
-
-navpart 1 collectors "" "Data collection" 1
-echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
+    - 'collectors/QUICKSTART.md'
+    - 'collectors/COLLECTORS.md'
+    - 'collectors/REFERENCE.md'
     - Internal plugins:
 "
 
@@ -248,20 +241,12 @@ navpart 4 collectors/python.d.plugin "" "Modules" 3 excludefirstlevel useLastDir
 echo -ne "        - Node.js:
             - 'collectors/node.d.plugin/README.md'
 "
-navpart 4 collectors/node.d.plugin "" "Modules" 3 excludefirstlevel
+navpart 4 collectors/node.d.plugin "" "Modules" 3 excludefirstlevel useLastDirAsPageName
 
 echo -ne "        - BASH:
             - 'collectors/charts.d.plugin/README.md'
-            - Modules:
-                - 'collectors/charts.d.plugin/ap/README.md'
-                - 'collectors/charts.d.plugin/apcupsd/README.md'
-                - 'collectors/charts.d.plugin/example/README.md'
-                - 'collectors/charts.d.plugin/libreswan/README.md'
-                - 'collectors/charts.d.plugin/nut/README.md'
-                - 'collectors/charts.d.plugin/opensips/README.md'
-            - Obsolete Modules:
-                - 'collectors/charts.d.plugin/sensors/README.md'
 "
+navpart 4 collectors/charts.d.plugin "" "Modules" 3 excludefirstlevel useLastDirAsPageName
 
 navpart 3 collectors/apps.plugin
 navpart 3 collectors/cups.plugin
@@ -273,9 +258,15 @@ navpart 3 collectors/xenstat.plugin
 navpart 3 collectors/perf.plugin
 navpart 3 collectors/slabinfo.plugin
 
-
-echo -ne "    - 'docs/Third-Party-Plugins.md'
+navpart 1 . netdata-cloud "Netdata Cloud"
+echo -ne "
+    - 'docs/netdata-cloud/README.md'
+    - 'docs/netdata-cloud/signing-in.md'
+    - 'docs/netdata-cloud/nodes-view.md'
 "
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
 
 navpart 1 health README "Health monitoring and alerts"
 echo -ne "    - 'health/QUICKSTART.md'

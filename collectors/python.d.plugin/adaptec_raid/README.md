@@ -1,12 +1,18 @@
-# adaptec raid
+# Adaptec RAID controller monitoring with Netdata
 
-Module collects logical and physical devices health metrics.
+Collects logical and physical devices metrics.
 
-**Requirements:**
+## Requirements
 
--   `arcconf` program
--   `sudo` program
--   `netdata` user needs to be able to sudo the `arcconf` program without password
+The module uses `arcconf`, which can only be executed by root.  It uses
+`sudo` and assumes that it is configured such that the `netdata` user can
+execute `arcconf` as root without password.
+
+Add to `sudoers`:
+
+```
+netdata ALL=(root)       NOPASSWD: /path/to/arcconf
+```
 
 To grab stats it executes:
 
@@ -23,27 +29,23 @@ It produces:
 
 4.  **Physical Device Temperature**
 
-## prerequisite
+## Configuration
 
-This module uses `arcconf` which can only be executed by root.  It uses
-`sudo` and assumes that it is configured such that the `netdata` user can
-execute `arcconf` as root without password.
-
-Add to `sudoers`:
-
-```
-netdata ALL=(root)       NOPASSWD: /path/to/arcconf
-```
-
-## configuration
-
- **adaptec_raid** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+**adaptec_raid** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
 ```yaml
 adaptec_raid: yes
 ```
 
-### Screenshot:
+Edit the `python.d/adaptec_raid.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/adaptec_raid.conf
+```
+
+
 
 ![image](https://user-images.githubusercontent.com/22274335/47278133-6d306680-d601-11e8-87c2-cc9c0f42d686.png)
 

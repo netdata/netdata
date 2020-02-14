@@ -1,6 +1,6 @@
-# retroshare
+# RetroShare monitoring with Netdata
 
-[RetroShare](https://retroshare.cc/) is a free and open-source peer-to-peer communication and file sharing app based on a friend-to-friend network.
+Monitors application bandwidth, peers and DHT metrics. 
 
 This module will monitor one or more `RetroShare` applications, depending on your configuration.
 
@@ -14,6 +14,14 @@ This module produces the following charts:
 
 
 ## Configuration
+
+Edit the `python.d/retroshare.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/retroshare.conf
+```
 
 Here is an example for 2 servers:
 

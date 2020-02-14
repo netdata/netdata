@@ -1,6 +1,6 @@
-# SNMP Data Collector
+# SNMP device monitoring with Netdata
 
-Using this collector, Netdata can collect data from any SNMP device. This collector uses [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
+Collects data from any SNMP device and uses the [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
 
 It supports:
 

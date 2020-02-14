@@ -1,4 +1,4 @@
-# exim
+# Exim monitoring with Netdata
 
 Simple module executing `exim -bpc` to grab exim queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.

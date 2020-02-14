@@ -288,6 +288,8 @@ extern void recursive_config_double_dir_load(
 
 #define BITS_IN_A_KILOBIT 1000
 
+/* misc. */
+#define UNUSED(x) (void)(x)
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);

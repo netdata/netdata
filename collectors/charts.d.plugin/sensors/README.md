@@ -1,4 +1,4 @@
-# sensors
+# Linux machine sensors monitoring with Netdata
 
 > THIS MODULE IS OBSOLETE.
 > USE [THE PYTHON ONE](../../python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
@@ -24,9 +24,17 @@ The plugin will create Netdata charts for:
 
 One chart for every sensor chip found and each of the above will be created.
 
-## configuration
+## Configuration
 
-This is the internal default for `/etc/netdata/sensors.conf`
+Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d/sensors.conf
+```
+
+This is the internal default for `charts.d/sensors.conf`
 
 ```sh
 # the directory the kernel keeps sensor data

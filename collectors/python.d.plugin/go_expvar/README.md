@@ -1,11 +1,8 @@
-# go_expvar
+# Go application monitoring with Netdata
 
-The `go_expvar` module can monitor any Go application that exposes its metrics with the use of
-`expvar` package from the Go standard library.
+Monitors Go application that exposes its metrics with the use of `expvar` package from the Go standard library.  The package produces charts for Go runtime memory statistics and optionally any number of custom charts.
 
-`go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts.
-
-For the memory statistics, it produces the following charts:
+The `go_expvar` module produces the following charts:
 
 1.  **Heap allocations** in kB
 
@@ -36,7 +33,7 @@ For the memory statistics, it produces the following charts:
 
     -   avg: average duration of all GC stop-the-world pauses
 
-## Monitoring Go Applications
+## Monitoring Go applications
 
 Netdata can be used to monitor running Go applications that expose their metrics with
 the use of the [expvar package](https://golang.org/pkg/expvar/) included in Go standard library.
@@ -251,7 +248,15 @@ In the above case, the exported variables will be available under `runtime.gorou
 `counters.cnt1` and `counters.cnt2` expvar_keys. If the flattening results in a key collision,
 the first defined key wins and all subsequent keys with the same name are ignored.
 
-**Configuration example**
+## Configuration
+
+Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/go_expvar.conf
+```
 
 The configuration below matches the second Go application described above.
 Netdata will monitor and chart memory stats for the application, as well as a custom chart of

@@ -144,7 +144,7 @@ changes based on your particular Nginx setup.
 
 **What's next?**:
 
--   Look at the [full list of data collection modules](Add-more-charts-to-netdata.md#available-data-collection-modules)
+-   Look at the [full list of data collection modules](../collectors/COLLECTORS.md)
     to configure your sources for auto-detection and monitoring.
 -   Improve the [performance](Performance.md) of Netdata on low-memory systems.
 -   Configure `systemd` to expose [systemd services

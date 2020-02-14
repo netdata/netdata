@@ -1,6 +1,6 @@
-# ipfs
+# IPFS monitoring with Netdata
 
-Module monitors [IPFS](https://ipfs.io) basic information.
+Collects [IPFS](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics. 
 
 1.  **Bandwidth** in kbits/s
 
@@ -11,7 +11,15 @@ Module monitors [IPFS](https://ipfs.io) basic information.
 
     -   peers
 
-## configuration
+## Configuration
+
+Edit the `python.d/ipfs.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/ipfs.conf
+```
 
 Only url to IPFS server is needed.
 
