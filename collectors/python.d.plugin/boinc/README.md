@@ -1,13 +1,10 @@
-# boinc
+# BOINC monitoring with Netdata
 
-This module monitors task counts for the Berkely Open Infrastructure
-Networking Computing (BOINC) distributed computing client using the same
-RPC interface that the BOINC monitoring GUI does.
+Monitors task counts for the Berkely Open Infrastructure Networking Computing (BOINC) distributed computing client using the same RPC interface that the BOINC monitoring GUI does.
 
-It provides charts tracking the total number of tasks and active tasks,
-as well as ones tracking each of the possible states for tasks.
+It provides charts tracking the total number of tasks and active tasks, as well as ones tracking each of the possible states for tasks.
 
-## configuration
+## Configuration
 
 Edit the `python.d/boinc.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.

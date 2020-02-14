@@ -1,6 +1,6 @@
-# traefik
+# Traefik monitoring with Netdata
 
-Module uses the `health` API to provide statistics.
+Uses the `health` API to provide statistics.
 
 It produces:
 

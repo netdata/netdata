@@ -1,6 +1,6 @@
-# rethinkdbs
+# RethinkDB monitoring with Netdata
 
-Module monitor rethinkdb health metrics.
+Collects database server and cluster statistics.
 
 Following charts are drawn:
 

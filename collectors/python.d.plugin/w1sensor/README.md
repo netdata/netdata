@@ -1,6 +1,7 @@
-# w1sensor
+# 1-Wire Sensors monitoring with Netdata
 
-Data from 1-Wire sensors.
+Monitors sensor temperature.
+
 On Linux these are supported by the wire, w1_gpio, and w1_therm modules.
 Currently temperature sensors are supported and automatically detected.
 

@@ -1,6 +1,6 @@
-# dns_query_time
+# DNS query RTT monitoring with Netdata
 
-This module provides DNS query time statistics.
+Measures DNS query round trip time.
 
 **Requirement:**
 

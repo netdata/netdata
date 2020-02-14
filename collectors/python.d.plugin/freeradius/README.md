@@ -1,4 +1,4 @@
-# freeradius
+# FreeRADIUS monitoring with Netdata
 
 Uses the `radclient` command to provide freeradius statistics. It is not recommended to run it every second.
 
@@ -44,7 +44,7 @@ It produces:
     -   proxy-acct-malformed-requests
     -   proxy-acct-unknown-typesa
 
-## configuration
+## Configuration
 
 Edit the `python.d/freeradius.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.

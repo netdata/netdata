@@ -1,6 +1,6 @@
-# portcheck
+# TCP endpoint monitoring with Netdata
 
-Module monitors a remote TCP service.
+Monitors TCP endpoint availability and response time.
 
 Following charts are drawn per host:
 

@@ -1,8 +1,8 @@
-# bind_rndc
+# ISC Bind monitoring with Netdata
 
-Module parses bind dump file to collect real-time performance metrics
+Collects Name server summary performance statistics using `rndc` tool.
 
-**Requirements:**
+## Requirements
 
 -   Version of bind must be 9.6 +
 -   Netdata must have permissions to run `rndc stats`
@@ -49,7 +49,7 @@ It produces:
 
 -   Same as Incoming queries
 
-## configuration
+## Configuration
 
 Edit the `python.d/bind_rndc.conf` configuration file using `edit-config` from the your agent's [config
 directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.

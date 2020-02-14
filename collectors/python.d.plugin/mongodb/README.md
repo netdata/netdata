@@ -1,8 +1,8 @@
-# mongodb
+# MongoDB monitoring with Netdata
 
-Module monitor mongodb performance and health metrics
+Monitors performance and health metrics of MongoDB.
 
-**Requirements:**
+## Requirements
 
 -   `python-pymongo` package v2.4+.
 

@@ -1,8 +1,8 @@
-# icecast
+# Icecast monitoring with Netdata
 
-This module will monitor number of listeners for active sources.
+Monitors the number of listeners for active sources.
 
-**Requirements:**
+## Requirements
 
 -   icecast version >= 2.4.0
 

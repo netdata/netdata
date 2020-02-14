@@ -1,6 +1,6 @@
-# stiebel eltron
+# Stiebel Eltron ISG monitoring with Netdata
 
-This module collects metrics from the configured heat pump and hot water installation from Stiebel Eltron ISG web.
+Collects metrics from the configured heat pump and hot water installation from Stiebel Eltron ISG web.
 
 **Requirements**
 

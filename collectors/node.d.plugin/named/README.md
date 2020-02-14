@@ -1,6 +1,6 @@
-# ISC Bind Statistics
+# ISC BIND monitoring with Netdata 
 
-Using this Netdata collector, you can monitor one or more ISC Bind servers.
+Monitor one or more ISC Bind servers.
 
 ## Example Netdata charts
 

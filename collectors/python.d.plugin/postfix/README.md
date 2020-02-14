@@ -1,6 +1,8 @@
-# postfix
+# Postfix monitoring with Netdata
 
-Simple module executing `postfix -p` to grab postfix queue.
+Monitors MTA email queue statistics using postqueue tool.  
+
+Execute `postfix -p` to grab postfix queue.
 
 It produces only two charts:
 

@@ -1,8 +1,6 @@
-# ceph
+# CEPH monitoring with Netdata
 
-This module monitors the ceph cluster usage and consumption data of a server.
-
-It produces:
+Monitors the ceph cluster usage and consumption data of a server, and produces:
 
 -   Cluster statistics (usage, available, latency, objects, read/write rate)
 -   OSD usage
@@ -12,7 +10,7 @@ It produces:
 -   Pool read/write rate
 -   number of objects per pool
 
-**Requirements:**
+## Requirements
 
 -   `rados` python module
 -   Granting read permissions to ceph group from keyring file
