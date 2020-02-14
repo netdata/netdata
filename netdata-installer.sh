@@ -1065,13 +1065,13 @@ get_compatible_kernel_for_ebpf() {
   kpkg=
 
   if [ "${kver}" -gt 0 ] && [ "${kver}" -le 004014000 ]; then
-    echo >&2 "Using eBPG Kernel Collector built against Linux 4.14"
+    echo >&2 " Using eBPG Kernel Collector built against Linux 4.14"
     kpkg="4_14"
   elif [ "${kver}" -gt 0 ] && [ "${kver}" -le 004019000 ]; then
-    echo >&2 "Using eBPG Kernel Collector built against Linux 4.19"
+    echo >&2 " Using eBPG Kernel Collector built against Linux 4.19"
     kpkg="4_19"
   elif [ "${kver}" -gt 0 ] && [ "${kver}" -ge 005000000 ]; then
-    echo >&2 "Using eBPG Kernel Collector built against Linux 5.4"
+    echo >&2 " Using eBPG Kernel Collector built against Linux 5.4"
     kpkg="4_5"
   else
     echo >&2 " ERROR: Cannot detect a valid libc on your system!"
@@ -1094,7 +1094,7 @@ should_install_ebpf() {
 
   # Check Kernel Compatibility
   if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
-    echo >&2 "Detect Kernel: ${kver}"
+    echo >&2 " Detected Kernel: ${kver}"
     run_failed "Kernel incompatible. Please contact NetData support!"
     return 1
   fi
