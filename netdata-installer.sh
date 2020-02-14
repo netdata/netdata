@@ -1054,7 +1054,7 @@ detect_libc() {
   return 0
 }
 
-has_compatible_kernel_for_ebpf() {
+get_compatible_kernel_for_ebpf() {
   kver="${1}"
 
   # XXX: Logic taken from Slack discussion in #ebpf
@@ -1093,7 +1093,7 @@ should_install_ebpf() {
   kver="${kver:-0}"
 
   # Check Kernel Compatibility
-  if ! get_compatible_kernel_for_ebpf "${kver}"; then
+  if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
     echo >&2 "Detect Kernel: ${kver}"
     run_failed "Kernel incompatible. Please contact NetData support!"
     return 1
