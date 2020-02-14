@@ -115,6 +115,19 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
+### CentOS / RHEL 6.x
+
+On CentOS / RHEL 6.x, many of the dependencies for Netdata are only
+available with versions older than what we need, so special setup is
+required if manually installing packages.
+
+CentOS 6.x:
+
+- Enable the EPEL repo
+- Enable the additional repo from [okay.network](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
+
+And install the minimum required dependencies.
+
 ### CentOS / RHEL 8.x
 
 For CentOS / RHEL 8.x a lot of development packages have moved out into their
