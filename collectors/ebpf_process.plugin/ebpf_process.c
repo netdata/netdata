@@ -780,8 +780,10 @@ static void change_collector_event() {
 static inline void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
         mode = 0;
+    /*
     else if (!strcasecmp(ptr, "dev"))
         mode = 1;
+        */
     else
         change_collector_event();
 }
