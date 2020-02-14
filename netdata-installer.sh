@@ -1048,7 +1048,6 @@ detect_libc() {
     libc="musl"
   else
     echo >&2 " ERROR: Cannot detect a valid libc on your system!"
-    ldd --version 1>&2
     return 1
   fi
   echo "${libc}"
