@@ -1171,6 +1171,10 @@ install_ebpf() {
   libdir=
   libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
   if [ -z "${libdir}" ]; then
+    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
+  fi
+
+  if [ -z "${libdir}" ]; then
     run_failed "Could not find a suitable lib directory"
     return 1
   fi
