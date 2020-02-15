@@ -1047,7 +1047,7 @@ detect_libc() {
     echo >&2 " Detected musl"
     libc="musl"
   else
-    echo >&2 " ERROR: Cannot detect a valid libc on your system!"
+    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
     return 1
   fi
   echo "${libc}"
@@ -1074,7 +1074,7 @@ get_compatible_kernel_for_ebpf() {
     echo >&2 " Using eBPF Kernel Package built against Linux 4.14"
     kpkg="4_14"
   else
-    echo >&2 " ERROR: Cannot detect a valid libc on your system!"
+    echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
     return 1
   fi
 
