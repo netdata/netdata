@@ -22,6 +22,7 @@
 #  - pushover.net notifications by @ktsaou
 #  - pushbullet.com push notifications by Tiago Peralta @tperalta82 #1070
 #  - telegram.org notifications by @hashworks #1002
+#  - tiniyo.com notifications by Tiniyo Team @tiniyo5 #1012
 #  - twilio.com notifications by Levi Blaney @shadycuz #1211
 #  - kafka notifications by @ktsaou #1342
 #  - pagerduty.com notifications by Jim Cooley @jimcooley #1373
@@ -156,6 +157,7 @@ alerta
 flock
 discord
 hipchat
+tiniyo
 twilio
 messagebird
 pd
@@ -314,6 +316,11 @@ PUSHOVER_APP_TOKEN=
 # pushbullet configs
 PUSHBULLET_ACCESS_TOKEN=
 PUSHBULLET_SOURCE_DEVICE=
+
+# tiniyo configs
+TINIYO_ACCOUNT_AUTHID=
+TINIYO_ACCOUNT_AUTHSECRETID=
+TINIYO_NUMBER=
 
 # twilio configs
 TWILIO_ACCOUNT_SID=
@@ -474,6 +481,9 @@ filter_recipient_by_criticality() {
 
 # check pushbullet
 [ -z "${PUSHBULLET_ACCESS_TOKEN}" ] && SEND_PUSHBULLET="NO"
+
+# check tiniyo
+{ [ -z "${TINIYO_ACCOUNT_AUTHID}" ] || [ -z "${TINIYO_ACCOUNT_AUTHSECRETID}" ] || [ -z "${TINIYO_NUMBER}" ]; } && SEND_TINIYO="NO"
 
 # check twilio
 { [ -z "${TWILIO_ACCOUNT_TOKEN}" ] || [ -z "${TWILIO_ACCOUNT_SID}" ] || [ -z "${TWILIO_NUMBER}" ]; } && SEND_TWILIO="NO"
@@ -972,6 +982,33 @@ EOF
 				sent=$((sent + 1))
 			else
 				error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+			fi
+		done
+
+		[ ${sent} -gt 0 ] && return 0
+	fi
+
+	return 1
+}
+
+# -----------------------------------------------------------------------------
+# tiniyo sender
+
+send_tiniyo() {
+	local accountauthid="${1}" accountsecret="${2}" tiniyonumber="${3}" recipients="${4}" title="${5}" message="${6}" httpcode sent=0 user
+	if [ "${SEND_TINIYO}" = "YES" ] && [ -n "${accountauthid}" ] && [ -n "${accountsecret}" ] && [ -n "${tiniyonumber}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
+		#https://tiniyo.com/dist/index2.html#tag/Message(SMS)
+		for user in ${recipients}; do
+			httpcode=$(docurl -X POST \
+				-u "${accountauthid}:${accountsecret}" \
+				"https://api.tiniyo.com/v1/Account/${accountsauthid}/Messages" \
+				-d '{ "dst": "'${user}'", "src": "'${tiniyonumber}'", "text": "'${title} ${message}'" }')
+
+			if [ "${httpcode}" = "200" ]; then
+				info "sent Tiniyo SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
 			fi
 		done
 
@@ -2086,6 +2123,17 @@ ${date}\\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
+
+# -----------------------------------------------------------------------------
+# send the tiniyo SMS
+
+send_tiniyo "${TINIYO_ACCOUNT_AUTHID}" "${TINIYO_ACCOUNT_AUTHSECRETID}" "${TINIYO_NUMBER}" "${to_tiniyo}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
+Severity: ${severity}
+Chart: ${chart}
+Family: ${family}
+${info}"
+
+SENT_TINIYO=$?
 
 # -----------------------------------------------------------------------------
 # send the twilio SMS
