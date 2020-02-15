@@ -229,6 +229,7 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
+${RPM_BUILD_DIR}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}
 
 %build
 # Conf step
@@ -517,6 +518,8 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Thu Feb 13 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-13
+- Add handling for custom libmosquitto fork
 * Wed Jan 01 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-12
 - Add explicit installation of log and cache directories
 - Clean up build dependencies.
