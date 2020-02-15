@@ -18,6 +18,7 @@ RUN pacman --noconfirm --needed -S autoconf \
                                    libwebsockets
 
 ARG ACLK=no
+ARG EXTRA
 COPY . /opt/netdata/source
 WORKDIR /opt/netdata/source
 
@@ -39,8 +40,8 @@ RUN rm -rf autom4te.cache
 RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
-RUN ACLK=${ACLK} CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
-    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1" ./netdata-installer.sh --disable-lto
+RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
+    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA}" ./netdata-installer.sh --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
