@@ -229,7 +229,7 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
-${RPM_BUILD_DIR}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}
+${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 
 %build
 # Conf step
