@@ -63,7 +63,7 @@ void *aclk_main(void *ptr);
 
 #define NETDATA_ACLK_HOOK \
     { \
-        .name = "AgentCloudLink", \
+        .name = "ACLK_Main", \
         .config_section = NULL, \
         .config_name = NULL, \
         .enabled = 1, \
