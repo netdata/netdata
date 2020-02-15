@@ -521,6 +521,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_FLOCK}" = "YES" ] ||
 	[ "${SEND_DISCORD}" = "YES" ] ||
 	[ "${SEND_HIPCHAT}" = "YES" ] ||
+	[ "${SEND_TINIYO}" = "YES" ] ||
 	[ "${SEND_TWILIO}" = "YES" ] ||
 	[ "${SEND_MESSAGEBIRD}" = "YES" ] ||
 	[ "${SEND_KAVENEGAR}" = "YES" ] ||
@@ -548,6 +549,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_PD="NO"
 		SEND_FLOCK="NO"
 		SEND_DISCORD="NO"
+		SEND_TINIYO="NO"
 		SEND_TWILIO="NO"
 		SEND_HIPCHAT="NO"
 		SEND_MESSAGEBIRD="NO"
@@ -668,6 +670,7 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_ALERTA}" \
 	"${SEND_FLOCK}" \
 	"${SEND_DISCORD}" \
+	"${SEND_TINIYO}" \
 	"${SEND_TWILIO}" \
 	"${SEND_HIPCHAT}" \
 	"${SEND_MESSAGEBIRD}" \
