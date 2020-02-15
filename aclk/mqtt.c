@@ -229,7 +229,7 @@ int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("Connect %s MQTT status = %d (%s)", aclk_hostname, rc, mosquitto_strerror(rc));
     else
-        info("Establishing MQTT link to %s", aclk_hostname);
+        info("Establishing MQTT link to [%s:%d]", aclk_hostname, aclk_port);
 
     return rc;
 }
@@ -255,7 +255,7 @@ static inline void _link_mosquitto_write()
 void aclk_lws_connect_notif_callback(){
     //the connection is done by LWS so this parameters dont matter
     //ig MQTT over LWS is used
-    _link_mqtt_connect("doesntmatter", 12345);
+    _link_mqtt_connect(aclk_hostname, aclk_port);
     _link_mosquitto_write();
 }
 
