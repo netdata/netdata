@@ -1,0 +1,5 @@
+version: '3.3'
+services:
+  vernemq:
+    image: vernemq-timo
+
