@@ -57,13 +57,12 @@ Try mounting the `tracefs` and `debugfs` filesystems using the commands below:
 If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to 
 mount these filesystems.
 
-## Configuring Netdata for eBPF plugin
+## Enable the eBPF plugin
+The plugin is disabled by default because it adds overhead to the system running the Netdata agent.
 
-The plugin is disabled by default because it adds overhead to the computer.
-To enable it set `ebpf_process = yes` in the `plugins` section of the `netdata.conf` configuration file
-as demonstrated below
+To enable it, use `edit-config` to open `netdata.conf` and set `ebpf_process = yes` in the `[plugins]` section.
 
-```
+```conf
 [plugins]
    ebpf_process = yes
 ```
