@@ -897,13 +897,13 @@ void *aclk_query_main_thread(void *ptr)
             aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
         }
 
+        aclk_process_queries();
+
         QUERY_THREAD_LOCK;
 
         // TODO: Need to check if there are queries awaiting already
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
             sleep_usec(USEC_PER_SEC * 1);
-
-        aclk_process_queries();
 
         QUERY_THREAD_UNLOCK;
 
