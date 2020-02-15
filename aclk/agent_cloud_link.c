@@ -14,7 +14,6 @@ int aclk_metadata_submitted = 0;
 int agent_state = 0;
 time_t last_init_sequence = 0;
 int waiting_init = 1;
-int cmdpause = 0; // Used to pause query processing
 
 BUFFER *aclk_buffer = NULL;
 char *global_base_topic = NULL;
@@ -135,7 +134,11 @@ struct aclk_query_queue {
 /*
  * After a connection failure -- delay in milliseconds
  * When a connection is established, the delay function
- * should be called with mode 0 to reset the fail count
+ * should be called with
+ *
+ * mode 0 to reset the delay
+ * mode 1 to sleep for the calculated amount of time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
+ *
  */
 unsigned long int aclk_delay(int mode)
 {
@@ -148,12 +151,19 @@ unsigned long int aclk_delay(int mode)
         return 0;
     }
 
-    delay = (1 << fail++);
+    delay = (1 << fail);
 
-    if (delay >= ACLK_MAX_BACKOFF_DELAY)
-        return ACLK_MAX_BACKOFF_DELAY * 1000;
+    if (delay >= ACLK_MAX_BACKOFF_DELAY) {
+        delay = ACLK_MAX_BACKOFF_DELAY * 1000;
+    }
+    else {
+        fail++;
+        delay = (delay * 1000) + (random() % 1000);
+    }
 
-    return (delay * 1000) + (random() % 1000);
+    sleep_usec(USEC_PER_MS * delay);
+
+    return delay;
 }
 
 /*
@@ -385,41 +395,25 @@ struct aclk_query *aclk_queue_pop()
 // is enough information to determine the base topic at init time
 
 
-char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
+char *create_publish_base_topic()
 {
-    static char *topic = NULL;
-
     if (unlikely(!is_agent_claimed()))
         return NULL;
 
     ACLK_LOCK;
 
-    if (unlikely(action == PUBLICH_TOPIC_FREE)) {
-        if (likely(topic)) {
-            freez(topic);
-            topic = NULL;
-        }
+    if (unlikely(!global_base_topic)) {
+        char tmp_topic[ACLK_MAX_TOPIC + 1], *tmp;
 
-        ACLK_UNLOCK;
-
-        return NULL;
-    }
-
-    if (unlikely(action == PUBLICH_TOPIC_REBUILD)) {
-        ACLK_UNLOCK;
-        get_publish_base_topic(PUBLICH_TOPIC_FREE);
-        return get_publish_base_topic(PUBLICH_TOPIC_GET);
-    }
-
-    if (unlikely(!topic)) {
-        char tmp_topic[ACLK_MAX_TOPIC + 1];
-
-        sprintf(tmp_topic, ACLK_TOPIC_STRUCTURE, is_agent_claimed());
-        topic = strdupz(tmp_topic);
+        snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, is_agent_claimed());
+        tmp = strchr(tmp_topic, '\n');
+        if (unlikely(tmp))
+            *tmp = '\0';
+        global_base_topic = strdupz(tmp_topic);
     }
 
     ACLK_UNLOCK;
-    return topic;
+    return global_base_topic;
 }
 
 /*
@@ -432,9 +426,6 @@ char *get_topic(char *sub_topic, char *final_topic, int max_size)
 {
     if (likely(sub_topic && sub_topic[0] == '/'))
         return sub_topic;
-
-    if (unlikely(!global_base_topic))
-        global_base_topic = GET_PUBLISH_BASE_TOPIC;
 
     if (unlikely(!global_base_topic))
         return sub_topic;
@@ -631,9 +622,7 @@ static struct _collector  *_add_collector(const char *hostname, const char *plug
         collector_list->next = tmp_collector;
     }
     tmp_collector->count++;
-#ifdef ACLK_DEBUG
-    info("ADD COLLECTOR %s [%s:%s] -- count %u", hostname, plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
-#endif
+    debug(D_ACLK, "ADD COLLECTOR %s [%s:%s] -- chart %u", hostname, plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
     return tmp_collector;
 }
 
@@ -680,7 +669,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
         return;
     }
 
-    debug(D_ACLK, "DEL COLLECTOR [%s:%s] -- count %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
+    debug(D_ACLK, "DEL COLLECTOR [%s:%s] -- charts %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
 
     COLLECTOR_UNLOCK;
     // TODO: Queue command for update to the cloud
@@ -770,35 +759,36 @@ int aclk_process_query()
     query_count++;
 
     debug(
-        D_ACLK, "Query #%d (%s) (%s) in queue %d seconds", (int)query_count, this_query->topic, this_query->query,
+        D_ACLK, "Query #%lld (%s) (%s) in queue %d seconds", query_count, this_query->topic, this_query->query,
         (int)(now_realtime_sec() - this_query->created));
 
     switch (this_query->cmd) {
+
         case ACLK_CMD_ONCONNECT:
             debug(D_ACLK, "EXECUTING on connect metadata command");
             aclk_send_metadata();
-            aclk_metadata_submitted = 1;
-            aclk_query_free(this_query);
-            return 1;
+            aclk_metadata_submitted = 2;
+            break;
+
         case ACLK_CMD_CHART:
             debug(D_ACLK, "EXECUTING a chart update command");
             aclk_send_single_chart(this_query->data, this_query->query);
-            aclk_query_free(this_query);
-            return 1;
+            break;
+
         case ACLK_CMD_ALARM:
             debug(D_ACLK, "EXECUTING an alarm update command");
             // TODO: handle properly
-            aclk_query_free(this_query);
-            return 1;
+            break;
+
         case ACLK_CMD_ALARMS:
             debug(D_ACLK, "EXECUTING an alarms update command");
             aclk_send_alarm_metadata();
-            aclk_query_free(this_query);
-            return 1;
+            break;
+
         case ACLK_CMD_CLOUD:
             aclk_execute_query(this_query);
-            aclk_query_free(this_query);
-            return 1;
+            break;
+
         default:
             break;
     }
@@ -816,9 +806,6 @@ int aclk_process_query()
 
 int aclk_process_queries()
 {
-    if (unlikely(cmdpause))
-        return 0;
-
     // Return if no queries pending
     if (likely(!aclk_queue.count))
         return 0;
@@ -851,41 +838,40 @@ static void aclk_query_thread_cleanup(void *ptr)
 }
 
 /**
- * MAin query processing thread
+ * Main query processing thread
  *
+ * On startup wait for the agent collectors to initialize
+ * Expect at least a time of ACLK_STABLE_TIMEOUT seconds
+ * of no new collectors coming in in order to mark the agent
+ * as stable (set agent_state = 1)
  */
 void *aclk_query_main_thread(void *ptr)
 {
     netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
 
+    while (!agent_state && !netdata_exit) {
+        time_t  checkpoint;
+
+        checkpoint =  now_realtime_sec() - last_init_sequence;
+        info("Waiting for agent collectors to initialize");
+        sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
+        if (checkpoint > ACLK_STABLE_TIMEOUT) {
+            agent_state = 1;
+            info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
+#ifdef ACLK_DEBUG
+            _dump_connector_list();
+#endif
+        }
+    }
 
     while (!netdata_exit) {
-
-        while (!agent_state && !netdata_exit) {
-            info("Waiting for agent collectors to initialize");
-            sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
-            if ((now_realtime_sec() - last_init_sequence) > ACLK_STABLE_TIMEOUT) {
-                agent_state = 1;
-                info("AGENT is stable");
-#ifdef ACLK_DEBUG
-                _dump_connector_list();
-#endif
-            }
-        }
 
         if (unlikely(netdata_exit))
             break;
 
-        if (unlikely(agent_state == 1)) {
-            agent_state = 2;
-            // Queue commands that need to run after agent stable
-
-            aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 0, 1, ACLK_CMD_ONCONNECT);
-
-            //TODO: Rewrite to remove this part of the code since we already do it in the
-            // the loop below
-            if (likely(aclk_connection_initialized && !netdata_exit))
-                aclk_process_queries();
+        if (unlikely(!aclk_metadata_submitted)) {
+            aclk_metadata_submitted = 1;
+            aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
         }
 
 #ifdef ACLK_SLEEP_LOOP
@@ -973,6 +959,8 @@ void *aclk_main(void *ptr)
             }
             initializing = 1;
             info("Initializing connection");
+
+            assert( NULL != create_publish_base_topic());
 
             if (unlikely(aclk_init(ACLK_INIT))) {
                 // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
@@ -1134,16 +1122,17 @@ int aclk_init(ACLK_INIT_ACTION action)
         error("Failed to initialize the agent cloud link library");
         return 1;
     }
-    global_base_topic = GET_PUBLISH_BASE_TOPIC;
+    //global_base_topic = get_publish_base_topic();
     init = 1;
 
     return 0;
 }
 
 
-void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
+inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
 {
     uuid_t uuid;
+    time_t time_created;
     char uuid_str[36 + 1];
 
     if (unlikely(!msg_id)) {
@@ -1152,6 +1141,8 @@ void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         msg_id = uuid_str;
     }
 
+    time_created = now_realtime_sec();
+
     buffer_sprintf(
         dest,
         "\t{\"type\": \"%s\",\n"
@@ -1159,7 +1150,9 @@ void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         "\t\"timestamp\": \"%ld\",\n"
         "\t\"version\": %d,\n"
         "\t\"payload\": ",
-        type, msg_id, now_realtime_sec(), ACLK_VERSION);
+        type, msg_id, time_created, ACLK_VERSION);
+
+    debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
 
 // Use this to disable encoding of quotes and newlines so that
@@ -1251,10 +1244,13 @@ int aclk_send_metadata()
     buffer_flush(aclk_buffer);
 
     aclk_create_header(aclk_buffer, "connect", NULL);
+
     buffer_sprintf(aclk_buffer,"{\n\t \"info\" : ");
     web_client_api_request_v1_info_fill_buffer(localhost, aclk_buffer);
+
     buffer_sprintf(aclk_buffer,", \n\t \"charts\" : ");
     charts2json(localhost, aclk_buffer);
+
     buffer_sprintf(aclk_buffer,"\n}\n}");
     aclk_buffer->contenttype = CT_APPLICATION_JSON;
 

@@ -73,10 +73,6 @@ typedef enum aclk_init_action {
 } ACLK_INIT_ACTION;
 
 
-#define GET_PUBLISH_BASE_TOPIC get_publish_base_topic(0)
-#define FREE_PUBLISH_BASE_TOPIC get_publish_base_topic(1)
-#define REBUILD_PUBLISH_BASE_TOPIC get_publish_base_topic(2)
-
 void *aclk_main(void *ptr);
 
 #define NETDATA_ACLK_HOOK \
@@ -92,27 +88,27 @@ void *aclk_main(void *ptr);
 
 extern int aclk_send_message(char *sub_topic, char *message);
 
-int     aclk_init();
-char    *get_base_topic();
+//int     aclk_init();
+//char    *get_base_topic();
 
 extern char *is_agent_claimed(void);
 
 // callbacks for agent cloud link
-int aclk_subscribe(char  *topic, int qos);
+int aclk_subscribe(char *topic, int qos);
 void aclk_shutdown();
-//void aclk_message_callback(struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg);
-
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents);
 int aclk_send_metadata();
 int aclk_wait_for_initialization();
-//int aclk_send_charts(RRDHOST *host, BUFFER *wb);
+char *create_publish_base_topic();
+int aclk_init(ACLK_INIT_ACTION action);
+
 int aclk_send_single_chart(char *host, char *chart);
 int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal, ACLK_CMD cmd);
-struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
-//void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
+struct aclk_query *aclk_query_find(char *token, char *data, char *msg_id,
+    char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
@@ -125,6 +121,5 @@ void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
 unsigned long int aclk_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
-
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
