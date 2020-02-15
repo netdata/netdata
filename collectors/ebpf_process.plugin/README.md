@@ -57,6 +57,17 @@ Try mounting the `tracefs` and `debugfs` filesystems using the commands below:
 If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to 
 mount these filesystems.
 
+## Configuring Netdata for eBPF plugin
+
+The plugin is disabled by default because it adds overhead to the computer.
+To enable it set `ebpf_process = yes` in the `plugins` section of the `netdata.conf` configuration file
+as demonstrated below
+
+```
+[plugins]
+   ebpf_process = yes
+```
+
 ## Charts
 
 The first version of `ebpf_process.plugin` gives a general vision about process running on computer. The charts related
@@ -153,8 +164,3 @@ following values: ​
 -   `return`: In this mode, Netdata also monitors the calls to function. In the `entry` mode, Netdata only traces kernel
     functions, but with `return`, Netdata also monitors the return of each function. This mode creates more charts, but
     also creates an overhead of roughly 110 nanosections for each function call.
--   `dev`: The development mode is the most expensive mode of the collector, and **should not be used in production**.
-    Whenever Netdata detects that a system call resulted in an error, it moves messages from the kernel side to the user
-    side, and stores the information inside `/var/log/netdata/developer.log`. `dev` is designed only for development and
-    debugging purposes.
-
