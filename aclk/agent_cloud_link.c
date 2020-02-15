@@ -15,8 +15,18 @@ int agent_state = 0;
 time_t last_init_sequence = 0;
 int waiting_init = 1;
 
-BUFFER *aclk_buffer = NULL;
 char *global_base_topic = NULL;
+
+char *create_uuid()
+{
+    uuid_t uuid;
+    char *uuid_str = mallocz(36 + 1);
+
+    uuid_generate(uuid);
+    uuid_unparse(uuid, uuid_str);
+
+    return uuid_str;
+}
 
 int cloud_to_agent_parse(JSON_ENTRY *e)
 {
@@ -39,11 +49,11 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
                 break;
             }
             if (!strcmp(e->name, ACLK_JSON_IN_TOPIC)) {
-                data->topic = strdupz(e->data.string);
+                data->callback_topic = strdupz(e->data.string);
                 break;
             }
             if (!strcmp(e->name, ACLK_JSON_IN_URL)) {
-                data->url = strdupz(e->data.string);
+                data->payload = strdupz(e->data.string);
                 break;
             }
             break;
@@ -110,7 +120,6 @@ struct _collector {
     struct _collector *next;
 };
 
-
 struct _collector *collector_list = NULL;
 
 struct aclk_query {
@@ -142,7 +151,7 @@ struct aclk_query_queue {
  */
 unsigned long int aclk_delay(int mode)
 {
-    static int fail = -1;
+    static  int fail = -1;
     unsigned long int delay;
 
     if (!mode || fail == -1) {
@@ -183,7 +192,6 @@ void aclk_query_free(struct aclk_query *this_query)
     if (likely(this_query->msg_id))
         freez(this_query->msg_id);
     freez(this_query);
-    return;
 }
 
 // Returns the entry after which we need to create a new entry to run at the specified time
@@ -325,7 +333,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
 
 inline int aclk_submit_request(struct aclk_request *request)
 {
-    return aclk_queue_query(request->topic, NULL, request->msg_id, request->url, 0, 0, ACLK_CMD_CLOUD);
+    return aclk_queue_query(request->callback_topic, NULL, request->msg_id, request->payload, 0, 0, ACLK_CMD_CLOUD);
 }
 
 /*
@@ -419,18 +427,22 @@ char *create_publish_base_topic()
 /*
  * Build a topic based on sub_topic and final_topic
  * if the sub topic starts with / assume that is an absolute topic
- * TODO: When testing double check with the incoming callback topic
+ *
  */
 
 char *get_topic(char *sub_topic, char *final_topic, int max_size)
 {
+    int rc;
+
     if (likely(sub_topic && sub_topic[0] == '/'))
         return sub_topic;
 
     if (unlikely(!global_base_topic))
         return sub_topic;
 
-    snprintfz(final_topic, max_size, "%s/%s", global_base_topic, sub_topic);
+    rc = snprintf(final_topic, max_size, "%s/%s", global_base_topic, sub_topic);
+    if (unlikely(rc >= max_size))
+        debug(D_ACLK, "Topic has been truncated to [%s] instead of [%s/%s]", final_topic, global_base_topic, sub_topic);
 
     return final_topic;
 }
@@ -688,6 +700,9 @@ int aclk_wait_for_initialization()
         while (!aclk_connection_initialized && (now_realtime_sec() - now) < ACLK_INITIALIZATION_WAIT) {
             sleep_usec(USEC_PER_SEC * ACLK_INITIALIZATION_SLEEP_WAIT);
             _link_event_loop(0);
+
+            if (unlikely(!netdata_exit))
+                return 1;
         }
 
         if (unlikely(!aclk_connection_initialized)) {
@@ -718,17 +733,19 @@ int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: ignore return code for now
+        // TODO: handle bad response perhaps in a different way. For now it does to the payload
         web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        BUFFER  *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+        buffer_flush(local_buffer);
 
         //TODO: handle bad response perhaps in a different way. For now it does to the payload
-        buffer_flush(aclk_buffer);
+        aclk_create_metadata_message(local_buffer, mysep ? mysep + 1 : "noop", this_query->msg_id, w->response.data);
+        local_buffer->contenttype = CT_APPLICATION_JSON;
+        aclk_send_message(this_query->topic, local_buffer->buffer, this_query->msg_id);
 
-        aclk_create_metadata_message(aclk_buffer, mysep ? mysep + 1 : "noop", this_query->msg_id, w->response.data);
-        aclk_buffer->contenttype = CT_APPLICATION_JSON;
-        aclk_send_message(this_query->topic, aclk_buffer->buffer);
-
-        buffer_free(w->response.data);
         freez(w);
+        buffer_free(w->response.data);
+        buffer_free(local_buffer);
         return 1;
     }
     return 0;
@@ -741,7 +758,7 @@ int aclk_execute_query(struct aclk_query *this_query)
 int aclk_process_query()
 {
     struct aclk_query *this_query;
-    static u_int64_t query_count = 0;
+    static long int query_count = 0;
 
     if (!aclk_connection_initialized)
         return 0;
@@ -759,7 +776,7 @@ int aclk_process_query()
     query_count++;
 
     debug(
-        D_ACLK, "Query #%lld (%s) (%s) in queue %d seconds", query_count, this_query->topic, this_query->query,
+        D_ACLK, "Query #%ld (%s) (%s) in queue %d seconds", query_count, this_query->topic, this_query->query,
         (int)(now_realtime_sec() - this_query->created));
 
     switch (this_query->cmd) {
@@ -775,9 +792,15 @@ int aclk_process_query()
             aclk_send_single_chart(this_query->data, this_query->query);
             break;
 
+        case ACLK_CMD_CHARTDEL:
+            debug(D_ACLK, "EXECUTING a chart delete command");
+            //TODO: This send the info metadata for now
+            aclk_send_info_metadata();
+            break;
+
         case ACLK_CMD_ALARM:
             debug(D_ACLK, "EXECUTING an alarm update command");
-            // TODO: handle properly
+            aclk_send_message(this_query->topic, this_query->query, this_query->msg_id);
             break;
 
         case ACLK_CMD_ALARMS:
@@ -786,6 +809,7 @@ int aclk_process_query()
             break;
 
         case ACLK_CMD_CLOUD:
+            debug(D_ACLK, "EXECUTING a cloud command");
             aclk_execute_query(this_query);
             break;
 
@@ -806,7 +830,9 @@ int aclk_process_query()
 
 int aclk_process_queries()
 {
-    // Return if no queries pending
+    if (unlikely(netdata_exit || !aclk_connection_initialized))
+        return 0;
+
     if (likely(!aclk_queue.count))
         return 0;
 
@@ -866,30 +892,20 @@ void *aclk_query_main_thread(void *ptr)
 
     while (!netdata_exit) {
 
-        if (unlikely(netdata_exit))
-            break;
-
         if (unlikely(!aclk_metadata_submitted)) {
             aclk_metadata_submitted = 1;
             aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
         }
 
-#ifdef ACLK_SLEEP_LOOP
-        aclk_process_queries();
-        sleep_usec(USEC_PER_MS * 800);
-#else
         QUERY_THREAD_LOCK;
 
         // TODO: Need to check if there are queries awaiting already
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
             sleep_usec(USEC_PER_SEC * 1);
 
-        if (likely(aclk_connection_initialized && !netdata_exit)) {
-            aclk_process_queries();
-        }
+        aclk_process_queries();
 
         QUERY_THREAD_UNLOCK;
-#endif
 
     } // forever
     info("Shutting down query processing thread");
@@ -927,26 +943,19 @@ void *aclk_main(void *ptr)
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
-    if (unlikely(!aclk_buffer))
-        aclk_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-
-    assert(aclk_buffer != NULL);
-
-    query_thread = callocz(1, sizeof(struct netdata_static_thread));
-
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
         sleep_usec(USEC_PER_MS * 300);
     }
 
     last_init_sequence = now_realtime_sec();
+    query_thread = NULL;
 
     while (!netdata_exit) {
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
         // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
         if (likely(!is_agent_claimed())) {
             sleep_usec(USEC_PER_SEC * 60);
-            info("Checking agent claiming status");
             continue;
         }
 
@@ -979,15 +988,17 @@ void *aclk_main(void *ptr)
                 aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
             }
 
-            if (unlikely(!query_thread->thread)) {
+            if (unlikely(!query_thread)) {
+                query_thread = callocz(1, sizeof(struct netdata_static_thread));
                 query_thread->thread = mallocz(sizeof(netdata_thread_t));
                 netdata_thread_create(
-                    query_thread->thread, "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, query_thread);
+                    query_thread->thread, ACLK_THREAD_NAME, NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread,
+                    query_thread);
             }
         }
 
-        //TODO: Check if there is a return code
         _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+        debug(D_ACLK,"LINK event loop called");
 
     } // forever
     aclk_shutdown();
@@ -1002,41 +1013,39 @@ void *aclk_main(void *ptr)
  * If base_topic is missing then the global_base_topic will be used (if available)
  *
  */
-int aclk_send_message(char *sub_topic, char *message)
+int aclk_send_message(char *sub_topic, char *message, char *msg_id)
 {
     int rc;
-    static int skip_due_to_shutdown = 0;
+    int mid;
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
-    if (!aclk_connection_initialized)
-        return 0;
-
-    if (unlikely(netdata_exit)) {
-        if (unlikely(!aclk_connection_initialized))
-            return 1;
-
-        ++skip_due_to_shutdown;
-        if (unlikely(!(skip_due_to_shutdown % 100)))
-            info("%d messages not sent -- shutdown in progress", skip_due_to_shutdown);
-        return 1;
-    }
-
-    if (unlikely(!message))
-        return 0;
+    UNUSED(msg_id);
 
     if (unlikely(aclk_wait_for_initialization()))
         return 1;
 
+    if (unlikely(!message))
+        return 0;
+
     final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
 
+    if (unlikely(!final_topic)) {
+        errno = 0;
+        error("Unable to build outgoing topic; truncated?");
+        return 1;
+    }
+
     ACLK_LOCK;
-    rc = _link_send_message(final_topic, message);
+    rc = _link_send_message(final_topic, message, &mid);
+    // TODO: link the msg_id with the mid so we can trace it
     ACLK_UNLOCK;
 
-    // TODO: Add better handling -- error will flood the logfile here
-    if (unlikely(rc))
+
+    if (unlikely(rc)) {
+        errno = 0;
         error("Failed to send message, error code %d (%s)", rc, _link_strerror(rc));
+    }
 
     return rc;
 }
@@ -1052,25 +1061,25 @@ int aclk_subscribe(char *sub_topic, int qos)
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
-    if (!aclk_connection_initialized)
-        return 0;
-
-    if (unlikely(netdata_exit)) {
-        return 1;
-    }
-
     if (unlikely(aclk_wait_for_initialization()))
         return 1;
 
     final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
+    if (unlikely(!final_topic)) {
+        errno = 0;
+        error("Unable to build outgoing topic; truncated?");
+        return 1;
+    }
 
     ACLK_LOCK;
     rc = _link_subscribe(final_topic, qos);
     ACLK_UNLOCK;
 
     // TODO: Add better handling -- error will flood the logfile here
-    if (unlikely(rc))
-        error("Failed to send message, error code %d (%s)", rc, _link_strerror(rc));
+    if (unlikely(rc)) {
+        errno = 0;
+        error("Failed subscribe to command topic %d (%s)", rc, _link_strerror(rc));
+    }
 
     return rc;
 }
@@ -1122,9 +1131,7 @@ int aclk_init(ACLK_INIT_ACTION action)
         error("Failed to initialize the agent cloud link library");
         return 1;
     }
-    //global_base_topic = get_publish_base_topic();
     init = 1;
-
     return 0;
 }
 
@@ -1209,55 +1216,64 @@ void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER
     return;
 }
 
+
 //TODO: this has been changed in the latest specs. We need to pack the data in one MQTT
 //message with a payload and has a list of json objects
 void aclk_send_alarm_metadata()
 {
-    //TODO: improve locking on the buffer -- same lock is used for the message send
-    //improve error handling
-    ACLK_LOCK;
-    buffer_flush(aclk_buffer);
+    BUFFER *local_buffer = NULL;
+    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+
     // Alarms configuration
-    aclk_create_header(aclk_buffer, "alarms", NULL);
-    health_alarms2json(localhost, aclk_buffer, 1);
-    buffer_sprintf(aclk_buffer,"\n}");
-    ACLK_UNLOCK;
-    aclk_send_message(ACLK_ALARMS_TOPIC, aclk_buffer->buffer);
+    char *msg_id = create_uuid();
+    buffer_flush(local_buffer);
+    aclk_create_header(local_buffer, "alarms", msg_id);
+    health_alarms2json(localhost, local_buffer, 1);
+    buffer_sprintf(local_buffer,"\n}");
+    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
+    freez(msg_id);
 
     // Alarms log
-    ACLK_LOCK;
-    buffer_flush(aclk_buffer);
-    aclk_create_header(aclk_buffer, "alarms_log", NULL);
-    health_alarm_log2json(localhost, aclk_buffer, 0);
-    buffer_sprintf(aclk_buffer,"\n}");
-    ACLK_UNLOCK;
-    aclk_send_message(ACLK_ALARMS_TOPIC, aclk_buffer->buffer);
+    msg_id = create_uuid();
+    buffer_flush(local_buffer);
+    aclk_create_header(local_buffer, "alarms_log", msg_id);
+    health_alarm_log2json(localhost, local_buffer, 0);
+    buffer_sprintf(local_buffer,"\n}");
+    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
+    freez(msg_id);
+
+    buffer_free(local_buffer);
 }
 
+int aclk_send_info_metadata()
+{
+    BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+
+    char *msg_id = create_uuid();
+    buffer_flush(local_buffer);
+
+    aclk_create_header(local_buffer, "connect", msg_id);
+    buffer_sprintf(local_buffer,"{\n\t \"info\" : ");
+    web_client_api_request_v1_info_fill_buffer(localhost, local_buffer);
+
+    buffer_sprintf(local_buffer,", \n\t \"charts\" : ");
+    charts2json(localhost, local_buffer);
+    buffer_sprintf(local_buffer,"\n}\n}");
+    local_buffer->contenttype = CT_APPLICATION_JSON;
+
+    aclk_send_message(ACLK_METADATA_TOPIC, local_buffer->buffer, msg_id);
+    freez(msg_id);
+
+    buffer_free(local_buffer);
+    return 0;
+}
 
 // Send info metadata message to the cloud if the link is established
 // or on request
 int aclk_send_metadata()
 {
-    ACLK_LOCK;
 
-    buffer_flush(aclk_buffer);
-
-    aclk_create_header(aclk_buffer, "connect", NULL);
-
-    buffer_sprintf(aclk_buffer,"{\n\t \"info\" : ");
-    web_client_api_request_v1_info_fill_buffer(localhost, aclk_buffer);
-
-    buffer_sprintf(aclk_buffer,", \n\t \"charts\" : ");
-    charts2json(localhost, aclk_buffer);
-
-    buffer_sprintf(aclk_buffer,"\n}\n}");
-    aclk_buffer->contenttype = CT_APPLICATION_JSON;
-
-    ACLK_UNLOCK;
-
-    aclk_send_message(ACLK_METADATA_TOPIC, aclk_buffer->buffer);
-
+    aclk_send_info_metadata();
     aclk_send_alarm_metadata();
 
     return 0;
@@ -1276,36 +1292,32 @@ void aclk_alarm_reload()
 int aclk_send_single_chart(char *hostname, char *chart)
 {
     RRDHOST *target_host;
-    ACLK_LOCK;
-
-    buffer_flush(aclk_buffer);
 
     target_host = rrdhost_find_by_hostname(hostname, 0);
     if (!target_host)
         return 1;
 
     RRDSET *st = rrdset_find(target_host, chart);
-
     if (!st)
         st = rrdset_find_byname(target_host, chart);
-
     if (!st) {
         info("FAILED to find chart %s", chart);
         return 1;
     }
 
-    aclk_buffer->contenttype = CT_APPLICATION_JSON;
+    BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    char *msg_id = create_uuid();
+    buffer_flush(local_buffer);
+    local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    buffer_flush(aclk_buffer);
+    aclk_create_header(local_buffer, "chart", msg_id);
+    rrdset2json(st, local_buffer, NULL, NULL);
+    buffer_sprintf(local_buffer,"\n}");
 
-    aclk_create_header(aclk_buffer, "chart", NULL);
+    aclk_send_message(ACLK_CHART_TOPIC, local_buffer->buffer, msg_id);
 
-    rrdset2json(st, aclk_buffer, NULL, NULL);
-    buffer_sprintf(aclk_buffer,"\n}\n}");
-
-
-    ACLK_UNLOCK;
-    aclk_send_message(ACLK_CHART_TOPIC, aclk_buffer->buffer);
+    freez(msg_id);
+    buffer_free(local_buffer);
     return 0;
 }
 
@@ -1324,6 +1336,21 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
 #endif
 }
 
+int    aclk_del_chart(RRDHOST *host, char *chart_name)
+{
+#ifndef ENABLE_ACLK
+    UNUSED(host);
+    UNUSED(chart_name);
+    return 0;
+#else
+    if (host != localhost)
+        return 0;
+
+    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, ACLK_CMD_CHARTDEL);
+    return 0;
+#endif
+}
+
 int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
     BUFFER *local_buffer = NULL;
@@ -1335,22 +1362,19 @@ int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
         return 0;
 
     local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    char *msg_id = create_uuid();
 
-    //TODO: Use the command queue
-    // Send the message directly for now
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
-    ACLK_LOCK;
     buffer_flush(local_buffer);
+    aclk_create_header(local_buffer, "alarms", msg_id);
 
-    aclk_create_header(local_buffer, "alarms", NULL);
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     health_alarm_entry2json_nolock(local_buffer, ae, host);
-
-    buffer_sprintf(local_buffer,"\n}");
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-    ACLK_UNLOCK;
-    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer);
+    buffer_sprintf(local_buffer,"\n}");
+    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, local_buffer->buffer , 0, 1, ACLK_CMD_ALARM);
 
+    freez(msg_id);
     buffer_free(local_buffer);
 
     return 0;
@@ -1360,14 +1384,19 @@ int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 //TODO: add and check the incoming type e.g http
 int aclk_handle_cloud_request(char *payload)
 {
-    struct aclk_request cloud_to_agent = { .type_id = NULL, .msg_id = NULL, .topic = NULL, .url = NULL, .version = 0};
+    struct aclk_request cloud_to_agent = { .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0};
 
-    debug(D_ACLK, "ACLK PAYLOAD [%s]", payload);
+    if (unlikely(!payload)) {
+        debug(D_ACLK, "ACLK incoming message is empty");
+        return 0;
+    }
+
+    debug(D_ACLK, "ACLK incoming message [%s]", payload);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
     if (unlikely(
-            JSON_OK != rc || !cloud_to_agent.url || !cloud_to_agent.topic || !cloud_to_agent.msg_id ||
+            JSON_OK != rc || !cloud_to_agent.payload || !cloud_to_agent.callback_topic || !cloud_to_agent.msg_id ||
             !cloud_to_agent.type_id || cloud_to_agent.version > ACLK_VERSION)) {
 
         if (JSON_OK != rc)
@@ -1376,8 +1405,8 @@ int aclk_handle_cloud_request(char *payload)
         if (cloud_to_agent.version > ACLK_VERSION)
             error("Unsupported version in JSON request %d", cloud_to_agent.version);
 
-        if (cloud_to_agent.url)
-            freez(cloud_to_agent.url);
+        if (cloud_to_agent.payload)
+            freez(cloud_to_agent.payload);
 
         if (cloud_to_agent.type_id)
             freez(cloud_to_agent.type_id);
@@ -1385,13 +1414,14 @@ int aclk_handle_cloud_request(char *payload)
         if (cloud_to_agent.msg_id)
             freez(cloud_to_agent.msg_id);
 
-        if (cloud_to_agent.topic)
-            freez(cloud_to_agent.topic);
+        if (cloud_to_agent.callback_topic)
+            freez(cloud_to_agent.callback_topic);
 
         return 1;
     }
 
     aclk_submit_request(&cloud_to_agent);
 
+    // Note: the payload comes from the callback and it will be automatically freed
     return 0;
 }

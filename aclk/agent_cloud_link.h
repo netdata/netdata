@@ -6,22 +6,20 @@
 #include "../daemon/common.h"
 #include "mqtt.h"
 
+#define ACLK_VERSION 1
+#define ACLK_THREAD_NAME "ACLKQ"
 #define ACLK_JSON_IN_MSGID "msg-id"
 #define ACLK_JSON_IN_TYPE "type"
 #define ACLK_JSON_IN_VERSION "version"
 #define ACLK_JSON_IN_TOPIC "callback-topic"
 #define ACLK_JSON_IN_URL "payload"
-
-//#define ACLK_SLEEP_LOOP 1   // query processing thread will sleep, thread wakeup disabled for now
-
-#define ACLK_MSG_TYPE_CHART "chart"
 #define ACLK_CHART_TOPIC "chart"
 #define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
-#define ACLK_MAX_BACKOFF_DELAY 1024 // maximum backoff delay in milliseconds
+#define ACLK_MAX_BACKOFF_DELAY 1024 // maximum backoff delay in seconds
 
 #define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1 // Wait time @ spin lock for MQTT initialization in seconds
@@ -32,7 +30,6 @@
 #define ACLK_MAX_TOPIC  255
 
 #define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
-#define ACLK_VERSION 1
 #define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
@@ -40,30 +37,20 @@
 struct aclk_request {
     char    *type_id;
     char    *msg_id;
-    char    *topic;
-    char    *url;
+    char    *callback_topic;
+    char    *payload;
     int     version;
 };
 
 
-typedef enum publish_topic_action {
-    PUBLICH_TOPIC_GET,
-    PUBLICH_TOPIC_FREE,
-    PUBLICH_TOPIC_REBUILD
-} PUBLISH_TOPIC_ACTION;
-
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
-    ACLK_CMD_WAIT,
-    ACLK_CMD_CONNECT,
     ACLK_CMD_ONCONNECT,
     ACLK_CMD_INFO,
     ACLK_CMD_CHART,
+    ACLK_CMD_CHARTDEL,
     ACLK_CMD_ALARM,
     ACLK_CMD_ALARMS,
-    ACLK_CMD_CHARTS,
-    ACLK_CMD_ALARMS_LOG,
-    ACLK_CMD_ALARMS_ACTIVE,
     ACLK_CMD_MAX
 } ACLK_CMD;
 
@@ -86,12 +73,14 @@ void *aclk_main(void *ptr);
         .start_routine = aclk_main \
     },
 
-extern int aclk_send_message(char *sub_topic, char *message);
+extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 
 //int     aclk_init();
 //char    *get_base_topic();
 
 extern char *is_agent_claimed(void);
+char *create_uuid();
+
 
 // callbacks for agent cloud link
 int aclk_subscribe(char *topic, int qos);
@@ -101,6 +90,7 @@ void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents);
 int aclk_send_metadata();
+int aclk_send_info_metadata();
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
 int aclk_init(ACLK_INIT_ACTION action);
@@ -110,6 +100,7 @@ int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int r
 struct aclk_query *aclk_query_find(char *token, char *data, char *msg_id,
     char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
+int aclk_del_chart(RRDHOST *host, char *chart_name);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);

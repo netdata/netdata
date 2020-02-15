@@ -7,8 +7,6 @@
 
 void (*_on_connect)(void *ptr) = NULL;
 void (*_on_disconnect)(void *ptr) = NULL;
-extern int cmdpause;
-
 
 #ifndef ENABLE_ACLK
 
@@ -24,10 +22,11 @@ int _link_event_loop(int timeout)
     return 0;
 }
 
-int _link_send_message(char *topic, char *message)
+int _link_send_message(char *topic, char *message, int *mid)
 {
     UNUSED(topic);
     UNUSED(message);
+    UNUSED(mid);
     return 0;
 }
 
@@ -53,15 +52,10 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 }
 
 #else
-/*
- * Just report the library info in the logfile for reference when issues arise
- *
- */
 
 struct mosquitto *mosq = NULL;
 
 // Get a string description of the error
-
 inline const char *_link_strerror(int rc)
 {
     return mosquitto_strerror(rc);
@@ -74,8 +68,6 @@ void mqtt_message_callback(
     UNUSED(mosq);
     UNUSED(obj);
 
-    // TODO: handle commands in a more efficient way, if we have many
-
     aclk_handle_cloud_request(msg->payload);
 }
 
@@ -86,6 +78,16 @@ int lws_wss_client_initialized = 0;
 // e.g. try 1st MQTT-WSS, 2nd MQTT plain, 3rd https fallback...
 int mqtt_over_websockets = 1;
 struct aclk_lws_wss_engine_instance *lws_engine_instance = NULL;
+
+void publish_callback(struct mosquitto *mosq, void *obj, int rc)
+{
+    UNUSED(mosq);
+    UNUSED(obj);
+    UNUSED(rc);
+
+    // TODO: link this with a msg_id so it can be traced
+    return;
+}
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
@@ -110,14 +112,12 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.
 
-    //mqtt_connection_initialized = 0;
     aclk_mqtt_connected = 0;
     _on_disconnect((void *) mosq);
 
     if(mqtt_over_websockets && lws_engine_instance)
         aclk_lws_wss_mqtt_layer_disconect_notif(lws_engine_instance);
 
-    //sleep_usec(USEC_PER_SEC * 5);
     return;
 }
 
@@ -148,7 +148,7 @@ int _mqtt_lib_init(void (*on_connect)(void *), void (*on_disconnect)(void *))
     char *server_crt;
     char *server_key;
 
-    // show library info so can have in in the logfile
+    // show library info so can have it in the logfile
     libmosq_version = mosquitto_lib_version(&libmosq_major, &libmosq_minor, &libmosq_revision);
     ca_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link cert", "*");
     server_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link server cert", "*");
@@ -192,6 +192,7 @@ int _mqtt_lib_init(void (*on_connect)(void *), void (*on_disconnect)(void *))
 
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
+    mosquitto_publish_callback_set(mosq, publish_callback);
 
     mosquitto_username_pw_set(mosq, NULL, NULL);
 
@@ -227,7 +228,7 @@ int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
     rc = mosquitto_connect_async(mosq, aclk_hostname, aclk_port, ACLK_PING_INTERVAL);
 
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
-        error("Connect %s MQTT status = %d (%s)", aclk_hostname, rc, mosquitto_strerror(rc));
+        error("Failed to establish link to [%s:%d] MQTT status = %d (%s)", aclk_hostname, aclk_port, rc, mosquitto_strerror(rc));
     else
         info("Establishing MQTT link to [%s:%d]", aclk_hostname, aclk_port);
 
@@ -390,7 +391,7 @@ int _link_subscribe(char  *topic, int qos)
  *
  */
 
-int _link_send_message(char *topic, char *message)
+int _link_send_message(char *topic, char *message, int *mid)
 {
     int rc;
 
@@ -406,10 +407,11 @@ int _link_send_message(char *topic, char *message)
     //if (unlikely(rc != MOSQ_ERR_SUCCESS))
     //    return rc;
 
-    rc = mosquitto_publish(mosq, NULL, topic, msg_len, message, ACLK_QOS, 0);
+    rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
 
     // TODO: Add better handling -- error will flood the logfile here
     if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
+        errno = 0;
         error("MQTT message failed : %s", mosquitto_strerror(rc));
     }
 
