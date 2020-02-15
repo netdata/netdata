@@ -1,0 +1,7 @@
+version: '3.3'
+services:
+  vernemq:
+    build:
+      dockerfile: configureVerneMQ.Dockerfile
+      context: .
+
