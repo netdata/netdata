@@ -1,84 +1,76 @@
 # External build-system
 
-This allows the agent to be built and tested on various linux distros regardless of the
-host system. In particular this allows MacOS to be used as a build host via Docker For
-Mac. For configurations that involve building and running the agent alone, we still use
+This wraps the build-system in Docker so that the host system and the target system are
+decoupled. This allows:
+* Cross-compilation (e.g. linux development from MacOS)
+* Cross-distro (e.g. using CentOS user-land while developing on Debian)
+* Multi-host scenarios (e.g. master/slave configurations)
+* Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
+
+The advantage of these scenarios is that they allow **reproducible** builds and testing
+for developers. This is the first iteration of the build-system to allow the team to use 
+it and get used to it.
+
+For configurations that involve building and running the agent alone, we still use
 `docker-compose` for consistency with more complex configurations. The more complex
 configurations allow the agent to be run in conjunction with parts of the cloud
 infrastructure (these parts of the code are not public), or with external brokers
 (such as VerneMQ for MQTT), or with other external tools (such as TSDB to allow the agent to
-export metrics).
+export metrics). Note: no external TSDB scenarios are available in the first iteration,
+they will be added in subsequent iterations.
 
 This differs from the packaging dockerfiles as it designed to be used for local development.
 The main difference is that these files are designed to support incremental compilation in
 the following way:
 
-1. The initial build should use of the `clean_build` dockerfiles to create a docker image
-   with the agent built from the source tree and installed into standard system paths
-   using `netdata-installer.sh`.
-2. When one of the `make_install` dockerfiles is used it will start on an image with the
-   last built version of the agent, the docker-cache will be aligned with changes in the
-   source repo (to prevent rebuilding intermediate images or re-running install steps),
-   the `make install` inside the container will only rebuild the changed files.
-
+1. The initial build should be performed using `bin/clean-install.sh`` to create a docker 
+   image with the agent built from the source tree and installed into standard system paths
+   using `netdata-installer.sh`. In addition to the steps performed by the standard packaging
+   builds a manifest is created to allow subsequent builds to be made incrementally using
+   `make` inside the container. Any libraries that are required for 'bleeding-edge' development
+   are added on top of the standard install.
+2. When the `bin/make-install.sh` script is used the docker container will be updated with 
+   a sanitized version of the current build-tree. The manifest will be used to line up the
+   state of the incoming docker cache with `make`'s view of the file-system according to the
+   manifest. This means the `make install` inside the container will only rebuild changes
+   since the last time the disk image was created.
+   
 The exact improvement on the compile-cycle depends on the speed of the network connection
 to pull the netdata dependencies, but should shrink the time considerably. For example,
-on a macbook pro the initial install takes about 1min + network delay and the incremental
+on a macbook pro the initial install takes about 1min + network delay [Note: there is 
+something bad happening with the standard installer at the end of the container build as
+it tries to kill the running agent - this is very slow and bad] and the incremental
 step only takes 15s. On a debian host with a fast network this reduces 1m30 -> 13s.
 
-# NOT UPDATED YET
+## Examples
 
-Each of the Dockerfiles is a known configuration (linux distro and version). To use the
-build-system it needs to be configured with an appropriate source. This can be done in
-two ways:
+1. Simple cross-compilation / cross-distro builds.
 
-1. Build a local copy of the source (pulled from the HEAD of the main repo).
-2. Link to an existing working directory containing the source.
-
-The idea is that option (1) can be used in automated testing sequences to ensure that
-the local source is independent, and that option (2) can be used during active development
-allowing the persistence of changes to the source tree across build / test steps.
-
-In both cases the source tree is not copied into the agent container - it is bind-mounted
-into the container file-system to prevent multiple copies of the tree existing during
-development (i.e. the version of the code in the container is *always* the copy on the
-host that is being developed).
-
-## Scripts
-
-| Script                  | Purpose |
-| ----------------------- | ------- |
-| `bin/fetch.sh` | Create (overwrite) directory with latest source |
-| `bin/link.sh`| Create (overwrite) directory with link to source |
-| `bin/preinst.sh` | Setup a config ready for installation of Netdata |
-| `bin/clean_install.sh`| Run the netdata-installer |
-| `bin/make_install.sh`| Run a `make; make install` inside the container |
-| `bin/run.sh`| Execute the Netdata agent inside the container |
-
-## Instantiation in Docker
-
-Each configuration results in two images in Docker and a container that is reused:
-
-* `distro_version_preinst` is the disk image in a state ready to install Netdata.
-* `distro_version_dev` is the disk image after the installer is executed.
-* `distro_version_dev` is the container (re-)used for building / executing Netdata.
-
-## Example usage
-
-```
-bin/link.sh ~/netdata/local.repo
-bin/preinst.sh ubuntu 19.10
-bin/clean_install.sh ubuntu 19.10
-bin/run.sh ubuntu 19.10
-... edit cycle ...
-bin/make_install.sh ubuntu 19.10
-bin/run.sh ubuntu 19.10
+```bash
+build_external/bin/clean-install.sh arch current
+docker run -it --rm arch_current_dev
+echo >>daemon/main.c     # Simulate edit by touching file
+build_external/bin/make-install.sh arch current
+docker run -it --rm arch_current_dev
 ```
 
-## Notes
+Currently there is no detection of when the installer needs to be rerun (really this is
+when the `autoreconf` / `configure` step must be rerun). Netdata was not written with
+multi-stage builds in mind and we need to work out how to do this in the future. For now
+it is up to you to know when you need to rerun the clean build step.
 
-CentOS is not properly supported yet. Because of the missing `Judy-devel` package in 
-CentOS 8 the plan is to pull in Judy separately and compile it locally. The `Dockerfile`
-is setup to get this far but I cannot test it further as trying to run a CentOS container
-hangs on Docker For Mac.
+```bash
+build_external/bin/clean-install.sh arch current
+build_external/bin/clean-install.sh ubuntu 19.10
+docker run -it --rm arch_current_dev
+echo >>daemon/main.c     # Simulate edit by touching file
+build_external/bin/make-install.sh arch current
+docker run -it --rm arch_current_dev
+echo >>daemon/daemon.c     # Simulate second edit step
+build_external/bin/make-install.sh arch current   # Observe a single file is rebuilt
+build_external/bin/make-install.sh arch current   # Observe both files are rebuilt
+```
 
+The state of the build in the two containers is independent.
+
+2. A simple master-slave scenario
