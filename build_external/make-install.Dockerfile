@@ -1,4 +1,7 @@
-FROM fedora_30_dev:latest
+ARG DISTRO=arch
+ARG VERSION=current
+
+FROM ${DISTRO}_${VERSION}_dev:latest
 
 # Sanitize new source tree by removing config-time state
 COPY . /opt/netdata/latest
