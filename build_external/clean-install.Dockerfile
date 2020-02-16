@@ -1,14 +1,9 @@
-FROM centos:8
-RUN sed -ie 's/enabled=0/enabled=1/' /etc/yum.repos.d/CentOS-PowerTools.repo
-RUN yum update -y
-RUN yum install -y epel-release
-RUN yum update -y
-RUN rpm -ivh http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
-RUN yum update -y
-RUN yum install -y autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python36 zlib-devel
-RUN curl -L https://downloads.sourceforge.net/project/judy/judy/Judy-1.0.5/Judy-1.0.5.tar.gz -o /opt/judy-1.0.5.tgz
-RUN cd /opt && tar xzf judy-1.0.5.tgz && cd judy-1.0.5 && ./configure && make && make install
-RUN cp /usr/local/lib/libJudy* /lib64/
+ARG DISTRO=arch
+ARG VERSION=current
+FROM netdata/package-builders:${DISTRO}${VERSION}
+
+ARG ACLK=no
+ARG EXTRA_CFLAGS
 
 COPY . /opt/netdata/source
 WORKDIR /opt/netdata/source
@@ -32,7 +27,7 @@ RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
 RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
-    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1" ./netdata-installer.sh --disable-lto
+    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log

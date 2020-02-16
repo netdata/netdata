@@ -1,5 +1,9 @@
 FROM archlinux/base:latest
 
+# There is some redundancy between this file and the archlinux Dockerfile in the helper images
+# repo and also with the clean-install.Dockefile. Once the help image is availabled on Docker
+# Hub this file can be deleted.
+
 RUN pacman -Sy
 RUN pacman --noconfirm --needed -S autoconf \
                                    autoconf-archive \
