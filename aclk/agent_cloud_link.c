@@ -9,6 +9,7 @@
 int aclk_port = 0;          // default 1883
 char *aclk_hostname = NULL; //default localhost
 int aclk_subscribed = 0;
+int aclk_disable_single_updates = 0;
 
 int aclk_metadata_submitted = 0;
 int agent_state = 0;
@@ -684,7 +685,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     debug(D_ACLK, "DEL COLLECTOR [%s:%s] -- charts %u", plugin_name?plugin_name:"*", module_name?module_name:"*", tmp_collector->count);
 
     COLLECTOR_UNLOCK;
-    // TODO: Queue command for update to the cloud
+
     aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 2, 1, ACLK_CMD_ONCONNECT);
 
     _free_collector(tmp_collector);
@@ -732,23 +733,29 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         mysep = strrchr(this_query->query, '/');
 
-        // TODO: ignore return code for now
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        int rc = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
         BUFFER  *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         buffer_flush(local_buffer);
-
-        //TODO: handle bad response perhaps in a different way. For now it does to the payload
-        aclk_create_metadata_message(local_buffer, mysep ? mysep + 1 : "noop", this_query->msg_id, w->response.data);
         local_buffer->contenttype = CT_APPLICATION_JSON;
+
+        aclk_create_header(local_buffer, "http", this_query->msg_id);
+
+        if (rc != HTTP_RESP_OK || (mysep?mysep+1:"noop", "badge.svg") == 0)
+            buffer_sprintf(local_buffer, "\"%s\"", aclk_encode_response(w->response.data)->buffer);
+        else
+            buffer_sprintf(local_buffer, "%s", aclk_encode_response(w->response.data)->buffer);
+
+        buffer_sprintf(local_buffer,"\n}");
+
         aclk_send_message(this_query->topic, local_buffer->buffer, this_query->msg_id);
 
-        freez(w);
         buffer_free(w->response.data);
+        freez(w);
         buffer_free(local_buffer);
-        return 1;
+        return 0;
     }
-    return 0;
+    return 1;
 }
 
 /*
@@ -1162,44 +1169,42 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
 
-// Use this to disable encoding of quotes and newlines so that
-// MQTT subscriber can display more readable data on screen
+//#define EYE_FRIENDLY
 
-#define EYE_FRIENDLY 1
+/*
+ * Take a buffer, encode it and rewrite it
+ *
+ */
 
-// encapsulate contents into metadata message as per ACLK documentation
-void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents)
+BUFFER *aclk_encode_response(BUFFER *contents)
 {
-#ifndef EYE_FRIENDLY
-    char *tmp_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+#ifdef EYE_FRIENDLY
+
+    return contents;
+#else
+    char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
-#endif
 
-    buffer_sprintf(
-        dest,
-        "\t{\"type\": \"%s\",\n"
-        "\t\"msg-id\": \"%s\",\n"
-        "\t\"payload\": %s\n\t}",
-        type, msg_id ? msg_id : "", contents->buffer);
-
-#ifndef EYE_FRIENDLY
-    //TODO: this is the initial escaping, It will expanded
-    src = dest->buffer;
+    src = contents->buffer;
     dst = tmp_buffer;
     while (*src) {
         switch (*src) {
-            case '0x0a':
             case '\n':
                 *dst++ = '\\';
                 *dst++ = 'n';
                 break;
-            case '\"':
+            case 0x01 ... 0x09:
+            case 0x0b ... 0x1F:
                 *dst++ = '\\';
-                *dst++ = '\"';
+                *dst++ = '0';
+                *dst++ = '0';
+                *dst++ = (*src < 0x0F) ? '0' : '1';
+                *dst++ = to_hex(*src);
                 break;
+            case '\"':
             case '\'':
                 *dst++ = '\\';
-                *dst++ = '\"';
+                *dst++ = *src;
                 break;
             default:
                 *dst++ = *src;
@@ -1208,40 +1213,41 @@ void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER
     }
     *dst = '\0';
 
-    buffer_flush(dest);
-    buffer_sprintf(dest, "%s", tmp_buffer);
+    buffer_flush(contents);
+    buffer_sprintf(contents, "%s", tmp_buffer);
 
     freez(tmp_buffer);
+    return contents;
 #endif
-    return;
 }
 
-
-//TODO: this has been changed in the latest specs. We need to pack the data in one MQTT
-//message with a payload and has a list of json objects
+/*
+ * This will send the alarms configuration
+ * and
+ */
 void aclk_send_alarm_metadata()
 {
-    BUFFER *local_buffer = NULL;
-    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
-    // Alarms configuration
     char *msg_id = create_uuid();
     buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "alarms", msg_id);
+    local_buffer->contenttype = CT_APPLICATION_JSON;
+
+    aclk_create_header(local_buffer, "connect_alarms", msg_id);
+
+    buffer_sprintf(local_buffer,"{\n\t \"configured-alarms\" : ");
     health_alarms2json(localhost, local_buffer, 1);
-    buffer_sprintf(local_buffer,"\n}");
-    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
-    freez(msg_id);
 
-    // Alarms log
-    msg_id = create_uuid();
-    buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "alarms_log", msg_id);
+    buffer_sprintf(local_buffer,",\n\t \"alarm-log\" : ");
     health_alarm_log2json(localhost, local_buffer, 0);
-    buffer_sprintf(local_buffer,"\n}");
-    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
-    freez(msg_id);
 
+    buffer_sprintf(local_buffer,",\n\t \"alarms-active\" : ");
+    health_alarms_values2json(localhost, local_buffer, 0);
+
+    buffer_sprintf(local_buffer,"\n}\n}");
+    aclk_send_message(ACLK_ALARMS_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+
+    freez(msg_id);
     buffer_free(local_buffer);
 }
 
@@ -1251,17 +1257,17 @@ int aclk_send_info_metadata()
 
     char *msg_id = create_uuid();
     buffer_flush(local_buffer);
+    local_buffer->contenttype = CT_APPLICATION_JSON;
 
     aclk_create_header(local_buffer, "connect", msg_id);
     buffer_sprintf(local_buffer,"{\n\t \"info\" : ");
     web_client_api_request_v1_info_fill_buffer(localhost, local_buffer);
 
     buffer_sprintf(local_buffer,", \n\t \"charts\" : ");
-    charts2json(localhost, local_buffer);
+    charts2json(localhost, local_buffer, 1);
     buffer_sprintf(local_buffer,"\n}\n}");
-    local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    aclk_send_message(ACLK_METADATA_TOPIC, local_buffer->buffer, msg_id);
+    aclk_send_message(ACLK_METADATA_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
     freez(msg_id);
 
     buffer_free(local_buffer);
@@ -1279,13 +1285,23 @@ int aclk_send_metadata()
     return 0;
 }
 
+void aclk_single_update_disable()
+{
+    aclk_disable_single_updates = 1;
+}
+
+void aclk_single_update_enable()
+{
+    aclk_disable_single_updates = 0;
+}
+
 // Trigged by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
     if (unlikely(!agent_state))
         return;
 
-    aclk_queue_query("_alarm", localhost->hostname, NULL, "alarms", 0, 1, ACLK_CMD_ALARMS);
+    aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
 }
 //rrd_stats_api_v1_chart(RRDSET *st, BUFFER *buf)
 
@@ -1311,8 +1327,8 @@ int aclk_send_single_chart(char *hostname, char *chart)
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
     aclk_create_header(local_buffer, "chart", msg_id);
-    rrdset2json(st, local_buffer, NULL, NULL);
-    buffer_sprintf(local_buffer,"\n}");
+    rrdset2json(st, local_buffer, NULL, NULL, 1);
+    buffer_sprintf(local_buffer,"\t\n}");
 
     aclk_send_message(ACLK_CHART_TOPIC, local_buffer->buffer, msg_id);
 
@@ -1331,6 +1347,9 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
     if (host != localhost)
         return 0;
 
+    if (unlikely(aclk_disable_single_updates))
+        return 0;
+
     aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, ACLK_CMD_CHART);
     return 0;
 #endif
@@ -1346,6 +1365,9 @@ int    aclk_del_chart(RRDHOST *host, char *chart_name)
     if (host != localhost)
         return 0;
 
+    if (unlikely(aclk_disable_single_updates))
+        return 0;
+
     aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, ACLK_CMD_CHARTDEL);
     return 0;
 #endif
@@ -1359,6 +1381,16 @@ int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
         return 0;
 
     if (agent_state == 0)
+        return 0;
+
+    /*
+     * Check if individual updates have been disabled
+     * This will be the case when we do health reload
+     * and all the alarms will be dropped and recreated.
+     * At the end of the health reload the complete alarm metadata
+     * info will be sent
+     */
+    if (unlikely(aclk_disable_single_updates))
         return 0;
 
     local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -1380,8 +1412,9 @@ int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     return 0;
 }
 
-
-//TODO: add and check the incoming type e.g http
+/*
+ * Parse the incoming payload and queue a command if valid
+ */
 int aclk_handle_cloud_request(char *payload)
 {
     struct aclk_request cloud_to_agent = { .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0};
@@ -1397,7 +1430,8 @@ int aclk_handle_cloud_request(char *payload)
 
     if (unlikely(
             JSON_OK != rc || !cloud_to_agent.payload || !cloud_to_agent.callback_topic || !cloud_to_agent.msg_id ||
-            !cloud_to_agent.type_id || cloud_to_agent.version > ACLK_VERSION)) {
+            !cloud_to_agent.type_id || cloud_to_agent.version > ACLK_VERSION ||
+            strcmp(cloud_to_agent.type_id, "http"))) {
 
         if (JSON_OK != rc)
             error("Malformed json request (%s)", payload);

@@ -88,7 +88,6 @@ void aclk_shutdown();
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
-void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents);
 int aclk_send_metadata();
 int aclk_send_info_metadata();
 int aclk_wait_for_initialization();
@@ -110,7 +109,11 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_alarm_reload();
 void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
+BUFFER *aclk_encode_response(BUFFER *contents);
 unsigned long int aclk_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
+void aclk_single_update_enable();
+void aclk_single_update_disable();
+
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
