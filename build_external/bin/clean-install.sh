@@ -2,6 +2,7 @@
 
 DISTRO="$1"
 VERSION="$2"
+BuildBase="$(cd "$(dirname "$0")" && cd .. && pwd)"
 
 # This is temporary - not all of the package-builder images from the helper-images repo
 # are available on Docker Hub. When everything falls under the "happy case"  below this
@@ -31,13 +32,13 @@ if cat <<HAPPY_CASE | grep "$DISTRO-$VERSION"
     debian-buster
 HAPPY_CASE
 then
-    docker build -f clean-install.Dockerfile -t "${DISTRO}_${VERSION}_dev" .. \
+    docker build -f "$BuildBase/clean-install.Dockerfile" -t "${DISTRO}_${VERSION}_dev" "$BuildBase/.." \
             --build-arg "DISTRO=$DISTRO" --build-arg "VERSION=$VERSION" --build-arg ACLK=yes \
             --build-arg EXTRA_CFLAGS="-DACLK_SSL_ALLOW_SELF_SIGNED"
 else
     case "$DISTRO-$VERSION" in
         arch-current)
-            docker build -f clean-install-arch.Dockerfile -t "${DISTRO}_${VERSION}_dev" .. \
+            docker build -f "$BuildBase/clean-install-arch.Dockerfile" -t "${DISTRO}_${VERSION}_dev" "$BuildBase/.." \
             --build-arg "DISTRO=$DISTRO" --build-arg "VERSION=$VERSION" --build-arg ACLK=yes \
             --build-arg EXTRA_CFLAGS="-DACLK_SSL_ALLOW_SELF_SIGNED"
         ;;
