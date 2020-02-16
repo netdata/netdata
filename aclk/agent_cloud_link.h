@@ -98,8 +98,7 @@ int aclk_send_single_chart(char *host, char *chart);
 int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal, ACLK_CMD cmd);
 struct aclk_query *aclk_query_find(char *token, char *data, char *msg_id,
     char *query, ACLK_CMD cmd, struct aclk_query **last_query);
-int aclk_update_chart(RRDHOST *host, char *chart_name);
-int aclk_del_chart(RRDHOST *host, char *chart_name);
+int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);

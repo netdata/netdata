@@ -426,7 +426,7 @@ void rrdset_delete(RRDSET *st) {
     recursively_delete_dir(st->cache_dir, "left-over chart");
 #ifdef ENABLE_ACLK
     aclk_del_collector(st->rrdhost->hostname, st->plugin_name, st->module_name);
-    aclk_del_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
 #endif
 }
 
@@ -767,7 +767,7 @@ RRDSET *rrdset_create_custom(
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
     aclk_add_collector(host->hostname, plugin, module);
-    aclk_update_chart(host, st->id);
+    aclk_update_chart(host, st->id, ACLK_CMD_CHART);
 #endif
     return(st);
 }

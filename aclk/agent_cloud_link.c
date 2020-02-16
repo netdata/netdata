@@ -1337,7 +1337,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     return 0;
 }
 
-int    aclk_update_chart(RRDHOST *host, char *chart_name)
+int    aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
 {
 #ifndef ENABLE_ACLK
     UNUSED(host);
@@ -1350,28 +1350,11 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
     if (unlikely(aclk_disable_single_updates))
         return 0;
 
-    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, ACLK_CMD_CHART);
+    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd);
     return 0;
 #endif
 }
 
-int    aclk_del_chart(RRDHOST *host, char *chart_name)
-{
-#ifndef ENABLE_ACLK
-    UNUSED(host);
-    UNUSED(chart_name);
-    return 0;
-#else
-    if (host != localhost)
-        return 0;
-
-    if (unlikely(aclk_disable_single_updates))
-        return 0;
-
-    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, ACLK_CMD_CHARTDEL);
-    return 0;
-#endif
-}
 
 int    aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
