@@ -73,4 +73,48 @@ build_external/bin/make-install.sh arch current   # Observe both files are rebui
 
 The state of the build in the two containers is independent.
 
-2. A simple master-slave scenario
+2. Single agent config in docker-compose
+
+This functions the same as the previous example but is wrapped in docker-compose to 
+allow injection into more complex test configurations.
+
+```bash
+Distro=debian Version=10 docker-compose -f projects/only-agent/docker-compose.yml up
+```
+
+Note: it is possible to run multiple copies of the agent using the `--scale` option for
+`docker-compose up`.
+
+```bash
+Distro=debian Version=10 docker-compose -f projects/only-agent/docker-compose.yml up --scale agent=3
+```
+
+3. A simple master-slave scenario
+
+```bash
+# Need to call clean-install on the configs used in the master/slave containers
+docker-compose -f master-slaves/docker-compose.yml up --scale agent_slave1=2
+```
+
+Note: this is not production ready yet, but it is left in so that we can see how it behaves
+and improve it. Currently it produces the following problems:
+  * Only the base-configuration in the compose without scaling works.
+  * The containers are hard-coded in the compose.
+  * There is no way to separate the agent configurations, so running multiple agent slaves
+    wth the same GUID kills the master which exits with a fatal condition.
+    
+4. The ACLK
+
+This is for internal use only as it requires access to a private repo. Clone the vernemq-docker
+repo and follow the instructions within to build an image called `vernemq`.
+
+```bash
+build_external/bin/clean-install.sh arch current  # Only needed first time
+docker-compose -f build_external/projects/aclk-testing/vernemq-compose.yml -f build__external/projects/aclk-testing/agent-compose.yml up --build
+```
+
+Notes:
+* We are currently limited to arch because of restrictions on libwebsockets
+* There is not yet a good way to configure the target agent container from the docker-compose command line.
+* Several other containers should be in this compose (a paho client, tshark etc).
+
