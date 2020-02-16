@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 DISTRO="$1"
 VERSION="$2"
 
