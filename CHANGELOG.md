@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Add Patti to docs and .md codeowners [\#8092](https://github.com/netdata/netdata/pull/8092) ([joelhans](https://github.com/joelhans))
 - Docs: Fix Node and Bash collector module titles [\#8086](https://github.com/netdata/netdata/pull/8086) ([joelhans](https://github.com/joelhans))
 - Add handling of libmosquitto to binary packages. [\#8085](https://github.com/netdata/netdata/pull/8085) ([Ferroin](https://github.com/Ferroin))
 - Fixes text if current version is \>= latest version and already installed [\#8078](https://github.com/netdata/netdata/pull/8078) ([prologic](https://github.com/prologic))
@@ -138,7 +139,6 @@
 - Parse host tags [\#7702](https://github.com/netdata/netdata/pull/7702) ([vlvkobal](https://github.com/vlvkobal))
 - Fix PR labeling \(again\). [\#7699](https://github.com/netdata/netdata/pull/7699) ([Ferroin](https://github.com/Ferroin))
 - General fixes to the installer. [\#7698](https://github.com/netdata/netdata/pull/7698) ([Ferroin](https://github.com/Ferroin))
-- Fix PR labeling GitHub Action. [\#7697](https://github.com/netdata/netdata/pull/7697) ([Ferroin](https://github.com/Ferroin))
 - Fixes \#7680 Remote write [\#7694](https://github.com/netdata/netdata/pull/7694) ([Ehekatl](https://github.com/Ehekatl))
 - Fix unclosed brackets in softnet alarm [\#7693](https://github.com/netdata/netdata/pull/7693) ([Ehekatl](https://github.com/Ehekatl))
 - Support static builds for Prometheus remote write [\#7691](https://github.com/netdata/netdata/pull/7691) ([Ehekatl](https://github.com/Ehekatl))
@@ -154,7 +154,6 @@
 - Stream with labels [\#7549](https://github.com/netdata/netdata/pull/7549) ([thiagoftsm](https://github.com/thiagoftsm))
 - Alarm Log labels [\#7548](https://github.com/netdata/netdata/pull/7548) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
-- Docs: Tweaks and linter fixes to contributing guidelines [\#7407](https://github.com/netdata/netdata/pull/7407) ([joelhans](https://github.com/joelhans))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
