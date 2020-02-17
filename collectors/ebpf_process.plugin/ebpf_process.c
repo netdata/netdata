@@ -71,6 +71,8 @@ static int debug_log = 0;
 static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
+static int nprocs;
+uint32_t *hash_values;
 
 pthread_mutex_t lock;
 
@@ -103,12 +105,6 @@ void open_developer_log() {
 }
 
 static int unmap_memory() {
-    int nprocs = (int) sysconf(_SC_NPROCESSORS_ONLN);
-
-    if (nprocs > NETDATA_MAX_PROCESSOR) {
-        nprocs = NETDATA_MAX_PROCESSOR;
-    }
-
     int i;
     int size = (int)sysconf(_SC_PAGESIZE)*(page_cnt + 1);
     for ( i = 0 ; i < nprocs ; i++ ) {
@@ -154,6 +150,10 @@ static void int_exit(int sig)
     if (developer_log) {
         fclose(developer_log);
         developer_log = NULL;
+    }
+
+    if (hash_values) {
+        freez(hash_values);
     }
 
     if (event_pid) {
@@ -511,12 +511,19 @@ void *process_publisher(void *ptr)
 
 static void move_from_kernel2user_global() {
     uint32_t idx;
-    uint32_t val;
     uint32_t res[NETDATA_GLOBAL_VECTOR];
 
+    uint32_t *val = hash_values;
     for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
-        if(!bpf_map_lookup_elem(map_fd[1], &idx, &val)) {
-            res[idx] = val;
+        if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
+            uint32_t total = 0;
+            int i;
+            for (i = 0; i < nprocs; i++)
+                total += val[i];
+
+            res[idx] = total;
+        } else {
+            res[idx] = 0;
         }
     }
 
@@ -589,8 +596,6 @@ void *process_log(void *ptr)
     (void) ptr;
 
     if (mode == 1 && debug_log) {
-        int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-
         netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
     }
 
@@ -631,6 +636,11 @@ int allocate_global_vectors() {
         return -1;
     }
 
+    hash_values = callocz(nprocs, sizeof(uint32_t));
+    if(!hash_values) {
+        return -1;
+    }
+
     return 0;
 }
 
@@ -643,12 +653,6 @@ static void build_complete_path(char *out, size_t length,char *path, char *filen
 }
 
 static int map_memory() {
-    int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-
-    if (nprocs > NETDATA_MAX_PROCESSOR) {
-        nprocs = NETDATA_MAX_PROCESSOR;
-    }
-
     int i;
     for (i = 0; i < nprocs; i++) {
         pmu_fd[i] = set_bpf_perf_event(i, 2);
@@ -764,7 +768,12 @@ void set_global_variables() {
     if(!netdata_configured_log_dir)
         netdata_configured_log_dir = LOG_DIR;
 
-    page_cnt *= sysconf(_SC_NPROCESSORS_ONLN);
+    page_cnt *= (int)sysconf(_SC_NPROCESSORS_ONLN);
+
+    nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs > NETDATA_MAX_PROCESSOR) {
+        nprocs = NETDATA_MAX_PROCESSOR;
+    }
 }
 
 static void change_collector_event() {
