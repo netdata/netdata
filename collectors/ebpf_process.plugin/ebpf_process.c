@@ -518,7 +518,8 @@ static void move_from_kernel2user_global() {
         if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
             uint32_t total = 0;
             int i;
-            for (i = 0; i < nprocs; i++)
+            int end = (mykernel < 265984)?1:nprocs;
+            for (i = 0; i < end; i++)
                 total += val[i];
 
             res[idx] = total;
