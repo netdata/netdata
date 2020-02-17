@@ -298,6 +298,8 @@ set(LIBNETDATA_FILES
         libnetdata/clocks/clocks.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
+        libnetdata/ebpf/ebpf.c
+        libnetdata/ebpf/ebpf.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
         libnetdata/inlined.h
@@ -403,6 +405,10 @@ set(PERF_PLUGIN_FILES
 
 set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
+        )
+
+set(EBPF_PROCESS_PLUGIN_FILES
+        collectors/ebpf_process.plugin/ebpf_process.c
         )
 
 set(PROC_PLUGIN_FILES
@@ -778,6 +784,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
+    SET(ENABLE_PLUGIN_EBPF True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -788,6 +795,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -798,6 +806,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_EBPF False)
 
 ENDIF()
 
@@ -901,6 +910,20 @@ IF(ENABLE_PLUGIN_PERF)
     target_compile_options(perf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "perf.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# ebpf_process.plugin
+
+IF(ENABLE_PLUGIN_EBPF)
+    message(STATUS "ebpf_process.plugin: enabled")
+    add_executable(ebpf_process.plugin config.h ${EBPF_PROCESS_PLUGIN_FILES})
+    target_link_libraries (ebpf_process.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "ebpf_process.plugin: disabled")
 ENDIF()
 
 

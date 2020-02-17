@@ -92,6 +92,17 @@ progress() {
   echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
+get() {
+  url="${1}"
+  if command -v curl > /dev/null 2>&1; then
+    curl -sSL -o - --connect-timeout 10 --retry 3 "${url}"
+  elif command -v wget > /dev/null 2>&1; then
+    wget -T 15 -O - "${url}"
+  else
+    fatal "I need curl or wget to proceed, but neither is available on this system."
+  fi
+}
+
 # -----------------------------------------------------------------------------
 
 netdata_banner() {

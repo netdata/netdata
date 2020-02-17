@@ -229,7 +229,7 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
-${RPM_BUILD_DIR}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}
+${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 
 %build
 # Conf step
@@ -272,6 +272,10 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 # ###########################################################
 # Install perf.plugin
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
+
+# ###########################################################
+# Install ebpf_process.plugin
+install -m 4750 -p ebpf_process.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf_process.plugin"
 
 # ###########################################################
 # Install cups.plugin

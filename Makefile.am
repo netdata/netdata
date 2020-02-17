@@ -62,6 +62,9 @@ dist_noinst_DATA = \
     packaging/version \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/mosquitto.version \
+    packaging/mosquitto.checksums \
+    packaging/bundle-mosquitto.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
@@ -132,6 +135,8 @@ LIBNETDATA_FILES = \
     libnetdata/clocks/clocks.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
+    libnetdata/ebpf/ebpf.c \
+    libnetdata/ebpf/ebpf.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
@@ -249,6 +254,12 @@ XENSTAT_PLUGIN_FILES = \
 
 PERF_PLUGIN_FILES = \
     collectors/perf.plugin/perf_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+EBPF_PROCESS_PLUGIN_FILES = \
+    collectors/ebpf_process.plugin/ebpf_process.c \
+    collectors/ebpf_process.plugin/ebpf_process.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -582,6 +593,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
 
 NETDATACLI_FILES = \
@@ -645,6 +657,14 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_EBPF
+    plugins_PROGRAMS += ebpf_process.plugin
+    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
+    ebpf_process_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 

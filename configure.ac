@@ -385,6 +385,17 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
+# VFS plugin libs
+
+AC_CHECK_LIB(
+    [dl],
+    [dlopen],
+    [EBPF_LIBS="-ldl"]
+)
+
+OPTIONAL_EBPF_LIBS="${EBPF_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
@@ -860,6 +871,17 @@ fi
 AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
+# -----------------------------------------------------------------------------
+# ebpf_process.plugin
+
+AC_MSG_CHECKING([if ebpf_process.plugin should be enabled])
+if test "${build_target}" == "linux" -a "${EBPF_LIBS}"; then
+    enable_vfs="yes"
+else
+    enable_vfs="no"
+fi
+AC_MSG_RESULT([${enable_vfs}])
+AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_vfs}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1196,6 +1218,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_EBPF_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
@@ -1276,6 +1299,7 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/slabinfo.plugin/Makefile
     collectors/statsd.plugin/Makefile
+    collectors/ebpf_process.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
@@ -1298,6 +1322,7 @@ AC_CONFIG_FILES([
     libnetdata/clocks/Makefile
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
+    libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile

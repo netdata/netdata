@@ -312,6 +312,7 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
+#include "ebpf/ebpf.h"
 #include "eval/eval.h"
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
