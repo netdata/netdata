@@ -27,8 +27,8 @@ fi
 
 # -----------------------------------------------------------------------------
 # Pull in OpenSSL properly if on macOS
-if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ] ; then
-    export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
+  export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
 fi
 
 # -----------------------------------------------------------------------------
@@ -169,6 +169,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
+  --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
   --disable-cloud            Disable the agent-cloud link, required for Netdata Cloud functionality.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
@@ -254,7 +255,11 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--disable-cloud") NETDATA_DISABLE_LIBMOSQUITTO=1 ; NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk" ;;
+    "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
+    "--disable-cloud")
+      NETDATA_DISABLE_LIBMOSQUITTO=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
+      ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -447,7 +452,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ] ; then
+  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ]; then
     return 0
   fi
 
@@ -470,7 +475,7 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" >"${tmp}/sha256sums.txt" 2>/dev/null
+  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
 
   cp packaging/mosquitto.checksums "${tmp}/sha256sums.txt"
 
@@ -902,8 +907,8 @@ govercomp() {
   ver2=$(echo "$2" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
 
   local IFS=.
-  read -ra ver1 <<<"$ver1"
-  read -ra ver2 <<<"$ver2"
+  read -ra ver1 <<< "$ver1"
+  read -ra ver2 <<< "$ver2"
 
   if [ ${#ver1[@]} -eq 0 ] || [ ${#ver2[@]} -eq 0 ]; then
     return 3
@@ -929,14 +934,14 @@ should_install_go() {
   local version_in_file
   local binary_version
 
-  version_in_file="$(cat packaging/go.d.version 2>/dev/null)"
-  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2>/dev/null)
+  version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
+  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
 
   govercomp "$version_in_file" "$binary_version"
   case $? in
-  0) return 1 ;; # =
-  2) return 1 ;; # <
-  *) return 0 ;; # >, error
+    0) return 1 ;; # =
+    2) return 1 ;; # <
+    *) return 0 ;; # >, error
   esac
 }
 
@@ -994,8 +999,8 @@ install_go() {
     return 0
   fi
 
-  grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" >"${tmp}/sha256sums.txt" 2>/dev/null
-  grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >>"${tmp}/sha256sums.txt" 2>/dev/null
+  grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
+  grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2> /dev/null
 
   # Checksum validation
   if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
@@ -1025,6 +1030,174 @@ install_go() {
 }
 
 install_go
+
+function get_kernel_version() {
+  r="$(uname -r | cut -f 1 -d '-')"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
+    return 1
+  fi
+  echo "${libc}"
+  return 0
+}
+
+get_compatible_kernel_for_ebpf() {
+  kver="${1}"
+
+  # XXX: Logic taken from Slack discussion in #ebpf
+  # everything that has a version <= 4.14 can use the code built to 4.14
+  # Continue the logic, everything that has a version <= 4.19 and >= 4.15 can use the code built to 4.19
+  # Finally,  everybody that is using 5.X can use what is compiled with 5.4
+
+  kpkg=
+
+  if [ "${kver}" -ge 005000000 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 5.4"
+    kpkg="5_4"
+  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004020017 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
+    kpkg="4_19"
+  elif [ "${kver}" -le 004014999 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.14"
+    kpkg="4_14"
+  else
+    echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
+    return 1
+  fi
+
+  echo "${kpkg}"
+  return 0
+}
+
+should_install_ebpf() {
+  if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
+    run_failed "ebpf not enabled. --enable-ebpf to enable"
+    return 1
+  fi
+
+  # Get and Parse Kernel Version
+  kver="$(get_kernel_version)"
+  kver="${kver:-0}"
+
+  # Check Kernel Compatibility
+  if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
+    echo >&2 " Detected Kernel: ${kver}"
+    run_failed "Kernel incompatible. Please contact NetData support!"
+    return 1
+  fi
+
+  # Check Kernel Config
+
+  tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
+
+  echo >&2 " Downloading check-kernel-config.sh ..."
+  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
+    run_failed "Failed to download check-kernel-config.sh"
+    echo 2>&" Removing temporary directory ${tmp} ..."
+    rm -rf "${tmp}"
+    return 1
+  fi
+
+  run chmod +x "${tmp}"/check-kernel-config.sh
+
+  if ! run "${tmp}"/check-kernel-config.sh; then
+    run_failed "Kernel unsupported or missing required config"
+    return 1
+  fi
+
+  rm -rf "${tmp}"
+
+  # TODO: Check for current vs. latest version
+
+  return 0
+}
+
+install_ebpf() {
+  if ! should_install_ebpf; then
+    return 0
+  fi
+
+  progress "Installing eBPF plugin"
+
+  # Get and Parse Kernel Version
+  kver="$(get_kernel_version)"
+  kver="${kver:-0}"
+
+  # Get Compatible eBPF Kernel Package
+  kpkg="$(get_compatible_kernel_for_ebpf "${kver}")"
+
+  # Detect libc
+  libc="$(detect_libc)"
+
+  PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
+
+  echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
+
+  PACKAGE_TARBALL_URL=
+  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | grep -o -E "\"browser_download_url\": \".*${PACKAGE_TARBALL}\"" | sed -e 's/"browser_download_url": "\(.*\)"/\1/')"
+
+  if [ -z "${PACKAGE_TARBALL_URL}" ]; then
+    run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
+    return 1
+  fi
+
+  tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
+
+  echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
+  if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
+    run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
+    echo 2>&" Removing temporary directory ${tmp} ..."
+    rm -rf "${tmp}"
+    return 1
+  fi
+
+  echo >&2 " Extracting ${PACKAGE_TARBALL} ..."
+  tar -xf "${tmp}/${PACKAGE_TARBALL}" -C "${tmp}"
+
+  echo >&2 " Finding suitable lib directory ..."
+  libdir=
+  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
+  if [ -z "${libdir}" ]; then
+    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
+  fi
+
+  if [ -z "${libdir}" ]; then
+    run_failed "Could not find a suitable lib directory"
+    return 1
+  fi
+
+  run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
+  run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run ln -v -f -s "${libdir}"/libbpf_kernel.so libbpf_kernel.so.0
+  run ldconfig
+
+  echo >&2 "ePBF installation all done!"
+  rm -rf "${tmp}"
+
+  return 0
+}
+
+progress "eBPF Kernel Collector (opt-in)"
+install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
