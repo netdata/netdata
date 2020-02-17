@@ -540,8 +540,13 @@ netdataDashboard.menu = {
         title: 'CockroachDB',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance and health statistics for various <code>CockroachDB</code> components.'
-    }
+    },
 
+    'ebpf': {
+        title: 'eBPF',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Monitor system calls, internal functtions, bytes read, bytes written and errors using <code>eBPF</code>.'
+    }
 };
 
 
@@ -3011,5 +3016,48 @@ netdataDashboard.context = {
     'cockroachdb.timeseries_write_bytes': {
         info: 'Size of metric samples written to disk.'
     },
+
+    // ------------------------------------------------------------------------
+    // eBPF
+
+    'ebpf.file_descriptor': {
+        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function \'do_sys_open\', that is the common function called from open(2) and openat(2). The close dimension is attached to the function \'__close_fd\', that is called from system call close(2).'
+    },
+
+    'ebpf.file_error': {
+        info: 'File error shows the number of calls that returned an error when called per period.'
+    },
+
+    'ebpf.deleted_objects': {
+        info: 'Deleted objects monitors calls to the function \'vfs_unlink\'. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
+    },
+
+    'ebpf.io': {
+        info: 'IO shows the number of calls for functions \'vfs_read\' and \'vfs_write\' independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
+    },
+
+    'ebpf.io_bytes': {
+        info: 'IO bytes shows the total of bytes read or written with success using the functions  \'vfs_read\' and \'vfs_write\'.'
+    },
+
+    'ebpf.io_error': {
+        info: 'IO error shows the number of calls for \'vfs_read\' and \'vfs_write\' that did not have success.'
+    },
+
+    'ebpf.process_thread': {
+        info: 'Process thread counts the number of times that the function \'do_fork\' was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for \'sys_clone\' that has the flag \'CLONE_THREAD\' set.'
+    },
+
+    'ebpf.exit': {
+        info: 'Exit count the number of calls for the functions responsible to close (\'do_exit\') and release(\'release_task\') tasks.'
+    },
+
+    'ebpf.task_error': {
+        info: 'Task error count the number of errors to create a new process or thread.'
+    },
+
+    'ebpf.process_status': {
+        info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
+    }
 
 };
