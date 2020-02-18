@@ -43,6 +43,12 @@ extern struct config exporting_config;
 #define EXPORTER_SEND_NAMES                     "send names instead of ids"
 #define EXPORTER_SEND_NAMES_DEFAULT             CONFIG_BOOLEAN_YES
 
+#define EXPORTER_KINESIS_STREAM_NAME            "stream name"
+#define EXPORTER_KINESIS_STREAM_NAME_DEFAULT    "netdata"
+
+#define EXPORTER_AWS_ACCESS_KEY_ID              "aws_access_key_id"
+#define EXPORTER_AWS_SECRET_ACCESS_KEY          "aws_secret_access_key"
+
 typedef enum exporting_options {
     EXPORTING_OPTION_NONE                   = 0,
 
@@ -88,6 +94,12 @@ struct instance_config {
 
 struct simple_connector_config {
     int default_port;
+};
+
+struct aws_kinesis_connector_config {
+    char *stream_name;
+    char *auth_key_id;
+    char *secure_key;
 };
 
 struct connector_config {

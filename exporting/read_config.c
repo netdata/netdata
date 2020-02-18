@@ -335,6 +335,22 @@ struct engine *read_exporting_config()
                 else
                     tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
 
+                if (i == BACKEND_TYPE_KINESIS) {
+                    struct aws_kinesis_connector_config *connector_specific_config =
+                        callocz(1, sizeof(struct aws_kinesis_connector_config));
+
+                    tmp_instance->config.connector_specific_config = connector_specific_config;
+
+                    connector_specific_config->stream_name = strdupz(exporter_get(
+                        instance_name, EXPORTER_KINESIS_STREAM_NAME, EXPORTER_KINESIS_STREAM_NAME_DEFAULT));
+
+                    connector_specific_config->auth_key_id = strdupz(exporter_get(
+                        instance_name, EXPORTER_AWS_ACCESS_KEY_ID, ""));
+
+                    connector_specific_config->secure_key = strdupz(exporter_get(
+                        instance_name, EXPORTER_AWS_SECRET_ACCESS_KEY, ""));
+                }
+
 #ifdef NETDATA_INTERNAL_CHECKS
                 info(
                     "     Dest=[%s], upd=[%d], buffer=[%d] timeout=[%ld] options=[%u]",
