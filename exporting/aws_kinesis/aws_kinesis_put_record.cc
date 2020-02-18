@@ -21,6 +21,14 @@ struct request_outcome {
 
 static Vector<request_outcome> request_outcomes;
 
+void aws_sdk_init() {
+    InitAPI(options);
+}
+
+void aws_sdk_shutdown() {
+    ShutdownAPI(options);
+}
+
 void kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout) {
     InitAPI(options);
 
@@ -39,8 +47,6 @@ void kinesis_init(const char *region, const char *access_key_id, const char *sec
 
 void kinesis_shutdown() {
     Delete(client);
-
-    ShutdownAPI(options);
 }
 
 int kinesis_put_record(const char *stream_name, const char *partition_key,

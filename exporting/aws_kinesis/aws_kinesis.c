@@ -33,6 +33,11 @@ int init_aws_kinesis_instance(struct instance *instance)
     uv_mutex_init(&instance->mutex);
     uv_cond_init(&instance->cond_var);
 
+    if (!instance->engine->aws_sdk_initialized) {
+        aws_sdk_init();
+        instance->engine->aws_sdk_initialized = 1;
+    }
+
     return 0;
 }
 

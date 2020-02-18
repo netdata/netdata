@@ -163,6 +163,8 @@ struct engine {
     size_t instance_num;
     time_t now;
 
+    int aws_sdk_initialized;
+
     struct instance *instance_root;
 };
 

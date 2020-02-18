@@ -9,8 +9,10 @@
 extern "C" {
 #endif
 
-void kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout);
+void aws_sdk_init();
+void aws_sdk_shutdown();
 
+void kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout);
 void kinesis_shutdown();
 
 int kinesis_put_record(const char *stream_name, const char *partition_key,
