@@ -457,7 +457,7 @@ bundle_libmosquitto() {
   fi
 
   if [ "$(uname)" != "Linux" ]; then
-    echo >&2 " Sorry NetData with custom libmosquitto is unable on $(uname) at this time!"
+    echo >&2 " Sorry NetData with custom libmosquitto is unsupported on $(uname) at this time!"
     echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
     return 0
   fi
