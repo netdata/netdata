@@ -475,9 +475,7 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
-
-  cp packaging/mosquitto.checksums "${tmp}/sha256sums.txt"
+  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/mosquitto.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
 
   # Checksum validation
   if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
