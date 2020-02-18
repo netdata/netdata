@@ -108,7 +108,7 @@ descriptors.
 
 #### File descriptor
 
-This chart contain two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
+This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
 functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)`, and
 `close(2)`. ​
 
