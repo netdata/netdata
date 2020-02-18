@@ -261,6 +261,13 @@ struct engine *read_exporting_config()
 
         info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
+#ifndef HAVE_KINESIS
+        if (tmp_ci_list->backend_type == BACKEND_TYPE_KINESIS) {
+            error("AWS Kinesis support isn't compiled");
+            goto next_connector_instance;
+        }
+#endif
+
         tmp_instance = (struct instance *)calloc(1, sizeof(struct instance));
         tmp_instance->next = engine->instance_root;
         engine->instance_root = tmp_instance;
@@ -350,6 +357,7 @@ struct engine *read_exporting_config()
                 config_get_number(instance_name, EXPORTER_UPDATE_EVERY, EXPORTER_UPDATE_EVERY_DEFAULT);
         }
 
+next_connector_instance:
         tmp_ci_list1 = tmp_ci_list->next;
         freez(tmp_ci_list);
         tmp_ci_list = tmp_ci_list1;

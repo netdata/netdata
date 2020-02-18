@@ -41,10 +41,7 @@ int init_connectors(struct engine *engine)
 #if HAVE_KINESIS
                 if (init_aws_kinesis_instance(instance) != 0)
                     return 1;
-#else
-            error("EXPORTING: AWS Kinesis support isn't compiled");
-            // TODO: remove the instance
-#endif // HAVE_KINESIS
+#endif
                 break;
             default:
                 error("EXPORTING: unknown exporting connector type");
