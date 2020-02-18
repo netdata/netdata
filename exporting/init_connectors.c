@@ -35,8 +35,13 @@ int init_connectors(struct engine *engine)
                     return 1;
                 break;
             case BACKEND_TYPE_KINESIS:
+#if HAVE_KINESIS
                 if (init_aws_kinesis_connector(connector) != 0)
                     return 1;
+#else
+                error("EXPORTING: AWS Kinesis support isn't compiled");
+#endif // HAVE_KINESIS
+                // TODO: remove the connector
                 break;
             default:
                 error("EXPORTING: unknown exporting connector type");
@@ -64,8 +69,13 @@ int init_connectors(struct engine *engine)
                         return 1;
                     break;
                 case BACKEND_TYPE_KINESIS:
+#if HAVE_KINESIS
                     if (init_aws_kinesis_instance(instance) != 0)
                         return 1;
+#else
+                error("EXPORTING: AWS Kinesis support isn't compiled");
+                // TODO: remove the instance
+#endif // HAVE_KINESIS
                     break;
                 default:
                     error("EXPORTING: unknown exporting connector type");
