@@ -6,8 +6,8 @@
 // Read from the config file -- new section [agent_cloud_link]
 // Defaults are supplied
 
-int aclk_port = 0;          // default 1883
-char *aclk_hostname = NULL; //default localhost
+int aclk_port = ACLK_DEFAULT_PORT;
+char *aclk_hostname = ACLK_DEFAULT_HOST;
 int aclk_subscribed = 0;
 int aclk_disable_single_updates = 0;
 
@@ -150,7 +150,7 @@ struct aclk_query_queue {
  * mode 1 to sleep for the calculated amount of time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
  *
  */
-unsigned long int aclk_delay(int mode)
+unsigned long int aclk_reconnect_delay(int mode)
 {
     static  int fail = -1;
     unsigned long int delay;
@@ -1108,7 +1108,7 @@ void aclk_disconnect(void *ptr)
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
     waiting_init = 1;
-    aclk_delay(0);
+    aclk_reconnect_delay(0);
 }
 
 void aclk_shutdown()
@@ -1129,8 +1129,8 @@ int aclk_init(ACLK_INIT_ACTION action)
     if (likely(init))
         return 0;
 
-    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", "localhost");
-    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", 9002);
+    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
+    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
     // initialize the low level link to the cloud
     rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);

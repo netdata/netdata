@@ -7,7 +7,7 @@
 #include "mqtt.h"
 
 #define ACLK_VERSION 1
-#define ACLK_THREAD_NAME "ACLKQ"
+#define ACLK_THREAD_NAME "ACLK_Query"
 #define ACLK_JSON_IN_MSGID "msg-id"
 #define ACLK_JSON_IN_TYPE "type"
 #define ACLK_JSON_IN_VERSION "version"
@@ -31,6 +31,8 @@
 
 #define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
 #define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
+#define ACLK_DEFAULT_PORT  9002
+#define ACLK_DEFAULT_HOST "localhost"
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
 
@@ -109,7 +111,7 @@ void aclk_alarm_reload();
 void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
 BUFFER *aclk_encode_response(BUFFER *contents);
-unsigned long int aclk_delay(int mode);
+unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 void aclk_single_update_enable();
 void aclk_single_update_disable();
