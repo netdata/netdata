@@ -118,7 +118,7 @@ This charts demonstrate the number of times some software tried and failed to op
  
 ### VFS
 
-A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is an layer on top of regular
+A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
 filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
 group won't show _all_ the actions that occured on your system.
 
