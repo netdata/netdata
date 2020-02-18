@@ -8,7 +8,7 @@ this plugin is to monitor IO and process management on the host where it is runn
   <figcaption>An example of VFS charts, made possible by the eBPF collector plugin</figcaption>
 </figure>
 
-## Enable the plugin on Linux
+## Enable the collector on Linux
 
 Currently, this `ebpf_process` collector only works on Linux systems. Because it adds overhead to the system running it,
 the collector is also disabled by default.
