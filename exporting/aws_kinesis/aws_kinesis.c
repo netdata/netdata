@@ -3,19 +3,6 @@
 #include "aws_kinesis.h"
 
 /**
- * Initialize AWS Kinesis connector
- *
- * @param instance a connector data structure.
- * @return Always returns 0.
- */
-int init_aws_kinesis_connector(struct connector *connector)
-{
-    connector->worker = aws_kinesis_connector_worker;
-
-    return 0;
-}
-
-/**
  * Initialize AWS Kinesis connector instance
  *
  * @param instance an instance data structure.
@@ -23,6 +10,8 @@ int init_aws_kinesis_connector(struct connector *connector)
  */
 int init_aws_kinesis_instance(struct instance *instance)
 {
+    instance->worker = aws_kinesis_connector_worker;
+
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_json_plaintext;
     instance->start_chart_formatting = NULL;

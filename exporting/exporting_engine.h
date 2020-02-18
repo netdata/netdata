@@ -78,6 +78,8 @@ typedef enum exporting_options {
 struct engine;
 
 struct instance_config {
+    BACKEND_TYPE type;
+
     const char *name;
     const char *destination;
 
@@ -100,11 +102,6 @@ struct aws_kinesis_connector_config {
     char *stream_name;
     char *auth_key_id;
     char *secure_key;
-};
-
-struct connector_config {
-    BACKEND_TYPE type;
-    void *connector_specific_config;
 };
 
 struct engine_config {
@@ -131,6 +128,7 @@ struct stats {
 struct instance {
     struct instance_config config;
     void *buffer;
+    void (*worker)(void *instance_p);
     struct stats stats;
 
     int scheduled;
@@ -156,16 +154,6 @@ struct instance {
 
     size_t index;
     struct instance *next;
-    struct connector *connector;
-};
-
-struct connector {
-    struct connector_config config;
-
-    void (*worker)(void *instance_p);
-
-    struct instance *instance_root;
-    struct connector *next;
     struct engine *engine;
 };
 
@@ -175,7 +163,7 @@ struct engine {
     size_t instance_num;
     time_t now;
 
-    struct connector *connector_root;
+    struct instance *instance_root;
 };
 
 void *exporting_main(void *ptr);

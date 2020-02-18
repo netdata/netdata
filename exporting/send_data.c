@@ -145,7 +145,7 @@ void simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
 
-    struct simple_connector_config *connector_specific_config = instance->connector->config.connector_specific_config;
+    struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
     struct stats *stats = &instance->stats;
 
     int sock = -1;
