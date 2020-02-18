@@ -16,13 +16,11 @@ struct engine *__mock_read_exporting_config()
     engine->config.hostname = strdupz("test-host");
     engine->config.update_every = 3;
 
-    engine->connector_root = calloc(1, sizeof(struct connector));
-    engine->connector_root->config.type = BACKEND_TYPE_GRAPHITE;
-    engine->connector_root->engine = engine;
 
-    engine->connector_root->instance_root = calloc(1, sizeof(struct instance));
-    struct instance *instance = engine->connector_root->instance_root;
-    instance->connector = engine->connector_root;
+    engine->instance_root = calloc(1, sizeof(struct instance));
+    struct instance *instance = engine->instance_root;
+    instance->engine = engine;
+    instance->config.type = BACKEND_TYPE_GRAPHITE;
     instance->config.name = strdupz("instance_name");
     instance->config.destination = strdupz("localhost");
     instance->config.update_every = 1;

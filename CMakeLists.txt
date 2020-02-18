@@ -965,6 +965,9 @@ if(BUILD_TESTING)
         exporting/tests/system_doubles.c
         )
     set(TEST_NAME exporting_engine)
+if(ENABLE_BACKEND_KINESIS)
+    list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
+endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
         ${TEST_NAME}_testdriver

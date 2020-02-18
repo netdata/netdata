@@ -9,6 +9,7 @@
 #include "exporting/graphite/graphite.h"
 #include "exporting/json/json.h"
 #include "exporting/opentsdb/opentsdb.h"
+#include "exporting/aws_kinesis/aws_kinesis.h"
 
 #include <stdarg.h>
 #include <stddef.h>
