@@ -59,8 +59,7 @@ commands. You can also configure your system's `/etc/fstab` configuration to mou
 
 eBPF collection is only enabled if you install Netdata with the `--enable-ebpf` option. 
 
-If you installed via the [one-line installation
-script](../../packaging/installer/README.md#automatic-one-line-installation-script), [64-bit
+If you installed via the [one-line installation script](../../packaging/installer/README.md), [64-bit
 binary](../../packaging/installer/methods/kickstart-64.md), or [manually](../../packaging/installer/methods/manual.md),
 you can append the `--enable-ebpf` option when you reinstall.
 
