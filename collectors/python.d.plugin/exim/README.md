@@ -5,7 +5,7 @@ This command can take a lot of time to finish its execution thus it is not recom
 
 ## Requirements
 
-The module uses the `exim` binary, which can only be executed as root by default. We need to allow other users to `exim` binary. We solve that adding `queue_list_requires_admin` statement in exim configuration and set to `false`, because is `true` by default. On many Linux distributions, the default location of `exim` configuration is in `/etc/exim.conf`.
+The module uses the `exim` binary, which can only be executed as root by default. We need to allow other users to `exim` binary. We solve that adding `queue_list_requires_admin` statement in exim configuration and set to `false`, because it is `true` by default. On many Linux distributions, the default location of `exim` configuration is in `/etc/exim.conf`.
 
 1. Edit the `exim` configuration with your preferred editor and add:
 `queue_list_requires_admin = false`
