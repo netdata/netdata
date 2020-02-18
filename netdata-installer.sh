@@ -865,10 +865,10 @@ if [ "${UID}" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
-	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
-		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-	fi
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+  fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
@@ -1093,6 +1093,12 @@ get_compatible_kernel_for_ebpf() {
 should_install_ebpf() {
   if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
     run_failed "ebpf not enabled. --enable-ebpf to enable"
+    return 1
+  fi
+
+  if [ "$(uname)" != "Linux" ]; then
+    echo >&2 " Sorry eBPF Collector is currently unsupproted on $(uname) Systems at this time."
+    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
     return 1
   fi
 
