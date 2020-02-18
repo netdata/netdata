@@ -13,27 +13,15 @@ and applications. Thanks to a new plugin and associated collectors released in
 [v1.20](https://blog.netdata.cloud/posts/release-1.20/) of Netdata, you can now monitor eBPF metrics with Netdata's
 per-second metrics collection and troubleshoot your applications with interactive visualizations.
 
+The process for enabling the eBPF collector is a little more complex than we'd like to cover in this tutorial. Read the
+[eBPF collector documentation](../../collectors/ebpf_process.plugin/README.md) for the full instructions.
+
+If you don't want to enable the eBPF collector now, you can still learn about the value of monitoring eBPF metrics in
+general, and what we currently support, below.
+
 ## Why eBPF monitoring matters
 
 t/k
-
-## Set up your system
-
-eBPF monitoring requires a Linux system running kernel version `4.11.0` or later, the `Kprobes` module enabled, and the
-`tracefs` and `debugfs` filesystems mounted. See our [eBPF plugin documentation](#enable-the-plugin-on-linux) for
-details about how you can ensure your system meets these prerequisites, and steps to follow if it doesn't already.
-
-As with all of our plugins and their associated collectors, restart Netdata with `service netdata restart`, or use the
-[appropriate method](../getting-started.md#start-stop-and-restart-netdata) for your system, and refresh your browser.
-Your Netdata dashboard should now feature eBPF charts brimming with new metrics every second!
-
-**IMAGE GOES HERE**
-
-## Configure the eBPF plugin
-
-The only other optional configuration is to use a different eBPF program than the default, `entry`. Read about each in
-our [documentation](#load). The default produces the fewest charts, but has the least amount of processing overload, and
-is the best option when getting started with monitoring eBPF.
 
 ## Example #1
 

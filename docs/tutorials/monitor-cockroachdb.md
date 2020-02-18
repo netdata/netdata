@@ -1,4 +1,4 @@
-# How to monitor CockroadchDB metrics with Netdata
+# Monitor CockroadchDB metrics with Netdata
 
 [CockroachDB](https://github.com/cockroachdb/cockroach) is an open-source that project brings SQL databases into
 scalable, disaster-resilient cloud deployments. Thanks to a [new CockroachDB
@@ -30,8 +30,8 @@ method](../getting-started.md#start-stop-and-restart-netdata) for your system, a
 CockroachDB metrics in your Netdata dashboard!
 
 <figure>
-  <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockrochDB database monitored by Netdata">
-  <figcaption>CPU utilization charts from a CockrochDB database monitored by Netdata</figcaption>
+  <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockroachDB database monitored by Netdata">
+  <figcaption>CPU utilization charts from a CockroachDB database monitored by Netdata</figcaption>
 </figure>
 
 > Note: Netdata collects metrics from CockroachDB every 10 seconds, instead of our usual 1 second, because CockroachDB
