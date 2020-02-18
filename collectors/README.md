@@ -24,8 +24,6 @@ guide](QUICKSTART.md).
 
 ## Tutorials
 
-[Monitor eBPF metrics with Netdata](../docs/tutorials/monitor-ebpf-linux.md)
-
 [Monitor Nginx or Apache web server log files with Netdata](../docs/tutorials/collect-apache-nginx-web-logs.md)
 
 [Monitor CockroadchDB metrics with Netdata](../docs/tutorials/monitor-cockroachdb.md)
