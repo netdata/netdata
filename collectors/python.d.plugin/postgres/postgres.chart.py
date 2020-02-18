@@ -39,6 +39,7 @@ CONN_PARAM_SSL_KEY = 'sslkey'
 QUERY_NAME_WAL = 'WAL'
 QUERY_NAME_ARCHIVE = 'ARCHIVE'
 QUERY_NAME_BACKENDS = 'BACKENDS'
+QUERY_NAME_BACKEND_USAGE = 'BACKEND_USAGE'
 QUERY_NAME_TABLE_STATS = 'TABLE_STATS'
 QUERY_NAME_INDEX_STATS = 'INDEX_STATS'
 QUERY_NAME_DATABASE = 'DATABASE'
@@ -75,6 +76,9 @@ METRICS = {
     QUERY_NAME_BACKENDS: [
         'backends_active',
         'backends_idle'
+    ],
+    QUERY_NAME_BACKEND_USAGE: [
+        'usage'
     ],
     QUERY_NAME_INDEX_STATS: [
         'index_count',
@@ -232,6 +236,17 @@ SELECT
      WHERE state = 'idle')
       AS backends_idle
 FROM pg_stat_activity;
+""",
+}
+
+QUERY_BACKEND_USAGE = {
+    DEFAULT: """
+SELECT
+    100.0 * sum(numbackends) / (SELECT  setting::int
+                FROM pg_settings
+                WHERE name = 'max_connections')
+      AS usage
+FROM pg_stat_database;
 """,
 }
 
@@ -528,10 +543,11 @@ SELECT
 """,
 }
 
-
 def query_factory(name, version=NO_VERSION):
     if name == QUERY_NAME_BACKENDS:
         return QUERY_BACKEND[DEFAULT]
+    elif name == QUERY_NAME_BACKEND_USAGE:
+        return QUERY_BACKEND_USAGE[DEFAULT]
     elif name == QUERY_NAME_TABLE_STATS:
         return QUERY_TABLE_STATS[DEFAULT]
     elif name == QUERY_NAME_INDEX_STATS:
@@ -588,6 +604,7 @@ ORDER = [
     'db_stat_connections',
     'database_size',
     'backend_process',
+    'backend_usage',
     'index_count',
     'index_size',
     'table_count',
@@ -672,6 +689,12 @@ CHARTS = {
         'lines': [
             ['backends_active', 'active', 'absolute'],
             ['backends_idle', 'idle', 'absolute']
+        ]
+    },
+    'backend_usage': {
+        'options': [None, '% of Connections in use', 'percentage', 'backend processes', 'postgres.backend_process', 'area'],
+        'lines': [
+            ['usage', 'usage', 'absolute']
         ]
     },
     'index_count': {
@@ -970,6 +993,7 @@ class Service(SimpleService):
     def populate_queries(self):
         self.queries[query_factory(QUERY_NAME_DATABASE)] = METRICS[QUERY_NAME_DATABASE]
         self.queries[query_factory(QUERY_NAME_BACKENDS)] = METRICS[QUERY_NAME_BACKENDS]
+        self.queries[query_factory(QUERY_NAME_BACKEND_USAGE)] = METRICS[QUERY_NAME_BACKEND_USAGE]
         self.queries[query_factory(QUERY_NAME_LOCKS)] = METRICS[QUERY_NAME_LOCKS]
         self.queries[query_factory(QUERY_NAME_BGWRITER)] = METRICS[QUERY_NAME_BGWRITER]
         self.queries[query_factory(QUERY_NAME_DIFF_LSN, self.server_version)] = METRICS[QUERY_NAME_WAL_WRITES]
