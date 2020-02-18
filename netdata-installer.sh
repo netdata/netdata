@@ -456,6 +456,12 @@ bundle_libmosquitto() {
     return 0
   fi
 
+  if [ "$(uname)" != "Linux" ]; then
+    echo >&2 " Sorry NetData with custom libmosquitto is unable on $(uname) at this time!"
+    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
+    return 0
+  fi
+
   progress "Prepare custom libmosquitto version"
 
   MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
