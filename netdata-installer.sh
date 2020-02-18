@@ -456,11 +456,17 @@ bundle_libmosquitto() {
     return 0
   fi
 
+  if [ "$(uname)" != "Linux" ]; then
+    echo >&2 " Sorry NetData with custom libmosquitto is unsupported on $(uname) at this time!"
+    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
+    return 0
+  fi
+
   progress "Prepare custom libmosquitto version"
 
   MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
 
-  tmp=$(mktemp -t -d netdata-mosquitto-XXXXXX)
+  tmp="$(mktemp -d -t netdata-mosquitto-XXXXXX)"
   MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
 
   if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}" ]; then
@@ -475,9 +481,7 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
-
-  cp packaging/mosquitto.checksums "${tmp}/sha256sums.txt"
+  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/mosquitto.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
 
   # Checksum validation
   if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
@@ -861,10 +865,10 @@ if [ "${UID}" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
-	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
-		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-	fi
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+  fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
@@ -975,7 +979,7 @@ install_go() {
       break
     fi
   done
-  tmp=$(mktemp -t -d netdata-go-XXXXXX)
+  tmp="$(mktemp -d -t netdata-go-XXXXXX)"
   GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
   if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" ]; then
@@ -1092,6 +1096,12 @@ should_install_ebpf() {
     return 1
   fi
 
+  if [ "$(uname)" != "Linux" ]; then
+    echo >&2 " Sorry eBPF Collector is currently unsupproted on $(uname) Systems at this time."
+    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
+    return 1
+  fi
+
   # Get and Parse Kernel Version
   kver="$(get_kernel_version)"
   kver="${kver:-0}"
@@ -1105,7 +1115,7 @@ should_install_ebpf() {
 
   # Check Kernel Config
 
-  tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
+  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
   echo >&2 " Downloading check-kernel-config.sh ..."
   if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
@@ -1158,7 +1168,7 @@ install_ebpf() {
     return 1
   fi
 
-  tmp="$(mktemp -t -d netdata-ebpf-XXXXXX)"
+  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
   echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
   if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
