@@ -1,6 +1,6 @@
-# Monitor CockroadchDB metrics with Netdata
+# Monitor CockroachDB metrics with Netdata
 
-[CockroachDB](https://github.com/cockroachdb/cockroach) is an open-source that project brings SQL databases into
+[CockroachDB](https://github.com/cockroachdb/cockroach) is an open-source project that brings SQL databases into
 scalable, disaster-resilient cloud deployments. Thanks to a [new CockroachDB
 collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/cockroachdb/) released in
 [v1.20](https://blog.netdata.cloud/posts/release-1.20/), you can now monitor any number of CockroachDB databases with
