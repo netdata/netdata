@@ -10,6 +10,7 @@ C](https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm)](https
 JS](https://img.shields.io/lgtm/grade/javascript/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:javascript)
 [![LGTM
 PYTHON](https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:python)
+[![TODOs](https://badgen.net/https/api.tickgit.com/badgen/github.com/netdata/netdata)](https://www.tickgit.com/browse?repo=github.com/netdata/netdata)
 
 ---
 
