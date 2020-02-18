@@ -1,42 +1,39 @@
 # ebpf_process.plugin
 
-This plugin uses eBPF to monitor system calls inside your operating system's kernel. For now, the main goal of this
-plugin is to monitor IO and process management on the host where it is running. 
+This collector plugin uses eBPF to monitor system calls inside your operating system's kernel. For now, the main goal of
+this plugin is to monitor IO and process management on the host where it is running.
 
-This plugin has different configuration modes, all of which can be adjusted with its configuration file at
-`ebpf_process.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
-plugin works using `entry` by reading this configuration file.
+<figure>
+  <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="n example of VFS charts, made possible by the eBPF collector plugin">
+  <figcaption>An example of VFS charts, made possible by the eBPF collector plugin</figcaption>
+</figure>
 
-You can always edit this file with `edit-config`:
+## Enable the collector on Linux
 
-```bash
-cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config ebpf_process.conf
-```
+Currently, this `ebpf_process` collector only works on Linux systems. Because it adds overhead to the system running it,
+the collector is also disabled by default.
 
-## Enable the plugin on Linux
+Follow the next few steps to ensure compatibility, prepare your system, install Netdata with eBPF compiled, and enable
+the collector.
 
-Currently, `ebpf_process` only works on Linux systems. 
+### Ensure kernel compatibility
 
-To enable this plugin and its collector, your operating system's kernel must be more recent than `4.11.0`, and it must
-be compiled with the option `CONFIG_KPROBES=y`. You can verify whether your kernel has this option enabled by running
+To enable this plugin and its collector, you must be on a Linux system with a kernel that is more recent than `4.11.0`
+and compiled with the option `CONFIG_KPROBES=y`. You can verify whether your kernel has this option enabled by running
 the following commands:
 
 ```bash
-# grep CONFIG_KPROBES=y /boot/config-$(uname -r)
-# zgrep CONFIG_KPROBES=y /proc/config.gz
+grep CONFIG_KPROBES=y /boot/config-$(uname -r)
+zgrep CONFIG_KPROBES=y /proc/config.gz
 ```
 
-If `Kprobes` is enabled, you will see `CONFIG_KPROBES=y` as the command's output. If you don't see `CONFIG_KPROBES=y`
-for any of the commands above, you will have to recompile your kernel to enable it. See the next step, [Recompiling your
-kernel](#recompile-your-kernel), for details.
+If `Kprobes` is enabled, you will see `CONFIG_KPROBES=y` as the command's output, and can skip ahead to the next step: [mount `debugfs` and `tracefs`](#mount-debugfs-and-tracefs).
 
-You also need to have both the `tracefs` and `debugfs` filesystems mounted on your system.
-
-### Recompile your kernel
+If you don't see `CONFIG_KPROBES=y` for any of the commands above, you will have to recompile your kernel to enable it.
 
 The process of recompiling Linux kernels varies based on your distribution and version. Read the documentation for your
-system's distribution to learn more about the specific workflow for 
+system's distribution to learn more about the specific workflow for recompiling the kernel, ensuring that you set the
+`CONFIG_KPROBES` setting to `y` in the process.
 
 -   [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
 -   [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
@@ -47,25 +44,52 @@ system's distribution to learn more about the specific workflow for
 
 ### Mount `debugfs` and `tracefs`
 
-Try mounting the `tracefs` and `debugfs` filesystems using the commands below:
+The eBPF collector also requires both the `tracefs` and `debugfs` filesystems. Try mounting the `tracefs` and `debugfs`
+filesystems using the commands below:
 
 ```bash
-# mount -t debugfs nodev /sys/kernel/debug
-# mount -t tracefs nodev /sys/kernel/tracing
+sudo mount -t debugfs nodev /sys/kernel/debug
+sudo mount -t tracefs nodev /sys/kernel/tracing
 ```
 ​
-If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to 
-mount these filesystems.
+If they are already mounted, you will see an error. If they are not mounted, they should be after running those two
+commands. You can also configure your system's `/etc/fstab` configuration to mount these filesystems.
 
-## Enable the eBPF plugin
-The plugin is disabled by default because it adds overhead to the system running the Netdata agent.
+### Install Netdata with the `--enable-ebpf` 
 
-To enable it, use `edit-config` to open `netdata.conf` and set `ebpf_process = yes` in the `[plugins]` section.
+eBPF collection is only enabled if you install Netdata with the `--enable-ebpf` option. 
+
+If you installed via the [one-line installation script](../../packaging/installer/README.md), [64-bit
+binary](../../packaging/installer/methods/kickstart-64.md), or [manually](../../packaging/installer/methods/manual.md),
+you can append the `--enable-ebpf` option when you reinstall.
+
+For example, if you used the one-line installation script, you can reinstall Netdata with the following:
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --enable-ebpf
+```
+
+This process will not overwrite any changes you made to configuration files.
+
+### Edit `netdata.conf` to enable the collector
+
+After installing Netdata with the `--enable-ebpf` option, you still need to enable the plugin explicitly. To do so, use
+`edit-config` to open `netdata.conf` and set `ebpf_process = yes` in the `[plugins]` section.
+
+```bash
+cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config netdata.conf
+```
+
+Scroll down to the `[plugins]` section and uncomment the `ebpf_process` line after changing its setting to `yes`.
 
 ```conf
 [plugins]
    ebpf_process = yes
 ```
+
+Restart Netdata with `service netdata restart`, or the appropriate method for your system, and reload your browser to
+see eBPF charts.
 
 ## Charts
 
@@ -83,7 +107,7 @@ descriptors.
 
 #### File descriptor
 
-This chart contain two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
+This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
 functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)`, and
 `close(2)`. ​
 
@@ -93,7 +117,7 @@ This charts demonstrate the number of times some software tried and failed to op
  
 ### VFS
 
-A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is an layer on top of regular
+A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
 filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
 group won't show _all_ the actions that occured on your system.
 
@@ -142,8 +166,16 @@ process and thread creation.
 
 ## Configuration
 
-The collector configuration file follows the same structure as `netdata.conf`. It is divided in different sections, with
-each one of them having the internal variables.
+This plugin has different configuration modes, all of which can be adjusted with its configuration file at
+`ebpf_process.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
+plugin works using `entry` by reading this configuration file.
+
+You can always edit this file with `edit-config`:
+
+```bash
+cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config ebpf_process.conf
+```
 
 ### `[global]`
 
