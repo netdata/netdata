@@ -261,6 +261,11 @@ struct engine *read_exporting_config()
 
         info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
+        if (tmp_ci_list->backend_type == BACKEND_TYPE_UNKNOWN) {
+            error("Unknown exporting connector type");
+            goto next_connector_instance;
+        }
+
 #ifndef HAVE_KINESIS
         if (tmp_ci_list->backend_type == BACKEND_TYPE_KINESIS) {
             error("AWS Kinesis support isn't compiled");
