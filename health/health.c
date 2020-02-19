@@ -179,7 +179,9 @@ void health_reload_host(RRDHOST *host) {
  * Reload the host configuration for all hosts.
  */
 void health_reload(void) {
-
+#ifdef ENABLE_ACLK
+    aclk_single_update_disable();
+#endif
     rrd_rdlock();
 
     RRDHOST *host;
@@ -187,6 +189,10 @@ void health_reload(void) {
         health_reload_host(host);
 
     rrd_unlock();
+#ifdef ENABLE_ACLK
+    aclk_single_update_enable();
+    aclk_alarm_reload();
+#endif
 }
 
 // ----------------------------------------------------------------------------

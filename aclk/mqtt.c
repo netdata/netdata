@@ -7,34 +7,33 @@
 
 void (*_on_connect)(void *ptr) = NULL;
 void (*_on_disconnect)(void *ptr) = NULL;
-extern int cmdpause;
-
 
 #ifndef ENABLE_ACLK
 
 inline const char *_link_strerror(int rc)
 {
-    (void) rc;
+    UNUSED(rc);
     return "no error";
 }
 
 int _link_event_loop(int timeout)
 {
-    (void) timeout;
+    UNUSED(timeout);
     return 0;
 }
 
-int _link_send_message(char *topic, char *message)
+int _link_send_message(char *topic, char *message, int *mid)
 {
-    (void) topic;
-    (void) message;
+    UNUSED(topic);
+    UNUSED(message);
+    UNUSED(mid);
     return 0;
 }
 
 int _link_subscribe(char  *topic, int qos)
 {
-    (void) topic;
-    (void) qos;
+    UNUSED(topic);
+    UNUSED(qos);
     return 0;
 }
 
@@ -45,23 +44,18 @@ void _link_shutdown()
 
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
-    (void) aclk_hostname;
-    (void) aclk_port;
-    (void) on_connect;
-    (void) on_disconnect;
+    UNUSED(aclk_hostname);
+    UNUSED(aclk_port);
+    UNUSED(on_connect);
+    UNUSED(on_disconnect);
     return 0;
 }
 
 #else
-/*
- * Just report the library info in the logfile for reference when issues arise
- *
- */
 
 struct mosquitto *mosq = NULL;
 
 // Get a string description of the error
-
 inline const char *_link_strerror(int rc)
 {
     return mosquitto_strerror(rc);
@@ -71,38 +65,10 @@ inline const char *_link_strerror(int rc)
 void mqtt_message_callback(
     struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg)
 {
-    (void) mosq;
-    (void) obj;
-
-    // TODO: handle commands in a more efficient way, if we have many
-
-    if (strcmp((char *)msg->payload, "pause") == 0) {
-        cmdpause = 1;
-        return;
-    }
-
-    if (strcmp((char *)msg->payload, "resume") == 0) {
-        cmdpause = 0;
-        return;
-    }
-
-    if (strcmp((char *)msg->payload, "reload") == 0) {
-        error_log_limit_unlimited();
-        info("Reloading health configuration");
-        health_reload();
-        error_log_limit_reset();
-        return;
-    }
-
-    if (strcmp((char *)msg->payload, "info") == 0) {
-        aclk_send_metadata();
-        return;
-    }
+    UNUSED(mosq);
+    UNUSED(obj);
 
     aclk_handle_cloud_request(msg->payload);
-
-    //info("Received type=[%s], msg-id=[%s], topic=[%s], url=[%s]",cloud_to_agent.type_id, cloud_to_agent.msg_id, cloud_to_agent.topic, cloud_to_agent.url);
-
 }
 
 int lws_wss_client_initialized = 0;
@@ -113,10 +79,20 @@ int lws_wss_client_initialized = 0;
 int mqtt_over_websockets = 1;
 struct aclk_lws_wss_engine_instance *lws_engine_instance = NULL;
 
+void publish_callback(struct mosquitto *mosq, void *obj, int rc)
+{
+    UNUSED(mosq);
+    UNUSED(obj);
+    UNUSED(rc);
+
+    // TODO: link this with a msg_id so it can be traced
+    return;
+}
+
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
-    (void) obj;
-    (void) rc;
+    UNUSED(obj);
+    UNUSED(rc);
 
     info("Connection to cloud estabilished");
 
@@ -130,20 +106,18 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 
 void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
-    (void) obj;
-    (void) rc;
+    UNUSED(obj);
+    UNUSED(rc);
 
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.
 
-    //mqtt_connection_initialized = 0;
     aclk_mqtt_connected = 0;
     _on_disconnect((void *) mosq);
 
     if(mqtt_over_websockets && lws_engine_instance)
         aclk_lws_wss_mqtt_layer_disconect_notif(lws_engine_instance);
 
-    //sleep_usec(USEC_PER_SEC * 5);
     return;
 }
 
@@ -166,7 +140,7 @@ size_t _mqtt_external_read_hook(void *buf, size_t count)
     return aclk_lws_wss_client_read(lws_engine_instance, buf, count);
 }
 
-int _mqtt_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
+int _mqtt_lib_init(void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
     int rc;
     int libmosq_major, libmosq_minor, libmosq_revision, libmosq_version;
@@ -174,7 +148,7 @@ int _mqtt_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
     char *server_crt;
     char *server_key;
 
-    // show library info so can have in in the logfile
+    // show library info so can have it in the logfile
     libmosq_version = mosquitto_lib_version(&libmosq_major, &libmosq_minor, &libmosq_revision);
     ca_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link cert", "*");
     server_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link server cert", "*");
@@ -218,6 +192,7 @@ int _mqtt_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
+    mosquitto_publish_callback_set(mosq, publish_callback);
 
     mosquitto_username_pw_set(mosq, NULL, NULL);
 
@@ -235,7 +210,7 @@ int _mqtt_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 #endif
 
     if(!mqtt_over_websockets) {
-        rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_RECONNECT_DELAY, 1);
+        rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_BACKOFF_DELAY, 1);
 
         if (unlikely(rc != MOSQ_ERR_SUCCESS))
             error("Failed to set the reconnect delay (%d) (%s)", rc, mosquitto_strerror(rc));
@@ -253,9 +228,9 @@ int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
     rc = mosquitto_connect_async(mosq, aclk_hostname, aclk_port, ACLK_PING_INTERVAL);
 
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
-        error("Connect %s MQTT status = %d (%s)", aclk_hostname, rc, mosquitto_strerror(rc));
+        error("Failed to establish link to [%s:%d] MQTT status = %d (%s)", aclk_hostname, aclk_port, rc, mosquitto_strerror(rc));
     else
-        info("Establishing MQTT link to %s", aclk_hostname);
+        info("Establishing MQTT link to [%s:%d]", aclk_hostname, aclk_port);
 
     return rc;
 }
@@ -281,14 +256,14 @@ static inline void _link_mosquitto_write()
 void aclk_lws_connect_notif_callback(){
     //the connection is done by LWS so this parameters dont matter
     //ig MQTT over LWS is used
-    _link_mqtt_connect("doesntmatter", 12345);
+    _link_mqtt_connect(aclk_hostname, aclk_port);
     _link_mosquitto_write();
 }
 
 void aclk_lws_data_received_callback(){
     int rc = mosquitto_loop_read(mosq, 1);
     if(rc != MOSQ_ERR_SUCCESS)
-        debug(D_ACLK, "ACLK: failure during mosquitto_loop_read %s", mosquitto_strerror(rc));       
+        debug(D_ACLK, "ACLK: failure during mosquitto_loop_read %s", mosquitto_strerror(rc));
 }
 
 static const struct aclk_lws_wss_engine_callbacks aclk_lws_engine_callbacks = {
@@ -311,7 +286,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
         }
     }
 
-    rc = _mqtt_lib_init(aclk_hostname, aclk_port, on_connect, on_disconnect);
+    rc = _mqtt_lib_init(on_connect, on_disconnect);
     if(rc != MOSQ_ERR_SUCCESS)
         return rc;
 
@@ -359,7 +334,7 @@ int _link_event_loop(int timeout)
 {
     if(mqtt_over_websockets)
         return _link_event_loop_wss();
-    
+
     return _link_event_loop_plain_mqtt(timeout);
 }
 
@@ -416,7 +391,7 @@ int _link_subscribe(char  *topic, int qos)
  *
  */
 
-int _link_send_message(char *topic, char *message)
+int _link_send_message(char *topic, char *message, int *mid)
 {
     int rc;
 
@@ -432,10 +407,11 @@ int _link_send_message(char *topic, char *message)
     //if (unlikely(rc != MOSQ_ERR_SUCCESS))
     //    return rc;
 
-    rc = mosquitto_publish(mosq, NULL, topic, msg_len, message, ACLK_QOS, 0);
+    rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
 
     // TODO: Add better handling -- error will flood the logfile here
     if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
+        errno = 0;
         error("MQTT message failed : %s", mosquitto_strerror(rc));
     }
 

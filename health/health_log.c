@@ -152,6 +152,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
             host->health_log_entries_written++;
         }
     }
+#ifdef ENABLE_ACLK
+    aclk_update_alarm(host, ae);
+#endif
 }
 
 inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
