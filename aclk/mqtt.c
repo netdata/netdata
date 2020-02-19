@@ -71,8 +71,6 @@ void mqtt_message_callback(
     aclk_handle_cloud_request(msg->payload);
 }
 
-int lws_wss_client_initialized = 0;
-
 // This is not define because in future we might want to try plain
 // MQTT as fallback ?
 // e.g. try 1st MQTT-WSS, 2nd MQTT plain, 3rd https fallback...
@@ -110,7 +108,6 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(rc);
 
     info("Connection to cloud failed");
-    // TODO: Keep the connection "alive" for now. The library will reconnect.
 
     aclk_mqtt_connected = 0;
     _on_disconnect((void *) mosq);
@@ -275,6 +272,7 @@ static const struct aclk_lws_wss_engine_callbacks aclk_lws_engine_callbacks = {
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
     int rc;
+    static int lws_wss_client_initialized = 0;
 
     if(mqtt_over_websockets) {
         // we will connect when WebSocket connection is up
@@ -401,11 +399,6 @@ int _link_send_message(char *topic, char *message, int *mid)
         return rc;
 
     int msg_len = strlen(message);
-
-    // TODO: handle encoding validation -- the message should be UFT8 encoded by the sender
-    //rc = mosquitto_validate_utf8(message, msg_len);
-    //if (unlikely(rc != MOSQ_ERR_SUCCESS))
-    //    return rc;
 
     rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
 

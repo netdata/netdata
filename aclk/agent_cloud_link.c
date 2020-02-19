@@ -34,12 +34,6 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
     struct aclk_request *data = e->callback_data;
 
     switch(e->type) {
-        case JSON_OBJECT:
-            e->callback_function = cloud_to_agent_parse;
-            break;
-        case JSON_ARRAY:
-            e->callback_function = cloud_to_agent_parse;
-            break;
         case JSON_STRING:
             if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
                 data->msg_id = strdupz(e->data.string);
@@ -60,7 +54,7 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
             break;
         case JSON_NUMBER:
             if (!strcmp(e->name, ACLK_JSON_IN_VERSION)) {
-                data->version = atol(e->data.string);
+                data->version = atoi(e->original_string);
                 break;
             }
             break;
@@ -197,7 +191,7 @@ void aclk_query_free(struct aclk_query *this_query)
 
 // Returns the entry after which we need to create a new entry to run at the specified time
 // If NULL is returned we need to add to HEAD
-// Called with locked entries
+// Need to have a QUERY lock before calling this
 
 struct aclk_query *aclk_query_find_position(time_t time_to_run)
 {
@@ -221,7 +215,7 @@ struct aclk_query *aclk_query_find_position(time_t time_to_run)
     return last_query;
 }
 
-// Need to have a lock before calling this
+// Need to have a QUERY lock before calling this
 struct aclk_query *aclk_query_find(char *topic, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query)
 {
     struct aclk_query *tmp_query, *prev_query;
@@ -308,7 +302,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     new_query->created = now_realtime_sec();
     new_query->run_after = run_after;
 
-    debug(D_ACLK, "Added query (%s) (%s)", topic, query);
+    debug(D_ACLK, "Added query (%s) (%s)", topic, query?query:"");
 
     tmp_query = aclk_query_find_position(run_after);
 
@@ -686,7 +680,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_UNLOCK;
 
-    aclk_queue_query("on_connect", "n/a", "n/a", "n/a", 2, 1, ACLK_CMD_ONCONNECT);
+    aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
 
     _free_collector(tmp_collector);
 }
@@ -783,7 +777,7 @@ int aclk_process_query()
     query_count++;
 
     debug(
-        D_ACLK, "Query #%ld (%s) (%s) in queue %d seconds", query_count, this_query->topic, this_query->query,
+        D_ACLK, "Query #%ld (%s) size=%ld in queue %d seconds", query_count, this_query->topic, this_query->query?strlen(this_query->query):0,
         (int)(now_realtime_sec() - this_query->created));
 
     switch (this_query->cmd) {
@@ -823,6 +817,8 @@ int aclk_process_query()
         default:
             break;
     }
+    debug(
+        D_ACLK, "Query #%ld (%s) done", query_count, this_query->topic);
 
     aclk_query_free(this_query);
 
@@ -1233,19 +1229,26 @@ void aclk_send_alarm_metadata()
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
+    debug(D_ACLK,"Metadata alarms start");
+
     aclk_create_header(local_buffer, "connect_alarms", msg_id);
 
     buffer_sprintf(local_buffer,"{\n\t \"configured-alarms\" : ");
     health_alarms2json(localhost, local_buffer, 1);
+    debug(D_ACLK,"Metadata %s with configured alarms has %ld bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer,",\n\t \"alarm-log\" : ");
     health_alarm_log2json(localhost, local_buffer, 0);
+    debug(D_ACLK,"Metadata %s with alarm_log has %ld bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer,",\n\t \"alarms-active\" : ");
     health_alarms_values2json(localhost, local_buffer, 0);
+    debug(D_ACLK,"Metadata %s with alarms_active has %ld bytes", msg_id, local_buffer->len);
+
 
     buffer_sprintf(local_buffer,"\n}\n}");
     aclk_send_message(ACLK_ALARMS_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    debug(D_ACLK,"Metadata %s encoded has %ld bytes", msg_id, local_buffer->len);
 
     freez(msg_id);
     buffer_free(local_buffer);
@@ -1255,6 +1258,8 @@ int aclk_send_info_metadata()
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
+    debug(D_ACLK,"Metadata /info start");
+
     char *msg_id = create_uuid();
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
@@ -1262,12 +1267,15 @@ int aclk_send_info_metadata()
     aclk_create_header(local_buffer, "connect", msg_id);
     buffer_sprintf(local_buffer,"{\n\t \"info\" : ");
     web_client_api_request_v1_info_fill_buffer(localhost, local_buffer);
+    debug(D_ACLK,"Metadata %s with info has %ld bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer,", \n\t \"charts\" : ");
     charts2json(localhost, local_buffer, 1);
     buffer_sprintf(local_buffer,"\n}\n}");
+    debug(D_ACLK,"Metadata %s with chart has %ld bytes", msg_id, local_buffer->len);
 
     aclk_send_message(ACLK_METADATA_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    debug(D_ACLK,"Metadata %s encoded has %ld bytes", msg_id, local_buffer->len);
     freez(msg_id);
 
     buffer_free(local_buffer);

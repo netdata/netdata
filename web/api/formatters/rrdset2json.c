@@ -53,7 +53,6 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
     if (likely(!skip_volatile))
         buffer_sprintf(wb,
-
                 "\t\t\t\"last_entry\": %ld,\n"
             , last_entry_t//rrdset_last_entry_t(st)
         );
