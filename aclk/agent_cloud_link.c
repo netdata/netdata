@@ -1157,7 +1157,7 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         dest,
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
-        "\t\"timestamp\": \"%ld\",\n"
+        "\t\"timestamp\": %ld,\n"
         "\t\"version\": %d,\n"
         "\t\"payload\": ",
         type, msg_id, time_created, ACLK_VERSION);
