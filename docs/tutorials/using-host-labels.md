@@ -21,7 +21,8 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config netdata.conf
 ```
 
-Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not to violate any of the [host label naming rules](../configuration-guide.md#netdata-labels).
+Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
+to violate any of the [host label naming rules](../configuration-guide.md#netdata-labels).
 
 ```conf
 [host labels]
@@ -90,6 +91,12 @@ virtualization information in one place: the master.
 Now, if you'd like to remind yourself of how much RAM a certain slave system has, you can simply access
 `http://localhost:19999/host/SLAVE_NAME/api/v1/info` and reference the automatically-generated host labels from the
 slave system. It's a vastly simplified way of accessing critical information about your infrastructure.
+
+> ⚠️ Because automatic labels for slave nodes are accessible via API calls, and contain sensitive information like
+> kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
+> documentation](../..//streaming/README.md#securing-streaming-communications) for details. You may also want to use
+> [access lists](../../web/server/README.md#access-lists) or [expose the API only to LAN/localhost
+> connections](../netdata-security.md#expose-netdata-only-in-a-private-lan).
 
 You can also use `_is_master`, `_is_slave`, and any other host labels in both health entities and metrics exporting.
 Speaking of which...
