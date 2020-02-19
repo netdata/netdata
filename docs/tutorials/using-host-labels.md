@@ -21,14 +21,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config netdata.conf
 ```
 
-Create a new `[host labels]` section wherever you choose:
-
-```conf
-[host labels]
-```
-
-Beneath that section, you can define a new host label, and its value for the system in question, taking care not to
-violate any of the [host label naming rules](../configuration-guide.md#netdata-labels), like so:
+Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not to violate any of the [host label naming rules](../configuration-guide.md#netdata-labels).
 
 ```conf
 [host labels]
@@ -81,8 +74,7 @@ They capture the following:
 -   Kernel version
 -   Operating system name and version
 -   CPU architecture, system cores, CPU frequency, RAM, and disk space
--   If Netdata is running inside of a container
-    -   If so, OS and hardware details about the container's host
+-   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
 -   What virtualization layer the system runs on top of, if any
 -   Whether the system is a streaming master or slave
 
@@ -96,8 +88,8 @@ from a slave to its master agent, which concentrates an entire infrastructure's 
 virtualization information in one place: the master.
 
 Now, if you'd like to remind yourself of how much RAM a certain slave system has, you can simply access
-`http://localhost:1999/host/SLAVE_NAME/api/v1/info` and reference the automatically-generated host labels from the slave
-system. It's a vastly simplified way of accessing critical information about your infrastructure.
+`http://localhost:19999/host/SLAVE_NAME/api/v1/info` and reference the automatically-generated host labels from the
+slave system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
 You can also use `_is_master`, `_is_slave`, and any other host labels in both health entities and metrics exporting.
 Speaking of which...
