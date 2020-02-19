@@ -62,9 +62,11 @@ int get_kernel_version() {
     if (fd < 0)
         return -1;
 
-    ssize_t len = read(fd, version, sizeof(version));
-    if (len < 0)
+    ssize_t len = read(fd, ver, sizeof(ver));
+    if (len < 0) {
+        close(fd);
         return -1;
+    }
 
     close(fd);
 
@@ -79,6 +81,9 @@ int get_kernel_version() {
 
     if (*version)
         version++;
+    else
+        return -1;
+
     move = patch;
     while (*version) *move++ = *version++;
     *move = '\0';
