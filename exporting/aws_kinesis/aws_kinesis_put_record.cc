@@ -12,14 +12,10 @@ using namespace Aws;
 
 static SDKOptions options;
 
-static Kinesis::KinesisClient *client;
-
 struct request_outcome {
     Kinesis::Model::PutRecordOutcomeCallable future_outcome;
     size_t data_len;
 };
-
-static Vector<request_outcome> request_outcomes;
 
 void aws_sdk_init() {
     InitAPI(options);
@@ -29,8 +25,12 @@ void aws_sdk_shutdown() {
     ShutdownAPI(options);
 }
 
-void kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout) {
-    InitAPI(options);
+void kinesis_init(
+    void *kinesis_specific_data_p,
+    const char *region, const char *access_key_id, const char *secret_key, const long timeout)
+{
+    struct aws_kinesis_specific_data *kinesis_specific_data =
+        (struct aws_kinesis_specific_data *)kinesis_specific_data_p;
 
     Client::ClientConfiguration config;
 
@@ -38,36 +38,49 @@ void kinesis_init(const char *region, const char *access_key_id, const char *sec
     config.requestTimeoutMs = timeout;
     config.connectTimeoutMs = timeout;
 
+    Kinesis::KinesisClient *client;
+
     if(access_key_id && *access_key_id && secret_key && *secret_key) {
         client = New<Kinesis::KinesisClient>("client", Auth::AWSCredentials(access_key_id, secret_key), config);
     } else {
         client = New<Kinesis::KinesisClient>("client", config);
     }
+    kinesis_specific_data->client = (void *)client;
+
+    Vector<request_outcome> *request_outcomes;
+
+    request_outcomes = new Vector<request_outcome>;
+    kinesis_specific_data->request_outcomes = (void *)request_outcomes;
+
 }
 
-void kinesis_shutdown() {
-    Delete(client);
+void kinesis_shutdown(void *client) {
+    Delete((Kinesis::KinesisClient *)client);
 }
 
-int kinesis_put_record(const char *stream_name, const char *partition_key,
-                       const char *data, size_t data_len) {
+void kinesis_put_record(
+    void *kinesis_specific_data_p,
+    const char *stream_name, const char *partition_key, const char *data, size_t data_len)
+{
+    struct aws_kinesis_specific_data *kinesis_specific_data =
+        (struct aws_kinesis_specific_data *)kinesis_specific_data_p;
     Kinesis::Model::PutRecordRequest request;
 
     request.SetStreamName(stream_name);
     request.SetPartitionKey(partition_key);
     request.SetData(Utils::ByteBuffer((unsigned char*) data, data_len));
 
-    request_outcomes.push_back({client->PutRecordCallable(request), data_len});
-
-    return 0;
+    ((Vector<request_outcome> *)(kinesis_specific_data->request_outcomes))->push_back(
+        { ((Kinesis::KinesisClient *)(kinesis_specific_data->client))->PutRecordCallable(request), data_len });
 }
 
-int kinesis_get_result(char *error_message, size_t *sent_bytes, size_t *lost_bytes) {
+int kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes) {
+    Vector<request_outcome> *request_outcomes = (Vector<request_outcome> *)request_outcomes_p;
     Kinesis::Model::PutRecordOutcome outcome;
     *sent_bytes = 0;
     *lost_bytes = 0;
 
-    for(auto request_outcome = request_outcomes.begin(); request_outcome != request_outcomes.end(); ) {
+    for(auto request_outcome = request_outcomes->begin(); request_outcome != request_outcomes->end(); ) {
         std::future_status status = request_outcome->future_outcome.wait_for(std::chrono::microseconds(100));
 
         if(status == std::future_status::ready || status == std::future_status::deferred) {
@@ -79,7 +92,7 @@ int kinesis_get_result(char *error_message, size_t *sent_bytes, size_t *lost_byt
                 outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);
             }
 
-            request_outcomes.erase(request_outcome);
+            request_outcomes->erase(request_outcome);
         } else {
             ++request_outcome;
         }

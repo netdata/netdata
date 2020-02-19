@@ -98,7 +98,7 @@ struct simple_connector_config {
     int default_port;
 };
 
-struct aws_kinesis_connector_config {
+struct aws_kinesis_specific_config {
     char *stream_name;
     char *auth_key_id;
     char *secure_key;
@@ -151,6 +151,8 @@ struct instance {
     int (*end_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
+
+    void *connector_specific_data;
 
     size_t index;
     struct instance *next;

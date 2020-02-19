@@ -38,6 +38,17 @@ int init_aws_kinesis_instance(struct instance *instance)
         instance->engine->aws_sdk_initialized = 1;
     }
 
+    struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    struct aws_kinesis_specific_data *connector_specific_data = callocz(1, sizeof(struct aws_kinesis_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    kinesis_init(
+        (void *)connector_specific_data,
+        instance->config.destination,
+        connector_specific_config->auth_key_id,
+        connector_specific_config->secure_key,
+        instance->config.timeoutms);
+
     return 0;
 }
 
@@ -51,13 +62,8 @@ int init_aws_kinesis_instance(struct instance *instance)
 void aws_kinesis_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
-    struct aws_kinesis_connector_config *connector_specific_config = instance->config.connector_specific_config;
-
-    kinesis_init(
-        instance->config.destination,
-        connector_specific_config->auth_key_id,
-        connector_specific_config->secure_key,
-        instance->config.timeoutms);
+    struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    struct aws_kinesis_specific_data *connector_specific_data = instance->connector_specific_data;
 
     while (!netdata_exit) {
         unsigned long long partition_key_seq = 0;
@@ -103,14 +109,16 @@ void aws_kinesis_connector_worker(void *instance_p)
                 buffer_len,
                 record_len);
 
-            kinesis_put_record(connector_specific_config->stream_name, partition_key, first_char, record_len);
+            kinesis_put_record(
+                connector_specific_data, connector_specific_config->stream_name, partition_key, first_char, record_len);
 
             sent += record_len;
             stats->chart_transmission_successes++;
 
             size_t sent_bytes = 0, lost_bytes = 0;
 
-            if(unlikely(kinesis_get_result(error_message, &sent_bytes, &lost_bytes))) {
+            if (unlikely(kinesis_get_result(
+                    connector_specific_data->request_outcomes, error_message, &sent_bytes, &lost_bytes))) {
                 // oops! we couldn't send (all or some of the) data
                 error("EXPORTING: %s", error_message);
                 error("EXPORTING: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
@@ -125,8 +133,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                                       * (buffer_len && (lost_bytes > buffer_len) ? (double)lost_bytes / buffer_len : 1));
 
                 break;
-            }
-            else {
+            } else {
                 stats->chart_receptions++;
             }
 

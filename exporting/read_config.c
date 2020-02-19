@@ -329,8 +329,8 @@ struct engine *read_exporting_config()
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
 
         if (tmp_instance->config.type == BACKEND_TYPE_KINESIS) {
-            struct aws_kinesis_connector_config *connector_specific_config =
-                callocz(1, sizeof(struct aws_kinesis_connector_config));
+            struct aws_kinesis_specific_config *connector_specific_config =
+                callocz(1, sizeof(struct aws_kinesis_specific_config));
 
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
