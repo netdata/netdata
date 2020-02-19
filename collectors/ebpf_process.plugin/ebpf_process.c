@@ -170,10 +170,10 @@ static void int_exit(int sig)
                 dup2 (fd, STDIN_FILENO);
                 dup2 (fd, STDOUT_FILENO);
                 dup2 (fd, STDERR_FILENO);
-
-                if (fd > 2)
-                    close (fd);
             }
+
+            if (fd > 2)
+                close (fd);
 
             int sid = setsid();
             if(sid >= 0) {
@@ -213,9 +213,9 @@ static inline void netdata_write_chart_cmd(char *type
             , order);
 }
 
-static void netdata_write_global_dimension(char *dimension, char *name)
+static void netdata_write_global_dimension(char *d, char *n)
 {
-    printf("DIMENSION %s %s absolute 1 1\n", dimension, name);
+    printf("DIMENSION %s %s absolute 1 1\n", d, n);
 }
 
 static void netdata_create_global_dimension(void *ptr, int end)
