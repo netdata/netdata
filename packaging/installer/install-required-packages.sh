@@ -591,6 +591,12 @@ declare -A pkg_automake=(
   ['default']="automake"
 )
 
+# Required to build libwebsockets and libmosquitto on some systems.
+declare -A pkg_cmake=(
+  ['clearlinux'="c-basic"
+  ['default']="cmake"
+)
+
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
@@ -1104,6 +1110,7 @@ packages() {
   require_cmd autogen || suitable_package autogen
   require_cmd automake || suitable_package automake
   require_cmd pkg-config || suitable_package pkg-config
+  require_cmd cmake || suitable_package cmake
 
   # -------------------------------------------------------------------------
   # debugging tools for development

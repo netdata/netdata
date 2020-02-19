@@ -259,6 +259,7 @@ while [ -n "${1}" ]; do
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
       NETDATA_DISABLE_LIBMOSQUITTO=1
+      NETDATA_SKIP_LIBWEBSOCKETS=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
       ;;
     "--install")
@@ -487,6 +488,58 @@ bundle_libmosquitto() {
 }
 
 bundle_libmosquitto
+
+# -----------------------------------------------------------------------------
+
+build_libwebsockets() {
+  pushd "${1}" > /dev/null || exit 1
+  cmake .
+  make
+  popd > /dev/null || exit 1
+}
+
+copy_libwebsockets() {
+  target_dir="${PWD}/externaldeps/libwebsockets"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/lib/libwebsockets.a" "${target_dir}/libwebsockets.a" || return 1
+  run cp -r "${1}/include" "${target_dir}" || return 1
+}
+
+bundle_libwebsockets() {
+  if [ -n "${NETDATA_SKIP_LIBWEBSOCKETS}" ] || pkg-config "libwebsockets >= 3" ; then
+    return 0
+  fi
+
+  progress "Prepare libwebsockets"
+
+  LIBWEBSOCKETS_PACKAGE_VERSION="$(cat packaging/libwebsockets.version)"
+
+  tmp="$(mktemp -d -t netdata-libwebsockets-XXXXXX)"
+  LIBWEBSOCKETS_PACKAGE_BASENAME="v${LIBWEBSOCKETS_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "libwebsockets" \
+                      "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+                      "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"
+  then
+    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" && \
+       build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
+       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "libwebsockets built and prepared."
+    else
+      run_failed "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    fi
+  else
+    run_failed "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+  fi
+}
+
+bundle_libwebsockets
 
 # -----------------------------------------------------------------------------
 echo >&2

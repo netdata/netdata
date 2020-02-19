@@ -61,16 +61,16 @@ This is how to do it by hand:
 
 ```sh
 # Debian / Ubuntu
-apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python
+apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake libwebsockets-dev
 
 # Fedora
-dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python
+dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake libwebsockets-devel
 
 # CentOS / Red Hat Enterprise Linux
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel
+yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel cmake libwebsockets-devel
 
 # openSUSE
-zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python
+zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake libwebsockets-devel
 ```
 
 Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
@@ -112,6 +112,16 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 | `liblz4` | Extremely fast compression algorithm, version r129 or greater|
 | `Judy`   | General purpose dynamic array|
 | `openssl`| Cryptography and SSL/TLS toolkit|
+
+*Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
+
+Netdata Cloud support may require the following packages to be installed:
+
+| package  | description
+|:--------:| -----------------------
+| `libwebsockets-devel` | Version 3 or higher is at needed build time for websockets support for Netdata Cloud
+| `libwebsockets` | Version 3 or higher is needed at runtime for websockets support for Netdata Cloud
+| `cmake` | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
