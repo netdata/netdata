@@ -77,7 +77,7 @@ void aws_kinesis_connector_worker(void *instance_p)
 
         size_t sent = 0;
 
-        while(sent < buffer_len) {
+        while (sent < buffer_len) {
             char partition_key[KINESIS_PARTITION_KEY_MAX + 1];
             snprintf(partition_key, KINESIS_PARTITION_KEY_MAX, "netdata_%llu", partition_key_seq++);
             size_t partition_key_len = strnlen(partition_key, KINESIS_PARTITION_KEY_MAX);
@@ -87,12 +87,12 @@ void aws_kinesis_connector_worker(void *instance_p)
             size_t record_len = 0;
 
             // split buffer into chunks of maximum allowed size
-            if(buffer_len - sent < KINESIS_RECORD_MAX - partition_key_len) {
+            if (buffer_len - sent < KINESIS_RECORD_MAX - partition_key_len) {
                 record_len = buffer_len - sent;
-            }
-            else {
+            } else {
                 record_len = KINESIS_RECORD_MAX - partition_key_len;
-                while(*(first_char + record_len) != '\n' && record_len) record_len--;
+                while (*(first_char + record_len) != '\n' && record_len)
+                    record_len--;
             }
 
             char error_message[ERROR_LINE_MAX + 1] = "";
@@ -121,27 +121,30 @@ void aws_kinesis_connector_worker(void *instance_p)
                     connector_specific_data->request_outcomes, error_message, &sent_bytes, &lost_bytes))) {
                 // oops! we couldn't send (all or some of the) data
                 error("EXPORTING: %s", error_message);
-                error("EXPORTING: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                      instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
+                error(
+                    "EXPORTING: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                    instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
 
                 stats->chart_transmission_failures++;
                 stats->chart_data_lost_events++;
                 stats->chart_lost_bytes += lost_bytes;
 
                 // estimate the number of lost metrics
-                stats->chart_lost_metrics += (collected_number)(stats->chart_buffered_metrics
-                                      * (buffer_len && (lost_bytes > buffer_len) ? (double)lost_bytes / buffer_len : 1));
+                stats->chart_lost_metrics += (collected_number)(
+                    stats->chart_buffered_metrics *
+                    (buffer_len && (lost_bytes > buffer_len) ? (double)lost_bytes / buffer_len : 1));
 
                 break;
             } else {
                 stats->chart_receptions++;
             }
 
-            if(unlikely(netdata_exit)) break;
+            if (unlikely(netdata_exit))
+                break;
         }
 
         stats->chart_sent_bytes += sent;
-        if(likely(sent == buffer_len))
+        if (likely(sent == buffer_len))
             stats->chart_sent_metrics = stats->chart_buffered_metrics;
 
         buffer_flush(buffer);
