@@ -30,6 +30,7 @@ struct aclk_lws_wss_engine_callbacks {
 	void (*connection_established_callback)();
 	void (*data_rcvd_callback)();
 	void (*data_writable_callback)();
+    void (*connection_closed)();
 };
 
 struct lws_wss_packet_buffer;
@@ -71,6 +72,8 @@ struct aclk_lws_wss_engine_instance {
 
 struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port);
 void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance* inst);
+
+void aclk_lws_wss_connect(struct aclk_lws_wss_engine_instance *inst);
 
 int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);
 int aclk_lws_wss_client_read (struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);

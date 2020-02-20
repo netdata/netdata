@@ -34,6 +34,9 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
     struct aclk_request *data = e->callback_data;
 
     switch(e->type) {
+        case JSON_OBJECT:
+        case JSON_ARRAY:
+                break;
         case JSON_STRING:
             if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
                 data->msg_id = strdupz(e->data.string);
@@ -165,7 +168,7 @@ unsigned long int aclk_reconnect_delay(int mode)
         delay = (delay * 1000) + (random() % 1000);
     }
 
-    sleep_usec(USEC_PER_MS * delay);
+//    sleep_usec(USEC_PER_MS * delay);
 
     return delay;
 }
@@ -735,7 +738,7 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         aclk_create_header(local_buffer, "http", this_query->msg_id);
 
-        if (rc != HTTP_RESP_OK || (mysep?mysep+1:"noop", "badge.svg") == 0)
+        if (rc != HTTP_RESP_OK || strcmp(mysep?mysep+1:"noop", "badge.svg") == 0)
             buffer_sprintf(local_buffer, "\"%s\"", aclk_encode_response(w->response.data)->buffer);
         else
             buffer_sprintf(local_buffer, "%s", aclk_encode_response(w->response.data)->buffer);
@@ -963,25 +966,21 @@ void *aclk_main(void *ptr)
         }
 
         if (unlikely(!aclk_connection_initialized)) {
-            static int initializing = 0;
+            static time_t last_init_time = 0;
 
-            if (likely(initializing)) {
-                _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-                continue;
+            if (unlikely(!last_init_time)) {
+                create_publish_base_topic();
+                aclk_init(ACLK_INIT);
             }
-            initializing = 1;
-            info("Initializing connection");
-
-            assert( NULL != create_publish_base_topic());
-
-            if (unlikely(aclk_init(ACLK_INIT))) {
-                // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
-                sleep_usec(USEC_PER_SEC * 60);
-                continue;
-            } else {
-                sleep_usec(USEC_PER_SEC * 1);
+            else {
+                // TODO: refine this. Allow for now 2 seconds for callbacks
+                if ((now_realtime_sec() - last_init_time) < 2) {
+                    _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+                    continue;
+                }
+                aclk_init(ACLK_REINIT);
             }
-            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+            last_init_time = now_realtime_sec();
             continue;
         }
 
@@ -1087,12 +1086,14 @@ int aclk_subscribe(char *sub_topic, int qos)
     return rc;
 }
 
+
 // This is called from a callback when the link goes up
 void aclk_connect(void *ptr)
 {
     UNUSED(ptr);
     info("Connection detected");
     waiting_init = 0;
+    aclk_reconnect_delay(0);
     return;
 }
 
@@ -1100,11 +1101,13 @@ void aclk_connect(void *ptr)
 void aclk_disconnect(void *ptr)
 {
     UNUSED(ptr);
-    info("Disconnect detected");
+
+    if (likely(aclk_connection_initialized))
+        info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
     waiting_init = 1;
-    aclk_reconnect_delay(0);
+    aclk_connection_initialized = 0;
 }
 
 void aclk_shutdown()
@@ -1117,10 +1120,16 @@ void aclk_shutdown()
 
 int aclk_init(ACLK_INIT_ACTION action)
 {
-    UNUSED(action);
-
+//    UNUSED(action);
     static int init = 0;
     int rc;
+
+    if (action == ACLK_REINIT) {
+        unsigned long delay = aclk_reconnect_delay(1);
+        info("Retrying to establish the ACLK connection in %.3f seconds", delay / 1000.0);
+        sleep_usec(USEC_PER_MS * delay);
+        init = 0;
+    }
 
     if (likely(init))
         return 0;
