@@ -965,8 +965,16 @@ if(BUILD_TESTING)
         exporting/tests/system_doubles.c
         )
     set(TEST_NAME exporting_engine)
+    set(KINESIS_LINK_OPTIONS)
 if(ENABLE_BACKEND_KINESIS)
     list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
+    list(
+        APPEND KINESIS_LINK_OPTIONS
+        -Wl,--wrap=aws_sdk_init
+        -Wl,--wrap=kinesis_init
+        -Wl,--wrap=kinesis_put_record
+        -Wl,--wrap=kinesis_get_result
+    )
 endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
@@ -998,6 +1006,7 @@ endif()
         -Wl,--wrap=recv
         -Wl,--wrap=send
         -Wl,--wrap=connect_to_one_of
+        ${KINESIS_LINK_OPTIONS}
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

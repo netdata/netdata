@@ -154,7 +154,6 @@ static void test_init_json_instance(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
-
     instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
     assert_int_equal(init_json_instance(instance), 0);
     assert_int_equal(
@@ -762,6 +761,117 @@ static void test_flush_host_labels(void **state)
     assert_int_equal(buffer_strlen(instance->labels), 0);
 }
 
+#if HAVE_KINESIS
+static void test_init_aws_kinesis_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+
+    struct aws_kinesis_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct aws_kinesis_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->stream_name = strdupz("test_stream");
+    connector_specific_config->auth_key_id = strdupz("test_auth_key_id");
+    connector_specific_config->secure_key = strdupz("test_secure_key");
+
+    expect_function_call(__wrap_aws_sdk_init);
+    expect_function_call(__wrap_kinesis_init);
+    expect_not_value(__wrap_kinesis_init, kinesis_specific_data_p, NULL);
+    expect_string(__wrap_kinesis_init, region, "localhost");
+    expect_string(__wrap_kinesis_init, access_key_id, "test_auth_key_id");
+    expect_string(__wrap_kinesis_init, secret_key, "test_secure_key");
+    expect_value(__wrap_kinesis_init, timeout, 10000);
+    assert_int_equal(init_aws_kinesis_instance(instance), 0);
+
+    assert_ptr_equal(instance->worker, aws_kinesis_connector_worker);
+    assert_ptr_equal(instance->start_batch_formatting, NULL);
+    assert_ptr_equal(instance->start_host_formatting, format_host_labels_json_plaintext);
+    assert_ptr_equal(instance->start_chart_formatting, NULL);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_json_plaintext);
+    assert_ptr_equal(instance->end_chart_formatting, NULL);
+    assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
+    assert_ptr_equal(instance->end_batch_formatting, NULL);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+    assert_ptr_not_equal(instance->connector_specific_data, NULL);
+    freez(instance->connector_specific_data);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+
+    expect_function_call(__wrap_kinesis_init);
+    expect_not_value(__wrap_kinesis_init, kinesis_specific_data_p, NULL);
+    expect_string(__wrap_kinesis_init, region, "localhost");
+    expect_string(__wrap_kinesis_init, access_key_id, "test_auth_key_id");
+    expect_string(__wrap_kinesis_init, secret_key, "test_secure_key");
+    expect_value(__wrap_kinesis_init, timeout, 10000);
+
+    assert_int_equal(init_aws_kinesis_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_json_plaintext);
+
+    free(connector_specific_config->stream_name);
+    free(connector_specific_config->auth_key_id);
+    free(connector_specific_config->secure_key);
+}
+
+static void test_aws_kinesis_connector_worker(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+    BUFFER *buffer = instance->buffer;
+
+    __real_mark_scheduled_instances(engine);
+
+    expect_function_call(__wrap_rrdhost_is_exportable);
+    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
+    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
+    will_return(__wrap_rrdhost_is_exportable, 1);
+
+    RRDSET *st = localhost->rrdset_root;
+    expect_function_call(__wrap_rrdset_is_exportable);
+    expect_value(__wrap_rrdset_is_exportable, instance, instance);
+    expect_value(__wrap_rrdset_is_exportable, st, st);
+    will_return(__wrap_rrdset_is_exportable, 1);
+
+    __real_prepare_buffers(engine);
+
+    struct aws_kinesis_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct aws_kinesis_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->stream_name = strdupz("test_stream");
+    connector_specific_config->auth_key_id = strdupz("test_auth_key_id");
+    connector_specific_config->secure_key = strdupz("test_secure_key");
+
+    struct aws_kinesis_specific_data *connector_specific_data = callocz(1, sizeof(struct aws_kinesis_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    expect_function_call(__wrap_kinesis_put_record);
+    expect_not_value(__wrap_kinesis_put_record, kinesis_specific_data_p, NULL);
+    expect_string(__wrap_kinesis_put_record, stream_name, "test_stream");
+    expect_string(__wrap_kinesis_put_record, partition_key, "netdata_0");
+    expect_value(__wrap_kinesis_put_record, data, buffer_tostring(buffer));
+    // The buffer is prepated by Graphite exporting connector
+    expect_string(
+        __wrap_kinesis_put_record, data,
+        "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
+    expect_value(__wrap_kinesis_put_record, data_len, 84);
+
+    expect_function_call(__wrap_kinesis_get_result);
+    expect_value(__wrap_kinesis_get_result, request_outcomes_p, NULL);
+    expect_not_value(__wrap_kinesis_get_result, error_message, NULL);
+    expect_not_value(__wrap_kinesis_get_result, sent_bytes, NULL);
+    expect_not_value(__wrap_kinesis_get_result, lost_bytes, NULL);
+    will_return(__wrap_kinesis_get_result, 0);
+
+    aws_kinesis_connector_worker(instance);
+
+    free(connector_specific_config->stream_name);
+    free(connector_specific_config->auth_key_id);
+    free(connector_specific_config->secure_key);
+}
+#endif // HAVE_KINESIS
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -831,6 +941,21 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_flush_host_labels, setup_initialized_engine, teardown_initialized_engine),
     };
 
-    return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
-           cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
+#if HAVE_KINESIS
+    const struct CMUnitTest kinesis_tests[] = {
+        cmocka_unit_test_setup_teardown(
+            test_init_aws_kinesis_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_aws_kinesis_connector_worker, setup_initialized_engine, teardown_initialized_engine),
+    };
+#endif
+
+    int test_res = cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
+              cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
+
+#if HAVE_KINESIS
+    test_res += cmocka_run_group_tests_name("kinesis_exporting_connector", kinesis_tests, NULL, NULL);
+#endif
+
+    return test_res;
 }

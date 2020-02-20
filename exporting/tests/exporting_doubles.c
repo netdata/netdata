@@ -158,3 +158,45 @@ int __mock_end_batch_formatting(struct instance *instance)
     check_expected_ptr(instance);
     return mock_type(int);
 }
+
+#if HAVE_KINESIS
+void __wrap_aws_sdk_init()
+{
+    function_called();
+}
+
+void __wrap_kinesis_init(
+    void *kinesis_specific_data_p, const char *region, const char *access_key_id, const char *secret_key,
+    const long timeout)
+{
+    function_called();
+    check_expected_ptr(kinesis_specific_data_p);
+    check_expected_ptr(region);
+    check_expected_ptr(access_key_id);
+    check_expected_ptr(secret_key);
+    check_expected(timeout);
+}
+
+void __wrap_kinesis_put_record(
+    void *kinesis_specific_data_p, const char *stream_name, const char *partition_key, const char *data,
+    size_t data_len)
+{
+    function_called();
+    check_expected_ptr(kinesis_specific_data_p);
+    check_expected_ptr(stream_name);
+    check_expected_ptr(partition_key);
+    check_expected_ptr(data);
+    check_expected_ptr(data);
+    check_expected(data_len);
+}
+
+int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
+{
+    function_called();
+    check_expected_ptr(request_outcomes_p);
+    check_expected_ptr(error_message);
+    check_expected_ptr(sent_bytes);
+    check_expected_ptr(lost_bytes);
+    return mock_type(int);
+}
+#endif //HAVE_KINESIS

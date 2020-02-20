@@ -842,5 +842,11 @@ if ENABLE_UNITTESTS
 if ENABLE_BACKEND_KINESIS
     exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
     exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=aws_sdk_init \
+        -Wl,--wrap=kinesis_init \
+        -Wl,--wrap=kinesis_put_record \
+        -Wl,--wrap=kinesis_get_result \
+        $(NULL)
 endif
 endif

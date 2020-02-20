@@ -94,7 +94,6 @@ void aws_kinesis_connector_worker(void *instance_p)
                 while (*(first_char + record_len) != '\n' && record_len)
                     record_len--;
             }
-
             char error_message[ERROR_LINE_MAX + 1] = "";
 
             debug(
