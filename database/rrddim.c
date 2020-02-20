@@ -184,7 +184,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
         }
     }
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
 }
 
@@ -428,7 +428,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     }
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
-    aclk_update_chart(host, st->id);
+    aclk_update_chart(host, st->id, ACLK_CMD_CHART);
 #endif
     return(rd);
 }
@@ -484,7 +484,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
             break;
     }
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
 }
 
@@ -505,7 +505,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
     return 0;
 }
@@ -522,7 +522,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
     return 0;
 }
@@ -533,7 +533,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
 }
 
@@ -542,7 +542,7 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
 #ifdef ENABLE_ACLK
-    aclk_update_chart(st->rrdhost, st->id);
+    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
 }
 
