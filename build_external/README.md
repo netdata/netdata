@@ -8,7 +8,7 @@ decoupled. This allows:
 * Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
 
 The advantage of these scenarios is that they allow **reproducible** builds and testing
-for developers. This is the first iteration of the build-system to allow the team to use 
+for developers. This is the first iteration of the build-system to allow the team to use
 it and get used to it.
 
 For configurations that involve building and running the agent alone, we still use
@@ -23,21 +23,21 @@ This differs from the packaging dockerfiles as it designed to be used for local 
 The main difference is that these files are designed to support incremental compilation in
 the following way:
 
-1. The initial build should be performed using `bin/clean-install.sh`` to create a docker 
+1. The initial build should be performed using `bin/clean-install.sh` to create a docker
    image with the agent built from the source tree and installed into standard system paths
    using `netdata-installer.sh`. In addition to the steps performed by the standard packaging
    builds a manifest is created to allow subsequent builds to be made incrementally using
    `make` inside the container. Any libraries that are required for 'bleeding-edge' development
    are added on top of the standard install.
-2. When the `bin/make-install.sh` script is used the docker container will be updated with 
+2. When the `bin/make-install.sh` script is used the docker container will be updated with
    a sanitized version of the current build-tree. The manifest will be used to line up the
    state of the incoming docker cache with `make`'s view of the file-system according to the
    manifest. This means the `make install` inside the container will only rebuild changes
    since the last time the disk image was created.
-   
+
 The exact improvement on the compile-cycle depends on the speed of the network connection
 to pull the netdata dependencies, but should shrink the time considerably. For example,
-on a macbook pro the initial install takes about 1min + network delay [Note: there is 
+on a macbook pro the initial install takes about 1min + network delay [Note: there is
 something bad happening with the standard installer at the end of the container build as
 it tries to kill the running agent - this is very slow and bad] and the incremental
 step only takes 15s. On a debian host with a fast network this reduces 1m30 -> 13s.
@@ -75,7 +75,7 @@ The state of the build in the two containers is independent.
 
 2. Single agent config in docker-compose
 
-This functions the same as the previous example but is wrapped in docker-compose to 
+This functions the same as the previous example but is wrapped in docker-compose to
 allow injection into more complex test configurations.
 
 ```bash
@@ -102,7 +102,7 @@ and improve it. Currently it produces the following problems:
   * The containers are hard-coded in the compose.
   * There is no way to separate the agent configurations, so running multiple agent slaves
     wth the same GUID kills the master which exits with a fatal condition.
-    
+
 4. The ACLK
 
 This is for internal use only as it requires access to a private repo. Clone the vernemq-docker
@@ -110,7 +110,7 @@ repo and follow the instructions within to build an image called `vernemq`.
 
 ```bash
 build_external/bin/clean-install.sh arch current  # Only needed first time
-docker-compose -f build_external/projects/aclk-testing/vernemq-compose.yml -f build__external/projects/aclk-testing/agent-compose.yml up --build
+docker-compose -f build_external/projects/aclk-testing/vernemq-compose.yml -f build_external/projects/aclk-testing/agent-compose.yml up --build
 ```
 
 Notes:
