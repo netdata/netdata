@@ -624,6 +624,12 @@ netdata_LDADD = \
     $(NULL)
 endif
 
+if STATIC_LWS
+netdata_LDADD += \
+    externaldeps/libwebsockets/libwebsockets.a \
+    $(NULL)
+endif
+
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
