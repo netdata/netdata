@@ -187,7 +187,12 @@ So, Netdata supports [simple patterns](../libnetdata/simple_pattern/).
 
 ## Netdata labels
 
-Since version 1.20, Netdata accepts user defined labels for host. The labels are defined in the section `[host labels]`.
+Beginning with  1.20, Netdata accepts user-defined **host labels**. These labels are defined in the section `[host
+labels]`.
+
+Read more about how these labels work and why they're an effective way to organize complex infrasturctures in our
+tutorial: [Use host labels to organize systems, metrics, and alarms](tutorials/using-host-labels.md).
+
 To define a label inside this section, some rules needs to be followed, or Netdata will reject the label. The following
 restrictions are applied for label names:
  
