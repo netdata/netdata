@@ -17,6 +17,7 @@ time_t last_init_sequence = 0;
 int waiting_init = 1;
 
 char *global_base_topic = NULL;
+int aclk_connecting = 0;
 
 char *create_uuid()
 {
@@ -966,21 +967,16 @@ void *aclk_main(void *ptr)
         }
 
         if (unlikely(!aclk_connection_initialized)) {
-            static time_t last_init_time = 0;
+            static int first_init = 0;
 
-            if (unlikely(!last_init_time)) {
+            if (unlikely(!first_init)) {
+                first_init = 1;
                 create_publish_base_topic();
                 aclk_init(ACLK_INIT);
-            }
-            else {
-                // TODO: refine this. Allow for now 2 seconds for callbacks
-                if ((now_realtime_sec() - last_init_time) < 2) {
-                    _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-                    continue;
-                }
+            } else
                 aclk_init(ACLK_REINIT);
-            }
-            last_init_time = now_realtime_sec();
+
+            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
             continue;
         }
 
@@ -1092,6 +1088,7 @@ void aclk_connect(void *ptr)
 {
     UNUSED(ptr);
     info("Connection detected");
+    aclk_connection_initialized = 1;
     waiting_init = 0;
     aclk_reconnect_delay(0);
     QUERY_THREAD_WAKEUP;
@@ -1109,6 +1106,7 @@ void aclk_disconnect(void *ptr)
     aclk_metadata_submitted = 0;
     waiting_init = 1;
     aclk_connection_initialized = 0;
+    aclk_connecting = 0;
 }
 
 void aclk_shutdown()
@@ -1126,9 +1124,22 @@ int aclk_init(ACLK_INIT_ACTION action)
     int rc;
 
     if (action == ACLK_REINIT) {
-        unsigned long delay = aclk_reconnect_delay(1);
+        if (likely(aclk_connecting)) {
+            return 0;
+        }
+
+        unsigned long int delay = aclk_reconnect_delay(1);
         info("Retrying to establish the ACLK connection in %.3f seconds", delay / 1000.0);
-        sleep_usec(USEC_PER_MS * delay);
+
+        while (delay) {
+            unsigned long int sleep_dosage;
+
+            sleep_dosage = delay < 1000 ? delay : 1000;
+            delay -= sleep_dosage;
+            sleep_usec(USEC_PER_MS * sleep_dosage);
+
+            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+        }
         init = 0;
     }
 
@@ -1139,6 +1150,7 @@ int aclk_init(ACLK_INIT_ACTION action)
     aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
     // initialize the low level link to the cloud
+    aclk_connecting = 1;
     rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");

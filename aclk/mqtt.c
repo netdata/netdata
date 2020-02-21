@@ -92,7 +92,6 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 
     info("Connection to cloud estabilished");
 
-    aclk_connection_initialized = 1;
     aclk_mqtt_connected = 1;
     _on_connect((void *)mosq);
 
