@@ -1094,6 +1094,7 @@ void aclk_connect(void *ptr)
     info("Connection detected");
     waiting_init = 0;
     aclk_reconnect_delay(0);
+    QUERY_THREAD_WAKEUP;
     return;
 }
 
