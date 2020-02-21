@@ -187,7 +187,7 @@ All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds"
 
 Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
 
-Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
 
 New collectors must have the title "[New collector] : [Name of collector]".
 
