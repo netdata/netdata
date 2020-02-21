@@ -429,6 +429,21 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     font-size: 0.75rem;
 }
 
+/* Support figures and figcaptions with some styling. */
+.md-typeset figure img {
+    border-radius: 3px 3px 0 0;
+}
+
+.md-typeset figure figcaption {
+    font-size: 0.75rem;
+    font-style: italic;
+    margin-top: -8px;
+    padding: 0.5rem;
+    border-width: 0 1px 1px 1px;
+    border-color: #AEB3B7;
+    border-style: solid;
+}
+
 /*
    Installer grid
 */
@@ -443,7 +458,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 .grid-item {
     grid-column: span 2;
     border-radius: 2px;
-    border: 1px solid black;
+    border: 1px solid #AEB3B7;
     padding: 1rem;
 }
 
