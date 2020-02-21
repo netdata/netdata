@@ -309,6 +309,10 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
 static inline int _link_event_loop_wss()
 {
+    if (unlikely(!lws_engine_instance)) {
+        return MOSQ_ERR_SUCCESS;
+    }
+
     if (lws_engine_instance && lws_engine_instance->websocket_connection_up)
         _link_mosquitto_write();
 
