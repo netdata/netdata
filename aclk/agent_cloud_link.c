@@ -958,25 +958,45 @@ void *aclk_main(void *ptr)
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 
+    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
+    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
+
+
+     // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
+     // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
+    while(likely(!is_agent_claimed())) {
+        sleep_usec(USEC_PER_SEC * 5);
+        if(netdata_exit)
+            goto exited;
+    }
+    create_publish_base_topic();
+
+    usec_t reconnect_expiry = 0; // In usecs
+
     while (!netdata_exit) {
-        // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
-        // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
-        if (likely(!is_agent_claimed())) {
-            sleep_usec(USEC_PER_SEC * 60);
-            continue;
-        }
+        static int first_init = 0;
+        _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+        debug(D_ACLK,"LINK event loop called");
 
         if (unlikely(!aclk_connection_initialized)) {
-            static int first_init = 0;
-
-            if (unlikely(!first_init)) {
+            if (unlikely(first_init)) {
+                aclk_try_to_connect();
                 first_init = 1;
-                create_publish_base_topic();
-                aclk_init(ACLK_INIT);
-            } else
-                aclk_init(ACLK_REINIT);
-
-            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+            } else {
+                if (aclk_connecting == 0) {
+                    if (reconnect_expiry == 0) {
+                        unsigned long int delay = aclk_reconnect_delay(1);
+                        reconnect_expiry = now_realtime_usec() + delay * 1000;
+                        info("Retrying to establish the ACLK connection in %.3f seconds", delay / 1000.0);
+                    }
+                    if (now_realtime_usec() >= reconnect_expiry) {
+                        reconnect_expiry = 0;
+                        aclk_connecting = 1;
+                        aclk_try_to_connect();
+                    }
+                    sleep_usec(USEC_PER_MS * 100);
+                }
+            }
             continue;
         }
 
@@ -994,11 +1014,8 @@ void *aclk_main(void *ptr)
                     query_thread);
             }
         }
-
-        _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-        debug(D_ACLK,"LINK event loop called");
-
     } // forever
+exited:
     aclk_shutdown();
 
     netdata_thread_cleanup_pop(1);
@@ -1117,47 +1134,13 @@ void aclk_shutdown()
     info("Shutdown complete");
 }
 
-int aclk_init(ACLK_INIT_ACTION action)
+void aclk_try_to_connect()
 {
-//    UNUSED(action);
-    static int init = 0;
     int rc;
-
-    if (action == ACLK_REINIT) {
-        if (likely(aclk_connecting)) {
-            return 0;
-        }
-
-        unsigned long int delay = aclk_reconnect_delay(1);
-        info("Retrying to establish the ACLK connection in %.3f seconds", delay / 1000.0);
-
-        while (delay) {
-            unsigned long int sleep_dosage;
-
-            sleep_dosage = delay < 1000 ? delay : 1000;
-            delay -= sleep_dosage;
-            sleep_usec(USEC_PER_MS * sleep_dosage);
-
-            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-        }
-        init = 0;
-    }
-
-    if (likely(init))
-        return 0;
-
-    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
-    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
-
-    // initialize the low level link to the cloud
-    aclk_connecting = 1;
     rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
-        return 1;
     }
-    init = 1;
-    return 0;
 }
 
 
