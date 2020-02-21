@@ -1,0 +1,51 @@
+version: '3.3'
+services:
+  agent_master:
+    build:
+      context: ../../..
+      dockerfile: build_external/make_install_fedora_30.Dockerfile
+      args:
+        ACLK: "yes"
+    image: fedora_30_dev
+    command: >
+      sh -c "echo 00000000-0000-0000-0000-000000000000 >/etc/netdata/claim.d/claimed_id &&
+             echo '[agent_cloud_link]' >>/etc/netdata/netdata.conf &&
+             echo '  agent cloud link hostname = 172.22.0.100' >>/etc/netdata/netdata.conf &&
+             echo '  agent cloud link port = 8080' >>/etc/netdata/netdata.conf &&
+             /usr/sbin/netdata -D"
+    ports:
+    - 20000:19999
+    networks:
+      service1_net:
+        ipv4_address: 172.22.0.99
+    #volumes:
+    #- ./master_stream.conf:/etc/netdata/stream.conf:ro
+#  agent_slave1:
+#    image: debian_buster_dev
+#    command: /usr/sbin/netdata -D
+#    ports:
+#    - 20001:19999
+#    volumes:
+#      - ./slave_stream.conf:/etc/netdata/stream.conf:ro
+#  agent_slave2:
+#    image: ubuntu_2004_dev
+#    command: /usr/sbin/netdata -D
+#    ports:
+#    - 20002:19999
+#    volumes:
+#      - ./slave_stream.conf:/etc/netdata/stream.conf:ro
+  vernemq:
+    build:
+      dockerfile: configureVerneMQ.Dockerfile
+      context: .
+    networks:
+      service1_net:
+        ipv4_address: 172.22.0.100
+
+networks:
+  service1_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/16
+
