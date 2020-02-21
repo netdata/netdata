@@ -41,13 +41,13 @@ should be installed on your system to build and run Netdata. It supports most ma
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
 ```
 
 Install all the required packages for **monitoring everything Netdata can monitor**:
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
 ```
 
 If the above do not work for you, please [open a github
@@ -114,6 +114,19 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 | `openssl`| Cryptography and SSL/TLS toolkit|
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
+
+### CentOS / RHEL 6.x
+
+On CentOS / RHEL 6.x, many of the dependencies for Netdata are only
+available with versions older than what we need, so special setup is
+required if manually installing packages.
+
+CentOS 6.x:
+
+- Enable the EPEL repo
+- Enable the additional repo from [okay.network](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
+
+And install the minimum required dependencies.
 
 ### CentOS / RHEL 8.x
 
