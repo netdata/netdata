@@ -1,5 +1,15 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.20.0...HEAD)
+
+**Merged pull requests:**
+
+- Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
+- Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
+- Cross-host docker builds [\#7754](https://github.com/netdata/netdata/pull/7754) ([amoss](https://github.com/amoss))
+
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.19.0...v1.20.0)
