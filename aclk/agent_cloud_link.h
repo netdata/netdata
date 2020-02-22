@@ -94,7 +94,7 @@ int aclk_send_metadata();
 int aclk_send_info_metadata();
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
-int aclk_init(ACLK_INIT_ACTION action);
+void aclk_try_to_connect();
 
 int aclk_send_single_chart(char *host, char *chart);
 int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal, ACLK_CMD cmd);

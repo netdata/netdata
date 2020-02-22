@@ -161,8 +161,13 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance* inst) {
 #endif
 }
 
-void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
-	struct lws_client_connect_info i;
+void aclk_lws_wss_connect(struct aclk_lws_wss_engine_instance *inst){
+    struct lws_client_connect_info i;
+
+    if(inst->lws_wsi) {
+        error("Already Connected. Only one connection supported at a time.");
+        return;
+    }
 
 	memset(&i, 0, sizeof(i));
 	i.context = inst->lws_context;
@@ -238,9 +243,9 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		//initial connection here
 		//later we will reconnect with delay od ACLK_LWS_WSS_RECONNECT_TIMEOUT
 		//in case this connection fails or drops
-		_aclk_wss_connect(inst);
-		break;
-	case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
+        aclk_lws_wss_connect(inst);
+        break;
+    case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
 		//TODO if already active make some error noise
 		//currently we expect only one connection per netdata
 		inst->lws_wsi = wsi;
@@ -270,7 +275,9 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		aclk_lws_wss_clear_io_buffers(inst);
 		inst->lws_wsi = NULL;
 		inst->websocket_connection_up = 0;
-		break;
+        if (reason == LWS_CALLBACK_WSI_DESTROY && inst->callbacks.connection_closed)
+            inst->callbacks.connection_closed();
+        break;
 	case LWS_CALLBACK_CLIENT_ESTABLISHED:
 		inst->websocket_connection_up = 1;
 		if(inst->callbacks.connection_established_callback)
