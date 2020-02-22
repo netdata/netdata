@@ -17,6 +17,7 @@ time_t last_init_sequence = 0;
 int waiting_init = 1;
 
 char *global_base_topic = NULL;
+int aclk_connecting = 0;
 
 char *create_uuid()
 {
@@ -34,6 +35,9 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
     struct aclk_request *data = e->callback_data;
 
     switch(e->type) {
+        case JSON_OBJECT:
+        case JSON_ARRAY:
+                break;
         case JSON_STRING:
             if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
                 data->msg_id = strdupz(e->data.string);
@@ -165,7 +169,7 @@ unsigned long int aclk_reconnect_delay(int mode)
         delay = (delay * 1000) + (random() % 1000);
     }
 
-    sleep_usec(USEC_PER_MS * delay);
+//    sleep_usec(USEC_PER_MS * delay);
 
     return delay;
 }
@@ -735,7 +739,7 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         aclk_create_header(local_buffer, "http", this_query->msg_id);
 
-        if (rc != HTTP_RESP_OK || (mysep?mysep+1:"noop", "badge.svg") == 0)
+        if (rc != HTTP_RESP_OK || strcmp(mysep?mysep+1:"noop", "badge.svg") == 0)
             buffer_sprintf(local_buffer, "\"%s\"", aclk_encode_response(w->response.data)->buffer);
         else
             buffer_sprintf(local_buffer, "%s", aclk_encode_response(w->response.data)->buffer);
@@ -954,34 +958,45 @@ void *aclk_main(void *ptr)
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 
+    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
+    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
+
+
+     // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
+     // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
+    while(likely(!is_agent_claimed())) {
+        sleep_usec(USEC_PER_SEC * 5);
+        if(netdata_exit)
+            goto exited;
+    }
+    create_publish_base_topic();
+
+    usec_t reconnect_expiry = 0; // In usecs
+
     while (!netdata_exit) {
-        // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
-        // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
-        if (likely(!is_agent_claimed())) {
-            sleep_usec(USEC_PER_SEC * 60);
-            continue;
-        }
+        static int first_init = 0;
+        _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+        debug(D_ACLK,"LINK event loop called");
 
         if (unlikely(!aclk_connection_initialized)) {
-            static int initializing = 0;
-
-            if (likely(initializing)) {
-                _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-                continue;
-            }
-            initializing = 1;
-            info("Initializing connection");
-
-            assert( NULL != create_publish_base_topic());
-
-            if (unlikely(aclk_init(ACLK_INIT))) {
-                // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
-                sleep_usec(USEC_PER_SEC * 60);
-                continue;
+            if (unlikely(first_init)) {
+                aclk_try_to_connect();
+                first_init = 1;
             } else {
-                sleep_usec(USEC_PER_SEC * 1);
+                if (aclk_connecting == 0) {
+                    if (reconnect_expiry == 0) {
+                        unsigned long int delay = aclk_reconnect_delay(1);
+                        reconnect_expiry = now_realtime_usec() + delay * 1000;
+                        info("Retrying to establish the ACLK connection in %.3f seconds", delay / 1000.0);
+                    }
+                    if (now_realtime_usec() >= reconnect_expiry) {
+                        reconnect_expiry = 0;
+                        aclk_connecting = 1;
+                        aclk_try_to_connect();
+                    }
+                    sleep_usec(USEC_PER_MS * 100);
+                }
             }
-            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
             continue;
         }
 
@@ -999,11 +1014,8 @@ void *aclk_main(void *ptr)
                     query_thread);
             }
         }
-
-        _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-        debug(D_ACLK,"LINK event loop called");
-
     } // forever
+exited:
     aclk_shutdown();
 
     netdata_thread_cleanup_pop(1);
@@ -1087,12 +1099,16 @@ int aclk_subscribe(char *sub_topic, int qos)
     return rc;
 }
 
+
 // This is called from a callback when the link goes up
 void aclk_connect(void *ptr)
 {
     UNUSED(ptr);
     info("Connection detected");
+    aclk_connection_initialized = 1;
     waiting_init = 0;
+    aclk_reconnect_delay(0);
+    QUERY_THREAD_WAKEUP;
     return;
 }
 
@@ -1100,11 +1116,14 @@ void aclk_connect(void *ptr)
 void aclk_disconnect(void *ptr)
 {
     UNUSED(ptr);
-    info("Disconnect detected");
+
+    if (likely(aclk_connection_initialized))
+        info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = 0;
     waiting_init = 1;
-    aclk_reconnect_delay(0);
+    aclk_connection_initialized = 0;
+    aclk_connecting = 0;
 }
 
 void aclk_shutdown()
@@ -1115,27 +1134,13 @@ void aclk_shutdown()
     info("Shutdown complete");
 }
 
-int aclk_init(ACLK_INIT_ACTION action)
+void aclk_try_to_connect()
 {
-    UNUSED(action);
-
-    static int init = 0;
     int rc;
-
-    if (likely(init))
-        return 0;
-
-    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
-    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
-
-    // initialize the low level link to the cloud
     rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
-        return 1;
     }
-    init = 1;
-    return 0;
 }
 
 
