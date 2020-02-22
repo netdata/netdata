@@ -231,10 +231,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
 
       # Fedora runs
-    - name: Run netdata lifecycle, on Fedora 29
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:29" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 29"
-
     - name: Run netdata lifecycle, on Fedora 30 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
@@ -416,14 +412,6 @@ jobs:
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="30" BUILD_STRING="fedora/30"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Fedora 29"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
