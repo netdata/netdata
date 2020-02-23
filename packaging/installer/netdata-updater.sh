@@ -96,17 +96,13 @@ function parse_version() {
 }
 
 get_latest_version() {
-  shasums="${1}"
-
-  tarball="$(grep -o 'netdata-v.*\.tar\.gz' "${shasums}")"
-  if [ -n "${tarball}" ]; then
-    # shellcheck disable=SC2001
-    # XXX: Need to use regex group substitution here.
-    version="$(echo "${tarball}" | sed -e 's/^netdata-\(.*\)\.tar.gz/\1/')"
-    parse_version "${version}"
+  local latest
+  if [ "${RELEASE_CHANNEL}" == "stable" ]; then
+    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
   else
-    echo "000000000000"
+    latest="$(download "https://storage.googleapis.com/netdata-nightlies/latest-version.txt" /dev/stdout)"
   fi
+  parse_version "$latest"
 }
 
 set_tarball_urls() {
@@ -139,7 +135,7 @@ update() {
   download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
 
   current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
-  latest_version="$(get_latest_version "${tmpdir}/sha256sum.txt")"
+  latest_version="$(get_latest_version)"
 
   # If we can't get the current version for some reason assume `0`
   current_version="${current_version:-0}"
