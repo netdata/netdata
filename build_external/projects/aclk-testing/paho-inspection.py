@@ -4,6 +4,7 @@ import paho.mqtt.client as mqtt
 
 def on_connect(mqttc, obj, flags, rc):                                                                                  
     print("connected rc: "+str(rc), flush=True)
+    mqttc.subscribe("/agent/#",0)
 def on_disconnect(mqttc, obj, flags, rc):                                                                                  
     print("disconnected rc: "+str(rc), flush=True)
 def on_message(mqttc, obj, msg):                                                                                        
@@ -26,7 +27,7 @@ mqttc.on_disconnect = on_disconnect
 mqttc.on_publish = on_publish                                                                                           
 mqttc.on_subscribe = on_subscribe                                                                                       
 mqttc.connect("vernemq", 9002, 60)                                                                                
-mqttc.subscribe("/agent/#",0)                                                                                           
+                                                                                           
 #mqttc.publish("/agent/mine","Test1")                                                                                    
 #mqttc.subscribe("$SYS/#", 0) 
 print("Connected succesfully, monitoring /agent/#", flush=True)                                                                                          
