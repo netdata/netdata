@@ -1,4 +1,3 @@
-import sys
 import ssl
 import paho.mqtt.client as mqtt
 
