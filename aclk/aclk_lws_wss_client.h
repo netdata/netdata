@@ -58,14 +58,7 @@ struct aclk_lws_wss_engine_instance {
 	int websocket_connection_up;
 
 // currently this is by default disabled
-// as decision has been made that reconnection
-// will have to be done from top layer
-// (after getting the new MQTT auth data)
-// for now i keep it here as it is usefull for
-// some of my internall testing
-#ifdef AUTO_RECONNECT_ON_LWS_LAYER
-	int reconnect_timeout_running;
-#endif
+
 	int data_to_read;
 	int upstream_reconnect_request;
 };
