@@ -593,7 +593,7 @@ declare -A pkg_automake=(
 
 # Required to build libwebsockets and libmosquitto on some systems.
 declare -A pkg_cmake=(
-  ['clearlinux'="c-basic"
+  ['clearlinux']="c-basic"
   ['default']="cmake"
 )
 
