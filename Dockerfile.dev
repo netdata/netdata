@@ -1,0 +1,19 @@
+FROM debian:stretch
+
+# Install Dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev \
+                       libssl-dev libmnl-dev gcc make git autoconf \
+                       autoconf-archive autogen automake pkg-config curl \
+                       python
+
+
+# Copy Sources
+WORKDIR /netdata
+COPY . .
+
+# Build
+RUN ./netdata-installer.sh -u --dont-wait --dont-start-it --disable-go
+
+CMD ["/bin/sh"]

@@ -103,7 +103,6 @@ Before submitting a PR we run through this checklist:
 * ./netdata-installer.sh
 * make dist
 * `packaging/makeself/build-x86_64-static.sh`
-* `clang-format -style=file`
 
 Please be aware that the linting pass at the end is currently messy as we are transitioning between code styles
 across most of our code-base, but we prefer new contributions that match the linting style.
