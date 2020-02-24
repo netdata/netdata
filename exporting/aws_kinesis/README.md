@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-To use AWS Kinesis for metric collecting and processing, AWS SDK for C++ should be
-[installed](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) first. Netdata works with
-the SDK version 1.7.121. Other versions might work correctly as well but they were not tested with Netdata.
+To use AWS Kinesis for metric collecting and processing, you must
+[install](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) AWS SDK for C++ first. Netdata
+works with the SDK version 1.7.121. Other versions might work correctly as well but they were not tested with Netdata.
 `libcrypto`, `libssl`, and `libcurl` are also required to compile Netdata with Kinesis support enabled. Next, Netdata
 should be re-installed from the source. The installer will detect that the required libraries are now available.
 
@@ -28,7 +28,7 @@ and set the following options:
     destination = us-east-1
 ```
 
-set the `destination` option to an AWS region.
+Set the `destination` option to an AWS region.
 
 Set AWS credentials and stream name:
 
