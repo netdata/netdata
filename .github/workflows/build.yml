@@ -63,7 +63,8 @@ jobs:
             pre: 'apt-get update'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - name: Git clone repository
+        uses: actions/checkout@v2
       - name: Build on ${{ matrix.distro }}
         env:
           PRE: ${{ matrix.pre }}
