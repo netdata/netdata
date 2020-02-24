@@ -9,7 +9,7 @@ works with the SDK version 1.7.121. Other versions might work correctly as well 
 should be re-installed from the source. The installer will detect that the required libraries are now available.
 
 If the AWS SDK for C++ is being installed from source, it is useful to set `-DBUILD_ONLY="kinesis"`. Otherwise, the
-building process could take a very long time. Take a note, that the default installation path for the libraries is
+building process could take a very long time. Note that the default installation path for the libraries is
 `/usr/local/lib64`. Many Linux distributions don't include this path as the default one for a library search, so it is
 advisable to use the following options to `cmake` while building the AWS SDK:
 
