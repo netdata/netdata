@@ -39,25 +39,25 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
         case JSON_ARRAY:
             break;
         case JSON_STRING:
-            if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
+            if (!strcmp(e->name, "msg-id")) {
                 data->msg_id = strdupz(e->data.string);
                 break;
             }
-            if (!strcmp(e->name, ACLK_JSON_IN_TYPE)) {
+            if (!strcmp(e->name, "type")) {
                 data->type_id = strdupz(e->data.string);
                 break;
             }
-            if (!strcmp(e->name, ACLK_JSON_IN_TOPIC)) {
+            if (!strcmp(e->name, "callback-topic")) {
                 data->callback_topic = strdupz(e->data.string);
                 break;
             }
-            if (!strcmp(e->name, ACLK_JSON_IN_URL)) {
+            if (!strcmp(e->name, "payload")) {
                 data->payload = strdupz(e->data.string);
                 break;
             }
             break;
         case JSON_NUMBER:
-            if (!strcmp(e->name, ACLK_JSON_IN_VERSION)) {
+            if (!strcmp(e->name, "version")) {
                 data->version = atoi(e->original_string);
                 break;
             }

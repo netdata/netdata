@@ -8,11 +8,6 @@
 
 #define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
-#define ACLK_JSON_IN_MSGID "msg-id"
-#define ACLK_JSON_IN_TYPE "type"
-#define ACLK_JSON_IN_VERSION "version"
-#define ACLK_JSON_IN_TOPIC "callback-topic"
-#define ACLK_JSON_IN_URL "payload"
 #define ACLK_CHART_TOPIC "chart"
 #define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
