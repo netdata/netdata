@@ -1501,6 +1501,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , os_type
             , netdata_configured_timezone
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , config_get(CONFIG_SECTION_BACKEND, "host labels", "")
             , program_name
             , program_version
             , default_rrd_update_every

@@ -176,7 +176,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone);
     rrdhost_init_tags(host, tags);
-    rrdhost_init_labels(host, labels);
+    rrdhost_init_labels_backend(host, labels);
 
     host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
     host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
@@ -457,7 +457,7 @@ RRDHOST *rrdhost_find_or_create(
 
         // update host tags and labels
         rrdhost_init_tags(host, tags);
-        rrdhost_init_labels(host, labels);
+        rrdhost_init_labels_backend(host, labels);
     }
 
     rrdhost_cleanup_orphan_hosts_nolock(host);
@@ -1014,7 +1014,7 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
     return label_list;
 }
 
-struct label *parse_backend_configs_string(char *config_string)
+struct label *parse_backend_configs_string(const char *config_string)
 {
     struct label *label_list = NULL;
     BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
@@ -1052,7 +1052,7 @@ struct label *parse_backend_configs_string(char *config_string)
             break;
     }
 
-    return label_list
+    return label_list;
 }
 
 struct label *load_labels_from_tags()
@@ -1060,7 +1060,7 @@ struct label *load_labels_from_tags()
     if (!localhost->tags)
         return NULL;
 
-    return parse_backend_configs_string(localhost->tags)
+    return parse_backend_configs_string(localhost->tags);
 }
 
 struct label *load_labels_from_labels_backend()
@@ -1068,7 +1068,7 @@ struct label *load_labels_from_labels_backend()
     if (!localhost->labels_backend)
         return NULL;
 
-    return parse_backend_configs_string(localhost->labels_backend)
+    return parse_backend_configs_string(localhost->labels_backend);
 }
 
 struct label *load_kubernetes_labels()

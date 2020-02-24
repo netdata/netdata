@@ -830,6 +830,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *os
         , const char *timezone
         , const char *tags
+        , const char *labels
         , const char *program_name
         , const char *program_version
         , int update_every
