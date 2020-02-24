@@ -244,7 +244,7 @@ struct engine *read_exporting_config()
         return NULL;
     }
 
-    engine = (struct engine *)calloc(1, sizeof(struct engine));
+    engine = (struct engine *)callocz(1, sizeof(struct engine));
     // TODO: Check and fill engine fields if actually needed
 
     if (exporting_config_exists) {
@@ -273,7 +273,7 @@ struct engine *read_exporting_config()
         }
 #endif
 
-        tmp_instance = (struct instance *)calloc(1, sizeof(struct instance));
+        tmp_instance = (struct instance *)callocz(1, sizeof(struct instance));
         tmp_instance->next = engine->instance_root;
         engine->instance_root = tmp_instance;
 
