@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Removed hack to force users off of stuck NetData v1.19.0-432 [\#8158](https://github.com/netdata/netdata/pull/8158) ([prologic](https://github.com/prologic))
 - Added support for Clear Linux in `install-required-packages.sh`. [\#8154](https://github.com/netdata/netdata/pull/8154) ([Ferroin](https://github.com/Ferroin))
 - Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
 - Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
