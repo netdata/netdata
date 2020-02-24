@@ -248,8 +248,6 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 	// Don't log to info - volume is proportional to message flow on ACLK.
 	switch (reason) {
 		case LWS_CALLBACK_CLIENT_WRITEABLE:
-			if (inst->aborting)
-				return -1;
 			aclk_lws_mutex_lock(&inst->write_buf_mutex);
 			data = lws_wss_packet_buffer_pop(&inst->write_buffer_head);
 			if(likely(data)) {
@@ -296,10 +294,9 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
         aclk_lws_wss_connect(inst);		// Makes the outgoing connection
         break;
     case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
-		//TODO if already active make some error noise
-		//currently we expect only one connection per netdata
+		if (inst->lws_wsi != NULL && inst->lws_wsi != wsi)
+			error("Multiple connections on same WSI? %p vs %p", inst->lws_wsi, wsi);
 		inst->lws_wsi = wsi;
-		inst->aborting = 0;
 		break;
 	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
 		error("Could not connect MQTT over WSS server \"%s:%d\". LwsReason:\"%s\"", inst->host, inst->port, (in ? (char*)in : "not given"));

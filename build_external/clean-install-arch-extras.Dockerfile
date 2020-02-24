@@ -4,7 +4,7 @@ FROM archlinux/base:latest
 # repo and also with the clean-install.Dockefile. Once the help image is availabled on Docker
 # Hub this file can be deleted.
 
-RUN pacman -Sy
+RUN pacman -Syyu --noconfirm
 RUN pacman --noconfirm --needed -S autoconf \
                                    autoconf-archive \
                                    autogen \
@@ -19,7 +19,8 @@ RUN pacman --noconfirm --needed -S autoconf \
                                    pkgconfig \
                                    python \
                                    libvirt \
-                                   libwebsockets
+                                   libwebsockets \
+                                   valgrind
 
 ARG ACLK=no
 ARG EXTRA_CFLAGS
@@ -51,4 +52,5 @@ RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
 
-CMD ["/usr/sbin/netdata", "-D"]
+CMD ["/usr/sbin/valgrind", "--leak-check=full", "/usr/sbin/netdata", "-D"]
+   
