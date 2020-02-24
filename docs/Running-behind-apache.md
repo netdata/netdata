@@ -166,7 +166,8 @@ Install the package `apache2-utils`. On debian / ubuntu run `sudo apt-get instal
 
 Then, generate password for user `netdata`, using `htpasswd -c /etc/apache2/.htpasswd netdata`
 
-**Apache 2.2 Example:**\
+**Apache 2.2 Example:**
+
 Modify the virtual host with these:
 
 ```conf
@@ -189,7 +190,30 @@ Modify the virtual host with these:
 
 Specify `Location /` if Netdata is running on dedicated virtual host.
 
-**Apache 2.4 (dedicated virtual host) Example:**  
+**Apache 2.4 on an existing virtual host**
+
+```conf
+<Location "/netdata" >
+	RewriteEngine On
+	ProxyPreserveHost On
+
+	AuthType Basic
+	AuthName "Protected site"
+	AuthUserFile /etc/apache2/.htpasswd
+	Require valid-user
+	# Local netdata server accessed with '/netdata/', at localhost:19999
+	ProxyPass "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
+	ProxyPassReverse "http://localhost:19999/"
+
+	# if the user did not give the trailing /, add it
+	# for HTTP (if the virtualhost is HTTP, use this)
+	#RewriteRule ^proxy:http://localhost:19999/$ http://%{HTTP_HOST}/netdata/ [L,R=301]
+	# for HTTPS (if the virtualhost is HTTPS, use this)
+	RewriteRule ^proxy:http://localhost:19999/$ https://%{HTTP_HOST}/netdata/ [L,R=301]
+</Location>
+```
+
+**Apache 2.4 (dedicated virtual host) Example:**
 
 ```conf
 <VirtualHost *:80>
