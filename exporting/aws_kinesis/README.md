@@ -1,4 +1,4 @@
-# Using Netdata with AWS Kinesis Data Streams
+# Export metrics to AWS Kinesis Data Streams
 
 ## Prerequisites
 
