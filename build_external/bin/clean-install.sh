@@ -42,6 +42,11 @@ else
             --build-arg "DISTRO=$DISTRO" --build-arg "VERSION=$VERSION" --build-arg ACLK=yes \
             --build-arg EXTRA_CFLAGS="-DACLK_SSL_ALLOW_SELF_SIGNED"
         ;;
+        arch-extras)   # Add valgrind to the container
+            docker build -f "$BuildBase/clean-install-arch-extras.Dockerfile" -t "${DISTRO}_${VERSION}_dev" "$BuildBase/.." \
+            --build-arg "DISTRO=$DISTRO" --build-arg "VERSION=$VERSION" --build-arg ACLK=yes \
+            --build-arg EXTRA_CFLAGS="-DACLK_SSL_ALLOW_SELF_SIGNED"
+        ;;
         *)
             echo "Unknown $DISTRO-$VERSION"
         ;;

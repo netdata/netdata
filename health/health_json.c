@@ -13,7 +13,7 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"

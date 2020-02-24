@@ -3,7 +3,7 @@
 #include "web/api/web_api_v1.h"
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
-    rrdset2json(st, wb, NULL, NULL);
+    rrdset2json(st, wb, NULL, NULL, 0);
 }
 
 void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
