@@ -30,7 +30,7 @@ method](../getting-started.md#start-stop-and-restart-netdata) for your system, a
 CockroachDB metrics in your Netdata dashboard!
 
 <figure>
-  <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockroachDB database monitored by Netdata">
+  <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockroachDB database monitored by Netdata" />
   <figcaption>CPU utilization charts from a CockroachDB database monitored by Netdata</figcaption>
 </figure>
 
