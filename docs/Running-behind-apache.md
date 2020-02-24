@@ -11,7 +11,7 @@ Below you can find instructions for configuring an apache server to:
 
 Make sure your apache has installed `mod_proxy` and `mod_proxy_http`.
 
-On debian/ubuntu systems, install them with this: 
+On debian/ubuntu systems, install them with this:
 
 ```sh
 sudo apt-get install apache2
@@ -62,7 +62,7 @@ Add the following on top of any existing virtual host. It will allow you to acce
 	#RewriteRule ^/netdata$ https://%{HTTP_HOST}/netdata/ [L,R=301]
 
 	# rest of virtual host config here
-	
+
 </VirtualHost>
 ```
 
@@ -81,17 +81,17 @@ Add the following on top of any existing virtual host. It will allow you to acce
 		Require all granted
 	</Proxy>
 
-    # proxy any host, on port 19999
-    ProxyPassMatch "^/netdata/([A-Za-z0-9\._-]+)/(.*)" "http://$1:19999/$2" connectiontimeout=5 timeout=30 keepalive=on
+	# proxy any host, on port 19999
+	ProxyPassMatch "^/netdata/([A-Za-z0-9\._-]+)/(.*)" "http://$1:19999/$2" connectiontimeout=5 timeout=30 keepalive=on
 
-    # make sure the user did not forget to add a trailing /
-    # for HTTP (if the virtualhost is HTTP, use this)
-    RewriteRule "^/netdata/([A-Za-z0-9\._-]+)$" http://%{HTTP_HOST}/netdata/$1/ [L,R=301]
-    # for HTTPS (if the virtualhost is HTTPS, use this)
-    RewriteRule "^/netdata/([A-Za-z0-9\._-]+)$" https://%{HTTP_HOST}/netdata/$1/ [L,R=301]
+	# make sure the user did not forget to add a trailing /
+	# for HTTP (if the virtualhost is HTTP, use this)
+	RewriteRule "^/netdata/([A-Za-z0-9\._-]+)$" http://%{HTTP_HOST}/netdata/$1/ [L,R=301]
+	# for HTTPS (if the virtualhost is HTTPS, use this)
+	RewriteRule "^/netdata/([A-Za-z0-9\._-]+)$" https://%{HTTP_HOST}/netdata/$1/ [L,R=301]
 
 	# rest of virtual host config here
-	
+
 </VirtualHost>
 ```
 
@@ -101,7 +101,7 @@ Add the following on top of any existing virtual host. It will allow you to acce
 If you want to control the servers your users can connect to, replace the `ProxyPassMatch` line with the following. This allows only `server1`, `server2`, `server3` and `server4`.
 
 ```
-    ProxyPassMatch "^/netdata/(server1|server2|server3|server4)/(.*)" "http://$1:19999/$2" connectiontimeout=5 timeout=30 keepalive=on
+	ProxyPassMatch "^/netdata/(server1|server2|server3|server4)/(.*)" "http://$1:19999/$2" connectiontimeout=5 timeout=30 keepalive=on
 ```
 
 ## Netdata on a dedicated virtual host
@@ -121,7 +121,7 @@ with this content:
 	RewriteEngine On
 	ProxyRequests Off
 	ProxyPreserveHost On
-	
+
 	ServerName netdata.domain.tld
 
 	<Proxy *>
@@ -136,7 +136,7 @@ with this content:
 </VirtualHost>
 ```
 
-Enable the VirtualHost: 
+Enable the VirtualHost:
 
 ```sh
 sudo a2ensite netdata.conf && service apache2 reload
@@ -154,7 +154,7 @@ RewriteEngine on
 RewriteRule (.*) http://localhost:19999/$1 [P,L]
 ```
 
-3.  Optional: If your server is remote, then just replace "localhost" with your actual hostname or IP, it just works.  
+3.  Optional: If your server is remote, then just replace "localhost" with your actual hostname or IP, it just works.
 
 Repeat the operation for as many servers as you need.
 
@@ -220,7 +220,7 @@ Specify `Location /` if Netdata is running on dedicated virtual host.
 	RewriteEngine On
 	ProxyRequests Off
 	ProxyPreserveHost On
-	
+
 	ServerName netdata.domain.tld
 
 	<Proxy *>
@@ -307,7 +307,7 @@ If you plan to use Netdata exclusively via apache, you can gain some performance
 
 ```
 [web]
-    enable gzip compression = no
+	enable gzip compression = no
 ```
 
 Once you disable compression at Netdata (and restart it), please verify you receive compressed responses from apache (it is important to receive compressed responses - the charts will be more snappy).
@@ -318,21 +318,21 @@ You would also need to instruct Netdata to listen only on `localhost`, `127.0.0.
 
 ```
 [web]
-    bind to = localhost
+	bind to = localhost
 ```
 
-or  
-
-```
-[web]
-    bind to = 127.0.0.1
-```
-
-or  
+or
 
 ```
 [web]
-    bind to = ::1
+	bind to = 127.0.0.1
+```
+
+or
+
+```
+[web]
+	bind to = ::1
 ```
 
 ---
@@ -341,14 +341,14 @@ You can also use a unix domain socket. This will also provide a faster route bet
 
 ```
 [web]
-    bind to = unix:/tmp/netdata.sock
+	bind to = unix:/tmp/netdata.sock
 ```
 
 Apache 2.4.24+ can not read from `/tmp` so create your socket in `/var/run/netdata`
 
 ```
 [web]
-    bind to = unix:/var/run/netdata/netdata.sock
+	bind to = unix:/var/run/netdata/netdata.sock
 ```
 
 _note: Netdata v1.8+ support unix domain sockets_
@@ -365,8 +365,8 @@ If your apache server is not on localhost, you can set:
 
 ```
 [web]
-    bind to = *
-    allow connections from = IP_OF_APACHE_SERVER
+	bind to = *
+	allow connections from = IP_OF_APACHE_SERVER
 ```
 
 *note: Netdata v1.9+ support `allow connections from`*
@@ -379,7 +379,7 @@ apache logs accesses and Netdata logs them too. You can prevent Netdata from gen
 
 ```
 [global]
-    access log = none
+	access log = none
 ```
 
 ## Troubleshooting mod_proxy
