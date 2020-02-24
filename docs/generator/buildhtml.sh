@@ -106,6 +106,6 @@ for d in "en" "kr" "zh" "pt" ; do
 done
 
 # Remove cloned projects and temp directories
-rm -rf ${GO_D_DIR} ${LOC_DIR} ${DOCS_DIR} ${SRC_DIR}
+# rm -rf ${GO_D_DIR} ${LOC_DIR} ${DOCS_DIR} ${SRC_DIR}
 
 echo "Finished"
