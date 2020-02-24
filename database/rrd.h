@@ -659,6 +659,7 @@ struct rrdhost {
 
     const char *os;                                 // the O/S type of the host
     const char *tags;                               // tags for this host
+    const char *labels_backend;                     // custom labels for this host
     const char *timezone;                           // the timezone of the host
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
