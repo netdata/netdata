@@ -86,7 +86,7 @@ charts for each job. Once you've edited `cockroachdb.conf` according to the need
 Netdata to see your new charts.
 
 <figure>
-  <img src="https://user-images.githubusercontent.com/1153921/73564469-d7e36b00-441c-11ea-8333-02ba0e1c294c.png" alt="Charts showing a node failure during a simulated test">
+  <img src="https://user-images.githubusercontent.com/1153921/73564469-d7e36b00-441c-11ea-8333-02ba0e1c294c.png" alt="Charts showing a node failure during a simulated test" />
   <figcaption>Charts showing a node failure during a simulated test</figcaption>
 </figure>
 
