@@ -161,8 +161,13 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance* inst) {
 #endif
 }
 
-void _aclk_wss_connect(struct aclk_lws_wss_engine_instance *inst){
-	struct lws_client_connect_info i;
+void aclk_lws_wss_connect(struct aclk_lws_wss_engine_instance *inst){
+    struct lws_client_connect_info i;
+
+    if(inst->lws_wsi) {
+        error("Already Connected. Only one connection supported at a time.");
+        return;
+    }
 
 	memset(&i, 0, sizeof(i));
 	i.context = inst->lws_context;
@@ -186,7 +191,37 @@ static inline int received_data_to_ringbuff(struct lws_ring *buffer, void* data,
 	}
 	return 1;
 }
-
+   
+static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
+{
+	switch(reason)
+	{
+		case LWS_CALLBACK_CLIENT_WRITEABLE:
+			return "LWS_CALLBACK_CLIENT_WRITEABLE";
+		case LWS_CALLBACK_CLIENT_RECEIVE:
+			return "LWS_CALLBACK_CLIENT_RECEIVE";
+		case LWS_CALLBACK_PROTOCOL_INIT:
+			return "LWS_CALLBACK_PROTOCOL_INIT";
+		case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
+			return "LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED";
+		case LWS_CALLBACK_USER:
+			return "LWS_CALLBACK_USER";
+		case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+			return "LWS_CALLBACK_CLIENT_CONNECTION_ERROR";
+		case LWS_CALLBACK_CLIENT_CLOSED:
+			return "LWS_CALLBACK_CLIENT_CLOSED";
+		case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
+			return "LWS_CALLBACK_WS_PEER_INITIATED_CLOSE";
+		case LWS_CALLBACK_WSI_DESTROY:
+			return "LWS_CALLBACK_WSI_DESTROY";
+		case LWS_CALLBACK_CLIENT_ESTABLISHED:
+			return "LWS_CALLBACK_CLIENT_ESTABLISHED";
+		default:
+			// Not using an internal buffer here for thread-safety with unknown calling context.
+			error("Unknown LWS callback %u", reason);
+			return "unknown";
+	}
+}
 static int
 aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
@@ -201,6 +236,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		return -1;
 	}
 
+	// Callback servicing is forced when we are closed from above.
 	if( inst->upstream_reconnect_request ) {
 		error("Closing lws connectino due to libmosquitto error.");
 		char *upstream_connection_error = "MQTT protocol error. Closing underlying wss connection.";
@@ -209,74 +245,83 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		inst->upstream_reconnect_request = 0;
 	}
 
+	// Don't log to info - volume is proportional to message flow on ACLK.
 	switch (reason) {
-	case LWS_CALLBACK_CLIENT_WRITEABLE:
-		aclk_lws_mutex_lock(&inst->write_buf_mutex);
-		data = lws_wss_packet_buffer_pop(&inst->write_buffer_head);
-		if(likely(data)) {
-			lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
-			lws_wss_packet_buffer_free(data);
-			if(inst->write_buffer_head)
-				lws_callback_on_writable(inst->lws_wsi);
-		}
-		aclk_lws_mutex_unlock(&inst->write_buf_mutex);
-		break;
-	case LWS_CALLBACK_CLIENT_RECEIVE:
-		aclk_lws_mutex_lock(&inst->read_buf_mutex);
-		if(!received_data_to_ringbuff(inst->read_ringbuffer, in, len))
-			retval = 1;
-		aclk_lws_mutex_unlock(&inst->read_buf_mutex);
+		case LWS_CALLBACK_CLIENT_WRITEABLE:
+			aclk_lws_mutex_lock(&inst->write_buf_mutex);
+			data = lws_wss_packet_buffer_pop(&inst->write_buffer_head);
+			if(likely(data)) {
+				lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
+				lws_wss_packet_buffer_free(data);
+				if(inst->write_buffer_head)
+					lws_callback_on_writable(inst->lws_wsi);
+			}
+			aclk_lws_mutex_unlock(&inst->write_buf_mutex);
+			return retval;
 
-		if(likely(inst->callbacks.data_rcvd_callback))
-			// to future myself -> do not call this while read lock is active as it will eventually
-			// want to acquire same lock later in aclk_lws_wss_client_read() function
-			inst->callbacks.data_rcvd_callback();
-		else
-			inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
-		break;
+		case LWS_CALLBACK_CLIENT_RECEIVE:
+			aclk_lws_mutex_lock(&inst->read_buf_mutex);
+			if(!received_data_to_ringbuff(inst->read_ringbuffer, in, len))
+				retval = 1;
+			aclk_lws_mutex_unlock(&inst->read_buf_mutex);
+
+			if(likely(inst->callbacks.data_rcvd_callback))
+				// to future myself -> do not call this while read lock is active as it will eventually
+				// want to acquire same lock later in aclk_lws_wss_client_read() function
+				inst->callbacks.data_rcvd_callback();
+			else
+				inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
+			return retval;
+		
+		case LWS_CALLBACK_WSI_CREATE:
+		case LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH: 
+		case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
+		case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
+		case LWS_CALLBACK_GET_THREAD_ID: // ?
+		case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+			// Expected and safe to ignore.
+			return retval;
+
+		default:
+			// Pass to next switch, this case removes compiler warnings.
+			break;
+
+	}
+	// Log to info - volume is proportional to connection attempts.
+	info("Processing callback %s", aclk_lws_callback_name(reason));
+	switch (reason) {
 	case LWS_CALLBACK_PROTOCOL_INIT:
-		//initial connection here
-		//later we will reconnect with delay od ACLK_LWS_WSS_RECONNECT_TIMEOUT
-		//in case this connection fails or drops
-		_aclk_wss_connect(inst);
-		break;
-	case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
-		//TODO if already active make some error noise
-		//currently we expect only one connection per netdata
+        aclk_lws_wss_connect(inst);		// Makes the outgoing connection
+        break;
+    case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
+		if (inst->lws_wsi != NULL && inst->lws_wsi != wsi)
+			error("Multiple connections on same WSI? %p vs %p", inst->lws_wsi, wsi);
 		inst->lws_wsi = wsi;
 		break;
-#ifdef AUTO_RECONNECT_ON_LWS_LAYER
-	case LWS_CALLBACK_USER:
-		inst->reconnect_timeout_running = 0;
-		_aclk_wss_connect(inst);
-		break;
-#endif
 	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
 		error("Could not connect MQTT over WSS server \"%s:%d\". LwsReason:\"%s\"", inst->host, inst->port, (in ? (char*)in : "not given"));
-		/* FALLTHRU */
+		// Fall-through
 	case LWS_CALLBACK_CLIENT_CLOSED:
 	case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
-#ifdef AUTO_RECONNECT_ON_LWS_LAYER
-		if(!inst->reconnect_timeout_running) {
-			lws_timed_callback_vh_protocol(lws_get_vhost(wsi),
-						lws_get_protocol(wsi),
-						LWS_CALLBACK_USER, ACLK_LWS_WSS_RECONNECT_TIMEOUT);
-			inst->reconnect_timeout_running = 1;
-		}
-		/* FALLTHRU */
-#endif
-		//no break here on purpose we want to continue with LWS_CALLBACK_WSI_DESTROY
+		inst->lws_wsi = NULL; // inside libwebsockets lws_close_free_wsi is called after callback
+        if (inst->callbacks.connection_closed)
+            inst->callbacks.connection_closed();
+		return -1;			  // the callback response is ignored, hope the above remains true
 	case LWS_CALLBACK_WSI_DESTROY:
 		aclk_lws_wss_clear_io_buffers(inst);
 		inst->lws_wsi = NULL;
 		inst->websocket_connection_up = 0;
-		break;
+        if (inst->callbacks.connection_closed)
+            inst->callbacks.connection_closed();
+        break;
 	case LWS_CALLBACK_CLIENT_ESTABLISHED:
 		inst->websocket_connection_up = 1;
 		if(inst->callbacks.connection_established_callback)
 			inst->callbacks.connection_established_callback();
 		break;
+
 	default:
+		error("Unexecpted callback from libwebsockets %s",aclk_lws_callback_name(reason));
 		break;
 	}
 	return retval; //0-OK, other connection should be closed!

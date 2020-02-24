@@ -1,5 +1,20 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.20.0...HEAD)
+
+**Merged pull requests:**
+
+- Removed hack to force users off of stuck NetData v1.19.0-432 [\#8158](https://github.com/netdata/netdata/pull/8158) ([prologic](https://github.com/prologic))
+- Added support for Clear Linux in `install-required-packages.sh`. [\#8154](https://github.com/netdata/netdata/pull/8154) ([Ferroin](https://github.com/Ferroin))
+- Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
+- Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
+- Remove Ubuntu 19.04 from CI and packaging. [\#8040](https://github.com/netdata/netdata/pull/8040) ([Ferroin](https://github.com/Ferroin))
+- Remove OpenSUSE Leap 15.0 from CI. [\#7990](https://github.com/netdata/netdata/pull/7990) ([Ferroin](https://github.com/Ferroin))
+- Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
+- Cross-host docker builds [\#7754](https://github.com/netdata/netdata/pull/7754) ([amoss](https://github.com/amoss))
+
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.19.0...v1.20.0)

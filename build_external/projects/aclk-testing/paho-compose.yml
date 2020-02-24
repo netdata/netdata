@@ -1,0 +1,6 @@
+version: '3.3'
+services:
+  paho_inspect:
+    build:
+      context: .
+      dockerfile: paho.Dockerfile

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# We use lots of computed variable names in here, so we need to disable shellcheck 2034
 
 export PATH="${PATH}:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 export LC_ALL=C
@@ -41,6 +43,7 @@ dnf=$(command -v dnf 2> /dev/null)
 emerge=$(command -v emerge 2> /dev/null)
 equo=$(command -v equo 2> /dev/null)
 pacman=$(command -v pacman 2> /dev/null)
+swupd=$(command -v swupd 2> /dev/null)
 yum=$(command -v yum 2> /dev/null)
 zypper=$(command -v zypper 2> /dev/null)
 
@@ -73,6 +76,7 @@ Supported distributions (DD):
     - debian, ubuntu (all Debian and Ubuntu derivatives)
     - redhat, fedora (all Red Hat and Fedora derivatives)
     - suse, opensuse (all SuSe and openSuSe derivatives)
+    - clearlinux     (all Clear Linux derivatives)
 
 Supported installers (IN):
 
@@ -84,6 +88,7 @@ Supported installers (IN):
     - yum            all Red Hat / Fedora / CentOS Linux derivatives
     - zypper         all SuSe Linux derivatives
     - apk            all Alpine derivatives
+    - swupd          all Clear Linux derivatives
 
 Supported packages (you can append many of them):
 
@@ -187,7 +192,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles)
+      alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles | clear-linux-os)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -279,7 +284,7 @@ user_picks_distribution() {
     exit 1
   fi
 
-  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ]; then
+  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ] && [ -z "${swupd}" ]; then
     echo >&2 "And it seems I cannot find a known package manager in this system."
     echo >&2 "Please open a github issue to help us support your system too."
     exit 1
@@ -296,6 +301,7 @@ user_picks_distribution() {
   [ -n "${emerge}" ] && echo >&2 " - Gentoo based (installer is: emerge)" && opts="emerge ${opts}"
   [ -n "${equo}" ] && echo >&2 " - Sabayon based (installer is: equo)" && opts="equo ${opts}"
   [ -n "${apk}" ] && echo >&2 " - Alpine Linux based (installer is: apk)" && opts="apk ${opts}"
+  [ -n "${swupd}" ] && echo >&2 " - Clear Linux based (installer is: swupd)" && opts="swupd ${opts}"
   echo >&2
 
   REPLY=
@@ -411,6 +417,15 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
+    clear-linux* | clearlinux* )
+      package_installer="install_swupd"
+      tree="clearlinux"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${swupd}" ]; then
+        echo >&2 "command 'swupd' is required to install packages on a '${distribution} ${version}' system."
+        exit 1
+      fi
+      ;;
+
     *)
       # oops! unknown system
       user_picks_distribution
@@ -494,6 +509,14 @@ check_package_manager() {
       return 0
       ;;
 
+    swupd)
+      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${swupd}" ] && echo >&2 "${1} is not available." && return 1
+      package_installer="install_swupd"
+      tree="clear-linux"
+      detection="user-input"
+      return 0
+      ;;
+
     *)
       echo >&2 "Invalid package manager: '${1}'."
       return 1
@@ -521,6 +544,7 @@ require_cmd() {
 
 declare -A pkg_find=(
   ['fedora']="findutils"
+  ['clearlinux']="findutils"
   ['default']="WARNING|"
 )
 
@@ -531,6 +555,7 @@ declare -A pkg_distro_sdk=(
 
 declare -A pkg_autoconf=(
   ['gentoo']="sys-devel/autoconf"
+  ['clearlinux']="c-basic"
   ['default']="autoconf"
 )
 
@@ -538,6 +563,7 @@ declare -A pkg_autoconf=(
 # https://github.com/firehol/netdata/pull/450
 declare -A pkg_autoconf_archive=(
   ['gentoo']="sys-devel/autoconf-archive"
+  ['clearlinux']="c-basic"
   ['alpine']="WARNING|"
   ['default']="autoconf-archive"
 
@@ -549,6 +575,7 @@ declare -A pkg_autoconf_archive=(
 
 declare -A pkg_autogen=(
   ['gentoo']="sys-devel/autogen"
+  ['clearlinux']="c-basic"
   ['alpine']="WARNING|"
   ['default']="autogen"
 
@@ -560,15 +587,18 @@ declare -A pkg_autogen=(
 
 declare -A pkg_automake=(
   ['gentoo']="sys-devel/automake"
+  ['clearlinux']="c-basic"
   ['default']="automake"
 )
 
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
+  ['clearlinux']="network-basic"
   ['default']="bridge-utils"
 )
 
 declare -A pkg_chrony=(
+  ['clearlinux']="time-server-basic"
   ['default']="chrony"
 )
 
@@ -583,6 +613,7 @@ declare -A pkg_gzip=(
 )
 
 declare -A pkg_tar=(
+  ['clearlinux']="os-core-update"
   ['default']="tar"
 )
 
@@ -593,6 +624,7 @@ declare -A pkg_git=(
 
 declare -A pkg_gcc=(
   ['gentoo']="sys-devel/gcc"
+  ['clearlinux']="c-basic"
   ['default']="gcc"
 )
 
@@ -610,6 +642,7 @@ declare -A pkg_iproute2=(
   ['debian']="iproute2"
   ['gentoo']="sys-apps/iproute2"
   ['sabayon']="sys-apps/iproute2"
+  ['clearlinux']="iproute2"
   ['default']="iproute"
 
   # exceptions
@@ -618,6 +651,7 @@ declare -A pkg_iproute2=(
 
 declare -A pkg_ipset=(
   ['gentoo']="net-firewall/ipset"
+  ['clearlinux']="network-basic"
   ['default']="ipset"
 )
 
@@ -640,6 +674,7 @@ declare -A pkg_libz_dev=(
   ['sabayon']="sys-libs/zlib"
   ['rhel']="zlib-devel"
   ['suse']="zlib-devel"
+  ['clearlinux']="devpkg-zlib"
   ['default']=""
 )
 
@@ -664,6 +699,7 @@ declare -A pkg_libmnl_dev=(
   ['sabayon']="net-libs/libmnl"
   ['rhel']="libmnl-devel"
   ['suse']="libmnl-devel"
+  ['clearlinux']="devpkg-libmnl"
   ['default']=""
 )
 
@@ -676,18 +712,22 @@ declare -A pkg_lm_sensors=(
   ['sabayon']="sys-apps/lm_sensors"
   ['rhel']="lm_sensors"
   ['suse']="sensors"
+  ['clearlinux']="lm-sensors"
   ['default']="lm_sensors"
 )
 
 declare -A pkg_logwatch=(
+  ['clearlinux']="WARNING|"
   ['default']="logwatch"
 )
 
 declare -A pkg_lxc=(
+  ['clearlinux']="WARNING|"
   ['default']="lxc"
 )
 
 declare -A pkg_mailutils=(
+  ['clearlinux']="WARNING|"
   ['default']="mailutils"
 )
 
@@ -705,6 +745,7 @@ declare -A pkg_netcat=(
   ['sabayon']="net-analyzer/gnu-netcat"
   ['rhel']="nmap-ncat"
   ['suse']="netcat-openbsd"
+  ['clearlinux']="sysadmin-basic"
   ['default']="netcat"
 
   # exceptions
@@ -719,6 +760,7 @@ declare -A pkg_nginx=(
 
 declare -A pkg_nodejs=(
   ['gentoo']="net-libs/nodejs"
+  ['clearlinux']="nodejs-basic"
   ['default']="nodejs"
 
   # exceptions
@@ -742,12 +784,14 @@ declare -A pkg_pkg_config=(
   ['sabayon']="virtual/pkgconfig"
   ['rhel']="pkgconfig"
   ['suse']="pkg-config"
+  ['clearlinux']="c-basic"
   ['default']="pkg-config"
 )
 
 declare -A pkg_python=(
   ['gentoo']="dev-lang/python"
   ['sabayon']="dev-lang/python:2.7"
+  ['clearlinux']="python-basic"
   ['default']="python"
 
   # Exceptions
@@ -763,6 +807,7 @@ declare -A pkg_python_mysqldb=(
   ['sabayon']="dev-python/mysqlclient"
   ['rhel']="MySQL-python"
   ['suse']="python-PyMySQL"
+  ['clearlinux']="WARNING|"
   ['default']="python-mysql"
 
   # exceptions
@@ -778,6 +823,7 @@ declare -A pkg_python3_mysqldb=(
   ['sabayon']="dev-python/mysqlclient"
   ['rhel']="WARNING|"
   ['suse']="WARNING|"
+  ['clearlinux']="WARNING|"
   ['default']="WARNING|"
 
   # exceptions
@@ -803,6 +849,7 @@ declare -A pkg_python_psycopg2=(
   ['sabayon']="dev-python/psycopg:2"
   ['rhel']="python-psycopg2"
   ['suse']="python-psycopg2"
+  ['clearlinux']="WARNING|"
   ['default']="python-psycopg2"
 )
 
@@ -815,6 +862,7 @@ declare -A pkg_python3_psycopg2=(
   ['sabayon']="dev-python/psycopg:2"
   ['rhel']="WARNING|"
   ['suse']="WARNING|"
+  ['clearlinux']="WARNING|"
   ['default']="WARNING|"
 )
 
@@ -822,6 +870,7 @@ declare -A pkg_python_pip=(
   ['alpine']="py-pip"
   ['gentoo']="dev-python/pip"
   ['sabayon']="dev-python/pip"
+  ['clearlinux']="python-basic"
   ['default']="python-pip"
 )
 
@@ -832,6 +881,7 @@ declare -A pkg_python3_pip=(
   ['gentoo']="dev-python/pip"
   ['sabayon']="dev-python/pip"
   ['rhel']="WARNING|"
+  ['clearlinux']="python3-basic"
   ['default']="python3-pip"
 )
 
@@ -842,6 +892,7 @@ declare -A pkg_python_pymongo=(
   ['debian']="python-pymongo"
   ['gentoo']="dev-python/pymongo"
   ['suse']="python-pymongo"
+  ['clearlinux']="WARNING|"
   ['default']="python-pymongo"
 )
 
@@ -852,6 +903,7 @@ declare -A pkg_python3_pymongo=(
   ['debian']="python3-pymongo"
   ['gentoo']="dev-python/pymongo"
   ['suse']="python3-pymongo"
+  ['clearlinux']="WARNING|"
   ['default']="python3-pymongo"
 )
 
@@ -864,6 +916,7 @@ declare -A pkg_python_requests=(
   ['sabayon']="dev-python/requests"
   ['rhel']="python-requests"
   ['suse']="python-requests"
+  ['clearlinux']="python-extras"
   ['default']="python-requests"
   ['alpine-3.1.4']="WARNING|"
   ['alpine-3.2.3']="WARNING|"
@@ -878,6 +931,7 @@ declare -A pkg_python3_requests=(
   ['sabayon']="dev-python/requests"
   ['rhel']="WARNING|"
   ['suse']="WARNING|"
+  ['clearlinux']="python-extras"
   ['default']="WARNING|"
 )
 
@@ -887,6 +941,7 @@ declare -A pkg_lz4=(
   ['ubuntu']="liblz4-dev"
   ['suse']="liblz4-devel"
   ['gentoo']="app-arch/lz4"
+  ['clearlinux']="devpkg-lz4"
   ['default']="lz4-devel"
 )
 
@@ -896,6 +951,7 @@ declare -A pkg_libuv=(
   ['ubuntu']="libuv1-dev"
   ['gentoo']="dev-libs/libuv"
   ['arch']="libuv"
+  ['clearlinux']="devpkg-libuv"
   ['default']="libuv-devel"
 )
 
@@ -904,11 +960,13 @@ declare -A pkg_openssl=(
   ['debian']="libssl-dev"
   ['ubuntu']="libssl-dev"
   ['suse']="libopenssl-devel"
+  ['clearlinux']="devpkg-openssl"
   ['default']="openssl-devel"
 )
 
 declare -A pkg_judy=(
-  ['alpine']="WARNING|" # TODO - need to add code to download and install judy for alpine case
+  ['alpine']="WARNING|" # TODO - need to add code to download and install judy for alpine and clearlinux
+  ['clearlinux']="WARNING|"
   ['debian']="libjudy-dev"
   ['ubuntu']="libjudy-dev"
   ['suse']="judy-devel"
@@ -920,6 +978,7 @@ declare -A pkg_judy=(
 declare -A pkg_python3=(
   ['gentoo']="dev-lang/python"
   ['sabayon']="dev-lang/python:3.4"
+  ['clearlinux']="python3-basic"
   ['default']="python3"
 
   # exceptions
@@ -929,6 +988,7 @@ declare -A pkg_python3=(
 declare -A pkg_screen=(
   ['gentoo']="app-misc/screen"
   ['sabayon']="app-misc/screen"
+  ['clearlinux']="sysadmin-basic"
   ['default']="screen"
 )
 
@@ -942,12 +1002,14 @@ declare -A pkg_sysstat=(
 
 declare -A pkg_tcpdump=(
   ['gentoo']="net-analyzer/tcpdump"
+  ['clearlinux']="network-basic"
   ['default']="tcpdump"
 )
 
 declare -A pkg_traceroute=(
   ['alpine']=" "
   ['gentoo']="net-analyzer/traceroute"
+  ['clearlinux']="network-basic"
   ['default']="traceroute"
 )
 
@@ -959,6 +1021,7 @@ declare -A pkg_valgrind=(
 declare -A pkg_ulogd=(
   ['centos']="WARNING|"
   ['rhel']="WARNING|"
+  ['clearlinux']="WARNING|"
   ['gentoo']="app-admin/ulogd"
   ['default']="ulogd2"
 )
@@ -1534,6 +1597,27 @@ install_zypper() {
   # install the required packages
   run ${sudo} zypper "${zypper_opts[@]}" install "${@}"
 }
+
+# -----------------------------------------------------------------------------
+# clearlinux
+
+validate_install_swupd() {
+  swupd bundle-list | grep -q "${*}" || echo "${*}"
+}
+
+install_swupd() {
+  # download the latest package info
+  if [ "${DRYRUN}" -eq 1 ]; then
+    echo >&2 " >> IMPORTANT << "
+    echo >&2 "    Please make sure your system is up to date"
+    echo >&2 "    by running:  ${sudo} swupd update  "
+    echo >&2
+  fi
+
+  run ${sudo} swupd bundle-add "${@}"
+}
+
+# -----------------------------------------------------------------------------
 
 install_failed() {
   local ret="${1}"
