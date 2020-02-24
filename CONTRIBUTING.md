@@ -181,6 +181,16 @@ However, it's not always that simple. Our [PR approval process](#pr-approval-pro
 
 One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
 
+#### PR title guidelines
+
+All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds", "Fixed" instead of "Fixes".
+
+Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
+
+Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+
+New collectors must have the title "[New collector] : [Name of collector]".
+
 ### PR approval process
 
 Each PR automatically [requires a review](https://help.github.com/articles/about-required-reviews-for-pull-requests/) from the code owners specified in `.github/CODEOWNERS`. Depending on the files contained in your PR, several people may be need to approve it.
