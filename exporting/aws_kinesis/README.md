@@ -19,7 +19,7 @@ cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib -DCMAKE_INSTALL_INCLUDEDIR=/usr/include -D
 
 ## Configuration
 
-To enable data sending to the kinesis service run `./edit-config exporting.conf` in the Netdata configuration directory
+To enable data sending to the Kinesis service, run `./edit-config exporting.conf` in the Netdata configuration directory
 and set the following options:
 
 ```conf
