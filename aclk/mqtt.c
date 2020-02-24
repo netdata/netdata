@@ -30,7 +30,7 @@ int _link_send_message(char *topic, char *message, int *mid)
     return 0;
 }
 
-int _link_subscribe(char  *topic, int qos)
+int _link_subscribe(char *topic, int qos)
 {
     UNUSED(topic);
     UNUSED(qos);
