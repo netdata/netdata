@@ -8,7 +8,7 @@
 #endif
 
 void _show_mqtt_info();
-int _link_event_loop(int timeout);
+int _link_event_loop();
 void _link_shutdown();
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *));
 int _link_subscribe(char *topic, int qos);
