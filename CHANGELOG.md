@@ -6,8 +6,19 @@
 
 **Merged pull requests:**
 
+- Added eBPF to docs navigation and improved title [\#8191](https://github.com/netdata/netdata/pull/8191) ([joelhans](https://github.com/joelhans))
+- Merging the feature branch for the ACLK in the previous sprint. [\#8179](https://github.com/netdata/netdata/pull/8179) ([amoss](https://github.com/amoss))
+- Docs: Fixed figure+image without closing tag [\#8177](https://github.com/netdata/netdata/pull/8177) ([joelhans](https://github.com/joelhans))
+- packaging/installer: fix get\_latest\_version for nightly channel [\#8172](https://github.com/netdata/netdata/pull/8172) ([ilyam8](https://github.com/ilyam8))
+- gihtub/actions: switch to checkout@v2 [\#8170](https://github.com/netdata/netdata/pull/8170) ([ilyam8](https://github.com/ilyam8))
+- docs: Corrected instructions for running Netdata behind Apache [\#8169](https://github.com/netdata/netdata/pull/8169) ([cakrit](https://github.com/cakrit))
+- openldap: fix dict access with python3 [\#8162](https://github.com/netdata/netdata/pull/8162) ([Mic92](https://github.com/Mic92))
+- Restrict GA message [\#8161](https://github.com/netdata/netdata/pull/8161) ([thiagoftsm](https://github.com/thiagoftsm))
+- backup group updated, added lsyncd [\#8159](https://github.com/netdata/netdata/pull/8159) ([DefauIt](https://github.com/DefauIt))
 - Removed hack to force users off of stuck NetData v1.19.0-432 [\#8158](https://github.com/netdata/netdata/pull/8158) ([prologic](https://github.com/prologic))
 - Added support for Clear Linux in `install-required-packages.sh`. [\#8154](https://github.com/netdata/netdata/pull/8154) ([Ferroin](https://github.com/Ferroin))
+- docs: Added PR title guidelines to the contribution guidelines, to make CHANGELOG more meaningful [\#8150](https://github.com/netdata/netdata/pull/8150) ([cakrit](https://github.com/cakrit))
+- Fix formatting in "Custom dashboards" section [\#8102](https://github.com/netdata/netdata/pull/8102) ([YorikSar](https://github.com/YorikSar))
 - Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
 - Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
 - Remove Ubuntu 19.04 from CI and packaging. [\#8040](https://github.com/netdata/netdata/pull/8040) ([Ferroin](https://github.com/Ferroin))

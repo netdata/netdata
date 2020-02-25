@@ -1,4 +1,4 @@
-# ebpf_process.plugin
+# eBPF monitoring with Netdata
 
 This collector plugin uses eBPF to monitor system calls inside your operating system's kernel. For now, the main goal of
 this plugin is to monitor IO and process management on the host where it is running.
