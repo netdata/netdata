@@ -78,8 +78,8 @@ METRICS = {
         'backends_idle'
     ],
     QUERY_NAME_BACKEND_USAGE: [
-        'used',
-        'available'
+        'available',
+        'used'
     ],
     QUERY_NAME_INDEX_STATS: [
         'index_count',
@@ -768,8 +768,8 @@ CHARTS = {
     'backend_usage': {
         'options': [None, '% of Connections in use', 'percentage', 'backend processes', 'postgres.backend_process', 'stacked'],
         'lines': [
-            ['used', 'used', 'percentage-of-absolute-row'],
-            ['available', 'available', 'percentage-of-absolute-row']
+            ['available', 'available', 'percentage-of-absolute-row'],
+            ['used', 'used', 'percentage-of-absolute-row']
         ]
     },
     'index_count': {
