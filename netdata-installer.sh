@@ -258,8 +258,7 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
-      NETDATA_DISABLE_LIBMOSQUITTO=1
-      NETDATA_SKIP_LIBWEBSOCKETS=1
+      NETDATA_DISABLE_CLOUD=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
       ;;
     "--install")
@@ -450,7 +449,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
     return 0
   fi
 
@@ -493,7 +492,7 @@ bundle_libmosquitto
 
 build_libwebsockets() {
   pushd "${1}" > /dev/null || exit 1
-  cmake .
+  cmake -D LWS_WITH_SOCKS5:bool=ON .
   make
   popd > /dev/null || exit 1
 }
@@ -508,7 +507,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_SKIP_LIBWEBSOCKETS}" ] || pkg-config "libwebsockets >= 3" ; then
+  if [ -n "${DISABLE_CLOUD}" ] ; then
     return 0
   fi
 
