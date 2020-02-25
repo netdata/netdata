@@ -1077,23 +1077,20 @@ get_compatible_kernel_for_ebpf() {
   kpkg=
 
   if [ "${kver}" -ge 005000000 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 5.4"
-    kpkg="5_4"
+    echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
+    kpkg="5_4_20"
   elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
     kpkg="4_19_104"
-  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004019101 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
-    kpkg="4_19"
   elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
-    kpkg="4_19"
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
+    kpkg="4_19_98"
   elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.15"
-    kpkg="4_15"
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
+    kpkg="4_15_18"
   elif [ "${kver}" -le 004014999 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.14"
-    kpkg="4_14"
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
+    kpkg="4_14_171"
   else
     echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
     return 1
