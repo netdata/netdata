@@ -5,9 +5,6 @@
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
 
-void (*_on_connect)(void *ptr) = NULL;
-void (*_on_disconnect)(void *ptr) = NULL;
-
 inline const char *_link_strerror(int rc)
 {
     return mosquitto_strerror(rc);
@@ -36,26 +33,28 @@ void publish_callback(struct mosquitto *mosq, void *obj, int rc)
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
+    UNUSED(mosq);
     UNUSED(obj);
     UNUSED(rc);
 
     info("Connection to cloud estabilished");
 
     aclk_mqtt_connected = 1;
-    _on_connect((void *)mosq);
+    aclk_connect();
 
     return;
 }
 
 void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
+    UNUSED(mosq);
     UNUSED(obj);
     UNUSED(rc);
 
     info("Connection to cloud failed");
 
     aclk_mqtt_connected = 0;
-    _on_disconnect((void *)mosq);
+    aclk_disconnect();
 
     aclk_lws_wss_mqtt_layer_disconect_notif();
 
@@ -82,7 +81,7 @@ size_t _mqtt_external_read_hook(void *buf, size_t count)
     return aclk_lws_wss_client_read(buf, count);
 }
 
-int _mqtt_lib_init(void (*on_connect)(void *), void (*on_disconnect)(void *))
+int _mqtt_lib_init()
 {
     int rc;
     //int libmosq_major, libmosq_minor, libmosq_revision, libmosq_version;
@@ -127,9 +126,6 @@ int _mqtt_lib_init(void (*on_connect)(void *), void (*on_disconnect)(void *))
         error("MQTT new structure  -- %s", mosquitto_strerror(errno));
         return 1;
     }
-
-    _on_connect = on_connect;
-    _on_disconnect = on_disconnect;
 
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
@@ -205,12 +201,12 @@ void aclk_lws_connection_closed()
 }
 
 
-int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
+int _link_lib_init(char *aclk_hostname, int aclk_port)
 {
     int rc = aclk_lws_wss_connect(aclk_hostname, aclk_port);
     aclk_lws_wss_service_loop();
 
-    rc = _mqtt_lib_init(on_connect, on_disconnect);
+    rc = _mqtt_lib_init();
     if (rc != MOSQ_ERR_SUCCESS)
         return rc;
 

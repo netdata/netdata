@@ -1084,9 +1084,8 @@ int aclk_subscribe(char *sub_topic, int qos)
 }
 
 // This is called from a callback when the link goes up
-void aclk_connect(void *ptr)
+void aclk_connect()
 {
-    UNUSED(ptr);
     info("Connection detected");
     aclk_connection_initialized = 1;
     waiting_init = 0;
@@ -1096,10 +1095,8 @@ void aclk_connect(void *ptr)
 }
 
 // This is called from a callback when the link goes down
-void aclk_disconnect(void *ptr)
+void aclk_disconnect()
 {
-    UNUSED(ptr);
-
     if (likely(aclk_connection_initialized))
         info("Disconnect detected");
     aclk_subscribed = 0;
@@ -1120,7 +1117,7 @@ void aclk_shutdown()
 void aclk_try_to_connect()
 {
     int rc;
-    rc = _link_lib_init(aclk_hostname, aclk_port, aclk_connect, aclk_disconnect);
+    rc = _link_lib_init(aclk_hostname, aclk_port);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
