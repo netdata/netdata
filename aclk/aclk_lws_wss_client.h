@@ -5,8 +5,6 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define ACLK_LWS_WSS_RECONNECT_TIMEOUT 5
-
 // This is as define because ideally the ACLK at high level
 // can do mosqitto writes and reads only from one thread
 // which is cleaner implementation IMHO
@@ -52,8 +50,6 @@ struct aclk_lws_wss_engine_instance {
     struct lws_wss_packet_buffer *write_buffer_head;
     struct lws_ring *read_ringbuffer;
 
-    struct aclk_lws_wss_engine_callbacks callbacks;
-
     //flags to be readed by engine user
     int websocket_connection_up;
 
@@ -63,16 +59,20 @@ struct aclk_lws_wss_engine_instance {
     int upstream_reconnect_request;
 };
 
-struct aclk_lws_wss_engine_instance *aclk_lws_wss_client_init(
-    const struct aclk_lws_wss_engine_callbacks *callbacks, const char *target_hostname, int target_port);
-void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *inst);
+void aclk_lws_wss_client_destroy();
 
-void aclk_lws_wss_connect(struct aclk_lws_wss_engine_instance *inst);
+int aclk_lws_wss_connect();
 
-int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);
-int aclk_lws_wss_client_read(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);
-int aclk_lws_wss_service_loop(struct aclk_lws_wss_engine_instance *inst);
+int aclk_lws_wss_client_write(void *buf, size_t count);
+int aclk_lws_wss_client_read(void *buf, size_t count);
+void aclk_lws_wss_service_loop();
 
-void aclk_lws_wss_mqtt_layer_disconect_notif(struct aclk_lws_wss_engine_instance *inst);
+void aclk_lws_wss_mqtt_layer_disconect_notif();
+
+// Notifications inside the layer above
+void aclk_lws_connection_established();
+void aclk_lws_connection_data_received();
+void aclk_lws_connection_closed();
+
 
 #endif
