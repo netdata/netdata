@@ -183,13 +183,24 @@ One thing you will need to do only for your first pull request in Netdata is to 
 
 #### PR title guidelines
 
-All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds", "Fixed" instead of "Fixes".
+- All PR titles and Commit messages _must_ follow the [Imperative Mood](https://en.wikipedia.org/wiki/Imperative_mood)
+- Be no more than ~50 characters (_longer description in the PR_)
 
-Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
+Some examples:
 
-Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+- Fix bug in NetData installer for FreeBSD 11.2
+- Improve docs for other installation methods
+- New collector for Prometheus endpoints
+- Add 4.19 Kernel variant for eBPF
+- Fix typo in README
+- etc
 
-New collectors must have the title "[New collector] : [Name of collector]".
+For good examples have a look at other projects like:
+
+- https://github.com/facebook/react/commits/master
+- https://github.com/tensorflow/tensorflow/commits/master
+- https://github.com/vuejs/vue/commits/dev
+- https://github.com/microsoft/vscode/commits/master
 
 ### PR approval process
 
