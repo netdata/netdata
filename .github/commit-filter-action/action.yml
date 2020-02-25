@@ -1,0 +1,21 @@
+name: "Filter Commit Message"
+description: "Easily run steps conditionally on the content of a commit message."
+inputs:
+  regex:
+    description: "The regex to attempt to match commit messages with. Uses JS regex syntax. Defaults to matching messages that do not contain [ci-skip]."
+    default: "^(?!.*\[ci-skip\].*)$"
+    required: true
+  invert-match:
+    description: "If true, invert the matching behavior (if the regex matches the message, output false instead of true)."
+    default: false
+    required: true
+  case-insensitive:
+    description: "If true, matching is performed case insensitively."
+    default: false
+    required: true
+outputs:
+  matched:
+    description: "Indicates whether a match was found or not, 'true' if one was found, 'false' otherwise."
+runs:
+  using: node12
+  main: main.js
