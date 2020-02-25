@@ -16,44 +16,49 @@ Following charts are drawn:
 
     -   active
 
-3.  **Write-Ahead Logging Statistics** files/s
+3.  **Current Backend Processe Usage** percentage
+
+    -   used
+    -   available
+
+4.  **Write-Ahead Logging Statistics** files/s
 
     -   total
     -   ready
     -   done
 
-4.  **Checkpoints** writes/s
+5.  **Checkpoints** writes/s
 
     -   scheduled
     -   requested
 
-5.  **Current connections to db** count
+6.  **Current connections to db** count
 
     -   connections
 
-6.  **Tuples returned from db** tuples/s
+7.  **Tuples returned from db** tuples/s
 
     -   sequential
     -   bitmap
 
-7.  **Tuple reads from db** reads/s
+8.  **Tuple reads from db** reads/s
 
     -   disk
     -   cache
 
-8.  **Transactions on db** transactions/s
+9.  **Transactions on db** transactions/s
 
     -   committed
     -   rolled back
 
-9.  **Tuples written to db** writes/s
+10.  **Tuples written to db** writes/s
 
     -   inserted
     -   updated
     -   deleted
     -   conflicts
 
-10. **Locks on db** count per type
+11. **Locks on db** count per type
 
     -   locks
 
