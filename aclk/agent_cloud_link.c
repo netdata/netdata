@@ -771,7 +771,7 @@ int aclk_process_query()
     query_count++;
 
     debug(
-        D_ACLK, "Query #%ld (%s) size=%ld in queue %d seconds", query_count, this_query->topic,
+        D_ACLK, "Query #%ld (%s) size=%zu in queue %d seconds", query_count, this_query->topic,
         this_query->query ? strlen(this_query->query) : 0, (int)(now_realtime_sec() - this_query->created));
 
     switch (this_query->cmd) {
@@ -961,7 +961,7 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-        _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+        _link_event_loop();
         debug(D_ACLK, "LINK event loop called");
 
         if (unlikely(!aclk_connection_initialized)) {
@@ -1222,19 +1222,19 @@ void aclk_send_alarm_metadata()
 
     buffer_sprintf(local_buffer, "{\n\t \"configured-alarms\" : ");
     health_alarms2json(localhost, local_buffer, 1);
-    debug(D_ACLK, "Metadata %s with configured alarms has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s with configured alarms has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
     health_alarm_log2json(localhost, local_buffer, 0);
-    debug(D_ACLK, "Metadata %s with alarm_log has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ",\n\t \"alarms-active\" : ");
     health_alarms_values2json(localhost, local_buffer, 0);
-    debug(D_ACLK, "Metadata %s with alarms_active has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, "\n}\n}");
     aclk_send_message(ACLK_ALARMS_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
-    debug(D_ACLK, "Metadata %s encoded has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
 
     freez(msg_id);
     buffer_free(local_buffer);
@@ -1253,15 +1253,15 @@ int aclk_send_info_metadata()
     aclk_create_header(local_buffer, "connect", msg_id);
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
     web_client_api_request_v1_info_fill_buffer(localhost, local_buffer);
-    debug(D_ACLK, "Metadata %s with info has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s with info has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ", \n\t \"charts\" : ");
     charts2json(localhost, local_buffer, 1);
     buffer_sprintf(local_buffer, "\n}\n}");
-    debug(D_ACLK, "Metadata %s with chart has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
     aclk_send_message(ACLK_METADATA_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
-    debug(D_ACLK, "Metadata %s encoded has %ld bytes", msg_id, local_buffer->len);
+    debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
     freez(msg_id);
 
     buffer_free(local_buffer);
