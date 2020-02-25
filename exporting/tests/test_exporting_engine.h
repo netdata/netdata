@@ -9,6 +9,7 @@
 #include "exporting/graphite/graphite.h"
 #include "exporting/json/json.h"
 #include "exporting/opentsdb/opentsdb.h"
+#include "exporting/aws_kinesis/aws_kinesis.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -94,6 +95,15 @@ int __mock_metric_formatting(struct instance *instance, RRDDIM *rd);
 int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
+
+void __wrap_aws_sdk_init();
+void __wrap_kinesis_init(
+    void *kinesis_specific_data_p, const char *region, const char *access_key_id, const char *secret_key,
+    const long timeout);
+void __wrap_kinesis_put_record(
+    void *kinesis_specific_data_p, const char *stream_name, const char *partition_key, const char *data,
+    size_t data_len);
+int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes);
 
 // -----------------------------------------------------------------------
 // fixtures

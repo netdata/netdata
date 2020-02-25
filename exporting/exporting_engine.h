@@ -43,6 +43,12 @@ extern struct config exporting_config;
 #define EXPORTER_SEND_NAMES                     "send names instead of ids"
 #define EXPORTER_SEND_NAMES_DEFAULT             CONFIG_BOOLEAN_YES
 
+#define EXPORTER_KINESIS_STREAM_NAME            "stream name"
+#define EXPORTER_KINESIS_STREAM_NAME_DEFAULT    "netdata"
+
+#define EXPORTER_AWS_ACCESS_KEY_ID              "aws_access_key_id"
+#define EXPORTER_AWS_SECRET_ACCESS_KEY          "aws_secret_access_key"
+
 typedef enum exporting_options {
     EXPORTING_OPTION_NONE                   = 0,
 
@@ -72,6 +78,8 @@ typedef enum exporting_options {
 struct engine;
 
 struct instance_config {
+    BACKEND_TYPE type;
+
     const char *name;
     const char *destination;
 
@@ -90,9 +98,10 @@ struct simple_connector_config {
     int default_port;
 };
 
-struct connector_config {
-    BACKEND_TYPE type;
-    void *connector_specific_config;
+struct aws_kinesis_specific_config {
+    char *stream_name;
+    char *auth_key_id;
+    char *secure_key;
 };
 
 struct engine_config {
@@ -119,6 +128,7 @@ struct stats {
 struct instance {
     struct instance_config config;
     void *buffer;
+    void (*worker)(void *instance_p);
     struct stats stats;
 
     int scheduled;
@@ -142,18 +152,10 @@ struct instance {
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
 
+    void *connector_specific_data;
+
     size_t index;
     struct instance *next;
-    struct connector *connector;
-};
-
-struct connector {
-    struct connector_config config;
-
-    void (*worker)(void *instance_p);
-
-    struct instance *instance_root;
-    struct connector *next;
     struct engine *engine;
 };
 
@@ -163,7 +165,9 @@ struct engine {
     size_t instance_num;
     time_t now;
 
-    struct connector *connector_root;
+    int aws_sdk_initialized;
+
+    struct instance *instance_root;
 };
 
 void *exporting_main(void *ptr);

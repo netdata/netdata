@@ -5,7 +5,6 @@
 
 #include "exporting/exporting_engine.h"
 
-int init_json_connector(struct connector *connector);
 int init_json_instance(struct instance *instance);
 
 int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host);
