@@ -1,0 +1,267 @@
+Loading /etc/os-release ...
+You should have EPEL enabled to install all the prerequisites.
+Check: http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/
+Running in non-interactive mode
+ > CentOS Version: 8 ...
+ > Checking for epel ...
+Running in non-interactive mode, assuming yes (y)
+ > Would have promptedfor epel not found, shall I install it? ...
+yum -y install epel-release 
+CentOS-8 - AppStream     [===                 ] ---  B/s |   0  B     --:-- ETACentOS-8 - AppStream     [===                 ] ---  B/s |   0  B     --:-- ETACentOS-8 - AppStream     [   ===              ] ---  B/s |   0  B     --:-- ETACentOS-8 - AppStream100% [====================] 1.3 kB/s | 685  B     00:00 ETACentOS-8 - AppStream  0% [                    ] 1.3 kB/s |   0  B     00:00 ETACentOS-8 - AppStream  0% [                    ] 1.3 kB/s |   0  B     00:00 ETACentOS-8 - AppStream 16% [===                 ] 222 kB/s | 1.1 MB     00:24 ETACentOS-8 - AppStream 48% [=========-          ] 629 kB/s | 3.1 MB     00:05 ETACentOS-8 - AppStream 66% [=============       ] 830 kB/s | 4.3 MB     00:02 ETACentOS-8 - AppStream 86% [=================   ] 1.0 MB/s | 5.6 MB     00:00 ETACentOS-8 - AppStream                            2.1 MB/s | 6.5 MB     00:03    
+CentOS-8 - Base          [      ===           ] ---  B/s |   0  B     --:-- ETACentOS-8 - Base     100% [====================] 1.3 kB/s | 658  B     00:00 ETACentOS-8 - Base       0% [                    ] 1.3 kB/s |   0  B     00:00 ETACentOS-8 - Base       0% [                    ] 1.3 kB/s |   0  B     00:00 ETACentOS-8 - Base      23% [====-               ] 241 kB/s | 1.2 MB     00:16 ETACentOS-8 - Base      78% [===============-    ] 794 kB/s | 3.9 MB     00:01 ETACentOS-8 - Base                                 2.6 MB/s | 5.0 MB     00:01    
+CentOS-8 - Extras        [         ===        ] ---  B/s |   0  B     --:-- ETACentOS-8 - Extras   100% [====================] 1.3 kB/s | 657  B     00:00 ETACentOS-8 - Extras                               3.8 kB/s | 2.1 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package               Architecture    Version            Repository       Size
+================================================================================
+Installing:
+ epel-release          noarch          8-5.el8            extras           22 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total download size: 22 k
+Installed size: 30 k
+Downloading Packages:
+CentOS-8 - Extras     0% [                    ] 1.3 kB/s |   0  B     00:00 ETACentOS-8 - Extras   100% [====================] 1.3 kB/s | 657  B     00:00 ETAepel-release-8-5.el8  0% [                    ] ---  B/s |   0  B     --:-- ETAepel-release-8-5.el8.noarch.rpm                 289 kB/s |  22 kB     00:00    
+--------------------------------------------------------------------------------
+Total                                            40 kB/s |  22 kB     00:00     
+warning: /var/cache/dnf/extras-cbfb2f07b0021b7e/packages/epel-release-8-5.el8.noarch.rpm: Header V3 RSA/SHA256 Signature, key ID 8483c65d: NOKEY
+CentOS-8 - Extras        [            ===     ] ---  B/s |   0  B     --:-- ETACentOS-8 - Extras                               1.6 MB/s | 1.6 kB     00:00    
+Importing GPG key 0x8483C65D:
+ Userid     : "CentOS (CentOS Official Signing Key) <security@centos.org>"
+ Fingerprint: 99DB 70FA E1D7 CE22 7FB6 4882 05B5 55B3 8483 C65D
+ From       : /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : epel-release-8-5.el8.noar [                          ] 1/1  Installing       : epel-release-8-5.el8.noar [=                         ] 1/1  Installing       : epel-release-8-5.el8.noar [==                        ] 1/1  Installing       : epel-release-8-5.el8.noar [===                       ] 1/1  Installing       : epel-release-8-5.el8.noar [====                      ] 1/1  Installing       : epel-release-8-5.el8.noar [=====                     ] 1/1  Installing       : epel-release-8-5.el8.noar [====================      ] 1/1  Installing       : epel-release-8-5.el8.noar [========================= ] 1/1  Installing       : epel-release-8-5.el8.noarch                            1/1 
+  Running scriptlet: epel-release-8-5.el8.noarch                            1/1 
+  Verifying        : epel-release-8-5.el8.noarch                            1/1 
+
+Installed:
+  epel-release-8-5.el8.noarch                                                   
+
+Complete!
+ > Checking for config-manager ...
+yum config-manager 
+No such command: config-manager. Please use /usr/bin/yum --help
+It could be a DNF plugin command, try: "dnf install 'dnf-command(config-manager)'"
+Running in non-interactive mode, assuming yes (y)
+ > Would have promptedfor config-manager not found, shall I install it? ...
+yum -y install dnf-command\(config-manager\) 
+Extra Packages for E     [===                 ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [===                 ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [   ===              ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [      ===           ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [         ===        ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [            ===     ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [               ===  ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [===                 ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [===                 ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [   ===              ] ---  B/s |   0  B     --:-- ETAExtra Packages for E     [      ===           ] ---  B/s |   0  B     --:-- ETAExtra Packages for E 14% [==-                 ] 2.8 MB/s | 893 kB     00:01 ETAExtra Packages for E 56% [===========         ] 3.1 MB/s | 3.3 MB     00:00 ETAExtra Packages for E 70% [==============      ] 3.1 MB/s | 4.2 MB     00:00 ETAExtra Packages for E 84% [================-   ] 3.1 MB/s | 5.0 MB     00:00 ETAExtra Packages for Enterprise Linux 8 - x86_64  1.3 MB/s | 5.9 MB     00:04    
+Last metadata expiration check: 0:00:02 ago on Tue Feb 25 22:36:09 2020.
+Dependencies resolved.
+================================================================================
+ Package                       Arch        Version            Repository   Size
+================================================================================
+Installing:
+ dnf-plugins-core              noarch      4.0.8-3.el8        BaseOS       62 k
+Installing dependencies:
+ python3-dateutil              noarch      1:2.6.1-6.el8      BaseOS      251 k
+ python3-dnf-plugins-core      noarch      4.0.8-3.el8        BaseOS      193 k
+ python3-six                   noarch      1.11.0-8.el8       BaseOS       38 k
+
+Transaction Summary
+================================================================================
+Install  4 Packages
+
+Total download size: 544 k
+Installed size: 1.3 M
+Downloading Packages:
+                      0% [                    ] 3.1 MB/s |   0  B     00:01 ETA                      0% [                    ] 2.8 MB/s | 658  B     00:02 ETA(1/4): dnf-plugins-c  0% [                    ] ---  B/s |   0  B     --:-- ETA(1/4): dnf-plugins-core-4.0.8-3.el8.noarch.rpm  755 kB/s |  62 kB     00:00    
+(2-3/4): python3-dat 20% [====                ] 1.3 MB/s | 111 kB     00:00 ETA(2/4): python3-six-1.11.0-8.el8.noarch.rpm      1.0 MB/s |  38 kB     00:00    
+(3-4/4): python3-dat 61% [============        ] 1.4 MB/s | 335 kB     00:00 ETA(3/4): python3-dnf-plugins-core-4.0.8-3.el8.noa 1.5 MB/s | 193 kB     00:00    
+(4/4): python3-dateu 66% [=============       ] 1.4 MB/s | 364 kB     00:00 ETA(4/4): python3-dateutil-2.6.1-6.el8.noarch.rpm  1.5 MB/s | 251 kB     00:00    
+--------------------------------------------------------------------------------
+Total                                           843 kB/s | 544 kB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :  [============                                       ] 1/1  Preparing        :  [=========================                          ] 1/1  Preparing        :  [======================================             ] 1/1  Preparing        :                                                        1/1 
+  Installing       : python3-six-1.11.0-8.el8. [                          ] 1/4  Installing       : python3-six-1.11.0-8.el8. [=                         ] 1/4  Installing       : python3-six-1.11.0-8.el8. [=========                 ] 1/4  Installing       : python3-six-1.11.0-8.el8. [=================         ] 1/4  Installing       : python3-six-1.11.0-8.el8. [==================        ] 1/4  Installing       : python3-six-1.11.0-8.el8. [===================       ] 1/4  Installing       : python3-six-1.11.0-8.el8. [========================= ] 1/4  Installing       : python3-six-1.11.0-8.el8.noarch                        1/4 
+  Installing       : python3-dateutil-1:2.6.1- [                          ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=                         ] 2/4  Installing       : python3-dateutil-1:2.6.1- [==                        ] 2/4  Installing       : python3-dateutil-1:2.6.1- [===                       ] 2/4  Installing       : python3-dateutil-1:2.6.1- [====                      ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=====                     ] 2/4  Installing       : python3-dateutil-1:2.6.1- [======                    ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=======                   ] 2/4  Installing       : python3-dateutil-1:2.6.1- [========                  ] 2/4  Installing       : python3-dateutil-1:2.6.1- [==========                ] 2/4  Installing       : python3-dateutil-1:2.6.1- [===========               ] 2/4  Installing       : python3-dateutil-1:2.6.1- [============              ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=============             ] 2/4  Installing       : python3-dateutil-1:2.6.1- [===============           ] 2/4  Installing       : python3-dateutil-1:2.6.1- [================          ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=================         ] 2/4  Installing       : python3-dateutil-1:2.6.1- [===================       ] 2/4  Installing       : python3-dateutil-1:2.6.1- [====================      ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=====================     ] 2/4  Installing       : python3-dateutil-1:2.6.1- [======================    ] 2/4  Installing       : python3-dateutil-1:2.6.1- [=======================   ] 2/4  Installing       : python3-dateutil-1:2.6.1- [========================  ] 2/4  Installing       : python3-dateutil-1:2.6.1- [========================= ] 2/4  Installing       : python3-dateutil-1:2.6.1-6.el8.noarch                  2/4 
+  Installing       : python3-dnf-plugins-core- [                          ] 3/4  Installing       : python3-dnf-plugins-core- [=                         ] 3/4  Installing       : python3-dnf-plugins-core- [==                        ] 3/4  Installing       : python3-dnf-plugins-core- [===                       ] 3/4  Installing       : python3-dnf-plugins-core- [====                      ] 3/4  Installing       : python3-dnf-plugins-core- [=====                     ] 3/4  Installing       : python3-dnf-plugins-core- [======                    ] 3/4  Installing       : python3-dnf-plugins-core- [=======                   ] 3/4  Installing       : python3-dnf-plugins-core- [========                  ] 3/4  Installing       : python3-dnf-plugins-core- [=========                 ] 3/4  Installing       : python3-dnf-plugins-core- [==========                ] 3/4  Installing       : python3-dnf-plugins-core- [===========               ] 3/4  Installing       : python3-dnf-plugins-core- [============              ] 3/4  Installing       : python3-dnf-plugins-core- [=============             ] 3/4  Installing       : python3-dnf-plugins-core- [==============            ] 3/4  Installing       : python3-dnf-plugins-core- [===============           ] 3/4  Installing       : python3-dnf-plugins-core- [================          ] 3/4  Installing       : python3-dnf-plugins-core- [=================         ] 3/4  Installing       : python3-dnf-plugins-core- [==================        ] 3/4  Installing       : python3-dnf-plugins-core- [===================       ] 3/4  Installing       : python3-dnf-plugins-core- [====================      ] 3/4  Installing       : python3-dnf-plugins-core- [=====================     ] 3/4  Installing       : python3-dnf-plugins-core- [======================    ] 3/4  Installing       : python3-dnf-plugins-core- [=======================   ] 3/4  Installing       : python3-dnf-plugins-core- [========================  ] 3/4  Installing       : python3-dnf-plugins-core- [========================= ] 3/4  Installing       : python3-dnf-plugins-core-4.0.8-3.el8.noarch            3/4 
+  Installing       : dnf-plugins-core-4.0.8-3. [                          ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [=                         ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [==                        ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [====                      ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [======                    ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [========                  ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [=========                 ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [===========               ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [=============             ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [==============            ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [===============           ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [================          ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [==================        ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [====================      ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [=====================     ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [=======================   ] 4/4  Installing       : dnf-plugins-core-4.0.8-3. [========================= ] 4/4  Installing       : dnf-plugins-core-4.0.8-3.el8.noarch                    4/4 
+  Running scriptlet: dnf-plugins-core-4.0.8-3.el8.noarch                    4/4 
+  Verifying        : dnf-plugins-core-4.0.8-3.el8.noarch                    1/4 
+  Verifying        : python3-dateutil-1:2.6.1-6.el8.noarch                  2/4 
+  Verifying        : python3-dnf-plugins-core-4.0.8-3.el8.noarch            3/4 
+  Verifying        : python3-six-1.11.0-8.el8.noarch                        4/4 
+
+Installed:
+  dnf-plugins-core-4.0.8-3.el8.noarch                                           
+  python3-dateutil-1:2.6.1-6.el8.noarch                                         
+  python3-dnf-plugins-core-4.0.8-3.el8.noarch                                   
+  python3-six-1.11.0-8.el8.noarch                                               
+
+Complete!
+ > Checking for PowerTools ...
+yum repolist 
+Last metadata expiration check: 0:00:04 ago on Tue Feb 25 22:36:09 2020.
+Running in non-interactive mode, assuming yes (y)
+ > Would have promptedfor PowerTools not found, shall I install it? ...
+yum -y config-manager --set-enabled PowerTools 
+ > Checking for getpagespeed-extras ...
+yum repolist 
+CentOS-8 - AppStream                            5.4 kB/s | 4.3 kB     00:00    
+CentOS-8 - Base                                 4.9 kB/s | 3.8 kB     00:00    
+CentOS-8 - Extras                               1.9 kB/s | 1.5 kB     00:00    
+CentOS-8 - PowerTools                           1.1 MB/s | 2.0 MB     00:01    
+Extra Packages for Enterprise Linux 8 - x86_64  8.0 kB/s | 5.8 kB     00:00    
+Running in non-interactive mode, assuming yes (y)
+ > Would have promptedfor PowerTools not found, shall I install it? ...
+yum -y install https://extras.getpagespeed.com/release-el8-latest.rpm 
+release-el8-latest.r     [===                 ] ---  B/s |   0  B     --:-- ETArelease-el8-latest.r     [===                 ] ---  B/s |   0  B     --:-- ETArelease-el8-latest.r     [   ===              ] ---  B/s |   0  B     --:-- ETArelease-el8-latest.rpm                           15 kB/s |  13 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package                         Arch       Version      Repository        Size
+================================================================================
+Installing:
+ [1mgetpagespeed-extras-release    (B[m noarch     10-11        @commandline      13 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total size: 13 k
+Installed size: 6.4 k
+Downloading Packages:
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : getpagespeed-extras-relea [                          ] 1/1  Installing       : getpagespeed-extras-relea [======                    ] 1/1  Installing       : getpagespeed-extras-relea [=============             ] 1/1  Installing       : getpagespeed-extras-relea [===================       ] 1/1  Installing       : getpagespeed-extras-relea [====================      ] 1/1  Installing       : getpagespeed-extras-relea [========================= ] 1/1  Installing       : getpagespeed-extras-release-10-11.noarch               1/1 
+  Running scriptlet: getpagespeed-extras-release-10-11.noarch               1/1 
+----------------------------------------------------------------------
+
+The GetPageSpeed repository has been installed.
+
+To enable package installs, subscribe using the following link:
+
+https://www.getpagespeed.com/repo-subscribe?server_ip=150.101.186.89
+
+----------------------------------------------------------------------
+
+  Verifying        : getpagespeed-extras-release-10-11.noarch               1/1 
+
+Installed:
+  getpagespeed-extras-release-10-11.noarch                                      
+
+Complete!
+
+/etc/os-release information:
+NAME            : CentOS Linux
+VERSION         : 8 (Core)
+ID              : centos
+ID_LIKE         : rhel fedora
+VERSION_ID      : 8
+
+We detected these:
+Distribution    : centos
+Version         : 8
+Codename        : 8 (Core)
+Package Manager : install_yum
+Packages Tree   : centos
+Detection Method: /etc/os-release
+Default Python v: 2 
+
+Searching for distro_sdk ...
+Searching for git ...
+ > Checking if package 'git' is installed...
+Searching for gcc ...
+ > Checking if package 'gcc' is installed...
+Searching for make ...
+ > Checking if package 'make' is installed...
+Searching for autoconf ...
+ > Checking if package 'autoconf' is installed...
+Searching for autoconf_archive ...
+ > Checking if package 'autoconf-archive' is installed...
+Searching for autogen ...
+ > Checking if package 'autogen' is installed...
+Searching for automake ...
+ > Checking if package 'automake' is installed...
+Searching for pkg_config ...
+ > Checking if package 'pkgconfig' is installed...
+Searching for netcat ...
+ > Checking if package 'nmap-ncat' is installed...
+Searching for libz_dev ...
+ > Checking if package 'zlib-devel' is installed...
+Searching for libuuid_dev ...
+ > Checking if package 'libuuid-devel' is installed...
+Searching for libmnl_dev ...
+ > Checking if package 'libmnl-devel' is installed...
+Searching for lm_sensors ...
+ > Checking if package 'lm_sensors' is installed...
+Searching for libuv ...
+ > Checking if package 'libuv-devel' is installed...
+Searching for lz4 ...
+ > Checking if package 'lz4-devel' is installed...
+Searching for openssl ...
+ > Checking if package 'openssl-devel' is installed...
+Searching for judy ...
+ > Checking if package 'Judy-devel' is installed...
+Searching for nodejs ...
+ > Checking if package 'nodejs' is installed...
+Searching for python ...
+ > Checking if package 'python2' is installed...
+Searching for python_pymongo ...
+WARNING
+package python-pymongo is not available in this system.
+You may try to install without it.
+
+Searching for python_mysqldb ...
+ > Checking if package 'MySQL-python' is installed...
+Searching for python_psycopg2 ...
+ > Checking if package 'python-psycopg2' is installed...
+
+The following command will be run:
+
+ >> IMPORTANT << 
+    Please make sure your system is up to date
+    by running:   yum update  
+
+Running in non-interactive mode
+yum -y install Judy-devel MySQL-python autoconf autoconf-archive autogen automake gcc git libmnl-devel libuuid-devel libuv-devel lm_sensors lz4-devel make nmap-ncat nodejs openssl-devel pkgconfig python-psycopg2 python2 zlib-devel 
+
+
+Running in non-interactive mode
+yum -y install Judy-devel MySQL-python autoconf autoconf-archive autogen automake gcc git libmnl-devel libuuid-devel libuv-devel lm_sensors lz4-devel make nmap-ncat nodejs openssl-devel pkgconfig python-psycopg2 python2 zlib-devel 
+GetPageSpeed package     [===                 ] ---  B/s |   0  B     --:-- ETAGetPageSpeed packages for Enterprise Linux 8 -  3.3 MB/s | 851 kB     00:00    
+GetPageSpeed package     [===                 ] ---  B/s |   0  B     --:-- ETAGetPageSpeed packages for Enterprise Linux 8 -  888 kB/s | 168 kB     00:00    
+No match for argument: [1mJudy-devel(B[m
+No match for argument: [1mMySQL-python(B[m
+No match for argument: [1mpython-psycopg2(B[m
+Error: Unable to find a match: Judy-devel MySQL-python python-psycopg2
+
+
+
+We are very sorry!
+
+Installation of required packages failed.
+
+What to do now:
+
+  1. Make sure your system is updated.
+     Most of the times, updating your system will resolve the issue.
+
+  2. If the error message is about a specific package, try removing
+     that package from the command and run it again.
+     Depending on the broken package, you may be able to continue.
+
+  3. Let us know. We may be able to help.
+     Open a github issue with the above log, at:
+
+           https://github.com/firehol/netdata/issues
+
+

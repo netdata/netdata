@@ -19,7 +19,8 @@ jobs:
           - 'alpine:3.10'
           - 'alpine:3.9'
           - 'archlinux:latest'
-          - 'centos:8'
+            # TODO: Disabled for now (See #8200)
+            # - 'centos:8'
           - 'centos:7'
           - 'centos:6'
           - 'debian:buster'
