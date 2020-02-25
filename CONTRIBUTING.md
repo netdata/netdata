@@ -181,12 +181,19 @@ However, it's not always that simple. Our [PR approval process](#pr-approval-pro
 
 One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
 
-#### PR title guidelines
+#### PR Guidelines
 
-- All PR titles and Commit messages _must_ follow the [Imperative Mood](https://en.wikipedia.org/wiki/Imperative_mood)
-- Be no more than ~50 characters (_longer description in the PR_)
+PR Titles:
 
-Some examples:
+- Must follow the [Imperative Mood](https://en.wikipedia.org/wiki/Imperative_mood)
+- Must be no more than ~50 characters (_longer description in the PR_)
+
+PR Descriptions:
+
+- Must clearly contain sufficient information regarding the content of the PR, including area/component, test plan, etc.
+- Must reference an existing issue.
+
+Some PR title examples:
 
 - Fix bug in NetData installer for FreeBSD 11.2
 - Improve docs for other installation methods
@@ -201,6 +208,7 @@ For good examples have a look at other projects like:
 - https://github.com/tensorflow/tensorflow/commits/master
 - https://github.com/vuejs/vue/commits/dev
 - https://github.com/microsoft/vscode/commits/master
+- Also see the Linux Kernel and Git projects as well as good examples.
 
 ### PR approval process
 
