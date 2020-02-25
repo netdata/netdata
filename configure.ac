@@ -304,18 +304,6 @@ AC_CHECK_LIB(
 )
 
 # -----------------------------------------------------------------------------
-# libwebsockets pure C library for implementing modern network protocols
-
-if test "${ACLK}" = "yes"; then
-    AC_CHECK_LIB(
-        [websockets],
-        [lws_set_timer_usecs],
-        [LWS_LIBS="-lwebsockets"]
-    )
-fi
-
-
-# -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
 
 AC_CHECK_LIB(
@@ -450,19 +438,15 @@ if test "${ACLK}" = "yes"; then
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
 
-    if test -z "${LWS_LIBS}"; then
-        AC_MSG_CHECKING([if libwebsockets static lib is present])
-        if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-            AC_MSG_RESULT([yes])
-            USE_static_libwebsockets="yes"
-            LWS_LIBS="-I externaldeps/libwebsockets/include"
-            if test "${build_target}" = "linux"; then
-                # TODO is possible to build LWS to not need this?
-                LWS_LIBS=" -lcap"
-            fi
-        else
-            AC_MSG_RESULT([no])
+    AC_MSG_CHECKING([if libwebsockets static lib is present])
+    if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
+        LWS_LIBS="-I externaldeps/libwebsockets/include"
+        if test "${build_target}" = "linux"; then
+            LWS_LIBS=" -lcap"
         fi
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
     fi
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
@@ -489,7 +473,6 @@ if test "${ACLK}" = "yes"; then
 
     AC_MSG_RESULT([${enable_aclk}])
 fi
-AM_CONDITIONAL([STATIC_LWS], [test "${USE_static_libwebsockets}" = "yes"])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
