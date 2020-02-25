@@ -1068,7 +1068,10 @@ get_compatible_kernel_for_ebpf() {
 
   # XXX: Logic taken from Slack discussion in #ebpf
   # everything that has a version <= 4.14 can use the code built to 4.14
-  # Continue the logic, everything that has a version <= 4.19 and >= 4.15 can use the code built to 4.19
+  # also all distributions that has a version <= 4.15.256 can use the code built to 4.15
+  # Continue the logic, everything that has a version < 4.19.102 and >= 4.15 can use the code built to 4.19
+  # Kernel 4.19 had a feature added in the version 4.19.102 that force us to break it in two, so version >= 4.19.102
+  # and smaller than < 5.0 runs with code built to 4.19.102
   # Finally,  everybody that is using 5.X can use what is compiled with 5.4
 
   kpkg=
@@ -1076,9 +1079,18 @@ get_compatible_kernel_for_ebpf() {
   if [ "${kver}" -ge 005000000 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 5.4"
     kpkg="5_4"
-  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004020017 ]; then
+  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
+    kpkg="4_19_104"
+  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004019101 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
     kpkg="4_19"
+  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19"
+    kpkg="4_19"
+  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.15"
+    kpkg="4_15"
   elif [ "${kver}" -le 004014999 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.14"
     kpkg="4_14"
