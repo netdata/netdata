@@ -3,75 +3,22 @@
 #include "libnetdata/libnetdata.h"
 #include "agent_cloud_link.h"
 
-// Read from the config file -- new section [agent_cloud_link]
-// Defaults are supplied
+// State-machine for the on-connect metadata transmission.
+// TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
+//       agent startup phase.
+static ACLK_METADATA_STATE aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
+static AGENT_STATE agent_state = AGENT_INITIALIZING;
 
-int aclk_subscribed = 0;
-int aclk_disable_single_updates = 0;
+// Other global state
+static int aclk_subscribed = 0;
+static int aclk_disable_single_updates = 0;
+static time_t last_init_sequence = 0;
+static int waiting_init = 1;
 
-int aclk_metadata_submitted = 0;
-int agent_state = 0;
-time_t last_init_sequence = 0;
-int waiting_init = 1;
+static char *global_base_topic = NULL;
+static int aclk_connecting = 0;
+static int aclk_connection_initialized = 0;
 
-char *global_base_topic = NULL;
-int aclk_connecting = 0;
-
-char *create_uuid()
-{
-    uuid_t uuid;
-    char *uuid_str = mallocz(36 + 1);
-
-    uuid_generate(uuid);
-    uuid_unparse(uuid, uuid_str);
-
-    return uuid_str;
-}
-
-int cloud_to_agent_parse(JSON_ENTRY *e)
-{
-    struct aclk_request *data = e->callback_data;
-
-    switch (e->type) {
-        case JSON_OBJECT:
-        case JSON_ARRAY:
-            break;
-        case JSON_STRING:
-            if (!strcmp(e->name, "msg-id")) {
-                data->msg_id = strdupz(e->data.string);
-                break;
-            }
-            if (!strcmp(e->name, "type")) {
-                data->type_id = strdupz(e->data.string);
-                break;
-            }
-            if (!strcmp(e->name, "callback-topic")) {
-                data->callback_topic = strdupz(e->data.string);
-                break;
-            }
-            if (!strcmp(e->name, "payload")) {
-                data->payload = strdupz(e->data.string);
-                break;
-            }
-            break;
-        case JSON_NUMBER:
-            if (!strcmp(e->name, "version")) {
-                data->version = atoi(e->original_string);
-                break;
-            }
-            break;
-
-        case JSON_BOOLEAN:
-            break;
-
-        case JSON_NULL:
-            break;
-    }
-    return 0;
-}
-
-// Set when we have connection up and running from the connection callback
-int aclk_connection_initialized = 0;
 // TODO modify previous comment if this stays this way
 // con_initialized means library is initialized and ready to be used
 // acklk_connected means there is actually an established connection
@@ -134,6 +81,60 @@ struct aclk_query_queue {
     struct aclk_query *aclk_query_tail;
     u_int64_t count;
 } aclk_queue = { .aclk_query_head = NULL, .aclk_query_tail = NULL, .count = 0 };
+
+char *create_uuid()
+{
+    uuid_t uuid;
+    char *uuid_str = mallocz(36 + 1);
+
+    uuid_generate(uuid);
+    uuid_unparse(uuid, uuid_str);
+
+    return uuid_str;
+}
+
+int cloud_to_agent_parse(JSON_ENTRY *e)
+{
+    struct aclk_request *data = e->callback_data;
+
+    switch (e->type) {
+        case JSON_OBJECT:
+        case JSON_ARRAY:
+            break;
+        case JSON_STRING:
+            if (!strcmp(e->name, "msg-id")) {
+                data->msg_id = strdupz(e->data.string);
+                break;
+            }
+            if (!strcmp(e->name, "type")) {
+                data->type_id = strdupz(e->data.string);
+                break;
+            }
+            if (!strcmp(e->name, "callback-topic")) {
+                data->callback_topic = strdupz(e->data.string);
+                break;
+            }
+            if (!strcmp(e->name, "payload")) {
+                data->payload = strdupz(e->data.string);
+                break;
+            }
+            break;
+        case JSON_NUMBER:
+            if (!strcmp(e->name, "version")) {
+                data->version = atoi(e->original_string);
+                break;
+            }
+            break;
+
+        case JSON_BOOLEAN:
+            break;
+
+        case JSON_NULL:
+            break;
+    }
+    return 0;
+}
+
 
 /*
  * After a connection failure -- delay in milliseconds
@@ -776,7 +777,7 @@ int aclk_process_query()
         case ACLK_CMD_ONCONNECT:
             debug(D_ACLK, "EXECUTING on connect metadata command");
             aclk_send_metadata();
-            aclk_metadata_submitted = 2;
+            aclk_metadata_submitted = ACLK_METADATA_SENT;
             break;
 
         case ACLK_CMD_CHART:
@@ -885,7 +886,7 @@ void *aclk_query_main_thread(void *ptr)
 
     while (!netdata_exit) {
         if (unlikely(!aclk_metadata_submitted)) {
-            aclk_metadata_submitted = 1;
+            aclk_metadata_submitted = ACLK_METADATA_CMD_QUEUED;
             aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
         }
 
@@ -1098,7 +1099,7 @@ void aclk_disconnect()
     if (likely(aclk_connection_initialized))
         info("Disconnect detected");
     aclk_subscribed = 0;
-    aclk_metadata_submitted = 0;
+    aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
     aclk_connection_initialized = 0;
     aclk_connecting = 0;

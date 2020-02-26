@@ -50,6 +50,17 @@ typedef enum aclk_cmd {
     ACLK_CMD_MAX
 } ACLK_CMD;
 
+typedef enum aclk_metadata_state {
+    ACLK_METADATA_REQUIRED,
+    ACLK_METADATA_CMD_QUEUED,
+    ACLK_METADATA_SENT
+} ACLK_METADATA_STATE;
+
+typedef enum agent_state {
+    AGENT_INITIALIZING,
+    AGENT_STABLE
+} AGENT_STATE;
+
 typedef enum aclk_init_action { ACLK_INIT, ACLK_REINIT } ACLK_INIT_ACTION;
 
 void *aclk_main(void *ptr);
