@@ -230,7 +230,6 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     UNUSED(user);
-    //struct aclk_lws_wss_engine_instance *inst = lws_context_user(lws_get_context(wsi));
     struct lws_wss_packet_buffer *data;
     int retval = 0;
 
@@ -312,7 +311,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
             engine_instance->websocket_connection_up = 1;
-            aclk_lws_connection_established();
+            aclk_lws_connection_established(engine_instance->host, engine_instance->port);
             break;
 
         default:

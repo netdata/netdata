@@ -19,7 +19,7 @@ int aclk_handle_cloud_request(char *);
 
 extern int aclk_connection_initialized;
 extern int aclk_mqtt_connected;
-extern char *aclk_hostname;
-extern int aclk_port;
+//extern char *aclk_hostname;
+//extern int aclk_port;
 
 #endif //NETDATA_MQTT_H

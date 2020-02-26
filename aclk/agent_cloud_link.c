@@ -6,8 +6,6 @@
 // Read from the config file -- new section [agent_cloud_link]
 // Defaults are supplied
 
-int aclk_port = ACLK_DEFAULT_PORT;
-char *aclk_hostname = ACLK_DEFAULT_HOST;
 int aclk_subscribed = 0;
 int aclk_disable_single_updates = 0;
 
@@ -945,8 +943,8 @@ void *aclk_main(void *ptr)
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 
-    aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
-    aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
+    char *aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
+    int aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
     // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
     // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
@@ -966,7 +964,7 @@ void *aclk_main(void *ptr)
 
         if (unlikely(!aclk_connection_initialized)) {
             if (unlikely(first_init)) {
-                aclk_try_to_connect();
+                aclk_try_to_connect(aclk_hostname, aclk_port);
                 first_init = 1;
             } else {
                 if (aclk_connecting == 0) {
@@ -978,7 +976,7 @@ void *aclk_main(void *ptr)
                     if (now_realtime_usec() >= reconnect_expiry) {
                         reconnect_expiry = 0;
                         aclk_connecting = 1;
-                        aclk_try_to_connect();
+                        aclk_try_to_connect(aclk_hostname, aclk_port);
                     }
                     sleep_usec(USEC_PER_MS * 100);
                 }
@@ -1114,10 +1112,10 @@ void aclk_shutdown()
     info("Shutdown complete");
 }
 
-void aclk_try_to_connect()
+void aclk_try_to_connect(char *hostname, int port)
 {
     int rc;
-    rc = _link_lib_init(aclk_hostname, aclk_port);
+    rc = _link_lib_init(hostname, port);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }

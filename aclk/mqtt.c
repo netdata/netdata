@@ -180,11 +180,9 @@ static inline void _link_mosquitto_write()
     }
 }
 
-void aclk_lws_connection_established()
+void aclk_lws_connection_established(char *hostname, int port)
 {
-    //the connection is done by LWS so this parameters dont matter
-    //ig MQTT over LWS is used
-    _link_mqtt_connect(aclk_hostname, aclk_port);
+    _link_mqtt_connect(hostname, port);  // Parameters only used for logging, lower layer connected.
     _link_mosquitto_write();
 }
 
