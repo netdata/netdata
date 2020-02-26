@@ -1,3 +1,7 @@
+# NOTE: This Dockerfile (`Dockerfile.test`) should only be used for dev/testing
+#       and *NOT* in production. Use the top-level `Dockerfile` which points to
+#       `./packaging/docker/Dockerfile`.
+#
 # TODO: Create a netdata/package-builder:alpine9
 #FROM netdata/package-buidler:alpine AS build
 FROM alpine:3.9 AS build
