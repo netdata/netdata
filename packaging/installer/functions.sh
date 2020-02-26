@@ -104,6 +104,37 @@ get() {
 }
 
 # -----------------------------------------------------------------------------
+# external component handling
+
+fetch_and_verify() {
+  local component=${1}
+  local url=${2}
+  local base_name=${3}
+  local tmp=${4}
+  local override=${5}
+
+  if [ -z "${override}" ]; then
+     get "${url}" > "${tmp}/${base_name}"
+  else
+    progress "Using provided ${component} archive ${override}"
+    run cp "${override}" "${tmp}/${base_name}"
+  fi
+
+  if [ ! -f "${tmp}/${base_name}" ] || [ ! -s "${tmp}/${base_name}" ]; then
+    run_failed "Unable to find usable archive for ${component}"
+    return 1
+  fi
+
+  grep "${base_name}\$" "${INSTALLER_DIR}/packaging/${component}.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
+
+  # Checksum validation
+  if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+    run_failed "${component} files checksum validation failed."
+    return 1
+  fi
+}
+
+# -----------------------------------------------------------------------------
 
 netdata_banner() {
   local l1="  ^" \

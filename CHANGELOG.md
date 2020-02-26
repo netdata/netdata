@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix bold text surplus stars [\#8193](https://github.com/netdata/netdata/pull/8193) ([grinapo](https://github.com/grinapo))
 - Added eBPF to docs navigation and improved title [\#8191](https://github.com/netdata/netdata/pull/8191) ([joelhans](https://github.com/joelhans))
 - Merging the feature branch for the ACLK in the previous sprint. [\#8179](https://github.com/netdata/netdata/pull/8179) ([amoss](https://github.com/amoss))
 - Docs: Fixed figure+image without closing tag [\#8177](https://github.com/netdata/netdata/pull/8177) ([joelhans](https://github.com/joelhans))
@@ -18,6 +19,7 @@
 - Removed hack to force users off of stuck NetData v1.19.0-432 [\#8158](https://github.com/netdata/netdata/pull/8158) ([prologic](https://github.com/prologic))
 - Added support for Clear Linux in `install-required-packages.sh`. [\#8154](https://github.com/netdata/netdata/pull/8154) ([Ferroin](https://github.com/Ferroin))
 - docs: Added PR title guidelines to the contribution guidelines, to make CHANGELOG more meaningful [\#8150](https://github.com/netdata/netdata/pull/8150) ([cakrit](https://github.com/cakrit))
+- Add an AWS Kinesis connector to the exporting engine [\#8145](https://github.com/netdata/netdata/pull/8145) ([vlvkobal](https://github.com/vlvkobal))
 - Fix formatting in "Custom dashboards" section [\#8102](https://github.com/netdata/netdata/pull/8102) ([YorikSar](https://github.com/YorikSar))
 - Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
 - Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))

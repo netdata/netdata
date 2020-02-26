@@ -636,6 +636,13 @@ set(EXPORTING_ENGINE_FILES
         exporting/send_internal_metrics.c
         )
 
+set(KINESIS_EXPORTING_FILES
+        exporting/aws_kinesis/aws_kinesis.c
+        exporting/aws_kinesis/aws_kinesis.h
+        exporting/aws_kinesis/aws_kinesis_put_record.cc
+        exporting/aws_kinesis/aws_kinesis_put_record.h
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -720,7 +727,7 @@ ENDIF()
 
 IF(ENABLE_BACKEND_KINESIS)
     message(STATUS "kinesis backend: enabled")
-    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES})
+    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES} ${KINESIS_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES aws-cpp-sdk-kinesis aws-cpp-sdk-core ${CRYPTO_LIBRARIES} ${SSL_LIBRARIES} ${CURL_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CRYPTO_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
     list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
@@ -981,6 +988,17 @@ if(BUILD_TESTING)
         exporting/tests/system_doubles.c
         )
     set(TEST_NAME exporting_engine)
+    set(KINESIS_LINK_OPTIONS)
+if(ENABLE_BACKEND_KINESIS)
+    list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
+    list(
+        APPEND KINESIS_LINK_OPTIONS
+        -Wl,--wrap=aws_sdk_init
+        -Wl,--wrap=kinesis_init
+        -Wl,--wrap=kinesis_put_record
+        -Wl,--wrap=kinesis_get_result
+    )
+endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
         ${TEST_NAME}_testdriver
@@ -1011,6 +1029,7 @@ if(BUILD_TESTING)
         -Wl,--wrap=recv
         -Wl,--wrap=send
         -Wl,--wrap=connect_to_one_of
+        ${KINESIS_LINK_OPTIONS}
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

@@ -12,7 +12,7 @@
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
 {
     if (host->exporting_flags == NULL)
-        host->exporting_flags = callocz(instance->connector->engine->instance_num, sizeof(size_t));
+        host->exporting_flags = callocz(instance->engine->instance_num, sizeof(size_t));
 
     RRDHOST_FLAGS *flags = &host->exporting_flags[instance->index];
 
@@ -46,7 +46,7 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
     RRDHOST *host = st->rrdhost;
 
     if (st->exporting_flags == NULL)
-        st->exporting_flags = callocz(instance->connector->engine->instance_num, sizeof(size_t));
+        st->exporting_flags = callocz(instance->engine->instance_num, sizeof(size_t));
 
     RRDSET_FLAGS *flags = &st->exporting_flags[instance->index];
 
