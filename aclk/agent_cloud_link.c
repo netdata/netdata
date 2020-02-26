@@ -1054,13 +1054,15 @@ int aclk_subscribe(char *sub_topic, int qos)
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
-    if (unlikely(aclk_wait_for_initialization()))
-        return 1;
-
     final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
     if (unlikely(!final_topic)) {
         errno = 0;
         error("Unable to build outgoing topic; truncated?");
+        return 1;
+    }
+
+    if (!aclk_connected) {
+        error("Cannot subscribe to %s - not connected!", topic);
         return 1;
     }
 
