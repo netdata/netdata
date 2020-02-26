@@ -6,6 +6,7 @@
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
 long web_client_streaming_rate_t = 0L;
+int web_client_default_dashboard = WEB_SERVER_OLD_DASHBOARD;
 
 /*
  * --------------------------------------------------------------------------------------------------------------------
@@ -481,6 +482,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
             size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
 
             static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
+
+            web_client_default_dashboard = (int)config_get_boolean(CONFIG_SECTION_WEB, "use react dashboard", web_client_default_dashboard);
 
             web_server_is_multithreaded = (static_threaded_workers_count > 1);
 

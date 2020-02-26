@@ -47,6 +47,8 @@ extern int web_client_timeout;
 extern int web_client_first_request_timeout;
 extern long web_client_streaming_rate_t;
 
+#define WEB_SERVER_OLD_DASHBOARD 0
+
 #ifdef WEB_SERVER_INTERNALS
 extern LISTEN_SOCKETS api_sockets;
 extern void web_client_update_acl_matches(struct web_client *w);
