@@ -591,6 +591,12 @@ declare -A pkg_automake=(
   ['default']="automake"
 )
 
+# Required to build libwebsockets and libmosquitto on some systems.
+declare -A pkg_cmake=(
+  ['clearlinux']="c-basic"
+  ['default']="cmake"
+)
+
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
@@ -701,6 +707,12 @@ declare -A pkg_libmnl_dev=(
   ['suse']="libmnl-devel"
   ['clearlinux']="devpkg-libmnl"
   ['default']=""
+)
+
+declare -A pkg_libwebsockets_dev=(
+  ['debian']="libwebsockets-dev"
+  ['ubuntu']="libwebsockets-dev"
+  ['default']="libwebsockets-devel"
 )
 
 declare -A pkg_lm_sensors=(
@@ -1104,6 +1116,7 @@ packages() {
   require_cmd autogen || suitable_package autogen
   require_cmd automake || suitable_package automake
   require_cmd pkg-config || suitable_package pkg-config
+  require_cmd cmake || suitable_package cmake
 
   # -------------------------------------------------------------------------
   # debugging tools for development
@@ -1157,6 +1170,7 @@ packages() {
     suitable_package libz-dev
     suitable_package libuuid-dev
     suitable_package libmnl-dev
+    suitable_package libwebsockets-dev
   fi
 
   # -------------------------------------------------------------------------

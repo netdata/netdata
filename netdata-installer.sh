@@ -258,7 +258,7 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
-      NETDATA_DISABLE_LIBMOSQUITTO=1
+      NETDATA_DISABLE_CLOUD=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
       ;;
     "--install")
@@ -435,10 +435,6 @@ trap build_error EXIT
 
 # -----------------------------------------------------------------------------
 
-fetch_libmosquitto() {
-  download_tarball "${1}" "${2}" "libmosquitto" "cloud"
-}
-
 build_libmosquitto() {
   run make -C "${1}/lib"
 }
@@ -453,7 +449,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_LIBMOSQUITTO}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
     return 0
   fi
 
@@ -470,32 +466,79 @@ bundle_libmosquitto() {
   tmp="$(mktemp -d -t netdata-mosquitto-XXXXXX)"
   MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
 
-  if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}" ]; then
-    fetch_libmosquitto "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}"
+  if fetch_and_verify "mosquitto" \
+                     "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" \
+                     "${MOSQUITTO_PACKAGE_BASENAME}" \
+                     "${tmp}" \
+                     "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"
+  then
+    if run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}" && \
+       build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && \
+       copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "libmosquitto built and prepared."
+    else
+      run_failed "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+    fi
   else
-    progress "Using provided mosquitto tarball ${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"
-    run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}" "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}"
+    run_failed "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
   fi
-
-  if [ ! -f "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ] || [ ! -s "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" ]; then
-    run_failed "unable to find a usable libmosquitto source archive, Netdata Cloud will not be available"
-    return 0
-  fi
-
-  grep "${MOSQUITTO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/mosquitto.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
-
-  # Checksum validation
-  if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
-    run_failed "mosquitto files checksum validation failed."
-    return 0
-  fi
-
-  run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}"
-
-  build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && rm "${tmp}"
 }
 
 bundle_libmosquitto
+
+# -----------------------------------------------------------------------------
+
+build_libwebsockets() {
+  pushd "${1}" > /dev/null || exit 1
+  cmake -D LWS_WITH_SOCKS5:bool=ON .
+  make
+  popd > /dev/null || exit 1
+}
+
+copy_libwebsockets() {
+  target_dir="${PWD}/externaldeps/libwebsockets"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/lib/libwebsockets.a" "${target_dir}/libwebsockets.a" || return 1
+  run cp -r "${1}/include" "${target_dir}" || return 1
+}
+
+bundle_libwebsockets() {
+  if [ -n "${DISABLE_CLOUD}" ] ; then
+    return 0
+  fi
+
+  progress "Prepare libwebsockets"
+
+  LIBWEBSOCKETS_PACKAGE_VERSION="$(cat packaging/libwebsockets.version)"
+
+  tmp="$(mktemp -d -t netdata-libwebsockets-XXXXXX)"
+  LIBWEBSOCKETS_PACKAGE_BASENAME="v${LIBWEBSOCKETS_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "libwebsockets" \
+                      "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+                      "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"
+  then
+    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" && \
+       build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
+       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "libwebsockets built and prepared."
+    else
+      run_failed "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    fi
+  else
+    run_failed "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+  fi
+}
+
+bundle_libwebsockets
 
 # -----------------------------------------------------------------------------
 echo >&2
