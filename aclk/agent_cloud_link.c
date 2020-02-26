@@ -17,8 +17,7 @@ static int waiting_init = 1;
 
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
-static int aclk_connection_initialized = 0;
-static int aclk_mqtt_connected = 0;
+static int aclk_connected = 0;
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -678,10 +677,10 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 // Wait for ACLK connection to be established
 int aclk_wait_for_initialization()
 {
-    if (unlikely(!aclk_connection_initialized)) {
+    if (unlikely(!aclk_connected)) {
         time_t now = now_realtime_sec();
 
-        while (!aclk_connection_initialized && (now_realtime_sec() - now) < ACLK_INITIALIZATION_WAIT) {
+        while (!aclk_connected && (now_realtime_sec() - now) < ACLK_INITIALIZATION_WAIT) {
             sleep_usec(USEC_PER_SEC * ACLK_INITIALIZATION_SLEEP_WAIT);
             _link_event_loop(0);
 
@@ -689,7 +688,7 @@ int aclk_wait_for_initialization()
                 return 1;
         }
 
-        if (unlikely(!aclk_connection_initialized)) {
+        if (unlikely(!aclk_connected)) {
             error("ACLK connection cannot be established");
             return 1;
         }
@@ -750,7 +749,7 @@ int aclk_process_query()
     struct aclk_query *this_query;
     static long int query_count = 0;
 
-    if (!aclk_connection_initialized)
+    if (!aclk_connected)
         return 0;
 
     this_query = aclk_queue_pop();
@@ -820,7 +819,7 @@ int aclk_process_query()
 
 int aclk_process_queries()
 {
-    if (unlikely(netdata_exit || !aclk_connection_initialized))
+    if (unlikely(netdata_exit || !aclk_connected))
         return 0;
 
     if (likely(!aclk_queue.count))
@@ -959,7 +958,7 @@ void *aclk_main(void *ptr)
         _link_event_loop();
         debug(D_ACLK, "LINK event loop called");
 
-        if (unlikely(!aclk_connection_initialized)) {
+        if (unlikely(!aclk_connected)) {
             if (unlikely(first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port);
                 first_init = 1;
@@ -981,7 +980,7 @@ void *aclk_main(void *ptr)
             continue;
         }
 
-        if (likely(aclk_mqtt_connected)) {
+        if (likely(aclk_connected)) {
             if (unlikely(!aclk_subscribed)) {
                 aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
             }
@@ -1082,8 +1081,7 @@ int aclk_subscribe(char *sub_topic, int qos)
 void aclk_connect()
 {
     info("Connection detected");
-    aclk_connection_initialized = 1;
-    aclk_mqtt_connected = 1;
+    aclk_connected = 1;
     waiting_init = 0;
     aclk_reconnect_delay(0);
     QUERY_THREAD_WAKEUP;
@@ -1093,20 +1091,19 @@ void aclk_connect()
 // This is called from a callback when the link goes down
 void aclk_disconnect()
 {
-    if (likely(aclk_connection_initialized))
+    if (likely(aclk_connected))
         info("Disconnect detected");
     aclk_subscribed = 0;
     aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
-    aclk_connection_initialized = 0;
+    aclk_connected = 0;
     aclk_connecting = 0;
-    aclk_mqtt_connected = 0;
 }
 
 void aclk_shutdown()
 {
     info("Shutdown initiated");
-    aclk_connection_initialized = 0;
+    aclk_connected = 0;
     _link_shutdown();
     info("Shutdown complete");
 }
