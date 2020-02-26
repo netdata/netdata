@@ -426,56 +426,6 @@ AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# ACLK
-
-#currently env var ACLK must be set to 'yes' to even consider building ACLK
-if test "${ACLK}" = "yes"; then
-    AC_MSG_CHECKING([if libmosquitto static lib is present])
-    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        HAVE_libmosquitto_a="yes"
-    else
-        HAVE_libmosquitto_a="no"
-    fi
-    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
-
-    AC_MSG_CHECKING([if libwebsockets static lib is present])
-    if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-        LWS_LIBS="-I externaldeps/libwebsockets/include"
-        if test "${build_target}" = "linux"; then
-            LWS_LIBS=" -lcap"
-        fi
-        AC_MSG_RESULT([yes])
-    else
-        AC_MSG_RESULT([no])
-    fi
-
-    AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}"; then
-        can_enable_aclk="yes"
-    else
-        can_enable_aclk="no"
-    fi
-    AC_MSG_RESULT([${can_enable_aclk}])
-
-    test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
-        AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
-
-    AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
-    if test "${aclk_required}" = "detect"; then
-        enable_aclk=$can_enable_aclk
-    else
-        enable_aclk=$aclk_required
-    fi
-
-    if test "${enable_aclk}" = "yes"; then
-        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-    fi
-
-    AC_MSG_RESULT([${enable_aclk}])
-fi
-AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
-
-# -----------------------------------------------------------------------------
 # Exporting engine
 AC_MSG_CHECKING([if netdata exporting engine should be used])
 if test "${UV_LIBS}"; then
@@ -590,6 +540,61 @@ fi
 AC_MSG_RESULT([${with_libcap}])
 AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
+# -----------------------------------------------------------------------------
+# ACLK
+
+#currently env var ACLK must be set to 'yes' to even consider building ACLK
+if test "${ACLK}" = "yes"; then
+    AC_MSG_CHECKING([if libmosquitto static lib is present])
+    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
+        HAVE_libmosquitto_a="yes"
+    else
+        HAVE_libmosquitto_a="no"
+    fi
+    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
+
+    AC_MSG_CHECKING([if libwebsockets static lib is present])
+    if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
+        LWS_LIBS="-I externaldeps/libwebsockets/include"
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
+    fi
+
+    if test "${build_target}" = "linux"; then
+        if test "${with_libcap}" != "no" -a "${have_libcap}" == "yes"; then
+            LWS_LIBS+=" -lcap"
+        else
+            #to make it more obvious why aclk can't be built
+            AC_MSG_WARN([-lcap is needed to build aclk on linux])
+        fi
+    fi
+
+    AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
+    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}" -a "${have_libcap}" == "yes"; then
+        can_enable_aclk="yes"
+    else
+        can_enable_aclk="no"
+    fi
+    AC_MSG_RESULT([${can_enable_aclk}])
+
+    test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
+        AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
+
+    AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
+    if test "${aclk_required}" = "detect"; then
+        enable_aclk=$can_enable_aclk
+    else
+        enable_aclk=$aclk_required
+    fi
+
+    if test "${enable_aclk}" = "yes"; then
+        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+    fi
+
+    AC_MSG_RESULT([${enable_aclk}])
+fi
+AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
