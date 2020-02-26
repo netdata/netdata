@@ -1490,7 +1490,11 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     strncpyz(filename, w->last_url, FILENAME_MAX);
     tok = mystrsep(&url, "?");
     buffer_flush(w->response.data);
-    return mysendfile(w, (tok && *tok)?tok:"/");
+    char *file_selection = (tok && *tok)?tok:"/";
+    if(web_client_default_dashboard == WEB_SERVER_REACT_DASHBOARD && !strcmp(file_selection, "/"))
+        file_selection = "/index-new.html";
+
+    return mysendfile(w, file_selection);
 }
 
 void web_client_process_request(struct web_client *w) {

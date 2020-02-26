@@ -48,6 +48,8 @@ extern int web_client_first_request_timeout;
 extern long web_client_streaming_rate_t;
 
 #define WEB_SERVER_OLD_DASHBOARD 0
+#define WEB_SERVER_REACT_DASHBOARD 1
+extern int web_client_default_dashboard;
 
 #ifdef WEB_SERVER_INTERNALS
 extern LISTEN_SOCKETS api_sockets;
