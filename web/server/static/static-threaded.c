@@ -455,6 +455,19 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+static int is_there_react_dashboard() {
+    char webfilename[FILENAME_MAX + 1];
+    snprintfz(webfilename, FILENAME_MAX, "%s/index-new.html", netdata_configured_web_dir);
+
+    FILE *fs = fopen(webfilename, "r");
+    if(fs) {
+        fclose(fs);
+        return 1;
+    }
+
+    return 0;
+}
+
 void *socket_listen_main_static_threaded(void *ptr) {
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_cleanup, ptr);
             web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
@@ -483,7 +496,10 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
             static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
 
-            web_client_default_dashboard = (int)config_get_boolean(CONFIG_SECTION_WEB, "use react dashboard", web_client_default_dashboard);
+            if (is_there_react_dashboard()) {
+                web_client_default_dashboard = (int) config_get_boolean(CONFIG_SECTION_WEB, "use react dashboard",
+                                                                        web_client_default_dashboard);
+            }
 
             web_server_is_multithreaded = (static_threaded_workers_count > 1);
 
