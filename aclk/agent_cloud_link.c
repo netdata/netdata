@@ -249,7 +249,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         return 0;
 
     // Ignore all commands if agent not stable and reset the last_init_sequence mark
-    if (agent_state == 0) {
+    if (agent_state == AGENT_INITIALIZING) {
         last_init_sequence = now_realtime_sec();
         return 0;
     }
@@ -674,28 +674,6 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     _free_collector(tmp_collector);
 }
 
-// Wait for ACLK connection to be established
-int aclk_wait_for_initialization()
-{
-    if (unlikely(!aclk_connected)) {
-        time_t now = now_realtime_sec();
-
-        while (!aclk_connected && (now_realtime_sec() - now) < ACLK_INITIALIZATION_WAIT) {
-            sleep_usec(USEC_PER_SEC * ACLK_INITIALIZATION_SLEEP_WAIT);
-            _link_event_loop(0);
-
-            if (unlikely(!netdata_exit))
-                return 1;
-        }
-
-        if (unlikely(!aclk_connected)) {
-            error("ACLK connection cannot be established");
-            return 1;
-        }
-    }
-    return 0;
-}
-
 int aclk_execute_query(struct aclk_query *this_query)
 {
     if (strncmp(this_query->query, "/api/v1/", 8) == 0) {
@@ -858,20 +836,20 @@ static void aclk_query_thread_cleanup(void *ptr)
  * On startup wait for the agent collectors to initialize
  * Expect at least a time of ACLK_STABLE_TIMEOUT seconds
  * of no new collectors coming in in order to mark the agent
- * as stable (set agent_state = 1)
+ * as stable (set agent_state = AGENT_STABLE)
  */
 void *aclk_query_main_thread(void *ptr)
 {
     netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
 
-    while (!agent_state && !netdata_exit) {
+    while (agent_state == AGENT_STABILIZING && !netdata_exit) {
         time_t checkpoint;
 
         checkpoint = now_realtime_sec() - last_init_sequence;
         info("Waiting for agent collectors to initialize");
         sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
         if (checkpoint > ACLK_STABLE_TIMEOUT) {
-            agent_state = 1;
+            agent_state = AGENT_STABLE;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
 #ifdef ACLK_DEBUG
             _dump_connector_list();
@@ -1016,8 +994,8 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
 
     UNUSED(msg_id);
 
-    if (unlikely(aclk_wait_for_initialization()))
-        return 1;
+    if(!aclk_connected)
+        return 0;
 
     if (unlikely(!message))
         return 0;
@@ -1284,7 +1262,7 @@ void aclk_single_update_enable()
 // Trigged by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
-    if (unlikely(!agent_state))
+    if (unlikely(agent_state != AGENT_STABLE))
         return;
 
     aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
@@ -1348,7 +1326,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     if (host != localhost)
         return 0;
 
-    if (agent_state == 0)
+    if (agent_state != AGENT_STABLE)
         return 0;
 
     /*
