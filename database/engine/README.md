@@ -41,7 +41,7 @@ can select the memory mode for localhost by editing netdata.conf and setting:
 For setting the memory mode for the rest of the nodes you should look at
 [streaming](../../streaming/).
 
-The `history` configuration option is meaningless for `memory mode = dbengine` and is ignored for any metrics being
+>**Tip!** For `memory mode = dbengine`, the `history` configuration option is meaningless and is ignored for any metrics being
 stored in the DB engine.
 
 All DB engine instances, for localhost and all other streaming recipient nodes inherit their configuration from
