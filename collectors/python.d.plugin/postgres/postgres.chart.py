@@ -766,7 +766,7 @@ CHARTS = {
         ]
     },
     'backend_usage': {
-        'options': [None, '% of Connections in use', 'percentage', 'backend processes', 'postgres.backend_process', 'stacked'],
+        'options': [None, '% of Connections in use', 'percentage', 'backend processes', 'postgres.backend_usage', 'stacked'],
         'lines': [
             ['available', 'available', 'percentage-of-absolute-row'],
             ['used', 'used', 'percentage-of-absolute-row']
