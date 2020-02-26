@@ -18,11 +18,7 @@ static int waiting_init = 1;
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
 static int aclk_connection_initialized = 0;
-
-// TODO modify previous comment if this stays this way
-// con_initialized means library is initialized and ready to be used
-// acklk_connected means there is actually an established connection
-int aclk_mqtt_connected = 0;
+static int aclk_mqtt_connected = 0;
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -1087,6 +1083,7 @@ void aclk_connect()
 {
     info("Connection detected");
     aclk_connection_initialized = 1;
+    aclk_mqtt_connected = 1;
     waiting_init = 0;
     aclk_reconnect_delay(0);
     QUERY_THREAD_WAKEUP;
@@ -1103,6 +1100,7 @@ void aclk_disconnect()
     waiting_init = 1;
     aclk_connection_initialized = 0;
     aclk_connecting = 0;
+    aclk_mqtt_connected = 0;
 }
 
 void aclk_shutdown()

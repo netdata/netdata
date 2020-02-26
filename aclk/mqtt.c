@@ -38,8 +38,6 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(rc);
 
     info("Connection to cloud estabilished");
-
-    aclk_mqtt_connected = 1;
     aclk_connect();
 
     return;
@@ -52,8 +50,6 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(rc);
 
     info("Connection to cloud failed");
-
-    aclk_mqtt_connected = 0;
     aclk_disconnect();
 
     aclk_lws_wss_mqtt_layer_disconect_notif();
