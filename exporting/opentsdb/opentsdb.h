@@ -5,7 +5,6 @@
 
 #include "exporting/exporting_engine.h"
 
-int init_opentsdb_connector(struct connector *connector);
 int init_opentsdb_telnet_instance(struct instance *instance);
 int init_opentsdb_http_instance(struct instance *instance);
 

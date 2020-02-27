@@ -25,6 +25,7 @@ SUBDIRS = \
     python.d.plugin \
     slabinfo.plugin \
     statsd.plugin \
+    ebpf_process.plugin \
     tc.plugin \
     $(NULL)
 

@@ -1,6 +1,6 @@
-# openldap
+# OpenLDAP monitoring with Netdata
 
-This module provides statistics information from openldap (slapd) server.
+Provides statistics information from openldap (slapd) server.
 Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(5) is available.
 
 **Requirement:**
@@ -47,7 +47,15 @@ Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(
     -   read
     -   write
 
-### configuration
+## Configuration
+
+Edit the `python.d/openldap.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/openldap.conf
+```
 
 Sample:
 

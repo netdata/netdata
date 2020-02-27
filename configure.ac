@@ -161,6 +161,14 @@ AC_ARG_ENABLE(
     ,
     [enable_jsonc="detect"]
 )
+if test "${ACLK}" = "yes"; then
+AC_ARG_ENABLE(
+    [aclk],
+    ,
+    [aclk_required="${enableval}"],
+    [aclk_required="detect"]
+)
+fi
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -295,6 +303,17 @@ AC_CHECK_LIB(
     [LZ4_LIBS="-llz4"]
 )
 
+# -----------------------------------------------------------------------------
+# libwebsockets pure C library for implementing modern network protocols
+
+if test "${ACLK}" = "yes"; then
+    AC_CHECK_LIB(
+        [websockets],
+        [lws_set_timer_usecs],
+        [LWS_LIBS="-lwebsockets"]
+    )
+fi
+
 
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
@@ -342,7 +361,6 @@ AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
-
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
 
@@ -367,15 +385,14 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
-# OpenSSL Cryptography and SSL/TLS Toolkit
-
+# eBPF plugin libs
 AC_CHECK_LIB(
     [dl],
     [dlopen],
-    [NETWORK_VIEWER_LIBS="-ldl"]
+    [EBPF_LIBS="-ldl"]
 )
 
-OPTIONAL_NETWORK_VIEWER_LIBS="${NETWORK_VIEWER_LIBS}"
+OPTIONAL_EBPF_LIBS="${EBPF_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS
@@ -418,6 +435,45 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# ACLK
+
+#currenlty env var ACLK must be set to 'yes' to even consider building ACLK
+if test "${ACLK}" = "yes"; then
+    AC_MSG_CHECKING([if libmosquitto static lib is present])
+    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
+        HAVE_libmosquitto_a="yes"
+    else
+        HAVE_libmosquitto_a="no"
+    fi
+    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
+
+    AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
+    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}"; then
+        can_enable_aclk="yes"
+    else
+        can_enable_aclk="no"
+    fi
+    AC_MSG_RESULT([${can_enable_aclk}])
+
+    test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
+        AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
+
+    AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
+    if test "${aclk_required}" = "detect"; then
+        enable_aclk=$can_enable_aclk
+    else
+        enable_aclk=$aclk_required
+    fi
+
+    if test "${enable_aclk}" = "yes"; then
+        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+    fi
+
+    AC_MSG_RESULT([${enable_aclk}])
+fi
+AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # Exporting engine
@@ -815,16 +871,18 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# networkviewer.plugin
+# ebpf_process.plugin
 
-AC_MSG_CHECKING([if networkviewer.plugin should be enabled])
-if test "${build_target}" == "linux" -a "${NETWORK_VIEWER_LIBS}"; then
+AC_MSG_CHECKING([if ebpf_process.plugin should be enabled])
+if test "${build_target}" == "linux" -a "${EBPF_LIBS}"; then
     enable_network_viewer="yes"
+    enable_vfs="yes"
 else
+    enable_vfs="no"
     enable_network_viewer="no"
 fi
-AC_MSG_RESULT([${enable_network_viewer}])
-AM_CONDITIONAL([ENABLE_PLUGIN_NETWORK_VIEWER], [test "${enable_network_viewer}" = "yes"])
+AC_MSG_RESULT([${enable_vfs}])
+AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_vfs}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1139,7 +1197,7 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_LIBS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1161,7 +1219,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
-AC_SUBST([OPTIONAL_NETWORK_VIEWER_LIBS])
+AC_SUBST([OPTIONAL_EBPF_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
@@ -1169,6 +1227,7 @@ AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CFLAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
+AC_SUBST([OPTIONAL_MQTT_LIBS])
 AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
 AC_SUBST([OPTIONAL_LIBCAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
@@ -1242,6 +1301,7 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/slabinfo.plugin/Makefile
     collectors/statsd.plugin/Makefile
+    collectors/ebpf_process.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
@@ -1253,6 +1313,7 @@ AC_CONFIG_FILES([
     exporting/graphite/Makefile
     exporting/json/Makefile
     exporting/opentsdb/Makefile
+    exporting/aws_kinesis/Makefile
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
@@ -1264,6 +1325,7 @@ AC_CONFIG_FILES([
     libnetdata/clocks/Makefile
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
+    libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
@@ -1308,6 +1370,7 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
+    aclk/Makefile
 ])
 AC_OUTPUT
 

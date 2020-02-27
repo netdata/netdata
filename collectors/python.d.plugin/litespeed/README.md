@@ -1,6 +1,6 @@
-# litespeed
+# LiteSpeed monitoring with Netdata
 
-Module monitor litespeed web server performance metrics.
+Collects web server performance metrics for network, connection, requests, and cache.  
 
 It produces:
 
@@ -44,7 +44,15 @@ It produces:
 
     -   hits
 
-## configuration
+## Configuration
+
+Edit the `python.d/litespeed.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/litespeed.conf
+```
 
 ```yaml
 local:

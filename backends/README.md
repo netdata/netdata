@@ -39,7 +39,7 @@ So, although Netdata collects metrics every second, it can send to the backend s
         metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
         protocol](prometheus/). Notes on using the remote write backend are [here](prometheus/remote_write/).
 
-    -   ****TimescaleDB** via [community-built connector](TIMESCALE.md) that takes JSON streams from a Netdata client
+    -   **TimescaleDB** via [community-built connector](TIMESCALE.md) that takes JSON streams from a Netdata client
         and writes them to a TimescaleDB table.
 
     -   **AWS Kinesis Data Streams**
@@ -183,9 +183,14 @@ from your Netdata):
      are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
 -   `host tags = list of TAG=VALUE` defines tags that should be appended on all metrics for the given host. These are
-     currently only sent to opentsdb and prometheus. Please use the appropriate format for each time-series db. For
-     example opentsdb likes them like `TAG1=VALUE1 TAG2=VALUE2`, but prometheus like `tag1="value1",tag2="value2"`. Host
-     tags are mirrored with database replication (streaming of metrics between Netdata servers).
+     currently only sent to graphite, json, opentsdb and prometheus. Please use the appropriate format for each
+     time-series db. For example opentsdb likes them like `TAG1=VALUE1 TAG2=VALUE2`, but prometheus like `tag1="value1",
+     tag2="value2"`. Host tags are mirrored with database replication (streaming of metrics between Netdata servers).
+
+     Starting from Netdata v1.20 the host tags are parsed in accordance with a configured backend type and stored as
+     host labels so that they can be reused in API responses and exporting connectors. The parsing is supported for
+     graphite, json, opentsdb, and prometheus (default) backend types. You can check how the host tags were parsed using
+     the /api/v1/info API call.
 
 ## monitoring operation
 

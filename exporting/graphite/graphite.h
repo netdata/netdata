@@ -5,7 +5,6 @@
 
 #include "exporting/exporting_engine.h"
 
-int init_graphite_connector(struct connector *connector);
 int init_graphite_instance(struct instance *instance);
 
 void sanitize_graphite_label_value(char *dst, char *src, size_t len);

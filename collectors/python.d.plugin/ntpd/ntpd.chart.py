@@ -4,11 +4,10 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import struct
 import re
+import struct
 
 from bases.FrameworkServices.SocketService import SocketService
-
 
 # NTP Control Message Protocol constants
 MODE = 6

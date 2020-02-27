@@ -14,7 +14,7 @@ backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @cosmix @Ferroin @knatsakis @ncmans @prologic
 collectors/ @vlvkobal @mfundul @cosmix
-collectors/charts.d.plugin/ @cosmix
+collectors/charts.d.plugin/ @ilyam8 @Ferroin @prologic @cosmix
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cosmix
 collectors/macos.plugin/ @vlvkobal @thiagoftsm @cosmix
 collectors/node.d.plugin/ @jacekkolasa @cosmix
@@ -25,7 +25,7 @@ collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cosmix
 daemon/ @thiagoftsm @mfundul @cosmix
 database/ @mfundul @thiagoftsm @cosmix
-docs/ @cosmix @joelhans
+docs/ @cosmix @joelhans @shortpatti
 health/ @thiagoftsm @vlvkobal @cosmix
 health/health.d/ @thiagoftsm @vlvkobal @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cosmix
@@ -37,7 +37,7 @@ web/ @thiagoftsm @mfundul @vlvkobal @cosmix
 web/gui/ @jacekkolasa @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
-*.md @cosmix @joelhans
+*.md @cosmix @joelhans @shortpatti
 *.am @cosmix @Ferroin @knatsakis @ncmans @prologic
 Dockerfile.* @Ferroin @knatsakis @ncmans @prologic @cosmix
 

@@ -1,6 +1,6 @@
-# httpcheck
+# HTTP endpoint monitoring with Netdata
 
-Module monitors remote http server for availability and response time.
+Monitors remote http server for availability and response time.
 
 Following charts are drawn per job:
 
@@ -17,7 +17,15 @@ Following charts are drawn per job:
     -   Connection failed: port not listening or blocked
     -   Connection timed out: host or port unreachable
 
-## configuration
+## Configuration
+
+Edit the `python.d/httpcheck.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/httpcheck.conf
+```
 
 Sample configuration and their default values.
 
@@ -32,7 +40,7 @@ server:
   redirect: yes                 # optional
 ```
 
-### notes
+### Notes
 
 -   The status chart is primarily intended for alarms, badges or for access via API.
 -   A system/service/firewall might block Netdata's access if a portscan or

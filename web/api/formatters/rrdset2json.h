@@ -5,6 +5,6 @@
 
 #include "rrd2json.h"
 
-extern void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used);
+extern void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile);
 
 #endif //NETDATA_API_FORMATTER_RRDSET2JSON_H

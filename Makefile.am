@@ -62,6 +62,9 @@ dist_noinst_DATA = \
     packaging/version \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/mosquitto.version \
+    packaging/mosquitto.checksums \
+    packaging/bundle-mosquitto.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
@@ -100,6 +103,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+    aclk \
     $(NULL)
 
 
@@ -108,6 +112,7 @@ AM_CFLAGS = \
     $(OPTIONAL_NFACCT_CFLAGS) \
     $(OPTIONAL_ZLIB_CFLAGS) \
     $(OPTIONAL_UUID_CFLAGS) \
+    $(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
@@ -115,10 +120,6 @@ AM_CFLAGS = \
     $(NULL)
 
 sbin_PROGRAMS =
-dist_cache_DATA = packaging/installer/.keep
-dist_varlib_DATA = packaging/installer/.keep
-dist_registry_DATA = packaging/installer/.keep
-dist_log_DATA = packaging/installer/.keep
 plugins_PROGRAMS =
 
 LIBNETDATA_FILES = \
@@ -134,6 +135,8 @@ LIBNETDATA_FILES = \
     libnetdata/clocks/clocks.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
+    libnetdata/ebpf/ebpf.c \
+    libnetdata/ebpf/ebpf.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
@@ -260,6 +263,11 @@ NETWORKVIEWER_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+EBPF_PROCESS_PLUGIN_FILES = \
+    collectors/ebpf_process.plugin/ebpf_process.c \
+    collectors/ebpf_process.plugin/ebpf_process.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
 
 PROC_PLUGIN_FILES = \
     collectors/proc.plugin/ipc.c \
@@ -467,6 +475,15 @@ CLAIM_PLUGIN_FILES = \
     claim/claim.h \
     $(NULL)
 
+ACLK_PLUGIN_FILES = \
+    aclk/agent_cloud_link.c \
+    aclk/agent_cloud_link.h \
+    aclk/mqtt.c \
+    aclk/mqtt.h \
+    aclk/aclk_lws_wss_client.c \
+    aclk/aclk_lws_wss_client.h \
+    $(NULL)
+
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
     exporting/exporting_engine.h \
@@ -482,6 +499,13 @@ EXPORTING_ENGINE_FILES = \
     exporting/check_filters.c \
     exporting/send_data.c \
     exporting/send_internal_metrics.c \
+    $(NULL)
+
+KINESIS_EXPORTING_FILES = \
+    exporting/aws_kinesis/aws_kinesis.c \
+    exporting/aws_kinesis/aws_kinesis.h \
+    exporting/aws_kinesis/aws_kinesis_put_record.cc \
+    exporting/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
 KINESIS_BACKEND_FILES = \
@@ -537,6 +561,12 @@ NETDATA_FILES = \
     $(CLAIM_PLUGIN_FILES) \
     $(NULL)
 
+if ENABLE_ACLK
+    NETDATA_FILES += \
+        $(ACLK_PLUGIN_FILES) \
+        $(NULL)
+endif
+
 if FREEBSD
     NETDATA_FILES += \
         $(FREEBSD_PLUGIN_FILES) \
@@ -570,12 +600,14 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_ZLIB_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_UUID_LIBS) \
+    $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_NETWORK_VIEWER_LIBS) \
+    $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
 
 NETDATACLI_FILES = \
@@ -587,9 +619,18 @@ NETDATACLI_FILES = \
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
+
+if ENABLE_ACLK
+netdata_LDADD = \
+    externaldeps/mosquitto/libmosquitto.a \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+else
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
+endif
+
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
@@ -641,6 +682,14 @@ if ENABLE_PLUGIN_FREEIPMI
         $(NULL)
 endif
 
+if ENABLE_PLUGIN_EBPF
+    plugins_PROGRAMS += ebpf_process.plugin
+    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
+    ebpf_process_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
 if ENABLE_PLUGIN_CUPS
     plugins_PROGRAMS += cups.plugin
     cups_plugin_SOURCES = $(CUPS_PLUGIN_FILES)
@@ -682,6 +731,13 @@ if ENABLE_PLUGIN_SLABINFO
     slabinfo_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_EXPORTING
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
 endif
 
 if ENABLE_BACKEND_KINESIS
@@ -806,6 +862,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=notify_workers \
         -Wl,--wrap=send_internal_metrics \
         -Wl,--wrap=now_realtime_sec \
+        -Wl,--wrap=uv_thread_set_name_np \
         -Wl,--wrap=uv_thread_create \
         -Wl,--wrap=uv_mutex_lock \
         -Wl,--wrap=uv_mutex_unlock \
@@ -819,4 +876,14 @@ if ENABLE_UNITTESTS
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+if ENABLE_BACKEND_KINESIS
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=aws_sdk_init \
+        -Wl,--wrap=kinesis_init \
+        -Wl,--wrap=kinesis_put_record \
+        -Wl,--wrap=kinesis_get_result \
+        $(NULL)
+endif
 endif

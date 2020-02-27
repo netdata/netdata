@@ -68,6 +68,9 @@ cgroup-network
 
 networkviewer.plugin
 
+ebpf_process.plugin
+!ebpf_process.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h
@@ -194,3 +197,6 @@ docs/generator/mkdocs.yml
 
 #CLion files
 netdata.cbp
+
+# External dependencies
+externaldeps/

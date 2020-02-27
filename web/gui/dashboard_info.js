@@ -534,8 +534,19 @@ netdataDashboard.menu = {
         title: 'Squid log',
         icon: '<i class="fas fa-file-alt"></i>',
         info: undefined
-    }
+    },
 
+    'cockroachdb': {
+        title: 'CockroachDB',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance and health statistics for various <code>CockroachDB</code> components.'
+    },
+
+    'ebpf': {
+        title: 'eBPF',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Monitor system calls, internal functtions, bytes read, bytes written and errors using <code>eBPF</code>.'
+    }
 };
 
 
@@ -2828,6 +2839,225 @@ netdataDashboard.context = {
 
     'squidlog.mime_type_requests': {
         info: 'The content type of the object as seen in the HTTP reply header. Please note that ICP exchanges usually don\'t have any content type.'
+    },
+
+    // ------------------------------------------------------------------------
+    // CockroachDB
+
+    'cockroachdb.process_cpu_time_combined_percentage': {
+        info: 'Current combined cpu utilization, calculated as <code>(user+system)/num of logical cpus</code>.'
+    },
+
+    'cockroachdb.host_disk_bandwidth': {
+        info: 'Summary disk bandwidth statistics across all system host disks.'
+    },
+
+    'cockroachdb.host_disk_operations': {
+        info: 'Summary disk operations statistics across all system host disks.'
+    },
+
+    'cockroachdb.host_disk_iops_in_progress': {
+        info: 'Summary disk iops in progress statistics across all system host disks.'
+    },
+
+    'cockroachdb.host_network_bandwidth': {
+        info: 'Summary network bandwidth statistics across all system host network interfaces.'
+    },
+
+    'cockroachdb.host_network_packets': {
+        info: 'Summary network packets statistics across all system host network interfaces.'
+    },
+
+    'cockroachdb.live_nodes': {
+        info: 'Will be <code>0</code> if this node is not itself live.'
+    },
+
+    'cockroachdb.total_storage_capacity': {
+        info: 'Entire disk capacity. It includes non-CR data, CR data, and empty space.'
+    },
+
+    'cockroachdb.storage_capacity_usability': {
+        info: '<code>usable</code> is sum of empty space and CR data, <code>unusable</code> is space used by non-CR data.'
+    },
+
+    'cockroachdb.storage_usable_capacity': {
+        info: 'Breakdown of <code>usable</code> space.'
+    },
+
+    'cockroachdb.storage_used_capacity_percentage': {
+        info: '<code>total</code> is % of <b>total</b> space used, <code>usable</code> is % of <b>usable</b> space used.'
+    },
+
+    'cockroachdb.sql_bandwidth': {
+        info: 'The total amount of SQL client network traffic.'
+    },
+
+    'cockroachdb.sql_errors': {
+        info: '<code>statement</code> is statements resulting in a planning or runtime error, ' +
+            '<code>transaction</code> is SQL transactions abort errors.'
+    },
+
+    'cockroachdb.sql_started_ddl_statements': {
+        info: 'The amount of <b>started</b> DDL (Data Definition Language) statements. ' +
+            'This type means database schema changes. ' +
+            'It includes <code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>, <code>RENAME</code>, <code>TRUNCATE</code> and <code>COMMENT</code> statements.'
+    },
+
+    'cockroachdb.sql_executed_ddl_statements': {
+        info: 'The amount of <b>executed</b> DDL (Data Definition Language) statements. ' +
+            'This type means database schema changes. ' +
+            'It includes <code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>, <code>RENAME</code>, <code>TRUNCATE</code> and <code>COMMENT</code> statements.'
+    },
+
+    'cockroachdb.sql_started_dml_statements': {
+        info: 'The amount of <b>started</b> DML (Data Manipulation Language) statements.'
+    },
+
+    'cockroachdb.sql_executed_dml_statements': {
+        info: 'The amount of <b>executed</b> DML (Data Manipulation Language) statements.'
+    },
+
+    'cockroachdb.sql_started_tcl_statements': {
+        info: 'The amount of <b>started</b> TCL (Transaction Control Language) statements.'
+    },
+
+    'cockroachdb.sql_executed_tcl_statements': {
+        info: 'The amount of <b>executed</b> TCL (Transaction Control Language) statements.'
+    },
+
+    'cockroachdb.live_bytes': {
+        info: 'The amount of live data used by both applications and the CockroachDB system.'
+    },
+
+    'cockroachdb.kv_transactions': {
+        info: 'KV transactions breakdown:<br>' +
+            '<ul>' +
+            ' <li><code>committed</code> committed KV transactions (including 1PC).</li>' +
+            ' <li><code>fast-path_committed</code> KV transaction on-phase commit attempts.</li>' +
+            ' <li><code>aborted</code> aborted KV transactions.</li>' +
+            ' </ul>'
+    },
+
+    'cockroachdb.kv_transaction_restarts': {
+        info: 'KV transactions restarts breakdown:<br>' +
+            '<ul>' +
+            ' <li><code>write too old</code> restarts due to a concurrent writer committing first.</li>' +
+            ' <li><code>write too old (multiple)</code> restarts due to multiple concurrent writers committing first.</li>' +
+            ' <li><code>forwarded timestamp (iso=serializable)</code> restarts due to a forwarded commit timestamp and isolation=SERIALIZABLE".</li>' +
+            ' <li><code>possible replay</code> restarts due to possible replays of command batches at the storage layer.</li>' +
+            ' <li><code>async consensus failure</code> restarts due to async consensus writes that failed to leave intents.</li>' +
+            ' <li><code>read within uncertainty interval</code> restarts due to reading a new value within the uncertainty interval.</li>' +
+            ' <li><code>aborted</code> restarts due to an abort by a concurrent transaction (usually due to deadlock).</li>' +
+            ' <li><code>push failure</code> restarts due to a transaction push failure.</li>' +
+            ' <li><code>unknown</code> restarts due to a unknown reasons.</li>' +
+            ' </ul>'
+    },
+
+    'cockroachdb.ranges': {
+        info: 'CockroachDB stores all user data (tables, indexes, etc.) and almost all system data in a giant sorted map of key-value pairs. ' +
+            'This keyspace is divided into "ranges", contiguous chunks of the keyspace, so that every key can always be found in a single range.'
+    },
+
+    'cockroachdb.ranges_replication_problem': {
+        info: 'Ranges with not optimal number of replicas:<br>' +
+            '<ul>' +
+            ' <li><code>unavailable</code> ranges with fewer live replicas than needed for quorum.</li>' +
+            ' <li><code>under replicated</code> ranges with fewer live replicas than the replication target.</li>' +
+            ' <li><code>over replicated</code> ranges with more live replicas than the replication target.</li>' +
+            ' </ul>'
+    },
+
+    'cockroachdb.replicas': {
+        info: 'CockroachDB replicates each range (3 times by default) and stores each replica on a different node.'
+    },
+
+    'cockroachdb.replicas_leaders': {
+        info: 'For each range, one of the replicas is the <code>leader</code> for write requests, <code>not leaseholders</code> is the number of Raft leaders whose range lease is held by another store.'
+    },
+
+    'cockroachdb.replicas_leaseholders': {
+        info: 'For each range, one of the replicas holds the "range lease". This replica, referred to as the <code>leaseholder</code>, is the one that receives and coordinates all read and write requests for the range.'
+    },
+
+    'cockroachdb.queue_processing_failures': {
+        info: 'Failed replicas breakdown by queue:<br>' +
+            '<ul>' +
+            ' <li><code>gc</code> replicas which failed processing in the GC queue.</li>' +
+            ' <li><code>replica gc</code> replicas which failed processing in the replica GC queue.</li>' +
+            ' <li><code>replication</code> replicas which failed processing in the replicate queue.</li>' +
+            ' <li><code>split</code> replicas which failed processing in the split queue.</li>' +
+            ' <li><code>consistency</code> replicas which failed processing in the consistency checker queue.</li>' +
+            ' <li><code>raft log</code> replicas which failed processing in the Raft log queue.</li>' +
+            ' <li><code>raft snapshot</code> replicas which failed processing in the Raft repair queue.</li>' +
+            ' <li><code>time series maintenance</code> replicas which failed processing in the time series maintenance queue.</li>' +
+            ' </ul>'
+    },
+
+    'cockroachdb.rebalancing_queries': {
+        info: 'Number of kv-level requests received per second by the store, averaged over a large time period as used in rebalancing decisions.'
+    },
+
+    'cockroachdb.rebalancing_writes': {
+        info: 'Number of keys written (i.e. applied by raft) per second to the store, averaged over a large time period as used in rebalancing decisions.'
+    },
+
+    'cockroachdb.slow_requests': {
+        info: 'Requests that have been stuck for a long time.'
+    },
+
+    'cockroachdb.timeseries_samples': {
+        info: 'The amount of metric samples written to disk.'
+    },
+
+    'cockroachdb.timeseries_write_errors': {
+        info: 'The amount of errors encountered while attempting to write metrics to disk.'
+    },
+
+    'cockroachdb.timeseries_write_bytes': {
+        info: 'Size of metric samples written to disk.'
+    },
+
+    // ------------------------------------------------------------------------
+    // eBPF
+
+    'ebpf.file_descriptor': {
+        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function \'do_sys_open\', that is the common function called from open(2) and openat(2). The close dimension is attached to the function \'__close_fd\', that is called from system call close(2).'
+    },
+
+    'ebpf.file_error': {
+        info: 'File error shows the number of calls that returned an error when called per period.'
+    },
+
+    'ebpf.deleted_objects': {
+        info: 'Deleted objects monitors calls to the function \'vfs_unlink\'. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
+    },
+
+    'ebpf.io': {
+        info: 'IO shows the number of calls for functions \'vfs_read\' and \'vfs_write\' independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
+    },
+
+    'ebpf.io_bytes': {
+        info: 'IO bytes shows the total of bytes read or written with success using the functions  \'vfs_read\' and \'vfs_write\'.'
+    },
+
+    'ebpf.io_error': {
+        info: 'IO error shows the number of calls for \'vfs_read\' and \'vfs_write\' that did not have success.'
+    },
+
+    'ebpf.process_thread': {
+        info: 'Process thread counts the number of times that the function \'do_fork\' was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for \'sys_clone\' that has the flag \'CLONE_THREAD\' set.'
+    },
+
+    'ebpf.exit': {
+        info: 'Exit count the number of calls for the functions responsible to close (\'do_exit\') and release(\'release_task\') tasks.'
+    },
+
+    'ebpf.task_error': {
+        info: 'Task error count the number of errors to create a new process or thread.'
+    },
+
+    'ebpf.process_status': {
+        info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
     }
 
 };
