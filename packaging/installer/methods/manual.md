@@ -61,16 +61,16 @@ This is how to do it by hand:
 
 ```sh
 # Debian / Ubuntu
-apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake libwebsockets-dev
+apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
 
 # Fedora
-dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake libwebsockets-devel
+dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 
 # CentOS / Red Hat Enterprise Linux
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel cmake libwebsockets-devel
+yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel cmake
 
 # openSUSE
-zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake libwebsockets-devel
+zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 ```
 
 Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
@@ -119,8 +119,6 @@ Netdata Cloud support may require the following packages to be installed:
 
 | package  | description
 |:--------:| -----------------------
-| `libwebsockets-devel` | Version 3 or higher is at needed build time for websockets support for Netdata Cloud
-| `libwebsockets` | Version 3 or higher is needed at runtime for websockets support for Netdata Cloud
 | `cmake` | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*

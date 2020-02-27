@@ -436,7 +436,7 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
-  run make -C "${1}/lib"
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
 }
 
 copy_libmosquitto() {
@@ -492,8 +492,8 @@ bundle_libmosquitto
 
 build_libwebsockets() {
   pushd "${1}" > /dev/null || exit 1
-  cmake -D LWS_WITH_SOCKS5:bool=ON .
-  make
+  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make
   popd > /dev/null || exit 1
 }
 
