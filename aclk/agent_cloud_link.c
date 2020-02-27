@@ -933,9 +933,6 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-        if (aclk_connected)
-            _link_event_loop();
-        debug(D_ACLK, "LINK event loop called");
 
         if (unlikely(!aclk_connected)) {
             if (unlikely(first_init)) {
@@ -956,21 +953,27 @@ void *aclk_main(void *ptr)
                     sleep_usec(USEC_PER_MS * 100);
                 }
             }
+            if (aclk_connecting) {
+                _link_event_loop();
+                sleep_usec(USEC_PER_MS * 100);
+            }
             continue;
         }
 
-        if (likely(aclk_connected)) {
-            if (unlikely(!aclk_subscribed)) {
-                aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
-            }
+        _link_event_loop();
+        sleep_usec(USEC_PER_MS * 100);
 
-            if (unlikely(!query_thread)) {
-                query_thread = callocz(1, sizeof(struct netdata_static_thread));
-                query_thread->thread = mallocz(sizeof(netdata_thread_t));
-                netdata_thread_create(
-                    query_thread->thread, ACLK_THREAD_NAME, NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread,
-                    query_thread);
-            }
+        // TODO: Move to on-connect
+        if (unlikely(!aclk_subscribed)) {
+            aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
+        }
+
+        if (unlikely(!query_thread)) {
+            query_thread = callocz(1, sizeof(struct netdata_static_thread));
+            query_thread->thread = mallocz(sizeof(netdata_thread_t));
+            netdata_thread_create(
+                query_thread->thread, ACLK_THREAD_NAME, NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread,
+                query_thread);
         }
     } // forever
 exited:

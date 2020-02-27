@@ -276,6 +276,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_GET_THREAD_ID: // ?
         case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
             // Expected and safe to ignore.
+            debug(D_ACLK, "Ignoring expected callback from LWS: %s", aclk_lws_callback_name(reason));
             return retval;
 
         default:
