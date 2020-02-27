@@ -616,7 +616,7 @@ provided by the snippet:
 
 In the first example, a value of `30`, without specifying the minimum, fills the chart bar to '75 %` (100% / 40 * 30). However, in this example the range is now `20` (40 - 20 = 20). The value `30` will fill the chart to ** '50 %`**, since it's in the middle between 20 and 40.
 
-This szenario is useful if you have metrics that change only within a specific range, e.g. temperatures that are very unlikely to fall out of range. In these cases it is more useful to have the chart render the values between the given min and max, to better highlight the changes within them.
+This scenario is useful if you have metrics that change only within a specific range, e.g. temperatures that are very unlikely to fall out of range. In these cases it is more useful to have the chart render the values between the given min and max, to better highlight the changes within them.
 
 #### Negative values
 

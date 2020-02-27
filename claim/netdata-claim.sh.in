@@ -12,7 +12,7 @@
 # Exit code: 5 - Unknown HTTP error message
 #
 # OK: Agent claimed successfully
-# HTTP Status code: 200
+# HTTP Status code: 204
 # Exit code: 0
 #
 # Error: The agent id is invalid; it does not fulfill the constraints
@@ -40,10 +40,10 @@
 # Error message: "duplicate agent id"
 # Exit code: 10
 #
-# Error: Already claimed in another workspace;
-#        this agent (same id, same public key) already belongs to another workspace
+# Error: Already claimed in another space;
+#        this agent (same id, same public key) already belongs to another space
 # HTTP Status code: 403
-# Error message: "claimed in another workspace"
+# Error message: "claimed in another space"
 # Exit code: 11
 #
 # Error: Internal server error. Any other unexpected error (DB problems, etc.)
@@ -142,7 +142,7 @@ if [ ! -f "${CLAIMING_DIR}/public.pem" ] ; then
 	fi
 fi
 
-TARGET_URL="${URL_BASE}/api/v1/workspaces/agents/${ID}"
+TARGET_URL="${URL_BASE}/api/v1/spaces/nodes/${ID}"
 # shellcheck disable=SC2002
 KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
 # shellcheck disable=SC2001
@@ -150,7 +150,7 @@ KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
 
 cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
 {
-    "agent": {
+    "node": {
         "id": "$ID",
         "hostname": "$HOSTNAME"
     },
@@ -193,19 +193,19 @@ if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
 fi
 
 HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
-if [ "${HTTP_STATUS_CODE}" -ne 200 ] ; then
+if [ "${HTTP_STATUS_CODE}" -ne 204 ] ; then
 	ERROR_MESSAGE=$(grep "\"error\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "error\":\"" '{print $2}' | sed s'/"}//g')
 	case ${ERROR_MESSAGE} in
-		"invalid agent id") EXIT_CODE=6 ;;
+		"invalid node id") EXIT_CODE=6 ;;
 		"invalid public key") EXIT_CODE=7 ;;
 		"token has expired") EXIT_CODE=8 ;;
 		"invalid token") EXIT_CODE=9 ;;
-		"duplicate agent id") EXIT_CODE=10 ;;
-		"claimed in another workspace") EXIT_CODE=11 ;;
+		"duplicate node id") EXIT_CODE=10 ;;
+		"claimed in another space") EXIT_CODE=11 ;;
 		"internal server error") EXIT_CODE=12 ;;
 		*) EXIT_CODE=5 ;;
 	esac
-	echo >&2 "Failed to claim agent."
+	echo >&2 "Failed to claim node."
 	rm -f "${CLAIMING_DIR}/tmpout.txt"
 	exit $EXIT_CODE
 fi
@@ -213,4 +213,4 @@ fi
 rm -f "${CLAIMING_DIR}/tmpout.txt"
 echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id"
 rm -f "${CLAIMING_DIR}/token"
-echo >&2 "Agent was successfully claimed."
+echo >&2 "Node was successfully claimed."

@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- fixed typo [\#8213](https://github.com/netdata/netdata/pull/8213) ([shortpatti](https://github.com/shortpatti))
 - Fix bold text surplus stars [\#8193](https://github.com/netdata/netdata/pull/8193) ([grinapo](https://github.com/grinapo))
+- Add support to new kernels [\#8192](https://github.com/netdata/netdata/pull/8192) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added eBPF to docs navigation and improved title [\#8191](https://github.com/netdata/netdata/pull/8191) ([joelhans](https://github.com/joelhans))
 - Merging the feature branch for the ACLK in the previous sprint. [\#8179](https://github.com/netdata/netdata/pull/8179) ([amoss](https://github.com/amoss))
 - Docs: Fixed figure+image without closing tag [\#8177](https://github.com/netdata/netdata/pull/8177) ([joelhans](https://github.com/joelhans))
@@ -20,11 +22,13 @@
 - Added support for Clear Linux in `install-required-packages.sh`. [\#8154](https://github.com/netdata/netdata/pull/8154) ([Ferroin](https://github.com/Ferroin))
 - docs: Added PR title guidelines to the contribution guidelines, to make CHANGELOG more meaningful [\#8150](https://github.com/netdata/netdata/pull/8150) ([cakrit](https://github.com/cakrit))
 - Add an AWS Kinesis connector to the exporting engine [\#8145](https://github.com/netdata/netdata/pull/8145) ([vlvkobal](https://github.com/vlvkobal))
+- Added libwebsockets bundling code to netdata-installer.sh [\#8144](https://github.com/netdata/netdata/pull/8144) ([Ferroin](https://github.com/Ferroin))
 - Fix formatting in "Custom dashboards" section [\#8102](https://github.com/netdata/netdata/pull/8102) ([YorikSar](https://github.com/YorikSar))
 - Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
 - Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
 - Remove Ubuntu 19.04 from CI and packaging. [\#8040](https://github.com/netdata/netdata/pull/8040) ([Ferroin](https://github.com/Ferroin))
 - Remove OpenSUSE Leap 15.0 from CI. [\#7990](https://github.com/netdata/netdata/pull/7990) ([Ferroin](https://github.com/Ferroin))
+- Removed tmem stat collection from xenstat plugin for Xen 4.13 [\#7951](https://github.com/netdata/netdata/pull/7951) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 - Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
 - Cross-host docker builds [\#7754](https://github.com/netdata/netdata/pull/7754) ([amoss](https://github.com/amoss))
 
@@ -181,7 +185,6 @@
 - Move the script for installing required packages into the main repo. [\#7563](https://github.com/netdata/netdata/pull/7563) ([Ferroin](https://github.com/Ferroin))
 - Stream with labels [\#7549](https://github.com/netdata/netdata/pull/7549) ([thiagoftsm](https://github.com/thiagoftsm))
 - Alarm Log labels [\#7548](https://github.com/netdata/netdata/pull/7548) ([thiagoftsm](https://github.com/thiagoftsm))
-- Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
