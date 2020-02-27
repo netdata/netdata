@@ -61,7 +61,7 @@ struct aclk_lws_wss_engine_instance {
 
 void aclk_lws_wss_client_destroy();
 
-int aclk_lws_wss_connect();
+int aclk_lws_wss_connect(char *host, int port);
 
 int aclk_lws_wss_client_write(void *buf, size_t count);
 int aclk_lws_wss_client_read(void *buf, size_t count);

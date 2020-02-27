@@ -160,11 +160,11 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_ins
 }
 
 // Return code indicates if connection attempt has started async.
-int aclk_lws_wss_connect()
+int aclk_lws_wss_connect(char *host, int port)
 {
     struct lws_client_connect_info i;
     if (!engine_instance) {
-        return aclk_lws_wss_client_init(engine_instance->host, engine_instance->port);
+        return aclk_lws_wss_client_init(host, port);
         // PROTOCOL_INIT callback will call again.
     }
 
@@ -286,7 +286,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
     info("Processing callback %s", aclk_lws_callback_name(reason));
     switch (reason) {
         case LWS_CALLBACK_PROTOCOL_INIT:
-            aclk_lws_wss_connect(); // Makes the outgoing connection
+            aclk_lws_wss_connect(engine_instance->host, engine_instance->port); // Makes the outgoing connection
             break;
         case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
             if (engine_instance->lws_wsi != NULL && engine_instance->lws_wsi != wsi)

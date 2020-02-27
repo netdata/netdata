@@ -933,7 +933,8 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-        _link_event_loop();
+        if (aclk_connected)
+            _link_event_loop();
         debug(D_ACLK, "LINK event loop called");
 
         if (unlikely(!aclk_connected)) {

@@ -7,7 +7,7 @@ services:
       args:
       - DISTRO=arch
       - VERSION=extras
-    image: arch_current_dev:latest
+    image: arch_extras_dev:latest
     command: >
       sh -c "echo -n 00000000-0000-0000-0000-000000000000 >/etc/netdata/claim.d/claimed_id &&
              echo '[agent_cloud_link]' >>/etc/netdata/netdata.conf &&
