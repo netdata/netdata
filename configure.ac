@@ -556,10 +556,11 @@ if test "${ACLK}" = "yes"; then
     AC_MSG_CHECKING([if libwebsockets static lib is present])
     if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
         LWS_LIBS="-I externaldeps/libwebsockets/include"
-        AC_MSG_RESULT([yes])
+        HAVE_libwebsockets_a="yes"
     else
-        AC_MSG_RESULT([no])
+        HAVE_libwebsockets_a="no"
     fi
+    AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 
     if test "${build_target}" = "linux" -a "${aclk_required}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
@@ -571,7 +572,7 @@ if test "${ACLK}" = "yes"; then
     fi
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
