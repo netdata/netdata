@@ -561,17 +561,17 @@ if test "${ACLK}" = "yes"; then
         AC_MSG_RESULT([no])
     fi
 
-    if test "${build_target}" = "linux"; then
-        if test "${with_libcap}" != "no" -a "${have_libcap}" == "yes"; then
+    if test "${build_target}" = "linux" -a "${aclk_required}" != "no"; then
+        if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
+            AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-aclk or enable libcap])
+        fi
+        if test "${with_libcap}" = "yes"; then
             LWS_LIBS+=" -lcap"
-        else
-            #to make it more obvious why aclk can't be built
-            AC_MSG_WARN([-lcap is needed to build aclk on linux])
         fi
     fi
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}" -a "${have_libcap}" == "yes"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${LWS_LIBS}"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
