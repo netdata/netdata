@@ -31,8 +31,11 @@ char *url_encode(char *str) {
         else if (*str == ' ')
             *pbuf++ = '+';
 
-        else
-            *pbuf++ = '%', *pbuf++ = to_hex(*str >> 4), *pbuf++ = to_hex(*str & 15);
+        else{
+            *pbuf++ = '%';
+            *pbuf++ = to_hex(*str >> 4);
+            *pbuf++ = to_hex(*str & 15);
+        }
 
         str++;
     }
