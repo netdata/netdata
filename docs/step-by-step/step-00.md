@@ -1,3 +1,8 @@
+---
+title: The step-by-step Netdata tutorial
+description: Welcome to the Netdata tutorial!
+---
+
 # The step-by-step Netdata tutorial
 
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.

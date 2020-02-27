@@ -62,41 +62,41 @@ navpart() {
 	done
 }
 
-echo -e 'site_name: Netdata Documentation
+echo -e "site_name: Netdata Documentation
 site_url: https://docs.netdata.cloud
 repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
 edit_uri: blob/master
-site_description: Netdata Documentation
-copyright: Netdata, 2019
+site_description: Learn about Netdata's real-time health monitoring and performance troubleshooting for all your systems and applications.
+copyright: Netdata, 2020
 docs_dir: '${docs_dir}'
 site_dir: '${site_dir}'
 #use_directory_urls: false
 strict: true
 extra:
   social:
-    - type: "github"
-      link: "https://github.com/netdata/netdata"
-    - type: "twitter"
-      link: "https://twitter.com/linuxnetdata"
-    - type: "facebook"
-      link: "https://www.facebook.com/linuxnetdata/"
+    - type: github
+      link: https://github.com/netdata/netdata
+    - type: twitter
+      link: https://twitter.com/linuxnetdata
+    - type: facebook
+      link: https://www.facebook.com/linuxnetdata/
 theme:
-    name: "material"
+    name: material
     palette:
-      primary: "blue grey"
-      accent: "light green"
+      primary: 'blue grey'
+      accent: 'light green'
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
     logo: custom/img/netdata_logo.svg
     language: '${language}'
 extra_css:
-  - "https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css"
-  - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
-  - "custom/css/netdata.css"
+  - 'https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css'
+  - 'https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css'
+  - 'custom/css/netdata.css'
 extra_javascript:
-  - "custom/javascripts/cookie-consent.js"
-  - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.js"
+  - 'custom/javascripts/cookie-consent.js'
+  - 'https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.js'
 markdown_extensions:
  - extra
  - abbr
@@ -111,7 +111,7 @@ markdown_extensions:
  - smarty
  - toc:
     permalink: True
-    separator: "-"
+    separator: '-'
  - wikilinks
  - pymdownx.arithmatex
  - pymdownx.betterem:
@@ -121,7 +121,7 @@ markdown_extensions:
  - pymdownx.details
  - pymdownx.highlight:
     pygments_style: manni
-    css_class: "highlight codehilite"
+    css_class: 'highlight codehilite'
     linenums_style: pymdownx-inline
  - pymdownx.inlinehilite
  - pymdownx.magiclink
@@ -139,7 +139,7 @@ markdown_extensions:
  - markdown.extensions.tables
  - markdown.extensions.abbr
  - pymdownx.extrarawhtml
-nav:'
+nav:"
 
 navpart 1 . "README" ""
 
