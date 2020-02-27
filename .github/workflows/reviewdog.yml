@@ -1,18 +1,6 @@
 name: reviewdog
 on: [pull_request]
 jobs:
-  golangci-lint:
-    name: runner / golangci-lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-      - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-check
-
   eslint:
     name: runner / eslint
     runs-on: ubuntu-latest
