@@ -709,12 +709,6 @@ declare -A pkg_libmnl_dev=(
   ['default']=""
 )
 
-declare -A pkg_libwebsockets_dev=(
-  ['debian']="libwebsockets-dev"
-  ['ubuntu']="libwebsockets-dev"
-  ['default']="libwebsockets-devel"
-)
-
 declare -A pkg_lm_sensors=(
   ['alpine']="lm_sensors"
   ['arch']="lm_sensors"
@@ -1170,7 +1164,6 @@ packages() {
     suitable_package libz-dev
     suitable_package libuuid-dev
     suitable_package libmnl-dev
-    suitable_package libwebsockets-dev
   fi
 
   # -------------------------------------------------------------------------
