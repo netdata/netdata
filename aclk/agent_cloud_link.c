@@ -47,10 +47,10 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
  */
 struct _collector {
     time_t created;
-    u_int32_t count; //chart count
-    u_int32_t hostname_hash;
-    u_int32_t plugin_hash;
-    u_int32_t module_hash;
+    uint32_t count; //chart count
+    uint32_t hostname_hash;
+    uint32_t plugin_hash;
+    uint32_t module_hash;
     char *hostname;
     char *plugin_name;
     char *module_name;
@@ -74,7 +74,7 @@ struct aclk_query {
 struct aclk_query_queue {
     struct aclk_query *aclk_query_head;
     struct aclk_query *aclk_query_tail;
-    u_int64_t count;
+    uint64_t count;
 } aclk_queue = { .aclk_query_head = NULL, .aclk_query_tail = NULL, .count = 0 };
 
 char *create_uuid()
@@ -842,7 +842,7 @@ void *aclk_query_main_thread(void *ptr)
 {
     netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
 
-    while (agent_state == AGENT_STABILIZING && !netdata_exit) {
+    while (agent_state == AGENT_INITIALIZING && !netdata_exit) {
         time_t checkpoint;
 
         checkpoint = now_realtime_sec() - last_init_sequence;
@@ -1060,7 +1060,7 @@ int aclk_subscribe(char *sub_topic, int qos)
 // This is called from a callback when the link goes up
 void aclk_connect()
 {
-    info("Connection detected");
+    info("Connection detected (%"PRIu64" queued queries)", aclk_queue.count);
     aclk_connected = 1;
     waiting_init = 0;
     aclk_reconnect_delay(0);
@@ -1072,7 +1072,7 @@ void aclk_connect()
 void aclk_disconnect()
 {
     if (likely(aclk_connected))
-        info("Disconnect detected");
+        info("Disconnect detected (%"PRIu64" queued queries)", aclk_queue.count);
     aclk_subscribed = 0;
     aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
