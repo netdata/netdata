@@ -37,7 +37,7 @@ void netdata_cleanup_and_exit(int ret) {
 // ----------------------------------------------------------------------
 //Netdata eBPF library
 void *libnetdata = NULL;
-int (*load_bpf_file)(char *, int) = NULL;
+int (*load_bpf_file)(char *, int, int *) = NULL;
 int (*set_bpf_perf_event)(int, int);
 int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
 int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
@@ -736,12 +736,14 @@ char *select_file() {
 int process_load_ebpf()
 {
     char lpath[4096];
-
+    int entries[] = { 100000, NETDATA_GLOBAL_VECTOR, 1024 };
     char *name = select_file();
+
+    entries[0] = (int) get_system_pid_max();
 
     build_complete_path(lpath, 4096, plugin_dir,  name);
     event_pid = getpid();
-    if (load_bpf_file(lpath, event_pid) ) {
+    if (load_bpf_file(lpath, event_pid, entries) ) {
         error("[EBPF_PROCESS] Cannot load program: %s", lpath);
         return -1;
     } else {

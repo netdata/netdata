@@ -40,6 +40,7 @@
 # include "../../libnetdata/clocks/clocks.h"
 # include "../../libnetdata/config/appconfig.h"
 # include "../../libnetdata/ebpf/ebpf.h"
+# include "../../libnetdata/os.h"
 
 typedef struct netdata_syscall_stat {
     unsigned long bytes;                //total number of bytes
