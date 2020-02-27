@@ -19,7 +19,7 @@ RUN pacman --noconfirm --needed -S autoconf \
                                    pkgconfig \
                                    python \
                                    libvirt \
-                                   libwebsockets
+                                   cmake
 
 ARG ACLK=no
 ARG EXTRA_CFLAGS
