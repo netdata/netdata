@@ -507,7 +507,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${DISABLE_CLOUD}" ] ; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
     return 0
   fi
 
