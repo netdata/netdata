@@ -1000,6 +1000,7 @@ void printLastError(char *msg)
 
 void aclk_get_challenge()
 {
+    info("Performing challenge-response sequence");
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
     BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -1014,6 +1015,7 @@ void aclk_get_challenge()
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     send_https_request("traefik", "443", url, b, NULL);
+    info("Challenge response from cloud: %s", b->buffer);
     // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
@@ -1056,9 +1058,11 @@ void aclk_get_challenge()
     // TODO - why would the decryption be ascii, did we forget a uu-encoding step in the spec?
     unsigned char response_json[4096]={};
     sprintf(response_json, "{response=\"%s\"}", plaintext);
+    info("Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
     send_https_request("traefik", "443", url, b, response_json);
+    info("Password response from cloud: %s", b->buffer);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
     rc = json_parse(b->buffer, &password, json_extract_singleton);
@@ -1118,8 +1122,10 @@ void *aclk_main(void *ptr)
         if (unlikely(!aclk_connected)) {
             if (unlikely(first_init)) {
                 aclk_get_challenge();
-                aclk_try_to_connect(aclk_hostname, aclk_port);
-                first_init = 1;
+                if (aclk_password != NULL) {
+                    aclk_try_to_connect(aclk_hostname, aclk_port);
+                    first_init = 1;
+                }
             } else {
                 if (aclk_connecting == 0) {
                     if (reconnect_expiry == 0) {
