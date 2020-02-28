@@ -808,19 +808,19 @@ install_react_dashboard() {
 
   progress "Fetching and installing new dashboard"
 
-  DSHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
+  DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
 
   tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
-  DSHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
+  DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
 
   if fetch_and_verify "dashboard" \
-                      "https://github.com/netdata/dasbhoard/archive/${DSHBOARD_PACKAGE_BASENAME}" \
-                      "${DSHBOARD_PACKAGE_BASENAME}" \
+                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${DASHBOARD_PACKAGE_BASENAME}" \
                       "${tmp}" \
-                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DSHBOARD}"
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
   then
-    if run tar -xf "${tmp}/${DSHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
-       copy_react_dashboard "${tmp}/dashboard-${DSHBOARD_PACKAGE_VERSION}" && \
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
+       copy_react_dashboard "${tmp}/build" && \
        rm -rf "${tmp}"
     then
       run_ok "React dashboard installed."
