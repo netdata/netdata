@@ -309,6 +309,7 @@ int aclk_lws_wss_connect(char *host, int port)
 
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
     i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    info("Disabling SSL certificate checks");
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
