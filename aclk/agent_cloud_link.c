@@ -1014,6 +1014,7 @@ void aclk_get_challenge()
     }
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
+    info("Retrieving challenge from cloud: %s", url);
     send_https_request("traefik", "443", url, b, NULL);
     info("Challenge response from cloud: %s", b->buffer);
     // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
