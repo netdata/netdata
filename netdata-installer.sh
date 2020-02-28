@@ -798,7 +798,7 @@ OPTIONSEOF
 
 copy_react_dashboard() {
   run mv "${1}/index.html" "${1}/index-new.html"
-  run cp -r "${1}/*" "${NETDATA_WEB_DIR}"
+  run cp -r "${1}"/* "${NETDATA_WEB_DIR}"
 }
 
 install_react_dashboard() {
