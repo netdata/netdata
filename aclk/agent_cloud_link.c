@@ -1119,6 +1119,8 @@ void *aclk_main(void *ptr)
     while (!netdata_exit) {
         static int first_init = 0;
 
+        info("loop state first_init_%d connected=%d connecting=%d", first_init, aclk_connected, aclk_connecting);
+        sleep_usec(USEC_PER_MS * 500);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_get_challenge();
