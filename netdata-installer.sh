@@ -195,6 +195,7 @@ USAGE: ${PROGRAM} [options]
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
+  --disable-react-dashboard  Use this flag to skip fetching and installing the new React-based dashboard.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -260,6 +261,9 @@ while [ -n "${1}" ]; do
     "--disable-cloud")
       NETDATA_DISABLE_CLOUD=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
+      ;;
+    "--disable-react-dashboard")
+      NETDATA_DISABLE_REACT_DASHBOARD=1
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
@@ -789,6 +793,46 @@ cat << OPTIONSEOF
     - netdata port             : ${NETDATA_PORT}
 
 OPTIONSEOF
+
+# -----------------------------------------------------------------------------
+
+copy_react_dashboard() {
+  run mv "${1}/index.html" "${1}/index-new.html"
+  run cp -r "${1}/*" "${NETDATA_WEB_DIR}"
+}
+
+install_react_dashboard() {
+  if [ -n "${NETDATA_DISABLE_REACT_DASHBOARD}" ] ; then
+    return 0
+  fi
+
+  progress "Fetching and installing new dashboard"
+
+  DSHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
+
+  tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
+  DSHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
+
+  if fetch_and_verify "dashboard" \
+                      "https://github.com/netdata/dasbhoard/archive/${DSHBOARD_PACKAGE_BASENAME}" \
+                      "${DSHBOARD_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DSHBOARD}"
+  then
+    if run tar -xf "${tmp}/${DSHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
+       copy_react_dashboard "${tmp}/dashboard-${DSHBOARD_PACKAGE_VERSION}" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "React dashboard installed."
+    else
+      run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+    fi
+  else
+    run_failed "Unable to fetch React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+  fi
+}
+
+install_react_dashboard
 
 # -----------------------------------------------------------------------------
 progress "Fix permissions of netdata directories (using user '${NETDATA_USER}')"
