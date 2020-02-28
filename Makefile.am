@@ -616,6 +616,7 @@ netdata_SOURCES = $(NETDATA_FILES)
 if ENABLE_ACLK
 netdata_LDADD = \
     externaldeps/mosquitto/libmosquitto.a \
+    externaldeps/libwebsockets/libwebsockets.a \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 else
