@@ -33,9 +33,9 @@ should be installed on your system to build and run Netdata. It supports most ma
         [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
     -   CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
--   **SuSe** Linux and its derivatives (including **openSuSe**)
+-   **SUSE** Linux and its derivatives (including **openSUSE**)
 
--   **SLE12** Must have your system registered with Suse Customer Center or have the DVD. See
+-   **SLE12** Must have your system registered with SUSE Customer Center or have the DVD. See
     [#1162](https://github.com/netdata/netdata/issues/1162)
 
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
