@@ -1120,7 +1120,7 @@ void *aclk_main(void *ptr)
         static int first_init = 0;
 
         if (unlikely(!aclk_connected)) {
-            if (unlikely(first_init)) {
+            if (unlikely(!first_init)) {
                 aclk_get_challenge();
                 if (aclk_password != NULL) {
                     aclk_try_to_connect(aclk_hostname, aclk_port);
