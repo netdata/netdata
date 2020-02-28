@@ -14,6 +14,8 @@ static int aclk_subscribed = 0;
 static int aclk_disable_single_updates = 0;
 static time_t last_init_sequence = 0;
 static int waiting_init = 1;
+static char *aclk_username = NULL;
+static char *aclk_password = NULL;
 
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
@@ -893,6 +895,185 @@ static void aclk_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+char *send_https_request(char *host, char *port, char *url, BUFFER *b, char *payload)
+{
+    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
+
+    buffer_flush(b);
+    buffer_sprintf(
+        b,
+        "GET %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
+        url, host);
+    if (payload != NULL)
+        buffer_strcat(b, payload);      // TODO Content-length ?
+    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
+
+    if (unlikely(sock == -1)) {
+        error("Handshake failed");
+        return NULL;
+    }
+
+    SSL_CTX *ctx = security_initialize_openssl_client();
+    // Certificate chain: not updating the stores - do we need private CA roots?
+    // Calls to SSL_CTX_load_verify_locations would go here.
+    SSL *ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, sock);
+    int err = SSL_connect(ssl);
+    SSL_write(ssl, b->buffer, b->len); // Timeout options?
+    int bytes_read = SSL_read(ssl, b->buffer, b->len);
+    SSL_shutdown(ssl);
+    close(sock);
+}
+
+struct dictionary_singleton {
+    char *key;
+    char *result;
+};
+
+int json_extract_singleton(JSON_ENTRY *e)
+{
+    struct dictionary_singleton *data = e->callback_data;
+
+    switch (e->type) {
+        case JSON_OBJECT:
+        case JSON_ARRAY:
+            break;
+        case JSON_STRING:
+            if (!strcmp(e->name, data->key)) {
+                data->result = strdupz(e->data.string);
+                break;
+            }
+            break;
+        case JSON_NUMBER:
+        case JSON_BOOLEAN:
+        case JSON_NULL:
+            break;
+    }
+    return 0;
+}
+
+//// PoC for the smoke-testing ///////////////////////////
+
+RSA * createRSA(unsigned char * key,int public)
+{
+    RSA *rsa= NULL;
+    BIO *keybio ;
+    keybio = BIO_new_mem_buf(key, -1);
+    if (keybio==NULL)
+    {
+        printf( "Failed to create key BIO");
+        return 0;
+    }
+    if(public)
+    {
+        rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa,NULL, NULL);
+    }
+    else
+    {
+        rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa,NULL, NULL);
+    }
+    if(rsa == NULL)
+    {
+        printf( "Failed to create RSA");
+    }
+
+    return rsa;
+}
+
+
+int private_decrypt(unsigned char * enc_data,int data_len,unsigned char * key, unsigned char *decrypted)
+{
+    RSA * rsa = createRSA(key,0);
+    int  result = RSA_private_decrypt( data_len, enc_data, decrypted, rsa, RSA_PKCS1_OAEP_PADDING);
+    return result;
+}
+
+void printLastError(char *msg)
+{
+    char * err = malloc(130);;
+    ERR_load_crypto_strings();
+    ERR_error_string(ERR_get_error(), err);
+    error("%s ERROR: %s\n",msg, err);
+    free(err);
+}
+
+
+void aclk_get_challenge()
+{
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
+    // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
+    BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    // TODO - proper claim id
+    // TODO - target host?
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL)
+    {
+        error("Agent was not claimed - cannot perform challenge/response");
+        return;
+    }
+    char url[1024];
+    sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
+    send_https_request("traefik", "443", url, b, NULL);
+    // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
+    struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
+    // Force null-termination?
+    int rc = json_parse(b->buffer, &challenge, json_extract_singleton);
+    if (challenge.result == NULL ) {
+        error("Could not retrieve challenge from auth response");
+        return;
+    }
+
+    // TODO: load the keys from claim.d
+    char filename[FILENAME_MAX + 1];    struct stat statbuf;
+    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+
+    if (lstat(filename, &statbuf) != 0) {
+        info("Can't respond to challenge - private key not found '%s' failed reason=\"%s\".", filename, strerror(errno));
+        return;
+    }
+    if (unlikely(statbuf.st_size == 0)) {
+        info("File '%s' has no contents. Challenge/response failed.", filename);
+        return;
+    }
+
+    FILE *f = fopen(filename, "rt");
+    if (unlikely(f == NULL)) {
+        error("File '%s' cannot be opened. Challenge/response failed.", filename);
+        return;
+    }
+    char *private_key = callocz(1, statbuf.st_size + 1);
+    size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
+    private_key[bytes_read] = 0;
+    info("Private key loaded");
+
+    // Decrypt - WE NEVER SPECIFIED THE MAX CHALLENGE LENGTH
+    size_t challenge_len = strlen(challenge.result);
+    unsigned char plaintext[4096]={};
+    int decrypted_length = private_decrypt(challenge.result, challenge_len, private_key, plaintext);
+    freez(challenge.result);
+
+    // TODO - this is ugly
+    // TODO - why would the decryption be ascii, did we forget a uu-encoding step in the spec?
+    unsigned char response_json[4096]={};
+    sprintf(response_json, "{response=\"%s\"}", plaintext);
+    // TODO - host
+    sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
+    send_https_request("traefik", "443", url, b, response_json);
+
+    struct dictionary_singleton password = { .key = "password", .result = NULL };
+    rc = json_parse(b->buffer, &password, json_extract_singleton);
+
+    if (password.result == NULL ) {
+        error("Could not retrieve password from auth response");
+        return;
+    }
+    if (aclk_password != NULL )
+        freez(aclk_password);
+    aclk_password = strdupz(password.result);
+}
+
+/////////////// End of the quick PoC /////////////////////////////
+
 /**
  * Main agent cloud link thread
  *
@@ -936,6 +1117,7 @@ void *aclk_main(void *ptr)
 
         if (unlikely(!aclk_connected)) {
             if (unlikely(first_init)) {
+                aclk_get_challenge();
                 aclk_try_to_connect(aclk_hostname, aclk_port);
                 first_init = 1;
             } else {
@@ -1095,7 +1277,7 @@ void aclk_shutdown()
 void aclk_try_to_connect(char *hostname, int port)
 {
     int rc;
-    rc = _link_lib_init(hostname, port);
+    rc = _link_lib_init(hostname, port, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }

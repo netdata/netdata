@@ -77,7 +77,7 @@ size_t _mqtt_external_read_hook(void *buf, size_t count)
     return aclk_lws_wss_client_read(buf, count);
 }
 
-int _mqtt_lib_init()
+static int _mqtt_lib_init(char *username, char *password)
 {
     int rc;
     //int libmosq_major, libmosq_minor, libmosq_revision, libmosq_version;
@@ -127,7 +127,8 @@ int _mqtt_lib_init()
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
     mosquitto_publish_callback_set(mosq, publish_callback);
 
-    mosquitto_username_pw_set(mosq, NULL, NULL);
+    info("Using challenge-response: %s / %s", username, password);
+    mosquitto_username_pw_set(mosq, username, password);
 
     rc = mosquitto_threaded_set(mosq, 1);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
@@ -195,12 +196,12 @@ void aclk_lws_connection_closed()
 }
 
 
-int _link_lib_init(char *aclk_hostname, int aclk_port)
+int _link_lib_init(char *aclk_hostname, int aclk_port, char *username, char *password)
 {
     int rc = aclk_lws_wss_connect(aclk_hostname, aclk_port);
     aclk_lws_wss_service_loop();
 
-    rc = _mqtt_lib_init();
+    rc = _mqtt_lib_init(username, password);
     if (rc != MOSQ_ERR_SUCCESS)
         return rc;
 

@@ -41,6 +41,7 @@ void security_clean_openssl();
 void security_start_ssl(int selector);
 int security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
+SSL_CTX * security_initialize_openssl_client();
 
 # endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

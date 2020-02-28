@@ -36,8 +36,10 @@ extern struct registry registry;
 /* rrd_init() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
+#ifndef ENABLE_ACLK
     info("The claiming feature is under development and still subject to change before the next release");
     return;
+#endif
 
     int exit_code;
     pid_t command_pid;
