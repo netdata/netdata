@@ -813,6 +813,42 @@ cat << OPTIONSEOF
 OPTIONSEOF
 
 # -----------------------------------------------------------------------------
+
+copy_react_dashboard() {
+  run mv "${1}/index.html" "${1}/index-new.html"
+  run cp -r "${1}"/* "${NETDATA_WEB_DIR}"
+}
+
+install_react_dashboard() {
+  progress "Fetching and installing dashboard"
+
+  DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
+
+  tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
+  DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
+
+  if fetch_and_verify "dashboard" \
+                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
+  then
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
+       copy_react_dashboard "${tmp}/build" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "React dashboard installed."
+    else
+      run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+    fi
+  else
+    run_failed "Unable to fetch React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+  fi
+}
+
+install_react_dashboard
+
+# -----------------------------------------------------------------------------
 progress "Fix permissions of netdata directories (using user '${NETDATA_USER}')"
 
 if [ ! -d "${NETDATA_RUN_DIR}" ]; then
