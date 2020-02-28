@@ -906,7 +906,7 @@ char *send_https_request(char *host, char *port, char *url, BUFFER *b, char *pay
         url, host);
     if (payload != NULL)
         buffer_strcat(b, payload);      // TODO Content-length ?
-    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
+    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
 
     if (unlikely(sock == -1)) {
         error("Handshake failed");
@@ -1015,7 +1015,7 @@ void aclk_get_challenge()
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s", url);
-    send_https_request("traefik", "443", url, b, NULL);
+    send_https_request("localhost", "8443", url, b, NULL);
     info("Challenge response from cloud: %s", b->buffer);
     // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
@@ -1062,7 +1062,7 @@ void aclk_get_challenge()
     info("Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    send_https_request("traefik", "443", url, b, response_json);
+    send_https_request("localhost", "443", url, b, response_json);
     info("Password response from cloud: %s", b->buffer);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
