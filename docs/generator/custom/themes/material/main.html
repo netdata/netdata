@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  {% if page and page.meta and page.meta.title %}
+    <meta property="og:title" content="{{ page.meta.title }}">
+  {% elif page and page.title and not page.is_homepage %}
+    <meta property="og:title" content="{{ page.title }} - {{ config.site_name }}">
+  {% else %}
+    <meta property="og:title" content="{{ config.site_name }}">
+  {% endif %}
+
+  {% if page and page.meta and page.meta.description %}
+    <meta property="og:description" content="{{ page.meta.description }}">
+  {% elif config.site_description %}
+    <meta property="og:description" content="{{ config.site_description }}">  
+  {% endif %}
+  <meta property="og:image" content="custom/img/netdata_docs.png">
+  <meta property="og:image:alt" content="Netdata documentation: Learn about real-time health monitoring and performance troubleshooting for systems and applications">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@linuxnetdata">
+  <meta name="twitter:creator" content="@linuxnetdata">
+  {% if page and page.meta and page.meta.title %}
+    <meta property="twitter:title" content="{{ page.meta.title }}">
+  {% elif page and page.title and not page.is_homepage %}
+    <meta property="twitter:title" content="{{ page.title }} - {{ config.site_name }}">
+  {% else %}
+    <meta property="twitter:title" content="{{ config.site_name }}">
+  {% endif %}
+  {% if page and page.meta and page.meta.description %}
+    <meta name="twitter:description" content="{{ page.meta.description }}">
+  {% elif config.site_description %}
+    <meta name="twitter:description" content="{{ config.site_description }}">  
+  {% endif %}
+  <meta name="twitter:image" content="custom/img/netdata_docs.png">
+  <meta name="twitter:image:alt" content="Netdata documentation: Learn about real-time health monitoring and performance troubleshooting for systems and applications">
+
+  <script type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "HowTo",
+      {% if page and page.meta and page.meta.title %}"name": "{{ page.meta.title }}",{% elif page and page.title and not page.is_homepage %}"name": "{{ page.title }} - {{ config.site_name }}",{% else %}"name": "{{ config.site_name }}",{% endif %}
+      {% if page and page.meta and page.meta.description %}"description": "{{ page.meta.description }}",{% elif config.site_description %}"description": "{{ config.site_description }}",{% endif %}
+      "image": {
+        "@type": "ImageObject",
+        "url": "custom/img/netdata_docs.png",
+        "height": "1200",
+        "width": "630"
+      },
+    }
+  </script>
+
+{% endblock %}

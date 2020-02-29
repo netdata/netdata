@@ -1402,6 +1402,14 @@ netdataDashboard.context = {
             '</ul>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.'
     },
+    'postgres.backend_usage': {
+        info: 'Connections usage against maximum connections allowed, as defined in the <i>max_connections</i> setting.<ul>' +
+            '<li><strong>available:</strong> maximum new connections allowed.</li>' +
+            '<li><strong>used:</strong> connections currently in use.</li>' +
+            '</ul>' +
+            'Assuming non-superuser accounts are being used to connect to Postgres (so <i>superuser_reserved_connections</i> are subtracted from <i>max_connections</i>).<br/>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/runtime-config-connection.html" target="_blank">Connections and Authentication</a>.'
+    },
 
 
     // ------------------------------------------------------------------------
