@@ -327,10 +327,15 @@ class Service(SimpleService):
         Get ceph osd performance
         :return: ceph osd perf --format json
         """
-        return json.loads(self.cluster.mon_command(json.dumps({
+        data = json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd perf',
             'format': 'json'
         }), '')[1].decode('utf-8'))
+        # https://github.com/netdata/netdata/issues/8247
+        # module uses 'osd_perf_infos' data, its been moved under 'osdstats` since 14.2
+        if 'osdstats' in data:
+            return data['osdstats']
+        return data
 
     def _get_osd_pool_stats(self):
         """
