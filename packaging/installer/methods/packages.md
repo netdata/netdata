@@ -6,10 +6,8 @@ We provide our own flavour of binary packages for the most common operating syst
 packaging formats.
 
 We have currently released packages following the .RPM format with version
-[1.16.0](https://github.com/netdata/netdata/releases/tag/v1.16.0). We have planned to release packages following the
-.DEB format with version [1.17.0](https://github.com/netdata/netdata/releases/tag/v1.17.0). Early adopters may
-experiment with our .DEB formatted packages using our nightly releases. Our current packaging infrastructure provider is
-[Package Cloud](https://packagecloud.io).
+[1.16.0](https://github.com/netdata/netdata/releases/tag/v1.16.0) and packages following the
+.DEB format with version [1.17.0](https://github.com/netdata/netdata/releases/tag/v1.17.0). Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io).
 
 Netdata is committed to support installation of our solution to all operating systems. This is a constant battle for
 Netdata, as we strive to automate and make things easier for our users. For the operating system support matrix, please
