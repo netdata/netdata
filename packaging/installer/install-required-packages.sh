@@ -75,7 +75,7 @@ Supported distributions (DD):
     - sabayon        (all Sabayon Linux derivatives)
     - debian, ubuntu (all Debian and Ubuntu derivatives)
     - redhat, fedora (all Red Hat and Fedora derivatives)
-    - suse, opensuse (all SuSe and openSuSe derivatives)
+    - suse, opensuse (all SUSE and openSUSE derivatives)
     - clearlinux     (all Clear Linux derivatives)
 
 Supported installers (IN):
@@ -86,7 +86,7 @@ Supported installers (IN):
     - equo           all Sabayon Linux derivatives
     - pacman         all Arch Linux derivatives
     - yum            all Red Hat / Fedora / CentOS Linux derivatives
-    - zypper         all SuSe Linux derivatives
+    - zypper         all SUSE Linux derivatives
     - apk            all Alpine derivatives
     - swupd          all Clear Linux derivatives
 
