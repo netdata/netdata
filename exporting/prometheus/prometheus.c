@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define BACKENDS_INTERNALS
-#include "backend_prometheus.h"
+#define EXPORTINGS_INTERNALS
+#include "prometheus.h"
 
 // ----------------------------------------------------------------------------
 // PROMETHEUS
@@ -158,7 +158,7 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable,
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
-    BACKEND_OPTIONS backend_options;
+    EXPORTING_OPTIONS exporting_options;
     PROMETHEUS_OUTPUT_OPTIONS output_options;
     const char *prefix;
     const char *labels;
@@ -223,7 +223,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
     return 0;
 }
 
-static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, time_t after, time_t before, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, EXPORTING_OPTIONS exporting_options, time_t after, time_t before, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
@@ -282,7 +282,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                 .host = host,
                 .wb = wb,
                 .labels = (labels[0] == ',')?&labels[1]:labels,
-                .backend_options = backend_options,
+                .exporting_options = exporting_options,
                 .output_options = output_options,
                 .prefix = prefix,
                 .now = now_realtime_sec(),
@@ -303,10 +303,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-        if(likely(backends_can_send_rrdset(backend_options, st))) {
+        if(likely(backends_can_send_rrdset(exporting_options, st))) {
             rrdset_rdlock(st);
 
-            int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
+            int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             if(as_collected) {
                 if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
@@ -316,7 +316,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     homogeneous = 0;
             }
             else {
-                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE && !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
+                if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE && !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
                     prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
@@ -471,13 +471,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                         // we need average or sum of the data
 
                         time_t first_t = after, last_t = before;
-                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
+                        calculated_number value = exporting_calculate_value_from_stored_data(st, rd, after, before, exporting_options, &first_t, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
 
-                            if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                            if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
                                 suffix = "_average";
-                            else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
+                            else if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_SUM)
                                 suffix = "_sum";
 
                             prometheus_label_copy(dimension, (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
@@ -585,7 +585,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
         RRDHOST *host
         , const char *__hostname
         , const char *prefix
-        , BACKEND_OPTIONS backend_options
+        , EXPORTING_OPTIONS exporting_options
         , time_t after
         , time_t before
         , size_t *count_charts
@@ -620,16 +620,16 @@ void rrd_stats_remote_write_allmetrics_prometheus(
         char family[PROMETHEUS_ELEMENT_MAX + 1];
         char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
-        prometheus_label_copy(chart, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+        prometheus_label_copy(chart, (exporting_options & EXPORTING_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-        if(likely(backends_can_send_rrdset(backend_options, st))) {
+        if(likely(backends_can_send_rrdset(exporting_options, st))) {
             rrdset_rdlock(st);
 
             (*count_charts)++;
 
-            int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
+            int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             if(as_collected) {
                 if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
@@ -639,7 +639,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                     homogeneous = 0;
             }
             else {
-                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
                     prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
             }
 
@@ -655,7 +655,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                         // we need as-collected / raw data
 
                         if(unlikely(rd->last_collected_time.tv_sec < after)) {
-                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
+                            debug(D_EXPORTING, "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
                             (*count_dims_skipped)++;
                             continue;
                         }
@@ -664,7 +664,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                             // we add all dimensions as labels
 
-                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            prometheus_label_copy(dimension, (exporting_options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
 
                             add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
@@ -674,7 +674,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
 
-                            prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            prometheus_name_copy(dimension, (exporting_options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
 
                             add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
@@ -685,16 +685,16 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                         // we need average or sum of the data
 
                         time_t first_t = after, last_t = before;
-                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
+                        calculated_number value = exporting_calculate_value_from_stored_data(st, rd, after, before, exporting_options, &first_t, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
 
-                            if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                            if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
                                 suffix = "_average";
-                            else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
+                            else if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_SUM)
                                 suffix = "_sum";
 
-                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            prometheus_label_copy(dimension, (exporting_options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
                             add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);
@@ -710,7 +710,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
 }
 #endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
-static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, EXPORTING_OPTIONS exporting_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
 
     time_t after  = prometheus_server_last_access(server, host, now);
@@ -728,11 +728,11 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
 
     if(output_options & PROMETHEUS_OUTPUT_HELP) {
         char *mode;
-        if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
             mode = "as collected";
-        else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+        else if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
             mode = "average";
-        else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
+        else if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_SUM)
             mode = "sum";
         else
             mode = "unknown";
@@ -751,24 +751,24 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
     return after;
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, backend_options, server, before, output_options);
+    time_t after = prometheus_preparation(host, wb, exporting_options, server, before, output_options);
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after, before, 0, output_options);
+    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, exporting_options, after, before, 0, output_options);
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, backend_options, server, before, output_options);
+    time_t after = prometheus_preparation(host, wb, exporting_options, server, before, output_options);
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after, before, 1, output_options);
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, exporting_options, after, before, 1, output_options);
     }
     rrd_unlock();
 }
