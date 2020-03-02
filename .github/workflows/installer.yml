@@ -5,16 +5,21 @@ on:
     branches:
       - master
     paths:
-      - 'packaging/installer/install-required-packages.sh'
+      - 'packaging/*'
+      - 'packaging/installer/**'
+      - 'netdata-installer.sh'
   pull_request:
     paths:
-      - 'packaging/installer/install-required-packages.sh'
+      - 'packaging/*'
+      - 'packaging/installer/**'
+      - 'netdata-installer.sh'
 jobs:
-  install-required-packages:
-    name: Required Packages
+  install:
+    name: netdata-installer.sh
     strategy:
       matrix:
         distro:
+          - 'alpine:edge'
           - 'alpine:3.11'
           - 'alpine:3.10'
           - 'alpine:3.9'
@@ -69,8 +74,8 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: Test installed-required-packages.sh on ${{ matrix.distro }}
+      - name: Test netdata-installer.sh on ${{ matrix.distro }}
         env:
           PRE: ${{ matrix.pre }}
         run: |
-          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && ${PRE}; ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive'
+          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && ${PRE}; ./netdata-installer.sh --dont-wait --non-interactive'
