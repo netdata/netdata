@@ -581,7 +581,7 @@ inline static void remote_write_split_words(char *str, char **words, int max_wor
     }
 }
 
-void rrd_stats_remote_write_allmetrics_prometheus(
+void backends_rrd_stats_remote_write_allmetrics_prometheus(
         RRDHOST *host
         , const char *__hostname
         , const char *prefix
@@ -595,7 +595,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
 
-    add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
+    backends_add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
     if(host->tags && *(host->tags)) {
         char tags[PROMETHEUS_LABELS_MAX + 1];
@@ -605,10 +605,10 @@ void rrd_stats_remote_write_allmetrics_prometheus(
 
         remote_write_split_words(tags, words, PROMETHEUS_LABELS_MAX_NUMBER);
 
-        add_host_info("netdata_host_tags_info", hostname, NULL, NULL, now_realtime_usec() / USEC_PER_MS);
+        backends_add_host_info("netdata_host_tags_info", hostname, NULL, NULL, now_realtime_usec() / USEC_PER_MS);
 
         for(i = 0; words[i] != NULL && words[i + 1] != NULL && (i + 1) < PROMETHEUS_LABELS_MAX_NUMBER; i += 2) {
-            add_tag(words[i], words[i + 1]);
+            backends_add_tag(words[i], words[i + 1]);
         }
     }
 
@@ -667,7 +667,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
 
-                            add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            backends_add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
                             (*count_dims)++;
                         }
                         else {
@@ -677,7 +677,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
 
-                            add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            backends_add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
                             (*count_dims)++;
                         }
                     }
@@ -697,7 +697,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
-                            add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);
+                            backends_add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);
                             (*count_dims)++;
                         }
                     }
@@ -751,7 +751,7 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
     return after;
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+void backends_rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
@@ -760,7 +760,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BU
     rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after, before, 0, output_options);
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+void backends_rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
@@ -774,7 +774,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
 }
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-int process_prometheus_remote_write_response(BUFFER *b) {
+int backends_process_prometheus_remote_write_response(BUFFER *b) {
     if(unlikely(!b)) return 1;
 
     const char *s = buffer_tostring(b);

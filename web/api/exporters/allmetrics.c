@@ -84,7 +84,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+            backends_rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
                     host
                     , w->response.data
                     , prometheus_server
@@ -96,7 +96,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
+            backends_rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
                     host
                     , w->response.data
                     , prometheus_server
