@@ -546,7 +546,13 @@ netdataDashboard.menu = {
         title: 'eBPF',
         icon: '<i class="fas fa-heartbeat"></i>',
         info: 'Monitor system calls, internal functtions, bytes read, bytes written and errors using <code>eBPF</code>.'
-    }
+    },
+
+    'vernemq': {
+        title: 'VerneMQ',
+        icon: '<i class="fas fa-comments"></i>',
+        info: 'Performance data for the <b><a href="https://vernemq.com/">VerneMQ</a></b> open-source MQTT broker.'
+    },
 };
 
 
@@ -3066,6 +3072,126 @@ netdataDashboard.context = {
 
     'ebpf.process_status': {
         info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
-    }
+    },
 
+    // ------------------------------------------------------------------------
+    // VerneMQ
+
+    'vernemq.sockets': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="open_sockets"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Connected Clients"'
+                    + ' data-units="clients"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'vernemq.queue_processes': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_processes"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Queues Processes"'
+                    + ' data-units="processes"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'vernemq.queue_messages_in_queues': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_messages_current"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Messages in the Queues"'
+                    + ' data-units="messages"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'vernemq.queue_messages': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_message_in"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="MQTT Recieve Rate"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_message_out"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="MQTT Send Rate"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ]
+    },
+    'vernemq.average_scheduler_utilization': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="system_utilization"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Average Scheduler Utilization"'
+                    + ' data-units="percentage"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
 };
