@@ -5,11 +5,13 @@ on:
     branches:
       - master
     paths:
+      - '.github/workflows/installer.yml'
       - 'packaging/*'
       - 'packaging/installer/**'
       - 'netdata-installer.sh'
   pull_request:
     paths:
+      - '.github/workflows/installer.yml'
       - 'packaging/*'
       - 'packaging/installer/**'
       - 'netdata-installer.sh'
