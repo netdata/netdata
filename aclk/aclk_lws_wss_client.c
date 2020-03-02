@@ -99,7 +99,7 @@ static void aclk_lws_wss_log_divert(int level, const char *line)
     }
 }
 
-static int aclk_lws_wss_client_init( const char *target_hostname, int target_port)
+static int aclk_lws_wss_client_init( char *target_hostname, int target_port)
 {
     static int lws_logging_initialized = 0;
     struct lws_context_creation_info info;
