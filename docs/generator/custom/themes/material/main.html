@@ -40,19 +40,4 @@
   <meta name="twitter:image" content="custom/img/netdata_docs.png">
   <meta name="twitter:image:alt" content="Netdata documentation: Learn about real-time health monitoring and performance troubleshooting for systems and applications">
 
-  <script type="application/ld+json">
-    {
-      "@context": "http://schema.org",
-      "@type": "HowTo",
-      {% if page and page.meta and page.meta.title %}"name": "{{ page.meta.title }}",{% elif page and page.title and not page.is_homepage %}"name": "{{ page.title }} - {{ config.site_name }}",{% else %}"name": "{{ config.site_name }}",{% endif %}
-      {% if page and page.meta and page.meta.description %}"description": "{{ page.meta.description }}",{% elif config.site_description %}"description": "{{ config.site_description }}",{% endif %}
-      "image": {
-        "@type": "ImageObject",
-        "url": "custom/img/netdata_docs.png",
-        "height": "1200",
-        "width": "630"
-      },
-    }
-  </script>
-
 {% endblock %}
