@@ -13,6 +13,7 @@ backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @cosmix @Ferroin @knatsakis @ncmans @prologic
+contrib/debian @cosmix @Ferroin @knatsakis @ncmans @prologic
 collectors/ @vlvkobal @mfundul @cosmix
 collectors/charts.d.plugin/ @ilyam8 @Ferroin @prologic @cosmix
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cosmix
