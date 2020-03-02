@@ -930,7 +930,7 @@ char *send_https_request(char *host, char *port, char *url, BUFFER *b, char *pay
         return NULL;
     }
     buffer_flush(b);
-    int bytes_read = SSL_read(ssl, b->buffer, b->len);
+    int bytes_read = SSL_read(ssl, b->buffer, b->size);
     error("Received %d bytes in response", bytes_read);
     SSL_shutdown(ssl);
     close(sock);
@@ -1026,7 +1026,7 @@ void aclk_get_challenge()
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s", url);
-    send_https_request("localhost", "8443", url, b, NULL);
+    send_https_request("loki.local", "8443", url, b, NULL);
     info("Challenge response from cloud: %s", b->buffer);
     // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
