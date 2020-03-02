@@ -1,14 +1,15 @@
 # Using Netdata with Prometheus
 
-> IMPORTANT: the format Netdata sends metrics to prometheus has changed since Netdata v1.7. The new prometheus backend
-> for Netdata supports a lot more features and is aligned to the development of the rest of the Netdata backends.
+> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.7. The new Prometheus exporting
+> connector for Netdata supports a lot more features and is aligned to the development of the rest of the Netdata
+> exporting connectors.
 
 Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently
-Netdata added support for Prometheus. I'm going to quickly show you how to install both Netdata and prometheus on the
-same server. We can then use grafana pointed at Prometheus to obtain long term metrics Netdata offers. I'm assuming we
+Netdata added support for Prometheus. I'm going to quickly show you how to install both Netdata and Prometheus on the
+same server. We can then use Grafana pointed at Prometheus to obtain long term metrics Netdata offers. I'm assuming we
 are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM or a cloud instance is up to you).
 
-## Installing Netdata and prometheus
+## Installing Netdata and Prometheus
 
 ### Installing Netdata
 
@@ -29,7 +30,7 @@ _(replace `your.netdata.ip` with the IP or hostname of the server running Netdat
 
 ### Installing Prometheus
 
-In order to install prometheus we are going to introduce our own systemd startup script along with an example of
+In order to install Prometheus we are going to introduce our own systemd startup script along with an example of
 prometheus.yaml configuration. Prometheus needs to be pointed to your server at a specific target url for it to scrape
 Netdata's api. Prometheus is always a pull model meaning Netdata is the passive client within this architecture.
 Prometheus always initiates the connection with Netdata.
@@ -198,12 +199,12 @@ this and click on 'targets' We should see the Netdata host as a scraped target.
 
 ---
 
-## Netdata support for prometheus
+## Netdata support for Prometheus
 
-> IMPORTANT: the format Netdata sends metrics to prometheus has changed since Netdata v1.6. The new format allows easier
+> IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.6. The new format allows easier
 > queries for metrics and supports both `as collected` and normalized metrics.
 
-Before explaining the changes, we have to understand the key differences between Netdata and prometheus.
+Before explaining the changes, we have to understand the key differences between Netdata and Prometheus.
 
 ### understanding Netdata metrics
 
@@ -230,36 +231,36 @@ they are both in the same chart).
 
 ### Netdata data source
 
-Netdata can send metrics to prometheus from 3 data sources:
+Netdata can send metrics to Prometheus from 3 data sources:
 
--   `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. No conversion is
-    done by Netdata. The latest value for each metric is just given to prometheus. This is the most preferred method by
-    prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how
+-   `as collected` or `raw` - this data source sends the metrics to Prometheus as they are collected. No conversion is
+    done by Netdata. The latest value for each metric is just given to Prometheus. This is the most preferred method by
+    Prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how
     to get meaningful values out of them.
 
     The format of the metrics is: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
     If the metric is a counter (`incremental` in Netdata lingo), `_total` is appended the context.
 
-    Unlike prometheus, Netdata allows each dimension of a chart to have a different algorithm and conversion constants
+    Unlike Prometheus, Netdata allows each dimension of a chart to have a different algorithm and conversion constants
     (`multiplier` and `divisor`). In this case, that the dimensions of a charts are heterogeneous, Netdata will use this
     format: `CONTEXT_DIMENSION{chart="CHART",family="FAMILY"}`
 
--   `average` - this data source uses the Netdata database to send the metrics to prometheus as they are presented on
+-   `average` - this data source uses the Netdata database to send the metrics to Prometheus as they are presented on
     the Netdata dashboard. So, all the metrics are sent as gauges, at the units they are presented in the Netdata
     dashboard charts. This is the easiest to work with.
 
     The format of the metrics is: `CONTEXT_UNITS_average{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
-    When this source is used, Netdata keeps track of the last access time for each prometheus server fetching the
-    metrics. This last access time is used at the subsequent queries of the same prometheus server to identify the
+    When this source is used, Netdata keeps track of the last access time for each Prometheus server fetching the
+    metrics. This last access time is used at the subsequent queries of the same Prometheus server to identify the
     time-frame the `average` will be calculated.
 
-    So, no matter how frequently prometheus scrapes Netdata, it will get all the database data. 
-    To identify each prometheus server, Netdata uses by default the IP of the client fetching the metrics.
+    So, no matter how frequently Prometheus scrapes Netdata, it will get all the database data. 
+    To identify each Prometheus server, Netdata uses by default the IP of the client fetching the metrics.
      
-    If there are multiple prometheus servers fetching data from the same Netdata, using the same IP, each prometheus
-    server can append `server=NAME` to the URL. Netdata will use this `NAME` to uniquely identify the prometheus server.
+    If there are multiple Prometheus servers fetching data from the same Netdata, using the same IP, each Prometheus
+    server can append `server=NAME` to the URL. Netdata will use this `NAME` to uniquely identify the Prometheus server.
 
 -   `sum` or `volume`, is like `average` but instead of averaging the values, it sums them.
 
@@ -279,9 +280,9 @@ Fetch with your web browser this URL:
 
 _(replace `your.netdata.ip` with the ip or hostname of your Netdata server)_
 
-Netdata will respond with all the metrics it sends to prometheus.
+Netdata will respond with all the metrics it sends to Prometheus.
 
-If you search that page for `"system.cpu"` you will find all the metrics Netdata is exporting to prometheus for this
+If you search that page for `"system.cpu"` you will find all the metrics Netdata is exporting to Prometheus for this
 chart. `system.cpu` is the chart name on the Netdata dashboard (on the Netdata dashboard all charts have a text heading
 such as : `Total CPU utilization (system.cpu)`. What we are interested here in the chart name: `system.cpu`).
 
@@ -313,9 +314,9 @@ netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension=
 
 _(Netdata response for `system.cpu` with source=`average`)_
 
-In `average` or `sum` data sources, all values are normalized and are reported to prometheus as gauges. Now, use the
-'expression' text form in prometheus. Begin to type the metrics we are looking for: `netdata_system_cpu`. You should see
-that the text form begins to auto-fill as prometheus knows about this metric.
+In `average` or `sum` data sources, all values are normalized and are reported to Prometheus as gauges. Now, use the
+'expression' text form in Prometheus. Begin to type the metrics we are looking for: `netdata_system_cpu`. You should see
+that the text form begins to auto-fill as Prometheus knows about this metric.
 
 If the data source was `as collected`, the response would be:
 
@@ -345,7 +346,7 @@ netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="idle"} 91847
 
 _(Netdata response for `system.cpu` with source=`as-collected`)_
 
-For more information check prometheus documentation.
+For more information check Prometheus documentation.
 
 ### Streaming data from upstream hosts
 
@@ -365,19 +366,19 @@ provided.
 
 ### Timestamps
 
-To pass the metrics through prometheus pushgateway, Netdata supports the option `&timestamps=no` to send the metrics
+To pass the metrics through Prometheus pushgateway, Netdata supports the option `&timestamps=no` to send the metrics
 without timestamps.
 
 ## Netdata host variables
 
 Netdata collects various system configuration metrics, like the max number of TCP sockets supported, the max number of
-files allowed system-wide, various IPC sizes, etc. These metrics are not exposed to prometheus by default.
+files allowed system-wide, various IPC sizes, etc. These metrics are not exposed to Prometheus by default.
 
 To expose them, append `variables=yes` to the Netdata URL.
 
 ### TYPE and HELP
 
-To save bandwidth, and because prometheus does not use them anyway, `# TYPE` and `# HELP` lines are suppressed. If
+To save bandwidth, and because Prometheus does not use them anyway, `# TYPE` and `# HELP` lines are suppressed. If
 wanted they can be re-enabled via `types=yes` and `help=yes`, e.g.
 `/api/v1/allmetrics?format=prometheus&types=yes&help=yes`
 
@@ -396,21 +397,21 @@ The default is controlled in `netdata.conf`:
 	send names instead of ids = yes | no
 ```
 
-You can overwrite it from prometheus, by appending to the URL:
+You can overwrite it from Prometheus, by appending to the URL:
 
 -   `&names=no` to get IDs (the old behaviour)
 -   `&names=yes` to get names
 
-### Filtering metrics sent to prometheus
+### Filtering metrics sent to Prometheus
 
-Netdata can filter the metrics it sends to prometheus with this setting:
+Netdata can filter the metrics it sends to Prometheus with this setting:
 
 ```conf
 [backend]
 	send charts matching = *
 ```
 
-This settings accepts a space separated list of patterns to match the **charts** to be sent to prometheus. Each pattern
+This settings accepts a space separated list of patterns to match the **charts** to be sent to Prometheus. Each pattern
 can use `*` as wildcard, any number of times (e.g `*a*b*c*` is valid). Patterns starting with `!` give a negative match
 (e.g `!*.bad users.* groups.*` will send all the users and groups except `bad` user and `bad` group). The order is
 important: the first match (positive or negative) left to right, is used.
@@ -436,15 +437,15 @@ before v1.12, append to the URL `&oldunits=yes`
 
 ### Accuracy of `average` and `sum` data sources
 
-When the data source is set to `average` or `sum`, Netdata remembers the last access of each client accessing prometheus
+When the data source is set to `average` or `sum`, Netdata remembers the last access of each client accessing Prometheus
 metrics and uses this last access time to respond with the `average` or `sum` of all the entries in the database since
-that. This means that prometheus servers are not losing data when they access Netdata with data source = `average` or
+that. This means that Prometheus servers are not losing data when they access Netdata with data source = `average` or
 `sum`.
 
-To uniquely identify each prometheus server, Netdata uses the IP of the client accessing the metrics. If however the IP
-is not good enough for identifying a single prometheus server (e.g. when prometheus servers are accessing Netdata
-through a web proxy, or when multiple prometheus servers are NATed to a single IP), each prometheus may append
-`&server=NAME` to the URL. This `NAME` is used by Netdata to uniquely identify each prometheus server and keep track of
+To uniquely identify each Prometheus server, Netdata uses the IP of the client accessing the metrics. If however the IP
+is not good enough for identifying a single Prometheus server (e.g. when Prometheus servers are accessing Netdata
+through a web proxy, or when multiple Prometheus servers are NATed to a single IP), each Prometheus may append
+`&server=NAME` to the URL. This `NAME` is used by Netdata to uniquely identify each Prometheus server and keep track of
 its last access time.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2Fprometheus%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2Fprometheus%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
