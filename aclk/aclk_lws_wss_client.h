@@ -35,7 +35,7 @@ struct lws_wss_packet_buffer;
 
 struct aclk_lws_wss_engine_instance {
     //target host/port for connection
-    const char *host;
+    char *host;
     int port;
 
     //internal data

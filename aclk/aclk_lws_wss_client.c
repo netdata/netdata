@@ -121,7 +121,6 @@ static int aclk_lws_wss_client_init( const char *target_hostname, int target_por
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
     info.port = CONTEXT_PORT_NO_LISTEN;
     info.protocols = protocols;
-    info.user = engine_instance;
 
     engine_instance->lws_context = lws_create_context(&info);
     if (!engine_instance->lws_context)
