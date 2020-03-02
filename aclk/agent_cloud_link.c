@@ -932,6 +932,7 @@ char *send_https_request(char *host, char *port, char *url, BUFFER *b, char *pay
     buffer_flush(b);
     int bytes_read = SSL_read(ssl, b->buffer, b->size);
     error("Received %d bytes in response", bytes_read);
+    b->len = bytes_read;
     SSL_shutdown(ssl);
     close(sock);
 }
@@ -1008,6 +1009,28 @@ void printLastError(char *msg)
     free(err);
 }
 
+char *extract_payload(BUFFER *b)
+{
+char *s = b->buffer;
+unsigned int line_len=0;
+    for (int i=0; i<b->len; i++)
+    {
+        if (*s == 0 )  return;
+        if (*s == '\n' ) {
+            if (line_len==0)
+              return s+1;
+            line_len = 0;
+        }
+        else if (*s == '\r') {
+            /* don't count */
+        }
+        else
+            line_len ++;
+        s++;
+    }
+    return NULL;
+}
+
 
 void aclk_get_challenge()
 {
@@ -1027,11 +1050,16 @@ void aclk_get_challenge()
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s", url);
     send_https_request("loki.local", "8443", url, b, NULL);
-    info("Challenge response from cloud: %s", b->buffer);
     // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
-    int rc = json_parse(b->buffer, &challenge, json_extract_singleton);
+    char *payload = extract_payload(b);
+    if (payload==NULL) {
+      error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
+      return;
+    }
+    info("Challenge response from cloud: %s", payload);
+    int rc = json_parse(payload, &challenge, json_extract_singleton);
     if (challenge.result == NULL ) {
         error("Could not retrieve challenge from auth response");
         return;
@@ -1058,13 +1086,16 @@ void aclk_get_challenge()
     char *private_key = callocz(1, statbuf.st_size + 1);
     size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
     private_key[bytes_read] = 0;
-    info("Private key loaded");
+    info("Private key loaded len=%d", bytes_read);
 
     // Decrypt - WE NEVER SPECIFIED THE MAX CHALLENGE LENGTH
     size_t challenge_len = strlen(challenge.result);
     unsigned char plaintext[4096]={};
     int decrypted_length = private_decrypt(challenge.result, challenge_len, private_key, plaintext);
     freez(challenge.result);
+    error("Decryption len=%d",decrypted_length);
+    plaintext[decrypted_length] = 0;
+    error("Decrypted challenge='%s'", plaintext);
 
     // TODO - this is ugly
     // TODO - why would the decryption be ascii, did we forget a uu-encoding step in the spec?
@@ -1073,11 +1104,16 @@ void aclk_get_challenge()
     info("Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    send_https_request("localhost", "8443", url, b, response_json);
-    info("Password response from cloud: %s", b->buffer);
+    send_https_request("loki.local", "8443", url, b, response_json);
+    payload = extract_payload(b);
+    if (payload==NULL) {
+      error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
+      return;
+    }
+    info("Password response from cloud: %s", payload);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    rc = json_parse(b->buffer, &password, json_extract_singleton);
+    rc = json_parse(payload, &password, json_extract_singleton);
 
     if (password.result == NULL ) {
         error("Could not retrieve password from auth response");
