@@ -23,17 +23,11 @@ jobs:
           - 'i386'
           - 'arm'
           - 'arm64'
-        include:
-          - arch: 'arm'
-            pre: 'docker run --rm --privileged multiarch/qemu-user-static --reset -p yes > /dev/null'
-          - arch: 'arm64'
-            pre: 'docker run --rm --privileged multiarch/qemu-user-static --reset -p yes > /dev/null'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Test Docker Build for ${{ matrix.arch }}
-        env:
-          PRE: ${{ matrix.pre }}
         run:
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes > /dev/null
           docker build . --no-cache --build-arg ARCH=${{ matrix.arch }} --file Dockerfile
