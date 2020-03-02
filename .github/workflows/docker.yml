@@ -1,0 +1,25 @@
+---
+name: Docker
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/docker.yml'
+      - 'netdata-installer.sh'
+      - 'packaging/**'
+  pull_request:
+    paths:
+      - '.github/workflows/docker.yml'
+      - 'netdata-installer.sh'
+      - 'packaging/**'
+jobs:
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Test Docker Build
+        run:
+          docker build -f packaging/docker/Dockerfile .
