@@ -919,8 +919,19 @@ char *send_https_request(char *host, char *port, char *url, BUFFER *b, char *pay
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
     int err = SSL_connect(ssl);
-    SSL_write(ssl, b->buffer, b->len); // Timeout options?
+    if (err!=1) {
+        error("SSL_connect() failed with err=%d", err);
+        return NULL;
+    }
+    err = SSL_write(ssl, b->buffer, b->len); // Timeout options?
+    if (err <= 0)
+    {
+        error("SSL_write() failed with err=%d", err);
+        return NULL;
+    }
+    buffer_flush(b);
     int bytes_read = SSL_read(ssl, b->buffer, b->len);
+    error("Received %d bytes in response", bytes_read);
     SSL_shutdown(ssl);
     close(sock);
 }
