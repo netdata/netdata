@@ -16,7 +16,7 @@ maintaining Netdata's [high standards for performance](#performance).
 eBPF is only available on Linux systems, which means this collector only works on Linux.
 
 The collector is currently in an _alpha_ stage, as we are still working on improving compatibility with more Linux
-distributions and versions, and ensure the collector works as expected.
+distributions and versions, and to ensure the collector works as expected.
 
 Follow the next few steps to ensure compatibility, prepare your system, install Netdata with eBPF compiled, and enable
 the collector.
