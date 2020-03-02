@@ -1,7 +1,7 @@
 # eBPF monitoring with Netdata
 
-This collector plugin uses eBPF to monitor system calls inside your operating system's kernel. For now, the main goal of
-this plugin is to monitor IO and process management on the host where it is running.
+This collector plugin uses eBPF (Extended Berkeley Packet Filter) to monitor system calls inside your operating system's
+kernel. For now, the main goal of this plugin is to monitor IO and process management on the host where it is running.
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />
@@ -13,8 +13,10 @@ maintaining Netdata's [high standards for performance](#performance).
 
 ## Enable the collector on Linux
 
-This eBPF collector only works on Linux systems. It is in an _alpha_ stage, as we are still working on improving
-compatibility with more Linux distributions and versions, and ensure the collector works as expected.
+eBPF is only available on Linux systems, which means this collector only works on Linux.
+
+The collector is currently in an _alpha_ stage, as we are still working on improving compatibility with more Linux
+distributions and versions, and ensure the collector works as expected.
 
 Follow the next few steps to ensure compatibility, prepare your system, install Netdata with eBPF compiled, and enable
 the collector.
@@ -201,8 +203,8 @@ following values: ​
 
 ## Performance
 
-Because eBPF monitoring is complex, we are evaluating the performance of this new collector collector in various
-real-world conditions, across various system loads, and when monitoring complex applications.
+Because eBPF monitoring is complex, we are evaluating the performance of this new collector in various real-world
+conditions, across various system loads, and when monitoring complex applications.
 
 Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
 nearly identical to our [apps.plugin collector](../apps.plugin/), despite collecting and displaying much more
