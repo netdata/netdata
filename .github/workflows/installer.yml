@@ -45,6 +45,8 @@ jobs:
           - 'ubuntu:18.04'
           - 'ubuntu:16.04'
         include:
+          - distro: 'alpine:edge'
+            pre: 'apk add -U bash'
           - distro: 'alpine:3.11'
             pre: 'apk add -U bash'
           - distro: 'alpine:3.10'
