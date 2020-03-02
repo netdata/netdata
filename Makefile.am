@@ -489,12 +489,20 @@ EXPORTING_ENGINE_FILES = \
     exporting/json/json.h \
     exporting/opentsdb/opentsdb.c \
     exporting/opentsdb/opentsdb.h \
+    exporting/prometheus/prometheus.c \
+    exporting/prometheus/prometheus.h \
     exporting/read_config.c \
     exporting/init_connectors.c \
     exporting/process_data.c \
     exporting/check_filters.c \
     exporting/send_data.c \
     exporting/send_internal_metrics.c \
+    $(NULL)
+
+PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES = \
+    exporting/prometheus/remote_write/remote_write.cc \
+    exporting/prometheus/remote_write/remote_write.h \
+    exporting/prometheus/remote_write/remote_write.proto \
     $(NULL)
 
 KINESIS_EXPORTING_FILES = \
@@ -514,7 +522,7 @@ KINESIS_BACKEND_FILES = \
 PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     backends/prometheus/remote_write/remote_write.cc \
     backends/prometheus/remote_write/remote_write.h \
-    backends/prometheus/remote_write/remote_write.proto \
+    backends/prometheus/remote_write/backends_remote_write.proto \
     $(NULL)
 
 MONGODB_BACKEND_FILES = \
@@ -734,16 +742,19 @@ if ENABLE_BACKEND_KINESIS
 endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+if ENABLE_EXPORTING
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+endif
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
     BUILT_SOURCES = \
-        backends/prometheus/remote_write/remote_write.pb.cc \
-        backends/prometheus/remote_write/remote_write.pb.h \
+        exporting/prometheus/remote_write/remote_write.pb.cc \
+        exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
     nodist_netdata_SOURCES = $(BUILT_SOURCES)
 
-backends/prometheus/remote_write/remote_write.pb.cc \
-backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
+exporting/prometheus/remote_write/remote_write.pb.cc \
+exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
 	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
 
 endif

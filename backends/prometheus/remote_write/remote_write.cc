@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <snappy.h>
-#include "remote_write.pb.h"
+#include "../../../exporting/prometheus/remote_write/remote_write.pb.h"
 #include "remote_write.h"
 
 using namespace prometheus;
 
-
-google::protobuf::Arena arena;
-WriteRequest *write_request;
+static google::protobuf::Arena arena;
+static WriteRequest *write_request;
 
 void backends_init_write_request() {
     GOOGLE_PROTOBUF_VERIFY_VERSION;

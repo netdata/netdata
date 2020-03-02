@@ -634,12 +634,19 @@ set(EXPORTING_ENGINE_FILES
         exporting/json/json.h
         exporting/opentsdb/opentsdb.c
         exporting/opentsdb/opentsdb.h
+        exporting/prometheus/prometheus.c
+        exporting/prometheus/prometheus.h
         exporting/read_config.c
         exporting/init_connectors.c
         exporting/process_data.c
         exporting/check_filters.c
         exporting/send_data.c
         exporting/send_internal_metrics.c
+        )
+
+set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
+        exporting/prometheus/remote_write/remote_write.cc
+        exporting/prometheus/remote_write/remote_write.h
         )
 
 set(KINESIS_EXPORTING_FILES
@@ -753,9 +760,10 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     message(STATUS "prometheus remote write backend: enabled")
 
     find_package(Protobuf REQUIRED)
-    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS backends/prometheus/remote_write/remote_write.proto)
+    protobuf_generate_cpp(BACKENDS_PROTO_SRCS BACKENDS_PROTO_HDRS backends/prometheus/remote_write/backends_remote_write.proto)
+    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
 
-    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
+    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${BACKENDS_PROTO_SRCS} ${BACKENDS_PROTO_HDRS} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
     list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER} ${SNAPPY_CFLAGS_OTHER})

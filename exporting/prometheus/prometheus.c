@@ -7,6 +7,37 @@
 // PROMETHEUS
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
+inline int can_send_rrdset(struct instance *instance, BACKEND_OPTIONS backend_options, RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+    (void)host;
+
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
+        return 0;
+
+    if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_BACKEND_SEND))) {
+        // we have not checked this chart
+        if(simple_pattern_matches(instance->config.charts_pattern, st->id) || simple_pattern_matches(instance->config.charts_pattern, st->name))
+            rrdset_flag_set(st, RRDSET_FLAG_BACKEND_SEND);
+        else {
+            rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
+            debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, host->hostname);
+            return 0;
+        }
+    }
+
+    if(unlikely(!rrdset_is_available_for_backends(st))) {
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, host->hostname);
+        return 0;
+    }
+
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
+        return 0;
+    }
+
+    return 1;
+}
+
 static struct prometheus_server {
     const char *server;
     uint32_t hash;
@@ -223,7 +254,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
     return 0;
 }
 
-static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, EXPORTING_OPTIONS exporting_options, time_t after, time_t before, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *prefix, EXPORTING_OPTIONS exporting_options, time_t after, time_t before, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
@@ -303,7 +334,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-        if(likely(backends_can_send_rrdset(exporting_options, st))) {
+        if(likely(can_send_rrdset(instance, exporting_options, st))) {
             rrdset_rdlock(st);
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
@@ -471,7 +502,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                         // we need average or sum of the data
 
                         time_t first_t = after, last_t = before;
-                        calculated_number value = exporting_calculate_value_from_stored_data(st, rd, after, before, exporting_options, &first_t, &last_t);
+                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
 
@@ -582,7 +613,8 @@ inline static void remote_write_split_words(char *str, char **words, int max_wor
 }
 
 void rrd_stats_remote_write_allmetrics_prometheus(
-        RRDHOST *host
+        struct instance *instance
+        , RRDHOST *host
         , const char *__hostname
         , const char *prefix
         , EXPORTING_OPTIONS exporting_options
@@ -624,7 +656,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-        if(likely(backends_can_send_rrdset(exporting_options, st))) {
+        if(likely(can_send_rrdset(instance, exporting_options, st))) {
             rrdset_rdlock(st);
 
             (*count_charts)++;
@@ -655,7 +687,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                         // we need as-collected / raw data
 
                         if(unlikely(rd->last_collected_time.tv_sec < after)) {
-                            debug(D_EXPORTING, "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
+                            debug(D_BACKEND, "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
                             (*count_dims_skipped)++;
                             continue;
                         }
@@ -685,7 +717,9 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                         // we need average or sum of the data
 
                         time_t first_t = after, last_t = before;
-                        calculated_number value = exporting_calculate_value_from_stored_data(st, rd, after, before, exporting_options, &first_t, &last_t);
+                        // TODO: remove first_t
+                        (void)first_t;
+                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
 
@@ -751,16 +785,16 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, EXPORTING
     return after;
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
     time_t after = prometheus_preparation(host, wb, exporting_options, server, before, output_options);
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, exporting_options, after, before, 0, output_options);
+    rrd_stats_api_v1_charts_allmetrics_prometheus(instance, host, wb, prefix, exporting_options, after, before, 0, output_options);
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
@@ -768,13 +802,13 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, exporting_options, after, before, 1, output_options);
+        rrd_stats_api_v1_charts_allmetrics_prometheus(instance, host, wb, prefix, exporting_options, after, before, 1, output_options);
     }
     rrd_unlock();
 }
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-int process_prometheus_remote_write_response(BUFFER *b) {
+int process_prometheus_remote_write_response(BUFFER *b, struct instance *instance) {
     if(unlikely(!b)) return 1;
 
     const char *s = buffer_tostring(b);
@@ -792,6 +826,6 @@ int process_prometheus_remote_write_response(BUFFER *b) {
     if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
         return 0;
     else
-        return discard_response(b, "prometheus remote write");
+        return exporting_discard_response(b, instance);
 }
 #endif
