@@ -458,7 +458,15 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
-  run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+  if [ "$(uname -s)" = Linux ] ; then
+    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+  else
+    pushd ${1} > /dev/null || return 1
+    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
+    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C lib
+    run mv lib/libmosquitto_static.a lib/libmosquitto.a
+    popd || return 1
+  fi
 }
 
 copy_libmosquitto() {
@@ -473,12 +481,6 @@ copy_libmosquitto() {
 bundle_libmosquitto() {
   if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
     echo "Skipping cloud"
-    return 0
-  fi
-
-  if [ "$(uname)" != "Linux" ]; then
-    echo >&2 " Sorry NetData with custom libmosquitto is unsupported on $(uname) at this time!"
-    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
     return 0
   fi
 
