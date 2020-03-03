@@ -2,7 +2,7 @@
 
 #include <snappy.h>
 #include "remote_write.pb.h"
-#include "remote_write.h"
+#include "remote_write_request.h"
 
 using namespace prometheus;
 

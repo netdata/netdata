@@ -6,7 +6,7 @@
 #include "exporting/exporting_engine.h"
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-#include "remote_write/remote_write.h"
+#include "remote_write/remote_write_request.h"
 #endif
 
 typedef enum prometheus_output_flags {

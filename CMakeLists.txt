@@ -645,8 +645,10 @@ set(EXPORTING_ENGINE_FILES
         )
 
 set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
-        exporting/prometheus/remote_write/remote_write.cc
+        exporting/prometheus/remote_write/remote_write.c
         exporting/prometheus/remote_write/remote_write.h
+        exporting/prometheus/remote_write/remote_write_request.cc
+        exporting/prometheus/remote_write/remote_write_request.h
         )
 
 set(KINESIS_EXPORTING_FILES
