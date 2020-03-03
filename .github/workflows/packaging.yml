@@ -8,7 +8,14 @@
 # With GHA, jobs run in parallel by default, as do individual matrix
 # instances, so all of these packages build in parallel.
 name: Package Builder
-on: [push]
+on:
+  # Trigger on pushes to master.
+  push:
+    branches:
+      - master
+  # Also trigger on pull requests
+  # Used to verify package builds
+  pull_request:
 jobs:
   debian: &build
     name: DEB / Debian / AMD64
@@ -72,7 +79,7 @@ jobs:
             docker pull ${DISTRO}:${{ matrix.version }}
           fi
       - name: Build
-        if: steps.check-commit.outputs.matched == true
+        if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
         shell: bash
         run: |
           # Figure out the package version.
@@ -91,7 +98,7 @@ jobs:
           mkdir -p artifacts
           docker run -it -v $PWD/artifacts:/artifacts local/package-builder:${DISTRO}${{ matrix.version }}
       - name: Upload
-        if: steps.check-commit.outputs.matched == true
+        if: steps.check-commit.outputs.matched == true && github.event_name != 'pull_request'
         shell: bash
         run: |
           # This figures out the distribution ID for the upload.
