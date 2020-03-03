@@ -966,6 +966,37 @@ int json_extract_singleton(JSON_ENTRY *e)
 
 //// PoC for the smoke-testing ///////////////////////////
 
+int base64_decode(char *input, size_t input_size, char *output, size_t output_size)
+{
+    static char lookup[256];
+    static int first_time=1;
+    if (first_time)
+    {
+        first_time = 0;
+        for(int i=0; i<256; i++)
+            lookup[i] = -1;
+        for(char i='A'; i<='Z'; i++)
+            lookup[i] = i-'A';
+        for(char i='a'; i<='z'; i++)
+            lookup[i] = i-'a' + 26;
+        for(char i='0'; i<='9'; i++)
+            lookup[i] = i-'0' + 52;
+        lookup['+'] = 62;
+        lookup['/'] = 63;
+    }
+    if ((input_size & 3) != 0)
+        return 1;
+    uint32_t quantum = 0;
+    for (size_t i = 0 ; i < input_size-4 ; i++ )
+    {
+        char x = lookup[ input[0] ];
+        if (x==-1)
+            return 1;
+        quantum = (quantum << 6) + x
+    }
+    // Handle padding only in last quantum
+}
+
 RSA * createRSA(unsigned char * key,int public)
 {
     RSA *rsa= NULL;
@@ -973,7 +1004,7 @@ RSA * createRSA(unsigned char * key,int public)
     keybio = BIO_new_mem_buf(key, -1);
     if (keybio==NULL)
     {
-        printf( "Failed to create key BIO");
+        error( "Failed to create key BIO");
         return 0;
     }
     if(public)
@@ -986,7 +1017,7 @@ RSA * createRSA(unsigned char * key,int public)
     }
     if(rsa == NULL)
     {
-        printf( "Failed to create RSA");
+        error( "Failed to create RSA");
     }
 
     return rsa;
@@ -996,7 +1027,10 @@ RSA * createRSA(unsigned char * key,int public)
 int private_decrypt(unsigned char * enc_data,int data_len,unsigned char * key, unsigned char *decrypted)
 {
     RSA * rsa = createRSA(key,0);
+    error("RSA key=%p Encrypted challenge len=%d", key, data_len);
     int  result = RSA_private_decrypt( data_len, enc_data, decrypted, rsa, RSA_PKCS1_OAEP_PADDING);
+    if (result == -1)
+        printLastError("Decrypt failed");
     return result;
 }
 
