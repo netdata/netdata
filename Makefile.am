@@ -885,4 +885,9 @@ if ENABLE_BACKEND_KINESIS
         -Wl,--wrap=kinesis_get_result \
         $(NULL)
 endif
+if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
+endif
 endif

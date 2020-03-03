@@ -744,20 +744,20 @@ void rrd_stats_remote_write_allmetrics_prometheus(
 }
 #endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
-static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, EXPORTING_OPTIONS exporting_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+static inline time_t prometheus_preparation(struct instance *instance, RRDHOST *host, BUFFER *wb, EXPORTING_OPTIONS exporting_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
 
     time_t after  = prometheus_server_last_access(server, host, now);
 
     int first_seen = 0;
     if(!after) {
-        after = now - global_backend_update_every;
+        after = now - instance->engine->config.update_every;
         first_seen = 1;
     }
 
     if(after > now) {
         // oops! this should never happen
-        after = now - global_backend_update_every;
+        after = now - instance->engine->config.update_every;
     }
 
     if(output_options & PROMETHEUS_OUTPUT_HELP) {
@@ -789,7 +789,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(struct instance *
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, exporting_options, server, before, output_options);
+    time_t after = prometheus_preparation(instance, host, wb, exporting_options, server, before, output_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(instance, host, wb, prefix, exporting_options, after, before, 0, output_options);
 }
@@ -798,7 +798,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(struct instance *in
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, exporting_options, server, before, output_options);
+    time_t after = prometheus_preparation(instance, host, wb, exporting_options, server, before, output_options);
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
