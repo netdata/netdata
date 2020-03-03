@@ -895,15 +895,15 @@ static void aclk_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-char *send_https_request(char *host, char *port, char *url, BUFFER *b, char *payload)
+char *send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
 
     buffer_flush(b);
     buffer_sprintf(
         b,
-        "GET %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
-        url, host);
+        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
+        method, url, host);
     if (payload != NULL)
         buffer_strcat(b, payload);      // TODO Content-length ?
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
@@ -966,7 +966,11 @@ int json_extract_singleton(JSON_ENTRY *e)
 
 //// PoC for the smoke-testing ///////////////////////////
 
-int base64_decode(char *input, size_t input_size, char *output, size_t output_size)
+// Base-64 decoder.
+// Note: This is non-validating, invalid input will be decoded without an error.
+//       Challenges are packed into json strings so we don't skip newlines.
+//       Size errors (i.e. invalid input size or insufficient output space) are caught.
+size_t base64_decode(char *input, size_t input_size, char *output, size_t output_size)
 {
     static char lookup[256];
     static int first_time=1;
@@ -985,16 +989,47 @@ int base64_decode(char *input, size_t input_size, char *output, size_t output_si
         lookup['/'] = 63;
     }
     if ((input_size & 3) != 0)
-        return 1;
-    uint32_t quantum = 0;
-    for (size_t i = 0 ; i < input_size-4 ; i++ )
     {
-        char x = lookup[ input[0] ];
-        if (x==-1)
-            return 1;
-        quantum = (quantum << 6) + x
+        error("Can't decode base-64 input length %zu", input_size);
+        return 0;
+    }
+    size_t unpadded_size = (input_size/4) * 3;
+    if ( (input_size/4) * 3 > output_size )
+    {
+        error("Output buffer size %zu is too small to decode %zu into", output_size, input_size);
+        return 0;
+    }
+    // Don't check padding within full quantums
+    for (size_t i = 0 ; i < input_size-4 ; i+=4 )
+    {
+        uint32_t value = (lookup[input[0]] << 18) + (lookup[input[1]] << 12) + (lookup[input[2]] << 6) + lookup[input[3]];
+        //error("Decoded %c %c %c %c -> %04x", input[0], input[1], input[2], input[3], value);
+        output[0] = value >> 16;
+        output[1] = value >> 8;
+        output[2] = value;
+        output += 3;
+        input += 4;
     }
     // Handle padding only in last quantum
+    if (input[2] == '=') {
+        uint32_t value = (lookup[input[0]] << 6) + lookup[input[1]];
+        output[0] = value >> 4;
+        return unpadded_size-2;
+    }
+    else if (input[3] == '=') {
+        uint32_t value = (lookup[input[0]] << 12) + (lookup[input[1]] << 6) + lookup[input[2]];
+        output[0] = value >> 10;
+        output[1] = value >> 2;
+        return unpadded_size-1;
+    }
+    else
+    {
+        uint32_t value = (input[0] << 18) + (input[1] << 12) + (input[2]<<6) + input[3];
+        output[0] = value >> 16;
+        output[1] = value >> 8;
+        output[2] = value;
+        return unpadded_size;
+    }
 }
 
 RSA * createRSA(unsigned char * key,int public)
@@ -1083,7 +1118,7 @@ void aclk_get_challenge()
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s", url);
-    send_https_request("loki.local", "8443", url, b, NULL);
+    send_https_request("GET", "loki.local", "8443", url, b, NULL);
     // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
@@ -1122,23 +1157,23 @@ void aclk_get_challenge()
     private_key[bytes_read] = 0;
     info("Private key loaded len=%d", bytes_read);
 
-    // Decrypt - WE NEVER SPECIFIED THE MAX CHALLENGE LENGTH
     size_t challenge_len = strlen(challenge.result);
+    unsigned char decoded[512];
+    size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
+
     unsigned char plaintext[4096]={};
-    int decrypted_length = private_decrypt(challenge.result, challenge_len, private_key, plaintext);
+    int decrypted_length = private_decrypt(decoded, decoded_len, private_key, plaintext);
     freez(challenge.result);
-    error("Decryption len=%d",decrypted_length);
+    error("Decoded len=%zu Decryption len=%d",decoded_len, decrypted_length);
     plaintext[decrypted_length] = 0;
     error("Decrypted challenge='%s'", plaintext);
 
-    // TODO - this is ugly
-    // TODO - why would the decryption be ascii, did we forget a uu-encoding step in the spec?
     unsigned char response_json[4096]={};
     sprintf(response_json, "{response=\"%s\"}", plaintext);
     info("Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    send_https_request("loki.local", "8443", url, b, response_json);
+    send_https_request("POST", "loki.local", "8443", url, b, response_json);
     payload = extract_payload(b);
     if (payload==NULL) {
       error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
