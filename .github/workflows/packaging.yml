@@ -7,7 +7,7 @@
 #
 # With GHA, jobs run in parallel by default, as do individual matrix
 # instances, so all of these packages build in parallel.
-name: Package Builder
+name: Packages
 on:
   # Trigger on pushes to master.
   push:
@@ -16,6 +16,8 @@ on:
   # Also trigger on pull requests
   # Used to verify package builds
   pull_request:
+    branches:
+      - master
 jobs:
   debian: &build
     name: DEB / Debian / AMD64
@@ -59,11 +61,11 @@ jobs:
           case-insensitive: true
       - name: Checkout
         uses: actions/checkout@v1
-        if: steps.check-commit.outputs.matched == true
+        if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
         with:
           fetch-depth: 0 # We need full history for versioning
       - name: Prepare Docker Images
-        if: steps.check-commit.outputs.matched == true
+        if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
         shell: bash
         run: |
           # If we have variables defined for aliasing image names, do so now.
