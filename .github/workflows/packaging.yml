@@ -123,7 +123,7 @@ jobs:
       ARCH: amd64
     strategy:
       matrix:
-        versions: [16.04, 18.04, 19.04, 19.10]
+        versions: [16.04, 18.04, 19.10]
       fail-fast: false
 
   fedora:
@@ -137,7 +137,7 @@ jobs:
       ALIAS_VERSION: 1
     strategy:
       matrix:
-        versions: [29.0, 30.0, 31.0]
+        versions: [30.0, 31.0]
       fail-fast: false
 
   centos:
@@ -151,7 +151,7 @@ jobs:
       ALIAS_VERSION: 1
     strategy:
       matrix:
-        versions: [7.0, 8.0]
+        versions: [7.0]
       fail-fast: false
 
   centos:
@@ -165,5 +165,5 @@ jobs:
       ARCH: amd64
     strategy:
       matrix:
-        versions: [15.0, 15.1]
+        versions: [15.1]
       fail-fast: false
