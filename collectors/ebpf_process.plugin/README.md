@@ -1,17 +1,22 @@
 # eBPF monitoring with Netdata
 
-This collector plugin uses eBPF to monitor system calls inside your operating system's kernel. For now, the main goal of
-this plugin is to monitor IO and process management on the host where it is running.
+This collector plugin uses eBPF (Extended Berkeley Packet Filter) to monitor system calls inside your operating system's
+kernel. For now, the main goal of this plugin is to monitor IO and process management on the host where it is running.
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />
   <figcaption>An example of VFS charts, made possible by the eBPF collector plugin</figcaption>
 </figure>
 
+With this eBPF collector, you can monitor sophisticated system-level metrics about your complex applications while
+maintaining Netdata's [high standards for performance](#performance).
+
 ## Enable the collector on Linux
 
-Currently, this `ebpf_process` collector only works on Linux systems. Because it adds overhead to the system running it,
-the collector is also disabled by default.
+eBPF is only available on Linux systems, which means this collector only works on Linux.
+
+The collector is currently in an _alpha_ stage, as we are still working on improving compatibility with more Linux
+distributions and versions, and to ensure the collector works as expected.
 
 Follow the next few steps to ensure compatibility, prepare your system, install Netdata with eBPF compiled, and enable
 the collector.
@@ -183,7 +188,7 @@ In this section we define variables applied to the whole collector and the other
 
 #### load
 
-The collector has three different eBPF programs. These programs monitor the same functions inside the kernel, but they
+The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
 monitor, process, and display different kinds of information.
 
 By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
@@ -195,3 +200,13 @@ following values: ​
 -   `return`: In this mode, Netdata also monitors the calls to function. In the `entry` mode, Netdata only traces kernel
     functions, but with `return`, Netdata also monitors the return of each function. This mode creates more charts, but
     also creates an overhead of roughly 110 nanosections for each function call.
+
+## Performance
+
+Because eBPF monitoring is complex, we are evaluating the performance of this new collector in various real-world
+conditions, across various system loads, and when monitoring complex applications.
+
+Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
+nearly identical to our [apps.plugin collector](../apps.plugin/), despite collecting and displaying much more
+sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of your
+complex applications at any load.

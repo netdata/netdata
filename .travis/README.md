@@ -125,7 +125,7 @@ The following distributions are supported
   - Version 29
   - Version 28
 
-- OpenSuSE versions
+- openSUSE versions
   - 15.1
   - 15.0
 

@@ -211,12 +211,12 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:buster" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 10 (buster)"
 
-      # openSuSE runs
-    - name: Run netdata lifecycle, on openSuSE 15.1
+      # openSUSE runs
+    - name: Run netdata lifecycle, on openSUSE 15.1
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.1" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.1"
 
-    - name: Run netdata lifecycle, on openSuSE Tumbleweed
+    - name: Run netdata lifecycle, on openSUSE Tumbleweed
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/tumbleweed:latest" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/tumbleweed:latest"
 
@@ -415,9 +415,9 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-    - name: "Build & Publish RPM package for OpenSuSE 15.1"
+    - name: "Build & Publish RPM package for openSUSE 15.1"
       <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( openSuSE)?\]/
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( openSUSE)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
         - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
