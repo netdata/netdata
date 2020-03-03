@@ -62,6 +62,8 @@ dist_noinst_DATA = \
     packaging/version \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/libwebsockets.version \
+    packaging/libwebsockets.checksums \
     packaging/mosquitto.version \
     packaging/mosquitto.checksums \
     packaging/bundle-mosquitto.sh \
