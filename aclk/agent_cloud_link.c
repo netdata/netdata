@@ -906,6 +906,7 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
         method, url, host);
     if (payload != NULL)
         buffer_strcat(b, payload);      // TODO Content-length ?
+    error("Sending HTTPS req:\n%s", b->buffer);
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
 
     if (unlikely(sock == -1)) {
@@ -923,7 +924,7 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
         error("SSL_connect() failed with err=%d", err);
         return NULL;
     }
-    err = SSL_write(ssl, b->buffer, b->len); // Timeout options?
+    err = SSL_write(ssl, b->buffer, b->len);
     if (err <= 0)
     {
         error("SSL_write() failed with err=%d", err);
@@ -1032,6 +1033,55 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
     }
 }
 
+size_t base64_encode(char *input, size_t input_size, char *output, size_t output_size)
+{
+    uint32_t value;
+    static char lookup[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                           "abcdefghijklmnopqrstuvwxyz"
+                           "0123456789+/";
+    if ((input_size/3+3)*4 >= output_size)
+    {
+        //error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input");
+        return 0;
+    }
+    size_t count = 0;
+    while (input_size>3)
+    {
+        value = ((input[0] << 16) + (input[1] << 8) + input[2]) & 0xffffff;
+        output[0] = lookup[value >> 18];
+        output[1] = lookup[(value >> 12) & 0x3f];
+        output[2] = lookup[(value >> 6) & 0x3f];
+        output[3] = lookup[value & 0x3f];
+        error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
+        output += 4;
+        input += 3;
+        input_size -= 3;
+        count += 4;
+    }
+    switch (input_size)
+    {
+        case 2:
+            value = (input[0] << 10) + (input[1] << 2);
+            output[0] = lookup[(value >> 12) & 0x3f];
+            output[1] = lookup[(value >> 6) & 0x3f];
+            output[2] = lookup[value & 0x3f];
+            output[3] = '=';
+            count += 4;
+            break;
+        case 1:
+            value = input[0] << 4;
+            output[0] = lookup[(value >> 6) & 0x3f];
+            output[1] = lookup[value & 0x3f];
+            output[2] = '=';
+            output[3] = '=';
+            count += 4;
+            break;
+        case 0:
+            break;
+    }
+    return count;
+}
+
 RSA * createRSA(unsigned char * key,int public)
 {
     RSA *rsa= NULL;
@@ -1107,7 +1157,6 @@ void aclk_get_challenge()
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
     BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-    // TODO - proper claim id
     // TODO - target host?
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -1118,8 +1167,7 @@ void aclk_get_challenge()
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s", url);
-    send_https_request("GET", "loki.local", "8443", url, b, NULL);
-    // {"challenge":"BfsCcoS16WfrX+t0sP3sEE1p9PnSEIYqXuSSzpqQ/H+du5TZFM8bFHvsdWDvqrW2vnanBUNmeZdjxAAu8cDuIxbGCVc8WiyPeTE4WiLeZnycVHi6B81vW38Lh/KrgJdtfewlh5e434ey4onp9UBdCJy9sjrSQZR6yEj0rB4ilvKjuyV2gJOysx6EVU5VBIfOphf/QBIiYroPmUL5WM0E6Re1g6P0au+Tb1N08kwbmOnY7VWk3/cqVvf0S9iV80Yrt69nqWXMl65cu9y9L4XZ4b7fi82Z7nwRIJYyHse8LAgUzraFGz3Z84Po3dnOaouvSQhY52AuwHpfojet+knXSg=="}
+    send_https_request("GET", "localhost", "8443", url, b, NULL);
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
     char *payload = extract_payload(b);
@@ -1134,7 +1182,6 @@ void aclk_get_challenge()
         return;
     }
 
-    // TODO: load the keys from claim.d
     char filename[FILENAME_MAX + 1];    struct stat statbuf;
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 
@@ -1164,16 +1211,19 @@ void aclk_get_challenge()
     unsigned char plaintext[4096]={};
     int decrypted_length = private_decrypt(decoded, decoded_len, private_key, plaintext);
     freez(challenge.result);
-    error("Decoded len=%zu Decryption len=%d",decoded_len, decrypted_length);
-    plaintext[decrypted_length] = 0;
-    error("Decrypted challenge='%s'", plaintext);
+    char encoded[512];
+    size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
+    error("Encoded len=%zu Decryption len=%d", encoded_len, decrypted_length);
+    encoded[encoded_len] = 0;
+
+    error("Decrypted/encoded challenge='%s'", encoded);
 
     unsigned char response_json[4096]={};
-    sprintf(response_json, "{response=\"%s\"}", plaintext);
+    sprintf(response_json, "{response=\"%s\"}", encoded);
     info("Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    send_https_request("POST", "loki.local", "8443", url, b, response_json);
+    send_https_request("POST", "localhost", "8443", url, b, response_json);
     payload = extract_payload(b);
     if (payload==NULL) {
       error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
