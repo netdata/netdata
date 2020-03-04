@@ -1041,7 +1041,7 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
     }
 }
 
-size_t base64_encode(char *input, size_t input_size, char *output, size_t output_size)
+size_t base64_encode(unsigned char *input, size_t input_size, char *output, size_t output_size)
 {
     uint32_t value;
     static char lookup[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -1049,7 +1049,7 @@ size_t base64_encode(char *input, size_t input_size, char *output, size_t output
                            "0123456789+/";
     if ((input_size/3+3)*4 >= output_size)
     {
-        //error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input");
+        error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input");
         return 0;
     }
     size_t count = 0;
@@ -1216,10 +1216,10 @@ void aclk_get_challenge()
 
     size_t challenge_len = strlen(challenge.result);
     unsigned char decoded[512];
-    //size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
-    char *test_chal = "kkMmFiCHMXzGC76L2fvStlV9IxkgSCT0eqhPQlL5mLQvwsqWZ/55OBRjJRXS+0UrMbryhyRqV9f1xocJdExr7+thpned5LXqnFV9h2AxbzuQ37DT4Nmgpqk12dTA2WaXxW4BIrvZiNvc6h/4VHdsa+kOj/Ic5bpr8ChP4JjD4xbj0TDTDK5YaOm5QtBwOi6p47G8LyUKydh/zbNsx3WOhnnJo4Jan45eARjdInWFUBri2hgLvx9dakOKkYIAzFQOYj6Z7WzqGew+FbKxm4Q1o3/O7aLiV96NIIWzoU6UcpuO5QD4YWfn5n4F2NnbIw8R0uIY4Jm7mnjvv9MoH3e/Sw==";
-    info("Fake response from cloud: %s", payload);
-    size_t decoded_len = base64_decode(test_chal, strlen(test_chal), decoded, sizeof(decoded));
+    size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
+    //char *test_chal = "bw4THfBglBRJsZcVxiDFSlzyggBTfIjhd1Z63xBaQ7dtfJDj/G9nRi2NnF26aI8Z3EZ/54/vlgiRU2umbMtjikHkI2Wyk3tWG7vH8/e3PA+5swL5ARdKBUakNCdADzYhcf/idTLRVWuc0xtqzLIQFGZ1AYM45Ze6euwEIzqisRoDEygEgm26Z2ZAuq9no8Cw95g7sZ2GsizvKtvcNLwMVhrf592KgxOsvxOJbom6g/5/g+LnDzTf6ei50HeJtokYIbNiRFNHQaUlGak3I17T2df9hXzXM4o2Gb7j5RNb12DRJe00axOnyZsx/pTWzReDpqsXMJyxprfSfYub1dzMvQ==";
+    //info("Fake response from cloud: %s", test_chal);
+    //size_t decoded_len = base64_decode(challenge.result, strlen(challenge.result), decoded, sizeof(decoded));
 
     unsigned char plaintext[4096]={};
     int decrypted_length = private_decrypt(decoded, decoded_len, private_key, plaintext);
