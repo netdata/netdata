@@ -26,5 +26,4 @@ rules:
   octal-values: enable
   quoted-strings: disable
   trailing-spaces: enable
-  truthy:
-    level: warning
+  truthy: disable

@@ -40,4 +40,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
-          yamllintdd_flags: '.yamllint.yml .travis.yml .github/workflows/*.yml'
