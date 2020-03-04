@@ -133,6 +133,54 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 }
 
 
+static RSA *aclk_private_key = NULL;
+static int create_private_key()
+{
+    char filename[FILENAME_MAX + 1];    struct stat statbuf;
+    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+
+    if (lstat(filename, &statbuf) != 0) {
+        error("Claimed agent cannot establish ACLK - private key not found '%s' failed reason=\"%s\".", filename, strerror(errno));
+        return 1;
+    }
+    if (unlikely(statbuf.st_size == 0)) {
+        info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
+        return 1;
+    }
+
+    FILE *f = fopen(filename, "rt");
+    if (unlikely(f == NULL)) {
+        error("Claimed agent cannot establish ACLK - unable to open private key '%s' failed reason=\"%s\".", filename, strerror(errno));
+        return 1;
+    }
+
+    char *private_key = callocz(1, statbuf.st_size + 1);
+    size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
+    private_key[bytes_read] = 0;
+    debug(D_ACLK, "Claimed agent loaded private key len=%d bytes", bytes_read);
+    fclose(f);
+
+    BIO *key_bio = BIO_new_mem_buf(private_key, -1);
+    if (key_bio==NULL) {
+        error("Claimed agent cannot establish ACLK - failed to create BIO for key");
+        goto biofailed;
+    }
+
+    aclk_private_key = PEM_read_bio_RSAPrivateKey(key_bio, NULL, NULL, NULL);
+    BIO_free(key_bio);
+    if (aclk_private_key!=NULL)
+        return 0;
+    char * err = mallocz(130);;
+    ERR_load_crypto_strings();
+    ERR_error_string(ERR_get_error(), err);
+    error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
+    freez(err);
+
+biofailed:
+    freez(private_key);
+    return 1;
+}
+
 /*
  * After a connection failure -- delay in milliseconds
  * When a connection is established, the delay function
@@ -1012,7 +1060,7 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
         output[0] = value >> 16;
         output[1] = value >> 8;
         output[2] = value;
-        error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
+        //error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
         output += 3;
         input += 4;
     }
@@ -1020,14 +1068,14 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
     if (input[2] == '=') {
         uint32_t value = (lookup[input[0]] << 6) + lookup[input[1]];
         output[0] = value >> 4;
-        error("Decoded %c %c %c %c -> %02x", input[0], input[1], input[2], input[3], output[0]);
+        //error("Decoded %c %c %c %c -> %02x", input[0], input[1], input[2], input[3], output[0]);
         return unpadded_size-2;
     }
     else if (input[3] == '=') {
         uint32_t value = (lookup[input[0]] << 12) + (lookup[input[1]] << 6) + lookup[input[2]];
         output[0] = value >> 10;
         output[1] = value >> 2;
-        error("Decoded %c %c %c %c -> %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1]);
+        //error("Decoded %c %c %c %c -> %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1]);
         return unpadded_size-1;
     }
     else
@@ -1036,7 +1084,7 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
         output[0] = value >> 16;
         output[1] = value >> 8;
         output[2] = value;
-        error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
+        //error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
         return unpadded_size;
     }
 }
@@ -1060,7 +1108,7 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
         output[1] = lookup[(value >> 12) & 0x3f];
         output[2] = lookup[(value >> 6) & 0x3f];
         output[3] = lookup[value & 0x3f];
-        error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
+        //error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
         output += 4;
         input += 3;
         input_size -= 3;
@@ -1074,7 +1122,7 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
             output[1] = lookup[(value >> 6) & 0x3f];
             output[2] = lookup[value & 0x3f];
             output[3] = '=';
-            error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]); 
+            //error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]); 
             count += 4;
             break;
         case 1:
@@ -1083,7 +1131,7 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
             output[1] = lookup[value & 0x3f];
             output[2] = '=';
             output[3] = '=';
-            error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
+            //error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
             count += 4;
             break;
         case 0:
@@ -1092,38 +1140,12 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
     return count;
 }
 
-RSA * createRSA(unsigned char * key,int public)
+
+
+int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decrypted)
 {
-    RSA *rsa= NULL;
-    BIO *keybio ;
-    keybio = BIO_new_mem_buf(key, -1);
-    if (keybio==NULL)
-    {
-        error( "Failed to create key BIO");
-        return 0;
-    }
-    if(public)
-    {
-        rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa,NULL, NULL);
-    }
-    else
-    {
-        rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa,NULL, NULL);
-    }
-    if(rsa == NULL)
-    {
-        error( "Failed to create RSA");
-    }
-
-    return rsa;
-}
-
-
-int private_decrypt(unsigned char * enc_data,int data_len,unsigned char * key, unsigned char *decrypted)
-{
-    RSA * rsa = createRSA(key,0);
-    error("RSA key=%p Encrypted challenge len=%d", key, data_len);
-    int  result = RSA_private_decrypt( data_len, enc_data, decrypted, rsa, RSA_PKCS1_OAEP_PADDING);
+    error("Encrypted challenge len=%d", data_len);
+    int  result = RSA_private_decrypt( data_len, enc_data, decrypted, aclk_private_key, RSA_PKCS1_OAEP_PADDING);
     if (result == -1)
         printLastError("Decrypt failed");
     return result;
@@ -1180,7 +1202,8 @@ void aclk_get_challenge()
     send_https_request("GET", "localhost", "8443", url, b, NULL);
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
-    char *payload = extract_payload(b);
+    char *payload = NULL;
+    payload = extract_payload(b);
     if (payload==NULL) {
       error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
       return;
@@ -1192,37 +1215,14 @@ void aclk_get_challenge()
         return;
     }
 
-    char filename[FILENAME_MAX + 1];    struct stat statbuf;
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
-
-    if (lstat(filename, &statbuf) != 0) {
-        info("Can't respond to challenge - private key not found '%s' failed reason=\"%s\".", filename, strerror(errno));
-        return;
-    }
-    if (unlikely(statbuf.st_size == 0)) {
-        info("File '%s' has no contents. Challenge/response failed.", filename);
-        return;
-    }
-
-    FILE *f = fopen(filename, "rt");
-    if (unlikely(f == NULL)) {
-        error("File '%s' cannot be opened. Challenge/response failed.", filename);
-        return;
-    }
-    char *private_key = callocz(1, statbuf.st_size + 1);
-    size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
-    private_key[bytes_read] = 0;
-    info("Private key loaded len=%d", bytes_read);
+ 
 
     size_t challenge_len = strlen(challenge.result);
     unsigned char decoded[512];
     size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
-    //char *test_chal = "bw4THfBglBRJsZcVxiDFSlzyggBTfIjhd1Z63xBaQ7dtfJDj/G9nRi2NnF26aI8Z3EZ/54/vlgiRU2umbMtjikHkI2Wyk3tWG7vH8/e3PA+5swL5ARdKBUakNCdADzYhcf/idTLRVWuc0xtqzLIQFGZ1AYM45Ze6euwEIzqisRoDEygEgm26Z2ZAuq9no8Cw95g7sZ2GsizvKtvcNLwMVhrf592KgxOsvxOJbom6g/5/g+LnDzTf6ei50HeJtokYIbNiRFNHQaUlGak3I17T2df9hXzXM4o2Gb7j5RNb12DRJe00axOnyZsx/pTWzReDpqsXMJyxprfSfYub1dzMvQ==";
-    //info("Fake response from cloud: %s", test_chal);
-    //size_t decoded_len = base64_decode(challenge.result, strlen(challenge.result), decoded, sizeof(decoded));
 
     unsigned char plaintext[4096]={};
-    int decrypted_length = private_decrypt(decoded, decoded_len, private_key, plaintext);
+    int decrypted_length = private_decrypt(decoded, decoded_len, plaintext);
     freez(challenge.result);
     char encoded[512];
     size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
@@ -1255,6 +1255,8 @@ void aclk_get_challenge()
         freez(aclk_password);
     aclk_username = strdupz(agent_id);
     aclk_password = strdupz(password.result);
+
+    buffer_free(b);
 }
 
 /////////////// End of the quick PoC /////////////////////////////
@@ -1286,14 +1288,18 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
     int aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
-    // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
-    // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
-    while (likely(!is_agent_claimed())) {
-        sleep_usec(USEC_PER_SEC * 5);
-        if (netdata_exit)
-            goto exited;
+    while(1) {
+        while (likely(!is_agent_claimed())) {
+            sleep_usec(USEC_PER_SEC * 5);
+            if (netdata_exit)
+                goto exited;
+        }
+        if (!create_private_key())
+            break;
+        sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
+    create_private_key();
 
     usec_t reconnect_expiry = 0; // In usecs
 
@@ -1349,6 +1355,9 @@ void *aclk_main(void *ptr)
     } // forever
 exited:
     aclk_shutdown();
+
+    freez(aclk_username);
+    freez(aclk_password);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
