@@ -1253,6 +1253,7 @@ void aclk_get_challenge()
     }
     if (aclk_password != NULL )
         freez(aclk_password);
+    aclk_username = strdupz(agent_id);
     aclk_password = strdupz(password.result);
 }
 
