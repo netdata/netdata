@@ -1,3 +1,4 @@
+---
 dist: bionic
 language: c
 
@@ -35,12 +36,10 @@ install:
   - export GIT_TAG="$(git tag --points-at)"
 
 
-
 # Setup notification system
 #
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
-
 
 
 # Define the stage sequence and conditionals
@@ -91,7 +90,6 @@ stages:
     if: type != cron AND type != pull_request AND branch = master
 
 
-
 # Define stage implementation details
 #
 jobs:
@@ -117,7 +115,6 @@ jobs:
       # This falls under same stage defined earlier
     - name: Web Dashboard pre-generated file consistency checks (dashboard.js)
       script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
-
 
 
       # Ensure netdata code builds successfully
@@ -153,7 +150,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
 
 
-
     - stage: Artifacts validation
 
       name: Unit Testing
@@ -180,7 +176,6 @@ jobs:
     - name: Build/install for CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
-
 
 
     - stage: "Artifacts validation on bare OS, stable to current lifecycle checks"
@@ -240,7 +235,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
-
     - stage: Support activities on main branch
       name: Generate changelog for release (only on special and tagged commit msg)
       before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
@@ -255,7 +249,6 @@ jobs:
       git:
         depth: false
       if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
-
 
 
     # ###### Packaging workflow section ######
@@ -352,7 +345,6 @@ jobs:
         - ALLOW_SOFT_FAILURE_HERE=true
 
 
-
     - stage: Package centos, fedora and opensuse
       _template: &RPM_TEMPLATE
         git:
@@ -424,7 +416,6 @@ jobs:
         - ALLOW_SOFT_FAILURE_HERE=true
     # ###### End of packaging workflow section ###### #
     # ############################################### #
-
 
 
     # We only publish if a TAG has been set during packaging
