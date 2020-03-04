@@ -899,14 +899,19 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
 
+    size_t payload_len = 0;
+    if (payload != NULL)
+        payload_len = strlen(payload);
+
     buffer_flush(b);
     buffer_sprintf(
         b,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
-        method, url, host);
+        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %d\r\nAccept-Language: en-us\r\n"
+        "User-Agent: Netdata/rocks\r\n\r\n",
+        method, url, host, payload_len);
     if (payload != NULL)
         buffer_strcat(b, payload);      // TODO Content-length ?
-    error("Sending HTTPS req:\n%s", b->buffer);
+    error("Sending HTTPS req (%d bytes): '%s'", b->len, buffer_tostring(b));
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
 
     if (unlikely(sock == -1)) {
@@ -1004,10 +1009,10 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
     for (size_t i = 0 ; i < input_size-4 ; i+=4 )
     {
         uint32_t value = (lookup[input[0]] << 18) + (lookup[input[1]] << 12) + (lookup[input[2]] << 6) + lookup[input[3]];
-        //error("Decoded %c %c %c %c -> %04x", input[0], input[1], input[2], input[3], value);
         output[0] = value >> 16;
         output[1] = value >> 8;
         output[2] = value;
+        error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
         output += 3;
         input += 4;
     }
@@ -1015,12 +1020,14 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
     if (input[2] == '=') {
         uint32_t value = (lookup[input[0]] << 6) + lookup[input[1]];
         output[0] = value >> 4;
+        error("Decoded %c %c %c %c -> %02x", input[0], input[1], input[2], input[3], output[0]);
         return unpadded_size-2;
     }
     else if (input[3] == '=') {
         uint32_t value = (lookup[input[0]] << 12) + (lookup[input[1]] << 6) + lookup[input[2]];
         output[0] = value >> 10;
         output[1] = value >> 2;
+        error("Decoded %c %c %c %c -> %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1]);
         return unpadded_size-1;
     }
     else
@@ -1029,6 +1036,7 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
         output[0] = value >> 16;
         output[1] = value >> 8;
         output[2] = value;
+        error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
         return unpadded_size;
     }
 }
@@ -1052,7 +1060,7 @@ size_t base64_encode(char *input, size_t input_size, char *output, size_t output
         output[1] = lookup[(value >> 12) & 0x3f];
         output[2] = lookup[(value >> 6) & 0x3f];
         output[3] = lookup[value & 0x3f];
-        error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
+        error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
         output += 4;
         input += 3;
         input_size -= 3;
@@ -1066,6 +1074,7 @@ size_t base64_encode(char *input, size_t input_size, char *output, size_t output
             output[1] = lookup[(value >> 6) & 0x3f];
             output[2] = lookup[value & 0x3f];
             output[3] = '=';
+            error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]); 
             count += 4;
             break;
         case 1:
@@ -1074,6 +1083,7 @@ size_t base64_encode(char *input, size_t input_size, char *output, size_t output
             output[1] = lookup[value & 0x3f];
             output[2] = '=';
             output[3] = '=';
+            error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
             count += 4;
             break;
         case 0:
@@ -1206,7 +1216,10 @@ void aclk_get_challenge()
 
     size_t challenge_len = strlen(challenge.result);
     unsigned char decoded[512];
-    size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
+    //size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
+    char *test_chal = "kkMmFiCHMXzGC76L2fvStlV9IxkgSCT0eqhPQlL5mLQvwsqWZ/55OBRjJRXS+0UrMbryhyRqV9f1xocJdExr7+thpned5LXqnFV9h2AxbzuQ37DT4Nmgpqk12dTA2WaXxW4BIrvZiNvc6h/4VHdsa+kOj/Ic5bpr8ChP4JjD4xbj0TDTDK5YaOm5QtBwOi6p47G8LyUKydh/zbNsx3WOhnnJo4Jan45eARjdInWFUBri2hgLvx9dakOKkYIAzFQOYj6Z7WzqGew+FbKxm4Q1o3/O7aLiV96NIIWzoU6UcpuO5QD4YWfn5n4F2NnbIw8R0uIY4Jm7mnjvv9MoH3e/Sw==";
+    info("Fake response from cloud: %s", payload);
+    size_t decoded_len = base64_decode(test_chal, strlen(test_chal), decoded, sizeof(decoded));
 
     unsigned char plaintext[4096]={};
     int decrypted_length = private_decrypt(decoded, decoded_len, private_key, plaintext);
