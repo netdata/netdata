@@ -748,7 +748,7 @@ declare -A pkg_libz_dev=(
   ['rhel']="zlib-devel"
   ['suse']="zlib-devel"
   ['clearlinux']="devpkg-zlib"
-  ['macos']="zlib"
+  ['macos']="NOTREQUIRED"
   ['default']=""
 )
 
