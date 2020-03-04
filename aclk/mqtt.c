@@ -116,7 +116,7 @@ static int _mqtt_lib_init(char *username, char *password)
         return 1;
     }
 
-    mosq = mosquitto_new("anon", true, NULL);
+    mosq = mosquitto_new(username, true, NULL);
     if (unlikely(!mosq)) {
         mosquitto_lib_cleanup();
         error("MQTT new structure  -- %s", mosquitto_strerror(errno));
