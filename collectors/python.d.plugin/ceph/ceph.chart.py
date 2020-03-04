@@ -206,8 +206,10 @@ class Service(SimpleService):
             df = self._get_df()
             osd_df = self._get_osd_df()
             osd_perf = self._get_osd_perf()
+            osd_perf_infos = get_osd_perf_infos(osd_perf)
             pool_stats = self._get_osd_pool_stats()
-            data.update(self._get_general(osd_perf, pool_stats))
+
+            data.update(self._get_general(osd_perf_infos, pool_stats))
             for pool in df['pools']:
                 data.update(self._get_pool_usage(pool))
                 data.update(self._get_pool_objects(pool))
@@ -215,14 +217,14 @@ class Service(SimpleService):
                 data.update(self._get_pool_rw(pool_io))
             for osd in osd_df['nodes']:
                 data.update(self._get_osd_usage(osd))
-            for osd_apply_commit in osd_perf['osd_perf_infos']:
+            for osd_apply_commit in osd_perf_infos:
                 data.update(self._get_osd_latency(osd_apply_commit))
             return data
         except (ValueError, AttributeError) as error:
             self.error(error)
             return None
 
-    def _get_general(self, osd_perf, pool_stats):
+    def _get_general(self, osd_perf_infos, pool_stats):
         """
         Get ceph's general usage
         :return: dict
@@ -240,7 +242,7 @@ class Service(SimpleService):
             write_bytes_sec += pool_rw_io_b['client_io_rate'].get('write_bytes_sec', 0)
             read_op_per_sec += pool_rw_io_b['client_io_rate'].get('read_op_per_sec', 0)
             write_op_per_sec += pool_rw_io_b['client_io_rate'].get('write_op_per_sec', 0)
-        for perf in osd_perf['osd_perf_infos']:
+        for perf in osd_perf_infos:
             apply_latency += perf['perf_stats']['apply_latency_ms']
             commit_latency += perf['perf_stats']['commit_latency_ms']
 
@@ -345,3 +347,11 @@ class Service(SimpleService):
             'prefix': 'osd pool stats',
             'format': 'json'
         }), '')[1].decode('utf-8'))
+
+
+def get_osd_perf_infos(osd_perf):
+    # https://github.com/netdata/netdata/issues/8247
+    # module uses 'osd_perf_infos' data, its been moved under 'osdstats` since Ceph v14.2
+    if 'osd_perf_infos' in osd_perf:
+        return osd_perf['osd_perf_infos']
+    return osd_perf['osdstats']['osd_perf_infos']
