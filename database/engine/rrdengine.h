@@ -17,6 +17,7 @@
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
+#include "metadata_log/logfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
 #include "rrdenglocking.h"
@@ -175,7 +176,10 @@ struct rrdengine_instance {
     struct page_cache pg_cache;
     uint8_t drop_metrics_under_page_cache_pressure; /* boolean */
     uint8_t global_compress_alg;
+
     struct transaction_commit_log commit_log;
+    struct metadata_record_commit_log metadata_record_log;
+
     struct rrdengine_datafile_list datafiles;
     char dbfiles_path[FILENAME_MAX+1];
     uint64_t disk_space;
