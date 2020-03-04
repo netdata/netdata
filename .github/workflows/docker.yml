@@ -16,10 +16,18 @@ on:
 jobs:
   docker-build:
     name: Docker Build
+    strategy:
+      matrix:
+        arch:
+          - amd64
+          - i386
+          - arm
+          - arm64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Test Docker Build
         run:
-          docker build -f packaging/docker/Dockerfile .
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          docker build --build-arg ARCH=${{ matrix.arch }} -f packaging/docker/Dockerfile .
