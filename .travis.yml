@@ -170,7 +170,7 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
 
     - name: Run netdata lifecycle, on ubuntu 18.04 (Containerized)
-      script: for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i"; docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:ubuntu1804" bats --tap tests/lifecycle.bats && break; sleep 15; done
+      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i"; docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:ubuntu1804" bats --tap tests/lifecycle.bats && break; sleep 15; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata lifecycle test script failed on ubuntu 18.04"
 
     - name: Run netdata lifecycle from stable to current, on CentOS 7 (Containerized)
