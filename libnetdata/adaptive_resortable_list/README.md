@@ -1,3 +1,14 @@
+<!--
+---
+title: Adaptive Re-sortable List (ARL)
+description: "The adaptable re-sortable list (ARL) is a library that allows Netdata to read a series of name-value pairs in the fastest possible way. The ARL maintains a list of `name` keywords found in the data source (even the ones that are not useful for data collection)."
+custom_edit_url: <https://github.com/netdata/netdata/edit/master/libnetdata/adaptive_resortable_list/README.md>
+keywords: 
+  - arl
+  - adaptive re-sortable list
+---
+-->
+
 # Adaptive Re-sortable List (ARL)
 
 This library allows Netdata to read a series of `name - value` pairs

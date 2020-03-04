@@ -1,3 +1,15 @@
+<!--
+---
+title: AVL library for B-Trees
+description: "AVL is a library for indexing objects in B-Trees, which is especially useful for database and large dataset retrieval implementations.  "
+custom_edit_url: <https://github.com/netdata/netdata/edit/master/libnetdata/avl/README.md>
+keywords: 
+  - avl
+  - b-trees
+  - large data collection
+---
+-->
+
 # AVL
 
 AVL is a library indexing objects in B-Trees.

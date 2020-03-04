@@ -1,3 +1,14 @@
+<!--
+---
+title: BUFFER
+description: "BUFFER is a convenience library for working with strings in `C`. It eliminates the need for tracking the string length, thus providing a safe alternative for string operations. Netdata uses BUFFERs for preparing web responses and buffering data to be sent upstream or to backed databases."
+custom_edit_url: <https://github.com/netdata/netdata/edit/master/libnetdata/buffer/README.md>
+keywords: 
+  - buffer
+  - buffering data
+---
+-->
+
 # BUFFER
 
 `BUFFER` is a convenience library for working with strings in `C`.
