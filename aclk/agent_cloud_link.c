@@ -1294,8 +1294,8 @@ void *aclk_main(void *ptr)
             if (netdata_exit)
                 goto exited;
         }
-        if (!create_private_key())
-            break;
+        if (!create_private_key() && !_mqtt_lib_init())
+            break; 
         sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
