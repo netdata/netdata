@@ -280,6 +280,11 @@ autodetect_distribution() {
       distribution="macos"
       version="$(uname -r)"
       detection="uname"
+
+      if [ ${EUID} -eq 0 ] ; then
+        echo >&2 "This script does not support running as EUID 0 on macOS. Please run it as a regular user."
+        exit 1
+      fi
       ;;
     *)
       return 1
@@ -1356,7 +1361,7 @@ run() {
 }
 
 sudo=
-if [ ${UID} -ne 0 ]; then
+if [ ${UID} -ne 0 ] && [ ${tree} != 'macos' ] ; then
   sudo="sudo"
 fi
 
