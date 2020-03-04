@@ -60,7 +60,7 @@ jobs:
           - distro: 'debian:buster'
             pre: 'apt-get update'
           - distro: 'debian:jessie'
-            pre: 'apt-get update'
+            pre: '/bin/sh -c "echo deb http://archive.debian.org/debian/ jessie-backports main contrib non-free >> /etc/apt/sources.list.d/99-archived.list && apt-get update -o Acquire::Check-Valid-Until=false"'
           - distro: 'debian:stretch'
             pre: 'apt-get update'
 
@@ -82,4 +82,4 @@ jobs:
         env:
           PRE: ${{ matrix.pre }}
         run: |
-          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && ${PRE}; ./packaging/installer/install-required-packages.sh netdata --dont-wait --non-interactive && ./netdata-installer.sh --dont-wait --dont-start-it'
+          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && ${PRE} ; ./packaging/installer/install-required-packages.sh netdata --dont-wait --non-interactive && ./netdata-installer.sh --dont-wait --dont-start-it'
