@@ -3,4 +3,19 @@
 #ifndef NETDATA_EXPORTING_PROMETHEUS_REMOTE_WRITE_H
 #define NETDATA_EXPORTING_PROMETHEUS_REMOTE_WRITE_H
 
+#include "exporting/exporting_engine.h"
+#include "exporting/prometheus/prometheus.h"
+#include "remote_write_request.h"
+
+struct prometheus_remote_write_specific_config {
+    char *remote_write_path;
+};
+
+int init_prometheus_remote_write_instance(struct instance *instance);
+
+int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host);
+int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st);
+int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *rd);
+int format_batch_prometheus_remote_write(struct instance *instance);
+
 #endif //NETDATA_EXPORTING_PROMETHEUS_REMOTE_WRITE_H

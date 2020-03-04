@@ -7,7 +7,7 @@
 // PROMETHEUS
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
-inline int can_send_rrdset(struct instance *instance, BACKEND_OPTIONS backend_options, RRDSET *st) {
+inline int can_send_rrdset(struct instance *instance, RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     (void)host;
 
@@ -30,7 +30,7 @@ inline int can_send_rrdset(struct instance *instance, BACKEND_OPTIONS backend_op
         return 0;
     }
 
-    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(BACKEND_OPTIONS_DATA_SOURCE(instance->config.options) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
@@ -75,7 +75,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     return 0;
 }
 
-static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable) {
+inline size_t prometheus_name_copy(char *d, const char *s, size_t usable) {
     size_t n;
 
     for(n = 0; *s && n < usable ; d++, s++, n++) {
@@ -89,7 +89,7 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
     return n;
 }
 
-static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable) {
+inline size_t prometheus_label_copy(char *d, const char *s, size_t usable) {
     size_t n;
 
     // make sure we can escape one character without overflowing the buffer
@@ -109,7 +109,7 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
     return n;
 }
 
-static inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
+inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
     const char *sorig = s;
     char *ret = d;
     size_t n;
@@ -179,12 +179,6 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable,
     return ret;
 }
 
-
-#define PROMETHEUS_ELEMENT_MAX 256
-#define PROMETHEUS_LABELS_MAX 1024
-#define PROMETHEUS_VARIABLE_MAX 256
-
-#define PROMETHEUS_LABELS_MAX_NUMBER 128
 
 struct host_variables_callback_options {
     RRDHOST *host;
@@ -334,7 +328,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(struct instance *insta
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-        if(likely(can_send_rrdset(instance, exporting_options, st))) {
+        if(likely(can_send_rrdset(instance, st))) {
             rrdset_rdlock(st);
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
@@ -569,180 +563,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(struct instance *insta
 
     rrdhost_unlock(host);
 }
-
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-inline static void remote_write_split_words(char *str, char **words, int max_words) {
-    char *s = str;
-    int i = 0;
-
-    while(*s && i < max_words - 1) {
-        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag name
-
-        if(*s)
-            words[i] = s;
-
-        while(*s && !isspace(*s) && *s != '=') s++; // find the end of the tag name
-
-        if(*s != '=') {
-            words[i] = NULL;
-            break;
-        }
-        *s = '\0';
-        s++;
-        i++;
-
-        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag value
-
-        if(*s && *s == '"') s++; // strip an opening quote
-        if(*s)
-            words[i] = s;
-
-        while(*s && !isspace(*s) && *s != ',') s++; // find the end of the tag value
-
-        if(*s && *s != ',') {
-            words[i] = NULL;
-            break;
-        }
-        if(s != words[i] && *(s - 1) == '"') *(s - 1) = '\0'; // strip a closing quote
-        if(*s != '\0') {
-            *s = '\0';
-            s++;
-            i++;
-        }
-    }
-}
-
-void rrd_stats_remote_write_allmetrics_prometheus(
-        struct instance *instance
-        , RRDHOST *host
-        , const char *__hostname
-        , const char *prefix
-        , EXPORTING_OPTIONS exporting_options
-        , time_t after
-        , time_t before
-        , size_t *count_charts
-        , size_t *count_dims
-        , size_t *count_dims_skipped
-) {
-    char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
-
-    add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
-
-    if(host->tags && *(host->tags)) {
-        char tags[PROMETHEUS_LABELS_MAX + 1];
-        strncpy(tags, host->tags, PROMETHEUS_LABELS_MAX);
-        char *words[PROMETHEUS_LABELS_MAX_NUMBER] = {NULL};
-        int i;
-
-        remote_write_split_words(tags, words, PROMETHEUS_LABELS_MAX_NUMBER);
-
-        add_host_info("netdata_host_tags_info", hostname, NULL, NULL, now_realtime_usec() / USEC_PER_MS);
-
-        for(i = 0; words[i] != NULL && words[i + 1] != NULL && (i + 1) < PROMETHEUS_LABELS_MAX_NUMBER; i += 2) {
-            add_tag(words[i], words[i + 1]);
-        }
-    }
-
-    // for each chart
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-        char chart[PROMETHEUS_ELEMENT_MAX + 1];
-        char context[PROMETHEUS_ELEMENT_MAX + 1];
-        char family[PROMETHEUS_ELEMENT_MAX + 1];
-        char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
-
-        prometheus_label_copy(chart, (exporting_options & EXPORTING_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
-        prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
-        prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
-
-        if(likely(can_send_rrdset(instance, exporting_options, st))) {
-            rrdset_rdlock(st);
-
-            (*count_charts)++;
-
-            int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
-            int homogeneous = 1;
-            if(as_collected) {
-                if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
-                    rrdset_update_heterogeneous_flag(st);
-
-                if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
-                    homogeneous = 0;
-            }
-            else {
-                if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
-                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
-            }
-
-            // for each dimension
-            RRDDIM *rd;
-            rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-                    char name[PROMETHEUS_LABELS_MAX + 1];
-                    char dimension[PROMETHEUS_ELEMENT_MAX + 1];
-                    char *suffix = "";
-
-                    if (as_collected) {
-                        // we need as-collected / raw data
-
-                        if(unlikely(rd->last_collected_time.tv_sec < after)) {
-                            debug(D_BACKEND, "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
-                            (*count_dims_skipped)++;
-                            continue;
-                        }
-
-                        if(homogeneous) {
-                            // all the dimensions of the chart, has the same algorithm, multiplier and divisor
-                            // we add all dimensions as labels
-
-                            prometheus_label_copy(dimension, (exporting_options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
-                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
-
-                            add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
-                            (*count_dims)++;
-                        }
-                        else {
-                            // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
-                            // we create a metric per dimension
-
-                            prometheus_name_copy(dimension, (exporting_options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
-                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
-
-                            add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
-                            (*count_dims)++;
-                        }
-                    }
-                    else {
-                        // we need average or sum of the data
-
-                        time_t first_t = after, last_t = before;
-                        // TODO: remove first_t
-                        (void)first_t;
-                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
-
-                        if(!isnan(value) && !isinf(value)) {
-
-                            if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
-                                suffix = "_average";
-                            else if(EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_SUM)
-                                suffix = "_sum";
-
-                            prometheus_label_copy(dimension, (exporting_options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
-                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
-
-                            add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);
-                            (*count_dims)++;
-                        }
-                    }
-                }
-            }
-
-            rrdset_unlock(st);
-        }
-    }
-}
-#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
 static inline time_t prometheus_preparation(struct instance *instance, RRDHOST *host, BUFFER *wb, EXPORTING_OPTIONS exporting_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";

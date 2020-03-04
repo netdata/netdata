@@ -6,17 +6,12 @@
 
 using namespace prometheus;
 
-
 google::protobuf::Arena arena;
 WriteRequest *write_request;
 
 void init_write_request() {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
-}
-
-void clear_write_request() {
-    write_request->clear_timeseries();
 }
 
 void add_host_info(const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp) {
@@ -107,9 +102,10 @@ size_t get_write_request_size(){
     return (size < INT_MAX)?size:0;
 }
 
-int pack_write_request(char *buffer, size_t *size) {
+int pack_and_clear_write_request(char *buffer, size_t *size) {
     std::string uncompressed_write_request;
     if(write_request->SerializeToString(&uncompressed_write_request) == false) return 1;
+    write_request->clear_timeseries();
 
     snappy::RawCompress(uncompressed_write_request.data(), uncompressed_write_request.size(), buffer, size);
 
