@@ -11,6 +11,7 @@ renice 19 $$ > /dev/null 2> /dev/null
 ME="${0}"
 
 if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
+
   echo >&2 "Sorry! This script needs BASH version 4+, but you have BASH version ${BASH_VERSION}"
   exit 1
 fi
@@ -1791,7 +1792,9 @@ if [ -z "${1}" ]; then
 fi
 
 pv=$(python --version 2>&1)
-if [[ "${pv}" =~ ^Python\ 2.* ]]; then
+if [ "${tree}" = macos ] ; then
+  pv=3
+elif [[ "${pv}" =~ ^Python\ 2.* ]]; then
   pv=2
 elif [[ "${pv}" =~ ^Python\ 3.* ]]; then
   pv=3
