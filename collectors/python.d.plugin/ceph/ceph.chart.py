@@ -120,7 +120,7 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.config_file = self.configuration.get('config_file')
         self.keyring_file = self.configuration.get('keyring_file')
-        self.rados_id = self.configuration.get('rados_id')
+        self.rados_id = self.configuration.get('rados_id', 'admin')
 
     def check(self):
         """
