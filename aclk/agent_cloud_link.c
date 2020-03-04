@@ -1219,7 +1219,7 @@ void aclk_get_challenge()
     error("Decrypted/encoded challenge='%s'", encoded);
 
     unsigned char response_json[4096]={};
-    sprintf(response_json, "{response=\"%s\"}", encoded);
+    sprintf(response_json, "{\"response\":\"%s\"}", encoded);
     info("Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
