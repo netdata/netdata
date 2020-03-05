@@ -1283,10 +1283,7 @@ install_apt_get() {
   read -r -a apt_opts <<< "$opts"
 
   # install the required packages
-  for pkg in "${@}"; do
-    [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} apt-get "${apt_opts[@]}" install "${pkg}"
-  done
+  run ${sudo} apt-get "${apt_opts[@]}" install "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1450,10 +1447,7 @@ install_emerge() {
   read -r -a emerge_opts <<< "$opts"
 
   # install the required packages
-  for pkg in "${@}"; do
-    [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} emerge "${emerge_opts[@]}" -v --noreplace "${pkg}"
-  done
+  run ${sudo} emerge "${emerge_opts[@]}" -v --noreplace "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1511,10 +1505,7 @@ install_equo() {
   read -r -a equo_opts <<< "$opts"
 
   # install the required packages
-  for pkg in "${@}"; do
-    [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-    run ${sudo} equo i "${equo_opts[@]}" "${pkg}"
-  done
+  run ${sudo} equo i "${equo_opts[@]}" "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -1570,17 +1561,10 @@ install_pacman() {
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://unix.stackexchange.com/questions/52277/pacman-option-to-assume-yes-to-every-question/52278
-    for pkg in "${@}"; do
-      [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-      # Try the noconfirm option, if that fails, go with the legacy way for non-interactive
-      run ${sudo} pacman --noconfirm --needed -S "${pkg}" || yes | run ${sudo} pacman --needed -S "${pkg}"
-    done
-
+    # Try the noconfirm option, if that fails, go with the legacy way for non-interactive
+    run ${sudo} pacman --noconfirm --needed -S "${@}" || yes | run ${sudo} pacman --needed -S "${@}"
   else
-    for pkg in "${@}"; do
-      [[ ${DRYRUN} -eq 0 ]] && echo >&2 "Adding package ${pkg}"
-      run ${sudo} pacman --needed -S "${pkg}"
-    done
+    run ${sudo} pacman --needed -S "${@}"
   fi
 }
 
