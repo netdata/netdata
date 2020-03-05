@@ -169,7 +169,10 @@ static int create_private_key()
     aclk_private_key = PEM_read_bio_RSAPrivateKey(key_bio, NULL, NULL, NULL);
     BIO_free(key_bio);
     if (aclk_private_key!=NULL)
+    {
+        freez(private_key);
         return 0;
+    }
     char * err = mallocz(130);;
     ERR_load_crypto_strings();
     ERR_error_string(ERR_get_error(), err);
@@ -975,12 +978,18 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     int err = SSL_connect(ssl);
     if (err!=1) {
         error("SSL_connect() failed with err=%d", err);
+        SSL_free(ssl);
+        close(sock);
+        SSL_CTX_free(ctx);
         return 1;
     }
     err = SSL_write(ssl, b->buffer, b->len);
     if (err <= 0)
     {
         error("SSL_write() failed with err=%d", err);
+        SSL_free(ssl);
+        close(sock);
+        SSL_CTX_free(ctx);
         return 1;
     }
     buffer_flush(b);
@@ -988,7 +997,9 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     debug(D_ACLK, "Received %d bytes in response", bytes_read);
     b->len = bytes_read;
     SSL_shutdown(ssl);
+    SSL_free(ssl);
     close(sock);
+        SSL_CTX_free(ctx);
     return 0;
 }
 
@@ -1255,6 +1266,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     debug(D_ACLK, "Challenge response from cloud: %s", payload);
     if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
     {
+        freez(challenge.result);
         error("Could not parse the json response with the challenge: %s", payload);
         return;
     }
@@ -1297,6 +1309,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     struct dictionary_singleton password = { .key = "password", .result = NULL };
     if (json_parse(payload, &password, json_extract_singleton) != JSON_OK)
     {
+        freez(password.result);
         error("Could not parse the json response with the password: %s", payload);
         return;
     }
@@ -1309,6 +1322,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         freez(aclk_password);
     aclk_username = strdupz(agent_id);
     aclk_password = strdupz(password.result);
+    freez(password.result);
 
     buffer_free(b);
 }
@@ -1431,6 +1445,10 @@ exited:
 
     freez(aclk_username);
     freez(aclk_password);
+    freez(aclk_hostname);
+    freez(aclk_port);
+    if (aclk_private_key != NULL)
+        RSA_free(aclk_private_key);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
