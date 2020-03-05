@@ -1,20 +1,8 @@
 name: reviewdog
 on: [pull_request]
 jobs:
-  golangci-lint:
-    name: runner / golangci-lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-      - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-check
-
   eslint:
-    name: runner / eslint
+    name: eslint
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
@@ -27,7 +15,7 @@ jobs:
           eslint_flags: '.'
 
   shellcheck:
-    name: runner / shellcheck
+    name: shellcheck
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
@@ -40,3 +28,15 @@ jobs:
           path: "."
           pattern: "*.sh*"
           exclude: "./.git/*"
+
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: yamllint
+        uses: reviewdog/action-yamllint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check

@@ -2789,7 +2789,7 @@ let chartState = function (element) {
                             hide: NETDATA.options.current.show_help_delay_hide_ms
                         },
                         title: 'Pan Right',
-                        content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help can be disabled from the settings.</small>'
                     });
                 }
 
@@ -2815,7 +2815,7 @@ let chartState = function (element) {
                             hide: NETDATA.options.current.show_help_delay_hide_ms
                         },
                         title: 'Chart Zoom In',
-                        content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart, or press SHIFT or ALT and use the mouse wheel or 2-finger touchpad scroll to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart, or press SHIFT or ALT and use the mouse wheel or 2-finger touchpad scroll to zoom in or out.<br/><small>Help can be disabled from the settings.</small>'
                     });
                 }
 
@@ -2842,7 +2842,7 @@ let chartState = function (element) {
                             hide: NETDATA.options.current.show_help_delay_hide_ms
                         },
                         title: 'Chart Zoom Out',
-                        content: 'Zoom out the chart. You can also press SHIFT or ALT and use the mouse wheel, or 2-finger touchpad scroll to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Zoom out the chart. You can also press SHIFT or ALT and use the mouse wheel, or 2-finger touchpad scroll to zoom in or out.<br/><small>Help can be disabled from the settings.</small>'
                     });
                 }
 
@@ -2874,7 +2874,7 @@ let chartState = function (element) {
                             hide: NETDATA.options.current.show_help_delay_hide_ms
                         },
                         title: 'Chart Resize',
-                        content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help can be disabled from the settings.</small>'
                     });
                 }
 
@@ -2934,7 +2934,7 @@ let chartState = function (element) {
                         show: NETDATA.options.current.show_help_delay_show_ms,
                         hide: NETDATA.options.current.show_help_delay_hide_ms
                     },
-                    content: 'You can click or tap on the values or the labels to select dimensions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
+                    content: 'You can click or tap on the values or the labels to select dimensions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help can be disabled from the settings.</small>'
                 });
             }
         } else {

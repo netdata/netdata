@@ -1,3 +1,8 @@
+---
+title: The step-by-step Netdata tutorial
+description: Learn what Netdata is, what it's capable of, and how it'll help you make faster and more informed decisions about the health and performance of your systems and applications.
+---
+
 # The step-by-step Netdata tutorial
 
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.
