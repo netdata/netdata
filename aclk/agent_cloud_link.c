@@ -1183,6 +1183,11 @@ unsigned int line_len=0;
 void aclk_get_challenge()
 {
     debug(D_ACLK, "Performing challenge-response sequence");
+    if (aclk_password != NULL)
+    {
+        freez(aclk_password);
+        aclk_password = NULL;
+    }
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
     BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
