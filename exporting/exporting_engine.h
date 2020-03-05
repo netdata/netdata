@@ -13,41 +13,8 @@
 
 extern struct config exporting_config;
 
-#define EXPORTER_DATA_SOURCE                    "data source"
-#define EXPORTER_DATA_SOURCE_DEFAULT            "average"
-
-#define EXPORTER_DESTINATION                    "destination"
-#define EXPORTER_DESTINATION_DEFAULT            "localhost"
-
-#define EXPORTER_UPDATE_EVERY                   "update every"
-#define EXPORTER_UPDATE_EVERY_DEFAULT           10
-
-#define EXPORTER_BUF_ONFAIL                     "buffer on failures"
-#define EXPORTER_BUF_ONFAIL_DEFAULT             10
-
-#define EXPORTER_TIMEOUT_MS                     "timeout ms"
-#define EXPORTER_TIMEOUT_MS_DEFAULT             10000
-
-#define EXPORTER_SEND_CHART_MATCH               "send charts matching"
-#define EXPORTER_SEND_CHART_MATCH_DEFAULT       "*"
-
-#define EXPORTER_SEND_HOST_MATCH                "send hosts matching"
-#define EXPORTER_SEND_HOST_MATCH_DEFAULT        "localhost *"
-
-#define EXPORTER_SEND_CONFIGURED_LABELS         "send configured labels"
-#define EXPORTER_SEND_CONFIGURED_LABELS_DEFAULT CONFIG_BOOLEAN_YES
-
-#define EXPORTER_SEND_AUTOMATIC_LABELS          "send automatic labels"
-#define EXPORTER_SEND_AUTOMATIC_LABELS_DEFAULT  CONFIG_BOOLEAN_NO
-
-#define EXPORTER_SEND_NAMES                     "send names instead of ids"
-#define EXPORTER_SEND_NAMES_DEFAULT             CONFIG_BOOLEAN_YES
-
-#define EXPORTER_KINESIS_STREAM_NAME            "stream name"
-#define EXPORTER_KINESIS_STREAM_NAME_DEFAULT    "netdata"
-
-#define EXPORTER_AWS_ACCESS_KEY_ID              "aws_access_key_id"
-#define EXPORTER_AWS_SECRET_ACCESS_KEY          "aws_secret_access_key"
+#define EXPORTING_UPDATE_EVERY_OPTION_NAME "update every"
+#define EXPORTING_UPDATE_EVERY_DEFAULT     10
 
 typedef enum exporting_options {
     EXPORTING_OPTION_NONE                   = 0,
