@@ -31,6 +31,9 @@ extern int netdata_thread_cancel(netdata_thread_t thread);
 extern int netdata_thread_join(netdata_thread_t thread, void **retval);
 extern int netdata_thread_detach(pthread_t thread);
 
+#define NETDATA_THREAD_NAME_MAX 15
+extern void uv_thread_set_name_np(uv_thread_t ut, const char* name);
+
 #define netdata_thread_self pthread_self
 #define netdata_thread_testcancel pthread_testcancel
 

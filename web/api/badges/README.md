@@ -178,19 +178,62 @@ These are options dedicated to badges:
 
     Divide the value with this number. The default is `1`.
 
--   `label_color=COLOR`
+-   Color customization parameters
 
-    The color of the label (the left part). You can use any HTML color, include `#NNN` and `#NNNNNN`. The following colors are defined in Netdata (and you can use them by name): `green`, `brightgreen`, `yellow`, `yellowgreen`, `orange`, `red`, `blue`, `grey`, `gray`, `lightgrey`, `lightgray`. These are taken from <https://github.com/badges/shields> so they are compatible with standard badges.
+    The following parameters specify colors of each individual part of the badge. Each parameter is documented in detail
+    below.
 
--   `value_color=COLOR:null|COLOR<VALUE|COLOR>VALUE|COLOR>=VALUE|COLOR<=VALUE|...`
+    | Area of badge      | Backgroud color parameter | Text color parameter |
+    | ---:               | :-----------------------: | :------------------: |
+    | Label (left) part  | `label_color`             | `text_color_lbl`     |
+    | Value (right) part | `value_color`             | `text_color_val`     |
 
-    You can add a pipe delimited list of conditions to pick the color. The first matching (left to right) will be used.
+    -   `label_color=COLOR`
 
-    Example: `value_color=grey:null|green<10|yellow<100|orange<1000|blue<10000|red`
+        The color of the label (the left part). You can use any HTML color in `RGB` or `RRGGBB` hex notation (without
+        the `#` character at the beginning). Additionally, you can use one of the following predefined colors (and you
+        can use them by their name):
+    
+        -   `green`
+        -   `brightgreen`
+        -   `yellow`
+        -   `yellowgreen`
+        -   `orange`
+        -   `red`
+        -   `blue`
+        -   `grey`
+        -   `gray`
+        -   `lightgrey`
+        -   `lightgray`
+    
+        These colors are taken from <https://github.com/badges/shields>, which makes them compatible with standard
+        badges.
 
-    The above will set `grey` if no value exists (not collected within the `gap when lost iterations above` in `netdata.conf` for the chart), `green` if the value is less than 10, `yellow` if the value is less than 100, etc up to `red` which will be used if no other conditions match.
+    -   `value_color=COLOR:null|COLOR<VALUE|COLOR>VALUE|COLOR>=VALUE|COLOR<=VALUE|...`
 
-    The supported operators are `<`, `>`, `<=`, `>=`, `=` (or `:`) and `!=` (or `<>`).
+        You can add a pipe delimited list of conditions to pick the value color. The first matching (left to right) will
+        be used.
+
+        Example: `value_color=grey:null|green<10|yellow<100|orange<1000|blue<10000|red`
+
+        The above will set `grey` if no value exists (not collected within the `gap when lost iterations above` in
+        `netdata.conf` for the chart), `green` if the value is less than 10, `yellow` if the value is less than 100, and
+        so on. Netdata will use `red` if no other conditions match. Only integers are suported as values.
+
+        The supported operators are `<`, `>`, `<=`, `>=`, `=` (or `:`), and `!=` (or `<>`).
+
+        You can also use the same syntax as the `label_color` parameter to define each of these colors. You can
+        reference a predefined color by name or `RGB`/`RRGGBB` hex notation.
+
+    -   `text_color_lbl=RGB` or `text_color_lbl=RRGGBB` or `text_color_lbl=color_by_name`
+
+        This value specifies the font color for the font of left/label side of the badge. The syntax is the same as the
+        `label_color` parameter. If not given, or given with an empty value, Netdata will use the default color.
+
+    -   `text_color_val=RGB` or `text_color_val=RRGGBB` or `text_color_lbl=color_by_name`
+
+        This value specifies the font color for the font of right/value side of the badge. The syntax is the same as the
+        `label_color` parameter. If not given, or given with an empty value, Netdata will use the default color.
 
 -   `precision=NUMBER`
 

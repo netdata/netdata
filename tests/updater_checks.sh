@@ -47,6 +47,10 @@ case "${running_os}" in
 "opensuse-leap"|"opensuse-tumbleweed")
 	zypper update -y
 	zypper install -y bats curl
+
+	# Fixes curl: (60) SSL certificate problem: unable to get local issuer certificate
+	# https://travis-ci.com/netdata/netdata/jobs/267573805
+	update-ca-certificates
 	;;
 "arch")
 	pacman -Sy
@@ -64,7 +68,7 @@ esac
 # Download and run depednency scriptlet, before anything else
 #
 deps_tool="/tmp/deps_tool.$$.sh"
-curl -Ss -o ${deps_tool} https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh
+curl -Ss -o ${deps_tool} https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh
 if [ -f "${deps_tool}" ]; then
 	echo "Running dependency handling script.."
 	chmod +x "${deps_tool}"

@@ -10,18 +10,17 @@ try:
     from psycopg2 import extensions
     from psycopg2.extras import DictCursor
     from psycopg2 import OperationalError
+
     PSYCOPG2 = True
 except ImportError:
     PSYCOPG2 = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-
 DEFAULT_PORT = 5432
 DEFAULT_USER = 'postgres'
-DEFAULT_CONNECT_TIMEOUT = 2       # seconds
+DEFAULT_CONNECT_TIMEOUT = 2  # seconds
 DEFAULT_STATEMENT_TIMEOUT = 5000  # ms
-
 
 CONN_PARAM_DSN = 'dsn'
 CONN_PARAM_HOST = 'host'
@@ -37,10 +36,10 @@ CONN_PARAM_SSL_CRL = 'sslcrl'
 CONN_PARAM_SSL_CERT = 'sslcert'
 CONN_PARAM_SSL_KEY = 'sslkey'
 
-
 QUERY_NAME_WAL = 'WAL'
 QUERY_NAME_ARCHIVE = 'ARCHIVE'
 QUERY_NAME_BACKENDS = 'BACKENDS'
+QUERY_NAME_BACKEND_USAGE = 'BACKEND_USAGE'
 QUERY_NAME_TABLE_STATS = 'TABLE_STATS'
 QUERY_NAME_INDEX_STATS = 'INDEX_STATS'
 QUERY_NAME_DATABASE = 'DATABASE'
@@ -77,6 +76,10 @@ METRICS = {
     QUERY_NAME_BACKENDS: [
         'backends_active',
         'backends_idle'
+    ],
+    QUERY_NAME_BACKEND_USAGE: [
+        'available',
+        'used'
     ],
     QUERY_NAME_INDEX_STATS: [
         'index_count',
@@ -141,10 +144,13 @@ METRICS = {
 
 NO_VERSION = 0
 DEFAULT = 'DEFAULT'
+V72 = 'V72'
+V82 = 'V82'
+V91 = 'V91'
+V92 = 'V92'
 V96 = 'V96'
 V10 = 'V10'
 V11 = 'V11'
-
 
 QUERY_WAL = {
     DEFAULT: """
@@ -235,6 +241,76 @@ SELECT
      WHERE state = 'idle')
       AS backends_idle
 FROM pg_stat_activity;
+""",
+}
+
+QUERY_BACKEND_USAGE = {
+    DEFAULT: """
+SELECT
+    COUNT(1) as used,
+    current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int
+    - COUNT(1) AS available
+FROM pg_catalog.pg_stat_activity
+WHERE backend_type IN ('client backend', 'background worker');
+""",
+    V10: """
+SELECT
+    SUM(s.conn) as used,
+    current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int
+    - SUM(s.conn) AS available
+FROM (
+    SELECT 's' as type, COUNT(1) as conn
+    FROM pg_catalog.pg_stat_activity
+    WHERE backend_type IN ('client backend', 'background worker')
+    UNION ALL
+    SELECT 'r', COUNT(1) 
+    FROM pg_catalog.pg_stat_replication
+) as s;
+""",
+    V92: """
+SELECT
+    SUM(s.conn) as used,
+    current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int
+    - SUM(s.conn) AS available
+FROM (
+    SELECT 's' as type, COUNT(1) as conn
+    FROM pg_catalog.pg_stat_activity
+    WHERE query NOT LIKE 'autovacuum: %%'
+    UNION ALL
+    SELECT 'r', COUNT(1) 
+    FROM pg_catalog.pg_stat_replication
+) as s;
+""",
+    V91: """
+SELECT
+    SUM(s.conn) as used,
+    current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int
+    - SUM(s.conn) AS available
+FROM (
+    SELECT 's' as type, COUNT(1) as conn
+    FROM pg_catalog.pg_stat_activity
+    WHERE current_query NOT LIKE 'autovacuum: %%'
+    UNION ALL
+    SELECT 'r', COUNT(1) 
+    FROM pg_catalog.pg_stat_replication
+) as s;
+""",
+    V82: """
+SELECT
+    COUNT(1) as used,
+    current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int
+    - COUNT(1) AS available
+FROM pg_catalog.pg_stat_activity
+WHERE current_query NOT LIKE 'autovacuum: %%';
+""",
+    V72: """
+SELECT
+    COUNT(1) as used,
+    current_setting('max_connections')::int - current_setting('superuser_reserved_connections')::int
+    - COUNT(1) AS available
+FROM pg_catalog.pg_stat_activity s
+JOIN pg_catalog.pg_database d ON d.oid = s.datid
+WHERE d.datallowconn;
 """,
 }
 
@@ -531,10 +607,21 @@ SELECT
 """,
 }
 
-
 def query_factory(name, version=NO_VERSION):
     if name == QUERY_NAME_BACKENDS:
         return QUERY_BACKEND[DEFAULT]
+    elif name == QUERY_NAME_BACKEND_USAGE:
+        if version < 80200:
+            return QUERY_BACKEND_USAGE[V72]
+        if version < 90100:
+            return QUERY_BACKEND_USAGE[V82]
+        if version < 90200:
+            return QUERY_BACKEND_USAGE[V91]
+        if version < 100000:
+            return QUERY_BACKEND_USAGE[V92]
+        elif version < 120000:
+            return QUERY_BACKEND_USAGE[V10]
+        return QUERY_BACKEND_USAGE[DEFAULT]
     elif name == QUERY_NAME_TABLE_STATS:
         return QUERY_TABLE_STATS[DEFAULT]
     elif name == QUERY_NAME_INDEX_STATS:
@@ -591,6 +678,7 @@ ORDER = [
     'db_stat_connections',
     'database_size',
     'backend_process',
+    'backend_usage',
     'index_count',
     'index_size',
     'table_count',
@@ -675,6 +763,13 @@ CHARTS = {
         'lines': [
             ['backends_active', 'active', 'absolute'],
             ['backends_idle', 'idle', 'absolute']
+        ]
+    },
+    'backend_usage': {
+        'options': [None, '% of Connections in use', 'percentage', 'backend processes', 'postgres.backend_usage', 'stacked'],
+        'lines': [
+            ['available', 'available', 'percentage-of-absolute-row'],
+            ['used', 'used', 'percentage-of-absolute-row']
         ]
     },
     'index_count': {
@@ -904,6 +999,7 @@ class Service(SimpleService):
         if not self.alive and not self.reconnect():
             return None
 
+        self.data = dict()
         try:
             cursor = self.conn.cursor(cursor_factory=DictCursor)
 
@@ -972,6 +1068,7 @@ class Service(SimpleService):
     def populate_queries(self):
         self.queries[query_factory(QUERY_NAME_DATABASE)] = METRICS[QUERY_NAME_DATABASE]
         self.queries[query_factory(QUERY_NAME_BACKENDS)] = METRICS[QUERY_NAME_BACKENDS]
+        self.queries[query_factory(QUERY_NAME_BACKEND_USAGE, self.server_version)] = METRICS[QUERY_NAME_BACKEND_USAGE]
         self.queries[query_factory(QUERY_NAME_LOCKS)] = METRICS[QUERY_NAME_LOCKS]
         self.queries[query_factory(QUERY_NAME_BGWRITER)] = METRICS[QUERY_NAME_BGWRITER]
         self.queries[query_factory(QUERY_NAME_DIFF_LSN, self.server_version)] = METRICS[QUERY_NAME_WAL_WRITES]
@@ -989,7 +1086,8 @@ class Service(SimpleService):
                 self.queries[query_factory(QUERY_NAME_WAL, self.server_version)] = METRICS[QUERY_NAME_WAL]
 
             if self.server_version >= 100000:
-                self.queries[query_factory(QUERY_NAME_REPSLOT_FILES, self.server_version)] = METRICS[QUERY_NAME_REPSLOT_FILES]
+                v = METRICS[QUERY_NAME_REPSLOT_FILES]
+                self.queries[query_factory(QUERY_NAME_REPSLOT_FILES, self.server_version)] = v
 
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
@@ -1005,12 +1103,12 @@ class Service(SimpleService):
             ]
             self.definitions['database_size']['lines'].append(dim)
             for chart_name in [name for name in self.order if name.startswith('db_stat')]:
-                    add_database_stat_chart(
-                        order=self.order,
-                        definitions=self.definitions,
-                        name=chart_name,
-                        database_name=database_name,
-                    )
+                add_database_stat_chart(
+                    order=self.order,
+                    definitions=self.definitions,
+                    name=chart_name,
+                    database_name=database_name,
+                )
             add_database_lock_chart(
                 order=self.order,
                 definitions=self.definitions,
@@ -1078,10 +1176,10 @@ def add_database_lock_chart(order, definitions, database_name):
     chart_name = database_name + '_locks'
     order.insert(-1, chart_name)
     definitions[chart_name] = {
-            'options':
+        'options':
             [None, 'Locks on db: ' + database_name, 'locks', 'db ' + database_name, 'postgres.db_locks', 'line'],
-            'lines': create_lines(database_name)
-            }
+        'lines': create_lines(database_name)
+    }
 
 
 def add_database_stat_chart(order, definitions, name, database_name):
@@ -1097,8 +1195,8 @@ def add_database_stat_chart(order, definitions, name, database_name):
     order.insert(0, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-               'options': [name, title + ': ' + database_name,  units, 'db ' + database_name, context,  chart_type],
-               'lines': create_lines(database_name, chart_template['lines'])}
+        'options': [name, title + ': ' + database_name, units, 'db ' + database_name, context, chart_type],
+        'lines': create_lines(database_name, chart_template['lines'])}
 
 
 def add_replication_delta_chart(order, definitions, name, application_name):
@@ -1115,8 +1213,8 @@ def add_replication_delta_chart(order, definitions, name, application_name):
     order.insert(position, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-               'options': [name, title + ': ' + application_name,  units, 'replication delta', context,  chart_type],
-               'lines': create_lines(application_name, chart_template['lines'])}
+        'options': [name, title + ': ' + application_name, units, 'replication delta', context, chart_type],
+        'lines': create_lines(application_name, chart_template['lines'])}
 
 
 def add_replication_slot_chart(order, definitions, name, slot_name):
@@ -1133,5 +1231,5 @@ def add_replication_slot_chart(order, definitions, name, slot_name):
     order.insert(position, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-               'options': [name, title + ': ' + slot_name,  units, 'replication slot files', context,  chart_type],
-               'lines': create_lines(slot_name, chart_template['lines'])}
+        'options': [name, title + ': ' + slot_name, units, 'replication slot files', context, chart_type],
+        'lines': create_lines(slot_name, chart_template['lines'])}

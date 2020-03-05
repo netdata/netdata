@@ -22,12 +22,14 @@ class ExecutableService(SimpleService):
         Get raw data from executed command
         :return: <list>
         """
+        command = command or self.command
+        self.debug("Executing command '{0}'".format(' '.join(command)))
         try:
-            p = Popen(command if command else self.command, stdout=PIPE, stderr=PIPE)
+            p = Popen(command, stdout=PIPE, stderr=PIPE)
         except Exception as error:
-            self.error('Executing command {command} resulted in error: {error}'.format(command=command or self.command,
-                                                                                       error=error))
+            self.error('Executing command {0} resulted in error: {1}'.format(command, error))
             return None
+
         data = list()
         std = p.stderr if stderr else p.stdout
         for line in std:

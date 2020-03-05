@@ -49,7 +49,7 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 print("2.1 Preparing repo on LXC container")
 common.prepare_repo(container)
 
-common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"])
 common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
 
 # Exceptional cases, not available everywhere

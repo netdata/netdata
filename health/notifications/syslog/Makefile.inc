@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	syslog/README.md \
-	syslog/Makefile.inc \
-	$(NULL)
+    syslog/README.md \
+    syslog/Makefile.inc \
+    $(NULL)
 

@@ -5,6 +5,21 @@
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
 
+// As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
+const char *operstate_names[] = { "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up" };
+
+static inline int get_operstate(char *operstate)
+{
+    int i;
+
+    for (i = 0; i < (int) (sizeof(operstate_names) / sizeof(char *)); i++) {
+        if (!strcmp(operstate, operstate_names[i])) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 // ----------------------------------------------------------------------------
 // netdev list
 
@@ -67,6 +82,8 @@ static struct netdev {
     kernel_uint_t tcarrier;
     kernel_uint_t tcompressed;
     kernel_uint_t speed;
+    kernel_uint_t duplex;
+    kernel_uint_t operstate;
 
     // charts
     RRDSET *st_bandwidth;
@@ -97,8 +114,17 @@ static struct netdev {
     RRDDIM *rd_tcompressed;
 
     usec_t speed_last_collected_usec;
+    usec_t duplex_last_collected_usec;
+    usec_t operstate_last_collected_usec;
+
     char *filename_speed;
     RRDSETVAR *chart_var_speed;
+
+    char *filename_duplex;
+    RRDSETVAR *chart_var_duplex;
+
+    char *filename_operstate;
+    RRDSETVAR *chart_var_operstate;
 
     struct netdev *next;
 } *netdev_root = NULL, *netdev_last_used = NULL;
@@ -169,10 +195,11 @@ static void netdev_free(struct netdev *d) {
 
     freez((void *)d->name);
     freez((void *)d->filename_speed);
+    freez((void *)d->filename_duplex);
+    freez((void *)d->filename_operstate);
     freez((void *)d);
     netdev_added--;
 }
-
 
 // ----------------------------------------------------------------------------
 // netdev renames
@@ -439,9 +466,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *disabled_list = NULL;
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
-    static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
-    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL, *proc_net_dev_filename = NULL;
+    static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1,
+               do_events = -1;
+    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL,
+                *proc_net_dev_filename = NULL;
+    static char *path_to_sys_class_net_duplex = NULL;
+    static char *path_to_sys_class_net_operstate = NULL;
     static long long int dt_to_refresh_speed = 0;
+    static long long int dt_to_refresh_duplex = 0;
+    static long long int dt_to_refresh_operstate = 0;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
@@ -454,6 +487,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/speed");
         path_to_sys_class_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/duplex");
+        path_to_sys_class_net_duplex = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device duplex", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/operstate");
+        path_to_sys_class_net_operstate = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device operstate", filename);
+
 
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
 
@@ -468,7 +508,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         disabled_list = simple_pattern_create(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching", "lo fireqos* *-ifb"), NULL, SIMPLE_PATTERN_EXACT);
 
         dt_to_refresh_speed = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "refresh interface speed every seconds", 10) * USEC_PER_SEC;
-        if(dt_to_refresh_speed < 0) dt_to_refresh_speed = 0;
+        dt_to_refresh_duplex = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "refresh interface duplex every seconds", 10) * USEC_PER_SEC;
+        dt_to_refresh_operstate = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "refresh interface operstate every seconds", 10) * USEC_PER_SEC;
+
+        if (dt_to_refresh_operstate < 0)
+            dt_to_refresh_operstate = 0;
+        if (dt_to_refresh_duplex < 0)
+            dt_to_refresh_duplex = 0;
+        if (dt_to_refresh_speed < 0)
+            dt_to_refresh_speed = 0;
     }
 
     if(unlikely(!ff)) {
@@ -525,6 +573,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 // set the filename to get the interface speed
                 snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
                 d->filename_speed = strdupz(buffer);
+
+                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
+                d->filename_duplex = strdupz(buffer);
+
+                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
+                d->filename_operstate = strdupz(buffer);
             }
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
@@ -664,6 +718,76 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         else {
                             rrdsetvar_custom_chart_variable_set(d->chart_var_speed, (calculated_number) d->speed);
                             d->speed_last_collected_usec = 0;
+                        }
+                    }
+                }
+            }
+
+            if (d->filename_duplex) {
+                d->duplex_last_collected_usec += dt;
+
+                if (unlikely(d->duplex_last_collected_usec >= (usec_t)dt_to_refresh_duplex)) {
+                    if (unlikely(!d->chart_var_duplex)) {
+                        d->chart_var_duplex = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "duplex");
+                        if (!d->chart_var_duplex) {
+                            error("Cannot create interface %s chart variable 'duplex'. Will not update the duplex status anymore.", d->name);
+                            freez(d->filename_duplex);
+                            d->filename_duplex = NULL;
+                        }
+                    }
+
+                    if (d->filename_duplex && d->chart_var_duplex) {
+                        char buffer[32 + 1];
+
+                        if (read_file(d->filename_duplex, buffer, 32)) {
+                            error("Cannot refresh interface %s duplex state by reading '%s'. I will stop updating it.", d->name, d->filename_duplex);
+                            freez(d->filename_duplex);
+                            d->filename_duplex = NULL;
+                        } else {
+                            // values can be unknown, half or full -- just check the first letter for speed
+                            if (buffer[0] == 'f')
+                                d->duplex = 2;
+                            else if (buffer[0] == 'h')
+                                d->duplex = 1;
+                            else
+                                d->duplex = 0;
+
+                            rrdsetvar_custom_chart_variable_set(d->chart_var_duplex, (calculated_number)d->duplex);
+                            d->duplex_last_collected_usec = 0;
+                        }
+                    }
+                }
+            }
+
+            if (d->filename_operstate) {
+                d->operstate_last_collected_usec += dt;
+
+                if (unlikely(d->operstate_last_collected_usec >= (usec_t)dt_to_refresh_operstate)) {
+                    if (unlikely(!d->chart_var_operstate)) {
+                        d->chart_var_operstate = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "operstate");
+                        if (!d->chart_var_operstate) {
+                            error(
+                                "Cannot create interface %s chart variable 'operstate'. I will stop updating it.",
+                                d->name);
+                            freez(d->filename_operstate);
+                            d->filename_operstate = NULL;
+                        }
+                    }
+
+                    if (d->filename_operstate && d->chart_var_operstate) {
+                        char buffer[32 + 1], *trimmed_buffer;
+
+                        if (read_file(d->filename_operstate, buffer, 32)) {
+                            error(
+                                "Cannot refresh %s operstate by reading '%s'. Will not update its status anymore.",
+                                d->name, d->filename_operstate);
+                            freez(d->filename_operstate);
+                            d->filename_operstate = NULL;
+                        } else {
+                            trimmed_buffer = trim(buffer);
+                            d->operstate = get_operstate(trimmed_buffer);
+                            rrdsetvar_custom_chart_variable_set(d->chart_var_operstate, (calculated_number)d->operstate);
+                            d->operstate_last_collected_usec = 0;
                         }
                     }
                 }

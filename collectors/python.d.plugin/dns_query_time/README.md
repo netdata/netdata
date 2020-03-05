@@ -1,12 +1,22 @@
-# dns_query_time
+# DNS query RTT monitoring with Netdata
 
-This module provides DNS query time statistics.
+Measures DNS query round trip time.
 
 **Requirement:**
 
 -   `python-dnspython` package
 
 It produces one aggregate chart or one chart per DNS server, showing the query time.
+
+## Configuration
+
+Edit the `python.d/dns_query_time.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different, if different
+sudo ./edit-config python.d/dns_query_time.conf
+```
 
 ---
 

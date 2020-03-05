@@ -29,6 +29,7 @@
 #  - hipchat notifications by @ktsaou #1561
 #  - fleep notifications by @Ferroin
 #  - prowlapp.com notifications by @Ferroin
+#  - irc notifications by @manosf
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
@@ -164,6 +165,7 @@ custom
 msteam
 kavenegar
 prowl
+irc
 awssns
 rocketchat
 sms
@@ -433,7 +435,6 @@ filter_recipient_by_criticality() {
 		if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
 			# we do not remove the file, so that he will get future notifications of this alarm
 			debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
-			return 0
 		fi
 		;;
 
@@ -442,7 +443,6 @@ filter_recipient_by_criticality() {
 			# remove the file, so that he will only receive notifications for CRITICAL states for this alarm
 			rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
 			debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm (will only receive CRITICAL notifications from now on)"
-			return 0
 		fi
 		;;
 	esac
@@ -1626,9 +1626,10 @@ send_irc() {
 		*) color="#777777" ;;
 		esac
 
+		SNDMESSAGE="${MESSAGE//$'\n'/", "}"
 		for CHANNEL in ${CHANNELS}; do
 			error=0
-			send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${MESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
+			send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
 			reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
 			for code in ${reply_codes}; do
 				if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then

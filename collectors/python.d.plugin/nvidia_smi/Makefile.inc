@@ -10,3 +10,4 @@ dist_pythonconfig_DATA += nvidia_smi/nvidia_smi.conf
 
 # do not install these files, but include them in the distribution
 dist_noinst_DATA       += nvidia_smi/README.md nvidia_smi/Makefile.inc
+

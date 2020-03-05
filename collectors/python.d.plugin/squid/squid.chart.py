@@ -5,7 +5,6 @@
 
 from bases.FrameworkServices.SocketService import SocketService
 
-
 ORDER = [
     'clients_net',
     'clients_requests',

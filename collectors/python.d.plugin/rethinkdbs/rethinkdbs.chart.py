@@ -5,6 +5,7 @@
 
 try:
     import rethinkdb as rdb
+
     HAS_RETHINKDB = True
 except ImportError:
     HAS_RETHINKDB = False

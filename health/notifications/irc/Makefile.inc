@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	irc/README.md \
-	irc/Makefile.inc \
-	$(NULL)
+    irc/README.md \
+    irc/Makefile.inc \
+    $(NULL)
 

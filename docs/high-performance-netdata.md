@@ -1,19 +1,23 @@
 # High performance Netdata
 
-If you plan to run a Netdata public on the internet, you will get the most performance out of it by following these rules:
+If you plan to run a Netdata public on the internet, you will get the most performance out of it by following these
+rules:
 
 ## 1. run behind nginx
 
-The internal web server is optimized to provide the best experience with few clients connected to it. Normally a web browser will make 4-6 concurrent connections to a web server, so that it can send requests in parallel. To best serve a single client, Netdata spawns a thread for each connection it receives (so 4-6 threads per connected web browser).
+The internal web server is optimized to provide the best experience with few clients connected to it. Normally a web
+browser will make 4-6 concurrent connections to a web server, so that it can send requests in parallel. To best serve a
+single client, Netdata spawns a thread for each connection it receives (so 4-6 threads per connected web browser).
 
-If you plan to have your Netdata public on the internet, this strategy wastes resources. It provides a lock-free environment so each thread is autonomous to serve the browser, but it does not scale well. Running Netdata behind nginx, idle connections to Netdata can be reused, thus improving significantly the performance of Netdata.
+If you plan to have your Netdata public on the internet, this strategy wastes resources. It provides a lock-free
+environment so each thread is autonomous to serve the browser, but it does not scale well. Running Netdata behind nginx,
+idle connections to Netdata can be reused, thus improving significantly the performance of Netdata.
 
 In the following nginx configuration we do the following:
 
--   allow nginx to maintain up to 1024 idle connections to Netdata (so Netdata will have up to 1024 threads waiting for requests)
-
+-   allow nginx to maintain up to 1024 idle connections to Netdata (so Netdata will have up to 1024 threads waiting for
+    requests)
 -   allow nginx to compress the responses of Netdata (later we will disable gzip compression at Netdata)
-
 -   we disable wordpress pingback attacks and allow only GET, HEAD and OPTIONS requests.
 
 ```conf
@@ -55,7 +59,7 @@ server {
 
 Then edit `/etc/netdata/netdata.conf` and set these config options:
 
-```
+```conf
 [global]
     bind socket to IP = 127.0.0.1
     access log = none
@@ -66,24 +70,28 @@ Then edit `/etc/netdata/netdata.conf` and set these config options:
 These options:
 
 -   `[global].bind socket to IP = 127.0.0.1` makes Netdata listen only for requests from localhost (nginx).
--   `[global].access log = none` disables the access.log of Netdata. It is not needed since Netdata only listens for requests on 127.0.0.1 and thus only nginx can access it. nginx has its own access.log for your record.
--   `[global].disconnect idle web clients after seconds = 3600` will kill inactive web threads after an hour of inactivity.
--   `[global].enable web responses gzip compression = no` disables gzip compression at Netdata (nginx will compress the responses).
+-   `[global].access log = none` disables the access.log of Netdata. It is not needed since Netdata only listens for
+    requests on 127.0.0.1 and thus only nginx can access it. nginx has its own access.log for your record.
+-   `[global].disconnect idle web clients after seconds = 3600` will kill inactive web threads after an hour of
+    inactivity.
+-   `[global].enable web responses gzip compression = no` disables gzip compression at Netdata (nginx will compress the
+    responses).
 
 ## 2. increase open files limit (non-systemd)
 
-By default Linux limits open file descriptors per process to 1024. This means that less than half of this number of client connections can be accepted by both nginx and Netdata. To increase them, create 2 new files:
+By default Linux limits open file descriptors per process to 1024. This means that less than half of this number of
+client connections can be accepted by both nginx and Netdata. To increase them, create 2 new files:
 
 1.  `/etc/security/limits.d/nginx.conf`, with these contents:
 
-```
+```conf
 nginx   soft    nofile  10000
 nginx   hard    nofile  30000
 ```
 
 2.  `/etc/security/limits.d/netdata.conf`, with these contents:
 
-```
+```conf
 netdata   soft    nofile  10000
 netdata   hard    nofile  30000
 ```
@@ -96,20 +104,22 @@ sysctl -p
 
 ## 2b. increase open files limit (systemd)
 
-Thanks to [@leleobhz](https://github.com/netdata/netdata/issues/655#issue-163932584), this is what you need to raise the limits using systemd:
+Thanks to [@leleobhz](https://github.com/netdata/netdata/issues/655#issue-163932584), this is what you need to raise the
+limits using systemd:
 
-This is based on <https://ma.ttias.be/increase-open-files-limit-in-mariadb-on-centos-7-with-systemd/> and here worked as following:
+This is based on <https://ma.ttias.be/increase-open-files-limit-in-mariadb-on-centos-7-with-systemd/> and here worked as
+following:
 
 1.  Create the folders in /etc:
 
-```
+```bash
 mkdir -p /etc/systemd/system/netdata.service.d
 mkdir -p /etc/systemd/system/nginx.service.d
 ```
 
 2.  Create limits.conf in each folder as following:
 
-```
+```conf
 [Service]
 LimitNOFILE=30000
 ```

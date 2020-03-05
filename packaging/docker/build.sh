@@ -19,6 +19,11 @@ ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
 [ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
 
+if [ "${RELEASE_CHANNEL}" != "nightly" ] && [ "${RELEASE_CHANNEL}" != "stable" ]; then
+  echo "RELEASE_CHANNEL must be set to either 'nightly' or 'stable' - build cannot proceed"
+  exit 1
+fi
+
 if [ -z ${REPOSITORY} ]; then
 	REPOSITORY="${TRAVIS_REPO_SLUG}"
 	if [ -z ${REPOSITORY} ]; then
@@ -60,10 +65,11 @@ docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 # Build images using multi-arch Dockerfile.
 for ARCH in ${ARCHS[@]}; do
-     TAG="${REPOSITORY}:${VERSION}-${ARCH}"
+     TAG="${REPOSITORY,,}:${VERSION}-${ARCH}"
      echo "Building tag ${TAG}.."
      eval docker build --no-cache \
           --build-arg ARCH="${ARCH}" \
+          --build-arg RELEASE_CHANNEL="${RELEASE_CHANNEL}" \
           --tag "${TAG}" \
           --file packaging/docker/Dockerfile ./
      echo "..Done!"

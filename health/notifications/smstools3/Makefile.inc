@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	smstools3/README.md \
-	smstools3/Makefile.inc \
-	$(NULL)
+    smstools3/README.md \
+    smstools3/Makefile.inc \
+    $(NULL)
 

@@ -9,7 +9,7 @@ typedef enum signal_action {
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
     NETDATA_SIGNAL_SAVE_DATABASE,
-    NETDATA_SIGNAL_LOG_ROTATE,
+    NETDATA_SIGNAL_REOPEN_LOGS,
     NETDATA_SIGNAL_RELOAD_HEALTH,
     NETDATA_SIGNAL_FATAL,
     NETDATA_SIGNAL_CHILD,
@@ -25,7 +25,7 @@ static struct {
         { SIGINT , "SIGINT",  0, NETDATA_SIGNAL_EXIT_CLEANLY  },
         { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY  },
         { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY  },
-        { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_LOG_ROTATE    },
+        { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS   },
         { SIGUSR1, "SIGUSR1", 0, NETDATA_SIGNAL_SAVE_DATABASE },
         { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH },
         { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL         },
@@ -221,33 +221,35 @@ void signals_handle(void) {
                             case NETDATA_SIGNAL_RELOAD_HEALTH:
                                 error_log_limit_unlimited();
                                 info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
-                                health_reload();
                                 error_log_limit_reset();
+                                execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_SAVE_DATABASE:
                                 error_log_limit_unlimited();
                                 info("SIGNAL: Received %s. Saving databases...", name);
-                                rrdhost_save_all();
-                                info("Databases saved.");
                                 error_log_limit_reset();
+                                execute_command(CMD_SAVE_DATABASE, NULL, NULL);
                                 break;
 
-                            case NETDATA_SIGNAL_LOG_ROTATE:
+                            case NETDATA_SIGNAL_REOPEN_LOGS:
                                 error_log_limit_unlimited();
                                 info("SIGNAL: Received %s. Reopening all log files...", name);
-                                reopen_all_log_files();
                                 error_log_limit_reset();
+                                execute_command(CMD_REOPEN_LOGS, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
                                 error_log_limit_unlimited();
                                 info("SIGNAL: Received %s. Cleaning up to exit...", name);
+                                commands_exit();
                                 netdata_cleanup_and_exit(0);
                                 exit(0);
+                                break;
 
                             case NETDATA_SIGNAL_FATAL:
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
+                                break;
 
                             case NETDATA_SIGNAL_CHILD:
                                 debug(D_CHILDS, "SIGNAL: Received %s. Reaping...", name);

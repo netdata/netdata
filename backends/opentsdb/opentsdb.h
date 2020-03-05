@@ -5,7 +5,7 @@
 
 #include "backends/backends.h"
 
-extern int format_dimension_collected_opentsdb_telnet(
+extern int backends_format_dimension_collected_opentsdb_telnet(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -17,7 +17,7 @@ extern int format_dimension_collected_opentsdb_telnet(
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 );
 
-extern int format_dimension_stored_opentsdb_telnet(
+extern int backends_format_dimension_stored_opentsdb_telnet(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -31,7 +31,7 @@ extern int format_dimension_stored_opentsdb_telnet(
 
 extern int process_opentsdb_response(BUFFER *b);
 
-int format_dimension_collected_opentsdb_http(
+int backends_format_dimension_collected_opentsdb_http(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -43,7 +43,7 @@ int format_dimension_collected_opentsdb_http(
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 );
 
-int format_dimension_stored_opentsdb_http(
+int backends_format_dimension_stored_opentsdb_http(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from

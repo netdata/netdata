@@ -993,7 +993,17 @@ int do_proc_stat(int update_every, usec_t dt) {
         for(core = 0; core < schedstat_cores_found; core++) {
             if(unlikely(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time))) {
                 pthread_t thread;
+                cpu_set_t global_cpu_set;
 
+                if (likely(!pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &global_cpu_set))) {
+                    if (unlikely(!CPU_ISSET(core, &global_cpu_set))) {
+                        continue;
+                    }
+                }
+                else
+                    error("Cannot read current process affinity");
+
+                // These threads are very ephemeral and don't need to have a specific name
                 if(unlikely(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core)))
                     error("Cannot create wake_cpu_thread");
                 else if(unlikely(pthread_join(thread, NULL)))

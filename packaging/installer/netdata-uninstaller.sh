@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#shellcheck disable=SC2181
 #
 # This is the netdata uninstaller script
 #
@@ -66,6 +65,29 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # -----------------------------------------------------------------------------
+# portable service command
+
+service_cmd="$(command -v service 2>/dev/null)"
+rcservice_cmd="$(command -v rc-service 2>/dev/null)"
+systemctl_cmd="$(command -v systemctl 2>/dev/null)"
+service() {
+
+    local cmd="${1}" action="${2}"
+
+    if [ -n "${systemctl_cmd}" ]; then
+        run "${systemctl_cmd}" "${action}" "${cmd}"
+        return $?
+    elif [ -n "${service_cmd}" ]; then
+        run "${service_cmd}" "${cmd}" "${action}"
+        return $?
+    elif [ -n "${rcservice_cmd}" ]; then
+        run "${rcservice_cmd}" "${cmd}" "${action}"
+        return $?
+    fi
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 
 setup_terminal() {
 	TPUT_RESET=""
@@ -97,16 +119,17 @@ setup_terminal() {
 setup_terminal || echo >/dev/null
 
 run_ok() {
-	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+	printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
 }
 
 run_failed() {
-	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+	printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
 }
 
 ESCAPED_PRINT_METHOD=
-printf "%q " test >/dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
+if printf "%q " test >/dev/null 2>&1; then
+	ESCAPED_PRINT_METHOD="printfq"
+fi
 escaped_print() {
 	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
 		printf "%q " "${@}"
@@ -128,22 +151,24 @@ run() {
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	printf >>"${run_logfile}" "${info}"
-	escaped_print >>"${run_logfile}" "${@}"
-	printf >>"${run_logfile}" " ... "
+	{
+		printf "%s" "${info}"
+		escaped_print "${@}"
+		printf "%s" " ... "
+	} >> "${run_logfile}"
 
-	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+	printf "%s" >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
 	escaped_print >&2 "${@}"
-	printf >&2 "${TPUT_RESET}\n"
+	printf "%s" >&2 "${TPUT_RESET}\n"
 
 	"${@}"
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		run_failed
-		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
+		run_failed "${*}"
+		printf >>"${run_logfile}" "FAILED with exit code %s\n" "${ret}"
 	else
-		run_ok
+		run_ok "${*}"
 		printf >>"${run_logfile}" "OK\n"
 	fi
 
@@ -159,10 +184,10 @@ portable_del_group() {
 	# Linux
 	if command -v groupdel 1>/dev/null 2>&1; then
 		if grep -q "${groupname}" /etc/group; then
-		  run groupdel -f "${groupname}" && return 0
+			run groupdel "${groupname}" && return 0
 		else
-		  echo >&2 "Group ${groupname} already removed in a previous step."
-		  run_ok
+			echo >&2 "Group ${groupname} already removed in a previous step."
+			run_ok "${*}"
 		fi
 	fi
 
@@ -176,6 +201,40 @@ portable_del_group() {
 	fi
 
 	echo >&2 "Group ${groupname} was not automatically removed, you might have to remove it manually"
+	return 1
+}
+
+issystemd() {
+	local pids p myns ns systemctl
+
+	# if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
+	if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ] ; then
+		return 1
+	fi
+
+	# if there is no systemctl command, it is not systemd
+	systemctl=$(command -v systemctl 2>/dev/null)
+	if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ] ; then
+		return 1
+	fi
+
+	# if pid 1 is systemd, it is systemd
+	[ "$(basename "$(readlink /proc/1/exe)" 2>/dev/null)" = "systemd" ] && return 0
+
+	# if systemd is not running, it is not systemd
+	pids=$(safe_pidof systemd 2>/dev/null)
+	[ -z "${pids}" ] && return 1
+
+	# check if the running systemd processes are not in our namespace
+	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+	for p in ${pids}; do
+		ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
+
+		# if pid of systemd is in our namespace, it is systemd
+		[ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
+	done
+
+	# else, it is not systemd
 	return 1
 }
 
@@ -258,22 +317,124 @@ rm_dir() {
 	fi
 }
 
+safe_pidof() {
+	local pidof_cmd
+	pidof_cmd="$(command -v pidof 2>/dev/null)"
+	if [ -n "${pidof_cmd}" ]; then
+		${pidof_cmd} "${@}"
+		return $?
+	else
+		ps -acxo pid,comm |
+			sed "s/^ *//g" |
+			grep netdata |
+			cut -d ' ' -f 1
+		return $?
+	fi
+}
+
+pidisnetdata() {
+	if [ -d /proc/self ]; then
+		if [ -z "$1" ] || [ ! -f "/proc/$1/stat" ] ; then
+			return 1
+		fi
+		[ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
+		return 1
+	fi
+	return 0
+}
+
+stop_netdata_on_pid() {
+	local pid="${1}" ret=0 count=0
+
+	pidisnetdata "${pid}" || return 0
+
+	printf >&2 "Stopping netdata on pid %s ..." "${pid}"
+	while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
+		if [ ${count} -gt 24 ]; then
+			echo >&2 "Cannot stop the running netdata on pid ${pid}."
+			return 1
+		fi
+
+		count=$((count + 1))
+
+		pidisnetdata "${pid}" || ret=1
+		if [ ${ret} -eq 1 ] ; then
+			break
+		fi
+
+		if [ ${count} -lt 12 ] ; then
+			run kill "${pid}" 2>/dev/null
+			ret=$?
+		else
+			run kill -9 "${pid}" 2>/dev/null
+			ret=$?
+		fi
+
+		test ${ret} -eq 0 && printf >&2 "." && sleep 5
+
+	done
+
+	echo >&2
+	if [ ${ret} -eq 0 ]; then
+		echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+		return 1
+	fi
+
+	echo >&2 "netdata on pid ${pid} stopped."
+	return 0
+}
+
 netdata_pids() {
 	local p myns ns
+
 	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+
 	for p in \
 		$(cat /var/run/netdata.pid 2>/dev/null) \
 		$(cat /var/run/netdata/netdata.pid 2>/dev/null) \
-		$(pidof netdata 2>/dev/null); do
-
+		$(safe_pidof netdata 2>/dev/null); do
 		ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
-		#shellcheck disable=SC2002
+
 		if [ -z "${myns}" ] || [ -z "${ns}" ] || [ "${myns}" = "${ns}" ]; then
-			name="$(cat "/proc/${p}/stat" 2>/dev/null | cut -d '(' -f 2 | cut -d ')' -f 1)"
-			if [ "${name}" = "netdata" ]; then
-				echo "${p}"
+			pidisnetdata "${p}" && echo "${p}"
+		fi
+	done
+}
+
+stop_all_netdata() {
+	local p
+
+	if [ "${UID}" -eq 0 ] ; then
+		uname="$(uname 2>/dev/null)"
+
+		# Any of these may fail, but we need to not bail if they do.
+		if issystemd; then
+			if systemctl stop netdata ; then
+				sleep 5
+			fi
+		elif [ "${uname}" = "Darwin" ]; then
+			if launchctl stop netdata ; then
+				sleep 5
+			fi
+		elif [ "${uname}" = "FreeBSD" ]; then
+			if /etc/rc.d/netdata stop ; then
+				sleep 5
+			fi
+		else
+			if service netdata stop ; then
+				sleep 5
 			fi
 		fi
+	fi
+
+	if [ -n "$(netdata_pids)" ] &&  [ -n "$(builtin type -P netdatacli)" ] ; then
+		netdatacli shutdown-agent
+		sleep 20
+	fi
+
+	for p in $(netdata_pids); do
+		# shellcheck disable=SC2086
+		stop_netdata_on_pid ${p}
 	done
 }
 
@@ -284,20 +445,7 @@ source "${ENVIRONMENT_FILE}" || exit 1
 
 #### STOP NETDATA
 echo >&2 "Stopping a possibly running netdata..."
-for p in $(netdata_pids); do
-	i=0
-	while kill "${p}" 2>/dev/null; do
-		if [ "$i" -gt 30 ]; then
-			echo >&2 "Forcefully stopping netdata with pid ${p}"
-			run kill -9 "${p}"
-			run sleep 2
-			break
-		fi
-		sleep 1
-		i=$((i + 1))
-	done
-done
-sleep 2
+stop_all_netdata
 
 #### REMOVE NETDATA FILES
 rm_file /etc/logrotate.d/netdata
@@ -312,6 +460,9 @@ if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
 	rm_dir "${NETDATA_PREFIX}"
 else
 	rm_file "/usr/sbin/netdata"
+	rm_file "/usr/sbin/netdatacli"
+	rm_file "/tmp/netdata-ipc"
+	rm_file "/usr/sbin/netdata-claim.sh"
 	rm_dir "/usr/share/netdata"
 	rm_dir "/usr/libexec/netdata"
 	rm_dir "/var/lib/netdata"

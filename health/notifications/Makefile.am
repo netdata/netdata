@@ -4,8 +4,8 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
-	alarm-notify.sh \
-	$(NULL)
+    alarm-notify.sh \
+    $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
@@ -16,15 +16,15 @@ dist_libconfig_DATA = \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
-	alarm-notify.sh \
-	alarm-email.sh \
-	alarm-test.sh \
-	$(NULL)
+    alarm-notify.sh \
+    alarm-email.sh \
+    alarm-test.sh \
+    $(NULL)
 
 dist_noinst_DATA = \
-	alarm-notify.sh.in \
-	README.md \
-	$(NULL)
+    alarm-notify.sh.in \
+    README.md \
+    $(NULL)
 
 include alerta/Makefile.inc
 include awssns/Makefile.inc

@@ -247,7 +247,7 @@ class SocketService(SimpleService):
             if self._check_raw_data(data):
                 break
 
-        self.debug('final response: {0}'.format(data))
+        self.debug(u'final response: {0}'.format(data))
         return data
 
     def _get_raw_data(self, raw=False, request=None):

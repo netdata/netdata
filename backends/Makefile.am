@@ -10,13 +10,13 @@ SUBDIRS = \
     prometheus \
     aws_kinesis \
     mongodb \
-	$(NULL)
+    $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	WALKTHROUGH.md \
-	$(NULL)
+    README.md \
+    WALKTHROUGH.md \
+    $(NULL)
 
 dist_noinst_SCRIPTS = \
-	nc-backend.sh \
-	$(NULL)
+    nc-backend.sh \
+    $(NULL)

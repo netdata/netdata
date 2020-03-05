@@ -9,6 +9,7 @@ struct health_cmdapi_thread_status {
 };
 
 unsigned int default_health_enabled = 1;
+char *silencers_filename;
 
 // ----------------------------------------------------------------------------
 // health initialization
@@ -70,7 +71,7 @@ void health_silencers_init(void) {
         }
         fclose(fd);
     } else {
-        error("Cannot open the file %s",silencers_filename);
+        info("Cannot open the file %s, so Netdata will work with the default health configuration.",silencers_filename);
     }
 }
 
@@ -152,6 +153,9 @@ void health_reload_host(RRDHOST *host) {
     rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
 
+    //Discard alarms with labels that do not apply to host
+    rrdcalc_labels_unlink_alarm_from_host(host);
+
     // link the loaded alarms to their charts
     RRDDIM *rd;
     rrdset_foreach_write(st, host) {
@@ -175,7 +179,9 @@ void health_reload_host(RRDHOST *host) {
  * Reload the host configuration for all hosts.
  */
 void health_reload(void) {
-
+#ifdef ENABLE_ACLK
+    aclk_single_update_disable();
+#endif
     rrd_rdlock();
 
     RRDHOST *host;
@@ -183,6 +189,10 @@ void health_reload(void) {
         health_reload_host(host);
 
     rrd_unlock();
+#ifdef ENABLE_ACLK
+    aclk_single_update_enable();
+    aclk_alarm_reload();
+#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -576,6 +586,8 @@ void *health_main(void *ptr) {
 
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
+
+    rrdcalc_labels_unlink();
 
     unsigned int loop = 0;
     while(!netdata_exit) {

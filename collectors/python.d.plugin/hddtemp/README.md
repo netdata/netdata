@@ -1,13 +1,21 @@
-# hddtemp
+# Hard drive temperature monitoring with Netdata
 
-Module monitors disk temperatures from one or more hddtemp daemons.
+Monitors disk temperatures from one or more `hddtemp` daemons.
 
 **Requirement:**
 Running `hddtemp` in daemonized mode with access on tcp port
 
 It produces one chart **Temperature** with dynamic number of dimensions (one per disk)
 
-## configuration
+## Configuration
+
+Edit the `python.d/hddtemp.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/hddtemp.conf
+```
 
 Sample:
 

@@ -42,3 +42,5 @@ Netdata Cloud is entirely optional. The application will never force you to crea
 ## Running Netdata Cloud on-premises or as a hosted instance
 
 We plan on making both on-premises and hosted instances of Netdata Cloud available to enterprises. Until then, we are creating a list of people and businesses interested in either of these options. To add yourself or your organization to this list, email us at [info@netdata.cloud](mailto:info@netdata.cloud).
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fnetdata-cloud%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

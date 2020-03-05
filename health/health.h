@@ -52,7 +52,7 @@ extern unsigned int default_health_enabled;
 
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
-char *silencers_filename;
+extern char *silencers_filename;
 
 extern void health_init(void);
 extern void *health_main(void *ptr);
@@ -62,6 +62,7 @@ extern void health_reload(void);
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
 extern void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
+extern void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
@@ -106,6 +107,8 @@ extern void health_alarm_log_free(RRDHOST *host);
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
 extern void *health_cmdapi_thread(void *ptr);
+
+extern void health_label_log_save(RRDHOST *host);
 
 extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 

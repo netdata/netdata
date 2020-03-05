@@ -1,5 +1,5 @@
 <!--
-Describe the change in summary section, including rationale and degin decisions.
+Describe the change in summary section, including rationale and design decisions.
 Include "Fixes #nnn" if you are fixing an existing issue.
 
 In "Component Name" section write which component is changed in this PR. This
@@ -15,5 +15,12 @@ helpful if there is no related issue.
 
 ##### Component Name
 
+##### Description of testing that the developer performed
+
+<!---
+Please be detailed enough that your reviewer can understand which test-cases you
+have covered, and recreate them if necessary.
+-->
 ##### Additional Information
+
 

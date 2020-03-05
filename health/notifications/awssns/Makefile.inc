@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	awssns/README.md \
-	awssns/Makefile.inc \
-	$(NULL)
+    awssns/README.md \
+    awssns/Makefile.inc \
+    $(NULL)
 

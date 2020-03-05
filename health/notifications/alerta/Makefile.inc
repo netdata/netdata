@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	alerta/README.md \
-	alerta/Makefile.inc \
-	$(NULL)
+    alerta/README.md \
+    alerta/Makefile.inc \
+    $(NULL)
 

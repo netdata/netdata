@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 // graphite backend
 
-int format_dimension_collected_graphite_plaintext(
+int backends_format_dimension_collected_graphite_plaintext(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -42,7 +42,7 @@ int format_dimension_collected_graphite_plaintext(
     return 1;
 }
 
-int format_dimension_stored_graphite_plaintext(
+int backends_format_dimension_stored_graphite_plaintext(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from

@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	slack/README.md \
-	slack/Makefile.inc \
-	$(NULL)
+    slack/README.md \
+    slack/Makefile.inc \
+    $(NULL)
 

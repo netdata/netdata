@@ -4,6 +4,7 @@
 #include <sched.h>
 
 char pidfile[FILENAME_MAX + 1] = "";
+char claimingdirectory[FILENAME_MAX + 1];
 
 static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     if(fd == -1) return;
@@ -50,6 +51,7 @@ int become_user(const char *username, int pid_fd) {
 
     create_needed_dir(netdata_configured_cache_dir, uid, gid);
     create_needed_dir(netdata_configured_varlib_dir, uid, gid);
+    create_needed_dir(claimingdirectory, uid, gid);
 
     if(pidfile[0]) {
         if(chown(pidfile, uid, gid) == -1)
@@ -434,6 +436,9 @@ int become_daemon(int dont_fork, const char *user)
     // never become a problem
     sched_setscheduler_set();
 
+    // Set claiming directory based on user config directory with correct ownership
+    snprintfz(claimingdirectory, FILENAME_MAX, "%s/claim.d", netdata_configured_user_config_dir);
+
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {
             error("Cannot become user '%s'. Continuing as we are.", user);
@@ -443,6 +448,7 @@ int become_daemon(int dont_fork, const char *user)
     else {
         create_needed_dir(netdata_configured_cache_dir, getuid(), getgid());
         create_needed_dir(netdata_configured_varlib_dir, getuid(), getgid());
+        create_needed_dir(claimingdirectory, getuid(), getgid());
     }
 
     if(pidfd != -1)

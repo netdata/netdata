@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	pushover/README.md \
-	pushover/Makefile.inc \
-	$(NULL)
+    pushover/README.md \
+    pushover/Makefile.inc \
+    $(NULL)
 

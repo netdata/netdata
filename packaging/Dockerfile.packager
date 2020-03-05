@@ -1,0 +1,42 @@
+ARG ARCH=amd64
+ARG DISTRO=debian
+ARG DISTRO_VERSION=10
+ARG VERSION=0.1
+
+FROM netdata/package-builders:${DISTRO}${DISTRO_VERSION} AS build
+
+ARG ARCH
+ARG DISTRO
+ARG DISTRO_VERSION
+ARG VERSION
+
+ENV ARCH=$ARCH
+ENV DISTRO=$DISTRO
+ENV DISTRO_VERSION=$DISTRO_VERSION
+ENV VERSION=$VERSION
+
+WORKDIR /netdata
+COPY . .
+
+RUN /build.sh
+
+FROM ${DISTRO}:${DISTRO_VERSION} AS runtime
+
+ARG ARCH
+ARG DISTRO
+ARG DISTRO_VERSION
+ARG VERSION
+
+ENV ARCH=$ARCH
+ENV DISTRO=$DISTRO
+ENV DISTRO_VERSION=$DISTRO_VERSION
+ENV VERSION=$VERSION
+
+COPY ./packaging/scripts/install.sh /install.sh
+COPY ./packaging/scripts/test.sh /test.sh
+
+COPY --from=build /netdata/artifacts /artifacts
+
+RUN /install.sh
+
+CMD ["/test.sh"]

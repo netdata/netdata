@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	discord/README.md \
-	discord/Makefile.inc \
-	$(NULL)
+    discord/README.md \
+    discord/Makefile.inc \
+    $(NULL)
 

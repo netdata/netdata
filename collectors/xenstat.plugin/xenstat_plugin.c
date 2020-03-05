@@ -83,16 +83,6 @@ struct vcpu_metrics {
     struct vcpu_metrics *next;
 };
 
-struct tmem_metrics {
-    unsigned long long curr_eph_pages;
-    unsigned long long succ_eph_gets;
-    unsigned long long succ_pers_puts;
-    unsigned long long succ_pers_gets;
-
-    int pages_chart_generated;
-    int operation_chart_generated;
-};
-
 struct vbd_metrics {
     unsigned int id;
 
@@ -152,7 +142,6 @@ struct domain_metrics {
     unsigned long long cur_mem;
     unsigned long long max_mem;
 
-    struct tmem_metrics tmem;
     struct vcpu_metrics *vcpu_root;
     struct vbd_metrics *vbd_root;
     struct network_metrics *network_root;
@@ -170,7 +159,6 @@ struct domain_metrics {
 struct node_metrics{
     unsigned long long tot_mem;
     unsigned long long free_mem;
-    long freeable_mb;
     int num_domains;
     unsigned int num_cpus;
     unsigned long long node_cpu_hz;
@@ -415,7 +403,6 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
 
     node_metrics.tot_mem = xenstat_node_tot_mem(node);
     node_metrics.free_mem = xenstat_node_free_mem(node);
-    node_metrics.freeable_mb = xenstat_node_freeable_mb(node);
     node_metrics.num_domains = xenstat_node_num_domains(node);
     node_metrics.num_cpus = xenstat_node_num_cpus(node);
     node_metrics.node_cpu_hz = xenstat_node_cpu_hz(node);
@@ -457,12 +444,6 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         d->cur_mem = xenstat_domain_cur_mem(domain);
         d->max_mem = xenstat_domain_max_mem(domain);
 
-        xenstat_tmem *tmem = xenstat_domain_tmem(domain);
-        d->tmem.curr_eph_pages = xenstat_tmem_curr_eph_pages(tmem);
-        d->tmem.succ_eph_gets = xenstat_tmem_succ_eph_gets(tmem);
-        d->tmem.succ_pers_puts = xenstat_tmem_succ_pers_puts(tmem);
-        d->tmem.succ_pers_gets = xenstat_tmem_succ_pers_gets(tmem);
-
         if(unlikely(vcpu_metrics_collect(d, domain) || vbd_metrics_collect(d, domain) || network_metrics_collect(d, domain))) {
             xenstat_free_node(node);
             return 1;
@@ -477,7 +458,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
 }
 
 static void xenstat_send_node_metrics() {
-    static int mem_chart_generated = 0, tmem_chart_generated = 0, domains_chart_generated = 0, cpus_chart_generated = 0, cpu_freq_chart_generated = 0;
+    static int mem_chart_generated = 0, domains_chart_generated = 0, cpus_chart_generated = 0, cpu_freq_chart_generated = 0;
 
     // ----------------------------------------------------------------
 
@@ -499,25 +480,6 @@ static void xenstat_send_node_metrics() {
             "END\n"
             , (collected_number) node_metrics.free_mem
             , (collected_number) (node_metrics.tot_mem - node_metrics.free_mem)
-    );
-
-    // ----------------------------------------------------------------
-
-    if(unlikely(!tmem_chart_generated)) {
-        printf("CHART xenstat.tmem '' 'Freeable Transcedent Memory' 'MiB' 'memory' '' line %d %d '' %s\n"
-               , NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM
-               , netdata_update_every
-               , PLUGIN_XENSTAT_NAME
-        );
-        printf("DIMENSION %s '' absolute 1 %d\n", "freeable", netdata_update_every * 1024 * 1024);
-        tmem_chart_generated = 1;
-    }
-
-    printf(
-            "BEGIN xenstat.tmem\n"
-            "SET freeable = %lld\n"
-            "END\n"
-            , (collected_number) node_metrics.freeable_mb
     );
 
     // ----------------------------------------------------------------
@@ -615,30 +577,6 @@ static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
     );
     printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
     printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
-}
-
-static void print_domain_tmem_pages_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.tmem_pages '' 'Current Number of Transcedent Memory Ephemeral Pages' 'pages' 'memory' 'xendomain.tmem_pages' line %d %d %s %s\n"
-                       , type
-                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES
-                       , netdata_update_every
-                       , obsolete_flag ? "obsolete": "''"
-                       , PLUGIN_XENSTAT_NAME
-    );
-    printf("DIMENSION pages '' absolute 1 %d\n", netdata_update_every);
-}
-
-static void print_domain_tmem_operations_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.tmem_operations '' 'Successful Transcedent Memory Puts and Gets' 'events/s' 'memory' 'xendomain.tmem_operations' line %d %d %s %s\n"
-                       , type
-                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS
-                       , netdata_update_every
-                       , obsolete_flag ? "obsolete": "''"
-                       , PLUGIN_XENSTAT_NAME
-    );
-    printf("DIMENSION ephemeral_gets 'ephemeral gets' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION persistent_puts 'persistent puts' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION persistent_gets 'persistent gets' incremental 1 %d\n", netdata_update_every);
 }
 
 static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics *d, int obsolete_flag) {
@@ -845,38 +783,6 @@ static void xenstat_send_domain_metrics() {
 
             // ----------------------------------------------------------------
 
-            if(unlikely(!d->tmem.pages_chart_generated)) {
-                print_domain_tmem_pages_chart_definition(type, CHART_IS_NOT_OBSOLETE);
-                d->tmem.pages_chart_generated = 1;
-            }
-            printf(
-                    "BEGIN %s.tmem_pages\n"
-                    "SET pages = %lld\n"
-                    "END\n"
-                    , type
-                    , (collected_number)d->tmem.curr_eph_pages
-            );
-
-            // ----------------------------------------------------------------
-
-            if(unlikely(!d->tmem.operation_chart_generated)) {
-                print_domain_tmem_operations_chart_definition(type, CHART_IS_NOT_OBSOLETE);
-                d->tmem.operation_chart_generated = 1;
-            }
-            printf(
-                    "BEGIN %s.tmem_operations\n"
-                    "SET ephemeral_gets = %lld\n"
-                    "SET persistent_puts = %lld\n"
-                    "SET persistent_gets = %lld\n"
-                    "END\n"
-                    , type
-                    , (collected_number)d->tmem.succ_eph_gets
-                    , (collected_number)d->tmem.succ_pers_puts
-                    , (collected_number)d->tmem.succ_eph_gets
-            );
-
-            // ----------------------------------------------------------------
-
             struct vbd_metrics *vbd_m;
             for(vbd_m = d->vbd_root; vbd_m; vbd_m = vbd_m->next) {
                 if(likely(vbd_m->updated && !vbd_m->error)) {
@@ -1036,8 +942,6 @@ static void xenstat_send_domain_metrics() {
             print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_vcpu_chart_definition(type, d, CHART_IS_OBSOLETE);
             print_domain_mem_chart_definition(type, CHART_IS_OBSOLETE);
-            print_domain_tmem_pages_chart_definition(type, CHART_IS_OBSOLETE);
-            print_domain_tmem_operations_chart_definition(type, CHART_IS_OBSOLETE);
 
             d = domain_metrics_free(d);
         }

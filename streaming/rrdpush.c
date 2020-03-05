@@ -25,7 +25,10 @@
  *
  */
 
+#define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
+#define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
+#define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
 typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
@@ -57,12 +60,12 @@ char *netdata_ssl_ca_file = NULL;
 static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
-    if(!appconfig_load(&stream_config, filename, 0)) {
+    if(!appconfig_load(&stream_config, filename, 0, NULL)) {
         info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
-        if(!appconfig_load(&stream_config, filename, 0))
+        if(!appconfig_load(&stream_config, filename, 0, NULL))
             info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
@@ -78,6 +81,7 @@ int rrdpush_init() {
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
@@ -149,6 +153,25 @@ static inline int should_send_chart_matching(RRDSET *st) {
     }
 
     return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
+}
+
+int configured_as_master() {
+    struct section *section = NULL;
+    int is_master = 0;
+
+    appconfig_wrlock(&stream_config);
+    for (section = stream_config.sections; section; section = section->next) {
+        uuid_t uuid;
+
+        if (uuid_parse(section->name, uuid) != -1 &&
+            appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
+            is_master = 1;
+            break;
+        }
+    }
+    appconfig_unlock(&stream_config);
+
+    return is_master;
 }
 
 // checks if the current chart definition has been sent
@@ -319,6 +342,38 @@ void rrdset_done_push(RRDSET *st) {
     rrdpush_buffer_unlock(host);
 }
 
+// labels
+void rrdpush_send_labels(RRDHOST *host) {
+    if (!host->labels || !(host->labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
+        return;
+
+    rrdpush_buffer_lock(host);
+    rrdhost_rdlock(host);
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+
+    struct label *labels = host->labels;
+    while(labels) {
+        buffer_sprintf(host->rrdpush_sender_buffer
+                , "LABEL \"%s\" = %d %s\n"
+                , labels->key
+                , (int)labels->label_source
+                , labels->value);
+
+        labels = labels->next;
+    }
+
+    buffer_sprintf(host->rrdpush_sender_buffer
+            , "OVERWRITE %s\n", "labels");
+
+    netdata_rwlock_unlock(&host->labels_rwlock);
+    rrdhost_unlock(host);
+
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+
+    rrdpush_buffer_unlock(host);
+    host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+}
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
@@ -442,6 +497,11 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
+static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
+    host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+    host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+}
+
 //called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
@@ -500,50 +560,76 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     }
 #endif
 
+    /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
+             version negotiation resulted in a high enough version.
+    */
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
-                    "&NETDATA_SYSTEM_OS_NAME=%s"
-                    "&NETDATA_SYSTEM_OS_ID=%s"
-                    "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
-                    "&NETDATA_SYSTEM_OS_VERSION=%s"
-                    "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
-                    "&NETDATA_SYSTEM_OS_DETECTION=%s"
-                    "&NETDATA_SYSTEM_KERNEL_NAME=%s"
-                    "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
-                    "&NETDATA_SYSTEM_ARCHITECTURE=%s"
-                    "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
-                    "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
-                    "&NETDATA_SYSTEM_CONTAINER=%s"
-                    "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
-                    " HTTP/1.1\r\n"
-                    "User-Agent: %s/%s\r\n"
-                    "Accept: */*\r\n\r\n"
-              , host->rrdpush_send_api_key
-              , host->hostname
-              , host->registry_hostname
-              , host->machine_guid
-              , default_rrd_update_every
-              , host->os
-              , host->timezone
-              , (host->tags) ? host->tags : ""
-              , (host->system_info->os_name) ? host->system_info->os_name : ""
-              , (host->system_info->os_id) ? host->system_info->os_id : ""
-              , (host->system_info->os_id_like) ? host->system_info->os_id_like : ""
-              , (host->system_info->os_version) ? host->system_info->os_version : ""
-              , (host->system_info->os_version_id) ? host->system_info->os_version_id : ""
-              , (host->system_info->os_detection) ? host->system_info->os_detection : ""
-              , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
-              , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
-              , (host->system_info->architecture) ? host->system_info->architecture : ""
-              , (host->system_info->virtualization) ? host->system_info->virtualization : ""
-              , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
-              , (host->system_info->container) ? host->system_info->container : ""
-              , (host->system_info->container_detection) ? host->system_info->container_detection : ""
-              , host->program_name
-              , host->program_version
-    );
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s&ver=%u"
+                 "&NETDATA_SYSTEM_OS_NAME=%s"
+                 "&NETDATA_SYSTEM_OS_ID=%s"
+                 "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
+                 "&NETDATA_SYSTEM_OS_VERSION=%s"
+                 "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
+                 "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_KERNEL_NAME=%s"
+                 "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
+                 "&NETDATA_SYSTEM_ARCHITECTURE=%s"
+                 "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
+                 "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CONTAINER=%s"
+                 "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                 "&NETDATA_CONTAINER_OS_NAME=%s"
+                 "&NETDATA_CONTAINER_OS_ID=%s"
+                 "&NETDATA_CONTAINER_OS_ID_LIKE=%s"
+                 "&NETDATA_CONTAINER_OS_VERSION=%s"
+                 "&NETDATA_CONTAINER_OS_VERSION_ID=%s"
+                 "&NETDATA_CONTAINER_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=%s"
+                 "&NETDATA_SYSTEM_CPU_FREQ=%s"
+                 "&NETDATA_SYSTEM_TOTAL_RAM=%s"
+                 "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
+                 "&NETDATA_PROTOCOL_VERSION=%s"
+                 " HTTP/1.1\r\n"
+                 "User-Agent: %s/%s\r\n"
+                 "Accept: */*\r\n\r\n"
+                 , host->rrdpush_send_api_key
+                 , host->hostname
+                 , host->registry_hostname
+                 , host->machine_guid
+                 , default_rrd_update_every
+                 , host->os
+                 , host->timezone
+                 , (host->tags) ? host->tags : ""
+                 , STREAMING_PROTOCOL_CURRENT_VERSION
+                 , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
+                 , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
+                 , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
+                 , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
+                 , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
+                 , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
+                 , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
+                 , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+                 , (host->system_info->architecture) ? host->system_info->architecture : ""
+                 , (host->system_info->virtualization) ? host->system_info->virtualization : ""
+                 , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
+                 , (host->system_info->container) ? host->system_info->container : ""
+                 , (host->system_info->container_detection) ? host->system_info->container_detection : ""
+                 , (host->system_info->container_os_name) ? host->system_info->container_os_name : ""
+                 , (host->system_info->container_os_id) ? host->system_info->container_os_id : ""
+                 , (host->system_info->container_os_id_like) ? host->system_info->container_os_id_like : ""
+                 , (host->system_info->container_os_version) ? host->system_info->container_os_version : ""
+                 , (host->system_info->container_os_version_id) ? host->system_info->container_os_version_id : ""
+                 , (host->system_info->container_os_detection) ? host->system_info->container_os_detection : ""
+                 , (host->system_info->host_cores) ? host->system_info->host_cores : ""
+                 , (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : ""
+                 , (host->system_info->host_ram_total) ? host->system_info->host_ram_total : ""
+                 , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
+                 , STREAMING_PROTOCOL_VERSION
+                 , host->program_name
+                 , host->program_version
+                 );
     http[eol] = 0x00;
 
 #ifdef ENABLE_HTTPS
@@ -584,23 +670,57 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
+    ssize_t received;
 #ifdef ENABLE_HTTPS
-    if(recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    received = recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
 #else
-    if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    received = recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
 #endif
         error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
 
-    if(strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT)) != 0) {
+    http[received] = '\0';
+    int answer = -1;
+    char *version_start = strchr(http, '=');
+    uint32_t version;
+    if(version_start) {
+        version_start++;
+        version = (uint32_t)strtol(version_start, NULL, 10);
+        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
+        if(!answer) {
+            rrdpush_set_flags_to_newest_stream(host);
+            host->stream_version = version;
+        }
+    } else {
+        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+        if(!answer) {
+            version = 1;
+            rrdpush_set_flags_to_newest_stream(host);
+        }
+        else {
+            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+            if(!answer) {
+                version = 0;
+                host->labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+            }
+        }
+    }
+
+    if(answer != 0) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
 
-    info("STREAM %s [send to %s]: established communication - ready to send metrics...", host->hostname, connected_to);
+    info("STREAM %s [send to %s]: established communication with a master using protocol version %u - ready to send metrics..."
+         , host->hostname
+         , connected_to
+         , version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
@@ -795,6 +915,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 }
 
                 if (ofd->revents & POLLOUT) {
+                    rrdpush_send_labels(host);
+
                     if (begin < buffer_strlen(host->rrdpush_sender_buffer)) {
                         debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes, begin = %zu)...", buffer_strlen(host->rrdpush_sender_buffer), begin);
 
@@ -962,6 +1084,7 @@ static int rrdpush_receive(int fd
                            , int update_every
                            , char *client_ip
                            , char *client_port
+                           , uint32_t stream_version
 #ifdef ENABLE_HTTPS
                            , struct netdata_ssl *ssl
 #endif
@@ -1078,12 +1201,23 @@ static int rrdpush_receive(int fd
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
-#ifdef ENABLE_HTTPS
-    host->ssl.conn = ssl->conn;
-    host->ssl.flags = ssl->flags;
-    if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+    char initial_response[HTTP_HEADER_SIZE];
+    if (stream_version > 1) {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_version);
+    } else if (stream_version == 1) {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
+    } else {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", host->hostname, client_ip, client_port);
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT);
+    }
+    #ifdef ENABLE_HTTPS
+    host->stream_ssl.conn = ssl->conn;
+    host->stream_ssl.flags = ssl->flags;
+    if(send_timeout(ssl, fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
-    if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+    if(send_timeout(fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
         log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "FAILED - CANNOT REPLY");
         error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", host->hostname, client_ip, client_port);
@@ -1123,6 +1257,8 @@ static int rrdpush_receive(int fd
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     host->connected_senders++;
     host->senders_disconnected_time = 0;
+    host->labels_flag = (stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
+
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             host->health_delay_up_to = now_realtime_sec() + alarms_delay;
@@ -1177,6 +1313,7 @@ struct rrdpush_thread {
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
+    uint32_t stream_version;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -1232,6 +1369,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
+	    , rpt->stream_version
 #ifdef ENABLE_HTTPS
 	    , &rpt->ssl
 #endif
@@ -1280,6 +1418,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
+    uint32_t stream_version = UINT_MAX;
     char buf[GUID_LEN + 1];
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
@@ -1308,11 +1447,35 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             timezone = value;
         else if(!strcmp(name, "tags"))
             tags = value;
-        else
-            if(unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
-                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+        else if(!strcmp(name, "ver"))
+            stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
+        else {
+            // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
+            if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
+                name = "NETDATA_HOST_OS_NAME";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID"))
+                name = "NETDATA_HOST_OS_ID";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE"))
+                name = "NETDATA_HOST_OS_ID_LIKE";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION"))
+                name = "NETDATA_HOST_OS_VERSION";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID"))
+                name = "NETDATA_HOST_OS_VERSION_ID";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION"))
+                name = "NETDATA_HOST_OS_DETECTION";
+            else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && stream_version == UINT_MAX) {
+                stream_version = 1;
             }
+
+            if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
+                     w->client_ip, w->client_port, name, value);
+            }
+        }
     }
+
+    if (stream_version == UINT_MAX)
+        stream_version = 0;
 
     if(!key || !*key) {
         rrdhost_system_info_free(system_info);
@@ -1425,6 +1588,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
+    rpt->stream_version    = stream_version;
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.flags         = w->ssl.flags;

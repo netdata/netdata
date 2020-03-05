@@ -178,7 +178,7 @@ netdata (1.6.0) - 2017-03-20
 
 -   new plugins
 
-    @l2isbad builds python data collection plugins for netdata at an wonderfull
+    @l2isbad builds python data collection plugins for netdata at an wonderful
     rate! He rocks!
 
     -   **web_log** for monitoring in real-time all kinds of web server log files @l2isbad
@@ -453,7 +453,7 @@ netdata (1.3.0) - 2016-08-28
     (<https://github.com/netdata/netdata/issues/436>),
     health monitoring was the winner. So here it is!
 
-    netdata now has a poweful health monitoring system embedded.
+    netdata now has a powerful health monitoring system embedded.
     Please check the wiki page:
 
     <https://github.com/netdata/netdata/tree/master/health>

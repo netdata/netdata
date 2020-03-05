@@ -1,7 +1,6 @@
-# nginx_plus
+# NGINX Plus monitoring with Netdata
 
-This module will monitor one or more nginx_plus servers depending on configuration.
-Servers can be either local or remote.
+Monitors one or more NGINX Plus servers depending on configuration. Servers can be either local or remote.
 
 Example nginx_plus configuration can be found in 'python.d/nginx_plus.conf'
 
@@ -134,11 +133,19 @@ For every cache:
 
     -   usage
 
-## configuration
+## Configuration
 
-Needs only `url` to server's `status`
+Edit the `python.d/nginx_plus.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
 
-Here is an example for local server:
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/nginx_plus.conf
+```
+
+Needs only `url` to server's `status`.
+
+Here is an example for a local server:
 
 ```yaml
 local:

@@ -4,27 +4,25 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import glob
-import re
 import os
-
+import re
 from collections import namedtuple
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 
 update_every = 10
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
-    'net_throughput_http',   # net throughput
+    'net_throughput_http',  # net throughput
     'net_throughput_https',  # net throughput
-    'connections_http',      # connections
-    'connections_https',     # connections
-    'requests',              # requests
-    'requests_processing',   # requests
-    'pub_cache_hits',        # cache
-    'private_cache_hits',    # cache
-    'static_hits',           # static
+    'connections_http',  # connections
+    'connections_https',  # connections
+    'requests',  # requests
+    'requests_processing',  # requests
+    'pub_cache_hits',  # cache
+    'private_cache_hits',  # cache
+    'static_hits',  # static
 ]
 
 CHARTS = {
@@ -178,7 +176,7 @@ class Service(SimpleService):
 
 def parse_file(data, lines):
     for line in lines:
-        if not line.startswith(('BPS_IN:', 'MAXCONN:', 'REQ_RATE []:')):
+        if not line.startswith(('BPS_IN:', 'MAXCONN:', 'PLAINCONN:', 'REQ_RATE []:')):
             continue
         m = dict(RE.findall(line))
         for v in T:

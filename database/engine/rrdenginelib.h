@@ -3,10 +3,9 @@
 #ifndef NETDATA_RRDENGINELIB_H
 #define NETDATA_RRDENGINELIB_H
 
-#include "rrdengine.h"
-
 /* Forward declarations */
 struct rrdeng_page_descr;
+struct rrdengine_instance;
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)

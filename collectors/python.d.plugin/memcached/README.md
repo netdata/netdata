@@ -1,6 +1,7 @@
-# memcached
+# Memcached monitoring with Netdata
 
-Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
+Collects memory-caching system performance metrics. It reads server response to stats command ([stats interface](https://github.com/memcached/memcached/wiki/Commands#stats)).
+
 
 1.  **Network** in kilobytes/s
 
@@ -66,7 +67,15 @@ Memcached monitoring module. Data grabbed from [stats interface](https://github.
 
     -   rate
 
-## configuration
+## Configuration
+
+Edit the `python.d/memcached.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/memcached.conf
+```
 
 Sample:
 

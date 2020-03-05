@@ -78,6 +78,36 @@ We expect most contributions to be for new data collection plugins. You can read
 
 Of course we appreciate contributions for any other part of the NetData agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include NetData charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
 
+If you are working on the C source code please be aware that we have a standard build configuration that we use. This
+is meant to keep the source tree clean and free of warnings. When you are preparing to work on the code:
+```
+CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1" ./netdata-installer.sh --disable-lto --dont-wait
+```
+
+Typically we will enable LTO during production builds. The reasons for configuring it this way are:
+
+| CFLAG / argument | Reasoning |
+| ---------------- | --------- |
+| `-O1` | This makes the debugger easier to use as it disables optimisations that break the relationship between the source and the state of the debugger |
+| `-ggdb` | Enable debugging symbols in gdb format (this also works with clang / llbdb) |
+| `-Wall -Wextra -Wformat-signedness` | Really, definitely, absolutely all the warnings |
+| `-DNETDATA_INTERNAL_CHECKS=1` | This enables the debug.log and turns on the macro that outputs to it |
+| `-D_FORTIFY_SOURCE=2` | Enable buffer-overflow checks on string-processing functions |
+| `-DNETDATA_VERIFY_LOCKS=1` | Enable extra checks and debug |
+| `--disable-lto ` | We enable LTO for production builds, but disable it during development are it can hide errors about missing symbols that have been pruned. |
+
+Before submitting a PR we run through this checklist:
+
+* Compilation warnings
+* valgrind
+* ./netdata-installer.sh
+* make dist
+* `packaging/makeself/build-x86_64-static.sh`
+* `clang-format -style=file`
+
+Please be aware that the linting pass at the end is currently messy as we are transitioning between code styles
+across most of our code-base, but we prefer new contributions that match the linting style.
+
 ### Contributions Ground Rules
 
 #### Code of Conduct and CLA
@@ -135,7 +165,7 @@ We use several different languages and have had contributions from several peopl
 For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the following exceptions:
 
 -   Use 4 space indentation instead of 8
--   We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
+-   We occasionally have multiple statements on a single line (e.g. `if (a) b;`)
 -   Allow max line length of 120 chars 
 -   Allow opening brace at the end of a function declaration: `function() {`. 
 -   Allow trailing comments
@@ -150,6 +180,16 @@ There are several guides for pull requests, such as the following:
 However, it's not always that simple. Our [PR approval process](#pr-approval-process) and the several merges we do every day may cause your fork to get behind the Netdata master. If you worked on something that has changed in the meantime, you will be required to do a git rebase, to bring your fork to the correct state. A very easy to follow guide on how to do it without learning all the intricacies of GitHub can be found [here](https://medium.com/@ruthmpardee/git-fork-workflow-using-rebase-587a144be470)
 
 One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
+
+#### PR title guidelines
+
+All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds", "Fixed" instead of "Fixes".
+
+Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
+
+Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+
+New collectors must have the title "[New collector] : [Name of collector]".
 
 ### PR approval process
 

@@ -13,7 +13,7 @@ try:
 except ImportError:
     from time import time
 
-from bases.collection import on_try_except_finally
+from bases.collection import on_try_except_finally, unicode_str
 
 
 LOGGING_LEVELS = {'CRITICAL': 50,
@@ -121,23 +121,23 @@ class BaseLogger(object):
             self.logger.setLevel(LOGGING_LEVELS[level])
 
     def debug(self, *msg, **kwargs):
-        self.logger.debug(' '.join(map(str, msg)), **kwargs)
+        self.logger.debug(' '.join(map(unicode_str, msg)), **kwargs)
 
     def info(self, *msg, **kwargs):
-        self.logger.info(' '.join(map(str, msg)), **kwargs)
+        self.logger.info(' '.join(map(unicode_str, msg)), **kwargs)
 
     def warning(self, *msg, **kwargs):
-        self.logger.warning(' '.join(map(str, msg)), **kwargs)
+        self.logger.warning(' '.join(map(unicode_str, msg)), **kwargs)
 
     def error(self, *msg, **kwargs):
-        self.logger.error(' '.join(map(str, msg)), **kwargs)
+        self.logger.error(' '.join(map(unicode_str, msg)), **kwargs)
 
     def alert(self, *msg,  **kwargs):
-        self.logger.critical(' '.join(map(str, msg)), **kwargs)
+        self.logger.critical(' '.join(map(unicode_str, msg)), **kwargs)
 
     @on_try_except_finally(on_finally=(exit, 1))
     def fatal(self, *msg, **kwargs):
-        self.logger.critical(' '.join(map(str, msg)), **kwargs)
+        self.logger.critical(' '.join(map(unicode_str, msg)), **kwargs)
 
 
 class PythonDLogger(object):

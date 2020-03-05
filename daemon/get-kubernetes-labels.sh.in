@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Checks if netdata is running in a kubernetes pod and fetches that pod's labels
+
+if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ] && [ -n "${MY_POD_NAMESPACE}" ] && [ -n "${MY_POD_NAME}" ]; then
+	if command -v jq >/dev/null 2>&1; then
+			KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
+		URL="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/namespaces/$MY_POD_NAMESPACE/pods/$MY_POD_NAME"
+		curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" "$URL" |
+		jq -r '.metadata.labels' | grep ':' | tr -d '," '
+		exit 0
+	else
+		echo "jq command not available. Please install jq to get host labels for kubernetes pods."
+		exit 1
+	fi
+else
+	exit 0
+fi

@@ -18,6 +18,7 @@
 -   `/proc/interrupts` (total and per core hardware interrupts)
 -   `/proc/softirqs` (total and per core software interrupts)
 -   `/proc/loadavg` (system load and total processes running)
+-   `/proc/pressure/{cpu,memory,io}` (pressure stall information)
 -   `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
 -   `/sys/class/power_supply` (power supply properties)
 -   `ipc` (IPC semaphores and message queues)
@@ -299,7 +300,7 @@ By default Netdata will enable monitoring metrics only when they are not zero. I
 
 There are several alarms defined in `health.d/net.conf`.
 
-The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a slave or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](../../health/#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a slave or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](../../health/REFERENCE.md#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
 
 #### configuration
 
