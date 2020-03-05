@@ -95,7 +95,8 @@ prep_html() {
 
 }
 
-for d in "en" "kr" "zh" "pt" ; do
+# for d in "en" "kr" "zh" "pt" ; do
+for d in "en" ; do
 	echo "Preparing source for $d"
 	cp -r ${SRC_DIR} ${DOCS_DIR}
 	if [ "${d}" != "en" ] ; then

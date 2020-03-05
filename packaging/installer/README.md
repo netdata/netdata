@@ -56,6 +56,18 @@ operating systems.
 
 ### Alternative methods
 
+<div class="installer-grid" markdown=1>
+
+[![Install with .deb or .rpm packages](https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png) Install with .deb or .rpm packages](methods/packages.md)
+
+[![Install with a pre-built static binary for 64-bit systems](https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png) Install with a pre-built static binary for 64-bit systems](methods/packages.md)
+
+[![Install Netdata on Docker](https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png) Install Netdata on Docker](../docker/README.md)
+
+</div>
+
+help
+
 <div class="installer-grid">
   <div class="grid-item">
     <div class="item-title">
@@ -63,7 +75,11 @@ operating systems.
       <h3>Packages</h3>
     </div>
     <ul>
-      <li><a href="methods/packages/">Install with <code>.deb</code> or <code>.rpm</code> packages</a></li>
+      <li markdown="1">
+
+        [Install with <code>.deb</code> or <code>.rpm</code> packages](methods/packages.md)
+
+      </li>
     </ul>
   </div>
   <div class="grid-item">
