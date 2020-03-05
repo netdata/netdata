@@ -11,7 +11,7 @@ uniquepath() {
       [ -n "${path}" ] && path="${path}:"
       path="${path}${REPLY}"
     fi
-  done < <(echo "${PATH}" | tr ":" "\\n")
+  done < <(echo "${PATH}" | tr ":" "\n")
 
   [ -n "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
 }
@@ -100,16 +100,16 @@ ACLK="${ACLK}"
 
 # keep a log of this command
 # shellcheck disable=SC2129
-printf "\\n# " >> netdata-installer.log
+printf "\n# " >> netdata-installer.log
 date >> netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >> netdata-installer.log
 printf 'LDFLAGS="%s" ' "${LDFLAGS}" >> netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >> netdata-installer.log
-printf "\\n" >> netdata-installer.log
+printf "\n" >> netdata-installer.log
 
 REINSTALL_OPTIONS="$(
   printf "%s" "${*}"
-  printf "\\n"
+  printf "\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' | sed 's/--dont-start-it//g')"
