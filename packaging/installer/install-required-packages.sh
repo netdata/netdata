@@ -1833,8 +1833,11 @@ if [[ "${pv}" =~ ^Python\ 2.* ]]; then
 elif [[ "${pv}" =~ ^Python\ 3.* ]]; then
   pv=3
   PACKAGES_NETDATA_PYTHON3=1
-else
+elif [[ "${tree}" == "centos" ]] && [ "${version}" -lt 8 ]; then
   pv=2
+else
+  pv=3
+  PACKAGES_NETDATA_PYTHON3=1
 fi
 
 [ "${detection}" = "/etc/os-release" ] && cat << EOF
