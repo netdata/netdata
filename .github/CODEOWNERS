@@ -51,6 +51,7 @@ Dockerfile.* @Ferroin @knatsakis @ncmans @prologic @cosmix
 .csslintrc @cosmix @Ferroin @knatsakis @ncmans @prologic
 .codeclimate.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
 .codacy.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
+.yamllint.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
 Dockerfile @Ferroin @knatsakis @ncmans @prologic @cosmix
 netdata.spec.in @cosmix @Ferroin @knatsakis @ncmans @prologic
 netdata-installer.sh @cosmix @Ferroin @knatsakis @ncmans @prologic
