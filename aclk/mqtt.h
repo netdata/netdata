@@ -10,8 +10,9 @@
 void _show_mqtt_info();
 int _link_event_loop();
 void _link_shutdown();
-int _link_lib_init();
-int _link_create_connection(char *username, char *password);
+int mqtt_attempt_connection(char *aclk_hostname, int aclk_port, char *username, char *password);
+//int _link_lib_init();
+int _mqtt_lib_init();
 int _link_subscribe(char *topic, int qos);
 int _link_send_message(char *topic, char *message, int *mid);
 const char *_link_strerror(int rc);

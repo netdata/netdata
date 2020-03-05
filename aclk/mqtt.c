@@ -202,7 +202,7 @@ void aclk_lws_connection_closed()
 }
 
 
-int _link_lib_init(char *aclk_hostname, int aclk_port, char *username, char *password)
+int mqtt_attempt_connection(char *aclk_hostname, int aclk_port, char *username, char *password)
 {
     if(aclk_lws_wss_connect(aclk_hostname, aclk_port))
         return MOSQ_ERR_UNKNOWN;

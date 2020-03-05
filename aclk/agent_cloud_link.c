@@ -157,7 +157,7 @@ static int create_private_key()
     char *private_key = callocz(1, statbuf.st_size + 1);
     size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
     private_key[bytes_read] = 0;
-    debug(D_ACLK, "Claimed agent loaded private key len=%d bytes", bytes_read);
+    debug(D_ACLK, "Claimed agent loaded private key len=%zu bytes", bytes_read);
     fclose(f);
 
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
@@ -943,7 +943,7 @@ static void aclk_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-char *send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
+int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
 
@@ -954,17 +954,17 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
     buffer_flush(b);
     buffer_sprintf(
         b,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %d\r\nAccept-Language: en-us\r\n"
+        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
         "User-Agent: Netdata/rocks\r\n\r\n",
         method, url, host, payload_len);
     if (payload != NULL)
         buffer_strcat(b, payload);
-    debug(D_ACLK, "Sending HTTPS req (%d bytes): '%s'", b->len, buffer_tostring(b));
+    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", b->len, buffer_tostring(b));
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
 
     if (unlikely(sock == -1)) {
         error("Handshake failed");
-        return NULL;
+        return 1;
     }
 
     SSL_CTX *ctx = security_initialize_openssl_client();
@@ -975,13 +975,13 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
     int err = SSL_connect(ssl);
     if (err!=1) {
         error("SSL_connect() failed with err=%d", err);
-        return NULL;
+        return 1;
     }
     err = SSL_write(ssl, b->buffer, b->len);
     if (err <= 0)
     {
         error("SSL_write() failed with err=%d", err);
-        return NULL;
+        return 1;
     }
     buffer_flush(b);
     int bytes_read = SSL_read(ssl, b->buffer, b->size);
@@ -989,6 +989,7 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
     b->len = bytes_read;
     SSL_shutdown(ssl);
     close(sock);
+    return 0;
 }
 
 struct dictionary_singleton {
@@ -1024,7 +1025,7 @@ int json_extract_singleton(JSON_ENTRY *e)
 // Note: This is non-validating, invalid input will be decoded without an error.
 //       Challenges are packed into json strings so we don't skip newlines.
 //       Size errors (i.e. invalid input size or insufficient output space) are caught.
-size_t base64_decode(char *input, size_t input_size, char *output, size_t output_size)
+size_t base64_decode(unsigned char *input, size_t input_size, unsigned char *output, size_t output_size)
 {
     static char lookup[256];
     static int first_time=1;
@@ -1033,11 +1034,11 @@ size_t base64_decode(char *input, size_t input_size, char *output, size_t output
         first_time = 0;
         for(int i=0; i<256; i++)
             lookup[i] = -1;
-        for(char i='A'; i<='Z'; i++)
+        for(int i='A'; i<='Z'; i++)
             lookup[i] = i-'A';
-        for(char i='a'; i<='z'; i++)
+        for(int i='a'; i<='z'; i++)
             lookup[i] = i-'a' + 26;
-        for(char i='0'; i<='9'; i++)
+        for(int i='0'; i<='9'; i++)
             lookup[i] = i-'0' + 52;
         lookup['+'] = 62;
         lookup['/'] = 63;
@@ -1097,7 +1098,7 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
                            "0123456789+/";
     if ((input_size/3+3)*4 >= output_size)
     {
-        error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input");
+        error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input", output_size, input_size);
         return 0;
     }
     size_t count = 0;
@@ -1108,7 +1109,7 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
         output[1] = lookup[(value >> 12) & 0x3f];
         output[2] = lookup[(value >> 6) & 0x3f];
         output[3] = lookup[value & 0x3f];
-        //error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
+        //error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]);
         output += 4;
         input += 3;
         input_size -= 3;
@@ -1145,27 +1146,24 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
 int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decrypted)
 {
     int  result = RSA_private_decrypt( data_len, enc_data, decrypted, aclk_private_key, RSA_PKCS1_OAEP_PADDING);
-    if (result == -1)
-        printLastError("Decrypt failed");
+    if (result == -1) {
+        char * err = malloc(130);
+        ERR_load_crypto_strings();
+        ERR_error_string(ERR_get_error(), err);
+        error("Decryption of the challenge failed: %s", err);
+        free(err);
+    }
     return result;
-}
-
-void printLastError(char *msg)
-{
-    char * err = malloc(130);;
-    ERR_load_crypto_strings();
-    ERR_error_string(ERR_get_error(), err);
-    error("%s ERROR: %s\n",msg, err);
-    free(err);
 }
 
 char *extract_payload(BUFFER *b)
 {
 char *s = b->buffer;
 unsigned int line_len=0;
-    for (int i=0; i<b->len; i++)
+    for (size_t i=0; i<b->len; i++)
     {
-        if (*s == 0 )  return;
+        if (*s == 0 )
+            return NULL;
         if (*s == '\n' ) {
             if (line_len==0)
               return s+1;
@@ -1198,7 +1196,11 @@ void aclk_get_challenge()
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s", url);
-    send_https_request("GET", "localhost", "8443", url, b, NULL);
+    if(send_https_request("GET", "localhost", "8443", url, b, NULL))
+    {
+        error("Challenge failed");
+        return;
+    }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
     char *payload = NULL;
@@ -1208,7 +1210,11 @@ void aclk_get_challenge()
       return;
     }
     debug(D_ACLK, "Challenge response from cloud: %s", payload);
-    int rc = json_parse(payload, &challenge, json_extract_singleton);
+    if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
+    {
+        error("Could not parse the json response with the challenge: %s", payload);
+        return;
+    }
     if (challenge.result == NULL ) {
         error("Could not retrieve challenge from auth response");
         return;
@@ -1218,7 +1224,7 @@ void aclk_get_challenge()
 
     size_t challenge_len = strlen(challenge.result);
     unsigned char decoded[512];
-    size_t decoded_len = base64_decode(challenge.result, challenge_len, decoded, sizeof(decoded));
+    size_t decoded_len = base64_decode((unsigned char*)challenge.result, challenge_len, decoded, sizeof(decoded));
 
     unsigned char plaintext[4096]={};
     int decrypted_length = private_decrypt(decoded, decoded_len, plaintext);
@@ -1228,12 +1234,16 @@ void aclk_get_challenge()
     encoded[encoded_len] = 0;
     debug(D_ACLK, "Encoded len=%zu Decryption len=%d: '%s'", encoded_len, decrypted_length, encoded);
 
-    unsigned char response_json[4096]={};
+    char response_json[4096]={};
     sprintf(response_json, "{\"response\":\"%s\"}", encoded);
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    send_https_request("POST", "localhost", "8443", url, b, response_json);
+    if(send_https_request("POST", "localhost", "8443", url, b, response_json))
+    {
+        error("Challenge-response failed");
+        return;
+    }
     payload = extract_payload(b);
     if (payload==NULL) {
       error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
@@ -1242,7 +1252,11 @@ void aclk_get_challenge()
     debug(D_ACLK, "Password response from cloud: %s", payload);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    rc = json_parse(payload, &password, json_extract_singleton);
+    if (json_parse(payload, &password, json_extract_singleton) != JSON_OK)
+    {
+        error("Could not parse the json response with the password: %s", payload);
+        return;
+    }
 
     if (password.result == NULL ) {
         error("Could not retrieve password from auth response");
@@ -1293,7 +1307,7 @@ void *aclk_main(void *ptr)
                 goto exited;
         }
         if (!create_private_key() && !_mqtt_lib_init())
-            break; 
+            break;
         sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
@@ -1474,7 +1488,7 @@ void aclk_try_to_connect(char *hostname, int port)
     if (aclk_password == NULL)
         return;
     int rc;
-    rc = _link_lib_init(hostname, port, aclk_username, aclk_password);
+    rc = mqtt_attempt_connection(hostname, port, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
