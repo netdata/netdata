@@ -19,6 +19,8 @@ area/backends:
 area/build:
   - build/*
   - build/**/*
+  - build_external/*
+  - build_external/**/*
   - CMakeLists.txt
   - configure.ac
   - Makefile.am
