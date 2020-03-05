@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck shell=sh
+# shellcheck disable=SC2154,SC2039
 cat << EOF  > "$archname"
 #!/bin/sh
 # This script was generated using Makeself $MS_VERSION
@@ -288,7 +290,7 @@ do
 	echo CRCsum=\"\$CRCsum\"
 	echo MD5sum=\"\$MD5\"
 	echo OLDUSIZE=$USIZE
-	echo OLDSKIP=`expr $SKIP + 1`
+	echo OLDSKIP=$((SKIP + 1))
 	exit 0
 	;;
     --lsm)
@@ -437,9 +439,6 @@ if test x"\$nox11" = xn; then
         fi
     fi
 fi
-
-[ -d "\$targetdir/etc/netdata.old" ] && echo "Moving existing old directory" && mv "\$targetdir/etc/netdata.old" "\$targetdir/etc/netdata.old.$$"
-[ -d \$targetdir/etc/netdata ] && echo "Backing up existing directory" && cp -r \$targetdir/etc/netdata "\$targetdir/etc/netdata.old"
 
 if test x"\$targetdir" = x.; then
     tmpdir="."
