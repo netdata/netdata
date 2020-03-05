@@ -21,7 +21,7 @@ typedef enum backend_types {
     BACKEND_TYPE_OPENTSDB_USING_TELNET,     // Send data to OpenTSDB using telnet API
     BACKEND_TYPE_OPENTSDB_USING_HTTP,       // Send data to OpenTSDB using HTTP API
     BACKEND_TYPE_JSON,                      // Stores the data using JSON.
-    BACKEND_TYPE_PROMETHEUS,                // The user selected to use Prometheus backend
+    BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE,   // The user selected to use Prometheus backend
     BACKEND_TYPE_KINESIS,                   // Send message to AWS Kinesis
     BACKEND_TYPE_MONGODB,                   // Send data to MongoDB collection
     BACKEND_TYPE_NUM                        // Number of backend types
