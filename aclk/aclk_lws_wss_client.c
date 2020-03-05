@@ -349,6 +349,8 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "LWS_CALLBACK_WSI_DESTROY";
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
             return "LWS_CALLBACK_CLIENT_ESTABLISHED";
+        case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
+            return "LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION";
         default:
             // Not using an internal buffer here for thread-safety with unknown calling context.
             error("Unknown LWS callback %u", reason);
@@ -403,6 +405,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
         case LWS_CALLBACK_GET_THREAD_ID: // ?
         case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+        case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
             // Expected and safe to ignore.
             debug(D_ACLK, "Ignoring expected callback from LWS: %s", aclk_lws_callback_name(reason));
             return retval;
@@ -444,7 +447,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
 
         default:
-            error("Unexecpted callback from libwebsockets %s", aclk_lws_callback_name(reason));
+            error("Unexpected callback from libwebsockets %s", aclk_lws_callback_name(reason));
             break;
     }
     return retval; //0-OK, other connection should be closed!

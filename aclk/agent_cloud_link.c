@@ -958,8 +958,8 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
         "User-Agent: Netdata/rocks\r\n\r\n",
         method, url, host, payload_len);
     if (payload != NULL)
-        buffer_strcat(b, payload);      // TODO Content-length ?
-    error("Sending HTTPS req (%d bytes): '%s'", b->len, buffer_tostring(b));
+        buffer_strcat(b, payload);
+    debug(D_ACLK, "Sending HTTPS req (%d bytes): '%s'", b->len, buffer_tostring(b));
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
 
     if (unlikely(sock == -1)) {
@@ -985,7 +985,7 @@ char *send_https_request(char *method, char *host, char *port, char *url, BUFFER
     }
     buffer_flush(b);
     int bytes_read = SSL_read(ssl, b->buffer, b->size);
-    error("Received %d bytes in response", bytes_read);
+    debug(D_ACLK, "Received %d bytes in response", bytes_read);
     b->len = bytes_read;
     SSL_shutdown(ssl);
     close(sock);
@@ -1144,7 +1144,6 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
 
 int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decrypted)
 {
-    error("Encrypted challenge len=%d", data_len);
     int  result = RSA_private_decrypt( data_len, enc_data, decrypted, aclk_private_key, RSA_PKCS1_OAEP_PADDING);
     if (result == -1)
         printLastError("Decrypt failed");
@@ -1185,7 +1184,7 @@ unsigned int line_len=0;
 
 void aclk_get_challenge()
 {
-    info("Performing challenge-response sequence");
+    debug(D_ACLK, "Performing challenge-response sequence");
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
     BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -1208,14 +1207,14 @@ void aclk_get_challenge()
       error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
       return;
     }
-    info("Challenge response from cloud: %s", payload);
+    debug(D_ACLK, "Challenge response from cloud: %s", payload);
     int rc = json_parse(payload, &challenge, json_extract_singleton);
     if (challenge.result == NULL ) {
         error("Could not retrieve challenge from auth response");
         return;
     }
 
- 
+
 
     size_t challenge_len = strlen(challenge.result);
     unsigned char decoded[512];
@@ -1226,14 +1225,12 @@ void aclk_get_challenge()
     freez(challenge.result);
     char encoded[512];
     size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
-    error("Encoded len=%zu Decryption len=%d", encoded_len, decrypted_length);
     encoded[encoded_len] = 0;
-
-    error("Decrypted/encoded challenge='%s'", encoded);
+    debug(D_ACLK, "Encoded len=%zu Decryption len=%d: '%s'", encoded_len, decrypted_length, encoded);
 
     unsigned char response_json[4096]={};
     sprintf(response_json, "{\"response\":\"%s\"}", encoded);
-    info("Password phase: %s",response_json);
+    debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
     send_https_request("POST", "localhost", "8443", url, b, response_json);
@@ -1242,7 +1239,7 @@ void aclk_get_challenge()
       error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
       return;
     }
-    info("Password response from cloud: %s", payload);
+    debug(D_ACLK, "Password response from cloud: %s", payload);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
     rc = json_parse(payload, &password, json_extract_singleton);
@@ -1288,6 +1285,7 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
     int aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
+    info("Waiting for netdata to be claimed");
     while(1) {
         while (likely(!is_agent_claimed())) {
             sleep_usec(USEC_PER_SEC * 5);
@@ -1310,11 +1308,8 @@ void *aclk_main(void *ptr)
         sleep_usec(USEC_PER_MS * 500);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
-                aclk_get_challenge();
-                if (aclk_password != NULL) {
-                    aclk_try_to_connect(aclk_hostname, aclk_port);
-                    first_init = 1;
-                }
+                aclk_try_to_connect(aclk_hostname, aclk_port);
+                first_init = 1;
             } else {
                 if (aclk_connecting == 0) {
                     if (reconnect_expiry == 0) {
@@ -1474,6 +1469,10 @@ void aclk_shutdown()
 
 void aclk_try_to_connect(char *hostname, int port)
 {
+    info("Attempting to establish the agent cloud link");
+    aclk_get_challenge();
+    if (aclk_password == NULL)
+        return;
     int rc;
     rc = _link_lib_init(hostname, port, aclk_username, aclk_password);
     if (unlikely(rc)) {
