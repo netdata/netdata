@@ -1019,8 +1019,6 @@ int json_extract_singleton(JSON_ENTRY *e)
     return 0;
 }
 
-//// PoC for the smoke-testing ///////////////////////////
-
 // Base-64 decoder.
 // Note: This is non-validating, invalid input will be decoded without an error.
 //       Challenges are packed into json strings so we don't skip newlines.
@@ -1179,8 +1177,49 @@ unsigned int line_len=0;
     return NULL;
 }
 
+static int decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
+{
+int pos = 0;
+    if (!strncmp("https://", url, 8))
+    {
+        pos = 8;
+    }
+    else if (!strncmp("http://", url, 7))
+    {
+        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
+        return 1;
+    }
+int host_end = pos;
+    while( url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':' )
+        host_end++;
+    if (url[host_end] == 0)
+    {
+        *aclk_hostname = strdupz(url+pos);
+        *aclk_port = strdupz("443");
+        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+        return 0;
+    }
+    if (url[host_end] == ':')
+    {
+        *aclk_hostname = callocz(host_end - pos + 1, 1);
+        strncpy(*aclk_hostname, url+pos, host_end - pos);
+        int port_end = host_end + 1;
+        while (url[port_end] >= '0' && url[port_end] <= '9')
+            port_end++;
+        if (port_end - host_end > 6)
+        {
+            error("Port specified in %s is invalid", url);
+            return 0;
+        }
+        *aclk_port = callocz(port_end - host_end + 1, 1);
+        for(int i=host_end + 1; i < port_end; i++)
+            (*aclk_port)[i - host_end - 1] = url[i];
+    }
+    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+    return 0;
+}
 
-void aclk_get_challenge()
+void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
     debug(D_ACLK, "Performing challenge-response sequence");
     if (aclk_password != NULL)
@@ -1188,7 +1227,6 @@ void aclk_get_challenge()
         freez(aclk_password);
         aclk_password = NULL;
     }
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
     BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     // TODO - target host?
@@ -1200,8 +1238,8 @@ void aclk_get_challenge()
     }
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
-    info("Retrieving challenge from cloud: %s", url);
-    if(send_https_request("GET", "localhost", "8443", url, b, NULL))
+    info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
+    if(send_https_request("GET", aclk_hostname, aclk_port, url, b, NULL))
     {
         error("Challenge failed");
         return;
@@ -1244,7 +1282,7 @@ void aclk_get_challenge()
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if(send_https_request("POST", "localhost", "8443", url, b, response_json))
+    if(send_https_request("POST", aclk_hostname, aclk_port, url, b, response_json))
     {
         error("Challenge-response failed");
         return;
@@ -1275,7 +1313,20 @@ void aclk_get_challenge()
     buffer_free(b);
 }
 
-/////////////// End of the quick PoC /////////////////////////////
+static void aclk_try_to_connect(char *hostname, char *port, int port_num)
+{
+    info("Attempting to establish the agent cloud link");
+    aclk_get_challenge(hostname, port);
+    if (aclk_password == NULL)
+        return;
+    int rc;
+    rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
+    if (unlikely(rc)) {
+        error("Failed to initialize the agent cloud link library");
+    }
+    aclk_connecting = 1;
+}
+
 
 /**
  * Main agent cloud link thread
@@ -1301,8 +1352,17 @@ void *aclk_main(void *ptr)
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 
-    char *aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
-    int aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
+
+    char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
+    char *aclk_port = NULL;
+    uint32_t port_num = 0;
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
+    if( decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port))
+    {
+        error("Configuration error - cannot use agent cloud link");
+        return NULL;
+    }
+    port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
 
     info("Waiting for netdata to be claimed");
     while(1) {
@@ -1327,7 +1387,7 @@ void *aclk_main(void *ptr)
         sleep_usec(USEC_PER_MS * 500);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
-                aclk_try_to_connect(aclk_hostname, aclk_port);
+                aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
             } else {
                 if (aclk_connecting == 0) {
@@ -1338,8 +1398,7 @@ void *aclk_main(void *ptr)
                     }
                     if (now_realtime_usec() >= reconnect_expiry) {
                         reconnect_expiry = 0;
-                        aclk_connecting = 1;
-                        aclk_try_to_connect(aclk_hostname, aclk_port);
+                        aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                     }
                     sleep_usec(USEC_PER_MS * 100);
                 }
@@ -1484,19 +1543,6 @@ void aclk_shutdown()
     aclk_connected = 0;
     _link_shutdown();
     info("Shutdown complete");
-}
-
-void aclk_try_to_connect(char *hostname, int port)
-{
-    info("Attempting to establish the agent cloud link");
-    aclk_get_challenge();
-    if (aclk_password == NULL)
-        return;
-    int rc;
-    rc = mqtt_attempt_connection(hostname, port, aclk_username, aclk_password);
-    if (unlikely(rc)) {
-        error("Failed to initialize the agent cloud link library");
-    }
 }
 
 inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
