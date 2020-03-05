@@ -100,11 +100,11 @@ PFSense](https://user-images.githubusercontent.com/1153921/76030071-cb0dd780-5ef
 Installation on PFSense](methods/pfsense.md)
 
 [![Install Netdata on
-Synology](https://user-images.githubusercontent.com/1153921/76030537-1c1dcb80-5ef3-11ea-9cf9-f130e7d41712.png) Install
+Synology](https://user-images.githubusercontent.com/1153921/76029789-5fc40580-5ef2-11ea-9d35-c022f682da77.png) Install
 Netdata on Synology](methods/synology.md)
 
 [![Manual installation on
-FreeNAS](https://user-images.githubusercontent.com/1153921/72070923-543dcf00-32f3-11ea-8053-d61bc96529b5.png) Manual
+FreeNAS](https://user-images.githubusercontent.com/1153921/76030537-1c1dcb80-5ef3-11ea-9cf9-f130e7d41712.png) Manual
 installation on FreeNAS](methods/freenas.md)
 
 [![Manual installation on
