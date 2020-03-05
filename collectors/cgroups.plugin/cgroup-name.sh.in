@@ -178,6 +178,12 @@ if [ -z "${NAME}" ]; then
 		# systemd-nspawn
 		NAME="$(echo "${CGROUP}" | sed 's/.*machine.slice[_\/]\(.*\)\.service/\1/g')"
 
+	elif [[ ${CGROUP} =~ machine.slice_machine.*-lxc ]]; then
+		# libvirtd / lxc containers
+		NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
+	elif [[ ${CGROUP} =~ machine-lxc.*scope ]]; then
+		# libvirtd / lxc containers
+		NAME="lxc/$(echo "${CGROUP}" | sed -r 's/machine-lxc\\x2d[[:digit:]]+\\x2d//g; s/\.scope//g')"
 	elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
 		# libvirtd / qemu virtual machines
 		# NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
