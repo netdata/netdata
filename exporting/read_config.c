@@ -266,6 +266,13 @@ struct engine *read_exporting_config()
             goto next_connector_instance;
         }
 
+#ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
+        if (tmp_ci_list->backend_type == BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE) {
+            error("Prometheus Remote Write support isn't compiled");
+            goto next_connector_instance;
+        }
+#endif
+
 #ifndef HAVE_KINESIS
         if (tmp_ci_list->backend_type == BACKEND_TYPE_KINESIS) {
             error("AWS Kinesis support isn't compiled");
@@ -327,6 +334,16 @@ struct engine *read_exporting_config()
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
+
+        if (tmp_instance->config.type == BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE) {
+            struct prometheus_remote_write_specific_config *connector_specific_config =
+                callocz(1, sizeof(struct prometheus_remote_write_specific_config));
+
+            tmp_instance->config.connector_specific_config = connector_specific_config;
+
+            connector_specific_config->remote_write_path = strdupz(exporter_get(
+                instance_name, "remote write URL path", "/receive"));
+        }
 
         if (tmp_instance->config.type == BACKEND_TYPE_KINESIS) {
             struct aws_kinesis_specific_config *connector_specific_config =

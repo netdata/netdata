@@ -7,10 +7,6 @@
 #include "exporting/prometheus/prometheus.h"
 #include "remote_write_request.h"
 
-struct prometheus_remote_write_specific_config {
-    char *remote_write_path;
-};
-
 int init_prometheus_remote_write_instance(struct instance *instance);
 
 int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host);

@@ -98,6 +98,10 @@ struct simple_connector_config {
     int default_port;
 };
 
+struct prometheus_remote_write_specific_config {
+    char *remote_write_path;
+};
+
 struct aws_kinesis_specific_config {
     char *stream_name;
     char *auth_key_id;
