@@ -403,7 +403,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     color: #00AB44;
 }
 
-.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link):hover {
+.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.installer-grid > p > a):not(.md-footer-social__link):hover {
     color: #35414A;
     border-bottom: 1px solid #35414A;
 }
