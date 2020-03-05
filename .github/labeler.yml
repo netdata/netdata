@@ -16,6 +16,14 @@ area/backends:
   - exporting/*
   - exporting/**/*
 
+area/build:
+  - build/*
+  - build/**/*
+  - CMakeLists.txt
+  - configure.ac
+  - Makefile.am
+  - "**/Makefile.am"
+
 area/ci:
   - .travis/*
   - .travis/**/*
@@ -55,8 +63,6 @@ area/health:
   - health/**/*
 
 area/packaging:
-  - build/*
-  - build/**/*
   - contrib/*
   - contrib/**/*
   - packaging/*
@@ -65,10 +71,6 @@ area/packaging:
   - system/**/*
   - Dockerfile*
   - netdata-installer.sh
-  - CMakeLists.txt
-  - configure.ac
-  - Makefile.am
-  - "**/Makefile.am"
   - netdata.spec.in
 
 area/registry:
