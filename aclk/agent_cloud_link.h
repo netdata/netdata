@@ -29,8 +29,6 @@
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
-#define CONFIG_SECTION_ACLK "agent_cloud_link"
-
 struct aclk_request {
     char *type_id;
     char *msg_id;
