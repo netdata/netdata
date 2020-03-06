@@ -5,7 +5,13 @@ on:
   push:
     branches:
       - master
+    paths:
+      - '**.c'
+      - '**.h'
   pull_request:
+    paths:
+      - '**.c'
+      - '**.h'
 jobs:
   unit-tests:
     name: Unit Tests
