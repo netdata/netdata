@@ -5,10 +5,6 @@
 
 #include "exporting/exporting_engine.h"
 
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-#include "remote_write/remote_write_request.h"
-#endif
-
 #define PROMETHEUS_ELEMENT_MAX 256
 #define PROMETHEUS_LABELS_MAX 1024
 #define PROMETHEUS_VARIABLE_MAX 256
@@ -28,22 +24,6 @@ typedef enum prometheus_output_flags {
 
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
-
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-extern void rrd_stats_remote_write_allmetrics_prometheus(
-        struct instance *instance
-        , RRDHOST *host
-        , const char *__hostname
-        , const char *prefix
-        , EXPORTING_OPTIONS exporting_options
-        , time_t after
-        , time_t before
-        , size_t *count_charts
-        , size_t *count_dims
-        , size_t *count_dims_skipped
-);
-extern int process_prometheus_remote_write_response(BUFFER *b, struct instance *instance);
-#endif
 
 int can_send_rrdset(struct instance *instance, RRDSET *st);
 size_t prometheus_name_copy(char *d, const char *s, size_t usable);

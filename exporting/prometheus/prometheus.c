@@ -626,26 +626,3 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(struct instance *in
     }
     rrd_unlock();
 }
-
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-int process_prometheus_remote_write_response(BUFFER *b, struct instance *instance) {
-    if(unlikely(!b)) return 1;
-
-    const char *s = buffer_tostring(b);
-    int len = buffer_strlen(b);
-
-    // do nothing with HTTP responses 200 or 204
-
-    while(!isspace(*s) && len) {
-        s++;
-        len--;
-    }
-    s++;
-    len--;
-
-    if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
-        return 0;
-    else
-        return exporting_discard_response(b, instance);
-}
-#endif
