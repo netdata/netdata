@@ -122,6 +122,8 @@ int _mqtt_lib_init()
 
 static int _mqtt_create_connection(char *username, char *password)
 {
+    if (mosq != NULL)
+        mosquitto_destroy(mosq);
     mosq = mosquitto_new(username, true, NULL);
     if (unlikely(!mosq)) {
         mosquitto_lib_cleanup();
