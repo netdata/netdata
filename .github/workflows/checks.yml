@@ -7,7 +7,7 @@ on:
   pull_request:
 jobs:
   checks:
-    name: Build
+    name: Consistency
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
