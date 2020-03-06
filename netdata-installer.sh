@@ -1244,13 +1244,34 @@ get_compatible_kernel_for_ebpf() {
   if [ "${kver}" -ge 005000000 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
     kpkg="5_4_20"
-  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
+  elif [ "${kver}" -ge 004020000 ] && [ "${kver}" -le 004020017 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.20.17"
+    kpkg="4_20_17"
+  elif [ "${kver}" -ge 004019105 ] && [ "${kver}" -le 004019108 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.105"
+    kpkg="4_19_105"
+  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004019104 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
     kpkg="4_19_104"
-  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
+  elif [ "${kver}" -ge 004019098 ] && [ "${kver}" -le 004019102 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
     kpkg="4_19_98"
-  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
+  elif [ "${kver}" -ge 004019006 ] && [ "${kver}" -le 004019097 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.6"
+    kpkg="4_19_6"
+  elif [ "${kver}" -ge 004018017 ] && [ "${kver}" -le 004018020 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.18.20"
+    kpkg="4_18_20"
+  elif [ "${kver}" -ge 004018000 ] && [ "${kver}" -le 004018016 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.18.16"
+    kpkg="4_18_16"
+  elif [ "${kver}" -ge 004016004 ] && [ "${kver}" -le 004016018 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.16.18"
+    kpkg="4_16_18"
+  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004016003 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.16.3"
+    kpkg="4_16_3"
+  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015018 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
     kpkg="4_15_18"
   elif [ "${kver}" -le 004014999 ]; then
