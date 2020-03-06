@@ -21,7 +21,7 @@ jobs:
         arch:
           - amd64
           - i386
-          - arm
+          - armhf
           - arm64
     runs-on: ubuntu-latest
     steps:
