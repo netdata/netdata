@@ -103,10 +103,6 @@ jobs:
       name: Run shellchecking on BASH
       script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
 
-      # Check if any of the C code deviates from our coding style
-    - name: Check coding style
-      script: .travis/clangformat.sh
-
       # This falls under same stage defined earlier
     - name: Run checksum checks on kickstart files
       script: ./tests/installer/checksums.sh
