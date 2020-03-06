@@ -11,7 +11,6 @@ renice 19 $$ > /dev/null 2> /dev/null
 ME="${0}"
 
 if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
-
   echo >&2 "Sorry! This script needs BASH version 4+, but you have BASH version ${BASH_VERSION}"
   exit 1
 fi
@@ -1361,7 +1360,7 @@ run() {
 }
 
 sudo=
-if [ ${UID} -ne 0 ] && [ ${tree} != 'macos' ] ; then
+if [ ${UID} -ne 0 ] ; then
   sudo="sudo"
 fi
 
@@ -1746,11 +1745,11 @@ install_brew() {
   if [ "${DRYRUN}" -eq 1 ]; then
     echo >&2 " >> IMPORTANT << "
     echo >&2 "    Please make sure your system is up to date"
-    echo >&2 "    by running:  ${sudo} brew upgrade "
+    echo >&2 "    by running:  brew upgrade "
     echo >&2
   fi
 
-  run ${sudo} brew install "${@}"
+  run brew install "${@}"
 }
 
 # -----------------------------------------------------------------------------
