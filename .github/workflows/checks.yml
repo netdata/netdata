@@ -19,4 +19,8 @@ jobs:
           ./tests/installer/checksums.sh
       - name: Web Dashboard pre-generated file consistency checks (dashboard.js)
         run: |
-          cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
+          cp web/gui/dashboard.js /tmp/dashboard.js
+          autoreconf -ivf
+          ./configure --enable-maintainer-mode
+          make dist
+          diff -sNrdu /tmp/dashboard.js web/gui/dashboard.js
