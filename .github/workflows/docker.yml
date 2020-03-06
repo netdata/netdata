@@ -22,7 +22,7 @@ jobs:
           - amd64
           - i386
           - armhf
-          - arm64
+          - aarch64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
