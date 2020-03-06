@@ -6,17 +6,16 @@ on:
     - cron: '0 1 * * *'
 jobs:
   coverity:
+    if: github.repository == 'netdata/netdata'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        if: github.repository == 'netdata/netdata'
       - name: Prepare environment
-        if: github.repository == 'netdata/netdata'
         run: |
-          bash <(curl -sS https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) --dont-wait --non-interactive netdata
-          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
+                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
       - name: Run coverity-scan
-        if: github.repository == 'netdata/netdata'
         run: |
           ./coverity-scan.sh --with-install
