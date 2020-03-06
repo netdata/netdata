@@ -51,6 +51,34 @@ static inline void remote_write_split_words(char *str, char **words, int max_wor
 }
 
 /**
+ * Process a responce received after Prometheus remote write connector had sent data
+ *
+ * @param buffer a response from a remote service.
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *instance) {
+    if(unlikely(!buffer)) return 1;
+
+    const char *s = buffer_tostring(buffer);
+    int len = buffer_strlen(buffer);
+
+    // do nothing with HTTP responses 200 or 204
+
+    while(!isspace(*s) && len) {
+        s++;
+        len--;
+    }
+    s++;
+    len--;
+
+    if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
+        return 0;
+    else
+        return exporting_discard_response(buffer, instance);
+}
+
+/**
  * Initialize Prometheus Remote Write connector instance
  *
  * @param instance an instance data structure.
@@ -67,6 +95,8 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = format_batch_prometheus_remote_write;
+
+    instance->response_checker = process_prometheus_remote_write_response;
 
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {
@@ -260,25 +290,4 @@ int format_batch_prometheus_remote_write(struct instance *instance)
     instance->stats.chart_buffered_bytes = (collected_number)buffer_strlen(buffer);
 
     return 0;
-}
-
-int process_prometheus_remote_write_response(BUFFER *b, struct instance *instance) {
-    if(unlikely(!b)) return 1;
-
-    const char *s = buffer_tostring(b);
-    int len = buffer_strlen(b);
-
-    // do nothing with HTTP responses 200 or 204
-
-    while(!isspace(*s) && len) {
-        s++;
-        len--;
-    }
-    s++;
-    len--;
-
-    if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
-        return 0;
-    else
-        return exporting_discard_response(b, instance);
 }
