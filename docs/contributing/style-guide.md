@@ -226,7 +226,7 @@ Use active voice instead of passive voice, because active voice is more concise 
 When using voice, the subject of the sentence is performing the action. In passive voice, the subject is being acted
 upon. A famous example of passive voice is the phrase "mistakes were made."
 
-```
+```plain
 # Not recommended (passive)
 When an alarm is triggered by a metric, a notification is sent by Netdata...
 
@@ -236,7 +236,7 @@ When a metric triggers an alarm, Netdata sends a notification...
 
 ### Standard American spelling
 
-While the Netdata team is mostly *not* American, we still aspire to use American spelling whenever possible, as it is
+While the Netdata team is mostly _not_ American, we still aspire to use American spelling whenever possible, as it is
 more commonly used within the monitoring industry.
 
 ### Clause order
@@ -244,7 +244,7 @@ more commonly used within the monitoring industry.
 If you want to instruct your reader to take some action in a particular circumstance, such as optional steps, the
 beginning of the sentence should indicate that circumstance.
 
-```
+```markup
 # Not recommended
 Read the reference guide if you'd like to learn more about custom dashboards.
 
@@ -253,19 +253,43 @@ If you'd like to learn more about custom dashboards, read the reference guide.
 ```
 
 By placing the circumstance at the beginning of the sentence, those who don't want to follow can stop reading and move
-on. Those who *do* want to read it are less likely to skip over the sentence.
+on. Those who _do_ want to read it are less likely to skip over the sentence.
 
 ### Oxford comma
 
 The Oxford comma is the comma used after the second-to-last item in a list of three or more items. It appears just
 before "and" or "or."
 
-```
+```markup
 # Not recommended
 Netdata can monitor RAM, disk I/O, MySQL queries per second and lm-sensors.
 
 # Recommended
 Netdata can monitor RAM, disk I/O, MySQL queries per second, and lm-sensors.
+```
+
+### Abbreviations (acronyms and initialisms)
+
+Use abbreviations (including [acronyms and initialisms](https://www.dictionary.com/e/acronym-vs-abbreviation/)) in
+documentation when one exists, when it's widely-accepted within the monitoring/sysadmin community, and when it improves
+the readability of a document.
+
+When introducing an abbreviation to a document for the first time, give the reader both the spelled-out version and the
+shortened version at the same time. For example:
+
+```markup
+You can use Netdata to monitor Extended Berkeley Packet Filter (eBPF) metrics in real-time.
+```
+
+After you define an abbreviation, don't switch back and forth—use only the abbreviation for the rest of the document.
+
+You can also use abbreviations in a document's title to keep the title short and relevant. If you do this, you should
+still introduce the spelled-out name alongside the abbreviation as soon as possible.
+
+```markup
+# Monitoring HDFS with Netdata
+
+You can now use Netdata to collect real-time metrics from your Hadoop Distributed File System (HDFS).
 ```
 
 ## Markdown syntax
@@ -293,11 +317,9 @@ Click on the **Sign in** button.
 !!! note Whenever possible, avoid using directional language to orient readers, because not every reader can use
     instructions like "look at the top-left corner" to find their way around an interface.
 
-```
 If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
 
 We're also working to establish standards for how we refer to certain elements of the Netdata's web interface. We'll include that in this style guide as soon as it's complete.
-```
 
 ### Language-specific syntax highlighting in code blocks
 
@@ -313,7 +335,7 @@ no language is specified, the Highlight extension doesn't apply syntax highlight
 Include the language directly after the three backticks (```` ``` ````) that start the code block. For highlighting C
 code, for example:
 
-````
+````c
 ```c
 inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
