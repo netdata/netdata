@@ -214,9 +214,6 @@ static inline int check_socks_enviroment(const char **proxy) {
     if(!tmp)
         return 1;
 
-    if(strnlen(tmp, ACLK_PROXY_MAXLEN) == ACLK_PROXY_MAXLEN)
-        return 1;
-
     if(aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
         *proxy = tmp;
         return 0;
@@ -238,9 +235,6 @@ static const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
             *type = PROXY_TYPE_SOCKS5;
         return proxy;
     }
-
-    if(strnlen(proxy, ACLK_PROXY_MAXLEN) == ACLK_PROXY_MAXLEN)
-        return proxy;
 
     *type = aclk_verify_proxy(proxy);
     if(*type == PROXY_TYPE_UNKNOWN) {
