@@ -45,11 +45,15 @@ Netdata runs with the lowest possible process priority, so even if 1000 users ar
 
 To lower the CPU utilization of Netdata when clients are accessing the dashboard, set `web compression level = 1`, or disable web compression completely by setting `enable web responses gzip compression = no`. Both settings are in the `[web]` section.
 
-## Monitoring a heavy loaded system
+## Monitoring a heavily-loaded system
 
-Netdata, while running, does not depend on disk I/O (apart its log files and `access.log` is written with buffering enabled and can be disabled). Some plugins that need disk may stop and show gaps during heavy system load, but the Netdata daemon itself should be able to work and collect values from `/proc` and `/sys` and serve web clients accessing it.
+While running, Netdata does not depend much on disk I/O aside from writing to log files and the [database
+engine](../database/engine/README.md) "spilling" historical metrics to disk when it uses all its available RAM.
 
-Keep in mind that Netdata saves its database when it exits and loads it back when restarted. While it is running though, its DB is only stored in RAM and no I/O takes place for it.
+Under a heavy system load, plugins that need disk may stop and show gaps during heavy system load, but the Netdata
+daemon itself should be able to work and collect values from `/proc` and `/sys` and serve web clients accessing it.
+
+Keep in mind that Netdata saves its database when it exits, and loads it up again when started.
 
 ## Netdata process priority
 
@@ -173,29 +177,22 @@ Normally, you will not need them. To disable them, set:
 	access log = none
 ```
 
-### 5. Set memory mode to RAM
+### 5. Lower Netdata's memory usage
 
-Setting the memory mode to `ram` will disable loading and saving the round robin database. This will not affect anything while running Netdata, but it might be required if you have very limited storage available.
+You can change the amount of RAM and disk the database engine uses for all charts and their dimensions with the
+following settings in the `[global]` section of `netdata.conf`:
 
-```
+```conf
 [global]
-	memory mode = ram
+	# memory mode = dbengine
+	# page cache size = 32
+	# dbengine disk space = 256
 ```
 
-### 6. Lower memory requirements
+See the [database engine documentation](../database/engine/README.md) or our [tutorial on metrics
+retention](tutorials/longer-metrics-storage.md) for more details on lowering the database engine's memory requirements.
 
-You can set the default size of the round robin database for all charts, using:
-
-```
-[global]
-      history = 600
-```
-
-The units for history is `[global].update every` seconds. So if `[global].update every = 6` and `[global].history = 600`, you will have an hour of data ( 6 x 600 = 3.600 ), which will store 600 points per dimension, one every 6 seconds.
-
-Check also [Database](../database) for directions on calculating the size of the round robin database.
-
-### 7. Disable gzip compression of responses
+### 6. Disable gzip compression of responses
 
 Gzip compression of the web responses is using more CPU that the rest of Netdata. You can lower the compression level or disable gzip compression completely. You can disable it, like this:
 

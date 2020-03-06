@@ -170,10 +170,10 @@ so as to avoid all disk bottlenecks.
 The reported numbers are the following:
 
 | device | page cache | dataset | reads/sec | writes/sec |
-| :---: | :---: | ---: | ---: | ---: |
-| HDD | 64 MiB | 4.1 GiB | 813K | 18.0M |
-| SSD | 64 MiB | 9.8 GiB | 1.7M | 43.0M |
-| N/A | 16 GiB | 6.8 GiB |118.2M | 30.2M |
+| :----: | :--------: | ------: | --------: | ---------: |
+| HDD    | 64 MiB     | 4.1 GiB | 813K      | 18.0M      |
+| SSD    | 64 MiB     | 9.8 GiB | 1.7M      | 43.0M      |
+| N/A    | 16 GiB     | 6.8 GiB | 118.2M    | 30.2M      |
 
 where "reads/sec" is the number of metric data points being read from the database via its API per second and
 "writes/sec" is the number of metric data points being written to the database per second. 

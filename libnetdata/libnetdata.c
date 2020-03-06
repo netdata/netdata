@@ -168,6 +168,7 @@ char *strdupz(const char *s) {
     return t;
 }
 
+// If ptr is NULL, no operation is performed.
 void freez(void *ptr) {
     free(ptr);
 }

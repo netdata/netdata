@@ -578,7 +578,7 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
+            backends_kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
 #else
             error("BACKEND: AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
@@ -860,18 +860,18 @@ void *backends_main(void *ptr) {
 
                 char error_message[ERROR_LINE_MAX + 1] = "";
 
-                debug(D_BACKEND, "BACKEND: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
+                debug(D_BACKEND, "BACKEND: backends_kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
                       buffer = %zu, record = %zu", destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name,
                       partition_key, buffer_len, record_len);
 
-                kinesis_put_record(kinesis_stream_name, partition_key, first_char, record_len);
+                backends_kinesis_put_record(kinesis_stream_name, partition_key, first_char, record_len);
 
                 sent += record_len;
                 chart_transmission_successes++;
 
                 size_t sent_bytes = 0, lost_bytes = 0;
 
-                if(unlikely(kinesis_get_result(error_message, &sent_bytes, &lost_bytes))) {
+                if(unlikely(backends_kinesis_get_result(error_message, &sent_bytes, &lost_bytes))) {
                     // oops! we couldn't send (all or some of the) data
                     error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
@@ -1199,7 +1199,7 @@ void *backends_main(void *ptr) {
 cleanup:
 #if HAVE_KINESIS
     if(do_kinesis) {
-        kinesis_shutdown();
+        backends_kinesis_shutdown();
         freez(kinesis_auth_key_id);
         freez(kinesis_secure_key);
         freez(kinesis_stream_name);

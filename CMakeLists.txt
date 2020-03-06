@@ -298,6 +298,8 @@ set(LIBNETDATA_FILES
         libnetdata/clocks/clocks.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
+        libnetdata/ebpf/ebpf.c
+        libnetdata/ebpf/ebpf.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
         libnetdata/inlined.h
@@ -339,8 +341,7 @@ set(LIBNETDATA_FILES
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
 set(APPS_PLUGIN_FILES
-        collectors/apps.plugin/apps_plugin.c
-        )
+        collectors/apps.plugin/apps_plugin.c)
 
 set(CHECKS_PLUGIN_FILES
         collectors/checks.plugin/plugin_checks.c
@@ -404,6 +405,10 @@ set(PERF_PLUGIN_FILES
 
 set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
+        )
+
+set(EBPF_PROCESS_PLUGIN_FILES
+        collectors/ebpf_process.plugin/ebpf_process.c
         )
 
 set(PROC_PLUGIN_FILES
@@ -606,6 +611,20 @@ set(CLAIM_PLUGIN_FILES
         claim/claim.h
         )
 
+set(ACLK_PLUGIN_FILES
+        aclk/agent_cloud_link.c
+        aclk/agent_cloud_link.h
+        aclk/aclk_lws_wss_client.c
+        aclk/aclk_lws_wss_client.h
+        aclk/mqtt.c
+        aclk/mqtt.h
+        )
+
+set(ACLK_STATIC_LIBS
+        ${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a
+        ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a
+        )
+
 set(EXPORTING_ENGINE_FILES
         exporting/exporting_engine.c
         exporting/exporting_engine.h
@@ -621,6 +640,13 @@ set(EXPORTING_ENGINE_FILES
         exporting/check_filters.c
         exporting/send_data.c
         exporting/send_internal_metrics.c
+        )
+
+set(KINESIS_EXPORTING_FILES
+        exporting/aws_kinesis/aws_kinesis.c
+        exporting/aws_kinesis/aws_kinesis.h
+        exporting/aws_kinesis/aws_kinesis_put_record.cc
+        exporting/aws_kinesis/aws_kinesis_put_record.h
         )
 
 set(KINESIS_BACKEND_FILES
@@ -673,7 +699,7 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        )
+)
 
 set(NETDATACLI_FILES
         daemon/commands.h
@@ -706,7 +732,7 @@ ENDIF()
 
 IF(ENABLE_BACKEND_KINESIS)
     message(STATUS "kinesis backend: enabled")
-    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES})
+    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES} ${KINESIS_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES aws-cpp-sdk-kinesis aws-cpp-sdk-core ${CRYPTO_LIBRARIES} ${SSL_LIBRARIES} ${CURL_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CRYPTO_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
     list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
@@ -750,10 +776,37 @@ ELSE()
     message(STATUS "mongodb backend: disabled (requires mongoc library)")
 ENDIF()
 
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
+
+IF("$ENV{ACLK}")
+    set(ACLK_CAN_BUILD 1)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
+        message(WARNING "Static build of mosquitto not found. Disabling ACLK")
+        set(ACLK_CAN_BUILD 0)
+    ENDIF()
+
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
+        message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
+        set(ACLK_CAN_BUILD 0)
+    ENDIF()
+
+    IF(ACLK_CAN_BUILD)
+        message(STATUS "agent-cloud-link: enabled")
+        list(APPEND NETDATA_FILES ${ACLK_PLUGIN_FILES})
+        list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_STATIC_LIBS})
+        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
+        IF(LINUX AND CAP_FOUND)
+            list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
+            list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
+            list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
+        ENDIF()
+    ELSE()
+        message(STATUS "agent-cloud-link: disabled")
+    ENDIF()
+ENDIF()
+
 # -----------------------------------------------------------------------------
 # netdata
-
-set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
 IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
@@ -770,6 +823,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
+    SET(ENABLE_PLUGIN_EBPF True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -780,6 +834,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -790,6 +845,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_EBPF False)
 
 ENDIF()
 
@@ -897,6 +953,20 @@ ENDIF()
 
 
 # -----------------------------------------------------------------------------
+# ebpf_process.plugin
+
+IF(ENABLE_PLUGIN_EBPF)
+    message(STATUS "ebpf_process.plugin: enabled")
+    add_executable(ebpf_process.plugin config.h ${EBPF_PROCESS_PLUGIN_FILES})
+    target_link_libraries (ebpf_process.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "ebpf_process.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
 # slabinfo.plugin
 
 IF(ENABLE_PLUGIN_SLABINFO)
@@ -950,6 +1020,17 @@ if(BUILD_TESTING)
         exporting/tests/system_doubles.c
         )
     set(TEST_NAME exporting_engine)
+    set(KINESIS_LINK_OPTIONS)
+if(ENABLE_BACKEND_KINESIS)
+    list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
+    list(
+        APPEND KINESIS_LINK_OPTIONS
+        -Wl,--wrap=aws_sdk_init
+        -Wl,--wrap=kinesis_init
+        -Wl,--wrap=kinesis_put_record
+        -Wl,--wrap=kinesis_get_result
+    )
+endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
         ${TEST_NAME}_testdriver
@@ -969,6 +1050,7 @@ if(BUILD_TESTING)
         -Wl,--wrap=notify_workers
         -Wl,--wrap=send_internal_metrics
         -Wl,--wrap=now_realtime_sec
+        -Wl,--wrap=uv_thread_set_name_np
         -Wl,--wrap=uv_thread_create
         -Wl,--wrap=uv_mutex_lock
         -Wl,--wrap=uv_mutex_unlock
@@ -979,6 +1061,7 @@ if(BUILD_TESTING)
         -Wl,--wrap=recv
         -Wl,--wrap=send
         -Wl,--wrap=connect_to_one_of
+        ${KINESIS_LINK_OPTIONS}
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

@@ -1,3 +1,8 @@
+---
+title: The step-by-step Netdata tutorial
+description: Learn what Netdata is, what it's capable of, and how it'll help you make faster and more informed decisions about the health and performance of your systems and applications.
+---
+
 # The step-by-step Netdata tutorial
 
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.
@@ -98,8 +103,9 @@ you choose. You can even monitor many systems from a single HTML file.
 
 [Step 9. Long-term metrics storage](step-09.md)
 
-Want to store lots of real-time metrics from Netdata? Tweak our custom database to your heart's content. Want to take
-your Netdata metrics elsewhere? We're happy to help you archive data to Prometheus, MongoDB, TimescaleDB, and others.
+By default, Netdata can store lots of real-time metrics, but you can also tweak our custom database engine to your
+heart's content. Want to take your Netdata metrics elsewhere? We're happy to help you archive data to Prometheus,
+MongoDB, TimescaleDB, and others.
 
 [Step 10. Set up a proxy](step-10.md)
 

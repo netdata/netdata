@@ -14,7 +14,7 @@ Make sure your apache has installed `mod_proxy` and `mod_proxy_http`.
 On debian/ubuntu systems, install them with this: 
 
 ```sh
-sudo apt-get install apache2-bin
+sudo apt-get install apache2
 ```
 
 Also make sure they are enabled:

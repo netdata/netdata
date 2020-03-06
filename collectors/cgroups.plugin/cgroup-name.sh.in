@@ -77,19 +77,36 @@ function docker_get_name_api() {
 }
 
 function k8s_get_name() {
-	# Take the last part of the delimited path identifier (expecting either _ or / as a delimiter).
-	local id="${1##*_}"
-	if [ "${id}" == "${1}" ]; then
-		id="${1##*/}"
+	if [[ "${1}" =~ ^kube.*_pod.*$ ]]; then
+		local id="${1##*_pod}"
+	else
+		# Take the last part of the delimited path identifier (expecting either _ or / as a delimiter).
+		local id="${1##*_}"
+		if [ "${id}" == "${1}" ]; then
+			id="${1##*/}"
+		fi
 	fi
-	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
 	if command -v jq >/dev/null 2>&1; then
-		NAME="$(
-		curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
-		jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)")' |
-		grep "$id" |
-		cut -d' ' -f1
-		)"
+		if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
+			KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
+			NAME="$(
+			curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
+			jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_\(.status.containerStatuses[0].name) \(.status.containerStatuses[0].containerID)"' |
+			grep "$id" |
+			cut -d' ' -f1
+			)"
+		elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
+			if [[ -z ${KUBE_CONFIG+x} ]]; then
+				KUBE_CONFIG="/etc/kubernetes/admin.conf"
+			fi
+			if kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces >/dev/null 2>&1; then
+				#shellcheck disable=SC2086
+				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' | \
+				jq -r '.items[] | select(.metadata.uid == "'$id'") | .metadata.name')"
+			else
+				warning "kubectl cannot get pod list, check for configuration file in $KUBE_CONFIG, or set this path to env \$KUBE_CONFIG"
+			fi
+		fi
 	else
 		warning "jq command not available, k8s_get_name() cannot execute. Please install jq should you wish for k8s to be fully functional"
 	fi
@@ -158,12 +175,10 @@ for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_C
 	fi
 done
 
-if [ -z "${NAME}" ] && [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ] && [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
-	k8s_get_name "${CGROUP}"
-fi
-
 if [ -z "${NAME}" ]; then
-	if [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
+	if [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
+		k8s_get_name "${CGROUP}"
+	elif [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
 		# docker containers
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"

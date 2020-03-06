@@ -23,7 +23,6 @@ except ImportError:
 from bases.collection import read_last_line
 from bases.FrameworkServices.LogService import LogService
 
-
 ORDER_APACHE_CACHE = [
     'apache_cache',
 ]
@@ -821,8 +820,8 @@ class Web:
             dim_id = match_dict['vhost'].replace('.', '_')
             if dim_id not in self.data:
                 self.charts['vhost'].add_dimension([dim_id,
-                                                   match_dict['vhost'],
-                                                   'incremental'])
+                                                    match_dict['vhost'],
+                                                    'incremental'])
                 self.data[dim_id] = 0
             self.data[dim_id] += 1
 
@@ -961,9 +960,9 @@ class Squid:
             return False
         self.storage['dynamic'] = {
             'http_code': {
-                 'chart': 'squid_detailed_response_codes',
-                 'func_dim_id': None,
-                 'func_dim': None
+                'chart': 'squid_detailed_response_codes',
+                'func_dim_id': None,
+                'func_dim': None
             },
             'hier_code': {
                 'chart': 'squid_hier_code',
@@ -1105,7 +1104,7 @@ def get_hist(index, buckets, time):
     :param time:    time
     :return: None
     """
-    for i in range(len(index)-1, -1, -1):
+    for i in range(len(index) - 1, -1, -1):
         if time <= index[i]:
             buckets[i] += 1
         else:

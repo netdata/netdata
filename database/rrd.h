@@ -618,12 +618,22 @@ typedef struct alarm_log {
 // RRD HOST
 
 struct rrdhost_system_info {
-    char *os_name;
-    char *os_id;
-    char *os_id_like;
-    char *os_version;
-    char *os_version_id;
-    char *os_detection;
+    char *host_os_name;
+    char *host_os_id;
+    char *host_os_id_like;
+    char *host_os_version;
+    char *host_os_version_id;
+    char *host_os_detection;
+    char *host_cores;
+    char *host_cpu_freq;
+    char *host_ram_total;
+    char *host_disk_space;
+    char *container_os_name;
+    char *container_os_id;
+    char *container_os_id_like;
+    char *container_os_version;
+    char *container_os_version_id;
+    char *container_os_detection;
     char *kernel_name;
     char *kernel_version;
     char *architecture;
@@ -696,6 +706,7 @@ struct rrdhost {
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
 
+    uint32_t stream_version;                             //Set the current version of the stream.
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush

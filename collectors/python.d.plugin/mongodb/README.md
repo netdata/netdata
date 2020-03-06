@@ -1,8 +1,8 @@
-# mongodb
+# MongoDB monitoring with Netdata
 
-Module monitor mongodb performance and health metrics
+Monitors performance and health metrics of MongoDB.
 
-**Requirements:**
+## Requirements
 
 -   `python-pymongo` package v2.4+.
 
@@ -175,7 +175,15 @@ db.createUser({
 })
 ```
 
-### configuration
+## Configuration
+
+Edit the `python.d/mongodb.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/mongodb.conf
+```
 
 Sample:
 

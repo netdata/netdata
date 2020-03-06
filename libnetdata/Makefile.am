@@ -10,6 +10,7 @@ SUBDIRS = \
     clocks \
     config \
     dictionary \
+    ebpf \
     eval \
     json \
     health \

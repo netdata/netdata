@@ -63,7 +63,7 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnet
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
 
 print ("3.1 Run install-required-packages scriptlet")
-common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"])
 common.run_command(container, ["bash", "%s/.install-required-packages.sh" % build_path, "netdata", "--dont-wait", "--non-interactive"])
 
 print("3.2 Installing package dependencies within LXC container")

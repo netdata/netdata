@@ -21,13 +21,12 @@ static char *claiming_errors[] = {
         "internal server error"                         // 12
 };
 
-#define AGENT_UNCLAIMED 0
-#define AGENT_CLAIMED 1
-static uint8_t claiming_status = AGENT_UNCLAIMED;
 
-uint8_t is_agent_claimed(void)
+static char *claimed_id = NULL;
+
+char *is_agent_claimed(void)
 {
-    return (AGENT_CLAIMED == claiming_status);
+    return claimed_id;
 }
 
 #define CLAIMING_COMMAND_LENGTH 16384
@@ -64,8 +63,7 @@ void claim_agent(char *claiming_arguments)
     exit_code = mypclose(fp, command_pid);
     info("Agent claiming command returned with code %d", exit_code);
     if (0 == exit_code) {
-        claiming_status = AGENT_CLAIMED;
-        info("Agent successfully claimed.");
+        load_claiming_state();
         return;
     }
     if (exit_code < 0) {
@@ -85,19 +83,37 @@ void claim_agent(char *claiming_arguments)
 
 void load_claiming_state(void)
 {
-    info("The claiming feature is under development and still subject to change before the next release");
-    return;
+    if (claimed_id != NULL) {
+        freez(claimed_id);
+        claimed_id = NULL;
+    }
 
     char filename[FILENAME_MAX + 1];
     struct stat statbuf;
 
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/is_claimed", netdata_configured_user_config_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
+
     // check if the file exists
     if (lstat(filename, &statbuf) != 0) {
-        info("File '%s' was not found. Setting state to AGENT_UNCLAIMED.", filename);
-        claiming_status = AGENT_UNCLAIMED;
-   } else {
-        info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-        claiming_status = AGENT_CLAIMED;
+        info("lstat on File '%s' failed reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
+        return;
     }
+    if (unlikely(statbuf.st_size == 0)) {
+        info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
+        return;
+    }
+
+    FILE *f = fopen(filename, "rt");
+    if (unlikely(f == NULL)) {
+        error("File '%s' cannot be opened. Setting state to AGENT_UNCLAIMED.", filename);
+        return;
+    }
+
+    claimed_id = callocz(1, statbuf.st_size + 1);
+    size_t bytes_read = fread(claimed_id, 1, statbuf.st_size, f);
+    claimed_id[bytes_read] = 0;
+    info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+    fclose(f);
+
+    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 }

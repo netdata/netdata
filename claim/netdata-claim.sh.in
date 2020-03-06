@@ -12,44 +12,68 @@
 # Exit code: 5 - Unknown HTTP error message
 #
 # OK: Agent claimed successfully
-# HTTP Status code: 200
+# HTTP Status code: 204
 # Exit code: 0
 #
 # Error: The agent id is invalid; it does not fulfill the constraints
 # HTTP Status code: 422
-# Error message: "invalid agent id"
+# Error key: "ErrInvalidNodeID"
+# Error message: "invalid node id"
 # Exit code: 6
+
+# Error: The agent hostname is invalid; it does not fulfill the constraints
+# HTTP Status code: 422
+# Error key: "ErrInvalidNodeName"
+# Error message: "invalid node name"
+# Exit code: 7
+#
+# Error: At least one of the given rooms ids is invalid; it does not fulfill the constraints
+# HTTP Status code: 422
+# Error key: "ErrInvalidRoomID"
+# Error message: "invalid room id"
+# Exit code: 8
 #
 # Error: Invalid public key; the public key is empty or not present
 # HTTP Status code: 422
+# Error key: "ErrInvalidPublicKey"
 # Error message: "invalid public key"
-# Exit code: 7
-#
-# Error: Expired token
-# HTTP Status code: 403
-# Error message: "token has expired"
-# Exit code: 8
-#
-# Error: Invalid claiming token; missing, undecryptable, invalid payload...
-# HTTP Status code: 422
-# Error message: "invalid token"
 # Exit code: 9
 #
-# Error: Duplicate agent id; an agent with the same id but a different public key is already registered in the cloud
-# HTTP Status code: 409
-# Error message: "duplicate agent id"
+# Error: Expired, missing or invalid token
+# HTTP Status code: 403
+# Error key: "ErrForbidden"
+# Error message: "token expired" | "token not found" | "invalid token"
 # Exit code: 10
 #
-# Error: Already claimed in another workspace;
-#        this agent (same id, same public key) already belongs to another workspace
-# HTTP Status code: 403
-# Error message: "claimed in another workspace"
+# Error: Duplicate agent id; an agent with the same id is already registered in the cloud
+# HTTP Status code: 409
+# Error key: "ErrAlreadyClaimed"
+# Error message: "already claimed"
 # Exit code: 11
+#
+# Error: The node claiming process is still in progress.
+# HTTP Status code: 102
+# Error key: "ErrProcessingClaim"
+# Error message: "processing claiming"
+# Exit code: 12
 #
 # Error: Internal server error. Any other unexpected error (DB problems, etc.)
 # HTTP Status code: 500
-# Error message: "internal server error"
-# Exit code: 12
+# Error key: "ErrInternalServerError"
+# Error message: "Internal Server Error"
+# Exit code: 13
+#
+# Error: There was a timout processing the claim.
+# HTTP Status code: 504
+# Error key: "ErrGatewayTimeout"
+# Error message: "Gateway Timeout"
+# Exit code: 14
+#
+# Error: The service cannot handle the claiming request at this time.
+# HTTP Status code: 503
+# Error key: "ErrServiceUnavailable"
+# Error message: "Service Unavailable"
+# Exit code: 15
 
 if command -v curl >/dev/null 2>&1 ; then
 	URLTOOL="curl"
@@ -142,7 +166,7 @@ if [ ! -f "${CLAIMING_DIR}/public.pem" ] ; then
 	fi
 fi
 
-TARGET_URL="${URL_BASE}/api/v1/workspaces/agents/${ID}"
+TARGET_URL="${URL_BASE}/api/v1/spaces/nodes/${ID}"
 # shellcheck disable=SC2002
 KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
 # shellcheck disable=SC2001
@@ -150,7 +174,7 @@ KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
 
 cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
 {
-    "agent": {
+    "node": {
         "id": "$ID",
         "hostname": "$HOSTNAME"
     },
@@ -193,24 +217,27 @@ if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
 fi
 
 HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
-if [ "${HTTP_STATUS_CODE}" -ne 200 ] ; then
-	ERROR_MESSAGE=$(grep "\"error\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "error\":\"" '{print $2}' | sed s'/"}//g')
+if [ "${HTTP_STATUS_CODE}" -ne 204 ] ; then
+	ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
 	case ${ERROR_MESSAGE} in
-		"invalid agent id") EXIT_CODE=6 ;;
-		"invalid public key") EXIT_CODE=7 ;;
-		"token has expired") EXIT_CODE=8 ;;
-		"invalid token") EXIT_CODE=9 ;;
-		"duplicate agent id") EXIT_CODE=10 ;;
-		"claimed in another workspace") EXIT_CODE=11 ;;
-		"internal server error") EXIT_CODE=12 ;;
+		"ErrInvalidNodeID") EXIT_CODE=6 ;;
+		"ErrInvalidNodeName") EXIT_CODE=7 ;;
+		"ErrInvalidRoomID") EXIT_CODE=8 ;;
+		"ErrInvalidPublicKey") EXIT_CODE=9 ;;
+		"ErrForbidden") EXIT_CODE=10 ;;
+		"ErrAlreadyClaimed") EXIT_CODE=11 ;;
+		"ErrProcessingClaim") EXIT_CODE=12 ;;
+		"ErrInternalServerError") EXIT_CODE=13 ;;
+		"ErrGatewayTimeout") EXIT_CODE=14 ;;
+		"ErrServiceUnavailable") EXIT_CODE=15 ;;
 		*) EXIT_CODE=5 ;;
 	esac
-	echo >&2 "Failed to claim agent."
+	echo >&2 "Failed to claim node."
 	rm -f "${CLAIMING_DIR}/tmpout.txt"
 	exit $EXIT_CODE
 fi
 
 rm -f "${CLAIMING_DIR}/tmpout.txt"
-touch "${CLAIMING_DIR}/is_claimed"
+echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id"
 rm -f "${CLAIMING_DIR}/token"
-echo >&2 "Agent was successfully claimed."
+echo >&2 "Node was successfully claimed."

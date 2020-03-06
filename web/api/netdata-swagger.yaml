@@ -291,7 +291,7 @@ paths:
             memory.
   /badge.svg:
     get:
-      summary: Generate a SVG image for a chart (or dimension)
+      summary: Generate a badge in form of SVG image for a chart (or dimension)
       description: Successful responses are SVG images.
       parameters:
         - name: chart
@@ -410,23 +410,82 @@ paths:
             format: any text
         - name: label_color
           in: query
-          description: A color to be used for the background of the label.
+          description: A color to be used for the background of the label side(left side) of the badge. One of predefined colors or specific color in hex `RGB` or `RRGGBB` format (without preceding `#` character). If value wrong or not given default color will be used.
           required: false
           allowEmptyValue: true
           schema:
-            type: string
-            format: any text
+            oneOf:
+              - type: string
+                enum:
+                  - green
+                  - brightgreen
+                  - yellow
+                  - yellowgreen
+                  - orange
+                  - red
+                  - blue
+                  - grey
+                  - gray
+                  - lightgrey
+                  - lightgray
+              - type: string
+                format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: value_color
           in: query
-          description: "A color to be used for the background of the label. You can set
+          description: "A color to be used for the background of the value *(right)* part of badge. You can set
             multiple using a pipe with a condition each, like this:
-            colorvalue|color:null The following operators are
-            supported: >, <, >=, <=, =, :null (to check if no value exists)."
+            `color<value|color:null` The following operators are
+            supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter.
+            Currently only integers are suported as values."
           required: false
           allowEmptyValue: true
           schema:
             type: string
             format: any text
+        - name: text_color_lbl
+          in: query
+          description: Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          required: false
+          allowEmptyValue: true
+          schema:
+           oneOf:
+              - type: string
+                enum:
+                  - green
+                  - brightgreen
+                  - yellow
+                  - yellowgreen
+                  - orange
+                  - red
+                  - blue
+                  - grey
+                  - gray
+                  - lightgrey
+                  - lightgray
+              - type: string
+                format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
+        - name: text_color_val
+          in: query
+          description: Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          required: false
+          allowEmptyValue: true
+          schema:
+           oneOf:
+              - type: string
+                enum:
+                  - green
+                  - brightgreen
+                  - yellow
+                  - yellowgreen
+                  - orange
+                  - red
+                  - blue
+                  - grey
+                  - gray
+                  - lightgrey
+                  - lightgray
+              - type: string
+                format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: multiply
           in: query
           description: Multiply the value with this number for rendering it at the image
@@ -450,6 +509,22 @@ paths:
           description: Set the scale of the badge (greater or equal to 100).
           required: false
           allowEmptyValue: true
+          schema:
+            type: number
+            format: integer
+        - name: fixed_width_lbl
+          in: query
+          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's left side *(label/name)*. You must set this parameter together with `fixed_width_val` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+        - name: fixed_width_val
+          in: query
+          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's right side *(value)*. You must set this parameter together with `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          required: false
+          allowEmptyValue: false
           schema:
             type: number
             format: integer
@@ -481,6 +556,17 @@ paths:
               - prometheus_all_hosts
               - json
             default: shell
+        - name: variables
+          in: query
+          description: When enabled, netdata will expose various system
+            configuration metrics.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: no
         - name: help
           in: query
           description: Enable or disable HELP lines in prometheus output.
@@ -593,6 +679,13 @@ paths:
           allowEmptyValue: true
           schema:
             type: boolean
+        - name: active
+          in: query
+          description: If passed, the raised alarms in state WARNING or CRITICAL are returned.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: boolean
       responses:
         "200":
           description: An object containing general info and a linked list of alarms.
@@ -600,6 +693,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/alarms"
+  /alarms_values:
+    get:
+      summary: Get a list of active or raised alarms on the server
+      description: The alarms_values endpoint returns the list of all raised or enabled alarms on
+        the netdata server. Called without any parameters, the raised alarms in
+        state WARNING or CRITICAL are returned. By passing "?all", all the
+        enabled alarms are returned.
+        This option output differs from `/alarms` in the number of variables delivered. This endpoint gives
+        to user `id`, `value` and alarm `status`.
+      parameters:
+        - name: all
+          in: query
+          description: If passed, all enabled alarms are returned.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: boolean
+        - name: active
+          in: query
+          description: If passed, the raised alarms in state WARNING or CRITICAL are returned.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: An object containing general info and a linked list of alarms.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/alarms_values"
   /alarm_log:
     get:
       summary: Retrieves the entries of the alarm log

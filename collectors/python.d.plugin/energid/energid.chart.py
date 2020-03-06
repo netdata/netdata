@@ -41,9 +41,9 @@ CHARTS = {
     'mempool': {
         'options': [None, 'MemPool', 'MiB', 'memory', 'energid.mempool', 'area'],
         'lines': [
-            ['mempool_max', 'Max', 'absolute', None, 1024*1024],
-            ['mempool_current', 'Usage', 'absolute', None, 1024*1024],
-            ['mempool_txsize', 'TX Size', 'absolute', None, 1024*1024],
+            ['mempool_max', 'Max', 'absolute', None, 1024 * 1024],
+            ['mempool_current', 'Usage', 'absolute', None, 1024 * 1024],
+            ['mempool_txsize', 'TX Size', 'absolute', None, 1024 * 1024],
         ],
     },
     'secmem': {
@@ -93,21 +93,22 @@ METHODS = {
         'mempool_max': r['maxmempool'],
     },
     'getmemoryinfo': lambda r: dict([
-        ('secmem_' + k, v) for (k,v) in r['locked'].items()
+        ('secmem_' + k, v) for (k, v) in r['locked'].items()
     ]),
     'getnetworkinfo': lambda r: {
-        'network_timeoffset' : r['timeoffset'],
+        'network_timeoffset': r['timeoffset'],
         'network_connections': r['connections'],
     },
     'gettxoutsetinfo': lambda r: {
-        'utxo_count' : r['txouts'],
-        'utxo_xfers' : r['transactions'],
-        'utxo_size' : r['disk_size'],
-        'utxo_amount' : r['total_amount'],
+        'utxo_count': r['txouts'],
+        'utxo_xfers': r['transactions'],
+        'utxo_size': r['disk_size'],
+        'utxo_amount': r['total_amount'],
     },
 }
 
 JSON_RPC_VERSION = '1.1'
+
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):

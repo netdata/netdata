@@ -707,10 +707,9 @@ function clearMyNetdataMenu() {
 }
 
 function errorMyNetdataMenu() {
-    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
+    setMyNetdataMenu(`<div class="agent-item" style="padding: 0 8px">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        Cannot load known netdata agents from netdata.cloud!
-        <div></div>
+        Cannot load known Netdata agents from Netdata Cloud! Please make sure you have the latest version of Netdata.
     </div>`);
 }
 
@@ -965,7 +964,7 @@ function gotoServerModalHandler(guid) {
 
     if (!isSignedIn()) {
         // When the registry is enabled, if the user's known URLs are not working
-        // we consult the registry to get additional URLs.  
+        // we consult the registry to get additional URLs.
         setTimeout(function () {
             if (gotoServerStop === false) {
                 document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
@@ -1805,8 +1804,8 @@ function renderPage(menus, data) {
 
     const isMemoryModeDbEngine = data.memory_mode === "dbengine";
 
-    sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/docs/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
-    sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
+    sidebar += '<li class="" style="padding-top:15px;"><a href="https://docs.netdata.cloud/collectors/quickstart/" target="_blank"><i class="fas fa-plus"></i> Add more charts</a></li>';
+    sidebar += '<li class=""><a href="https://docs.netdata.cloud/health/quickstart/" target="_blank"><i class="fas fa-plus"></i> Add more alarms</a></li>';
     sidebar += '<li class="" style="margin:20px;color:#666;"><small>Every ' +
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
       'Netdata collects <strong>' + data.dimensions_count.toLocaleString() + '</strong> metrics on ' +
@@ -5129,7 +5128,7 @@ function netdataRegistryCallback(machinesArray) {
     registryAgents = machinesArray;
 
     if (isSignedIn()) {
-        // We call getCloudAccountAgents() here because it requires that 
+        // We call getCloudAccountAgents() here because it requires that
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountAgents().then((agents) => {
@@ -5155,8 +5154,8 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
-// the account ui before receiving the definitive response from the web server. 
+// If we know the cloudBaseURL and agentID from local storage render (eagerly)
+// the account ui before receiving the definitive response from the web server.
 // This improves the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");

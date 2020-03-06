@@ -1,10 +1,7 @@
-# uwsgi
+# uWSGI monitoring with Netdata
 
-Module monitor uwsgi performance metrics.
+Monitors performance metrics exposed by [`Stats Server`](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html).
 
-<https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html>
-
-lines are creates dynamically based on how many workers are there
 
 Following charts are drawn:
 
@@ -23,7 +20,15 @@ Following charts are drawn:
 4.  **Harakiris**
 5.  **Respawns**
 
-## configuration
+## Configuration
+
+Edit the `python.d/uwsgi.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/uwsgi.conf
+```
 
 ```yaml
 socket:

@@ -1,8 +1,8 @@
-# nsd
+# NSD monitoring with Netdata
 
-Module uses the `nsd-control stats_noreset` command to provide `nsd` statistics.
+Uses the `nsd-control stats_noreset` command to provide `nsd` statistics.
 
-**Requirements:**
+## Requirements
 
 -   Version of `nsd` must be 4.0+
 -   Netdata must have permissions to run `nsd-control stats_noreset`

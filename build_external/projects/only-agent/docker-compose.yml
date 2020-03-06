@@ -1,0 +1,8 @@
+version: '3'
+services:
+  agent:
+    image: ${Distro}_${Version}_dev
+    command: /usr/sbin/netdata -D
+    ports:
+    - 80
+    - 443

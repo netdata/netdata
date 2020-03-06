@@ -179,7 +179,6 @@ CHARTS = {
     }
 }
 
-
 METRICS = {
     'bin': {'algorithm': 'incremental', 'divisor': 1024},
     'bout': {'algorithm': 'incremental', 'divisor': 1024},
@@ -193,14 +192,12 @@ METRICS = {
     'hrsp_other': {'algorithm': 'incremental', 'divisor': 1}
 }
 
-
 BACKEND_METRICS = {
     'qtime': {'algorithm': 'absolute', 'divisor': 1},
     'ctime': {'algorithm': 'absolute', 'divisor': 1},
     'rtime': {'algorithm': 'absolute', 'divisor': 1},
     'ttime': {'algorithm': 'absolute', 'divisor': 1}
 }
-
 
 REGEX = dict(url=re_compile(r'idle = (?P<idle>[0-9]+)'),
              socket=re_compile(r'Idle_pct: (?P<idle>[0-9]+)'))
@@ -309,7 +306,7 @@ class Service(UrlService, SocketService):
                                                                 name, METRICS[metric]['algorithm'], 1,
                                                                 METRICS[metric]['divisor']])
             self.definitions['fhrsp_total']['lines'].append(['_'.join(['frontend', 'hrsp_total', idx]),
-                                                            name, 'incremental', 1, 1])
+                                                             name, 'incremental', 1, 1])
         for back in self.data['backend']:
             name, idx = back['# pxname'], back['# pxname'].replace('.', '_')
             for metric in METRICS:
@@ -317,7 +314,7 @@ class Service(UrlService, SocketService):
                                                                 name, METRICS[metric]['algorithm'], 1,
                                                                 METRICS[metric]['divisor']])
             self.definitions['bhrsp_total']['lines'].append(['_'.join(['backend', 'hrsp_total', idx]),
-                                                            name, 'incremental', 1, 1])
+                                                             name, 'incremental', 1, 1])
             for metric in BACKEND_METRICS:
                 self.definitions['b' + metric]['lines'].append(['_'.join(['backend', metric, idx]),
                                                                 name, BACKEND_METRICS[metric]['algorithm'], 1,

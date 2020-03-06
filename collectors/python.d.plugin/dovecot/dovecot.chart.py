@@ -5,9 +5,7 @@
 
 from bases.FrameworkServices.SocketService import SocketService
 
-
 UNIX_SOCKET = '/var/run/dovecot/stats'
-
 
 ORDER = [
     'sessions',
@@ -51,7 +49,8 @@ CHARTS = {
         ]
     },
     'context_switches': {
-        'options': [None, 'Dovecot Context Switches', 'switches', 'context switches', 'dovecot.context_switches', 'line'],
+        'options': [None, 'Dovecot Context Switches', 'switches', 'context switches', 'dovecot.context_switches',
+                    'line'],
         'lines': [
             ['vol_cs', 'voluntary', 'absolute'],
             ['invol_cs', 'involuntary', 'absolute']

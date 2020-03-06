@@ -4,12 +4,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from __future__ import division
-import json
 
+import json
 from collections import namedtuple
 
 from bases.FrameworkServices.UrlService import UrlService
-
 
 MEMSTATS_ORDER = [
     'memstats_heap',

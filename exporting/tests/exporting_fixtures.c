@@ -15,14 +15,12 @@ int teardown_configured_engine(void **state)
 {
     struct engine *engine = *state;
 
-    struct instance *instance = engine->connector_root->instance_root;
+    struct instance *instance = engine->instance_root;
     free((void *)instance->config.destination);
     free((void *)instance->config.name);
     simple_pattern_free(instance->config.charts_pattern);
     simple_pattern_free(instance->config.hosts_pattern);
     free(instance);
-
-    free(engine->connector_root);
 
     free((void *)engine->config.prefix);
     free((void *)engine->config.hostname);
@@ -122,8 +120,8 @@ int teardown_initialized_engine(void **state)
     struct engine *engine = *state;
 
     teardown_rrdhost();
-    buffer_free(engine->connector_root->instance_root->labels);
-    buffer_free(engine->connector_root->instance_root->buffer);
+    buffer_free(engine->instance_root->labels);
+    buffer_free(engine->instance_root->buffer);
     teardown_configured_engine(state);
 
     return 0;

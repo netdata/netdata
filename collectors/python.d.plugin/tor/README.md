@@ -1,8 +1,8 @@
-# tor
+# Tor monitoring with Netdata
 
-Module connects to tor control port to collect traffic statistics.
+Connects to the Tor control port to collect traffic statistics.
 
-**Requirements:**
+## Requirements
 
 -   `tor` program
 -   `stem` python package
@@ -14,9 +14,17 @@ It produces only one chart:
     -   read
     -   write
 
-## configuration
+## Configuration
 
-Needs only `control_port`
+Edit the `python.d/tor.conf` configuration file using `edit-config` from the your agent's [config
+directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/tor.conf
+```
+
+Needs only `control_port`.
 
 Here is an example for local server:
 

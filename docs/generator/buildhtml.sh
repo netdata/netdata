@@ -18,12 +18,13 @@ SRC_DIR="${GENERATOR_DIR}/src"
 GO_D_DIR="collectors/go.d.plugin"
 rm -rf ${GO_D_DIR}
 git clone https://github.com/netdata/go.d.plugin.git ${GO_D_DIR}
+find "${GO_D_DIR}" -maxdepth 1 -mindepth 1 -type d ! -name modules -exec rm -rf '{}' \;
 
 # Copy all Netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
 rm -rf ${SRC_DIR}
 mkdir ${SRC_DIR}
-find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -exec cp -prv --parents '{}' ./${SRC_DIR}/ ';'
+find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -exec cp -pr --parents '{}' ./${SRC_DIR}/ ';'
 
 # Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
@@ -34,6 +35,9 @@ sed -i -e '0,/# Netdata /s//# Netdata Documentation\n\n/' ${SRC_DIR}/README.md
 
 # Remove all GA tracking code
 find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
+
+# Use h1 heading as page title for collectors pages
+find ${SRC_DIR}/collectors/  -type f -name 'README.md' -exec sed -i -e '1 s|^# \(.*\)|title: \1\n---\n\n# \1\n|' {} \;
 
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
@@ -91,7 +95,7 @@ prep_html() {
 
 }
 
-for d in "en" "zh" "pt" ; do
+for d in "en" "kr" "zh" "pt" ; do
 	echo "Preparing source for $d"
 	cp -r ${SRC_DIR} ${DOCS_DIR}
 	if [ "${d}" != "en" ] ; then

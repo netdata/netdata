@@ -4,13 +4,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
-
 from collections import defaultdict
 from subprocess import Popen
 
-from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
-
+from bases.collection import find_binary
 
 update_every = 30
 

@@ -36,7 +36,7 @@ static inline const char* get_release_channel() {
     return (use_stable)?"stable":"nightly";
 }
 
-void charts2json(RRDHOST *host, BUFFER *wb) {
+void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile) {
     static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
@@ -76,7 +76,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, st->id);
             buffer_strcat(wb, "\": ");
-            rrdset2json(st, wb, &dimensions, &memory);
+            rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
             c++;
             st->last_accessed_time = now;

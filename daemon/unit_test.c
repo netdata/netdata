@@ -1491,6 +1491,9 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
 {
+    /* We don't want to drop metrics when generating load, we prefer to block data generation itself */
+    rrdeng_drop_metrics_under_page_cache_pressure = 0;
+
     return rrdhost_find_or_create(
             name
             , name

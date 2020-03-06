@@ -189,7 +189,8 @@ CHARTS = {
         'lines': []
     },
     'commands_duration': {
-        'options': [None, 'ProxySQL Commands Duration', 'milliseconds', 'commands', 'proxysql.commands_duration', 'line'],
+        'options': [None, 'ProxySQL Commands Duration', 'milliseconds', 'commands', 'proxysql.commands_duration',
+                    'line'],
         'lines': []
     }
 }
