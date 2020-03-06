@@ -17,7 +17,7 @@ on:
       - 'netdata-installer.sh'
 jobs:
   install:
-    name: Installer
+    name: Install
     strategy:
       matrix:
         distro:
@@ -60,7 +60,8 @@ jobs:
           - distro: 'debian:buster'
             pre: 'apt-get update'
           - distro: 'debian:jessie'
-            pre: '/bin/sh -c "echo deb http://archive.debian.org/debian/ jessie-backports main contrib non-free >> /etc/apt/sources.list.d/99-archived.list && apt-get update -o Acquire::Check-Valid-Until=false"'
+            pre: <
+              /bin/sh -c 'echo "deb http://archive.debian.org/debian/ jessie-backports main contrib non-free" >> /etc/apt/sources.list.d/99-archived.list && apt-get update -o Acquire::Check-Valid-Until=false'
           - distro: 'debian:stretch'
             pre: 'apt-get update'
 
