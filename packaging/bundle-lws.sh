@@ -14,4 +14,4 @@ cmake -D LWS_WITH_SOCKS5:boolean=YES . || exit 1
 make || exit 1
 cd "${startdir}" || exit 1
 cp -a "${LWS_BUILD_PATH}/lib/libwebsockets.a" "${1}/externaldeps/libwebsockets" || exit 1
-cp -ra "${LWS_BUILD_PATH}/include" "${1}/externaldeps/libwebsockets" || exit 1
+cp -a "${LWS_BUILD_PATH}/include" "${1}/externaldeps/libwebsockets" || exit 1
