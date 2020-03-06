@@ -752,6 +752,7 @@ declare -A pkg_netcat=(
   ['rhel']="nmap-ncat"
   ['suse']="netcat-openbsd"
   ['clearlinux']="sysadmin-basic"
+  ['arch']="gnu-netcat"
   ['default']="netcat"
 
   # exceptions
