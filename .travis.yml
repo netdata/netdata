@@ -108,15 +108,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
     - stage: Artifacts validation
-      name: Unit Testing
-      script:
-        - .travis/run-unit-tests.sh
-      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
-      # We need a full deep clone for the checks done by the unit testing script to work.
-      git:
-        depth: false
-      after_failure: post_message "TRAVIS_MESSAGE" "Unit testing failed"
-
     - name: Build/Install for ubuntu 18.04 (not containerized)
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
