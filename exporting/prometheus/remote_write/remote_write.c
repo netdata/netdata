@@ -166,20 +166,16 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
 
     add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
-    // TODO: use labels instead of tags
-    if(host->tags && *(host->tags)) {
-        char tags[PROMETHEUS_LABELS_MAX + 1];
-        strncpy(tags, host->tags, PROMETHEUS_LABELS_MAX);
-        char *words[PROMETHEUS_LABELS_MAX_NUMBER] = {NULL};
-        int i;
+    if (unlikely(sending_labels_configured(instance))) {
+        rrdhost_check_rdlock(host);
+        netdata_rwlock_rdlock(&host->labels_rwlock);
+        for (struct label *label = host->labels; label; label = label->next) {
+            if (!should_send_label(instance, label))
+                continue;
 
-        remote_write_split_words(tags, words, PROMETHEUS_LABELS_MAX_NUMBER);
-
-        add_host_info("netdata_host_tags_info", hostname, NULL, NULL, now_realtime_usec() / USEC_PER_MS);
-
-        for(i = 0; words[i] != NULL && words[i + 1] != NULL && (i + 1) < PROMETHEUS_LABELS_MAX_NUMBER; i += 2) {
-            add_tag(words[i], words[i + 1]);
+            add_tag(label->key, label->value);
         }
+        netdata_rwlock_unlock(&host->labels_rwlock);
     }
 
     return 0;
