@@ -1,0 +1,22 @@
+---
+name: Checks
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  checks:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: Run checksum checks on kickstart files
+        env:
+          LOCAL_ONLY: "true"
+        run: |
+          ./tests/installer/checksums.sh
+      - name: Web Dashboard pre-generated file consistency checks (dashboard.js)
+        run: |
+          cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js

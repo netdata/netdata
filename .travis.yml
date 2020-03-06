@@ -46,7 +46,6 @@ notifications:
 #
 stages:
   # Mandatory runs, we always want these executed
-  - name: Code quality, linting, syntax, code style
   - name: Build process
   - name: Artifacts validation
   - name: Artifacts validation on bare OS, stable to current lifecycle checks
@@ -97,22 +96,6 @@ jobs:
   allow_failures:
     - env: ALLOW_SOFT_FAILURE_HERE=true
   include:
-      # Do code quality, syntax checking and other pre-build activities
-    - stage: Code quality, linting, syntax, code style
-
-      name: Run shellchecking on BASH
-      script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
-
-      # This falls under same stage defined earlier
-    - name: Run checksum checks on kickstart files
-      script: ./tests/installer/checksums.sh
-      env: LOCAL_ONLY="true"
-
-      # This falls under same stage defined earlier
-    - name: Web Dashboard pre-generated file consistency checks (dashboard.js)
-      script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
-
-
       # Ensure netdata code builds successfully
     - stage: Build process
 
