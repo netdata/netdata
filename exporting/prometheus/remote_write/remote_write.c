@@ -134,8 +134,6 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
     prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
     if(likely(can_send_rrdset(instance, st))) {
-        rrdset_rdlock(st);
-
         as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
         homogeneous = 1;
         if(as_collected) {
