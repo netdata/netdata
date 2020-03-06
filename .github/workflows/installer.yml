@@ -17,7 +17,7 @@ on:
       - 'netdata-installer.sh'
 jobs:
   install:
-    name: netdata-installer.sh
+    name: Installer
     strategy:
       matrix:
         distro:
