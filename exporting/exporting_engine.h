@@ -123,6 +123,7 @@ struct instance {
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
 
+    void (*send_header)(int *sock, struct instance *instance);
     int (*response_checker)(BUFFER *buffer, struct instance *instance);
 
     void *connector_specific_data;

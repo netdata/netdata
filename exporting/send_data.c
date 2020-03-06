@@ -98,6 +98,9 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     struct stats *stats = &instance->stats;
 
+    if (instance->send_header)
+        instance->send_header(sock, instance);
+
     ssize_t written;
     written = send(*sock, buffer_tostring(buffer), len, flags);
 

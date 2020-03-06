@@ -51,6 +51,40 @@ static inline void remote_write_split_words(char *str, char **words, int max_wor
 }
 
 /**
+ * Send header to a server
+ *
+ * @param sock a communication socket.
+ * @param instance an instance data structure.
+ */
+void prometheus_remote_write_send_header(int *sock, struct instance *instance)
+{
+    int flags = 0;
+#ifdef MSG_NOSIGNAL
+    flags += MSG_NOSIGNAL;
+#endif
+
+    struct prometheus_remote_write_specific_config *connector_specific_config = instance->config.connector_specific_config;
+
+    static BUFFER *header;
+    if(!header)
+        header = buffer_create(0);
+
+    buffer_sprintf(
+        header,
+        "POST %s HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Accept: */*\r\n"
+        "Content-Length: %zu\r\n"
+        "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
+        connector_specific_config->remote_write_path,
+        instance->engine->config.hostname,
+        buffer_strlen((BUFFER *)instance->buffer));
+
+    send(*sock, buffer_tostring(header), buffer_strlen(header), flags);
+    buffer_flush(header);
+}
+
+/**
  * Process a responce received after Prometheus remote write connector had sent data
  *
  * @param buffer a response from a remote service.
@@ -96,6 +130,7 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = format_batch_prometheus_remote_write;
 
+    instance->send_header = prometheus_remote_write_send_header;
     instance->response_checker = process_prometheus_remote_write_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -267,19 +302,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
         return 1;
     }
 
-    struct prometheus_remote_write_specific_config *connector_specific_config = instance->config.connector_specific_config;
     BUFFER *buffer = instance->buffer;
-
-    buffer_sprintf(
-        buffer,
-        "POST %s HTTP/1.1\r\n"
-        "Host: %s\r\n"
-        "Accept: */*\r\n"
-        "Content-Length: %zu\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
-        connector_specific_config->remote_write_path,
-        instance->engine->config.hostname,
-        data_size);
 
     buffer_need_bytes(buffer, data_size);
     if (unlikely(pack_and_clear_write_request(buffer->buffer, &data_size))) {
