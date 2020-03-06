@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+      - name: Prerequisite Deps
+        run: |
+          ./packaging/installer/install-required-deps.sh --dont-wait --non-interactive netdata
       - name: Run checksum checks on kickstart files
         env:
           LOCAL_ONLY: "true"
