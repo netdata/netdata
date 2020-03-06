@@ -131,7 +131,7 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->end_batch_formatting = format_batch_prometheus_remote_write;
 
     instance->send_header = prometheus_remote_write_send_header;
-    instance->response_checker = process_prometheus_remote_write_response;
+    instance->check_response = process_prometheus_remote_write_response;
 
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {

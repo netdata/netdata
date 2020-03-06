@@ -76,7 +76,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 
     // if we received data, process them
     if (buffer_strlen(response))
-        instance->response_checker(response, instance);
+        instance->check_response(response, instance);
 }
 
 /**
