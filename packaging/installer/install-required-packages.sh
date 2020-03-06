@@ -1660,6 +1660,17 @@ if [ -z "${1}" ]; then
   exit 1
 fi
 
+pv=$(python --version 2>&1)
+if [[ "${pv}" =~ ^Python\ 2.* ]]; then
+  pv=2
+elif [[ "${pv}" =~ ^Python\ 3.* ]]; then
+  pv=3
+elif [[ "${tree}" == "centos" ]] && [ "${version}" -lt 8 ]; then
+  pv=2
+else
+  pv=3
+fi
+
 # parse command line arguments
 DONT_WAIT=0
 NON_INTERACTIVE=0
@@ -1701,17 +1712,24 @@ while [ -n "${1}" ]; do
     netdata-all)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_NODEJS=1
-      PACKAGES_NETDATA_PYTHON=1
-      PACKAGES_NETDATA_PYTHON_MYSQL=1
-      PACKAGES_NETDATA_PYTHON_POSTGRES=1
-      PACKAGES_NETDATA_PYTHON_MONGO=1
+      if [ "${pv}" -eq 2 ] ; then
+        PACKAGES_NETDATA_PYTHON=1
+        PACKAGES_NETDATA_PYTHON_MYSQL=1
+        PACKAGES_NETDATA_PYTHON_POSTGRES=1
+        PACKAGES_NETDATA_PYTHON_MONGO=1
+      else
+        PACKAGES_NETDATA_PYTHON3=1
+        PACKAGES_NETDATA_PYTHON3_MYSQL=1
+        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
+        PACKAGES_NETDATA_PYTHON3_MONGO=1
+      fi
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
       ;;
 
     netdata)
       PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_PYTHON=1
+      PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_DATABASE=1
       ;;
 
@@ -1724,18 +1742,33 @@ while [ -n "${1}" ]; do
       ;;
 
     python-mysql | mysql-python | mysqldb | netdata-mysql)
-      PACKAGES_NETDATA_PYTHON=1
-      PACKAGES_NETDATA_PYTHON_MYSQL=1
+      if [ "${pv}" -eq 2 ] ; then
+        PACKAGES_NETDATA_PYTHON=1
+        PACKAGES_NETDATA_PYTHON_MYSQL=1
+      else
+        PACKAGES_NETDATA_PYTHON3=1
+        PACKAGES_NETDATA_PYTHON3_MYSQL=1
+      fi
       ;;
 
     python-postgres | postgres-python | psycopg2 | netdata-postgres)
-      PACKAGES_NETDATA_PYTHON=1
-      PACKAGES_NETDATA_PYTHON_POSTGRES=1
+      if [ "${pv}" -eq 2 ] ; then
+        PACKAGES_NETDATA_PYTHON=1
+        PACKAGES_NETDATA_PYTHON_POSTGRES=1
+      else
+        PACKAGES_NETDATA_PYTHON3=1
+        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
+      fi
       ;;
 
     python-pymongo)
-      PACKAGES_NETDATA_PYTHON=1
-      PACKAGES_NETDATA_PYTHON_MONGO=1
+      if [ "${pv}" -eq 2 ] ; then
+        PACKAGES_NETDATA_PYTHON=1
+        PACKAGES_NETDATA_PYTHON_MONGO=1
+      else
+        PACKAGES_NETDATA_PYTHON3=1
+        PACKAGES_NETDATA_PYTHON3_MONGO=1
+      fi
       ;;
 
     nodejs | netdata-nodejs)
@@ -1746,7 +1779,7 @@ while [ -n "${1}" ]; do
 
     sensors | netdata-sensors)
       PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_PYTHON=1
+      PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
       ;;
@@ -1762,11 +1795,17 @@ while [ -n "${1}" ]; do
     demo | all)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_NODEJS=1
-      PACKAGES_NETDATA_PYTHON=1
-      PACKAGES_NETDATA_PYTHON3=1
-      PACKAGES_NETDATA_PYTHON_MYSQL=1
-      PACKAGES_NETDATA_PYTHON_POSTGRES=1
-      PACKAGES_NETDATA_PYTHON_MONGO=1
+      if [ "${pv}" -eq 2 ] ; then
+        PACKAGES_NETDATA_PYTHON=1
+        PACKAGES_NETDATA_PYTHON_MYSQL=1
+        PACKAGES_NETDATA_PYTHON_POSTGRES=1
+        PACKAGES_NETDATA_PYTHON_MONGO=1
+      else
+        PACKAGES_NETDATA_PYTHON3=1
+        PACKAGES_NETDATA_PYTHON3_MYSQL=1
+        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
+        PACKAGES_NETDATA_PYTHON3_MONGO=1
+      fi
       PACKAGES_DEBUG=1
       PACKAGES_IPRANGE=1
       PACKAGES_FIREHOL=1
@@ -1813,19 +1852,6 @@ if [ -z "${package_installer}" ] || [ -z "${tree}" ]; then
 
   # Validate package manager trees
   validate_package_trees
-fi
-
-pv=$(python --version 2>&1)
-if [[ "${pv}" =~ ^Python\ 2.* ]]; then
-  pv=2
-elif [[ "${pv}" =~ ^Python\ 3.* ]]; then
-  pv=3
-  PACKAGES_NETDATA_PYTHON3=1
-elif [[ "${tree}" == "centos" ]] && [ "${version}" -lt 8 ]; then
-  pv=2
-else
-  pv=3
-  PACKAGES_NETDATA_PYTHON3=1
 fi
 
 [ "${detection}" = "/etc/os-release" ] && cat << EOF
