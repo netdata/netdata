@@ -1032,6 +1032,7 @@ declare -A pkg_ulogd=(
   ['rhel']="WARNING|"
   ['clearlinux']="WARNING|"
   ['gentoo']="app-admin/ulogd"
+  ['arch']="ulogd"
   ['default']="ulogd2"
 )
 
