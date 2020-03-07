@@ -6,10 +6,17 @@
 
 **Merged pull requests:**
 
+- Fixed dependency names for Arch Linux. [\#8334](https://github.com/netdata/netdata/pull/8334) ([Ferroin](https://github.com/Ferroin))
+- Rename the review workflow and be consistent about workflow and job names. [\#8332](https://github.com/netdata/netdata/pull/8332) ([prologic](https://github.com/prologic))
+- Add retries for more Travis transient failures [\#8327](https://github.com/netdata/netdata/pull/8327) ([prologic](https://github.com/prologic))
+- Removed extra printed `\n` [\#8326](https://github.com/netdata/netdata/pull/8326) ([Jiab77](https://github.com/Jiab77))
+- Removed extra printed `\n` [\#8325](https://github.com/netdata/netdata/pull/8325) ([Jiab77](https://github.com/Jiab77))
+- Removed extra printed `\n` [\#8324](https://github.com/netdata/netdata/pull/8324) ([Jiab77](https://github.com/Jiab77))
 - Switched to using Python 3 by default instead of Python 2. [\#8318](https://github.com/netdata/netdata/pull/8318) ([Ferroin](https://github.com/Ferroin))
 - Fixed missing folders in `/var/` by creating them during postinst [\#8314](https://github.com/netdata/netdata/pull/8314) ([SamK](https://github.com/SamK))
 - Add standards for abbreviations/acronyms to docs style guide [\#8313](https://github.com/netdata/netdata/pull/8313) ([joelhans](https://github.com/joelhans))
 - Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
+- Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 - ACLK  cmake fixes [\#8280](https://github.com/netdata/netdata/pull/8280) ([underhood](https://github.com/underhood))
 - Added ability to change ID used to connect to ceph. [\#8276](https://github.com/netdata/netdata/pull/8276) ([paulmezz](https://github.com/paulmezz))
 - Added libwebsockets files to `make dist`. [\#8275](https://github.com/netdata/netdata/pull/8275) ([Ferroin](https://github.com/Ferroin))
@@ -27,6 +34,7 @@
 - fixed typo [\#8213](https://github.com/netdata/netdata/pull/8213) ([shortpatti](https://github.com/shortpatti))
 - Retry transient failures from our lifecycle tests on Travis CI [\#8203](https://github.com/netdata/netdata/pull/8203) ([prologic](https://github.com/prologic))
 - Fix RHEL / CentOS 8.x dependencies for Judy-devel and others [\#8202](https://github.com/netdata/netdata/pull/8202) ([prologic](https://github.com/prologic))
+- Remvoed the use of clang-format that does not actually block PRs or surface anything to developers \#8188 [\#8196](https://github.com/netdata/netdata/pull/8196) ([prologic](https://github.com/prologic))
 - Fix bold text surplus stars [\#8193](https://github.com/netdata/netdata/pull/8193) ([grinapo](https://github.com/grinapo))
 - Add support to new kernels [\#8192](https://github.com/netdata/netdata/pull/8192) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added eBPF to docs navigation and improved title [\#8191](https://github.com/netdata/netdata/pull/8191) ([joelhans](https://github.com/joelhans))
