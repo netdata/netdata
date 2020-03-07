@@ -752,6 +752,7 @@ declare -A pkg_netcat=(
   ['rhel']="nmap-ncat"
   ['suse']="netcat-openbsd"
   ['clearlinux']="sysadmin-basic"
+  ['arch']="gnu-netcat"
   ['default']="netcat"
 
   # exceptions
@@ -948,6 +949,7 @@ declare -A pkg_lz4=(
   ['suse']="liblz4-devel"
   ['gentoo']="app-arch/lz4"
   ['clearlinux']="devpkg-lz4"
+  ['arch']="lz4"
   ['default']="lz4-devel"
 )
 
@@ -967,6 +969,7 @@ declare -A pkg_openssl=(
   ['ubuntu']="libssl-dev"
   ['suse']="libopenssl-devel"
   ['clearlinux']="devpkg-openssl"
+  ['arch']="openssl"
   ['default']="openssl-devel"
 )
 

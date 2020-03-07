@@ -6,21 +6,22 @@
 
 **Merged pull requests:**
 
-- Added yamllint to reviewdog PR checks. [\#8291](https://github.com/netdata/netdata/pull/8291) ([Ferroin](https://github.com/Ferroin))
-- Fixed Travis CI build handling. [\#8288](https://github.com/netdata/netdata/pull/8288) ([Ferroin](https://github.com/Ferroin))
+- Switched to using Python 3 by default instead of Python 2. [\#8318](https://github.com/netdata/netdata/pull/8318) ([Ferroin](https://github.com/Ferroin))
+- Fixed missing folders in `/var/` by creating them during postinst [\#8314](https://github.com/netdata/netdata/pull/8314) ([SamK](https://github.com/SamK))
+- Add standards for abbreviations/acronyms to docs style guide [\#8313](https://github.com/netdata/netdata/pull/8313) ([joelhans](https://github.com/joelhans))
+- Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
+- ACLK  cmake fixes [\#8280](https://github.com/netdata/netdata/pull/8280) ([underhood](https://github.com/underhood))
 - Added ability to change ID used to connect to ceph. [\#8276](https://github.com/netdata/netdata/pull/8276) ([paulmezz](https://github.com/paulmezz))
 - Added libwebsockets files to `make dist`. [\#8275](https://github.com/netdata/netdata/pull/8275) ([Ferroin](https://github.com/Ferroin))
 - Fixed misplaced commas in help disable strings [\#8266](https://github.com/netdata/netdata/pull/8266) ([FlyingSixtySix](https://github.com/FlyingSixtySix))
 - Disable Schema tag in documentation [\#8264](https://github.com/netdata/netdata/pull/8264) ([joelhans](https://github.com/joelhans))
 - Tweak eBPF documentation and add performance data [\#8261](https://github.com/netdata/netdata/pull/8261) ([joelhans](https://github.com/joelhans))
-- Revert "Added Docker build tests to PR checks." [\#8260](https://github.com/netdata/netdata/pull/8260) ([Ferroin](https://github.com/Ferroin))
 - python.d/ceph: fix get\_osd\_perf\(\) for 14.2+ [\#8248](https://github.com/netdata/netdata/pull/8248) ([ilyam8](https://github.com/ilyam8))
 - Adapt the claiming script to new API responses [\#8245](https://github.com/netdata/netdata/pull/8245) ([hmoragrega](https://github.com/hmoragrega))
 - vernemq alarms, dashboard info and godplugin new version [\#8236](https://github.com/netdata/netdata/pull/8236) ([ilyam8](https://github.com/ilyam8))
 - Fix misspelling of openSUSE and SUSE [\#8233](https://github.com/netdata/netdata/pull/8233) ([m-rey](https://github.com/m-rey))
 - Implement OpenGraph and basic Schema tags [\#8224](https://github.com/netdata/netdata/pull/8224) ([joelhans](https://github.com/joelhans))
 - Adding support for ACLK build-configuration [\#8223](https://github.com/netdata/netdata/pull/8223) ([amoss](https://github.com/amoss))
-- Removed reviewdog golang check. [\#8221](https://github.com/netdata/netdata/pull/8221) ([Ferroin](https://github.com/Ferroin))
 - Fix claiming script to reflect API changes on netdata.cloud [\#8220](https://github.com/netdata/netdata/pull/8220) ([cosmix](https://github.com/cosmix))
 - packaging/installer: fix bundle\_libwebsockets [\#8219](https://github.com/netdata/netdata/pull/8219) ([ilyam8](https://github.com/ilyam8))
 - fixed typo [\#8213](https://github.com/netdata/netdata/pull/8213) ([shortpatti](https://github.com/shortpatti))
@@ -201,7 +202,6 @@
 - Fix setuid for freeipmi.plugin in Docker images [\#7684](https://github.com/netdata/netdata/pull/7684) ([lassebm](https://github.com/lassebm))
 - Fixes for pfSense Installation [\#7665](https://github.com/netdata/netdata/pull/7665) ([prologic](https://github.com/prologic))
 - Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
-- Restrict quotes in label values [\#7594](https://github.com/netdata/netdata/pull/7594) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

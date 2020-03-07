@@ -1,5 +1,8 @@
-name: reviewdog
-on: [pull_request]
+---
+# Runs various ReviewDog based checks against PR with suggested changes to improve quality
+name: Review
+on:
+  pull_request:
 jobs:
   eslint:
     name: eslint
@@ -7,7 +10,7 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: eslint
+      - name: Run eslint
         uses: reviewdog/action-eslint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -20,7 +23,7 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: shellcheck
+      - name: Run shellcheck
         uses: reviewdog/action-shellcheck@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -35,7 +38,7 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: yamllint
+      - name: Run yamllint
         uses: reviewdog/action-yamllint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
