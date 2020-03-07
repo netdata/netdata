@@ -668,7 +668,7 @@ if ENABLE_PLUGIN_CGROUP_NETWORK
         $(NULL)
 endif
 
-if ENABLE_PLUGIN_NETWORK_VIEWER
+if ENABLE_PLUGIN_EBPF
     plugins_PROGRAMS += networkviewer.plugin
     networkviewer_plugin_SOURCES = $(NETWORKVIEWER_PLUGIN_FILES)
     networkviewer_plugin_LDADD = \
