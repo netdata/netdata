@@ -46,6 +46,9 @@ override_dh_install: debian/netdata.postinst
 	cp -rp $(TEMPTOP)/usr $(TOP)
 	cp -rp $(TEMPTOP)/var $(TOP)
 	cp -rp $(TEMPTOP)/etc $(TOP)
+	mkdir -p "$(TOP)/var/log/netdata"
+	mkdir -p "$(TOP)/var/cache/netdata"
+	mkdir -p "$(TOP)/var/run/netdata"
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#

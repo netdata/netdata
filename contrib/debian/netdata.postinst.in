@@ -38,6 +38,14 @@ case "$1" in
               dpkg-statoverride --update --add netdata netdata 0755 /var/cache/netdata
           fi
 
+          if ! dpkg-statoverride --list /var/run/netdata >/dev/null 2>&1; then
+              dpkg-statoverride --update --add netdata netdata 0755 /var/run/netdata
+          fi
+
+          if ! dpkg-statoverride --list /var/log/netdata >/dev/null 2>&1; then
+              dpkg-statoverride --update --add netdata adm 02750 /var/log/netdata
+          fi
+
         fi
 
         dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry
