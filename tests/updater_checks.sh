@@ -25,9 +25,7 @@ blind_arch_grep_install() {
 }
 blind_arch_grep_install || echo "Workaround failed, proceed as usual"
 
-running_os="$(cat /etc/os-release |grep '^ID=' | cut -d'=' -f2 | sed -e 's/"//g')"
-# Special case for older centos
-[[ -f /etc/centos-release ]] && [[ -z "${running_os}" ]] && running_os="$(cat /etc/centos-release | grep "CentOS release 6" | cut -d' ' -f 1)"
+running_os="$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | sed -e 's/"//g')"
 
 case "${running_os}" in
 "centos"|"fedora"|"CentOS")
@@ -65,20 +63,9 @@ case "${running_os}" in
 	;;
 esac
 
-# Download and run depednency scriptlet, before anything else
+# Run depednency scriptlet, before anything else
 #
-deps_tool="/tmp/deps_tool.$$.sh"
-curl -Ss -o ${deps_tool} https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh
-if [ -f "${deps_tool}" ]; then
-	echo "Running dependency handling script.."
-	chmod +x "${deps_tool}"
-	${deps_tool} --non-interactive netdata
-	rm -f "${deps_tool}"
-	echo "Done!"
-else
-	echo "Failed to fetch dependency script, aborting the test"
-	exit 1
-fi
+./packaging/installer/install-required-packages.sh --non-interactive netdata
 
 echo "Running BATS file.."
 bats --tap tests/updater_checks.bats

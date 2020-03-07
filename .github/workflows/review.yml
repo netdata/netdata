@@ -1,13 +1,16 @@
-name: reviewdog
-on: [pull_request]
+---
+# Runs various ReviewDog based checks against PR with suggested changes to improve quality
+name: Review
+on:
+  pull_request:
 jobs:
   eslint:
-    name: runner / eslint
+    name: eslint
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: eslint
+      - name: Run eslint
         uses: reviewdog/action-eslint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -15,12 +18,12 @@ jobs:
           eslint_flags: '.'
 
   shellcheck:
-    name: runner / shellcheck
+    name: shellcheck
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: shellcheck
+      - name: Run shellcheck
         uses: reviewdog/action-shellcheck@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -28,3 +31,15 @@ jobs:
           path: "."
           pattern: "*.sh*"
           exclude: "./.git/*"
+
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: Run yamllint
+        uses: reviewdog/action-yamllint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check

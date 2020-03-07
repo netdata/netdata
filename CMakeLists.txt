@@ -614,9 +614,15 @@ set(CLAIM_PLUGIN_FILES
 set(ACLK_PLUGIN_FILES
         aclk/agent_cloud_link.c
         aclk/agent_cloud_link.h
-        aclk/agent_cloud_link.c
+        aclk/aclk_lws_wss_client.c
+        aclk/aclk_lws_wss_client.h
         aclk/mqtt.c
         aclk/mqtt.h
+        )
+
+set(ACLK_STATIC_LIBS
+        ${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a
+        ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a
         )
 
 set(EXPORTING_ENGINE_FILES
@@ -693,8 +699,7 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${ACLK_PLUGIN_FILES}
-        )
+)
 
 set(NETDATACLI_FILES
         daemon/commands.h
@@ -771,10 +776,37 @@ ELSE()
     message(STATUS "mongodb backend: disabled (requires mongoc library)")
 ENDIF()
 
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
+
+IF("$ENV{ACLK}")
+    set(ACLK_CAN_BUILD 1)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
+        message(WARNING "Static build of mosquitto not found. Disabling ACLK")
+        set(ACLK_CAN_BUILD 0)
+    ENDIF()
+
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
+        message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
+        set(ACLK_CAN_BUILD 0)
+    ENDIF()
+
+    IF(ACLK_CAN_BUILD)
+        message(STATUS "agent-cloud-link: enabled")
+        list(APPEND NETDATA_FILES ${ACLK_PLUGIN_FILES})
+        list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_STATIC_LIBS})
+        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
+        IF(LINUX AND CAP_FOUND)
+            list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
+            list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
+            list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
+        ENDIF()
+    ELSE()
+        message(STATUS "agent-cloud-link: disabled")
+    ENDIF()
+ENDIF()
+
 # -----------------------------------------------------------------------------
 # netdata
-
-set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
 IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}

@@ -417,7 +417,7 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
-    clear-linux* | clearlinux* )
+    clear-linux* | clearlinux*)
       package_installer="install_swupd"
       tree="clearlinux"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${swupd}" ]; then
@@ -752,6 +752,7 @@ declare -A pkg_netcat=(
   ['rhel']="nmap-ncat"
   ['suse']="netcat-openbsd"
   ['clearlinux']="sysadmin-basic"
+  ['arch']="gnu-netcat"
   ['default']="netcat"
 
   # exceptions
@@ -948,6 +949,7 @@ declare -A pkg_lz4=(
   ['suse']="liblz4-devel"
   ['gentoo']="app-arch/lz4"
   ['clearlinux']="devpkg-lz4"
+  ['arch']="lz4"
   ['default']="lz4-devel"
 )
 
@@ -967,6 +969,7 @@ declare -A pkg_openssl=(
   ['ubuntu']="libssl-dev"
   ['suse']="libopenssl-devel"
   ['clearlinux']="devpkg-openssl"
+  ['arch']="openssl"
   ['default']="openssl-devel"
 )
 
@@ -1337,12 +1340,16 @@ validate_tree_centos() {
       fi
     fi
 
-    echo >&2 " > Checking for getpagespeed-extras ..."
-    if ! run yum ${sudo} repolist | grep 'getpagespeed-extras'; then
-      if prompt "PowerTools not found, shall I install it?"; then
-        run ${sudo} yum ${opts} install https://extras.getpagespeed.com/release-el8-latest.rpm
+    echo >&2 " > Checking for Okay ..."
+    if ! rpm -qa | grep okay > /dev/null; then
+      if prompt "okay not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
       fi
     fi
+
+    echo >&2 " > Installing Judy-devel directly ..."
+    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
+
   elif [[ "${version}" =~ ^6\..*$ ]]; then
     echo >&2 " > Detected CentOS 6.x ..."
     echo >&2 " > Checking for Okay ..."
@@ -1351,6 +1358,7 @@ validate_tree_centos() {
         run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm
       fi
     fi
+
   fi
 }
 
@@ -1828,8 +1836,11 @@ if [[ "${pv}" =~ ^Python\ 2.* ]]; then
 elif [[ "${pv}" =~ ^Python\ 3.* ]]; then
   pv=3
   PACKAGES_NETDATA_PYTHON3=1
-else
+elif [[ "${tree}" == "centos" ]] && [ "${version}" -lt 8 ]; then
   pv=2
+else
+  pv=3
+  PACKAGES_NETDATA_PYTHON3=1
 fi
 
 [ "${detection}" = "/etc/os-release" ] && cat << EOF
