@@ -1,0 +1,39 @@
+---
+name: Checks
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  checksum-checks:
+    name: Checksums
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: Run checksum checks on kickstart files
+        env:
+          LOCAL_ONLY: "true"
+        run: |
+          ./tests/installer/checksums.sh
+  dashboard-checks:
+    name: Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: Install required packages
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
+      - name: Backup dashboard.js
+        run: |
+          cp web/gui/dashboard.js /tmp/dashboard.js
+      - name: Regenerate dashboard.js
+        run: |
+          autoreconf -ivf
+          ./configure --enable-maintainer-mode
+          make dist
+      - name: Compare generated Dashboard vs. Backed up Dashboard
+        run: |
+          diff -sNrdu /tmp/dashboard.js web/gui/dashboard.js
