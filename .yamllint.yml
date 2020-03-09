@@ -6,6 +6,9 @@ yaml-files:
   - 'collectors/python.d.plugin/*.conf'
   - 'collectors/python.d.plugin/*/*.conf'
 
+ignore: |
+    .github/commit-filter-action/node_modules
+
 rules:
   line-length:
     max: 120

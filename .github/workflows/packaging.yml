@@ -57,7 +57,8 @@ jobs:
         id: check-commit
         uses: ./.github/commit-filter-action
         with:
-          regex: "^\[Package ${{ env.ARCH }} ${{ env.FORMAT }}( ${{ env.DISTRO })?\]"
+          regex: |
+            ^\[Package ${{ env.ARCH }} ${{ env.FORMAT }}( ${{ env.DISTRO })?\]
           case-insensitive: true
       - name: Checkout
         uses: actions/checkout@v1
