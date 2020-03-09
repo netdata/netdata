@@ -1,12 +1,5 @@
 ---
 # Handles building of binary packages for the agent.
-#
-# We have one job for each distribution + CPU architecture combination
-# we build on. For each distribution, we then use the matrix functionality
-# to run separate builds for each version of that distribution we build on.
-#
-# With GHA, jobs run in parallel by default, as do individual matrix
-# instances, so all of these packages build in parallel.
 name: Packages
 on:
   # Trigger on pushes to master.
@@ -19,35 +12,96 @@ on:
     branches:
       - master
 jobs:
-  debian: &build
-    name: DEB / Debian / AMD64
+  build:
+    name: Build Packages / AMD64
     runs-on: ubuntu-latest
     env:
-      # This defines the distribution name used when selecting docker images.
-      DISTRO: debian
-      # If this is set, it specifies the upstream docker image name for
-      # the base distribution images. This is needed for OpenSUSE because
-      # they don't follow proper conventions for image naming.
-      # BASE_IMAGE: debian
-      # This defines the distribution name used when uploading to
-      # PackageCloud (which usually differs from the docker image name.
-      PKGCLOUDDISTRO: Debian
-      # This defines the package format ('deb' or 'rpm'), used when
-      # uploading to PackageCloud.
-      FORMAT: deb
       # This is the CPU Architecture for the build.
       ARCH: amd64
-      # See the comment below on version numbers for what this does.
-      ALIAS_VERSION: 1
     strategy:
       matrix:
-        # The version numbers must match up with what PackageCloud uses,
-        # meaning that they must include a '.' and a minor version (which
-        # is usually zero. We handle the discrepancies this casues
-        # for the docker images we use for the package build and test
-        # procedure internally when ALIAS_VERSION is defined in the
-        # environment.
-        versions: [8.0, 9.0, 10.0]
+        platform:
+          - debian8
+          - debian9
+          - debian10
+          - ubuntu16.04
+          - ubuntu18.04
+          - ubuntu19.10
+          - fedora30
+          - fedora31
+          - centos7
+          - opensuse15.1
+        include:
+          - platform: debian8
+            distro: debian
+            version: 8
+            pkgclouddistro: Debian
+            pkgcloudversion: 8.0
+            format: deb
+            base_image: debian
+          - platform: debian9
+            distro: debian
+            version: 9
+            pkgclouddistro: Debian
+            pkgcloudversion: 9.0
+            format: deb
+            base_image: debian
+          - platform: debian10
+            distro: debian
+            version: 10
+            pkgclouddistro: Debian
+            pkgcloudversion: 10.0
+            format: deb
+            base_image: debian
+          - platform: ubuntu16.04
+            distro: ubuntu
+            version: 16.04
+            pkgclouddistro: Ubuntu
+            pkgcloudversion: 16.04
+            format: deb
+            base_image: ubuntu
+          - platform: ubuntu18.04
+            distro: ubuntu
+            version: 18.04
+            pkgclouddistro: Ubuntu
+            pkgcloudversion: 18.04
+            format: deb
+            base_image: ubuntu
+          - platform: ubuntu19.10
+            distro: ubuntu
+            version: 19.10
+            pkgclouddistro: Ubuntu
+            pkgcloudversion: 19.10
+            format: deb
+            base_image: ubuntu
+          - platform: fedora30
+            distro: fedora
+            version: 30
+            pkgclouddistro: Fedora
+            pkgcloudversion: 30.0
+            format: rpm
+            base_image: fedora
+          - platform: fedora31
+            distro: fedora
+            version: 31
+            pkgclouddistro: Fedora
+            pkgcloudversion: 31.0
+            format: rpm
+            base_image: fedora
+          - platform: centos7
+            distro: centos
+            version: 7
+            pkgclouddistro: Enterprise Linux
+            pkgcloudversion: 7.0
+            format: rpm
+            base_image: centos
+          - platform: opensuse15.1
+            distro: opensuse
+            version: 15.1
+            pkgclouddistro: Fedora
+            pkgcloudversion: 15.1
+            format: rpm
+            base_image: opensuse/leap
       # We intentiaonally disable the fail-fast behavior so that a
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
@@ -58,7 +112,7 @@ jobs:
         uses: ./.github/commit-filter-action
         with:
           regex: |
-            ^\[Package ${{ env.ARCH }} ${{ env.FORMAT }}( ${{ env.DISTRO })?\]
+            ^\[Package ${{ env.ARCH }} ${{ matrix.format }}( ${{ matrix.distro }})?\]
           case-insensitive: true
       - name: Checkout
         uses: actions/checkout@v1
@@ -69,17 +123,9 @@ jobs:
         if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
         shell: bash
         run: |
-          # If we have variables defined for aliasing image names, do so now.
-          if [ -n "${BASE_IMAGE}" ] ; then
-            docker pull ${BASE_IMAGE}:${{ matrix.version }}
-            docker tag ${BASE_IMAGE}:${{ matrix.version }} ${DISTRO}:${{ matrix.version }}
-          fi
-          # Create apropriate aliases for the Docker image version.
-          if [ -n "${ALIAS_VERSION}" ] ; then
-            docker pull ${DISTRO}:$(echo ${{ matrix.version }} | cut -f 1 -d '.')
-            docker tag ${DISTRO}:$(echo ${{ matrix.version }} | cut -f 1 -d '.') ${DISTRO}:${{ matrix.version }}
-          else
-            docker pull ${DISTRO}:${{ matrix.version }}
+          docker pull ${{ matrix.base_image }}:${{ matrix.version }}
+          if [ "${{ matrix.base_image }}" != "${{ matrix.distro }}" ] ; then
+            docker tag ${{ matrix.base_image }}:${{ matrix.version }} ${{ matrix.distro }}:${{ matrix.version }}
           fi
       - name: Build
         if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
@@ -94,10 +140,10 @@ jobs:
           # Actually build the package.
           docker build . \
               -f packaging/Dockerfile.packaging \
-              --build-arg DISTRO=${DISTRO} \
+              --build-arg DISTRO=${{ matrix.distro }} \
               --build-arg DISTRO_VERSION=${{ matrix.version }} \
               --build-arg VERSION=$PKG_VERSION \
-              -t local/package-builder:${DISTRO}${{ matrix.version }}
+              -t local/package-builder:${{ matrix.distro }}${{ matrix.version }}
           mkdir -p artifacts
           docker run -it -v $PWD/artifacts:/artifacts local/package-builder:${DISTRO}${{ matrix.version }}
       - name: Upload
@@ -105,7 +151,7 @@ jobs:
         shell: bash
         run: |
           # This figures out the distribution ID for the upload.
-          DIST_ID="$(curl https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/distributions.json | python3 .github/parse_packagecloud_dist_id.py ${FORMAT} ${PKGCLOUDDISTRO} ${{ matrix.version }})"
+          DIST_ID="$(curl https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/distributions.json | python3 .github/parse_packagecloud_dist_id.py ${{ matrix.format }} ${{ matrix.pkgclouddistro }} ${{ matrix.pkgcloudversion }})"
           last_commit="$(git log -1 --pretty=format:"%s")"
           REPO="${{ secrets.PACKAGE_CLOUD_REPO }}"
           if echo "${last_commit}" | grep -qiE "\[build latest\]" ; then
@@ -115,58 +161,3 @@ jobs:
             curl -F "package[distro_version_id]=${BUILD_ID}" \
                  -F "package[package_file]=@${pkgfile}" \
                  https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/repos/${{ secrets.PACKAGE_CLOUD_REPO }}/packages.json || exit 1
-
-  ubuntu:
-    <<: *build
-    name: DEB / Ubuntu / amd64
-    env:
-      DISTRO: ubuntu
-      PKGCLOUDDISTRO: Ubuntu
-      FORMAT: deb
-      ARCH: amd64
-    strategy:
-      matrix:
-        versions: [16.04, 18.04, 19.10]
-      fail-fast: false
-
-  fedora:
-    <<: *build
-    name: RPM / Fedora / amd64
-    env:
-      DISTRO: fedora
-      PKGCLOUDDISTRO: Fedora
-      FORMAT: rpm
-      ARCH: amd64
-      ALIAS_VERSION: 1
-    strategy:
-      matrix:
-        versions: [30.0, 31.0]
-      fail-fast: false
-
-  centos:
-    <<: *build
-    name: RPM / CentOS & RHEL / amd64
-    env:
-      DISTRO: centos
-      PKGCLOUDDISTRO: Enterprise Linux
-      FORMAT: rpm
-      ARCH: amd64
-      ALIAS_VERSION: 1
-    strategy:
-      matrix:
-        versions: [7.0]
-      fail-fast: false
-
-  centos:
-    <<: *build
-    name: RPM / OpenSUSE / amd64
-    env:
-      DISTRO: opensuse
-      PKGCLOUDDISTRO: Enterprise Linux
-      BASE_IMAGE: opensuse/leap
-      FORMAT: rpm
-      ARCH: amd64
-    strategy:
-      matrix:
-        versions: [15.1]
-      fail-fast: false
