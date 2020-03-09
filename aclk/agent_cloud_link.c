@@ -140,7 +140,7 @@ static int create_private_key()
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 
     if (lstat(filename, &statbuf) != 0) {
-        error("Claimed agent cannot establish ACLK - private key not found '%s' failed reason=\"%s\".", filename, strerror(errno));
+        error("Claimed agent cannot establish ACLK - private key not found '%s' failed.", filename);
         return 1;
     }
     if (unlikely(statbuf.st_size == 0)) {
@@ -150,7 +150,7 @@ static int create_private_key()
 
     FILE *f = fopen(filename, "rt");
     if (unlikely(f == NULL)) {
-        error("Claimed agent cannot establish ACLK - unable to open private key '%s' failed reason=\"%s\".", filename, strerror(errno));
+        error("Claimed agent cannot establish ACLK - unable to open private key '%s'.", filename);
         return 1;
     }
 
@@ -173,9 +173,8 @@ static int create_private_key()
         freez(private_key);
         return 0;
     }
-    char * err = mallocz(130);;
-    ERR_load_crypto_strings();
-    ERR_error_string(ERR_get_error(), err);
+    char err[512];
+    ERR_error_string_n(ERR_get_error(), err, sizeof(err));
     error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
     freez(err);
 
@@ -949,6 +948,7 @@ static void aclk_main_cleanup(void *ptr)
 int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
+    int rc=1;
 
     size_t payload_len = 0;
     if (payload != NULL)
@@ -971,36 +971,47 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     }
 
     SSL_CTX *ctx = security_initialize_openssl_client();
+    if (ctx==NULL) {
+        error("Cannot allocate SSL context");
+        goto exit_sock;
+    }
     // Certificate chain: not updating the stores - do we need private CA roots?
     // Calls to SSL_CTX_load_verify_locations would go here.
     SSL *ssl = SSL_new(ctx);
+    if (ssl==NULL) {
+        error("Cannot allocate SSL");
+        goto exit_CTX;
+    }
     SSL_set_fd(ssl, sock);
     int err = SSL_connect(ssl);
     if (err!=1) {
         error("SSL_connect() failed with err=%d", err);
-        SSL_free(ssl);
-        close(sock);
-        SSL_CTX_free(ctx);
-        return 1;
+        goto exit_SSL;
     }
     err = SSL_write(ssl, b->buffer, b->len);
     if (err <= 0)
     {
         error("SSL_write() failed with err=%d", err);
-        SSL_free(ssl);
-        close(sock);
-        SSL_CTX_free(ctx);
-        return 1;
+        goto exit_SSL;
     }
     buffer_flush(b);
     int bytes_read = SSL_read(ssl, b->buffer, b->size);
-    debug(D_ACLK, "Received %d bytes in response", bytes_read);
-    b->len = bytes_read;
+    if (bytes_read >= 0) {
+        debug(D_ACLK, "Received %d bytes in response", bytes_read);
+        b->len = bytes_read;
+    }
+    else {
+        error("No response available - SSL_read()=%d", bytes_read);
+    }
     SSL_shutdown(ssl);
+    rc = 0;
+exit_SSL:
     SSL_free(ssl);
+exit_CTX:
+    SSL_CTX_free(ctx);
+exit_sock:
     close(sock);
-        SSL_CTX_free(ctx);
-    return 0;
+    return rc;
 }
 
 struct dictionary_singleton {
@@ -1058,7 +1069,7 @@ size_t base64_decode(unsigned char *input, size_t input_size, unsigned char *out
         return 0;
     }
     size_t unpadded_size = (input_size/4) * 3;
-    if ( (input_size/4) * 3 > output_size )
+    if ( unpadded_size > output_size )
     {
         error("Output buffer size %zu is too small to decode %zu into", output_size, input_size);
         return 0;
@@ -1105,7 +1116,7 @@ size_t base64_encode(unsigned char *input, size_t input_size, char *output, size
     static char lookup[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                            "abcdefghijklmnopqrstuvwxyz"
                            "0123456789+/";
-    if ((input_size/3+3)*4 >= output_size)
+    if ((input_size/3+1)*4 >= output_size)
     {
         error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input", output_size, input_size);
         return 0;
@@ -1156,11 +1167,9 @@ int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decry
 {
     int  result = RSA_private_decrypt( data_len, enc_data, decrypted, aclk_private_key, RSA_PKCS1_OAEP_PADDING);
     if (result == -1) {
-        char * err = malloc(130);
-        ERR_load_crypto_strings();
-        ERR_error_string(ERR_get_error(), err);
+        char err[512];
+        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
         error("Decryption of the challenge failed: %s", err);
-        free(err);
     }
     return result;
 }
@@ -1320,9 +1329,9 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     if (aclk_password != NULL )
         freez(aclk_password);
-    aclk_username = strdupz(agent_id);
-    aclk_password = strdupz(password.result);
-    freez(password.result);
+    if (aclk_username == NULL)
+        aclk_username = strdupz(agent_id);
+    aclk_password = password.result;
 
     buffer_free(b);
 }
