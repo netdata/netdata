@@ -107,6 +107,10 @@ jobs:
       # successfully built and tested packages for another version.
       fail-fast: false
     steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 0 # We need full history for versioning
       - name: Check Commit Message
         id: check-commit
         uses: ./.github/commit-filter-action
@@ -114,11 +118,6 @@ jobs:
           regex: |
             ^\[Package ${{ env.ARCH }} ${{ matrix.format }}( ${{ matrix.distro }})?\]
           case-insensitive: true
-      - name: Checkout
-        uses: actions/checkout@v1
-        if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
-        with:
-          fetch-depth: 0 # We need full history for versioning
       - name: Prepare Docker Images
         if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
         shell: bash
