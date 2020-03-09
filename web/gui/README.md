@@ -160,5 +160,7 @@ dashboards](custom/) or [Atlassian Confluence dashboards](confluence/) guides.
 
 ## New React Dashboard
 
-We've been working on refactoring the Dashboard code, to make adding new features and fixing bugs easier. Currently it doesn't include any noticeable changes in UI. The new Dashboard is added to the codebase, but it's not enabled by default. To enable it, please add `use react dashboard = yes` in `[Web]` section in your `netdata.conf`.
+We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
+
+The new dashboard is added to the codebase, but isn't enabled by default. To enable it, add `use react dashboard = yes` in `[web]` section in your `netdata.conf`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
  
