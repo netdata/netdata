@@ -57,9 +57,9 @@ netdata_network_t *ingoing_table = NULL;
 netdata_port_list_t *port_list = NULL;
 netdata_control_connection_t connection_controller;
 
-static char *user_config_dir = NULL;
-static char *stock_config_dir = NULL;
-static char *plugin_dir = NULL;
+static char *user_config_dir = CONFIG_DIR;
+static char *stock_config_dir = LIBCONFIG_DIR;
+static char *plugin_dir = PLUGINS_DIR;
 
 uint32_t *econn_udp = NULL;
 uint64_t *ibytes_udp = NULL;
@@ -142,7 +142,7 @@ void clean_port_index(netdata_port_stats_t *r) {
     if (ncs) {
         ncs = (netdata_port_stats_t *)avl_remove_lock(ptr, (avl *)r);
         if (ncs != r) {
-            error("[NETWORK VIEWER] Cannot remove a port");
+            //error("[NETWORK VIEWER] Cannot remove a port");
         }
     }
 }
@@ -161,6 +161,7 @@ void clean_ports(netdata_port_stats_t *clean) {
     free(clean);
 }
 
+/* NETWORK VIEWER
 void clean_connections() {
     netdata_conn_stats_t *move = connection_controller.tree->next;
     while (move) {
@@ -169,8 +170,8 @@ void clean_connections() {
         move = next;
     }
     free(connection_controller.tree);
-
 }
+ */
 
 void clean_list_ports() {
     netdata_port_list_t *move = port_list->next;
@@ -193,10 +194,11 @@ static void int_exit(int sig) {
     }
 
     unmap_memory();
-
+    /* NETWORK VIEWER
     if(connection_controller.tree) {
         clean_connections();
     }
+     */
 
     if(connection_controller.ports_ipv4) {
         clean_ports(connection_controller.ports_ipv4);
@@ -234,7 +236,7 @@ static void int_exit(int sig) {
     }
 
     if (ebytes_udp) {
-        freez(econn_udp);
+        freez(ebytes_udp);
     }
 
     if (econn_tcp) {
@@ -708,9 +710,9 @@ void *network_viewer_collector(void *ptr) {
 }
 // ----------------------------------------------------------------------
 
-static void build_complete_path(char *out, size_t length, char *filename) {
+static void build_complete_path(char *out, size_t length, char *path, char *filename) {
     if(plugin_dir){
-        snprintf(out, length, "%s/%s", plugin_dir, filename);
+        snprintf(out, length, "%s/%s", path, filename);
     } else {
         snprintf(out, length, "%s", filename);
     }
@@ -720,7 +722,7 @@ int network_viewer_load_libraries() {
     char *err = NULL;
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, "libnetdata_ebpf.so");
+    build_complete_path(lpath, 4096, plugin_dir, "libnetdata_ebpf.so");
     libnetdatanv = dlopen(lpath ,RTLD_LAZY);
     if (!libnetdatanv) {
         error("[NETWORK VIEWER] Cannot load %s.", lpath);
@@ -744,7 +746,7 @@ int network_viewer_load_libraries() {
             return -1;
         }
 
-        netdata_perf_loop_multi = dlsym(libnetdatanv, "my_perf_loop_multi");
+        netdata_perf_loop_multi = dlsym(libnetdatanv, "netdata_perf_loop_multi");
         if ((err = dlerror()) != NULL) {
             error("[NETWORK VIEWER] Cannot find my_perf_loop_multi: %s", err);
             return -1;
@@ -769,7 +771,7 @@ int network_viewer_load_libraries() {
 int network_viewer_load_ebpf() {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, "netdata_ebpf_network_viewer.o");
+    build_complete_path(lpath, 4096, plugin_dir, "netdata_ebpf_network_viewer.o");
     event_pid = getpid();
     if (load_bpf_file(lpath, event_pid) ) {
         return -1;
@@ -1203,8 +1205,16 @@ int allocate_publish_vectors() {
 
 void parse_config() {
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(!user_config_dir)
+        user_config_dir = CONFIG_DIR;
+
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(!stock_config_dir)
+        stock_config_dir = LIBCONFIG_DIR;
+
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+    if(!plugin_dir)
+        plugin_dir = PLUGINS_DIR;
 
     memset(&connection_controller,0,sizeof(connection_controller));
     avl_init_lock(&connection_controller.port_list, compare_port_value);
