@@ -403,7 +403,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     color: #00AB44;
 }
 
-.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link):hover {
+.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.installer-grid > p > a):not(.md-footer-social__link):hover {
     color: #35414A;
     border-bottom: 1px solid #35414A;
 }
@@ -455,6 +455,30 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     grid-gap: 2rem;
 }
 
+.installer-grid > p {
+    grid-column: span 2;
+    margin: 0;
+}
+
+.installer-grid > p > a {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid #AEB3B7;
+}
+
+.installer-grid > p > a:hover {
+    border: 1px solid #00AB44;
+}
+
+.installer-grid a img {
+    vertical-align: text-bottom;
+    height: 64px;
+    flex: 0 0 64px;
+    padding-right: 1rem;
+}
+
 .grid-item {
     grid-column: span 2;
     border-radius: 2px;
@@ -463,7 +487,11 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 }
 
 @media only screen and (max-width:76.25em) {
-    .grid-item {
+    .installer-grid {
+        grid-gap: 1rem;
+    }
+
+    .installer-grid > p {
         grid-column: span 4;
     }
 }
