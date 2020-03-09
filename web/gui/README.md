@@ -19,6 +19,12 @@ have to configure anything to access it, although you can adjust [your
 settings](../server/#other-netdataconf-web-section-options) in the
 `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
 
+## New React Dashboard
+
+We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
+
+The new dashboard is added to the codebase, but isn't enabled by default. To enable it, add `use react dashboard = yes` in `[web]` section in your `netdata.conf`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
+ 
 ## Navigating the standard dashboard
 
 Beyond charts, the standard dashboard can be broken down into three key areas:
@@ -157,10 +163,3 @@ For information on creating custom dashboards from scratch, see the [custom
 dashboards](custom/) or [Atlassian Confluence dashboards](confluence/) guides.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
-
-## New React Dashboard
-
-We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
-
-The new dashboard is added to the codebase, but isn't enabled by default. To enable it, add `use react dashboard = yes` in `[web]` section in your `netdata.conf`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
- 
