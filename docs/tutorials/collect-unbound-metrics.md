@@ -7,16 +7,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/c
 
 # Monitor Unbound DNS servers with Netdata
 
-[Unbound](https://nlnetlabs.nl/projects/unbound/about/) is a "validating, recursive, caching DNS resolver" from NLNet
+[Unbound](https://nlnetlabs.nl/projects/unbound/about/) is a "validating, recursive, caching Domain Name System (DNS) resolver" from NLNet
 Labs. In v1.19 of Netdata, we release a completely refactored collector for collecting real-time metrics from Unbound
 servers and displaying them in Netdata dashboards.
 
-Unbound runs on FreeBSD, OpenBSD, NetBSD, MacOS, Linux, and Windows, and supports DNS-over-TLS, which ensures that DNS
-queries and answers are all encrypted with TLS. In theory, that should reduce the risk of eavesdropping or
-man-in-the-middle attacks when communicating to DNS servers.
+Unbound runs on FreeBSD, OpenBSD, NetBSD, macOS, Linux, and Windows, and supports DNS over Transport Layer Security (TLS), which ensures that DNS queries and answers get encrypted with TLS. In theory, that should reduce the risk of eavesdropping or man-in-the-middle attacks when communicating to DNS servers.
 
-This tutorial will show you how to collect dozens of essential metrics from your Unbound servers with minimal
-configuration.
+This tutorial shows you how to collect dozens of essential metrics from your Unbound servers with minimal configuration.
 
 ## Set up your Unbound installation
 
@@ -24,7 +21,7 @@ As with all data sources, Netdata can auto-detect Unbound servers if you install
 procedure.
 
 Regardless of whether you're connecting to a local or remote Unbound server, you need to be able to access the server's
-`remote-control` interface via an IP address, FQDN, or Unix socket.
+`remote-control` interface via an IP address, Fully Qualified Domain Name (FQDN), or Unix socket.
 
 To set up the `remote-control` interface, you can use `unbound-control`. First, run `unbound-control-setup` to generate
 the TLS key files that will encrypt connections to the remote interface. Then add the following to the end of your
