@@ -109,6 +109,7 @@ BuildRequires: autoconf-archive
 BuildRequires: autogen
 %endif
 BuildRequires: automake
+BuildRequires: cmake
 BuildRequires: pkgconfig
 BuildRequires: curl
 BuildRequires: findutils
@@ -233,6 +234,7 @@ happened, on your systems and applications.
 %prep
 %setup -q -n %{name}-%{version}
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 
 %build
 # Conf step

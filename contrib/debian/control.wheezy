@@ -3,6 +3,7 @@ Build-Depends: debhelper (>= 9),
                dh-autoreconf,
                pkg-config,
                dpkg-dev (>= 1.13.19),
+               cmake,
                zlib1g-dev,
                uuid-dev
 Section: net
