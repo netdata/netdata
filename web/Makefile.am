@@ -18,7 +18,8 @@ usersslconfigdir=$(configdir)/ssl
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
-libexec_SCRIPTS = \
+scriptsdir=${prefix}/libexec/netdata
+scripts_SCRIPTS = \
     netdata-switch-dashboard.sh \
     $(NULL)
 
