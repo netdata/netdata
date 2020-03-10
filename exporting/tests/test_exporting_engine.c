@@ -824,6 +824,17 @@ static void test_prometheus_remote_write_send_header(void **state)
 
     free(connector_specific_config->remote_write_path);
 }
+
+static void test_process_prometheus_remote_write_response(void **state)
+{
+    (void)state;
+    BUFFER *buffer = buffer_create(0);
+
+    buffer_sprintf(buffer, "HTTP/1.1 200 OK\r\n");
+    assert_int_equal(process_prometheus_remote_write_response(buffer, NULL), 0);
+
+    buffer_free(buffer);
+}
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
 
 #if HAVE_KINESIS
@@ -1015,6 +1026,7 @@ int main(void)
             test_init_prometheus_remote_write_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
             test_prometheus_remote_write_send_header, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test(test_process_prometheus_remote_write_response),
     };
 
     test_res += cmocka_run_group_tests_name(
