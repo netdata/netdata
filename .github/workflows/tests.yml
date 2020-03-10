@@ -13,8 +13,8 @@ on:
       - '**.c'
       - '**.h'
 jobs:
-  unit-tests:
-    name: Unit Tests
+  unit-tests-legacy:
+    name: Unit Tests (legacy)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,8 +25,40 @@ jobs:
           sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
                                   libnetfilter-acct-dev
-      - name: Run unit tests
+      - name: Run ./tests/run-unit-tests.sh
         env:
           CFLAGS: "-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1"
         run: |
           ./tests/run-unit-tests.sh
+
+  unit-tests-cmocka:
+    name: Unit Tests (cmocka)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare environment
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
+                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
+                                  libnetfilter-acct-dev libmongoc-dev  libcmocka-dev
+      - name: Configure
+        run: |
+          autoreconf -ivf
+          ./configure
+      - name: Build
+        run: |
+          mkdir build-tmp
+          cd build-tmp
+          cmake \
+            -D BUILD_TESTING=1 \
+            -D UNIT_TESTING=1 \
+            -D BSON_LIBRARY=/usr/lib/x86_64-linux-gnu/libbson-1.0.so \
+            -D MONGOC_LIBRARY=/usr/lib/x86_64-linux-gnu/libmongoc-1.0.so \
+            ..
+          make
+      - name: Run ctest
+        run: |
+          cd build-tmp
+          ctest
