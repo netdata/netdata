@@ -958,8 +958,8 @@ fi
 copy_react_dashboard() {
   run rm -rf "${NETDATA_WEB_DIR}-react"
   run rm -rf "${NETDATA_WEB_DIR}-classic"
-  run cp -ap "${1}/" "${NETDATA_WEB_DIR}-react/"
-  run cp -ap "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
+  run cp -a "${1}/" "${NETDATA_WEB_DIR}-react/"
+  run cp -a "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
   run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
 }
 
@@ -985,8 +985,8 @@ install_react_dashboard() {
         run_ok "React dashboard installed."
       else
         run_failed "Failed to switch to React dashboard."
-        run find "${NETDATA_WEB_DIR}" -d -delete
-        run cp -ap "${NETDATA_WEB_DIR}-classic/." "${NETDATA_WEB_DIR}"
+        run rm -rf "${NETDATA_WEB_DIR}"
+        run cp -a "${NETDATA_WEB_DIR}-classic" "${NETDATA_WEB_DIR}"
       fi
     else
       run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
