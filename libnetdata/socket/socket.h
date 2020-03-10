@@ -56,6 +56,7 @@ extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
 extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
+int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
 
 #ifdef ENABLE_HTTPS
 extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
