@@ -60,8 +60,9 @@ jobs:
           mkdir build-tmp
           cd build-tmp
           cmake \
-            -D BUILD_TESTING=1 \
             -D UNIT_TESTING=1 \
+            -D BUILD_TESTING=1 \
+            -D CMAKE_BUILD_TYPE="Debug" \
             -D BSON_LIBRARY=/usr/lib/x86_64-linux-gnu/libbson-1.0.so \
             -D MONGOC_LIBRARY=/usr/lib/x86_64-linux-gnu/libmongoc-1.0.so \
             ..
