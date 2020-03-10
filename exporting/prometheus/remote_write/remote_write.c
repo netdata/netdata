@@ -100,8 +100,6 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     uv_mutex_init(&instance->mutex);
     uv_cond_init(&instance->cond_var);
 
-    // struct prometheus_remote_write_specific_config *connector_specific_config =
-    //     instance->config.connector_specific_config;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
@@ -230,9 +228,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
         else {
             // we need average or sum of the data
 
-            time_t first_t = instance->after, last_t = instance->before;
-            // TODO: remove first_t
-            (void)first_t;
+            time_t last_t = instance->before;
             calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
             if(!isnan(value) && !isinf(value)) {
