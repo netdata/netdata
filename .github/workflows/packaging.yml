@@ -151,7 +151,7 @@ jobs:
               --build-arg VERSION=$PKG_VERSION \
               -t local/package-builder:${{ matrix.distro }}${{ matrix.version }}
           mkdir -p artifacts
-          docker run -it -v $PWD/artifacts:/artifacts local/package-builder:${DISTRO}${{ matrix.version }}
+          docker run -v $PWD/artifacts:/artifacts local/package-builder:${DISTRO}${{ matrix.version }}
       - name: Upload
         if: env.taggedrun == 1
         shell: bash
