@@ -33,72 +33,72 @@ jobs:
         include:
           - platform: debian8
             distro: debian
-            version: 8
+            version: "8"
             pkgclouddistro: Debian
-            pkgcloudversion: 8.0
+            pkgcloudversion: "8.0"
             format: deb
             base_image: debian
           - platform: debian9
             distro: debian
-            version: 9
+            version: "9"
             pkgclouddistro: Debian
-            pkgcloudversion: 9.0
+            pkgcloudversion: "9.0"
             format: deb
             base_image: debian
           - platform: debian10
             distro: debian
-            version: 10
+            version: "10"
             pkgclouddistro: Debian
-            pkgcloudversion: 10.0
+            pkgcloudversion: "10.0"
             format: deb
             base_image: debian
           - platform: ubuntu16.04
             distro: ubuntu
-            version: 16.04
+            version: "16.04"
             pkgclouddistro: Ubuntu
-            pkgcloudversion: 16.04
+            pkgcloudversion: "16.04"
             format: deb
             base_image: ubuntu
           - platform: ubuntu18.04
             distro: ubuntu
-            version: 18.04
+            version: "18.04"
             pkgclouddistro: Ubuntu
-            pkgcloudversion: 18.04
+            pkgcloudversion: "18.04"
             format: deb
             base_image: ubuntu
           - platform: ubuntu19.10
             distro: ubuntu
-            version: 19.10
+            version: "19.10"
             pkgclouddistro: Ubuntu
-            pkgcloudversion: 19.10
+            pkgcloudversion: "19.10"
             format: deb
             base_image: ubuntu
           - platform: fedora30
             distro: fedora
-            version: 30
+            version: "30"
             pkgclouddistro: Fedora
-            pkgcloudversion: 30.0
+            pkgcloudversion: "30.0"
             format: rpm
             base_image: fedora
           - platform: fedora31
             distro: fedora
-            version: 31
+            version: "31"
             pkgclouddistro: Fedora
-            pkgcloudversion: 31.0
+            pkgcloudversion: "31.0"
             format: rpm
             base_image: fedora
           - platform: centos7
             distro: centos
-            version: 7
+            version: "7"
             pkgclouddistro: Enterprise Linux
-            pkgcloudversion: 7.0
+            pkgcloudversion: "7.0"
             format: rpm
             base_image: centos
           - platform: opensuse15.1
             distro: opensuse
-            version: 15.1
+            version: "15.1"
             pkgclouddistro: Fedora
-            pkgcloudversion: 15.1
+            pkgcloudversion: "15.1"
             format: rpm
             base_image: opensuse/leap
       # We intentiaonally disable the fail-fast behavior so that a
