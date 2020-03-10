@@ -6,13 +6,19 @@
 
 **Merged pull requests:**
 
+- Fix cosmetic error checking for CentOS 8 version in install-required-packages [\#8339](https://github.com/netdata/netdata/pull/8339) ([prologic](https://github.com/prologic))
+- Fixed typo [\#8335](https://github.com/netdata/netdata/pull/8335) ([peroxy](https://github.com/peroxy))
 - Fixed dependency names for Arch Linux. [\#8334](https://github.com/netdata/netdata/pull/8334) ([Ferroin](https://github.com/Ferroin))
 - Rename the review workflow and be consistent about workflow and job names. [\#8332](https://github.com/netdata/netdata/pull/8332) ([prologic](https://github.com/prologic))
+- Migrate Travis based checks to Github Actions [\#8329](https://github.com/netdata/netdata/pull/8329) ([prologic](https://github.com/prologic))
 - Add retries for more Travis transient failures [\#8327](https://github.com/netdata/netdata/pull/8327) ([prologic](https://github.com/prologic))
 - Removed extra printed `\n` [\#8326](https://github.com/netdata/netdata/pull/8326) ([Jiab77](https://github.com/Jiab77))
 - Removed extra printed `\n` [\#8325](https://github.com/netdata/netdata/pull/8325) ([Jiab77](https://github.com/Jiab77))
 - Removed extra printed `\n` [\#8324](https://github.com/netdata/netdata/pull/8324) ([Jiab77](https://github.com/Jiab77))
+- Migrate coverity-scan to Github Actions [\#8321](https://github.com/netdata/netdata/pull/8321) ([prologic](https://github.com/prologic))
+- Fix links in packaging/installer to work on GitHub and docs [\#8319](https://github.com/netdata/netdata/pull/8319) ([joelhans](https://github.com/joelhans))
 - Switched to using Python 3 by default instead of Python 2. [\#8318](https://github.com/netdata/netdata/pull/8318) ([Ferroin](https://github.com/Ferroin))
+- Added various fixes and improvements to the installers. [\#8315](https://github.com/netdata/netdata/pull/8315) ([Ferroin](https://github.com/Ferroin))
 - Fixed missing folders in `/var/` by creating them during postinst [\#8314](https://github.com/netdata/netdata/pull/8314) ([SamK](https://github.com/SamK))
 - Add standards for abbreviations/acronyms to docs style guide [\#8313](https://github.com/netdata/netdata/pull/8313) ([joelhans](https://github.com/joelhans))
 - Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
@@ -23,6 +29,8 @@
 - Fixed misplaced commas in help disable strings [\#8266](https://github.com/netdata/netdata/pull/8266) ([FlyingSixtySix](https://github.com/FlyingSixtySix))
 - Disable Schema tag in documentation [\#8264](https://github.com/netdata/netdata/pull/8264) ([joelhans](https://github.com/joelhans))
 - Tweak eBPF documentation and add performance data [\#8261](https://github.com/netdata/netdata/pull/8261) ([joelhans](https://github.com/joelhans))
+- Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
+- Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
 - python.d/ceph: fix get\_osd\_perf\(\) for 14.2+ [\#8248](https://github.com/netdata/netdata/pull/8248) ([ilyam8](https://github.com/ilyam8))
 - Adapt the claiming script to new API responses [\#8245](https://github.com/netdata/netdata/pull/8245) ([hmoragrega](https://github.com/hmoragrega))
 - vernemq alarms, dashboard info and godplugin new version [\#8236](https://github.com/netdata/netdata/pull/8236) ([ilyam8](https://github.com/ilyam8))
@@ -31,6 +39,7 @@
 - Adding support for ACLK build-configuration [\#8223](https://github.com/netdata/netdata/pull/8223) ([amoss](https://github.com/amoss))
 - Fix claiming script to reflect API changes on netdata.cloud [\#8220](https://github.com/netdata/netdata/pull/8220) ([cosmix](https://github.com/cosmix))
 - packaging/installer: fix bundle\_libwebsockets [\#8219](https://github.com/netdata/netdata/pull/8219) ([ilyam8](https://github.com/ilyam8))
+- Remove the confusion around the multiple Dockerfile\(s\) we have [\#8214](https://github.com/netdata/netdata/pull/8214) ([prologic](https://github.com/prologic))
 - fixed typo [\#8213](https://github.com/netdata/netdata/pull/8213) ([shortpatti](https://github.com/shortpatti))
 - Retry transient failures from our lifecycle tests on Travis CI [\#8203](https://github.com/netdata/netdata/pull/8203) ([prologic](https://github.com/prologic))
 - Fix RHEL / CentOS 8.x dependencies for Judy-devel and others [\#8202](https://github.com/netdata/netdata/pull/8202) ([prologic](https://github.com/prologic))
@@ -54,6 +63,7 @@
 - Added connections \(backend\) usage to postgres monitoring [\#8126](https://github.com/netdata/netdata/pull/8126) ([ManuelPombo](https://github.com/ManuelPombo))
 - Fix formatting in "Custom dashboards" section [\#8102](https://github.com/netdata/netdata/pull/8102) ([YorikSar](https://github.com/YorikSar))
 - Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
+- Cleans up CODEOWNERS for the build system itself \(not to be confused with packaging\) [\#8098](https://github.com/netdata/netdata/pull/8098) ([prologic](https://github.com/prologic))
 - added requirements for exim. Issue \#8087 [\#8096](https://github.com/netdata/netdata/pull/8096) ([petarkozic](https://github.com/petarkozic))
 - Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
 - Remove Ubuntu 19.04 from CI and packaging. [\#8040](https://github.com/netdata/netdata/pull/8040) ([Ferroin](https://github.com/Ferroin))
@@ -61,6 +71,7 @@
 - Removed tmem stat collection from xenstat plugin for Xen 4.13 [\#7951](https://github.com/netdata/netdata/pull/7951) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 - Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
 - Cross-host docker builds [\#7754](https://github.com/netdata/netdata/pull/7754) ([amoss](https://github.com/amoss))
+- fix installation for ubuntu 14.04 [\#7690](https://github.com/netdata/netdata/pull/7690) ([Ehekatl](https://github.com/Ehekatl))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
@@ -209,7 +220,6 @@
 - Adds a Dockerfile.docs for more easily and reproducibly building/rebuilding docs [\#7688](https://github.com/netdata/netdata/pull/7688) ([prologic](https://github.com/prologic))
 - Fix setuid for freeipmi.plugin in Docker images [\#7684](https://github.com/netdata/netdata/pull/7684) ([lassebm](https://github.com/lassebm))
 - Fixes for pfSense Installation [\#7665](https://github.com/netdata/netdata/pull/7665) ([prologic](https://github.com/prologic))
-- Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

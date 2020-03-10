@@ -12,7 +12,7 @@ backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @cosmix @Ferroin @knatsakis @ncmans @prologic
+build/ @cosmix
 contrib/debian @cosmix @Ferroin @knatsakis @ncmans @prologic
 collectors/ @vlvkobal @mfundul @cosmix
 collectors/charts.d.plugin/ @ilyam8 @Ferroin @prologic @cosmix
@@ -38,9 +38,9 @@ web/ @thiagoftsm @mfundul @vlvkobal @cosmix
 web/gui/ @jacekkolasa @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
+*.am @cosmix
 *.md @cosmix @joelhans @shortpatti
-*.am @cosmix @Ferroin @knatsakis @ncmans @prologic
-Dockerfile.* @Ferroin @knatsakis @ncmans @prologic @cosmix
+Dockerfile* @Ferroin @knatsakis @ncmans @prologic @cosmix
 
 # Ownership of specific files
 .gitignore @cosmix @Ferroin @knatsakis @ncmans @prologic
@@ -52,7 +52,6 @@ Dockerfile.* @Ferroin @knatsakis @ncmans @prologic @cosmix
 .codeclimate.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
 .codacy.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
 .yamllint.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
-Dockerfile @Ferroin @knatsakis @ncmans @prologic @cosmix
 netdata.spec.in @cosmix @Ferroin @knatsakis @ncmans @prologic
 netdata-installer.sh @cosmix @Ferroin @knatsakis @ncmans @prologic
 netlify.toml @cosmix

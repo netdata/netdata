@@ -56,127 +56,61 @@ operating systems.
 
 ### Alternative methods
 
-<div class="installer-grid">
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install with .deb or .rpm packages" />
-      <h3>Packages</h3>
-    </div>
-    <ul>
-      <li><a href="methods/packages/">Install with <code>.deb</code> or <code>.rpm</code> packages</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png" alt="Install with a pre-built static binary for 64-bit systems" />
-      <h3>Static binary</h3>
-    </div>
-    <ul>
-      <li><a href="methods/kickstart-64/">Install with a pre-built static binary for 64-bit systems</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />
-      <h3>Docker</h3>
-    </div>
-    <ul>
-      <li><a href="../docker/#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
-      <li><a href="../docker/#run-netdata-with-the-docker-command">Using a <code>docker-compose.yml</code> file</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/71960868-c1236d00-31fe-11ea-859e-902d36233e38.png" alt="Install Netdata on Kubernetes" />
-      <h3>Kubernetes</h3>
-    </div>
-    <ul>
-      <li><a href="https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments">Using a Helm chart</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install Netdata on cloud providers (GCP/AWS/Azure)" />
-      <h3>Cloud providers (GCP/AWS/Azure)</h3>
-    </div>
-    <ul>
-      <li><a href="methods/cloud-providers/#recommended-installation-method-for-cloud-providers">Recommended installation methods for cloud providers</a></li>
-      <li><a href="methods/cloud-providers/#post-installation-configuration">Post-installation configuration</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/71961672-8cb0b080-3200-11ea-84f8-9139c7434110.png" alt="Install Netdata on macOS" />
-      <h3>macOS</h3>
-    </div>
-    <ul>
-      <li><a href="methods/macos/#with-homebrew">Homebrew</a></li>
-      <li><a href="methods/macos/#from-source">Manual installation from source</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />
-      <h3>FreeBSD</h3>
-    </div>
-    <ul>
-      <li><a href="methods/freebsd/">Installation on FreeBSD</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png" alt="Install manually from source" />
-      <h3>Manual</h3>
-    </div>
-    <ul>
-      <li><a href="methods/manual/">Install manually from source</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png" alt="Install on offline/air-gapped systems" />
-      <h3>Offline</h3>
-    </div>
-    <ul>
-      <li><a href="methods/offline/">Install on offline/air-gapped systems</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/71961918-13fe2400-3201-11ea-9a91-fe6f5b27df0c.png" alt="Install Netdata on PFSense" />
-      <h3>PFSense</h3>
-    </div>
-    <ul>
-      <li><a href="methods/pfsense/">Installation on PFSense</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/71962148-853dd700-3201-11ea-9a09-16fdb39e9ee4.png" alt="Install Netdata on Synology" />
-      <h3>Synology</h3>
-    </div>
-    <ul>
-      <li><a href="methods/synology/">Installation on Synology</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/72070923-543dcf00-32f3-11ea-8053-d61bc96529b5.png" alt="Install Netdata on Alpine FreeNAS" />
-      <h3>FreeNAS</h3>
-    </div>
-    <ul>
-      <li><a href="methods/freenas/">Manual installation on FreeNAS</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <div class="item-title">
-      <img src="https://user-images.githubusercontent.com/1153921/72070921-53a53880-32f3-11ea-80f1-7d00cd8a7906.png" alt="Install Netdata on Alpine Linux" />
-      <h3>Alpine</h3>
-    </div>
-    <ul>
-      <li><a href="methods/alpine/">Manual installation on Alpine</a></li>
-    </ul>
-  </div>
+<div class="installer-grid" markdown=1>
+
+[![Install with .deb or .rpm
+packages](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png) Install
+with .deb or .rpm packages](methods/packages.md)
+
+[![Install with a pre-built static binary for 64-bit
+systems](https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png) Install
+with a pre-built static binary for 64-bit systems](methods/kickstart-64.md)
+
+[![Install Netdata on
+Docker](https://user-images.githubusercontent.com/1153921/76029355-85044400-5ef1-11ea-96f4-79edc58f9b5c.png) Install
+Netdata on Docker](../docker/README.md)
+
+[![Install Netdata on
+Kubernetes](https://user-images.githubusercontent.com/1153921/76029478-cc8ad000-5ef1-11ea-8981-dd04744b00da.png) Install
+Netdata on Kubernetes with a Helm
+chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
+
+[![Install Netdata on cloud providers
+(GCP/AWS/Azure)](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png)
+Install Netdata on cloud providers (GCP/AWS/Azure)](methods/cloud-providers.md)
+
+[![Install Netdata on
+macOS](https://user-images.githubusercontent.com/1153921/76029616-1673b600-5ef2-11ea-888a-4a1375a42246.png) Install
+Netdata on macOS](methods/macos.md)
+
+[![Install Netdata on
+FreeBSD](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png) Install
+Netdata on FreeBSD](methods/freebsd.md)
+
+[![Install manually from
+source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
+manually from source](methods/manual.md)
+
+[![Install on offline/air-gapped
+systems](https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png) Install on
+offline/air-gapped systems](methods/offline.md)
+
+[![Installation on
+PFSense](https://user-images.githubusercontent.com/1153921/76030071-cb0dd780-5ef2-11ea-87cd-607d943dc521.png)
+Installation on PFSense](methods/pfsense.md)
+
+[![Install Netdata on
+Synology](https://user-images.githubusercontent.com/1153921/76029789-5fc40580-5ef2-11ea-9d35-c022f682da77.png) Install
+Netdata on Synology](methods/synology.md)
+
+[![Manual installation on
+FreeNAS](https://user-images.githubusercontent.com/1153921/76030537-1c1dcb80-5ef3-11ea-9cf9-f130e7d41712.png) Manual
+installation on FreeNAS](methods/freenas.md)
+
+[![Manual installation on
+Alpine](https://user-images.githubusercontent.com/1153921/76029682-37d4a200-5ef2-11ea-9a2c-a8ffeb1d13c3.png) Manual
+installation on Alpine](methods/alpine.md)
+
 </div>
 
 ## Automatic updates

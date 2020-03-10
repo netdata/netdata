@@ -1,0 +1,24 @@
+---
+# Runs coverity-scan.sh every 24h on `master`
+name: Coverity Scan
+on:
+  schedule:
+    - cron: '0 1 * * *'
+jobs:
+  coverity:
+    if: github.repository == 'netdata/netdata'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare environment
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
+                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
+      - name: Run coverity-scan
+        env:
+          COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+          COVERITY_SCAN_SUBMIT_MAIL: ${{ secrets.COVERITY_SCAN_SUBMIT_MAIL }}
+        run: |
+          ./coverity-scan.sh --with-install
