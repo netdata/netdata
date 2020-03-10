@@ -2,10 +2,9 @@
 # Handles building of binary packages for the agent.
 name: Packages
 on:
-  # Trigger on pushes to master.
-  push:
-    branches:
-      - master
+  # Trigger workflow on branch or tag creation.
+  # We filter to only tags later on since we can't here.
+  create:
   # Also trigger on pull requests
   # Used to verify package builds
   pull_request:
@@ -13,7 +12,7 @@ on:
       - master
 jobs:
   build:
-    name: Build Packages / AMD64
+    name: Build / AMD64
     runs-on: ubuntu-latest
     env:
       # This is the CPU Architecture for the build.
@@ -107,19 +106,27 @@ jobs:
       # successfully built and tested packages for another version.
       fail-fast: false
     steps:
-      - name: Checkout
-        uses: actions/checkout@v1
+      - name: Checkout PR # Checkout the PR if it's a PR.
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0 # We need full history for versioning
-      - name: Check Commit Message
-        id: check-commit
-        uses: ./.github/commit-filter-action
+      - name: Checkout Tag # Otherwise check out the tag that triggered this.
+        if: github.event_name == 'create' && github.event.ref_type == 'tag'
+        uses: actions/checkout@v2
         with:
-          regex: |
-            ^\[Package ${{ env.ARCH }} ${{ matrix.format }}( ${{ matrix.distro }})?\]
-          case-insensitive: true
+          refs: ${{ github.event.ref }}
+          fetch-depth: 0 # We need full history for versioning
+      - name: Check Base Branch
+        if: github.event_name == 'pull_request' || (github.event_name == 'create' && github.event.ref_type == 'tag')
+        run: |
+          if [ "${{ github.event_name }}" == "create" ] && ( echo "${{ github.event.ref }}" | grep -q "nightly" ) && ( git branch --contains tags/${{ github.event.ref }} | grep -q master ); then
+            echo ::set-env name=taggedrun::1
+          else
+            echo ::set-env name=taggedrun::0
+          fi
       - name: Prepare Docker Images
-        if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || env.taggedrun == 1
         shell: bash
         run: |
           docker pull ${{ matrix.base_image }}:${{ matrix.version }}
@@ -127,13 +134,13 @@ jobs:
             docker tag ${{ matrix.base_image }}:${{ matrix.version }} ${{ matrix.distro }}:${{ matrix.version }}
           fi
       - name: Build
-        if: steps.check-commit.outputs.matched == true || github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || env.taggedrun == 1
         shell: bash
         run: |
           # Figure out the package version.
           PKG_VERSION="$(cut -d '-' -f 1 packaging/version)"
           last_commit="$(git log -1 --pretty=format:"%s")"
-          if echo "${last_commit}" | grep -qiE "\[build latest\]" ; then
+          if [ "${{ env.taggedrun }}" -eq 1 ] ; then
             PKG_VERSION="$(cut -d '-' -f 1 packaging/version | sed -e 's/-/./g').latest"
           fi
           # Actually build the package.
@@ -146,7 +153,7 @@ jobs:
           mkdir -p artifacts
           docker run -it -v $PWD/artifacts:/artifacts local/package-builder:${DISTRO}${{ matrix.version }}
       - name: Upload
-        if: steps.check-commit.outputs.matched == true && github.event_name != 'pull_request'
+        if: env.taggedrun == 1
         shell: bash
         run: |
           # This figures out the distribution ID for the upload.

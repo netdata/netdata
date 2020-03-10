@@ -39,6 +39,15 @@ git checkout master
 git fetch --all
 git pull
 
+if [ -n "${BUILD_NIGHTLY}" ] ; then
+    echo "--- Tagging nightly build ---"
+    git tag "nightly-$(date -u +%Y%m%d)"
+    push_change
+
+    echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
+    sleep "${WAIT_TIME}"
+fi
+
 commit_change "amd64" "DEB"
 push_change
 
