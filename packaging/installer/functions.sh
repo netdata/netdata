@@ -114,7 +114,7 @@ fetch_and_verify() {
   local override=${5}
 
   if [ -z "${override}" ]; then
-     get "${url}" > "${tmp}/${base_name}"
+    get "${url}" > "${tmp}/${base_name}"
   else
     progress "Using provided ${component} archive ${override}"
     run cp "${override}" "${tmp}/${base_name}"
@@ -407,6 +407,16 @@ install_netdata_service() {
   local uname
   uname="$(uname 2> /dev/null)"
 
+  local key="unknown"
+  if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release || return 1
+    key="${ID}-${VERSION_ID}"
+
+  elif [ -f /etc/redhat-release ]; then
+    key=$(< /etc/redhat-release)
+  fi
+
   if [ "${UID}" -eq 0 ]; then
     if [ "${uname}" = "Darwin" ]; then
 
@@ -443,6 +453,10 @@ install_netdata_service() {
       elif [ -w "/usr/lib/systemd/system" ]; then
         SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
       elif [ -w "/etc/systemd/system" ]; then
+        SYSTEMD_DIRECTORY="/etc/systemd/system"
+      fi
+
+      if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
         SYSTEMD_DIRECTORY="/etc/systemd/system"
       fi
 
