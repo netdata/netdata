@@ -1146,6 +1146,21 @@ static int rrdpush_receive(int fd
         close(fd);
         return 1;
     }
+
+    /*
+     * Quick path for rejecting multiple connections. Don't take any locks so that progress is made. The same
+     * condition will be checked again below, while holding the global and host writer locks. Any potential false
+     * positives will not cause harm. Data hazards with host deconstruction will be handled when reference counting
+     * is implemented.
+     */
+    host = rrdhost_find_by_guid(machine_guid, 0);
+    if(host && host->connected_senders > 0) {
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
+        close(fd);
+        return 0;
+    }
+
     host = rrdhost_find_or_create(
             hostname
             , registry_hostname
