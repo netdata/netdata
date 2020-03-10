@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.
 
 # SNMP device monitoring with Netdata
 
-Collects data from any SNMP device and uses the [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
+Collects data from any Simple Network Management Protocol (SNMP) device and uses the [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
 
 It supports:
 
@@ -30,7 +30,7 @@ In this example:
 
 -   the SNMP device is `10.11.12.8`.
 -   the SNMP community is `public`.
--   we will update the values every 10 seconds (`update_every: 10` under the server `10.11.12.8`).
+-   we update the values every 10 seconds (`update_every: 10` under the server `10.11.12.8`).
 -   we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`. Note that the charts and dimensions must not contain any white space or special characters, other than `.` and `_`.
 
 ```json
@@ -102,7 +102,7 @@ In this example:
 
 `update_every` is the update frequency for each server, in seconds.
 
-`max_request_size` limits the maximum number of OIDs that will be requested in a single call. The default is 50. Lower this number of you get `TooBig` errors in Netdata's `error.log`.
+`max_request_size` limits the maximum number of object identifiers (OIDs) that get requested in a single call. The default is 50. Lower this number if you get `TooBig` errors in Netdata's `error.log`.
 
 `family` sets the name of the submenu of the dashboard each chart will appear under.
 
@@ -171,7 +171,7 @@ Each of the 24 new charts will have its id (1-24) appended at:
 
 The `options` given for each server, are:
 
--   `port` - UDP port to send requests too. Defaults to `161`.
+-   `port` - User Datagram Protocol (UDP) port to send requests too. Defaults to `161`.
 -   `retries` - number of times to re-send a request. Defaults to `1`.
 -   `sourceAddress` - IP address from which SNMP requests should originate, there is no default for this option, the operating system will select an appropriate source address when the SNMP request is sent.
 -   `sourcePort` - UDP port from which SNMP requests should originate, defaults to an ephemeral port selected by the operation system.

@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # FreeRADIUS monitoring with Netdata
 
-Uses the `radclient` command to provide freeradius statistics. It is not recommended to run it every second.
+Uses the `radclient` command to provide Free Remote Authentication Dial-In User Service (FreeRADIUS) statistics. It is not recommended to run it every second.
 
 It produces:
 
@@ -84,7 +84,7 @@ To do this, create a link from the sites-enabled directory to the status file in
 -   cd sites-enabled
 -   ln -s ../sites-available/status status
 
-and restart/reload your FREERADIUS server.
+and restart/reload your FreeRADIUS server.
 
 ---
 

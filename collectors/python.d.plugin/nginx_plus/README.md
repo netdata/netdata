@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 Monitors one or more NGINX Plus servers depending on configuration. Servers can be either local or remote.
 
-Example nginx_plus configuration can be found in 'python.d/nginx_plus.conf'
+Example nginx_plus configuration can be found in `python.d/nginx_plus.conf`
 
 It produces following charts:
 

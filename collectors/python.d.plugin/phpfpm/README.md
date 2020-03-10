@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # PHP-FPM monitoring with Netdata
 
-Monitors one or more PHP-FPM instances depending on configuration.
+Monitors one or more Hypertext Preprocessor-FastCGI Process Manager (PHP-FPM) instances depending on configuration.
 
 ## Requirements
 

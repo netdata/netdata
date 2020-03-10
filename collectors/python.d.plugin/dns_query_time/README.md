@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # DNS query RTT monitoring with Netdata
 
-Measures DNS query round trip time.
+Measures Domain Name System (DNS) query round trip time.
 
 **Requirement:**
 

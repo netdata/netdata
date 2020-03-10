@@ -9,10 +9,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 Provides statistics information from Dovecot server.
 
-Statistics are taken from dovecot socket by executing `EXPORT global` command.
-More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
+Statistics are taken from Dovecot socket by executing `EXPORT global` command.
+More information about Dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
 
-Module isn't compatible with new statistic api (v2.3), but you are still able to use the module with Dovecot v2.3
+Module isn't compatible with new statistic API (v2.3), but you are still able to use the module with Dovecot v2.3
 by following [upgrading steps.](https://wiki2.dovecot.org/Upgrading/2.3).
 
 **Requirement:**

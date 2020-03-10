@@ -12,7 +12,7 @@ Monitors the leases database to show all active leases for given pools.
 ## Requirements
 
 -   dhcpd leases file MUST BE readable by Netdata
--   pools MUST BE in CIDR format
+-   pools MUST BE in Classless Inter-Domain Routing (CIDR) format
 
 It produces:
 

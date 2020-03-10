@@ -7,19 +7,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.
 
 # ISC BIND monitoring with Netdata 
 
-Monitor one or more ISC Bind servers.
+Monitor one or more Internet Systems Consortium (ISC) Berkeley Internet Name Domain (BIND) servers.
 
 ## Example Netdata charts
 
 Depending on the number of views your bind has, you may get a large number of charts.
-Here this is with just one view:
+Here is one view:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/12765473/879b8e04-ca07-11e5-817d-b0651996c42b.png)
 ![image](https://cloud.githubusercontent.com/assets/2662304/12766538/12b272fa-ca0d-11e5-81e1-6a9f8ff488ff.png)
 
 ## How it works
 
-The plugin will execute (from within node.js) the equivalent of:
+The plugin executes (from within node.js) the equivalent of:
 
 ```sh
 curl "http://localhost:8888/json/v1/server"

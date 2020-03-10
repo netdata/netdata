@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # IPFS monitoring with Netdata
 
-Collects [IPFS](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics. 
+Collects [InterPlanetary File System (IPFS)](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics. 
 
 1.  **Bandwidth** in kbits/s
 

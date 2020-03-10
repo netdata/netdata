@@ -7,12 +7,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # NVIDIA GPU monitoring with Netdata
 
-Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
+Monitors performance metrics (memory usage, fan speed, Peripheral Component Interconnect Express (PCIe) bandwidth utilization, temperature, etc.) using `nvidia-smi` CLI tool.
 
 
 **Requirements and Notes:**
 
--   You must have the `nvidia-smi` tool installed and your NVIDIA GPU(s) must support the tool. Mostly the newer high end models used for AI / ML and Crypto or Pro range, read more about [nvidia_smi](https://developer.nvidia.com/nvidia-system-management-interface).
+-   You must have the `nvidia-smi` tool installed and your NVIDIA GPU(s) must support the tool. Mostly the newer high end models used for Artificial Intelligence/Machine Learning (AI/ML) and Crypto or Pro range, read more about [nvidia_smi](https://developer.nvidia.com/nvidia-system-management-interface).
 
 -   You must enable this plugin as its disabled by default due to minor performance issues.
 

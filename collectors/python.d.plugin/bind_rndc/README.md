@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!--
 ---
 title: "ISC Bind monitoring with Netdata"
@@ -6,12 +7,15 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 -->
 
 # ISC Bind monitoring with Netdata
+=======
+# ISC BIND monitoring with Netdata
+>>>>>>> scrubbing the collectors for correct use of acronyms
 
 Collects Name server summary performance statistics using `rndc` tool.
 
 ## Requirements
 
--   Version of bind must be 9.6 +
+-   Version of BIND must be 9.6 +
 -   Netdata must have permissions to run `rndc stats`
 
 It produces:

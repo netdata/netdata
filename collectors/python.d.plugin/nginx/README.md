@@ -11,10 +11,10 @@ Monitors one or more NGINX servers depending on configuration. Servers can be ei
 
 ## Requirements
 
--   nginx with configured 'ngx_http_stub_status_module'
--   'location /stub_status'
+-   nginx with configured `ngx_http_stub_status_module`
+-   `location /stub_status`
 
-Example nginx configuration can be found in 'python.d/nginx.conf'
+Example nginx configuration can be found in `python.d/nginx.conf`
 
 It produces following charts:
 

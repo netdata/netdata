@@ -7,12 +7,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.
 
 # Stiebel Eltron ISG monitoring with Netdata
 
-Collects metrics from the configured heat pump and hot water installation from Stiebel Eltron ISG web.
+Collects metrics from the configured heat pump and hot water installation from Stiebel Eltron Intelligent Services Gateway (ISG) web.
 
 **Requirements**
 
 -   Configuration file `stiebeleltron.conf` in the node.d Netdata config dir (default: `/etc/netdata/node.d/stiebeleltron.conf`)
--   Stiebel Eltron ISG web with network access (http), without password login
+-   Stiebel Eltron ISG web with network access (HTTP), without password login
 
 The charts are configurable, however, the provided default configuration collects the following:
 
@@ -110,7 +110,7 @@ The charts are being generated using the configuration below. So if your install
             "url": "http://machine.ip.or.dns/?s=1,0",
             "update_every": 10,
             "categories": [ 
-		{
+        {
                     "id": "eletricreheating",
                     "name": "electric reheating",
                     "charts": [
@@ -179,7 +179,7 @@ The charts are being generated using the configuration below. So if your install
                         }
                     ]
                 },
-		{
+        {
                     "id": "heating",
                     "name": "heating",
                     "charts": [
@@ -289,11 +289,11 @@ The charts are being generated using the configuration below. So if your install
                         }
                     ]
                 },
-		{
+        {
                     "id": "hotwater",
                     "name": "hot water",
                     "charts": [
-			{
+            {
                             "title": "Hot Water Temperature",
                             "id": "hotwatertemp",
                             "unit": "Celsius",
@@ -314,7 +314,7 @@ The charts are being generated using the configuration below. So if your install
                         }
                     ]
                 },
-		{
+        {
                     "id": "general",
                     "name": "general",
                     "charts": [
@@ -346,22 +346,22 @@ The charts are being generated using the configuration below. So if your install
                                 }
                             ]
                         },
-			{
+            {
                             "title": "Heating Circuit Pressure",
                             "id": "heatingcircuit",
-                            "unit": "bar",							
+                            "unit": "bar",                            
                             "type": "line",
                             "prio": 3,
                             "dimensions": [
                                 {
                                     "name": "Heating Circuit",
                                     "id": "heatingcircuit",
-				    "digits": 2,
+                    "digits": 2,
                                     "regex": "PRESSURE HTG CIRC<\\\/td>\\s*<td.*>(-?[0-9]+,[0-9]*).*<\\\/td>"
                                 }
                             ]
                         },
-			{
+            {
                             "title": "Flow Rate",
                             "id": "flowrate",
                             "unit": "liters/min",
@@ -371,12 +371,12 @@ The charts are being generated using the configuration below. So if your install
                                 {
                                     "name": "Flow Rate",
                                     "id": "flowrate",
-				    "digits": 2,
+                    "digits": 2,
                                     "regex": "FLOW RATE<\\\/td>\\s*<td.*>(-?[0-9]+,[0-9]+).*<\\\/td>"
                                 }
                             ]
                         },
-			{
+            {
                             "title": "Output",
                             "id": "output",
                             "unit": "%",
@@ -388,7 +388,7 @@ The charts are being generated using the configuration below. So if your install
                                     "id": "outputheatpump",
                                     "regex": "OUTPUT HP<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*).*<\\\/td>"
                                 },
-				{
+                {
                                     "name": "Water Pump",
                                     "id": "intpumprate",
                                     "regex": "INT PUMP RATE<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*).*<\\\/td>"
@@ -399,13 +399,13 @@ The charts are being generated using the configuration below. So if your install
                 }
             ]
         },
-	{
+    {
             "name": "Heat Pump",
             "id": "heatpump",
             "url": "http://machine.ip.or.dns/?s=1,1",
             "update_every": 10,
             "categories": [
-		{
+        {
                     "id": "runtime",
                     "name": "runtime",
                     "charts": [
@@ -428,7 +428,7 @@ The charts are being generated using the configuration below. So if your install
                                 }
                             ]
                         },
-			{
+            {
                             "title": "Reheating",
                             "id": "reheating",
                             "unit": "h",
@@ -449,7 +449,7 @@ The charts are being generated using the configuration below. So if your install
                         }
                     ]
                 },
-		{
+        {
                     "id": "processdata",
                     "name": "process data",
                     "charts": [
@@ -469,7 +469,7 @@ The charts are being generated using the configuration below. So if your install
                         }
                     ]
                 },
-		{
+        {
                     "id": "energy",
                     "name": "energy",
                     "charts": [
@@ -483,18 +483,18 @@ The charts are being generated using the configuration below. So if your install
                                 {
                                     "name": "Heating",
                                     "id": "heating",
-				    "digits": 3,
+                    "digits": 3,
                                     "regex": "COMPRESSOR HEATING DAY<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*)"
                                 },
-				{
+                {
                                     "name": "Hot Water",
                                     "id": "hotwater",
-				    "digits": 3,
+                    "digits": 3,
                                     "regex": "COMPRESSOR DHW DAY<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*)"
                                 }
                             ]
                         },
-			{
+            {
                             "title": "Compressor Total",
                             "id": "compressortotal",
                             "unit": "MWh",
@@ -504,13 +504,13 @@ The charts are being generated using the configuration below. So if your install
                                 {
                                     "name": "Heating",
                                     "id": "heating",
-				    "digits": 3,
+                    "digits": 3,
                                     "regex": "COMPRESSOR HEATING TOTAL<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*)"
                                 },
-				{
+                {
                                     "name": "Hot Water",
                                     "id": "hotwater",
-				    "digits": 3,
+                    "digits": 3,
                                     "regex": "COMPRESSOR DHW TOTAL<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*)"
                                 }
                             ]

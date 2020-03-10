@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/freei
 
 Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
-> FreeIPMI provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+> FreeIPMI provides in-band and out-of-band Intelligent Platform Management Interface (IPMI) software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
 ## Compile `freeipmi.plugin`
 
@@ -108,8 +108,8 @@ You can set these options in `/etc/netdata/netdata.conf` at this section:
 
 ```
 [plugin:freeipmi]
-	update every = 5
-	command options = 
+    update every = 5
+    command options = 
 ```
 
 Append to `command options =` the settings you need. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
@@ -122,7 +122,7 @@ So, `freeipmi.plugin` supports the option `ignore` that accepts a comma separate
 
 ```
 [plugin:freeipmi]
-	command options = ignore 1,2,3,4,...
+    command options = ignore 1,2,3,4,...
 ```
 
 To find the IDs to ignore, run the command `ipmimonitoring`. The first column is the wanted ID:

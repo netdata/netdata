@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # TCP endpoint monitoring with Netdata
 
-Monitors TCP endpoint availability and response time.
+Monitors Transmission Control Protocol (TCP) endpoint availability and response time.
 
 Following charts are drawn per host:
 

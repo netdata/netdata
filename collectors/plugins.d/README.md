@@ -70,14 +70,14 @@ Example:
 
 ```
 [plugins]
-	# enable running new plugins = yes
-	# check for new plugins every = 60
+    # enable running new plugins = yes
+    # check for new plugins every = 60
 
-	# charts.d = yes
-	# fping = yes
-	# ioping = yes
-	# node.d = yes
-	# python.d = yes
+    # charts.d = yes
+    # fping = yes
+    # ioping = yes
+    # node.d = yes
+    # python.d = yes
 ```
 
 The setting `enable running new plugins` sets the default behavior for all external plugins. It can be 
@@ -95,8 +95,8 @@ For example, for `apps.plugin` the following section is available:
 
 ```
 [plugin:apps]
-	# update every = 1
-	# command options =
+    # update every = 1
+    # command options =
 ```
 
 -   `update every` controls the granularity of the external plugin.
@@ -233,7 +233,7 @@ the template is:
 
 -   `options`
 
-    a space separated list of options, enclosed in quotes. 4 options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to backends). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
+    a space separated list of options, enclosed in quotes. Four options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to backends). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
 
 -   `plugin` and `module`
 

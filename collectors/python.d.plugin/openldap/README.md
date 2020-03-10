@@ -7,8 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # OpenLDAP monitoring with Netdata
 
-Provides statistics information from openldap (slapd) server.
-Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(5) is available.
+Provides statistics information from OpenLDAP (slapd) server.
+Statistics are taken from Lightweight Directory Access Protocol (LDAP) monitoring interface. Manual page, slapd-monitor(5) is available.
 
 **Requirement:**
 

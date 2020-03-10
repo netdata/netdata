@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Postfix monitoring with Netdata
 
-Monitors MTA email queue statistics using postqueue tool.  
+Monitors Mail Transfer Agent (MTA) email queue statistics using postqueue tool.  
 
 Execute `postfix -p` to grab postfix queue.
 

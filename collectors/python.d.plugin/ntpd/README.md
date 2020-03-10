@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # NTP daemon monitoring with Netdata
 
-Monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`, the [standard NTP query program](http://doc.ntp.org/current-stable/ntpq.html).
+Monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the Network Time Protocol (NTP) Control Message Protocol via User Datagram Protocol (UDP) socket, similar to `ntpq`, the [standard NTP query program](http://doc.ntp.org/current-stable/ntpq.html).
 
 ## Requirements
 

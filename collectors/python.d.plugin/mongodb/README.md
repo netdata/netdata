@@ -15,7 +15,7 @@ Monitors performance and health metrics of MongoDB.
 
 You need to install it manually.
 
-Number of charts depends on mongodb version, storage engine and other features (replication):
+Number of charts depends on MongoDB version, storage engine and other features (replication):
 
 1.  **Read requests**:
 
@@ -204,8 +204,8 @@ local:
     pass : 'netdata'
 ```
 
-If no configuration is given, module will attempt to connect to mongodb daemon on `127.0.0.1:27017` address
+If no configuration is given, module will attempt to connect to MongoDB daemon on `127.0.0.1:27017` address
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fmongodb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2FMongoDB%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

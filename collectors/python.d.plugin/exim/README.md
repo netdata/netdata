@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Exim monitoring with Netdata
 
-Simple module executing `exim -bpc` to grab exim queue.
+Simple module executing `exim -bpc` to grab the Experimental Internet Mailer (Exim) queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.
 
 ## Requirements
@@ -22,7 +22,7 @@ The module uses the `exim` binary, which can only be executed as root by default
 
 On a WHM server, you can reconfigure `exim` over the WHM interface with the following steps.
 
-1. Login to WHM
+1. Login to Web Host Manager (WHM)
 2. Navigate to Service Configuration --> Exim Configuration Manager --> tab Advanced Editor
 3. Scroll down to the button **Add additional configuration setting** and click on it.
 4. In the new dropdown which will appear above we need to find and choose:

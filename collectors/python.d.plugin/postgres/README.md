@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # PostgreSQL monitoring with Netdata
 
-Collects database health and performance metrics.
+Collects health and performance metrics for the PostgreSQL database.
 
 ## Requirements
 

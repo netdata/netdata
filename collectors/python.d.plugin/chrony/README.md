@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Chrony monitoring with Netdata
 
-Monitors the precision and statistics of a local chronyd server, and produces:
+Monitors the precision and statistics of a local Chrony Daemon (chronyd) server, and produces:
 
 -   frequency
 -   last offset

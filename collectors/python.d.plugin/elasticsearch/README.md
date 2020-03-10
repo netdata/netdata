@@ -25,7 +25,7 @@ It produces:
 
 3.  **Memory usage and garbace collection** charts:
 
-    -   JVM heap currently in use, committed
+    -   Java Virtual Machine (JVM) heap currently in use, committed
     -   Count of garbage collections
     -   Time spent on garbage collections
 
