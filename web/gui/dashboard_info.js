@@ -545,7 +545,7 @@ netdataDashboard.menu = {
     'ebpf': {
         title: 'eBPF',
         icon: '<i class="fas fa-heartbeat"></i>',
-        info: 'Monitor system calls, internal functtions, bytes read, bytes written and errors using <code>eBPF</code>.'
+        info: 'Monitor system calls, internal functions, bytes read, bytes written and errors using <code>eBPF</code>.'
     },
 
     'vernemq': {
