@@ -51,8 +51,8 @@ void add_host_info(
     sample->set_timestamp(timestamp);
 }
 
-// adds tag to the last created timeseries
-void add_tag(void *write_request_p, char *tag, char *value) {
+// adds label to the last created timeseries
+void add_label(void *write_request_p, char *key, char *value) {
     WriteRequest *write_request = (WriteRequest *)write_request_p;
     TimeSeries *timeseries;
     Label *label;
@@ -60,7 +60,7 @@ void add_tag(void *write_request_p, char *tag, char *value) {
     timeseries = write_request->mutable_timeseries(write_request->timeseries_size() - 1);
 
     label = timeseries->add_labels();
-    label->set_name(tag);
+    label->set_name(key);
     label->set_value(value);
 }
 

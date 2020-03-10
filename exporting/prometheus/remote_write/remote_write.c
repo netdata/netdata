@@ -137,7 +137,7 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
             if (!should_send_label(instance, label))
                 continue;
 
-            add_tag(connector_specific_data->write_request, label->key, label->value);
+            add_label(connector_specific_data->write_request, label->key, label->value);
         }
         netdata_rwlock_unlock(&host->labels_rwlock);
     }

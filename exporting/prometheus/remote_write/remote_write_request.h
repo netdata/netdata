@@ -17,7 +17,7 @@ void add_host_info(
     void *write_request_p,
     const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp);
 
-void add_tag(void *write_request_p, char *tag, char *value);
+void add_label(void *write_request_p, char *key, char *value);
 
 void add_metric(
     void *write_request_p,
