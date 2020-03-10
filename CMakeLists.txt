@@ -1040,8 +1040,13 @@ if(ENABLE_BACKEND_KINESIS)
         -Wl,--wrap=kinesis_get_result
     )
 endif()
+    set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)
 if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     list(APPEND EXPORTING_ENGINE_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
+    list(
+        APPEND PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS
+        -Wl,--wrap=init_write_request
+    )
 endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
@@ -1074,6 +1079,7 @@ endif()
         -Wl,--wrap=send
         -Wl,--wrap=connect_to_one_of
         ${KINESIS_LINK_OPTIONS}
+        ${PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS}
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

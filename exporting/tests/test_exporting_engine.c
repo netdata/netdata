@@ -761,6 +761,45 @@ static void test_flush_host_labels(void **state)
     assert_int_equal(buffer_strlen(instance->labels), 0);
 }
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+static void test_init_prometheus_remote_write_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    expect_function_call(__wrap_init_write_request);
+    will_return(__wrap_init_write_request, 0xff);
+
+    assert_int_equal(init_prometheus_remote_write_instance(instance), 0);
+
+    assert_ptr_equal(instance->worker, simple_connector_worker);
+    assert_ptr_equal(instance->start_batch_formatting, NULL);
+    assert_ptr_equal(instance->start_host_formatting, format_host_prometheus_remote_write);
+    assert_ptr_equal(instance->start_chart_formatting, format_chart_prometheus_remote_write);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_prometheus_remote_write);
+    assert_ptr_equal(instance->end_chart_formatting, NULL);
+    assert_ptr_equal(instance->end_host_formatting, NULL);
+    assert_ptr_equal(instance->end_batch_formatting, format_batch_prometheus_remote_write);
+    assert_ptr_equal(instance->send_header, prometheus_remote_write_send_header);
+    assert_ptr_equal(instance->check_response, process_prometheus_remote_write_response);
+
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+
+    struct prometheus_remote_write_specific_data *connector_specific_data =
+        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+
+    assert_ptr_not_equal(instance->connector_specific_data, NULL);
+    assert_ptr_equal(connector_specific_data->write_request, 0xff);
+    freez(instance->connector_specific_data);
+}
+
+static void test_prometheus_remote_write_connector_worker(void **state)
+{
+    (void)state;
+}
+#endif // ENABLE_PROMETHEUS_REMOTE_WRITE
+
 #if HAVE_KINESIS
 static void test_init_aws_kinesis_instance(void **state)
 {
@@ -851,7 +890,7 @@ static void test_aws_kinesis_connector_worker(void **state)
     expect_string(__wrap_kinesis_put_record, stream_name, "test_stream");
     expect_string(__wrap_kinesis_put_record, partition_key, "netdata_0");
     expect_value(__wrap_kinesis_put_record, data, buffer_tostring(buffer));
-    // The buffer is prepated by Graphite exporting connector
+    // The buffer is prepared by Graphite exporting connector
     expect_string(
         __wrap_kinesis_put_record, data,
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
@@ -941,6 +980,21 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_flush_host_labels, setup_initialized_engine, teardown_initialized_engine),
     };
 
+    int test_res = cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
+                   cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    const struct CMUnitTest prometheus_remote_write_tests[] = {
+        cmocka_unit_test_setup_teardown(
+            test_init_prometheus_remote_write_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_prometheus_remote_write_connector_worker, setup_initialized_engine, teardown_initialized_engine),
+    };
+
+    test_res += cmocka_run_group_tests_name(
+        "prometheus_remote_write_exporting_connector", prometheus_remote_write_tests, NULL, NULL);
+#endif
+
 #if HAVE_KINESIS
     const struct CMUnitTest kinesis_tests[] = {
         cmocka_unit_test_setup_teardown(
@@ -948,12 +1002,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_aws_kinesis_connector_worker, setup_initialized_engine, teardown_initialized_engine),
     };
-#endif
 
-    int test_res = cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
-              cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
-
-#if HAVE_KINESIS
     test_res += cmocka_run_group_tests_name("kinesis_exporting_connector", kinesis_tests, NULL, NULL);
 #endif
 

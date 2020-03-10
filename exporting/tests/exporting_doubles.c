@@ -159,6 +159,14 @@ int __mock_end_batch_formatting(struct instance *instance)
     return mock_type(int);
 }
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+void *__wrap_init_write_request()
+{
+    function_called();
+    return mock_ptr_type(void *);
+}
+#endif // ENABLE_PROMETHEUS_REMOTE_WRITE
+
 #if HAVE_KINESIS
 void __wrap_aws_sdk_init()
 {
