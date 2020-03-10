@@ -27,7 +27,7 @@ switch_dashboard() {
     echo "Switching to ${new} dashboard..."
 
     find "${webdir}" -d -delete
-    cp -rp "${path}/." "${webdir}"
+    cp -ap "${path}/." "${webdir}"
     exit 0
 }
 

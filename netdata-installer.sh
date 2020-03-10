@@ -813,50 +813,6 @@ cat << OPTIONSEOF
 OPTIONSEOF
 
 # -----------------------------------------------------------------------------
-
-copy_react_dashboard() {
-  run rm -rf "${NETDATA_WEB_DIR}/../web-react"
-  run rm -rf "${NETDATA_WEB_DIR}/../web-classic"
-  run cp -rp "${1}/" "${NETDATA_WEB_DIR}/../web-react/"
-  run cp -rp "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}/../web-classic"
-}
-
-install_react_dashboard() {
-  progress "Fetching and installing dashboard"
-
-  DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
-
-  tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
-  DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
-
-  if fetch_and_verify "dashboard" \
-                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${tmp}" \
-                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
-  then
-    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
-       copy_react_dashboard "${tmp}/build" && \
-       rm -rf "${tmp}"
-    then
-      if run "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" react ; then
-        run_ok "React dashboard installed."
-      else
-        run_failed "Failed to switch to React dashboard."
-        run find "${NETDATA_WEB_DIR}" -d -delete
-        run cp -rp "${NETDATA_WEB_DIR}/../web-classic/." "${NETDATA_WEB_DIR}"
-      fi
-    else
-      run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
-    fi
-  else
-    run_failed "Unable to fetch React dashboard. The install process will continue, but you will not be able to use the new dashboard."
-  fi
-}
-
-install_react_dashboard
-
-# -----------------------------------------------------------------------------
 progress "Fix permissions of netdata directories (using user '${NETDATA_USER}')"
 
 if [ ! -d "${NETDATA_RUN_DIR}" ]; then
@@ -996,6 +952,51 @@ else
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
+
+# -----------------------------------------------------------------------------
+
+copy_react_dashboard() {
+  run rm -rf "${NETDATA_WEB_DIR}-react"
+  run rm -rf "${NETDATA_WEB_DIR}-classic"
+  run cp -ap "${1}/" "${NETDATA_WEB_DIR}-react/"
+  run cp -ap "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
+  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
+}
+
+install_react_dashboard() {
+  progress "Fetching and installing dashboard"
+
+  DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
+
+  tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
+  DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
+
+  if fetch_and_verify "dashboard" \
+                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
+  then
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
+       copy_react_dashboard "${tmp}/build" && \
+       rm -rf "${tmp}"
+    then
+      if run "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" react ; then
+        run_ok "React dashboard installed."
+      else
+        run_failed "Failed to switch to React dashboard."
+        run find "${NETDATA_WEB_DIR}" -d -delete
+        run cp -ap "${NETDATA_WEB_DIR}-classic/." "${NETDATA_WEB_DIR}"
+      fi
+    else
+      run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+    fi
+  else
+    run_failed "Unable to fetch React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+  fi
+}
+
+install_react_dashboard
 
 # -----------------------------------------------------------------------------
 
