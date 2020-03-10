@@ -1,0 +1,44 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (c) 2020 Netdata Incorporated
+
+set -e
+
+webdir="@webdir_POST@"
+
+usage() {
+    cat << EOF
+USAGE: switch-netdata-dashboard.sh <dashboard-name>
+
+<dashboard-name> is required, it specifies which dashboard to use. Valid
+arguments are 'react' to use the new React dashboard, and 'classic'
+to use the old dashboard.
+
+Once run, you can use the new dashboard by performing a valdiating reload
+in your browser (Ctrl-Shift-R in most browsers).
+EOF
+exit 1
+}
+
+switch_dashboard() {
+    new="${1}"
+    path="${webdir}-${new}"
+
+    echo "Switching to ${new} dashboard..."
+
+    find "${webdir}" -d -delete
+    cp -rp "${path}/." "${webdir}"
+    exit 0
+}
+
+case "${1}" in
+    react)
+        switch_dashboard react
+        ;;
+    classic)
+        switch_dashboard classic
+        ;;
+    *)
+        usage
+        ;;
+esac

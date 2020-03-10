@@ -815,8 +815,10 @@ OPTIONSEOF
 # -----------------------------------------------------------------------------
 
 copy_react_dashboard() {
-  run mv "${1}/index.html" "${1}/index-new.html"
-  run cp -r "${1}"/* "${NETDATA_WEB_DIR}"
+  run rm -rf "${NETDATA_WEB_DIR}/../web-react"
+  run rm -rf "${NETDATA_WEB_DIR}/../web-classic"
+  run cp -rp "${1}/" "${NETDATA_WEB_DIR}/../web-react/"
+  run cp -rp "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}/../web-classic"
 }
 
 install_react_dashboard() {
@@ -837,7 +839,13 @@ install_react_dashboard() {
        copy_react_dashboard "${tmp}/build" && \
        rm -rf "${tmp}"
     then
-      run_ok "React dashboard installed."
+      if run "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" react ; then
+        run_ok "React dashboard installed."
+      else
+        run_failed "Failed to switch to React dashboard."
+        run find "${NETDATA_WEB_DIR}" -d -delete
+        run cp -rp "${NETDATA_WEB_DIR}/../web-classic/." "${NETDATA_WEB_DIR}"
+      fi
     else
       run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
     fi
