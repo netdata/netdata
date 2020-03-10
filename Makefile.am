@@ -524,7 +524,6 @@ KINESIS_BACKEND_FILES = \
 PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     backends/prometheus/remote_write/remote_write.cc \
     backends/prometheus/remote_write/remote_write.h \
-    backends/prometheus/remote_write/backends_remote_write.proto \
     $(NULL)
 
 MONGODB_BACKEND_FILES = \
