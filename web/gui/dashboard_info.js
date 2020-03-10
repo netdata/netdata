@@ -553,6 +553,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-comments"></i>',
         info: 'Performance data for the <b><a href="https://vernemq.com/">VerneMQ</a></b> open-source MQTT broker.'
     },
+
+    'pulsar': {
+        title: 'Pulsar',
+        icon: '<i class="fas fa-comments"></i>',
+        info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
+    },
 };
 
 
@@ -3193,5 +3199,207 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
+    },
+
+    // ------------------------------------------------------------------------
+    // Apache Pulsar
+    'pulsar.messages_rate': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_rate_in"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Publish"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_rate_out"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Dispatch"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ]
+    },
+    'pulsar.subscription_msg_rate_redeliver': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_subscription_msg_rate_redeliver"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Redelivered"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.subscription_blocked_on_unacked_messages': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_subscription_blocked_on_unacked_messages"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Blocked On Unacked"'
+                    + ' data-units="subscriptions"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.msg_backlog': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_msg_backlog"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Messages Backlog"'
+                    + ' data-units="messages"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'pulsar.namespace_messages_rate': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="publish"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Publish"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="dispatch"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Dispatch"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ]
+    },
+    'pulsar.namespace_subscription_msg_rate_redeliver': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="redelivered"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Redelivered"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.namespace_subscription_blocked_on_unacked_messages': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="blocked"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Blocked On Unacked"'
+                    + ' data-units="subscriptions"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.namespace_msg_backlog': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="backlog"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Messages Backlog"'
+                    + ' data-units="messages"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ],
     },
 };
