@@ -193,7 +193,7 @@ New collectors must have the title "[New collector] : [Name of collector]".
 
 #### Commit messages when PRs are merged
 
-When a PR is squashed and merged into master the title of the commit message (first line) must be the PR title
+When a PR gets squashed and merged into master, the title of the commit message (first line) must be the PR title
 followed by the PR number.
 
 The body of the commit message should be a short description of the work, preferably taken from the connected issue.
