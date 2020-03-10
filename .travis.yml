@@ -128,7 +128,6 @@ jobs:
 
 
     - stage: Artifacts validation
-
       name: Unit Testing
       script:
         - .travis/run-unit-tests.sh
