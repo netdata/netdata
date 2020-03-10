@@ -41,6 +41,24 @@ fi
 cd "${NETDATA_SOURCE_DIR}" || exit 1
 
 # -----------------------------------------------------------------------------
+# set up handling for deferred error messages
+NETDATA_DEFERRED_ERRORS=""
+
+defer_error() {
+  NETDATA_DEFERRED_ERRORS="${NETDATA_DEFERRED_ERRORS}\n* ${1}"
+}
+
+print_deferred_errors() {
+  if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
+    echo >&2
+    echo >&2 "The following non-fatal errors were encountered during the installation process:"
+    # shellcheck disable=SC2059
+    printf >&2 "${NETDATA_DEFERRED_ERRORS}"
+    echo >&2
+  fi
+}
+
+# -----------------------------------------------------------------------------
 # load the required functions
 
 if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
@@ -495,12 +513,16 @@ bundle_libmosquitto() {
       run_failed "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
         exit 1
+      else
+        defer_error "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
       fi
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
     if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
       exit 1
+    else
+      defer_error "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
     fi
   fi
 }
@@ -553,12 +575,16 @@ bundle_libwebsockets() {
       run_failed "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
         exit 1
+      else
+        defer_error "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
       fi
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
       exit 1
+    else
+      defer_error "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     fi
   fi
 }
@@ -1067,6 +1093,7 @@ install_go() {
 
   if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
     run_failed "go.d plugin download failed, go.d plugin will not be available"
+    defer_error "go.d plugin download failed, go.d plugin will not be available"
     echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
     echo >&2
     return 0
@@ -1083,6 +1110,7 @@ install_go() {
     echo >&2
 
     run_failed "go.d.plugin package files checksum validation failed."
+    defer_error "go.d.plugin package files checksum validation failed, go.d.plugin will not be available"
     return 0
   fi
 
@@ -1511,6 +1539,8 @@ echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
 cat << EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
 new_installation
 EOF
+
+print_deferred_errors
 
 # -----------------------------------------------------------------------------
 echo >&2
