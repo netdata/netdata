@@ -145,7 +145,7 @@ jobs:
           fi
           # Actually build the package.
           docker build . \
-              -f packaging/Dockerfile.packaging \
+              -f packaging/Dockerfile.packager \
               --build-arg DISTRO=${{ matrix.distro }} \
               --build-arg DISTRO_VERSION=${{ matrix.version }} \
               --build-arg VERSION=$PKG_VERSION \
