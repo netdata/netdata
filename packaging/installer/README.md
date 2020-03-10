@@ -56,7 +56,7 @@ operating systems.
 
 ### Alternative methods
 
-<div class="installer-grid" markdown=1>
+<div class="installer-grid" markdown="1">
 
 [![Install with .deb or .rpm
 packages](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png) Install
