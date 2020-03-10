@@ -1046,6 +1046,8 @@ if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     list(
         APPEND PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS
         -Wl,--wrap=init_write_request
+        -Wl,--wrap=add_host_info
+        -Wl,--wrap=add_label
     )
 endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})

@@ -835,6 +835,48 @@ static void test_process_prometheus_remote_write_response(void **state)
 
     buffer_free(buffer);
 }
+
+static void test_format_host_prometheus_remote_write(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    struct prometheus_remote_write_specific_data *connector_specific_data =
+        mallocz(sizeof(struct prometheus_remote_write_specific_data *));
+    instance->connector_specific_data = (void *)connector_specific_data;
+    connector_specific_data->write_request = (void *)0xff;
+
+    localhost->program_name = strdupz("test_program");
+    localhost->program_version = strdupz("test_version");
+
+    expect_function_call(__wrap_add_host_info);
+    expect_value(__wrap_add_host_info, write_request_p, 0xff);
+    expect_string(__wrap_add_host_info, name, "netdata_info");
+    expect_string(__wrap_add_host_info, instance, "test-host");
+    expect_string(__wrap_add_host_info, application, "test_program");
+    expect_string(__wrap_add_host_info, version, "test_version");
+    expect_in_range(
+        __wrap_add_host_info, timestamp, now_realtime_usec() / USEC_PER_MS - 1000, now_realtime_usec() / USEC_PER_MS);
+
+    expect_function_call(__wrap_add_label);
+    expect_value(__wrap_add_label, write_request_p, 0xff);
+    expect_string(__wrap_add_label, key, "key1");
+    expect_string(__wrap_add_label, value, "value1");
+
+    expect_function_call(__wrap_add_label);
+    expect_value(__wrap_add_label, write_request_p, 0xff);
+    expect_string(__wrap_add_label, key, "key2");
+    expect_string(__wrap_add_label, value, "value2");
+
+    assert_int_equal(format_host_prometheus_remote_write(instance, localhost), 0);
+
+    freez(connector_specific_data);
+    free(localhost->program_name);
+    free(localhost->program_version);
+}
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
 
 #if HAVE_KINESIS
@@ -1027,6 +1069,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_prometheus_remote_write_send_header, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_process_prometheus_remote_write_response),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
     };
 
     test_res += cmocka_run_group_tests_name(

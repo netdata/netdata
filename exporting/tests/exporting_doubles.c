@@ -165,6 +165,27 @@ void *__wrap_init_write_request()
     function_called();
     return mock_ptr_type(void *);
 }
+
+void __wrap_add_host_info(
+    void *write_request_p,
+    const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp)
+{
+    function_called();
+    check_expected_ptr(write_request_p);
+    check_expected_ptr(name);
+    check_expected_ptr(instance);
+    check_expected_ptr(application);
+    check_expected_ptr(version);
+    check_expected(timestamp);
+}
+
+void __wrap_add_label(void *write_request_p, char *key, char *value)
+{
+    function_called();
+    check_expected_ptr(write_request_p);
+    check_expected_ptr(key);
+    check_expected_ptr(value);
+}
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
 
 #if HAVE_KINESIS
