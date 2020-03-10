@@ -7,13 +7,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cgrou
 
 # cgroups.plugin
 
-You can monitor containers and virtual machines using **cgroups**.
+You can monitor containers and virtual machines using control groups (**cgroups**), which are a Linux kernel feature that provides accounting and resource usage limiting for processes. When cgroups get bundled with namespaces (i.e., isolation), they form what we usually call **containers**.
 
-cgroups (or control groups), are a Linux kernel feature that provides accounting and resource usage limiting for processes. When cgroups are bundled with namespaces (i.e. isolation), they form what we usually call **containers**.
+cgroups are hierarchical, meaning that cgroups can contain child cgroups, which can contain more cgroups.  All accounting gets reported (and resource usage limits get applied) also in a hierarchical way.
 
-cgroups are hierarchical, meaning that cgroups can contain child cgroups, which can contain more cgroups, etc. All accounting is reported (and resource usage limits are applied) also in a hierarchical way.
-
-To visualize cgroup metrics Netdata provides configuration for cherry picking the cgroups of interest. By default (without any configuration) Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc) and **virtual machines** spawn by managers that register them with cgroups (qemu, libvirt, etc).
+To visualize cgroup metrics, Netdata provides configuration for cherry-picking the cgroups of interest. By default (without any configuration), Netdata picks **systemd services**, all kinds of **containers** (for example, LXC or Docker) and **virtual machines** spawn by managers that register them with cgroups (QEMU, libvirt, etc.).
 
 ## configuring Netdata for cgroups
 
@@ -34,11 +32,11 @@ Linux exposes resource usage reporting and provides dynamic configuration for cg
 
 ```
 [plugin:cgroups]
-	check for new cgroups every = 10
-	path to /sys/fs/cgroup/cpuacct = /sys/fs/cgroup/cpuacct
-	path to /sys/fs/cgroup/blkio = /sys/fs/cgroup/blkio
-	path to /sys/fs/cgroup/memory = /sys/fs/cgroup/memory
-	path to /sys/fs/cgroup/devices = /sys/fs/cgroup/devices
+    check for new cgroups every = 10
+    path to /sys/fs/cgroup/cpuacct = /sys/fs/cgroup/cpuacct
+    path to /sys/fs/cgroup/blkio = /sys/fs/cgroup/blkio
+    path to /sys/fs/cgroup/memory = /sys/fs/cgroup/memory
+    path to /sys/fs/cgroup/devices = /sys/fs/cgroup/devices
 ```
 
 Netdata rescans these directories for added or removed cgroups every `check for new cgroups every` seconds.
@@ -51,14 +49,14 @@ For each of the directories found, Netdata provides a configuration variable:
 
 ```
 [plugin:cgroups]
-	search for cgroups under PATH = yes | no
+    search for cgroups under PATH = yes | no
 ```
 
 To provide a sane default for this setting, Netdata uses the following pattern list (patterns starting with `!` give a negative match and their order is important: the first matching a path will be used):
 
 ```
 [plugin:cgroups]
-	search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  *
+    search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  *
 ```
 
 So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by Netdata](#monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
@@ -69,8 +67,8 @@ Basic unified cgroups metrics are supported. To use them instead of v1 cgroups a
 
 ```
 [plugin:cgroups]
-	use unified cgroups = yes
-	path to unified cgroups = /sys/fs/cgroup
+    use unified cgroups = yes
+    path to unified cgroups = /sys/fs/cgroup
 ```
 
 Unified cgroups use same name pattern matching as v1 cgroups. `cgroup_enable_systemd_services_detailed_memory` is currently unsupported when using unified cgroups.
@@ -81,14 +79,14 @@ To check if the cgroup is enabled, Netdata uses this setting:
 
 ```
 [plugin:cgroups]
-	enable cgroup NAME = yes | no
+    enable cgroup NAME = yes | no
 ```
 
 To provide a sane default, Netdata uses the following pattern list (it checks the pattern against the path of the cgroup):
 
 ```
 [plugin:cgroups]
-	enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
+    enable by default cgroups matching =  !*/init.scope  *.scope  !*/vcpu*  !*/emulator  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  !/  !/docker  !/libvirt  !/lxc  !/lxc/*/ns  !/lxc/*/ns/*  !/machine  !/qemu  !/system  !/systemd  !/user  *
 ```
 
 The above provides the default `yes` or `no` setting for the cgroup. However, there is an additional step. In many cases the cgroups found in the `/sys/fs/cgroup` hierarchy are just random numbers and in many cases these numbers are ephemeral: they change across reboots or sessions.
@@ -99,8 +97,8 @@ For this mapping Netdata provides 2 configuration options:
 
 ```
 [plugin:cgroups]
-	run script to rename cgroups matching =  *.scope  *docker*  *lxc*  *qemu*  !/  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  *
-	script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
+    run script to rename cgroups matching =  *.scope  *docker*  *lxc*  *qemu*  !/  !*.mount  !*.partition  !*.service  !*.slice  !*.swap  !*.user  *
+    script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
 ```
 
 The whole point for the additional pattern list, is to limit the number of times the script will be called. Without this pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
@@ -113,7 +111,7 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 
 ```
 [plugin:cgroups]
-	enable memory (used mem including cache) = yes
+    enable memory (used mem including cache) = yes
 ```
 
 You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
@@ -195,7 +193,7 @@ Which systemd services are monitored by Netdata is determined by the following p
 
 ```
 [plugin:cgroups]
-	cgroups to match as systemd services =  !/system.slice/*/*.service  /system.slice/*.service
+    cgroups to match as systemd services =  !/system.slice/*/*.service  /system.slice/*.service
 ```
 
 - - -
