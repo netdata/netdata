@@ -1,3 +1,10 @@
+<!--
+---
+title: "External plugins overview"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md
+---
+-->
+
 # External plugins overview
 
 `plugins.d` is the Netdata internal plugin that collects metrics

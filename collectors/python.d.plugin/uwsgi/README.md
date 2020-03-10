@@ -1,3 +1,10 @@
+<!--
+---
+title: "uWSGI monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/uwsgi/README.md
+---
+-->
+
 # uWSGI monitoring with Netdata
 
 Monitors performance metrics exposed by [`Stats Server`](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html).

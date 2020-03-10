@@ -1,3 +1,10 @@
+<!--
+---
+title: "Apache/NGINX/Squid monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/web_log/README.md
+---
+-->
+
 # Apache/NGINX/Squid monitoring with Netdata
 
 Tails access log file and Collects web server/caching proxy metrics.

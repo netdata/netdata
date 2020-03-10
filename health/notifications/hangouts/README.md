@@ -1,3 +1,10 @@
+<!--
+---
+title: "Hangouts Chat"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/hangouts/README.md
+---
+-->
+
 # Hangouts Chat
 
 This is what you will get:

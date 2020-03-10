@@ -1,3 +1,10 @@
+<!--
+---
+title: "Value formatter"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/value/README.md
+---
+-->
+
 # Value formatter
 
 The Value formatter presents [results of database queries](../../queries) as a single value.

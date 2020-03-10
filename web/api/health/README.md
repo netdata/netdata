@@ -1,3 +1,10 @@
+<!--
+---
+title: "Health API Calls"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/health/README.md
+---
+-->
+
 # Health API Calls
 
 ## Health Read API

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Spring Boot2 monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/springboot/README.md
+---
+-->
+
 # Spring Boot2 monitoring with Netdata
 
 Monitors one or more Java Spring-boot applications depending on configuration.

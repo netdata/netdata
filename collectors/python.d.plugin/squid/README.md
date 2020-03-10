@@ -1,3 +1,10 @@
+<!--
+---
+title: "Squid monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/squid/README.md
+---
+-->
+
 # Squid monitoring with Netdata
 
 Monitors one or more squid instances depending on configuration.

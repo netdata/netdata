@@ -1,3 +1,10 @@
+<!--
+---
+title: "Database"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/database/README.md
+---
+-->
+
 # Database
 
 Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine

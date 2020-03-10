@@ -1,3 +1,10 @@
+<!--
+---
+title: "`static-threaded` web server"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/static/README.md
+---
+-->
+
 # `static-threaded` web server
 
 The `static-threaded` web server spawns a fixed number of threads.

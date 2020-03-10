@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 5. Health monitoring alarms and notifications"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-05.md
+---
+-->
+
 # Step 5. Health monitoring alarms and notifications
 
 In the fifth step of the Netdata tutorial, we're introducing you to one of our core features: **health monitoring**.

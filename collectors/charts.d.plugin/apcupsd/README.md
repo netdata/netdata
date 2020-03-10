@@ -1,3 +1,10 @@
+<!--
+---
+title: "APC UPS monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/apcupsd/README.md
+---
+-->
+
 # APC UPS monitoring with Netdata
 
 Monitors different APC UPS models and retrieves status information using `apcaccess` tool.

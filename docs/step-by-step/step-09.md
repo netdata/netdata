@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 9. Long-term metrics storage"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-09.md
+---
+-->
+
 # Step 9. Long-term metrics storage
 
 By default, Netdata stores metrics in a custom database we call the [database engine](../../database/engine/), which

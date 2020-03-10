@@ -1,3 +1,10 @@
+<!--
+---
+title: "PowerDNS dnsdist monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dnsdist/README.md
+---
+-->
+
 # PowerDNS dnsdist monitoring with Netdata
 
 Collects load-balancer performance and health metrics, and draws the following charts:

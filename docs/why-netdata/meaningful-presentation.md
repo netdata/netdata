@@ -1,3 +1,10 @@
+<!--
+---
+title: "Meaningful presentation"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/meaningful-presentation.md
+---
+-->
+
 # Meaningful presentation
 
 Metrics are a lot more than name-value pairs over time. It is just not practical to require from all users to have a deep understanding of all metrics for monitoring their systems and applications.

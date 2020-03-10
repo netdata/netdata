@@ -1,3 +1,10 @@
+<!--
+---
+title: "Why Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/README.md
+---
+-->
+
 # Why Netdata
 
 > Any performance monitoring solution that does not go down to per second

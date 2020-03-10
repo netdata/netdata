@@ -1,3 +1,10 @@
+<!--
+---
+title: "Using the Nodes View"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/nodes-view.md
+---
+-->
+
 # Using the Nodes View
 
 ## Introduction

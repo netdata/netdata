@@ -1,3 +1,10 @@
+<!--
+---
+title: "Installation guide"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
+---
+-->
+
 # Installation guide
 
 Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even

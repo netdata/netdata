@@ -1,3 +1,10 @@
+<!--
+---
+title: "OpenTSDB with HTTP"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/opentsdb/README.md
+---
+-->
+
 # OpenTSDB with HTTP
 
 Netdata can easily communicate with OpenTSDB using HTTP API. To enable this channel, set the following options in your

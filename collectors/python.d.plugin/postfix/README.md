@@ -1,3 +1,10 @@
+<!--
+---
+title: "Postfix monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/postfix/README.md
+---
+-->
+
 # Postfix monitoring with Netdata
 
 Monitors MTA email queue statistics using postqueue tool.  

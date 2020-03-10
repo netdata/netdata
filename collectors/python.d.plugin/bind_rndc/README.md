@@ -1,3 +1,10 @@
+<!--
+---
+title: "ISC Bind monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/bind_rndc/README.md
+---
+-->
+
 # ISC Bind monitoring with Netdata
 
 Collects Name server summary performance statistics using `rndc` tool.

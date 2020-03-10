@@ -1,3 +1,10 @@
+<!--
+---
+title: "Database Queries"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/README.md
+---
+-->
+
 # Database Queries
 
 Netdata database can be queried with `/api/v1/data` and `/api/v1/badge.svg` REST API methods.

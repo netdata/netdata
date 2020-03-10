@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata with .deb/.rpm packages"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md
+---
+-->
+
 # Install Netdata with .deb/.rpm packages
 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)

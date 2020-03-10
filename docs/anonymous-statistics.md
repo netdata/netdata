@@ -1,3 +1,10 @@
+<!--
+---
+title: "Anonymous statistics"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
+---
+-->
+
 # Anonymous statistics
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. We use

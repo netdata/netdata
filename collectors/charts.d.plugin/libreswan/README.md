@@ -1,3 +1,10 @@
+<!--
+---
+title: "Libreswan IPSec tunnel monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/libreswan/README.md
+---
+-->
+
 # Libreswan IPSec tunnel monitoring with Netdata
 
 Collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.

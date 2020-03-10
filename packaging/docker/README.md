@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata with Docker"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
+---
+-->
+
 # Install Netdata with Docker
 
 Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set

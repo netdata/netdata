@@ -1,3 +1,10 @@
+<!--
+---
+title: "High performance Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/high-performance-netdata.md
+---
+-->
+
 # High performance Netdata
 
 If you plan to run a Netdata public on the internet, you will get the most performance out of it by following these

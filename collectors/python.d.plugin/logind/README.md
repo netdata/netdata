@@ -1,3 +1,10 @@
+<!--
+---
+title: "Systemd-Logind monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/logind/README.md
+---
+-->
+
 # Systemd-Logind monitoring with Netdata
 
 Monitors active sessions, users, and seats tracked by `systemd-logind` or `elogind`.

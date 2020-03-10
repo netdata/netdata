@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata via apache's mod_proxy"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md
+---
+-->
+
 # Netdata via apache's mod_proxy
 
 Below you can find instructions for configuring an apache server to:

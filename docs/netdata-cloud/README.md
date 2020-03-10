@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata Cloud"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md
+---
+-->
+
 # Netdata Cloud
 
 Netdata Cloud is core to our ongoing mission to provide real-time, distributed health monitoring and performance troubleshooting. It's the foundation of an ecosystem of tools that will help you build more extraordinary infrastructures.

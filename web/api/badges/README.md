@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata badges"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/badges/README.md
+---
+-->
+
 # Netdata badges
 
 **Badges are cool!**

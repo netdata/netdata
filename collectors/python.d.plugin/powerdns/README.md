@@ -1,3 +1,10 @@
+<!--
+---
+title: "PowerDNS monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/powerdns/README.md
+---
+-->
+
 # PowerDNS monitoring with Netdata
 
 Monitors authoritative server and recursor statistics.

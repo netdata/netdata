@@ -1,3 +1,10 @@
+<!--
+---
+title: "Email"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/email/README.md
+---
+-->
+
 # Email
 
 You need a working `sendmail` command for email alerts to work. Almost all MTAs provide a `sendmail` interface.

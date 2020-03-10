@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata on Synology"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md
+---
+-->
+
 # Install Netdata on Synology
 
 The documentation previously recommended installing the Debian Chroot package from the Synology community package
