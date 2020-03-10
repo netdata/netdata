@@ -9,47 +9,6 @@ char chart[PROMETHEUS_ELEMENT_MAX + 1];
 char family[PROMETHEUS_ELEMENT_MAX + 1];
 char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
-static inline void remote_write_split_words(char *str, char **words, int max_words) {
-    char *s = str;
-    int i = 0;
-
-    while(*s && i < max_words - 1) {
-        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag name
-
-        if(*s)
-            words[i] = s;
-
-        while(*s && !isspace(*s) && *s != '=') s++; // find the end of the tag name
-
-        if(*s != '=') {
-            words[i] = NULL;
-            break;
-        }
-        *s = '\0';
-        s++;
-        i++;
-
-        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag value
-
-        if(*s && *s == '"') s++; // strip an opening quote
-        if(*s)
-            words[i] = s;
-
-        while(*s && !isspace(*s) && *s != ',') s++; // find the end of the tag value
-
-        if(*s && *s != ',') {
-            words[i] = NULL;
-            break;
-        }
-        if(s != words[i] && *(s - 1) == '"') *(s - 1) = '\0'; // strip a closing quote
-        if(*s != '\0') {
-            *s = '\0';
-            s++;
-            i++;
-        }
-    }
-}
-
 /**
  * Send header to a server
  *
