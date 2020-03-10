@@ -7,7 +7,6 @@
 using namespace prometheus;
 
 google::protobuf::Arena arena;
-WriteRequest *write_request;
 
 void *init_write_request() {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
