@@ -9,12 +9,17 @@ using namespace prometheus;
 google::protobuf::Arena arena;
 WriteRequest *write_request;
 
-void init_write_request() {
+void *init_write_request() {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
+    WriteRequest *write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
+    return (void *)write_request;
 }
 
-void add_host_info(const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp) {
+void add_host_info(
+    void *write_request_p,
+    const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp)
+{
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
     TimeSeries *timeseries;
     Sample *sample;
     Label *label;
@@ -47,7 +52,8 @@ void add_host_info(const char *name, const char *instance, const char *applicati
 }
 
 // adds tag to the last created timeseries
-void add_tag(char *tag, char *value) {
+void add_tag(void *write_request_p, char *tag, char *value) {
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
     TimeSeries *timeseries;
     Label *label;
 
@@ -58,7 +64,12 @@ void add_tag(char *tag, char *value) {
     label->set_value(value);
 }
 
-void add_metric(const char *name, const char *chart, const char *family, const char *dimension, const char *instance, const double value, const int64_t timestamp) {
+void add_metric(
+    void *write_request_p,
+    const char *name, const char *chart, const char *family, const char *dimension,
+    const char *instance, const double value, const int64_t timestamp)
+{
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
     TimeSeries *timeseries;
     Sample *sample;
     Label *label;
@@ -92,7 +103,9 @@ void add_metric(const char *name, const char *chart, const char *family, const c
     sample->set_timestamp(timestamp);
 }
 
-size_t get_write_request_size(){
+size_t get_write_request_size(void *write_request_p){
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
+
 #if GOOGLE_PROTOBUF_VERSION < 3001000
     size_t size = (size_t)snappy::MaxCompressedLength(write_request->ByteSize());
 #else
@@ -102,11 +115,12 @@ size_t get_write_request_size(){
     return (size < INT_MAX)?size:0;
 }
 
-int pack_and_clear_write_request(char *buffer, size_t *size) {
+int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *size) {
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
     std::string uncompressed_write_request;
+
     if(write_request->SerializeToString(&uncompressed_write_request) == false) return 1;
     write_request->clear_timeseries();
-
     snappy::RawCompress(uncompressed_write_request.data(), uncompressed_write_request.size(), buffer, size);
 
     return 0;

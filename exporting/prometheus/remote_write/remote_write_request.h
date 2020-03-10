@@ -11,22 +11,22 @@ struct prometheus_remote_write_specific_data {
     void *write_request;
 };
 
-void init_write_request();
-
-void clear_write_request();
+void *init_write_request();
 
 void add_host_info(
+    void *write_request_p,
     const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp);
 
-void add_tag(char *tag, char *value);
+void add_tag(void *write_request_p, char *tag, char *value);
 
 void add_metric(
-    const char *name, const char *chart, const char *family, const char *dimension, const char *instance,
-    const double value, const int64_t timestamp);
+    void *write_request_p,
+    const char *name, const char *chart, const char *family, const char *dimension,
+    const char *instance, const double value, const int64_t timestamp);
 
-size_t get_write_request_size();
+size_t get_write_request_size(void *write_request_p);
 
-int pack_and_clear_write_request(char *buffer, size_t *size);
+int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *size);
 
 void protocol_buffers_shutdown();
 
