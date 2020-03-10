@@ -47,6 +47,14 @@ jobs:
         run: |
           autoreconf -ivf
           ./configure
+      # XXX: Work-around for bug with libbson-1.0 in Ubuntu 18.04
+      # See: https://bugs.launchpad.net/ubuntu/+source/libmongoc/+bug/1790771
+      #      https://jira.mongodb.org/browse/CDRIVER-2818
+      - name: Fix libbson
+        run: |
+          pushd /usr/lib || exit 1
+          sudo ln -s /usr/include .
+          popd || exit 1
       - name: Build
         run: |
           mkdir build-tmp
