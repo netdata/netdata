@@ -876,6 +876,17 @@ if ENABLE_UNITTESTS
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=init_write_request \
+        -Wl,--wrap=add_host_info \
+        -Wl,--wrap=add_label \
+        -Wl,--wrap=add_metric \
+        $(NULL)
+    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
+endif
 if ENABLE_BACKEND_KINESIS
     exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
     exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
@@ -885,15 +896,5 @@ if ENABLE_BACKEND_KINESIS
         -Wl,--wrap=kinesis_put_record \
         -Wl,--wrap=kinesis_get_result \
         $(NULL)
-endif
-if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
-    exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
-    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
-        -Wl,--wrap=init_write_request \
-        -Wl,--wrap=add_host_info \
-        -Wl,--wrap=add_label \
-        $(NULL)
-    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
 endif
 endif

@@ -1030,16 +1030,6 @@ if(BUILD_TESTING)
         )
     set(TEST_NAME exporting_engine)
     set(KINESIS_LINK_OPTIONS)
-if(ENABLE_BACKEND_KINESIS)
-    list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
-    list(
-        APPEND KINESIS_LINK_OPTIONS
-        -Wl,--wrap=aws_sdk_init
-        -Wl,--wrap=kinesis_init
-        -Wl,--wrap=kinesis_put_record
-        -Wl,--wrap=kinesis_get_result
-    )
-endif()
     set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)
 if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     list(APPEND EXPORTING_ENGINE_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
@@ -1048,6 +1038,17 @@ if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
         -Wl,--wrap=init_write_request
         -Wl,--wrap=add_host_info
         -Wl,--wrap=add_label
+        -Wl,--wrap=add_metric
+    )
+endif()
+if(ENABLE_BACKEND_KINESIS)
+    list(APPEND EXPORTING_ENGINE_FILES ${KINESIS_EXPORTING_FILES})
+    list(
+        APPEND KINESIS_LINK_OPTIONS
+        -Wl,--wrap=aws_sdk_init
+        -Wl,--wrap=kinesis_init
+        -Wl,--wrap=kinesis_put_record
+        -Wl,--wrap=kinesis_get_result
     )
 endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})

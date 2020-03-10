@@ -877,6 +877,34 @@ static void test_format_host_prometheus_remote_write(void **state)
     free(localhost->program_name);
     free(localhost->program_version);
 }
+
+static void test_format_dimension_prometheus_remote_write(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    struct prometheus_remote_write_specific_data *connector_specific_data =
+        mallocz(sizeof(struct prometheus_remote_write_specific_data *));
+    instance->connector_specific_data = (void *)connector_specific_data;
+    connector_specific_data->write_request = (void *)0xff;
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    expect_function_call(__wrap_add_metric);
+    expect_value(__wrap_add_metric, write_request_p, 0xff);
+    expect_string(__wrap_add_metric, name, "netdata_");
+    expect_string(__wrap_add_metric, chart, "");
+    expect_string(__wrap_add_metric, family, "");
+    expect_string(__wrap_add_metric, dimension, "dimension_name");
+    expect_string(__wrap_add_metric, instance, "test-host");
+    expect_value(__wrap_add_metric, value, 0x292932e0);
+    expect_value(__wrap_add_metric, timestamp, 15052 * MSEC_PER_SEC);
+
+    assert_int_equal(format_dimension_prometheus_remote_write(instance, rd), 0);
+}
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
 
 #if HAVE_KINESIS
@@ -1071,6 +1099,8 @@ int main(void)
         cmocka_unit_test(test_process_prometheus_remote_write_response),
         cmocka_unit_test_setup_teardown(
             test_format_host_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
     };
 
     test_res += cmocka_run_group_tests_name(
