@@ -214,9 +214,6 @@ static inline int check_socks_enviroment(const char **proxy) {
     if(!tmp)
         return 1;
 
-    if(strnlen(tmp, ACLK_PROXY_MAXLEN) == ACLK_PROXY_MAXLEN)
-        return 1;
-
     if(aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
         *proxy = tmp;
         return 0;
@@ -238,9 +235,6 @@ static const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
             *type = PROXY_TYPE_SOCKS5;
         return proxy;
     }
-
-    if(strnlen(proxy, ACLK_PROXY_MAXLEN) == ACLK_PROXY_MAXLEN)
-        return proxy;
 
     *type = aclk_verify_proxy(proxy);
     if(*type == PROXY_TYPE_UNKNOWN) {
@@ -309,6 +303,7 @@ int aclk_lws_wss_connect(char *host, int port)
 
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
     i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    info("Disabling SSL certificate checks");
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
@@ -348,6 +343,8 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "LWS_CALLBACK_WSI_DESTROY";
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
             return "LWS_CALLBACK_CLIENT_ESTABLISHED";
+        case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
+            return "LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION";
         default:
             // Not using an internal buffer here for thread-safety with unknown calling context.
             error("Unknown LWS callback %u", reason);
@@ -402,6 +399,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
         case LWS_CALLBACK_GET_THREAD_ID: // ?
         case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+        case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
             // Expected and safe to ignore.
             debug(D_ACLK, "Ignoring expected callback from LWS: %s", aclk_lws_callback_name(reason));
             return retval;
@@ -443,7 +441,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
 
         default:
-            error("Unexecpted callback from libwebsockets %s", aclk_lws_callback_name(reason));
+            error("Unexpected callback from libwebsockets %s", aclk_lws_callback_name(reason));
             break;
     }
     return retval; //0-OK, other connection should be closed!

@@ -14,6 +14,8 @@ static int aclk_subscribed = 0;
 static int aclk_disable_single_updates = 0;
 static time_t last_init_sequence = 0;
 static int waiting_init = 1;
+static char *aclk_username = NULL;
+static char *aclk_password = NULL;
 
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
@@ -130,6 +132,56 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
     return 0;
 }
 
+
+static RSA *aclk_private_key = NULL;
+static int create_private_key()
+{
+    char filename[FILENAME_MAX + 1];    struct stat statbuf;
+    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+
+    if (lstat(filename, &statbuf) != 0) {
+        error("Claimed agent cannot establish ACLK - private key not found '%s' failed.", filename);
+        return 1;
+    }
+    if (unlikely(statbuf.st_size == 0)) {
+        info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
+        return 1;
+    }
+
+    FILE *f = fopen(filename, "rt");
+    if (unlikely(f == NULL)) {
+        error("Claimed agent cannot establish ACLK - unable to open private key '%s'.", filename);
+        return 1;
+    }
+
+    char *private_key = callocz(1, statbuf.st_size + 1);
+    size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
+    private_key[bytes_read] = 0;
+    debug(D_ACLK, "Claimed agent loaded private key len=%zu bytes", bytes_read);
+    fclose(f);
+
+    BIO *key_bio = BIO_new_mem_buf(private_key, -1);
+    if (key_bio==NULL) {
+        error("Claimed agent cannot establish ACLK - failed to create BIO for key");
+        goto biofailed;
+    }
+
+    aclk_private_key = PEM_read_bio_RSAPrivateKey(key_bio, NULL, NULL, NULL);
+    BIO_free(key_bio);
+    if (aclk_private_key!=NULL)
+    {
+        freez(private_key);
+        return 0;
+    }
+    char err[512];
+    ERR_error_string_n(ERR_get_error(), err, sizeof(err));
+    error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
+    freez(err);
+
+biofailed:
+    freez(private_key);
+    return 1;
+}
 
 /*
  * After a connection failure -- delay in milliseconds
@@ -893,6 +945,412 @@ static void aclk_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
+{
+    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
+    int rc=1;
+
+    size_t payload_len = 0;
+    if (payload != NULL)
+        payload_len = strlen(payload);
+
+    buffer_flush(b);
+    buffer_sprintf(
+        b,
+        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
+        "User-Agent: Netdata/rocks\r\n\r\n",
+        method, url, host, payload_len);
+    if (payload != NULL)
+        buffer_strcat(b, payload);
+    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", b->len, buffer_tostring(b));
+    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
+
+    if (unlikely(sock == -1)) {
+        error("Handshake failed");
+        return 1;
+    }
+
+    SSL_CTX *ctx = security_initialize_openssl_client();
+    if (ctx==NULL) {
+        error("Cannot allocate SSL context");
+        goto exit_sock;
+    }
+    // Certificate chain: not updating the stores - do we need private CA roots?
+    // Calls to SSL_CTX_load_verify_locations would go here.
+    SSL *ssl = SSL_new(ctx);
+    if (ssl==NULL) {
+        error("Cannot allocate SSL");
+        goto exit_CTX;
+    }
+    SSL_set_fd(ssl, sock);
+    int err = SSL_connect(ssl);
+    if (err!=1) {
+        error("SSL_connect() failed with err=%d", err);
+        goto exit_SSL;
+    }
+    err = SSL_write(ssl, b->buffer, b->len);
+    if (err <= 0)
+    {
+        error("SSL_write() failed with err=%d", err);
+        goto exit_SSL;
+    }
+    buffer_flush(b);
+    int bytes_read = SSL_read(ssl, b->buffer, b->size);
+    if (bytes_read >= 0) {
+        debug(D_ACLK, "Received %d bytes in response", bytes_read);
+        b->len = bytes_read;
+    }
+    else {
+        error("No response available - SSL_read()=%d", bytes_read);
+    }
+    SSL_shutdown(ssl);
+    rc = 0;
+exit_SSL:
+    SSL_free(ssl);
+exit_CTX:
+    SSL_CTX_free(ctx);
+exit_sock:
+    close(sock);
+    return rc;
+}
+
+struct dictionary_singleton {
+    char *key;
+    char *result;
+};
+
+int json_extract_singleton(JSON_ENTRY *e)
+{
+    struct dictionary_singleton *data = e->callback_data;
+
+    switch (e->type) {
+        case JSON_OBJECT:
+        case JSON_ARRAY:
+            break;
+        case JSON_STRING:
+            if (!strcmp(e->name, data->key)) {
+                data->result = strdupz(e->data.string);
+                break;
+            }
+            break;
+        case JSON_NUMBER:
+        case JSON_BOOLEAN:
+        case JSON_NULL:
+            break;
+    }
+    return 0;
+}
+
+// Base-64 decoder.
+// Note: This is non-validating, invalid input will be decoded without an error.
+//       Challenges are packed into json strings so we don't skip newlines.
+//       Size errors (i.e. invalid input size or insufficient output space) are caught.
+size_t base64_decode(unsigned char *input, size_t input_size, unsigned char *output, size_t output_size)
+{
+    static char lookup[256];
+    static int first_time=1;
+    if (first_time)
+    {
+        first_time = 0;
+        for(int i=0; i<256; i++)
+            lookup[i] = -1;
+        for(int i='A'; i<='Z'; i++)
+            lookup[i] = i-'A';
+        for(int i='a'; i<='z'; i++)
+            lookup[i] = i-'a' + 26;
+        for(int i='0'; i<='9'; i++)
+            lookup[i] = i-'0' + 52;
+        lookup['+'] = 62;
+        lookup['/'] = 63;
+    }
+    if ((input_size & 3) != 0)
+    {
+        error("Can't decode base-64 input length %zu", input_size);
+        return 0;
+    }
+    size_t unpadded_size = (input_size/4) * 3;
+    if ( unpadded_size > output_size )
+    {
+        error("Output buffer size %zu is too small to decode %zu into", output_size, input_size);
+        return 0;
+    }
+    // Don't check padding within full quantums
+    for (size_t i = 0 ; i < input_size-4 ; i+=4 )
+    {
+        uint32_t value = (lookup[input[0]] << 18) + (lookup[input[1]] << 12) + (lookup[input[2]] << 6) + lookup[input[3]];
+        output[0] = value >> 16;
+        output[1] = value >> 8;
+        output[2] = value;
+        //error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
+        output += 3;
+        input += 4;
+    }
+    // Handle padding only in last quantum
+    if (input[2] == '=') {
+        uint32_t value = (lookup[input[0]] << 6) + lookup[input[1]];
+        output[0] = value >> 4;
+        //error("Decoded %c %c %c %c -> %02x", input[0], input[1], input[2], input[3], output[0]);
+        return unpadded_size-2;
+    }
+    else if (input[3] == '=') {
+        uint32_t value = (lookup[input[0]] << 12) + (lookup[input[1]] << 6) + lookup[input[2]];
+        output[0] = value >> 10;
+        output[1] = value >> 2;
+        //error("Decoded %c %c %c %c -> %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1]);
+        return unpadded_size-1;
+    }
+    else
+    {
+        uint32_t value = (input[0] << 18) + (input[1] << 12) + (input[2]<<6) + input[3];
+        output[0] = value >> 16;
+        output[1] = value >> 8;
+        output[2] = value;
+        //error("Decoded %c %c %c %c -> %02x %02x %02x", input[0], input[1], input[2], input[3], output[0], output[1], output[2]);
+        return unpadded_size;
+    }
+}
+
+size_t base64_encode(unsigned char *input, size_t input_size, char *output, size_t output_size)
+{
+    uint32_t value;
+    static char lookup[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                           "abcdefghijklmnopqrstuvwxyz"
+                           "0123456789+/";
+    if ((input_size/3+1)*4 >= output_size)
+    {
+        error("Output buffer for encoding size=%zu is not large enough for %zu-bytes input", output_size, input_size);
+        return 0;
+    }
+    size_t count = 0;
+    while (input_size>3)
+    {
+        value = ((input[0] << 16) + (input[1] << 8) + input[2]) & 0xffffff;
+        output[0] = lookup[value >> 18];
+        output[1] = lookup[(value >> 12) & 0x3f];
+        output[2] = lookup[(value >> 6) & 0x3f];
+        output[3] = lookup[value & 0x3f];
+        //error("Base-64 encode (%04x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]);
+        output += 4;
+        input += 3;
+        input_size -= 3;
+        count += 4;
+    }
+    switch (input_size)
+    {
+        case 2:
+            value = (input[0] << 10) + (input[1] << 2);
+            output[0] = lookup[(value >> 12) & 0x3f];
+            output[1] = lookup[(value >> 6) & 0x3f];
+            output[2] = lookup[value & 0x3f];
+            output[3] = '=';
+            //error("Base-64 encode (%06x) -> %c %c %c %c\n", (value>>2)&0xffff, output[0], output[1], output[2], output[3]); 
+            count += 4;
+            break;
+        case 1:
+            value = input[0] << 4;
+            output[0] = lookup[(value >> 6) & 0x3f];
+            output[1] = lookup[value & 0x3f];
+            output[2] = '=';
+            output[3] = '=';
+            //error("Base-64 encode (%06x) -> %c %c %c %c\n", value, output[0], output[1], output[2], output[3]); 
+            count += 4;
+            break;
+        case 0:
+            break;
+    }
+    return count;
+}
+
+
+
+int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decrypted)
+{
+    int  result = RSA_private_decrypt( data_len, enc_data, decrypted, aclk_private_key, RSA_PKCS1_OAEP_PADDING);
+    if (result == -1) {
+        char err[512];
+        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
+        error("Decryption of the challenge failed: %s", err);
+    }
+    return result;
+}
+
+char *extract_payload(BUFFER *b)
+{
+char *s = b->buffer;
+unsigned int line_len=0;
+    for (size_t i=0; i<b->len; i++)
+    {
+        if (*s == 0 )
+            return NULL;
+        if (*s == '\n' ) {
+            if (line_len==0)
+              return s+1;
+            line_len = 0;
+        }
+        else if (*s == '\r') {
+            /* don't count */
+        }
+        else
+            line_len ++;
+        s++;
+    }
+    return NULL;
+}
+
+static int decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
+{
+int pos = 0;
+    if (!strncmp("https://", url, 8))
+    {
+        pos = 8;
+    }
+    else if (!strncmp("http://", url, 7))
+    {
+        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
+        return 1;
+    }
+int host_end = pos;
+    while( url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':' )
+        host_end++;
+    if (url[host_end] == 0)
+    {
+        *aclk_hostname = strdupz(url+pos);
+        *aclk_port = strdupz("443");
+        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+        return 0;
+    }
+    if (url[host_end] == ':')
+    {
+        *aclk_hostname = callocz(host_end - pos + 1, 1);
+        strncpy(*aclk_hostname, url+pos, host_end - pos);
+        int port_end = host_end + 1;
+        while (url[port_end] >= '0' && url[port_end] <= '9')
+            port_end++;
+        if (port_end - host_end > 6)
+        {
+            error("Port specified in %s is invalid", url);
+            return 0;
+        }
+        *aclk_port = callocz(port_end - host_end + 1, 1);
+        for(int i=host_end + 1; i < port_end; i++)
+            (*aclk_port)[i - host_end - 1] = url[i];
+    }
+    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+    return 0;
+}
+
+void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
+{
+    debug(D_ACLK, "Performing challenge-response sequence");
+    if (aclk_password != NULL)
+    {
+        freez(aclk_password);
+        aclk_password = NULL;
+    }
+    // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
+    BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    // TODO - target host?
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL)
+    {
+        error("Agent was not claimed - cannot perform challenge/response");
+        return;
+    }
+    char url[1024];
+    sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
+    info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
+    if(send_https_request("GET", aclk_hostname, aclk_port, url, b, NULL))
+    {
+        error("Challenge failed");
+        return;
+    }
+    struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
+    // Force null-termination?
+    char *payload = NULL;
+    payload = extract_payload(b);
+    if (payload==NULL) {
+      error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
+      return;
+    }
+    debug(D_ACLK, "Challenge response from cloud: %s", payload);
+    if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
+    {
+        freez(challenge.result);
+        error("Could not parse the json response with the challenge: %s", payload);
+        return;
+    }
+    if (challenge.result == NULL ) {
+        error("Could not retrieve challenge from auth response");
+        return;
+    }
+
+
+
+    size_t challenge_len = strlen(challenge.result);
+    unsigned char decoded[512];
+    size_t decoded_len = base64_decode((unsigned char*)challenge.result, challenge_len, decoded, sizeof(decoded));
+
+    unsigned char plaintext[4096]={};
+    int decrypted_length = private_decrypt(decoded, decoded_len, plaintext);
+    freez(challenge.result);
+    char encoded[512];
+    size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
+    encoded[encoded_len] = 0;
+    debug(D_ACLK, "Encoded len=%zu Decryption len=%d: '%s'", encoded_len, decrypted_length, encoded);
+
+    char response_json[4096]={};
+    sprintf(response_json, "{\"response\":\"%s\"}", encoded);
+    debug(D_ACLK, "Password phase: %s",response_json);
+    // TODO - host
+    sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
+    if(send_https_request("POST", aclk_hostname, aclk_port, url, b, response_json))
+    {
+        error("Challenge-response failed");
+        return;
+    }
+    payload = extract_payload(b);
+    if (payload==NULL) {
+      error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
+      return;
+    }
+    debug(D_ACLK, "Password response from cloud: %s", payload);
+
+    struct dictionary_singleton password = { .key = "password", .result = NULL };
+    if (json_parse(payload, &password, json_extract_singleton) != JSON_OK)
+    {
+        freez(password.result);
+        error("Could not parse the json response with the password: %s", payload);
+        return;
+    }
+
+    if (password.result == NULL ) {
+        error("Could not retrieve password from auth response");
+        return;
+    }
+    if (aclk_password != NULL )
+        freez(aclk_password);
+    if (aclk_username == NULL)
+        aclk_username = strdupz(agent_id);
+    aclk_password = password.result;
+
+    buffer_free(b);
+}
+
+static void aclk_try_to_connect(char *hostname, char *port, int port_num)
+{
+    info("Attempting to establish the agent cloud link");
+    aclk_get_challenge(hostname, port);
+    if (aclk_password == NULL)
+        return;
+    int rc;
+    rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
+    if (unlikely(rc)) {
+        error("Failed to initialize the agent cloud link library");
+    }
+    aclk_connecting = 1;
+}
+
+
 /**
  * Main agent cloud link thread
  *
@@ -917,26 +1375,42 @@ void *aclk_main(void *ptr)
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 
-    char *aclk_hostname = config_get(CONFIG_SECTION_ACLK, "agent cloud link hostname", ACLK_DEFAULT_HOST);
-    int aclk_port = config_get_number(CONFIG_SECTION_ACLK, "agent cloud link port", ACLK_DEFAULT_PORT);
 
-    // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
-    // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
-    while (likely(!is_agent_claimed())) {
-        sleep_usec(USEC_PER_SEC * 5);
-        if (netdata_exit)
-            goto exited;
+    char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
+    char *aclk_port = NULL;
+    uint32_t port_num = 0;
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
+    if( decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port))
+    {
+        error("Configuration error - cannot use agent cloud link");
+        return NULL;
+    }
+    port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
+
+    info("Waiting for netdata to be claimed");
+    while(1) {
+        while (likely(!is_agent_claimed())) {
+            sleep_usec(USEC_PER_SEC * 5);
+            if (netdata_exit)
+                goto exited;
+        }
+        if (!create_private_key() && !_mqtt_lib_init())
+            break;
+        sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
+    create_private_key();
 
     usec_t reconnect_expiry = 0; // In usecs
 
     while (!netdata_exit) {
         static int first_init = 0;
 
+        info("loop state first_init_%d connected=%d connecting=%d", first_init, aclk_connected, aclk_connecting);
+        sleep_usec(USEC_PER_MS * 500);
         if (unlikely(!aclk_connected)) {
-            if (unlikely(first_init)) {
-                aclk_try_to_connect(aclk_hostname, aclk_port);
+            if (unlikely(!first_init)) {
+                aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
             } else {
                 if (aclk_connecting == 0) {
@@ -947,8 +1421,7 @@ void *aclk_main(void *ptr)
                     }
                     if (now_realtime_usec() >= reconnect_expiry) {
                         reconnect_expiry = 0;
-                        aclk_connecting = 1;
-                        aclk_try_to_connect(aclk_hostname, aclk_port);
+                        aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                     }
                     sleep_usec(USEC_PER_MS * 100);
                 }
@@ -978,6 +1451,13 @@ void *aclk_main(void *ptr)
     } // forever
 exited:
     aclk_shutdown();
+
+    freez(aclk_username);
+    freez(aclk_password);
+    freez(aclk_hostname);
+    freez(aclk_port);
+    if (aclk_private_key != NULL)
+        RSA_free(aclk_private_key);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1090,15 +1570,6 @@ void aclk_shutdown()
     aclk_connected = 0;
     _link_shutdown();
     info("Shutdown complete");
-}
-
-void aclk_try_to_connect(char *hostname, int port)
-{
-    int rc;
-    rc = _link_lib_init(hostname, port);
-    if (unlikely(rc)) {
-        error("Failed to initialize the agent cloud link library");
-    }
 }
 
 inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)

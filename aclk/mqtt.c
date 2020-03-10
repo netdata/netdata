@@ -81,6 +81,7 @@ int _mqtt_lib_init()
 {
     int rc;
     //int libmosq_major, libmosq_minor, libmosq_revision, libmosq_version;
+    /* Commenting out now as it is unused - do not delete, this is needed for the on-prem version.
     char *ca_crt;
     char *server_crt;
     char *server_key;
@@ -105,6 +106,7 @@ int _mqtt_lib_init()
         freez(server_key);
         server_key = NULL;
     }
+    */
 
     //    info(
     //        "Detected libmosquitto library version %d, %d.%d.%d", libmosq_version, libmosq_major, libmosq_minor,
@@ -115,21 +117,28 @@ int _mqtt_lib_init()
         error("Failed to initialize MQTT (libmosquitto library)");
         return 1;
     }
+    return 0;
+}
 
-    mosq = mosquitto_new("anon", true, NULL);
+static int _mqtt_create_connection(char *username, char *password)
+{
+    if (mosq != NULL)
+        mosquitto_destroy(mosq);
+    mosq = mosquitto_new(username, true, NULL);
     if (unlikely(!mosq)) {
         mosquitto_lib_cleanup();
         error("MQTT new structure  -- %s", mosquitto_strerror(errno));
-        return 1;
+        return MOSQ_ERR_UNKNOWN;
     }
 
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
     mosquitto_publish_callback_set(mosq, publish_callback);
 
-    mosquitto_username_pw_set(mosq, NULL, NULL);
+    info("Using challenge-response: %s / %s", username, password);
+    mosquitto_username_pw_set(mosq, username, password);
 
-    rc = mosquitto_threaded_set(mosq, 1);
+    int rc = mosquitto_threaded_set(mosq, 1);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("Failed to tune the thread model for libmoquitto (%s)", mosquitto_strerror(rc));
 
@@ -145,7 +154,7 @@ int _mqtt_lib_init()
     return rc;
 }
 
-int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
+static int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
 {
     int rc;
 
@@ -195,13 +204,14 @@ void aclk_lws_connection_closed()
 }
 
 
-int _link_lib_init(char *aclk_hostname, int aclk_port)
+int mqtt_attempt_connection(char *aclk_hostname, int aclk_port, char *username, char *password)
 {
-    int rc = aclk_lws_wss_connect(aclk_hostname, aclk_port);
+    if(aclk_lws_wss_connect(aclk_hostname, aclk_port))
+        return MOSQ_ERR_UNKNOWN;
     aclk_lws_wss_service_loop();
 
-    rc = _mqtt_lib_init();
-    if (rc != MOSQ_ERR_SUCCESS)
+    int rc = _mqtt_create_connection(username, password);
+    if (rc!= MOSQ_ERR_SUCCESS)
         return rc;
 
     mosquitto_external_callbacks_set(mosq, _mqtt_external_write_hook, _mqtt_external_read_hook);

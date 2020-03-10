@@ -607,7 +607,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
 // service     the service name or port to connect to
 // timeout     the timeout for establishing a connection
 
-static inline int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout) {
+int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout) {
     struct addrinfo hints;
     struct addrinfo *ai_head = NULL, *ai = NULL;
 
