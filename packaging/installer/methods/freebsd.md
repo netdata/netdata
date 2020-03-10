@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata on FreeBSD"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
+---
+-->
+
 # Install Netdata on FreeBSD
 
 You can install Netdata from either the `ports` or `packages` collections.

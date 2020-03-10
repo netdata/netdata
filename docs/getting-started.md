@@ -1,3 +1,10 @@
+<!--
+---
+title: "Getting started guide"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started.md
+---
+-->
+
 # Getting started guide
 
 Thanks for trying Netdata! In this getting started guide, we'll quickly walk you through the first steps you should take

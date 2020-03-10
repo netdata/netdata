@@ -1,3 +1,10 @@
+<!--
+---
+title: "CEPH monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ceph/README.md
+---
+-->
+
 # CEPH monitoring with Netdata
 
 Monitors the ceph cluster usage and consumption data of a server, and produces:

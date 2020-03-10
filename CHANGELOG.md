@@ -1,3 +1,10 @@
+<!--
+---
+title: "Changelog"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/CHANGELOG.md
+---
+-->
+
 # Changelog
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)

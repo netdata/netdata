@@ -1,3 +1,10 @@
+<!--
+---
+title: "node.d.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/README.md
+---
+-->
+
 # node.d.plugin
 
 `node.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `node.js`.

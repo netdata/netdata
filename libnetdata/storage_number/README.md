@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata storage number"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/storage_number/README.md
+---
+-->
+
 # Netdata storage number
 
 Although `netdata` does all its calculations using `long double`, it stores all values using

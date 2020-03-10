@@ -1,3 +1,10 @@
+<!--
+---
+title: "Fronius Symo monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/fronius/README.md
+---
+-->
+
 # Fronius Symo monitoring with Netdata
 
 Collects metrics from the configured solar power installation from Fronius Symo.

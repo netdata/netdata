@@ -1,3 +1,10 @@
+<!--
+---
+title: "Web dashboards overview"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/README.md
+---
+-->
+
 # Web dashboards overview
 
 Because Netdata is a health monitoring and _performance troubleshooting_ system,

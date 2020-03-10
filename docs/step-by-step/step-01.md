@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 1. Netdata's building blocks"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-01.md
+---
+-->
+
 # Step 1. Netdata's building blocks
 
 Netdata is a distributed and real-time _health monitoring and performance troubleshooting toolkit_ for monitoring your

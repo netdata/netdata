@@ -1,3 +1,10 @@
+<!--
+---
+title: "Max"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/max/README.md
+---
+-->
+
 # Max
 
 This module finds the max value in the time-frame given.

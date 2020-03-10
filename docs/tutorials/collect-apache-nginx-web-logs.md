@@ -1,3 +1,10 @@
+<!--
+---
+title: "Monitor Nginx or Apache web server log files with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/collect-apache-nginx-web-logs.md
+---
+-->
+
 # Monitor Nginx or Apache web server log files with Netdata
 
 Log files have been a critical resource for developers and system administrators who want to understand the health and

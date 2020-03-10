@@ -1,3 +1,10 @@
+<!--
+---
+title: "Uninstall Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md
+---
+-->
+
 # Uninstall Netdata
 
 Our self-contained uninstaller is able to remove Netdata installations created with shell installer. It doesn't need any

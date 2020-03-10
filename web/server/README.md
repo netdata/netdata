@@ -1,3 +1,10 @@
+<!--
+---
+title: "Web server"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/README.md
+---
+-->
+
 # Web server
 
 The Netdata web server runs as `static-threaded`, i.e. with a fixed, configurable number of threads.

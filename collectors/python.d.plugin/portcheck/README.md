@@ -1,3 +1,10 @@
+<!--
+---
+title: "TCP endpoint monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/portcheck/README.md
+---
+-->
+
 # TCP endpoint monitoring with Netdata
 
 Monitors TCP endpoint availability and response time.

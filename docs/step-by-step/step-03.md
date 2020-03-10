@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 3. Monitor more than one system with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-03.md
+---
+-->
+
 # Step 3. Monitor more than one system with Netdata
 
 The Netdata agent is _distributed_ by design. That means each agent operates independently from any other, collecting

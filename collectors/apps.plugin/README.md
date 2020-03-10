@@ -1,3 +1,10 @@
+<!--
+---
+title: "apps.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/apps.plugin/README.md
+---
+-->
+
 # apps.plugin
 
 `apps.plugin` breaks down system resource usage to **processes**, **users** and **user groups**.

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Samba monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/samba/README.md
+---
+-->
+
 # Samba monitoring with Netdata
 
 Monitors the performance metrics of Samba file sharing.

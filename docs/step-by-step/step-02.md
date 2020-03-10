@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 2. Get to know Netdata's dashboard"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-02.md
+---
+-->
+
 # Step 2. Get to know Netdata's dashboard
 
 Welcome to Netdata proper! Now that you understand how Netdata works, how it's built, and why we built it, you can start

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Redis monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/redis/README.md
+---
+-->
+
 # Redis monitoring with Netdata
 
 Monitors database status. It reads server response to `INFO` command.

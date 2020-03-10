@@ -1,3 +1,10 @@
+<!--
+---
+title: "1-Wire Sensors monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/w1sensor/README.md
+---
+-->
+
 # 1-Wire Sensors monitoring with Netdata
 
 Monitors sensor temperature.

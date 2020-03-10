@@ -1,3 +1,10 @@
+<!--
+---
+title: "Hard drive temperature monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/hddtemp/README.md
+---
+-->
+
 # Hard drive temperature monitoring with Netdata
 
 Monitors disk temperatures from one or more `hddtemp` daemons.

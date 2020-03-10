@@ -1,3 +1,10 @@
+<!--
+---
+title: "Prometheus remote write backend"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/prometheus/remote_write/README.md
+---
+-->
+
 # Prometheus remote write backend
 
 ## Prerequisites

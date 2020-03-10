@@ -1,3 +1,10 @@
+<!--
+---
+title: "PostgreSQL monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/postgres/README.md
+---
+-->
+
 # PostgreSQL monitoring with Netdata
 
 Collects database health and performance metrics.

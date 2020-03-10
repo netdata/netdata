@@ -1,3 +1,10 @@
+<!--
+---
+title: "Supported collectors list"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md
+---
+-->
+
 # Supported collectors list
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 10. Set up a proxy"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-10.md
+---
+-->
+
 # Step 10. Set up a proxy
 
 You're almost through! At this point, you should be pretty familiar with now Netdata works and how to configure it to

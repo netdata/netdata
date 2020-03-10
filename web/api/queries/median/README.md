@@ -1,3 +1,10 @@
+<!--
+---
+title: "Median"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/median/README.md
+---
+-->
+
 # Median
 
 The median is the value separating the higher half from the lower half of a data sample

@@ -1,3 +1,10 @@
+<!--
+---
+title: "RiakKV monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/riakkv/README.md
+---
+-->
+
 # RiakKV monitoring with Netdata
 
 Collects database stats from `/stats` endpoint.

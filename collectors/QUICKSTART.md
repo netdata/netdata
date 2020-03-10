@@ -1,3 +1,10 @@
+<!--
+---
+title: "Collectors quickstart"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/QUICKSTART.md
+---
+-->
+
 # Collectors quickstart
 
 In this quickstart guide, you'll learn how to enable collectors so you can get metrics from your favorite applications

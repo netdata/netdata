@@ -1,3 +1,10 @@
+<!--
+---
+title: "SMS Server Tools 3"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/smstools3/README.md
+---
+-->
+
 # SMS Server Tools 3
 
 The [SMS Server Tools 3](http://smstools3.kekekasvi.com/) is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.

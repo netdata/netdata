@@ -1,3 +1,10 @@
+<!--
+---
+title: "LiteSpeed monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/litespeed/README.md
+---
+-->
+
 # LiteSpeed monitoring with Netdata
 
 Collects web server performance metrics for network, connection, requests, and cache.  

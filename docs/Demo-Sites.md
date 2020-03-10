@@ -1,3 +1,10 @@
+<!--
+---
+title: "Demo sites"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
+---
+-->
+
 # Demo sites
 
 Live demo installations of Netdata are available at **[https://www.netdata.cloud](https://www.netdata.cloud/#live-demo)**:

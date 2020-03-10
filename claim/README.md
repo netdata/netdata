@@ -1,3 +1,10 @@
+<!--
+---
+title: "Agent claiming"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
+---
+-->
+
 # Agent claiming
 
 Agent claiming is part of the onboarding process when creating a workspace in Netdata Cloud. Each workspace gets its own

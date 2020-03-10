@@ -1,3 +1,10 @@
+<!--
+---
+title: "Syslog"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/syslog/README.md
+---
+-->
+
 # Syslog
 
 You need a working `logger` command for this to work.  This is the case on pretty much every Linux system in existence, and most BSD systems.
