@@ -794,9 +794,35 @@ static void test_init_prometheus_remote_write_instance(void **state)
     freez(instance->connector_specific_data);
 }
 
-static void test_prometheus_remote_write_connector_worker(void **state)
+static void test_prometheus_remote_write_send_header(void **state)
 {
-    (void)state;
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+    int sock = 1;
+
+    struct prometheus_remote_write_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct prometheus_remote_write_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->remote_write_path = strdupz("/receive");
+
+    buffer_sprintf(instance->buffer, "test buffer");
+
+    expect_function_call(__wrap_send);
+    expect_value(__wrap_send, sockfd, 1);
+    expect_not_value(__wrap_send, buf, NULL);
+    expect_string(
+        __wrap_send, buf,
+        "POST /receive HTTP/1.1\r\n"
+        "Host: test-host\r\n"
+        "Accept: */*\r\n"
+        "Content-Length: 11\r\n"
+        "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
+    expect_value(__wrap_send, len, 125);
+    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
+
+    prometheus_remote_write_send_header(&sock, instance);
+
+    free(connector_specific_config->remote_write_path);
 }
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
 
@@ -988,7 +1014,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_init_prometheus_remote_write_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
-            test_prometheus_remote_write_connector_worker, setup_initialized_engine, teardown_initialized_engine),
+            test_prometheus_remote_write_send_header, setup_initialized_engine, teardown_initialized_engine),
     };
 
     test_res += cmocka_run_group_tests_name(
