@@ -3,7 +3,7 @@
 ## Prerequisites
 
 To use the Prometheus remote write API with [storage
-providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage) you should install first
+providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage), install
 [protobuf](https://developers.google.com/protocol-buffers/) and [snappy](https://github.com/google/snappy) libraries.
 Next, Netdata should be re-installed from the source. The installer will detect that the required libraries and
 utilities are now available.
