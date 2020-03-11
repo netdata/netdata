@@ -71,3 +71,16 @@ jobs:
         run: |
           cd build-tmp
           ctest
+      - name: Prepare Artifacts
+        if: always()
+        run: |
+          mkdir logs
+          pushd build-tmp || exit 1
+          find . -type f -name '*.log' -exec cp {} ../logs/ \;
+          popd || exit 1
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v1
+        if: always()
+        with:
+          name: logs
+          path: logs
