@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step ∞. You're finished!"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-99.md
+---
+-->
+
 # Step ∞. You're finished!
 
 Congratulations. 🎉

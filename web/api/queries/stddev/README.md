@@ -1,3 +1,10 @@
+<!--
+---
+title: "standard deviation (`stddev`)"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/stddev/README.md
+---
+-->
+
 # standard deviation (`stddev`)
 
 The standard deviation is a measure that is used to quantify the amount of variation or dispersion

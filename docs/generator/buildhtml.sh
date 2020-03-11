@@ -33,6 +33,9 @@ cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 echo "Modifying README header"
 sed -i -e '0,/# Netdata /s//# Netdata Documentation\n\n/' ${SRC_DIR}/README.md
 
+# Strip comments around frontmatter.
+find ${SRC_DIR} -name '*.md' -exec sed -i "/<!--/d;/-->/d;" {} \;
+
 # Remove all GA tracking code
 find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
 

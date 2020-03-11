@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 6. Collect metrics from more services and apps"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-06.md
+---
+-->
+
 # Step 6. Collect metrics from more services and apps
 
 When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more.

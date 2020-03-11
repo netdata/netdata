@@ -1,3 +1,10 @@
+<!--
+---
+title: "fping.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/fping.plugin/README.md
+---
+-->
+
 # fping.plugin
 
 The fping plugin supports monitoring latency, packet loss and uptime of any number of network end points,

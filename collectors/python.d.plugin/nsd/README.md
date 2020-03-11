@@ -1,3 +1,10 @@
+<!--
+---
+title: "NSD monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nsd/README.md
+---
+-->
+
 # NSD monitoring with Netdata
 
 Uses the `nsd-control stats_noreset` command to provide `nsd` statistics.

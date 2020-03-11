@@ -1,3 +1,10 @@
+<!--
+---
+title: "Read documentation on <https://docs.netdata.cloud>"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/README.md
+---
+-->
+
 # Read documentation on <https://docs.netdata.cloud>
 
 Welcome to the Netdata documentation! While you can read Netdata documentation here, or throughout the Netdata repository, our intention is that these pages are read on [docs.netdata.cloud](https://docs.netdata.cloud). 

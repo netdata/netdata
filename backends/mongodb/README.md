@@ -1,3 +1,10 @@
+<!--
+---
+title: "MongoDB backend"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/mongodb/README.md
+---
+-->
+
 # MongoDB backend
 
 ## Prerequisites

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Gearman monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/gearman/README.md
+---
+-->
+
 # Gearman monitoring with Netdata
 
 Monitors Gearman worker statistics. A chart is shown for each job as well as one showing a summary of all workers.

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Security Policy"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/SECURITY.md
+---
+-->
+
 # Security Policy
 
 ## Supported Versions

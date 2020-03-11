@@ -1,3 +1,10 @@
+<!--
+---
+title: "Update Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md
+---
+-->
+
 # Update Netdata
 
 ![image8](https://cloud.githubusercontent.com/assets/2662304/14253735/536f4580-fa95-11e5-9f7b-99112b31a5d7.gif)

@@ -1,3 +1,10 @@
+<!--
+---
+title: "IPFS monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ipfs/README.md
+---
+-->
+
 # IPFS monitoring with Netdata
 
 Collects [IPFS](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics. 

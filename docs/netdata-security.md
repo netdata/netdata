@@ -1,3 +1,10 @@
+<!--
+---
+title: "Security design"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-security.md
+---
+-->
+
 # Security design
 
 We have given special attention to all aspects of Netdata, ensuring that everything throughout its operation is as secure as possible. Netdata has been designed with security in mind.

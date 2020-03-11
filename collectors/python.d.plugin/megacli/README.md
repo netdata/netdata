@@ -1,3 +1,10 @@
+<!--
+---
+title: "MegaRAID controller monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/megacli/README.md
+---
+-->
+
 # MegaRAID controller monitoring with Netdata
 
 Collects adapter, physical drives and battery stats.

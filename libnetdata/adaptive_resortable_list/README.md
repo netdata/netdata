@@ -1,3 +1,10 @@
+<!--
+---
+title: "Adaptive Re-sortable List (ARL)"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/adaptive_resortable_list/README.md
+---
+-->
+
 # Adaptive Re-sortable List (ARL)
 
 This library allows Netdata to read a series of `name - value` pairs

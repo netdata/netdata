@@ -1,3 +1,10 @@
+<!--
+---
+title: "CSV formatter"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/csv/README.md
+---
+-->
+
 # CSV formatter
 
 The CSV formatter presents [results of database queries](../../queries) in the following formats:

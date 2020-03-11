@@ -1,3 +1,10 @@
+<!--
+---
+title: "freeipmi.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/freeipmi.plugin/README.md
+---
+-->
+
 # freeipmi.plugin
 
 Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.

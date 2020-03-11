@@ -1,3 +1,10 @@
+<!--
+---
+title: "Beanstalk monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/beanstalk/README.md
+---
+-->
+
 # Beanstalk monitoring with Netdata
 
 Provides server and tube-level statistics.

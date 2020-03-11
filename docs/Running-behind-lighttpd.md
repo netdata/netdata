@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata via lighttpd v1.4.x"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-lighttpd.md
+---
+-->
+
 # Netdata via lighttpd v1.4.x
 
 Here is a config for accessing Netdata in a suburl via lighttpd 1.4.46 and newer:

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Writing metrics to TimescaleDB"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/TIMESCALE.md
+---
+-->
+
 # Writing metrics to TimescaleDB
 
 Thanks to Netdata's community of developers and system administrators, and Mahlon Smith

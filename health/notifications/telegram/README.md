@@ -1,3 +1,10 @@
+<!--
+---
+title: "Telegram"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/telegram/README.md
+---
+-->
+
 # Telegram
 
 [Telegram](https://telegram.org/) is a messaging app with a focus on speed and security, it’s super-fast, simple and free. You can use Telegram on all your devices at the same time — your messages sync seamlessly across any number of your phones, tablets or computers.

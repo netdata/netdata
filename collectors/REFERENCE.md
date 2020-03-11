@@ -1,3 +1,10 @@
+<!--
+---
+title: "Collectors configuration reference"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/REFERENCE.md
+---
+-->
+
 # Collectors configuration reference
 
 Welcome to the collector configuration reference guide.

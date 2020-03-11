@@ -1,3 +1,10 @@
+<!--
+---
+title: "Memcached monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/memcached/README.md
+---
+-->
+
 # Memcached monitoring with Netdata
 
 Collects memory-caching system performance metrics. It reads server response to stats command ([stats interface](https://github.com/memcached/memcached/wiki/Commands#stats)).

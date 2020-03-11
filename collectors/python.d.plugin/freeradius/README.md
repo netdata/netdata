@@ -1,3 +1,10 @@
+<!--
+---
+title: "FreeRADIUS monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/freeradius/README.md
+---
+-->
+
 # FreeRADIUS monitoring with Netdata
 
 Uses the `radclient` command to provide freeradius statistics. It is not recommended to run it every second.

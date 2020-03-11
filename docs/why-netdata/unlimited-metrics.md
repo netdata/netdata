@@ -1,3 +1,10 @@
+<!--
+---
+title: "Unlimited metrics"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/unlimited-metrics.md
+---
+-->
+
 # Unlimited metrics
 
 All metrics are important and all metrics should be available when you need them.  

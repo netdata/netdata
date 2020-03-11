@@ -1,3 +1,10 @@
+<!--
+---
+title: "Export metrics to AWS Kinesis Data Streams"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/aws_kinesis/README.md
+---
+-->
+
 # Export metrics to AWS Kinesis Data Streams
 
 ## Prerequisites

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata on offline systems"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md
+---
+-->
+
 # Install Netdata on offline systems
 
 You can install Netdata on systems without internet access, but you need to take a few extra steps to make it work.

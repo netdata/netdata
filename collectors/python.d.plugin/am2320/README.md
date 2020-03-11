@@ -1,3 +1,10 @@
+<!--
+---
+title: "AM2320 sensor monitoring with netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/am2320/README.md
+---
+-->
+
 # AM2320 sensor monitoring with netdata
 
 Displays a graph of the temperature and humity from a AM2320 sensor.

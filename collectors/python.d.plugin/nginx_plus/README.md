@@ -1,3 +1,10 @@
+<!--
+---
+title: "NGINX Plus monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nginx_plus/README.md
+---
+-->
+
 # NGINX Plus monitoring with Netdata
 
 Monitors one or more NGINX Plus servers depending on configuration. Servers can be either local or remote.

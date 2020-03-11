@@ -1,3 +1,10 @@
+<!--
+---
+title: "UPS/PDU monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/nut/README.md
+---
+-->
+
 # UPS/PDU monitoring with Netdata
 
 Collects UPS data for all power devices configured in the system.

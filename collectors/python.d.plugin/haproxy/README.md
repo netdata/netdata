@@ -1,3 +1,10 @@
+<!--
+---
+title: "HAProxy monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/haproxy/README.md
+---
+-->
+
 # HAProxy monitoring with Netdata
 
 Monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.

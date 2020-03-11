@@ -1,3 +1,10 @@
+<!--
+---
+title: "Fail2ban monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/fail2ban/README.md
+---
+-->
+
 # Fail2ban monitoring with Netdata
 
 Monitors the fail2ban log file to show all bans for all active jails.
