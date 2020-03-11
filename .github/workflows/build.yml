@@ -73,13 +73,15 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+      - name: install-required-packages.sh on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
+        run: |
+          echo $PRE > ./prep-cmd.sh
+          docker build . -f .github/Dockerfile.build_test -t build_test --build-arg BASE=${{ matrix.distro }}
       - name: Regular build on ${{ matrix.distro }}
-        env:
-          PRE: ${{ matrix.pre }}
         run: |
-          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && /bin/sh -c "${PRE}"; ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive all && autoreconf -ivf && ./configure && make -j2'
+          docker run --rm -e PRE -w /netdata build_test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}
-        env:
-          PRE: ${{ matrix.pre }}
         run: |
-          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && /bin/sh -c "${PRE}" ; ./packaging/installer/install-required-packages.sh netdata --dont-wait --non-interactive && ./netdata-installer.sh --dont-wait --dont-start-it'
+          docker run --rm -e PRE -w /netdata build_test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it'
