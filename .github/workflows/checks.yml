@@ -60,7 +60,10 @@ jobs:
       - name: Make dist
         run: |
           make dist
-          ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
+      - name: Verify & Set distfile
+        run: |
+          ls -lah netdata-*.tar.gz
+          echo "::set-env name=DISTFILE::$(ls netdata-*.tar.gz)"
       - name: Run run_install_with_dist_file.sh
         run: |
-          ./.github/scripts/run_install_with_dist_file.sh
+          ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"

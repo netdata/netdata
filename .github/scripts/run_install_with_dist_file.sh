@@ -5,43 +5,33 @@
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud)
-#
+
 set -e
 
-# If we are not in netdata git repo, at the top level directory, fail
-TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
-CWD=$(git rev-parse --show-cdup || echo "")
-if [ -n "${CWD}" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
-  echo "Run as .travis/$(basename "$0") from top level directory of netdata git repository"
-  echo "Changelog generation process aborted"
+if [ $# -ne 1 ]; then
+  printf >&2 "Usage: %s <dist_file>\n" "$(basename "$0")"
   exit 1
 fi
 
-echo "Initiating dist archive contents validation"
-DIST_FILE_FROM_GIT="netdata-$(git describe).tar.gz"
-DIST_FILE_FROM_FILE="netdata-$(tr -d '\n' < packaging/version).tar.bgz"
-if [ -f "${DIST_FILE_FROM_GIT}" ]; then
-  DIST_FILE="${DIST_FILE_FROM_GIT}"
-elif [ -f "${DIST_FILE_FROM_FILE}" ]; then
-  DIST_FILE="${DIST_FILE_FROM_FILE}"
-else
-  echo "I could not find netdata distfile. Nor ${DIST_FILE_FROM_GIT} or ${DIST_FILE_FROM_FILE} exist"
-  exit 1
+distfile="${1}"
+shift
+
+printf >&2 "Opening dist archive %s ... " "${distfile}"
+tar -xovf "${distfile}"
+distdir="$(echo "${distfile}" | cut -d. -f1,2,3)"
+if [ ! -d "${distdir}" ]; then
+  printf >&2 "ERROR: %s is not a directory" "${distdir}"
+  exit 2
 fi
 
-echo "Opening dist archive ${DIST_FILE}"
-tar -xovf "${DIST_FILE}"
-NETDATA_DIST_FOLDER=$(echo "${DIST_FILE}" | cut -d. -f1,2,3)
-if [ ! -d "${NETDATA_DIST_FOLDER}" ]; then
-  echo "I could not locate folder ${NETDATA_DIST_FOLDER}, something went wrong failing the test"
-  exit 1
-fi
+printf >&2 "Entering %s and starting docker run ..." "${distdir}"
 
-echo "Entering ${NETDATA_DIST_FOLDER} and starting docker compilation"
-cd "${NETDATA_DIST_FOLDER}"
-docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O'-' 'http://127.0.0.1:19999/api/v1/info' | grep version"
+pushd "${distdir}" || exit 1
+docker run \
+  -v "${PWD}:/netdata" \
+  -w /netdata \
+  "netdata/os-test:centos7" \
+  /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
+popd || exit 1
 
-echo "Installation completed with no errors! Removing temporary folders"
-
-cd -
-rm -rf "${NETDATA_DIST_FOLDER}"
+echo "All Done!"
