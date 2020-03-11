@@ -26,7 +26,13 @@ switch_dashboard() {
 
     echo "Switching to ${new} dashboard..."
 
-    rm -rf "${webdir}"
+    for dashboard in classic react ; do
+        # shellcheck disable=SC2013
+        for path in $(cat ${webdir}-${dashboard}/.files) ; do
+            rm -f "${webdir}/${path}"
+        done
+    done
+
     cp -a "${path}" "${webdir}"
     exit 0
 }

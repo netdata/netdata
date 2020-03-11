@@ -960,7 +960,12 @@ copy_react_dashboard() {
   run rm -rf "${NETDATA_WEB_DIR}-classic"
   run cp -a "${1}/" "${NETDATA_WEB_DIR}-react"
   run cp -a "${NETDATA_WEB_DIR}/dashboard_info.js" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/dashboard.slate.css" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/dashboard.css" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/main.css" "${NETDATA_WEB_DIR}-react"
+  run echo "$(cd ${NETDATA_WEB_DIR}-react && find . -type f | sed -e 's/\.\///')" > "${NETDATA_WEB_DIR}-react/.files"
   run cp -a "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
+  run echo "$(find web/gui -type f | sed -e "s/web\/gui\///")" > "${NETDATA_WEB_DIR}-classic/.files"
   run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
 }
 
