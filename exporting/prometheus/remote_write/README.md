@@ -1,5 +1,8 @@
 # Prometheus remote write exporting connector
 
+The Prometheus remote write exporting connector uses the exporting engine to send Netdata metrics to your choice of more
+than 20 external storage providers for long-term archiving and further analysis.
+
 ## Prerequisites
 
 To use the Prometheus remote write API with [storage
