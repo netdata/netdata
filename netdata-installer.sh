@@ -280,6 +280,7 @@ while [ -n "${1}" ]; do
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
         echo "Cloud explicitly enabled, not re-enabling it"
       else
+        ACLK=no
         NETDATA_DISABLE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
       fi
@@ -288,6 +289,7 @@ while [ -n "${1}" ]; do
       if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
         echo "Cloud explicitly disabled, not re-enabling it"
       else
+        ACLK=yes
         NETDATA_REQUIRE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-aclk/} --enable-aclk"
       fi
@@ -480,7 +482,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ "x${ACLK}" != "xyes" ]; then
     return 0
   fi
 
@@ -548,7 +550,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ "x${ACLK}" != "xyes" ]; then
     return 0
   fi
 
