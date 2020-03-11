@@ -8,7 +8,7 @@
 
 #define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
-#define ACLK_CHART_TOPIC "chart"
+#define ACLK_CHART_TOPIC "outbound/meta"
 #define ACLK_ALARMS_TOPIC "outbound/alarms"
 #define ACLK_METADATA_TOPIC "outbound/meta"
 #define ACLK_COMMAND_TOPIC "inbound/cmd"
