@@ -6,7 +6,6 @@ In "Component Name" section write which component is changed in this PR. This
 will help us review your PR quicker.
 
 In "Test Plan" provide enough detail on how you plan to test this PR so that a reviewer can validate your tests. If our CI covers sufficient tests, then state which tests cover the change.
-covered by our CI then state which tests cover the change.
 
 If you have more information you want to add, write them in "Additional
 Information" section. This is usually used to help others understand your
