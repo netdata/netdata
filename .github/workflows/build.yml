@@ -7,10 +7,11 @@ on:
   pull_request:
 jobs:
   build:
-    name: Build
+    name: Build & Install
     strategy:
       matrix:
         distro:
+          - 'alpine:edge'
           - 'alpine:3.11'
           - 'alpine:3.10'
           - 'alpine:3.9'
@@ -21,6 +22,7 @@ jobs:
           - 'debian:bullseye'
           - 'debian:buster'
           - 'debian:stretch'
+          - 'debian:jessie'
           - 'fedora:31'
           - 'fedora:30'
           - 'fedora:29'
@@ -34,6 +36,8 @@ jobs:
           - 'ubuntu:18.04'
           - 'ubuntu:16.04'
         include:
+          - distro: 'alpine:edge'
+            pre: 'apk add -U bash'
           - distro: 'alpine:3.11'
             pre: 'apk add -U bash'
           - distro: 'alpine:3.10'
@@ -50,6 +54,8 @@ jobs:
             pre: 'apt-get update'
           - distro: 'debian:stretch'
             pre: 'apt-get update'
+          - distro: 'debian:jessie'
+            pre: 'apt-get update'
 
           - distro: 'ubuntu:20.04'
             pre: 'apt-get update'
@@ -65,7 +71,12 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: Build on ${{ matrix.distro }}
+      - name: Regular build on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
+        run: |
+          docker run --rm -e PRE -v $PWD:/netdata -w /netdata ${{ matrix.distro }} /bin/sh -c '[ -n "${PRE}" ] && ${PRE}; ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive all && autoreconf -ivf && ./configure && make -j2'
+      - name: netdata-installer on ${{ matrix.distro }}
         env:
           PRE: ${{ matrix.pre }}
         run: |
