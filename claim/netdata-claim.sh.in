@@ -129,11 +129,19 @@ do
                 -hostname=*) HOSTNAME=${arg:10} ;;
                 -verbose) VERBOSE=1 ;;
                 -insecure) INSECURE=1 ;;
+                -proxy=socks*) PROXY=${arg:7} ;;
+                -noproxy) NOPROXY=yes ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
         esac
         shift 1
 done
+
+# if curl not installed give warning SOCKS can't be used
+if [[ "${URLTOOL}" != "curl" && "${PROXY}" = socks* ]] ; then
+        echo >&2 "wget doesn't support SOCKS. Please install curl or disable SOCKS proxy."
+        exit 1
+fi
 
 echo >&2 "Token: ****************"
 echo >&2 "Base URL: $URL_BASE"
@@ -196,9 +204,17 @@ fi
 
 if [ "${URLTOOL}" = "curl" ] ; then
         URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+        if [ "${NOPROXY}" = "yes" ] ; then
+                URLCOMMAND="${URLCOMMAND} -x \"\""
+        else
+                URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
+        fi
 else
         URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
+        if [ "${NOPROXY}" = "yes" ] ; then
+                URLCOMMAND="${URLCOMMAND} --no-proxy"
+        fi
 fi
 
 if [ "${INSECURE}" == 1 ] ; then
@@ -207,7 +223,6 @@ if [ "${INSECURE}" == 1 ] ; then
     else
         URLCOMMAND="${URLCOMMAND} --no-check-certificate"
     fi
-
 fi
 
 if [ -r "${CLOUD_CERTIFICATE_FILE}" ] ; then
