@@ -958,7 +958,8 @@ fi
 copy_react_dashboard() {
   run rm -rf "${NETDATA_WEB_DIR}-react"
   run rm -rf "${NETDATA_WEB_DIR}-classic"
-  run cp -a "${1}/" "${NETDATA_WEB_DIR}-react/"
+  run cp -a "${1}/" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/dashboard_info.js" "${NETDATA_WEB_DIR}-react"
   run cp -a "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
   run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
 }
