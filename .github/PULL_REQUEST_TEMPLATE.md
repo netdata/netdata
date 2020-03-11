@@ -22,11 +22,10 @@ helpful if there is no related issue.
 ##### Test Plan
 
 <!---
-Please be detailed enough that your reviewer can understand which test-cases you
+Provide enough detail so that your reviewer can understand which test-cases you
 have covered, and recreate them if necessary. If sufficient tests are covered
 by our CI then state which tests cover the change.
 -->
 
 ##### Additional Information
-
 
