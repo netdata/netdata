@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "RiakKV monitoring with Netdata"
@@ -7,9 +6,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 -->
 
 # RiakKV monitoring with Netdata
-=======
-# Riak KV monitoring with Netdata
->>>>>>> scrubbing the collectors for correct use of acronyms
 
 Collects database stats from `/stats` endpoint.
 
