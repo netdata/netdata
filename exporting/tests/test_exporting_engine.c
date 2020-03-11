@@ -905,6 +905,53 @@ static void test_format_dimension_prometheus_remote_write(void **state)
 
     assert_int_equal(format_dimension_prometheus_remote_write(instance, rd), 0);
 }
+
+static void test_format_batch_prometheus_remote_write(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    struct prometheus_remote_write_specific_data *connector_specific_data =
+        mallocz(sizeof(struct prometheus_remote_write_specific_data *));
+    instance->connector_specific_data = (void *)connector_specific_data;
+    connector_specific_data->write_request = __real_init_write_request();
+
+    __real_add_host_info(
+        connector_specific_data->write_request,
+        "test_name", "test_instance", "test_application", "test_version", 15051);
+
+    __real_add_label(connector_specific_data->write_request, "test_key", "test_value");
+
+    __real_add_metric(
+        connector_specific_data->write_request,
+        "test_name", "test chart", "test_family", "test_dimension",
+        "test_instance", 123000321, 15052);
+
+    assert_int_equal(format_batch_prometheus_remote_write(instance), 0);
+
+    BUFFER *buffer = instance->buffer;
+    assert_int_equal(buffer_strlen(buffer), 192);
+
+    BUFFER *escaped_buffer = buffer_create(850);
+    size_t len = buffer_strlen(buffer);
+    char *ch = (char *)buffer_tostring(buffer);
+    for (; len > 0; ch++, len--)
+        buffer_sprintf(escaped_buffer, "\\%03o", (unsigned int)*ch);
+    assert_string_equal(buffer_tostring(escaped_buffer),
+        "\\37777777641\\002\\120\\012\\37777777622\\001\\012\\025\\012\\010\\137\\137\\156\\141\\155\\145\\137\\137"
+        "\\022\\011\\164\\145\\163\\164\\005\\015\\064\\012\\031\\012\\010\\151\\156\\163\\164\\141\\156\\143\\145\\022"
+        "\\015\\005\\027\\021\\017\\100\\012\\037\\012\\013\\141\\160\\160\\154\\151\\143\\141\\164\\151\\157\\156\\022"
+        "\\020\\005\\036\\035\\022\\034\\012\\027\\012\\007\\166\\145\\162\\163\\001\\035\\000\\014\\005\\035\\015\\016"
+        "\\014\\012\\026\\012\\010\\005\\020\\020\\153\\145\\171\\022\\012\\005\\012\\040\\166\\141\\154\\165\\145\\022"
+        "\\014\\011\\000\\005\\001\\030\\37777777760\\077\\020\\37777777713\\165\\012\\37777777611\\142\\37777777625"
+        "\\000\\034\\023\\012\\005\\143\\150\\141\\162\\164\\011\\075\\000\\040\\005\\014\\054\\012\\025\\012\\006\\146"
+        "\\141\\155\\151\\154\\171\\022\\013\\005\\123\\011\\015\\040\\012\\033\\012\\011\\144\\151\\155\\145\\156\\005"
+        "\\37777777607\\000\\016\\005\\032\\025\\020\\000\\012\\146\\37777777736\\000\\064\\022\\014\\011\\000\\000\\000"
+        "\\004\\130\\123\\37777777635\\101\\020\\37777777714\\165");
+
+    buffer_free(escaped_buffer);
+    protocol_buffers_shutdown();
+}
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
 
 #if HAVE_KINESIS
@@ -1101,6 +1148,8 @@ int main(void)
             test_format_host_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_format_dimension_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_batch_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
     };
 
     test_res += cmocka_run_group_tests_name(
