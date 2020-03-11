@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "Fail2ban monitoring with Netdata"
@@ -7,9 +6,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 -->
 
 # Fail2ban monitoring with Netdata
-=======
-# Fail2Ban monitoring with Netdata
->>>>>>> scrubbing the collectors for correct use of acronyms
 
 Monitors the Fail2Ban log file to show all bans for all active jails.
 
