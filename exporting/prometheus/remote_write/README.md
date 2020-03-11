@@ -21,7 +21,7 @@ in the Netdata configuration directory and set the following options:
 ```
 
 `remote write URL path` is used to set an endpoint path for the remote write protocol. The default value is `/receive`.
-For example, if your endpoint is `http://example.domain:example_port/storage/read` you should set
+For example, if your endpoint is `http://example.domain:example_port/storage/read`:
 
 ```conf
     destination = example.domain:example_port
