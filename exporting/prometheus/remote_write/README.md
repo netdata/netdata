@@ -10,7 +10,7 @@ utilities are now available.
 
 ## Configuration
 
-To enable data sending to a storage provider using the Prometheus remote write API, run `./edit-config exporting.conf`
+To enable data exporting to a storage provider using the Prometheus remote write API, run `./edit-config exporting.conf`
 in the Netdata configuration directory and set the following options:
 
 ```conf
