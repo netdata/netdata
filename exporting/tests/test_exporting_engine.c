@@ -924,8 +924,8 @@ static void test_format_batch_prometheus_remote_write(void **state)
 
     __real_add_metric(
         connector_specific_data->write_request,
-        "test_name", "test chart", "test_family", "test_dimension",
-        "test_instance", 123000321, 15052);
+        "test_name", "test chart", "test_family", "test_dimension", "test_instance",
+        123000321, 15052);
 
     assert_int_equal(format_batch_prometheus_remote_write(instance), 0);
 
@@ -937,7 +937,8 @@ static void test_format_batch_prometheus_remote_write(void **state)
     char *ch = (char *)buffer_tostring(buffer);
     for (; len > 0; ch++, len--)
         buffer_sprintf(escaped_buffer, "\\%03o", (unsigned int)*ch);
-    assert_string_equal(buffer_tostring(escaped_buffer),
+    assert_string_equal(
+        buffer_tostring(escaped_buffer),
         "\\37777777641\\002\\120\\012\\37777777622\\001\\012\\025\\012\\010\\137\\137\\156\\141\\155\\145\\137\\137"
         "\\022\\011\\164\\145\\163\\164\\005\\015\\064\\012\\031\\012\\010\\151\\156\\163\\164\\141\\156\\143\\145\\022"
         "\\015\\005\\027\\021\\017\\100\\012\\037\\012\\013\\141\\160\\160\\154\\151\\143\\141\\164\\151\\157\\156\\022"

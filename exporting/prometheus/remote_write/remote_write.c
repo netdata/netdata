@@ -22,10 +22,11 @@ void prometheus_remote_write_send_header(int *sock, struct instance *instance)
     flags += MSG_NOSIGNAL;
 #endif
 
-    struct prometheus_remote_write_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    struct prometheus_remote_write_specific_config *connector_specific_config =
+        instance->config.connector_specific_config;
 
     static BUFFER *header;
-    if(!header)
+    if (!header)
         header = buffer_create(0);
 
     buffer_sprintf(
@@ -50,22 +51,24 @@ void prometheus_remote_write_send_header(int *sock, struct instance *instance)
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
  */
-int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *instance) {
-    if(unlikely(!buffer)) return 1;
+int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *instance)
+{
+    if (unlikely(!buffer))
+        return 1;
 
     const char *s = buffer_tostring(buffer);
     int len = buffer_strlen(buffer);
 
     // do nothing with HTTP responses 200 or 204
 
-    while(!isspace(*s) && len) {
+    while (!isspace(*s) && len) {
         s++;
         len--;
     }
     s++;
     len--;
 
-    if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
+    if (likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
         return 0;
     else
         return exporting_discard_response(buffer, instance);
@@ -152,22 +155,24 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
  */
 int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
 {
-    prometheus_label_copy(chart, (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(
+        chart,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        PROMETHEUS_ELEMENT_MAX);
     prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
     prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-    if(likely(can_send_rrdset(instance, st))) {
+    if (likely(can_send_rrdset(instance, st))) {
         as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
         homogeneous = 1;
-        if(as_collected) {
-            if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
+        if (as_collected) {
+            if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
                 rrdset_update_heterogeneous_flag(st);
 
-            if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+            if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
                 homogeneous = 0;
-        }
-        else {
-            if(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
+        } else {
+            if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
                 prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
         }
     }
@@ -187,7 +192,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
     struct prometheus_remote_write_specific_data *connector_specific_data =
         (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
 
-    if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+    if (rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
         char name[PROMETHEUS_LABELS_MAX + 1];
         char dimension[PROMETHEUS_ELEMENT_MAX + 1];
         char *suffix = "";
@@ -195,55 +200,73 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
         if (as_collected) {
             // we need as-collected / raw data
 
-            if(unlikely(rd->last_collected_time.tv_sec < instance->after)) {
-                debug(D_BACKEND, "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, rd->rrdset->id, instance->engine->config.hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)instance->after, (unsigned long)instance->before);
+            if (unlikely(rd->last_collected_time.tv_sec < instance->after)) {
+                debug(
+                    D_BACKEND,
+                    "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
+                    "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
+                    rd->id, rd->rrdset->id,
+                    instance->engine->config.hostname,
+                    (unsigned long)rd->last_collected_time.tv_sec,
+                    (unsigned long)instance->after,
+                    (unsigned long)instance->before);
                 return 1;
             }
 
-            if(homogeneous) {
+            if (homogeneous) {
                 // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                 // we add all dimensions as labels
 
-                prometheus_label_copy(dimension, (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                prometheus_label_copy(
+                    dimension,
+                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+                    PROMETHEUS_ELEMENT_MAX);
                 snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->engine->config.prefix, context, suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
                     name, chart, family, dimension, instance->engine->config.hostname,
                     rd->last_collected_value, timeval_msec(&rd->last_collected_time));
-            }
-            else {
+            } else {
                 // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                 // we create a metric per dimension
 
-                prometheus_name_copy(dimension, (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
-                snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->engine->config.prefix, context, dimension, suffix);
+                prometheus_name_copy(
+                    dimension,
+                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+                    PROMETHEUS_ELEMENT_MAX);
+                snprintf(
+                    name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->engine->config.prefix, context, dimension,
+                    suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
                     name, chart, family, NULL, instance->engine->config.hostname,
                     rd->last_collected_value, timeval_msec(&rd->last_collected_time));
             }
-        }
-        else {
+        } else {
             // we need average or sum of the data
 
             time_t last_t = instance->before;
             calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
-            if(!isnan(value) && !isinf(value)) {
-
-                if(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
+            if (!isnan(value) && !isinf(value)) {
+                if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
                     suffix = "_average";
-                else if(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_SUM)
+                else if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_SUM)
                     suffix = "_sum";
 
-                prometheus_label_copy(dimension, (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
-                snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->engine->config.prefix, context, units, suffix);
+                prometheus_label_copy(
+                    dimension,
+                    (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+                    PROMETHEUS_ELEMENT_MAX);
+                snprintf(
+                    name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->engine->config.prefix, context, units, suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
-                    name, chart, family, dimension, instance->engine->config.hostname, value, last_t * MSEC_PER_SEC);
+                    name, chart, family, dimension, instance->engine->config.hostname,
+                    value, last_t * MSEC_PER_SEC);
             }
         }
     }

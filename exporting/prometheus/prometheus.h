@@ -5,8 +5,8 @@
 
 #include "exporting/exporting_engine.h"
 
-#define PROMETHEUS_ELEMENT_MAX 256
-#define PROMETHEUS_LABELS_MAX 1024
+#define PROMETHEUS_ELEMENT_MAX  256
+#define PROMETHEUS_LABELS_MAX   1024
 #define PROMETHEUS_VARIABLE_MAX 256
 
 #define PROMETHEUS_LABELS_MAX_NUMBER 128
@@ -22,8 +22,12 @@ typedef enum prometheus_output_flags {
 	PROMETHEUS_OUTPUT_HIDEUNITS  = (1 << 6)
 } PROMETHEUS_OUTPUT_OPTIONS;
 
-extern void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
-extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
+extern void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+    struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix,
+    EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
+extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
+    struct instance *instance, RRDHOST *host, BUFFER *wb, const char *server, const char *prefix,
+    EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 
 int can_send_rrdset(struct instance *instance, RRDSET *st);
 size_t prometheus_name_copy(char *d, const char *s, size_t usable);
