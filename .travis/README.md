@@ -1,3 +1,10 @@
+<!--
+---
+title: "Description of CI build configuration"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/.travis/README.md
+---
+-->
+
 # Description of CI build configuration
 
 ## Variables needed by travis

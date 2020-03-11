@@ -1,3 +1,10 @@
+<!--
+---
+title: "Monitor CockroachDB metrics with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/monitor-cockroachdb.md
+---
+-->
+
 # Monitor CockroachDB metrics with Netdata
 
 [CockroachDB](https://github.com/cockroachdb/cockroach) is an open-source project that brings SQL databases into

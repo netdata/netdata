@@ -67,6 +67,7 @@ dist_noinst_DATA = \
     packaging/mosquitto.version \
     packaging/mosquitto.checksums \
     packaging/bundle-mosquitto.sh \
+    packaging/bundle-lws.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \

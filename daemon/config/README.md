@@ -1,3 +1,10 @@
+<!--
+---
+title: "Daemon configuration"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/config/README.md
+---
+-->
+
 # Daemon configuration
 
 <details markdown="1"><summary>The daemon configuration file is read from `/etc/netdata/netdata.conf`.</summary>

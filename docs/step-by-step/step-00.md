@@ -1,7 +1,9 @@
+<!--
 ---
-title: The step-by-step Netdata tutorial
-description: Learn what Netdata is, what it's capable of, and how it'll help you make faster and more informed decisions about the health and performance of your systems and applications.
+title: "The step-by-step Netdata tutorial"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-00.md
 ---
+-->
 
 # The step-by-step Netdata tutorial
 

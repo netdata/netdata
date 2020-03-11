@@ -1,3 +1,10 @@
+<!--
+---
+title: "Performance"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Performance.md
+---
+-->
+
 # Performance
 
 Netdata performance is affected by:

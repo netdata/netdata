@@ -1,3 +1,10 @@
+<!--
+---
+title: "statsd.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
+---
+-->
+
 # statsd.plugin
 
 statsd is a system to collect data from any application. Applications are sending metrics to it, usually via non-blocking UDP communication, and statsd servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.

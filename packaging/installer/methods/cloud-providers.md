@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata on cloud providers"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/cloud-providers.md
+---
+-->
+
 # Install Netdata on cloud providers
 
 Netdata is fully compatible with popular cloud providers like Google Cloud Platform (GCP), Amazon Web Services (AWS),

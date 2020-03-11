@@ -1,3 +1,10 @@
+<!--
+---
+title: "IRC"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/irc/README.md
+---
+-->
+
 # IRC
 
 This is what you will get:

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Dashboard"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/web/README.md
+---
+-->
+
 # Dashboard
 
 The Netdata dashboard shows HTML notifications, when it is open.

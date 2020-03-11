@@ -1,3 +1,10 @@
+<!--
+---
+title: "RethinkDB monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/rethinkdbs/README.md
+---
+-->
+
 # RethinkDB monitoring with Netdata
 
 Collects database server and cluster statistics.

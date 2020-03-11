@@ -1,3 +1,10 @@
+<!--
+---
+title: "A GitHub star is important"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/a-github-star-is-important.md
+---
+-->
+
 # A GitHub star is important
 
 **GitHub stars** allow Netdata to expand its reach, its community, especially attract people with skills willing to

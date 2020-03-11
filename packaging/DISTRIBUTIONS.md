@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata distribution support matrix"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/DISTRIBUTIONS.md
+---
+-->
+
 # Netdata distribution support matrix
 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)

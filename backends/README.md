@@ -1,3 +1,10 @@
+<!--
+---
+title: "Metrics long term archiving"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/README.md
+---
+-->
+
 # Metrics long term archiving
 
 Netdata supports backends for archiving the metrics, or providing long term dashboards, using Grafana or other tools,

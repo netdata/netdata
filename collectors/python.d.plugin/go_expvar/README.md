@@ -1,3 +1,10 @@
+<!--
+---
+title: "Go application monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/go_expvar/README.md
+---
+-->
+
 # Go application monitoring with Netdata
 
 Monitors Go application that exposes its metrics with the use of `expvar` package from the Go standard library.  The package produces charts for Go runtime memory statistics and optionally any number of custom charts.

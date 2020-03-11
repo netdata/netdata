@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata cli"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/cli/README.md
+---
+-->
+
 # Netdata cli
 
 You can see the commands netdatacli supports by executing it with `netdatacli` and entering `help` in

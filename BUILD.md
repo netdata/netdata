@@ -1,3 +1,10 @@
+<!--
+---
+title: "The build system"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/BUILD.md
+---
+-->
+
 # The build system
 
 We are currently migrating from `autotools` to `CMake` as a build-system. This document 

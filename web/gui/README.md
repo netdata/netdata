@@ -1,3 +1,10 @@
+<!--
+---
+title: "The standard web dashboard"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
+---
+-->
+
 # The standard web dashboard
 
 The standard web dashboard is the heart of Netdata's performance troubleshooting

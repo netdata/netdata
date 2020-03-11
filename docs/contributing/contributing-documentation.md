@@ -1,3 +1,10 @@
+<!--
+---
+title: "Contributing to documentation"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/contributing-documentation.md
+---
+-->
+
 # Contributing to documentation
 
 We welcome contributions to Netdata's already extensive documentation, which we host at

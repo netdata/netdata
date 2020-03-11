@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 7. Netdata's dashboard in depth"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-07.md
+---
+-->
+
 # Step 7. Netdata's dashboard in depth
 
 Welcome to the seventh step of the Netdata guide!

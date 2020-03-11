@@ -1,3 +1,10 @@
+<!--
+---
+title: "Single (or Simple) Exponential Smoothing (`ses`)"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/ses/README.md
+---
+-->
+
 # Single (or Simple) Exponential Smoothing (`ses`)
 
 > This query is also available as `ema` and `ewma`.

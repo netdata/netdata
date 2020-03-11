@@ -1,3 +1,10 @@
+<!--
+---
+title: "eBPF monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf_process.plugin/README.md
+---
+-->
+
 # eBPF monitoring with Netdata
 
 This collector plugin uses eBPF (Extended Berkeley Packet Filter) to monitor system calls inside your operating system's

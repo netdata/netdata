@@ -1,3 +1,10 @@
+<!--
+---
+title: "Query formatting"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/README.md
+---
+-->
+
 # Query formatting
 
 API data queries need to be formatted before returned to the caller.

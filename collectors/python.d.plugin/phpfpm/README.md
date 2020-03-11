@@ -1,3 +1,10 @@
+<!--
+---
+title: "PHP-FPM monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/phpfpm/README.md
+---
+-->
+
 # PHP-FPM monitoring with Netdata
 
 Monitors one or more PHP-FPM instances depending on configuration.

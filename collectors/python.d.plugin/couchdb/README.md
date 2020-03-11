@@ -1,3 +1,10 @@
+<!--
+---
+title: "Apache CouchDB monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/couchdb/README.md
+---
+-->
+
 # Apache CouchDB monitoring with Netdata
 
 Monitors vital statistics of a local Apache CouchDB 2.x server, including:

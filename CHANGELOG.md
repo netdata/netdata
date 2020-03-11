@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix MDX parsing in installation guide [\#8362](https://github.com/netdata/netdata/pull/8362) ([joelhans](https://github.com/joelhans))
+- ebpf plugin info typo fix  [\#8360](https://github.com/netdata/netdata/pull/8360) ([ilyam8](https://github.com/ilyam8))
+- Improve ACLK according to results of the smoke-test. [\#8358](https://github.com/netdata/netdata/pull/8358) ([amoss](https://github.com/amoss))
+- Add packaging/bundle-lws.sh to dist\_noinst\_DATA \(was missed\) [\#8356](https://github.com/netdata/netdata/pull/8356) ([prologic](https://github.com/prologic))
+- Remove possible erroneous blank line causing Travis to fail possibly and default to magical behaviour [\#8355](https://github.com/netdata/netdata/pull/8355) ([prologic](https://github.com/prologic))
+- Bulk add frontmatter to all documentation [\#8354](https://github.com/netdata/netdata/pull/8354) ([joelhans](https://github.com/joelhans))
 - Fix cosmetic error checking for CentOS 8 version in install-required-packages [\#8339](https://github.com/netdata/netdata/pull/8339) ([prologic](https://github.com/prologic))
 - Fixed typo [\#8335](https://github.com/netdata/netdata/pull/8335) ([peroxy](https://github.com/peroxy))
 - Fixed dependency names for Arch Linux. [\#8334](https://github.com/netdata/netdata/pull/8334) ([Ferroin](https://github.com/Ferroin))

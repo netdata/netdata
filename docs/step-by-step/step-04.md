@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 4. The basics of configuring Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-04.md
+---
+-->
+
 # Step 4. The basics of configuring Netdata
 
 Welcome to the fourth step of the Netdata tutorial.

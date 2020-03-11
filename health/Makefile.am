@@ -75,6 +75,7 @@ dist_healthconfig_DATA = \
     health.d/portcheck.conf \
     health.d/postgres.conf \
     health.d/processes.conf \
+    health.d/pulsar.conf \
     health.d/qos.conf \
     health.d/ram.conf \
     health.d/redis.conf \

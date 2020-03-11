@@ -1,3 +1,10 @@
+<!--
+---
+title: "Tor monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tor/README.md
+---
+-->
+
 # Tor monitoring with Netdata
 
 Connects to the Tor control port to collect traffic statistics.
