@@ -1,3 +1,10 @@
+<!--
+---
+title: "RabbitMQ monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/rabbitmq/README.md
+---
+-->
+
 # RabbitMQ monitoring with Netdata
 
 Collects message broker global and per virtual host metrics.

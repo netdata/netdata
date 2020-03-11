@@ -1,3 +1,10 @@
+<!--
+---
+title: "Change how long Netdata stores metrics"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/longer-metrics-storage.md
+---
+-->
+
 # Change how long Netdata stores metrics
 
 Netdata helps you collect thousands of system and application metrics every second, but what about storing them for the

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata alarm notifications"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/README.md
+---
+-->
+
 # Netdata alarm notifications
 
 The `exec` line in health configuration defines an external script that will be called once

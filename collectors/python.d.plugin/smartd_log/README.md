@@ -1,3 +1,10 @@
+<!--
+---
+title: "Storage devices monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/smartd_log/README.md
+---
+-->
+
 # Storage devices monitoring with Netdata
 
 Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.

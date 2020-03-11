@@ -1,3 +1,10 @@
+<!--
+---
+title: "Apache Tomcat monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tomcat/README.md
+---
+-->
+
 # Apache Tomcat monitoring with Netdata
 
 Presents memory utilization of tomcat containers.

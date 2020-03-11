@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata style guide"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
+---
+-->
+
 # Netdata style guide
 
 This in-progress style guide establishes editorial guidelines for anyone who wants to write documentation for Netdata

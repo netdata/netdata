@@ -1,3 +1,10 @@
+<!--
+---
+title: "Contributor Covenant Code of Conduct"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/CODE_OF_CONDUCT.md
+---
+-->
+
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge

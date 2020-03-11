@@ -1,3 +1,10 @@
+<!--
+---
+title: "Monitor Unbound DNS servers with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/collect-unbound-metrics.md
+---
+-->
+
 # Monitor Unbound DNS servers with Netdata
 
 [Unbound](https://nlnetlabs.nl/projects/unbound/about/) is a "validating, recursive, caching DNS resolver" from NLNet

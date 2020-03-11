@@ -1,3 +1,10 @@
+<!--
+---
+title: "freebsd.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/freebsd.plugin/README.md
+---
+-->
+
 # freebsd.plugin
 
 Collects resource usage and performance data on FreeBSD systems

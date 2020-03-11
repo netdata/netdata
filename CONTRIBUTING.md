@@ -1,3 +1,10 @@
+<!--
+---
+title: "Contributing"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/CONTRIBUTING.md
+---
+-->
+
 # Contributing
 
 Thank you for considering contributing to Netdata.

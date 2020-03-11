@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata daemon"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
+---
+-->
+
 # Netdata daemon
 
 ## Starting netdata

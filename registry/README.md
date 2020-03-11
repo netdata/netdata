@@ -1,3 +1,10 @@
+<!--
+---
+title: "Registry"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/registry/README.md
+---
+-->
+
 # Registry
 
 The Netdata registry implements the node menu on the top left corner of the Netdata dashboards and enables the Netdata

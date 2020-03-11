@@ -7,13 +7,13 @@ services:
       args:
       - DISTRO=arch
       - VERSION=extras
-    image: arch_current_dev:latest
+    image: arch_extras_dev:latest
     command: >
       sh -c "echo -n 00000000-0000-0000-0000-000000000000 >/etc/netdata/claim.d/claimed_id &&
              echo '[agent_cloud_link]' >>/etc/netdata/netdata.conf &&
              echo '  agent cloud link hostname = vernemq' >>/etc/netdata/netdata.conf &&
              echo '  agent cloud link port = 9002' >>/etc/netdata/netdata.conf &&
-             /usr/sbin/valgrind --leak-check=full /usr/sbin/netdata -D"
+             /usr/sbin/valgrind --leak-check=full /usr/sbin/netdata -D -W debug_flags=0x200000000"
     ports:
     - 20000:19999
 

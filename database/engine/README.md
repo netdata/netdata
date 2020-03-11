@@ -1,3 +1,10 @@
+<!--
+---
+title: "Database engine"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/README.md
+---
+-->
+
 # Database engine
 
 The Database Engine works like a traditional database. There is some amount of RAM dedicated to data caching and

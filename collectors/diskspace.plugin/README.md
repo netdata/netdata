@@ -1,3 +1,10 @@
+<!--
+---
+title: "diskspace.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/diskspace.plugin/README.md
+---
+-->
+
 # diskspace.plugin
 
 This plugin monitors the disk space usage of mounted disks, under Linux. The plugin requires Netdata to have execute/search permissions on the mount point itself, as well as each component of the absolute path to the mount point.

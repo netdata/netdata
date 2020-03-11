@@ -1,3 +1,10 @@
+<!--
+---
+title: "Running Netdata behind Nginx"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-nginx.md
+---
+-->
+
 # Running Netdata behind Nginx
 
 ## Intro

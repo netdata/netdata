@@ -1,3 +1,10 @@
+<!--
+---
+title: "charts.d.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/README.md
+---
+-->
+
 # charts.d.plugin
 
 `charts.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `BASH` v4+.

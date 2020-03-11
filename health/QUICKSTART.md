@@ -1,3 +1,10 @@
+<!--
+---
+title: "Health quickstart"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/QUICKSTART.md
+---
+-->
+
 # Health quickstart
 
 In this getting started guide, you'll learn the basics of editing health configuration files. With this knowledge, you

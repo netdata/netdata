@@ -1,3 +1,10 @@
+<!--
+---
+title: "Streaming and replication"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
+---
+-->
+
 # Streaming and replication
 
 Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected

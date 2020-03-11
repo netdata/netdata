@@ -1,3 +1,10 @@
+<!--
+---
+title: "Using Netdata with Prometheus"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/prometheus/README.md
+---
+-->
+
 # Using Netdata with Prometheus
 
 > IMPORTANT: the format Netdata sends metrics to prometheus has changed since Netdata v1.7. The new prometheus backend

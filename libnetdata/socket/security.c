@@ -84,7 +84,7 @@ void security_openssl_common_options(SSL_CTX *ctx) {
  *
  * @return It returns the context on success or NULL otherwise
  */
-static SSL_CTX * security_initialize_openssl_client() {
+SSL_CTX * security_initialize_openssl_client() {
     SSL_CTX *ctx;
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     ctx = SSL_CTX_new(SSLv23_client_method());

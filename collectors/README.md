@@ -1,3 +1,10 @@
+<!--
+---
+title: "Collecting metrics"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/README.md
+---
+-->
+
 # Collecting metrics
 
 Netdata can collect metrics from hundreds of different sources, be they internal data created by the system itself, or

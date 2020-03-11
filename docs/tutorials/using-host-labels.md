@@ -1,3 +1,10 @@
+<!--
+---
+title: "Use host labels to organize systems, metrics, and alarms"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/using-host-labels.md
+---
+-->
+
 # Use host labels to organize systems, metrics, and alarms
 
 When you use Netdata to monitor and troubleshoot an entire infrastructure, whether that's dozens or hundreds of systems,

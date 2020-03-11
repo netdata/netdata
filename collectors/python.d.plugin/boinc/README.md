@@ -1,3 +1,10 @@
+<!--
+---
+title: "BOINC monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/boinc/README.md
+---
+-->
+
 # BOINC monitoring with Netdata
 
 Monitors task counts for the Berkely Open Infrastructure Networking Computing (BOINC) distributed computing client using the same RPC interface that the BOINC monitoring GUI does.

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Monitor a Hadoop cluster with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/monitor-hadoop-cluster.md
+---
+-->
+
 # Monitor a Hadoop cluster with Netdata
 
 Hadoop is an [Apache project](https://hadoop.apache.org/) is a framework for processing large sets of data across a

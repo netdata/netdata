@@ -1,3 +1,10 @@
+<!--
+---
+title: "Health monitoring"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/README.md
+---
+-->
+
 # Health monitoring
 
 With Netdata, you can monitor the health and performance of your systems and applications. You start with hundreds of

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Registration and signing in"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/signing-in.md
+---
+-->
+
 # Registration and signing in
 
 To use the features of [Netdata Cloud](README.md), you must first register an account with Netdata Cloud and associate your first Netdata node with the Netdata Cloud [registry](../../registry/README.md). **Netdata Cloud is entirely free for all Netdata users**, and does not store any metrics created by your machines. You keep your data—Netdata Cloud just connects it all together.

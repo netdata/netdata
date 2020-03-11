@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata on pfSense"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md
+---
+-->
+
 # Install Netdata on pfSense
 
 To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt
