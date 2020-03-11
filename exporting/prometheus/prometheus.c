@@ -386,7 +386,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         char context[PROMETHEUS_ELEMENT_MAX + 1];
         char family[PROMETHEUS_ELEMENT_MAX + 1];
-        char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
         prometheus_label_copy(
             chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id, PROMETHEUS_ELEMENT_MAX);
@@ -395,6 +394,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
         if (likely(can_send_rrdset(instance, st))) {
             rrdset_rdlock(st);
+
+            char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
