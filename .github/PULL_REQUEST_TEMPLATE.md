@@ -5,7 +5,7 @@ Include "Fixes #nnn" if you are fixing an existing issue.
 In "Component Name" section write which component is changed in this PR. This
 will help us review your PR quicker.
 
-In "Test Plan" please detail exactly how you plan to test this PR with enough
+In "Test Plan" provide enough detail on how you plan to test this PR so that a reviewer can validate your tests. If our CI covers sufficient tests, then state which tests cover the change.
 detail that a reviewer can validate your tests. If sufficient tests are
 covered by our CI then state which tests cover the change.
 
