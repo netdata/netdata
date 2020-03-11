@@ -84,7 +84,7 @@ else
 	exit 3
 fi
 if ! command -v openssl >/dev/null 2>&1 ; then
-	echo >&2 "I need openssl to proceed, but neither is available on this system."
+	echo >&2 "I need openssl to proceed, but it is not available on this system."
 	exit 3
 fi
 
