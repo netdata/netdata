@@ -8,10 +8,10 @@
 
 #define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
-#define ACLK_CHART_TOPIC "chart"
-#define ACLK_ALARMS_TOPIC "alarms"
-#define ACLK_METADATA_TOPIC "meta"
-#define ACLK_COMMAND_TOPIC "cmd"
+#define ACLK_CHART_TOPIC "outbound/meta"
+#define ACLK_ALARMS_TOPIC "outbound/alarms"
+#define ACLK_METADATA_TOPIC "outbound/meta"
+#define ACLK_COMMAND_TOPIC "inbound/cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
 #define ACLK_MAX_BACKOFF_DELAY 1024 // maximum backoff delay in seconds
