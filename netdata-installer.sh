@@ -282,7 +282,7 @@ while [ -n "${1}" ]; do
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
-        echo "Cloud explicitly enabled, not re-enabling it"
+        echo "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
@@ -290,7 +290,7 @@ while [ -n "${1}" ]; do
       ;;
     "--require-cloud")
       if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
-        echo "Cloud explicitly disabled, not re-enabling it"
+        echo "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-aclk/} --enable-aclk"
