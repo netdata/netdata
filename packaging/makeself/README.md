@@ -25,7 +25,7 @@ Once finished, a file named `netdata-vX.X.X-gGITHASH-x86_64-DATE-TIME.run` will 
 
 ---
 
-## building binaries with debug info
+## Building binaries with debug info
 
 To build Netdata binaries with debugging / tracing information in them, use:
 
@@ -36,7 +36,7 @@ cd /path/to/netdata.git
 
 These binaries are not optimized (they are a bit slower), they have certain features disables (like log flood protection), other features enables (like `debug flags`) and are not stripped (the binary files are bigger, since they now include source code tracing information).
 
-### debugging Netdata binaries
+### Debugging Netdata binaries
 
 Once you have installed a binary package with debugging info, you will need to install `valgrind` and run this command to start Netdata:
 

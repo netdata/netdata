@@ -12,14 +12,14 @@ performance of their web servers, and Netdata is taking important steps to make 
 
 By parsing web server log files with Netdata, and seeing the volume of redirects, requests, or server errors over time,
 you can better understand what's happening on your infrastructure. Too many bad requests? Maybe a recent deploy missed a
-few small SVG icons. Too many requsests? Time to batten down the hatches—it's a DDoS.
+few small SVG icons. Too many requsests? Time to batten down the hatches—it's a Distributed Denial of Service (DDoS).
 
 Netdata has been capable of monitoring web log files for quite some time, thanks for the [weblog python.d
 module](../../collectors/python.d.plugin/web_log/README.md), but we recently refactored this module in Go, and that
 effort comes with a ton of improvements.
 
-You can now use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
-ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
+You can now use the [LTSV log format](http://ltsv.org/), track Transport Layer Security (TLS) and cipher usage, and the whole parser is faster than
+ever. In one test on a system with Solid State Drive (SSD) storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](https://blog.netdata.cloud/posts/release-1.19/).
 
 The [go.d plugin](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog) is currently compatible with

@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # SpigotMC monitoring with Netdata
 
-Performs basic monitoring for Spigot Minecraft servers.
+Performs basic monitoring for Spigot Minecraft (SpigotMC) servers.
 
 It provides two charts, one tracking server-side ticks-per-second in
 1, 5 and 15 minute averages, and one tracking the number of currently

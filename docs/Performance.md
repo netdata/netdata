@@ -114,20 +114,20 @@ Edit `/etc/netdata/netdata.conf`, find the `[plugins]` section:
 
 ```
 [plugins]
-	proc = yes
+    proc = yes
 
-	tc = no
-	idlejitter = no
-	cgroups = no
-	checks = no
-	apps = no
-	charts.d = no
-	node.d = no
-	python.d = no
+    tc = no
+    idlejitter = no
+    cgroups = no
+    checks = no
+    apps = no
+    charts.d = no
+    node.d = no
+    python.d = no
 
-	plugins directory = /usr/libexec/netdata/plugins.d
-	enable running new plugins = no
-	check for new plugins every = 60
+    plugins directory = /usr/libexec/netdata/plugins.d
+    enable running new plugins = no
+    check for new plugins every = 60
 ```
 
 In detail:
@@ -135,7 +135,7 @@ In detail:
 | plugin|description|
 |:----:|:----------|
 | `proc`|the internal plugin used to monitor the system. Normally, you don't want to disable this. You can disable individual functions of it at the next section.|
-| `tc`|monitoring network interfaces QoS (tc classes)|
+| `tc`|monitoring network interfaces Quality of Service (QoS) (tc classes)|
 | `idlejitter`|internal plugin (written in C) that attempts show if the systems starved for CPU. Disabling it will eliminate a thread.|
 | `cgroups`|monitoring linux containers. Most probably you are not going to need it. This will also eliminate another thread.|
 | `checks`|a debugging plugin, which is disabled by default.|
@@ -154,8 +154,8 @@ In this section you can select which modules of the `proc` plugin you need. All 
 
 ```
 [plugin:proc]
-	# /proc/net/dev = yes                       # network interfaces
-	# /proc/diskstats = yes                     # disks
+    # /proc/net/dev = yes                       # network interfaces
+    # /proc/diskstats = yes                     # disks
 ...
 ```
 
@@ -169,8 +169,8 @@ If the CPU of the embedded device is too weak, try setting even lower update fre
 
 Keep in mind this will also force dashboard chart refreshes to happen at the same rate. So increasing this number actually lowers data collection frequency but also lowers dashboard chart refreshes frequency.
 
-This is a dashboard on a device with `[global].update every = 5` (this device is a media player and is now playing a movie):		
-		
+This is a dashboard on a device with `[global].update every = 5` (this device is a media player and is now playing a movie):        
+        
 ![pi1](https://cloud.githubusercontent.com/assets/2662304/15338489/ca84baaa-1c88-11e6-9ab2-118208e11ce1.gif)
 
 ### 4. Disable logs
@@ -179,9 +179,9 @@ Normally, you will not need them. To disable them, set:
 
 ```
 [global]
-	debug log = none
-	error log = none
-	access log = none
+    debug log = none
+    error log = none
+    access log = none
 ```
 
 ### 5. Lower Netdata's memory usage
@@ -191,9 +191,9 @@ following settings in the `[global]` section of `netdata.conf`:
 
 ```conf
 [global]
-	# memory mode = dbengine
-	# page cache size = 32
-	# dbengine disk space = 256
+    # memory mode = dbengine
+    # page cache size = 32
+    # dbengine disk space = 256
 ```
 
 See the [database engine documentation](../database/engine/README.md) or our [tutorial on metrics
@@ -205,22 +205,22 @@ Gzip compression of the web responses is using more CPU that the rest of Netdata
 
 ```
 [web]
-	enable gzip compression = no
+    enable gzip compression = no
 ```
 
 To lower the compression level, do this:
 
 ```
 [web]
-	enable gzip compression = yes
-	gzip compression level = 1
+    enable gzip compression = yes
+    gzip compression level = 1
 ```
 
 Finally, if no web server is installed on your device, you can use port tcp/80 for Netdata:
 
 ```
 [web]
-	port = 80
+    port = 80
 ```
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FPerformance&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!--
 ---
 title: "Netdata via apache's mod_proxy"
@@ -6,8 +7,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-beh
 -->
 
 # Netdata via apache's mod_proxy
+=======
+# Netdata via Apache's mod_proxy
+>>>>>>> scrubbing the collectors for correct use of acronyms
 
-Below you can find instructions for configuring an apache server to:
+Below you can find instructions for configuring an Apache server to:
 
 1.  proxy a single Netdata via an HTTP and HTTPS virtual host
 2.  dynamically proxy any number of Netdata servers
@@ -16,7 +20,7 @@ Below you can find instructions for configuring an apache server to:
 
 ## Requirements
 
-Make sure your apache has installed `mod_proxy` and `mod_proxy_http`.
+Make sure your Apache has installed `mod_proxy` and `mod_proxy_http`.
 
 On debian/ubuntu systems, install them with this: 
 
@@ -41,35 +45,35 @@ sudo a2enmod rewrite
 
 ## Netdata on an existing virtual host
 
-On any **existing** and already **working** apache virtual host, you can redirect requests for URL `/netdata/` to one or more Netdata servers.
+On any **existing** and already **working** Apache virtual host, you can redirect requests for URL `/netdata/` to one or more Netdata servers.
 
-### proxy one Netdata, running on the same server apache runs
+### Proxy one Netdata, running on the same server Apache runs
 
 Add the following on top of any existing virtual host. It will allow you to access Netdata as `http://virtual.host/netdata/`.
 
 ```conf
 <VirtualHost *:80>
 
-	RewriteEngine On
-	ProxyRequests Off
-	ProxyPreserveHost On
+    RewriteEngine On
+    ProxyRequests Off
+    ProxyPreserveHost On
 
-	<Proxy *>
-		Require all granted
-	</Proxy>
+    <Proxy *>
+        Require all granted
+    </Proxy>
 
-	# Local Netdata server accessed with '/netdata/', at localhost:19999
-	ProxyPass "/netdata/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
-	ProxyPassReverse "/netdata/" "http://localhost:19999/"
+    # Local Netdata server accessed with '/netdata/', at localhost:19999
+    ProxyPass "/netdata/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
+    ProxyPassReverse "/netdata/" "http://localhost:19999/"
 
-	# if the user did not give the trailing /, add it
-	# for HTTP (if the virtualhost is HTTP, use this)
-	RewriteRule ^/netdata$ http://%{HTTP_HOST}/netdata/ [L,R=301]
-	# for HTTPS (if the virtualhost is HTTPS, use this)
-	#RewriteRule ^/netdata$ https://%{HTTP_HOST}/netdata/ [L,R=301]
+    # if the user did not give the trailing /, add it
+    # for HTTP (if the virtualhost is HTTP, use this)
+    RewriteRule ^/netdata$ http://%{HTTP_HOST}/netdata/ [L,R=301]
+    # for HTTPS (if the virtualhost is HTTPS, use this)
+    #RewriteRule ^/netdata$ https://%{HTTP_HOST}/netdata/ [L,R=301]
 
-	# rest of virtual host config here
-	
+    # rest of virtual host config here
+    
 </VirtualHost>
 ```
 
@@ -80,13 +84,13 @@ Add the following on top of any existing virtual host. It will allow you to acce
 ```conf
 <VirtualHost *:80>
 
-	RewriteEngine On
-	ProxyRequests Off
-	ProxyPreserveHost On
+    RewriteEngine On
+    ProxyRequests Off
+    ProxyPreserveHost On
 
-	<Proxy *>
-		Require all granted
-	</Proxy>
+    <Proxy *>
+        Require all granted
+    </Proxy>
 
     # proxy any host, on port 19999
     ProxyPassMatch "^/netdata/([A-Za-z0-9\._-]+)/(.*)" "http://$1:19999/$2" connectiontimeout=5 timeout=30 keepalive=on
@@ -97,13 +101,13 @@ Add the following on top of any existing virtual host. It will allow you to acce
     # for HTTPS (if the virtualhost is HTTPS, use this)
     RewriteRule "^/netdata/([A-Za-z0-9\._-]+)$" https://%{HTTP_HOST}/netdata/$1/ [L,R=301]
 
-	# rest of virtual host config here
-	
+    # rest of virtual host config here
+    
 </VirtualHost>
 ```
 
 > IMPORTANT<br/>
-> The above config allows your apache users to connect to port 19999 on any server on your network.
+> The above config allows your Apache users to connect to port 19999 on any server on your network.
 
 If you want to control the servers your users can connect to, replace the `ProxyPassMatch` line with the following. This allows only `server1`, `server2`, `server3` and `server4`.
 
@@ -113,9 +117,9 @@ If you want to control the servers your users can connect to, replace the `Proxy
 
 ## Netdata on a dedicated virtual host
 
-You can proxy Netdata through apache, using a dedicated apache virtual host.
+You can proxy Netdata through Apache, using a dedicated Apache virtual host.
 
-Create a new apache site:
+Create a new Apache site:
 
 ```sh
 nano /etc/apache2/sites-available/netdata.conf
@@ -125,21 +129,21 @@ with this content:
 
 ```conf
 <VirtualHost *:80>
-	RewriteEngine On
-	ProxyRequests Off
-	ProxyPreserveHost On
-	
-	ServerName netdata.domain.tld
+    RewriteEngine On
+    ProxyRequests Off
+    ProxyPreserveHost On
+    
+    ServerName netdata.domain.tld
 
-	<Proxy *>
-		Require all granted
-	</Proxy>
+    <Proxy *>
+        Require all granted
+    </Proxy>
 
-	ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
-	ProxyPassReverse "/" "http://localhost:19999/"
+    ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
+    ProxyPassReverse "/" "http://localhost:19999/"
 
-	ErrorLog ${APACHE_LOG_DIR}/netdata-error.log
-	CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/netdata-error.log
+    CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
 </VirtualHost>
 ```
 
@@ -177,21 +181,21 @@ Then, generate password for user `netdata`, using `htpasswd -c /etc/apache2/.htp
 Modify the virtual host with these:
 
 ```conf
-	# replace the <Proxy *> section
-	<Proxy *>
-		Order deny,allow
-		Allow from all
-	</Proxy>
+    # replace the <Proxy *> section
+    <Proxy *>
+        Order deny,allow
+        Allow from all
+    </Proxy>
 
-	# add a <Location /netdata/> section
-	<Location /netdata/>
-		AuthType Basic
-		AuthName "Protected site"
-		AuthUserFile /etc/apache2/.htpasswd
-		Require valid-user
-		Order deny,allow
-		Allow from all
-	</Location>
+    # add a <Location /netdata/> section
+    <Location /netdata/>
+        AuthType Basic
+        AuthName "Protected site"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+        Order deny,allow
+        Allow from all
+    </Location>
 ```
 
 Specify `Location /` if Netdata is running on dedicated virtual host.
@@ -200,25 +204,25 @@ Specify `Location /` if Netdata is running on dedicated virtual host.
 
 ```conf
 <VirtualHost *:80>
-	RewriteEngine On
-	ProxyRequests Off
-	ProxyPreserveHost On
-	
-	ServerName netdata.domain.tld
+    RewriteEngine On
+    ProxyRequests Off
+    ProxyPreserveHost On
+    
+    ServerName netdata.domain.tld
 
-	<Proxy *>
-		AllowOverride None
-		AuthType Basic
-		AuthName "Protected site"
-		AuthUserFile /etc/apache2/.htpasswd
-		Require valid-user
-	</Proxy>
+    <Proxy *>
+        AllowOverride None
+        AuthType Basic
+        AuthName "Protected site"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Proxy>
 
-	ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
-	ProxyPassReverse "/" "http://localhost:19999/"
+    ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
+    ProxyPassReverse "/" "http://localhost:19999/"
 
-	ErrorLog ${APACHE_LOG_DIR}/netdata-error.log
-	CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/netdata-error.log
+    CustomLog ${APACHE_LOG_DIR}/netdata-access.log combined
 </VirtualHost>
 ```
 
@@ -226,18 +230,18 @@ Note: Changes are applied by reloading or restarting Apache.
 
 ## Configuration of Content Security Policy
 
-If you want to enable CSP within your Apache, you should consider some special requirements of the headers. Modify your configuration like that:
+If you want to enable Content Security Policy (CSP) within your Apache, you should consider some special requirements of the headers. Modify your configuration like that:
 
 ```
-	Header always set Content-Security-Policy "default-src http: 'unsafe-inline' 'self' 'unsafe-eval'; script-src http: 'unsafe-inline' 'self' 'unsafe-eval'; style-src http: 'self' 'unsafe-inline'"
+    Header always set Content-Security-Policy "default-src http: 'unsafe-inline' 'self' 'unsafe-eval'; script-src http: 'unsafe-inline' 'self' 'unsafe-eval'; style-src http: 'self' 'unsafe-inline'"
 ```
 
 Note: Changes are applied by reloading or restarting Apache.
 
 ## Using Netdata with Apache's `mod_evasive` module
 
-The `mod_evasive` Apache module helps system administrators protect their web server from brute force and distributed
-denial of service attack (DDoS) attacks.
+The `mod_evasive` Apache module helps system administrators protect their web server from brute force and Distributed
+Denial of Service (DDoS) attacks.
 
 Because Netdata sends a request to the web server for every chart update, it's normal to create 20-30 requests per
 second, per client. If you're using `mod_evasive` on your Apache web server, this volume of requests will trigger the
@@ -269,11 +273,11 @@ following:
 
 ```conf
 <VirtualHost *:80>
-	...
-	# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
-	<IfModule mod_evasive20.c>
-		DOSPageCount        30
-	</IfModule>
+    ...
+    # Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
+    <IfModule mod_evasive20.c>
+        DOSPageCount        30
+    </IfModule>
 </VirtualHost>
 ```
 
@@ -286,14 +290,14 @@ You might edit `/etc/netdata/netdata.conf` to optimize your setup a bit. For app
 
 ## Response compression
 
-If you plan to use Netdata exclusively via apache, you can gain some performance by preventing double compression of its output (Netdata compresses its response, apache re-compresses it) by editing `/etc/netdata/netdata.conf` and setting:
+If you plan to use Netdata exclusively via Apache, you can gain some performance by preventing double compression of its output (Netdata compresses its response, Apache re-compresses it) by editing `/etc/netdata/netdata.conf` and setting:
 
 ```
 [web]
     enable gzip compression = no
 ```
 
-Once you disable compression at Netdata (and restart it), please verify you receive compressed responses from apache (it is important to receive compressed responses - the charts will be more snappy).
+Once you disable compression at Netdata (and restart it), please verify you receive compressed responses from Apache (it is important to receive compressed responses - the charts will be more snappy).
 
 ## Limit direct access to Netdata
 
@@ -320,7 +324,7 @@ or
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between apache and Netdata:
+You can also use a Unix domain socket. This will also provide a faster route between Apache and Netdata:
 
 ```
 [web]
@@ -336,7 +340,7 @@ Apache 2.4.24+ can not read from `/tmp` so create your socket in `/var/run/netda
 
 _note: Netdata v1.8+ support unix domain sockets_
 
-At the apache side, prepend the 2nd argument to `ProxyPass` with `unix:/tmp/netdata.sock|`, like this:
+At the Apache side, prepend the 2nd argument to `ProxyPass` with `unix:/tmp/netdata.sock|`, like this:
 
 ```
 ProxyPass "/netdata/" "unix:/tmp/netdata.sock|http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
@@ -344,7 +348,7 @@ ProxyPass "/netdata/" "unix:/tmp/netdata.sock|http://localhost:19999/" connectio
 
 ---
 
-If your apache server is not on localhost, you can set:
+If your Apache server is not on localhost, you can set:
 
 ```
 [web]
@@ -356,9 +360,9 @@ If your apache server is not on localhost, you can set:
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
-## prevent the double access.log
+## Prevent the double access.log
 
-apache logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
+Apache logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
 [global]
@@ -369,7 +373,7 @@ apache logs accesses and Netdata logs them too. You can prevent Netdata from gen
 
 Make sure the requests reach Netdata, by examing `/var/log/netdata/access.log`.
 
-1.  if the requests do not reach Netdata, your apache does not forward them.
+1.  if the requests do not reach Netdata, your Apache does not forward them.
 2.  if the requests reach Netdata but the URLs are wrong, you have not re-written them properly.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-apache&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-Apache&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

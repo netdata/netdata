@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # RetroShare monitoring with Netdata
 
-Monitors application bandwidth, peers and DHT metrics. 
+Monitors application bandwidth, peers and Distributed Hash Table (DHT) metrics. 
 
 This module will monitor one or more `RetroShare` applications, depending on your configuration.
 

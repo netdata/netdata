@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Amazon SNS
 
-As part of it's AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' or SNS.  Amazon SNS works kind of similarly to Netdata's own notification system, allowing dispatch of a single notification to multiple subscribers of different types.  Among other things, SNS supports sending notifications to:
+As part of it's AWS suite, Amazon provides a notification broker service called Simple Notification Service (SNS).  Amazon SNS works kind of similarly to Netdata's own notification system, allowing dispatch of a single notification to multiple subscribers of different types.  Among other things, SNS supports sending notifications to:
 
 -   Email addresses.
 -   Mobile Phones via SMS.
@@ -31,7 +31,7 @@ aws configure
 
 THis will prompt you for the access key and secret key for accessing Amazon SNS (as well as the default region and output format, but you can leave those blank because we don't use them).
 
-Once that's done, you're ready to go and can specify the desired topic ARN as a recipient.
+Once that's done, you're ready to go and can specify the desired topic Amazon Resource Names (ARN) as a recipient.
 
 Notes:
 

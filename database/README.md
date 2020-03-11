@@ -17,7 +17,7 @@ Netdata is fully capable of long-term metrics storage, at per-second granularity
     data collection update frequency (`update_every`) **without losing** the previously stored metrics. For more details
     see [here](engine/).
 
-2.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
+2.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports Kernel Samepage Merging [(KSM)](#ksm).
 
 3.  `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata
     restart. It also uses `mmap()` and supports [KSM](#ksm).

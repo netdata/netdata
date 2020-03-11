@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Storage devices monitoring with Netdata
 
-Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
+Monitors `smartd` log files to collect HDD/SSD Self-Monitoring, Analysis and Reporting Technology (S.M.A.R.T) attributes.
 
 ## Requirements
 

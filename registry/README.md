@@ -83,7 +83,7 @@ in the Netdata registry regardless of whether you sign in or not.
 Your web browser **only**! If sending this information is against your policies, you can [run your own
 registry](#run-your-own-registry)
 
-Your Netdata servers do not talk to the registry. This is a UML diagram of its operation:
+Your Netdata servers do not talk to the registry. This is a Unified Modeling Language (UML) diagram of its operation:
 
 ![registry](https://cloud.githubusercontent.com/assets/2662304/19448565/11a70632-94ab-11e6-9d80-f410b4acb797.png)
 
@@ -154,10 +154,7 @@ IPs in `10.*` except `10.1.2.3`. The order is important: left to right, the firs
 Keep in mind that connections to Netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by
 `[registry].allow from` should also be allowed by `[web].allow connection from`.
 
-The patterns can be matches over IP addresses or FQDN of the host. In order to check the FQDN of the connection without
-opening the Netdata agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection
-time the reverse-dns of the peer IP address is resolved, and a forward DNS resolution is made to validate the IP address
-against the name-pattern.
+The patterns can be matches over IP addresses or Fully Qualified Domain Name (FQDN) of the host.  To check the FQDN connection without opening the Netdata agent to Domain Name System (DNS) spoofing, you must set up a reverse DNS for the connecting host.  At connection time, the reverse DNS of the peer IP address gets resolved, and a forward DNS resolution validates the IP address against the name-pattern.
 
 Please note that this process can be expensive on a machine that is serving many connections. The behaviour of the
 pattern matching can be controlled with the following setting:

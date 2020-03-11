@@ -57,7 +57,7 @@ When no configuration is given, module uses `https://fqdn.example.com:8140`.
 
 ### notes
 
--   Exact Fully Qualified Domain Name of the node should be used.
+-   Exact Fully Qualified Domain Name (FQDN) of the node should be used.
 -   Usually Puppet Server/DB startup time is VERY long. So, there should
     be quite reasonable retry count.
 -   Secure PuppetDB config may require client certificate. Not applies

@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Syslog
 
-You need a working `logger` command for this to work.  This is the case on pretty much every Linux system in existence, and most BSD systems.
+You need a working `logger` command for this to work.  This is the case on pretty much every Linux system in existence, and most Berkeley Software Distribution (BSD) systems.
 
 Logged messages will look like this:
 

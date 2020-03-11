@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Tor monitoring with Netdata
 
-Connects to the Tor control port to collect traffic statistics.
+Connects to the The Onion Router (Tor) control port to collect traffic statistics.
 
 ## Requirements
 

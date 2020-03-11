@@ -30,7 +30,7 @@ Most monitoring solutions, when they are able to detect something, provide just 
 
 Of course this introduces a lot more problems: how to troubleshoot a slowdown using the console, if the slowdown lifetime is just a few seconds, randomly spread throughout the day?
 
-You can't! You will spend your entire day on the console, waiting for the problem to happen again while you are logged in. A blame war starts: developers blame the systems, sysadmins blame the hosting provider, someone says it is a DNS problem, another one believes it is network related, etc. We have all experienced this, multiple times...
+You can't! You will spend your entire day on the console, waiting for the problem to happen again while you are logged in. A blame war starts: developers blame the systems, sysadmins blame the hosting provider, someone says it is a Domain Name System (DNS) problem, another one believes it is network related, etc. We have all experienced this, multiple times...
 
 So, why do monitoring solutions and SaaS providers filter out metrics?
 

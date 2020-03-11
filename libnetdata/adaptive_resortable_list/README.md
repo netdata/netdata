@@ -12,7 +12,7 @@ in the **fastest possible way**.
 
 ARLs are used all over Netdata, as they are the most
 CPU utilization efficient way to process `/proc` files. They are used to
-process both vertical (csv like) and horizontal (one pair per line) `name - value` pairs.
+process both vertical (CSV like) and horizontal (one pair per line) `name - value` pairs.
 
 ## How ARL works
 

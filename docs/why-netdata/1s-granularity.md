@@ -11,7 +11,7 @@ High resolution metrics are required to effectively monitor and troubleshoot sys
 
 ## Why?
 
--   The world is going real-time. Today, customer experience is significantly affected by response time, so SLAs are tighter than ever before. It is just not practical to monitor a 2-second SLA with 10-second metrics.
+-   The world is going real-time. Today, customer experience is significantly affected by response time, so Service Level Agreements (SLAs) are tighter than ever before. It is just not practical to monitor a 2-second SLA with 10-second metrics.
 
 -   IT goes virtual. Unlike real hardware, virtual environments are not linear, nor predictable. You cannot expect resources to be available when your applications need them. They will eventually be, but not exactly at the time they are needed. The latency of virtual environments is affected by many factors, most of which are outside our control, like: the maintenance policy of the hosting provider, the work load of third party virtual machines running on the same physical servers combined with the resource allocation and throttling policy among virtual machines, the provisioning system of the hosting provider, etc.
 
@@ -23,7 +23,7 @@ They want to, but they can't, at least not massively.
 
 The reasons lie in their design decisions:
 
-1.  Time-series databases (prometheus, graphite, opentsdb, influxdb, etc) centralize all the metrics. At scale, these databases can easily become the bottleneck of the whole infrastructure.
+1.  Time-series databases (Prometheus, Graphite, OpenTSDB, InfluxDB, etc.) centralize all the metrics. At scale, these databases can easily become the bottleneck of the whole infrastructure.
 
 2.  SaaS providers base their business models on centralizing all the metrics. On top of the time-series database bottleneck they also have increased bandwidth costs. So, massively supporting high resolution metrics, destroys their business model.
 

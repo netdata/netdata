@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Varnish Cache monitoring with Netdata
 
-Provides HTTP accelerator global, backends (VBE) and disks (SMF) statistics using `varnishstat` tool.
+Provides HTTP accelerator global, backends (Varnish Backend (VBE)) and disks (Service Management Facility (SMF)) statistics using `varnishstat` tool.
 
 
 ## Requirements

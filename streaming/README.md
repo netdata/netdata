@@ -118,7 +118,7 @@ sending and the receiving Netdata.
 API keys are used to authorize the communication of a pair of sending-receiving Netdata.
 Once the communication is authorized, the sending Netdata can push metrics for any number of hosts.
 
-You can generate an API key with the command `uuidgen`. API keys are just random GUIDs.
+You can generate an API key with the command `uuidgen`. API keys are just random Globally Unique Identifiers (GUIDs).
 You can use the same API key on all your Netdata, or use a different API key for any pair of
 sending-receiving Netdata.
 
@@ -146,7 +146,7 @@ This is an overview of how these options can be combined:
 
 For the options to encrypt the data stream between the slave and the master, refer to [securing the communication](#securing-streaming-communications)
 
-##### options for the receiving node
+##### Options for the receiving node
 
 `stream.conf` looks like this:
 
@@ -382,7 +382,7 @@ On the master, edit `/etc/netdata/stream.conf` (to edit it on your system run `/
 
 ```bash
 [11111111-2222-3333-4444-555555555555]
-	# enable/disable this API key
+    # enable/disable this API key
     enabled = yes
 
     # one hour of data for each of the slaves
@@ -417,7 +417,7 @@ On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your syste
     # the IP and PORT of the master
     destination = 10.11.12.13:19999
 
-	# the API key to use
+    # the API key to use
     api key = 11111111-2222-3333-4444-555555555555
 ```
 
@@ -428,7 +428,7 @@ Using just the above configuration, the `slaves` will be pushing their metrics t
 ```bash
 [global]
     # disable the local database
-	memory mode = none
+    memory mode = none
 
 [health]
     # disable health checks

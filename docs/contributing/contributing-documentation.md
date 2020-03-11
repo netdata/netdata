@@ -34,9 +34,9 @@ clarifying a confusing sentence.
 
 Editing locally is more complex, as you need to download the Netdata repository and build the documentation using
 `mkdocs`, but allows you to better organize complex projects. By building documentation locally, you can preview your
-work using a local web server before you submit your PR.
+work using a local web server before you submit your pull request (PR).
 
-In both cases, you'll finish by submitting a pull request (PR). Once you submit your PR, GitHub will initiate a number
+In both cases, you'll finish by submitting a PR. Once you submit your PR, GitHub will initiate a number
 of jobs, including a Netlify preview. You can use this preview to view the documentation site with your changes applied,
 which might help you catch any lingering issues.
 
@@ -195,9 +195,9 @@ well. You can now navigate through the documentation as you would on the live si
 ## Pull requests and final steps
 
 When you're finished with your changes, add and commit them to your fork of the Netdata repository. Head over to GitHub
-to create your pull request (PR).
+to create your PR.
 
-Once we receive your pull request (PR), we'll take time to read through it and assess it for correctness, conciseness,
+Once we receive your PR, we'll take time to read through it and assess it for correctness, conciseness,
 and overall quality. We may point to specific sections and ask for additional information or other fixes.
 
 ## What's next

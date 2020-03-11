@@ -17,9 +17,9 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 4.  [Netdata viewers authentication](#netdata-viewers-authentication)
     -   [Why Netdata should be protected](#why-netdata-should-be-protected)
     -   [Protect Netdata from the internet](#protect-netdata-from-the-internet)
-        		\- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
-        		\- [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
-        		\- [Other methods](#other-methods)
+                \- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
+                \- [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
+                \- [Other methods](#other-methods)
 5.  [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
 
 ## Your data are safe with Netdata
@@ -56,9 +56,9 @@ Netdata is a monitoring system. It should be protected, the same way you protect
 
 Viewers will be able to get some information about the system Netdata is running. This information is everything the dashboard provides. The dashboard includes a list of the services each system runs (the legends of the charts under the `Systemd Services` section),  the applications running (the legends of the charts under the `Applications` section), the disks of the system and their names, the user accounts of the system that are running processes (the `Users` and `User Groups` section of the dashboard), the network interfaces and their names (not the IPs) and detailed information about the performance of the system and its applications.
 
-This information is not sensitive (meaning that it is not your business data), but **it is important for possible attackers**. It will give them clues on what to check, what to try and in the case of DDoS against your applications, they will know if they are doing it right or not.
+This information is not sensitive (meaning that it is not your business data), but **it is important for possible attackers**. It will give them clues on what to check, what to try and in the case of Distributed Denial of Service (DDoS) against your applications, they will know if they are doing it right or not.
 
-Also, viewers could use Netdata itself to stress your servers. Although the Netdata daemon runs unprivileged, with the minimum process priority (scheduling priority `idle` - lower than nice 19) and adjusts its OutOfMemory (OOM) score to 1000 (so that it will be first to be killed by the kernel if the system starves for memory), some pressure can be applied on your systems if someone attempts a DDoS against Netdata.
+Also, viewers could use Netdata itself to stress your servers. Although the Netdata daemon runs unprivileged, with the minimum process priority (scheduling priority `idle` - lower than nice 19) and adjusts its Out-Of-Memory (OOM) score to 1000 (so that it will be first to be killed by the kernel if the system starves for memory), some pressure can be applied on your systems if someone attempts a DDoS against Netdata.
 
 ### Protect Netdata from the internet
 
@@ -68,11 +68,11 @@ Until we add a distributed authentication method to Netdata, you have the follow
 
 #### Expose Netdata only in a private LAN
 
-If your organisation has a private administration and management LAN, you can bind Netdata on this network interface on all your servers. This is done in `Netdata.conf` with these settings:
+If your organisation has a private administration and management Local Area Network (LAN), you can bind Netdata on this network interface on all your servers. This is done in `Netdata.conf` with these settings:
 
 ```
 [web]
-	bind to = 10.1.1.1:19999 localhost:19999
+    bind to = 10.1.1.1:19999 localhost:19999
 ```
 
 You can bind Netdata to multiple IPs and ports. If you use hostnames, Netdata will resolve them and use all the IPs (in the above example `localhost` usually resolves to both `127.0.0.1` and `::1`).
@@ -89,18 +89,18 @@ In Netdata v1.9+ there is also access list support, like this:
 
 ```
 [web]
-	bind to = *
-	allow connections from = localhost 10.* 192.168.*
+    bind to = *
+    allow connections from = localhost 10.* 192.168.*
 ```
 
 #### Fine-grained access control
 
 The access list support allows filtering of all incoming connections, by specific IP addresses, ranges
-or validated DNS lookups. Only connections that match an entry on the list will be allowed:
+or validated Domain Name System (DNS) lookups. Only connections that match an entry on the list will be allowed:
 
 ```
 [web]
-	allow connections from = localhost 192.168.* 1.2.3.4 homeip.net
+    allow connections from = localhost 192.168.* 1.2.3.4 homeip.net
 ```
 
 Connections from the IP addresses are allowed if the connection IP matches one of the patterns given.
@@ -114,12 +114,12 @@ list settings:
 
 ```
 [web]
-	allow connections from = 160.1.*
-	allow badges from = 160.1.1.2
-	allow streaming from = 160.1.2.*
-	allow management from = control.subnet.ip
-	allow netdata.conf from = updates.subnet.ip
-	allow dashboard from = frontend.subnet.ip
+    allow connections from = 160.1.*
+    allow badges from = 160.1.1.2
+    allow streaming from = 160.1.2.*
+    allow management from = control.subnet.ip
+    allow netdata.conf from = updates.subnet.ip
+    allow dashboard from = frontend.subnet.ip
 ```
 
 In this example only connections from `160.1.x.x` are allowed, only the specific IP address `160.1.1.2`
@@ -147,7 +147,7 @@ For Netdata v1.9+ you can also use `netdata.conf`:
 
 ```
 [web]
-	allow connections from = localhost 1.2.3.4
+    allow connections from = localhost 1.2.3.4
 ```
 
 Of course you can add more IPs.
@@ -163,7 +163,7 @@ NETDATA_PORT=19999
 iptables -t filter -N netdata 2>/dev/null || iptables -t filter -F netdata
 for x in ${NETDATA_ALLOWED}
 do
-	# allow this IP
+    # allow this IP
     iptables -t filter -A netdata -s ${x} -j ACCEPT
 done
 

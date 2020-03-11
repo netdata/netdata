@@ -7,13 +7,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/stats
 
 # statsd.plugin
 
-statsd is a system to collect data from any application. Applications are sending metrics to it, usually via non-blocking UDP communication, and statsd servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
+statsd is a system to collect data from any application. Applications are sending metrics to it, usually via non-blocking User Datagram Protocol (UDP) communication, and statsd servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
 
 There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
 
 Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards, stream them to other Netdata servers or archive them to backend time-series databases.
 
-Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd ports (tcp and udp 8125 - yes, Netdata statsd server supports both tcp and udp at the same time).
+Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd ports (TCP and UDP 8125 - yes, Netdata statsd server supports both tcp and udp at the same time).
 
 Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. So, the application can send its metrics to `localhost:8125`. This provides a distributed statsd implementation.
 
@@ -89,26 +89,26 @@ This is the statsd configuration at `/etc/netdata/netdata.conf`:
 
 ```
 [statsd]
-	# enabled = yes
-	# decimal detail = 1000
-	# update every (flushInterval) = 1
-	# udp messages to process at once = 10
-	# create private charts for metrics matching = *
-	# max private charts allowed = 200
-	# max private charts hard limit = 1000
-	# private charts memory mode = save
-	# private charts history = 3996
-	# histograms and timers percentile (percentThreshold) = 95.00000
-	# add dimension for number of events received = yes
-	# gaps on gauges (deleteGauges) = no
-	# gaps on counters (deleteCounters) = no
-	# gaps on meters (deleteMeters) = no
-	# gaps on sets (deleteSets) = no
-	# gaps on histograms (deleteHistograms) = no
-	# gaps on timers (deleteTimers) = no
-	# listen backlog = 4096
-	# default port = 8125
-	# bind to = udp:localhost:8125 tcp:localhost:8125
+    # enabled = yes
+    # decimal detail = 1000
+    # update every (flushInterval) = 1
+    # udp messages to process at once = 10
+    # create private charts for metrics matching = *
+    # max private charts allowed = 200
+    # max private charts hard limit = 1000
+    # private charts memory mode = save
+    # private charts history = 3996
+    # histograms and timers percentile (percentThreshold) = 95.00000
+    # add dimension for number of events received = yes
+    # gaps on gauges (deleteGauges) = no
+    # gaps on counters (deleteCounters) = no
+    # gaps on meters (deleteMeters) = no
+    # gaps on sets (deleteSets) = no
+    # gaps on histograms (deleteHistograms) = no
+    # gaps on timers (deleteTimers) = no
+    # listen backlog = 4096
+    # default port = 8125
+    # bind to = udp:localhost:8125 tcp:localhost:8125
 ```
 
 ### statsd main config options
@@ -233,12 +233,12 @@ So, to create the statsd application `myapp`, you can create the file `/etc/netd
 
 ```
 [app]
-	name = myapp
-	metrics = myapp.*
-	private charts = no
-	gaps when not collected = no
-	memory mode = ram
-	history = 60
+    name = myapp
+    metrics = myapp.*
+    private charts = no
+    gaps when not collected = no
+    memory mode = ram
+    history = 60
 
 [dictionary]
     m1 = metric1
@@ -247,15 +247,15 @@ So, to create the statsd application `myapp`, you can create the file `/etc/netd
 # replace 'mychart' with the chart id
 # the chart will be named: myapp.mychart
 [mychart]
-	name = mychart
-	title = my chart title
-	family = my family
-	context = chart.context
-	units = tests/s
-	priority = 91000
-	type = area
-	dimension = myapp.metric1 m1
-	dimension = myapp.metric2 m2
+    name = mychart
+    title = my chart title
+    family = my family
+    context = chart.context
+    units = tests/s
+    priority = 91000
+    type = area
+    dimension = myapp.metric1 m1
+    dimension = myapp.metric2 m2
 ```
 
 Using the above configuration `myapp` should get its own section on the dashboard, having one chart with 2 dimensions.
@@ -499,14 +499,14 @@ You can also use this little function to take care of all the details:
 STATSD_HOST="localhost"
 STATSD_PORT="8125"
 statsd() {
-	local udp="-u" all="${*}"
+    local udp="-u" all="${*}"
 
         # if the string length of all parameters given is above 1000, use TCP
         [ "${#all}" -gt 1000 ] && udp=
 
         while [ ! -z "${1}" ]
         do
-          	printf "${1}\n"
+              printf "${1}\n"
                 shift
         done | nc ${udp} --send-only ${STATSD_HOST} ${STATSD_PORT} || return 1
 

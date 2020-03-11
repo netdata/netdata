@@ -17,7 +17,7 @@ implementations.
 
 Netdata comes with built-in and pre-configured support for monitoring both HDFS and Zookeeper.
 
-This tutorial assumes you have a Hadoop cluster, with HDFS and Zookeeper, running already. If you don't, please follow
+This tutorial assumes you have a Hadoop cluster, with HDFS and Zookeeper, running already. If you don't, follow
 the [official Hadoop
 instructions](http://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html) or an
 alternative, like the guide available from
@@ -33,7 +33,7 @@ For more specifics on the collection modules used in this tutorial, read the res
 As with all data sources, Netdata can auto-detect HDFS and Zookeeper nodes if you installed them using the standard
 installation procedure.
 
-For Netdata to collect HDFS metrics, it needs to be able to access the node's `/jmx` endpoint. You can test whether an
+For Netdata to collect HDFS metrics, it needs to access the node's `/jmx` endpoint. You can test whether an
 JMX endpoint is accessible by using `curl HDFS-IP:PORT/jmx`. For a NameNode, you should see output similar to the
 following:
 
@@ -95,7 +95,7 @@ al-9866",
 }
 ```
 
-If Netdata can't access the `/jmx` endpoint for either a NameNode or DataNode, it will not be able to auto-detect and
+If Netdata can't access the `/jmx` endpoint for either a NameNode or DataNode, it does not auto-detect and
 collect metrics from your HDFS implementation.
 
 Zookeeper auto-detection relies on an accessible client port and a whitelisted `mntr` command. For more details on
@@ -113,7 +113,7 @@ cd /etc/netdata/
 sudo ./edit-config go.d/hdfs.conf
 ```
 
-At the bottom of the file, you will see two example jobs, both of which are commented out:
+At the bottom of the file, you see two example jobs, both commented out:
 
 ```yaml
 # [ JOBS ]
@@ -126,7 +126,7 @@ At the bottom of the file, you will see two example jobs, both of which are comm
 ```
 
 Uncomment these lines and edit the `url` value(s) according to your setup. Now's the time to add any other configuration
-details, which you can find inside of the `hdfs.conf` file itself. Most production implementations will require TLS
+details, which you can find inside of the `hdfs.conf` file itself. Most production implementations require Transport Layer Security (TLS)
 certificates.
 
 The result for a simple HDFS setup, running entirely on `localhost` and without certificate authentication, might look
@@ -142,7 +142,7 @@ jobs:
     url: http://127.0.0.1:9864/jmx
 ```
 
-At this point, Netdata should be configured to collect metrics from your HDFS servers. Let's move on to Zookeeper.
+At this point, Netdata is configured to collect metrics from your HDFS servers. Let's move on to Zookeeper.
 
 Next, use `edit-config` again to initialize/edit your `zookeeper.conf` file.
 
@@ -169,7 +169,7 @@ Finally, restart Netdata.
 sudo service restart netdata
 ```
 
-Upon restart, Netdata should recognize your HDFS/Zookeeper servers, enable the HDFS and Zookeeper modules, and begin
+Upon restart, Netdata recognizes your HDFS/Zookeeper servers, enables the HDFS and Zookeeper modules, and begins
 showing real-time metrics for both in your Netdata dashboard. 🎉
 
 ## Configuring HDFS and Zookeeper alarms

@@ -36,7 +36,7 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 ---
 
-## MacOS
+## macOS
 
 | System | URL | Core Developer | Package Maintainer
 |:-:|:-:|:-:|:-:|

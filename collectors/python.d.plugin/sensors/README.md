@@ -23,7 +23,7 @@ sudo ./edit-config python.d/sensors.conf
 
 ### possible issues
 
-There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
+There have been reports from users that on certain servers, Advanced Configuration and Power Interface (ACPI) ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
 We are tracking such cases in issue [#827](https://github.com/netdata/netdata/issues/827).
 Please join this discussion for help.
 

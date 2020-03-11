@@ -29,7 +29,7 @@ All Nginx configurations can be found in the `/etc/nginx/` directory. The main c
 
 Configuration options in Nginx are known as directives. Directives are organized into groups known as blocks or contexts. The two terms can be used interchangeably.
 
-Depending on your installation source, you’ll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories. 
+Depending on your installation source, you'll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories. 
 
 You can edit the Nginx configuration file with Nano, Vim or any other text editors you are comfortable with.
 
