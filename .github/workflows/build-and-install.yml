@@ -78,7 +78,10 @@ jobs:
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t build_test --build-arg BASE=${{ matrix.distro }}
       - name: Regular build on ${{ matrix.distro }}
         run: |
-          docker run --rm -e PRE -w /netdata build_test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+          docker run --rm -w /netdata build_test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}
         run: |
-          docker run --rm -e PRE -w /netdata build_test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it'
+          docker run --rm -w /netdata build_test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+      - name: netdata-installer on ${{ matrix.distro }}
+        run: |
+          docker run --rm -w /netdata build_test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
