@@ -1,10 +1,3 @@
-<!--
----
-title: "Netdata Documentation"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/DOCUMENTATION.md
----
--->
-
 # Netdata Documentation
 
 **Netdata is real-time health monitoring and performance troubleshooting for systems and applications.** It helps you
