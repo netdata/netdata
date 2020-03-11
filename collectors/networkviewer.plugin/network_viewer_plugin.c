@@ -349,21 +349,21 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
 }
 
 static void netdata_create_charts() {
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV6, "TCP request size to specific port.", "bytes/s", "Socket", 1000);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV6, "TCP receive size from specific port.", "bytes/s", "Socket", 999);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6, "TCP active connections per port.", "active connections", "Socket", 998);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV6, "TCP receive size from specific port.", "bytes/s", "Socket", 1000);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV6, "TCP request size to specific port.", "bytes/s", "Socket", 999);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_IPV6, "TCP active connections per port.", "active connections", "Socket", 998);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV6, "UDP request size to specific port.", "bytes/s", "Socket", 997);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV6, "UDP receive size from specific port.", "bytes/s", "Socket", 996);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6, "UDP active connections per port.", "active connections", "Socket", 995);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV6, "UDP receive size from specific port.", "bytes/s", "Socket", 997);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV6, "UDP request size to specific port.", "bytes/s", "Socket", 996);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_IPV6, "UDP active connections per port.", "active connections", "Socket", 995);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV4, "TCP request size to specific port.", "bytes/s", "Socket", 994);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV4, "TCP receive size from specific port.", "bytes/s", "Socket", 993);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4, "TCP active connections per port.", "active connections", "Socket", 992);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV4, "TCP receive size from specific port.", "bytes/s", "Socket", 994);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV4, "TCP request size to specific port.", "bytes/s", "Socket", 993);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_IPV4, "TCP active connections per port.", "active connections", "Socket", 992);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV4, "UDP request size to specific port.", "bytes/s","Socket", 991);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV4, "UDP receive size from specific port.", "bytes/s","Socket", 990);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4, "UDP active connections per port.", "active connections","Socket", 989);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV4, "UDP receive size from specific port.", "bytes/s","Socket", 991);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV4, "UDP request size to specific port.", "bytes/s","Socket", 990);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_IPV4, "UDP active connections per port.", "active connections","Socket", 989);
 
 }
 
@@ -425,20 +425,20 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
             if(move->iprev) {
                 *ibytes = move->inow - move->iprev;
                 *ebytes = move->enow - move->eprev;
+                *econn = move->etot - move->itot;
             } else {
                 *ibytes = 0;
                 *ebytes = 0;
+                *econn = 0;
             }
 
             move->iprev = move->inow;
             move->eprev = move->enow;
-
-            *econn = move->etot;
+            move->itot = move->etot;
         } else {
             *ibytes = 0;
             *ebytes = 0;
-
-            *econn = move->etot;
+            *econn = 0;
         }
 
         move = move->next;
@@ -451,8 +451,8 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
         write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV4, ebytes_tcp);
         write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV4, ebytes_udp);
 
-        write_connection(NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4, econn_tcp);
-        write_connection(NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4, econn_udp);
+        write_connection(NETWORK_VIEWER_TCP_CONNECTION_IPV4, econn_tcp);
+        write_connection(NETWORK_VIEWER_UDP_CONNECTION_IPV4, econn_udp);
     } else {
         write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ibytes_tcp);
         write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ibytes_udp);
@@ -460,8 +460,8 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
         write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV6, ebytes_tcp);
         write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV6, ebytes_udp);
 
-        write_connection(NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6, econn_tcp);
-        write_connection(NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6, econn_udp);
+        write_connection(NETWORK_VIEWER_TCP_CONNECTION_IPV6, econn_tcp);
+        write_connection(NETWORK_VIEWER_UDP_CONNECTION_IPV6, econn_udp);
     }
 }
 
@@ -539,6 +539,7 @@ netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
 void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
     p->inow += e->recv;
     p->enow += e->sent;
+    p->etot += 1;
 
     /* NETWORK VIEWER CODE
     netdata_conn_stats_t *ret;

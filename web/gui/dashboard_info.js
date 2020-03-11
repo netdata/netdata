@@ -3074,6 +3074,54 @@ netdataDashboard.context = {
         info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
     },
 
+    'ebpf.udp_conn_ipv4': {
+        info: 'This chart demonstrate the number of calls to UDP function using IPV4 protocol in the last period of time in the specified ports. To make this chart Netdata is monitoring the kernel functions \'udp_recvmsg\' and \'udp_sendmsg\'.'
+    },
+
+    'ebpf.udp_transf_outbound_ipv4': {
+        info: 'This chart demonstrate the size of the packages in bytes when a request is done using UDP functions with protocol IPV4. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.udp_transf_inbound_ipv4': {
+        info: 'This chart demonstrate the size of the packages in bytes received using UDP functions with protocol IPV4. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.tcp_conn_ipv4': {
+        info: 'This chart demonstrate the number of calls to TCP function using IPV4 protocol in the last period of time in the specified ports. To make this chart Netdata is monitoring the kernel functions \'tcp_cleanup_rbuf\', \'tcp_close\' and \'tcp_sendmsg\'.'
+    },
+
+    'ebpf.tcp_transf_outbound_ipv4': {
+        info: 'This chart demonstrate the size of the packages in bytes when a request is done using TCP functions with protocol IPV4. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.tcp_transf_inbound_ipv4': {
+        info: 'This chart demonstrate the size of the packages in bytes received using TCP functions with protocol IPV4. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.udp_conn_ipv6': {
+        info: 'This chart demonstrate the number of calls to UDP function using IPV6 protocol in the last period of time in the specified ports. To make this chart Netdata is monitoring the kernel functions \'udp_recvmsg\' and \'udp_sendmsg\'.'
+    },
+
+    'ebpf.udp_transf_outbound_ipv6': {
+        info: 'This chart demonstrate the size of the packages in bytes when a request is done using UDP functions with protocol IPV6. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.udp_transf_inbound_ipv6': {
+        info: 'This chart demonstrate the size of the packages in bytes received using UDP functions with protocol IPV6. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.tcp_conn_ipv6': {
+        info: 'This chart demonstrate the number of calls to TCP function using IPV6 protocol in the last period of time in the specified ports. To make this chart Netdata is monitoring the kernel functions \'tcp_cleanup_rbuf\', \'tcp_close\' and \'tcp_sendmsg\'.'
+    },
+
+    'ebpf.tcp_transf_outbound_ipv6': {
+        info: 'This chart demonstrate the size of the packages in bytes when a request is done using TCP functions with protocol IPV6. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
+    'ebpf.tcp_transf_inbound_ipv6': {
+        info: 'This chart demonstrate the size of the packages in bytes received using TCP functions with protocol IPV6. It is important to say that here we are not measuring the Ethernet and IP layers of the packages, because they are small portion of the request.'
+    },
+
     // ------------------------------------------------------------------------
     // VerneMQ
 

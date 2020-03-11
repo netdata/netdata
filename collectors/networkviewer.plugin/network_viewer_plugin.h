@@ -155,9 +155,9 @@ typedef struct netdata_network {
 # define NETWORK_VIEWER_UDP_OUTBOUND_IPV4 "udp_transf_outbound_ipv4"
 # define NETWORK_VIEWER_UDP_INBOUND_IPV4 "udp_transf_inbound_ipv4"
 
-# define NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4 "tcp_conn_outbound_ipv4"
+# define NETWORK_VIEWER_TCP_CONNECTION_IPV4 "tcp_conn_ipv4"
 //# define NETWORK_VIEWER_CHART5 "TCP_conn_inbound_ipv4"
-# define NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4 "udp_conn_outbound_ipv4"
+# define NETWORK_VIEWER_UDP_CONNECTION_IPV4 "udp_conn_ipv4"
 //# define NETWORK_VIEWER_CHART7 "UDP_conn_inbound_ipv4"
 
 # define NETWORK_VIEWER_TCP_OUTBOUND_IPV6 "tcp_transf_outbound_ipv6"
@@ -165,9 +165,9 @@ typedef struct netdata_network {
 # define NETWORK_VIEWER_UDP_OUTBOUND_IPV6 "udp_transf_outbound_ipv6"
 # define NETWORK_VIEWER_UDP_INBOUND_IPV6 "udp_transf_inbound_ipv6"
 
-# define NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6 "tcp_conn_outbound_ipv6"
+# define NETWORK_VIEWER_TCP_CONNECTION_IPV6 "tcp_conn_ipv6"
 //# define NETWORK_VIEWER_CHART13 "TCP_conn_inbound_ipv6"
-# define NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6 "udp_conn_outbound_ipv6"
+# define NETWORK_VIEWER_UDP_CONNECTION_IPV6 "udp_conn_ipv6"
 //# define NETWORK_VIEWER_CHART15 "UDP_conn_inbound_ipv6"
 
 
