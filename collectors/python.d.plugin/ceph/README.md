@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "CEPH monitoring with Netdata"
