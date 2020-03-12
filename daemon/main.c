@@ -1149,6 +1149,7 @@ int main(int argc, char **argv) {
             mallopt(M_ARENA_MAX, 1);
 #endif
         test_clock_boottime();
+        test_clock_monotonic_coarse();
 
         // prepare configuration environment variables for the plugins
 
