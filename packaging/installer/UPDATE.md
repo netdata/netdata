@@ -14,8 +14,8 @@ We actively develop Netdata to add new features and remove bugs, and encourage a
 most up-to-date version, whether that's nightly or major releases.
 
 Before you update Netdata using one of the methods below, check to see if your Netdata agent is already up-to-date by
-opening the update modal in the dashboard. Click the **Update** button in the top navigation to open it. The modal will
-tell you whether your agent is up-to-date or not.
+opening the update modal in the dashboard. Click the **Update** button in the top navigation to open it. The modal tells
+you whether your agent is up-to-date or not.
 
 ![Opening the update
 modal](https://user-images.githubusercontent.com/1153921/76559153-d5cced00-645b-11ea-8dcd-893f8d16f7a8.gif)
@@ -34,27 +34,27 @@ you installed it.** Choose from the following list to see the appropriate update
 ## One-line installer script (`kickstart.sh`)
 
 If you installed Netdata using our one-line automatic installation script, run it again to update Netdata. Any custom
-settings present in your Netdata configuration directory (typically at `/etc/netdata`) will persist during this process.
+settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists during this process.
 
-This script will download the latest Netdata source (either the nightly or stable version), compile Netdata, and update
-it via reinstallation.
+This script downloads the latest Netdata source (either the nightly or stable version), compiles Netdata, and updates it
+via reinstallation.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
-> want to retain those settings, you will need to set them again during this process. See the [`kickstart.sh`
+> want to retain those settings, you need to set them again during this process. See the [`kickstart.sh`
 > documentation](methods/kickstart.md#optional-parameters-to-alter-your-installation) for more information on these
 > parameters and what they do.
 
 ## `.deb` or `.rpm` packages
 
 If you installed Netdata with `.deb` or `.rpm` packages, use your distribution's package manager update Netdata. Any
-custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) will persist during this
+custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists during this
 process.
 
-Your package manager will grab a new package from our hosted repository, update Netdata, and restart it.
+Your package manager grabs a new package from our hosted repository, updates Netdata, and restarts it.
 
 ```bash
 apt-get install netdata     # Ubuntu/Debian
@@ -68,18 +68,18 @@ zypper in netdata           # openSUSE
 ## Pre-built static binary for 64-bit systems (`kickstart-static64.sh`)
 
 If you installed Netdata using the pre-built static binary, run the `kickstart-static64.sh` script again to update
-Netdata. Any custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) will persist
+Netdata. Any custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists
 during this process.
 
-This script will download the latest Netdata source (either the nightly or stable version), compile Netdata, and update
-it via reinstallation.
+This script downloads the latest Netdata source (either the nightly or stable version), compiles Netdata, and updates it
+via reinstallation.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
-> want to retain those settings, you will need to set them again during this process. See the [`kickstart-static64.sh`
+> want to retain those settings, you need to set them again during this process. See the [`kickstart-static64.sh`
 > documentation](methods/kickstart-64.md#optional-parameters-to-alter-your-installation) for more information on these
 > parameters and what they do.
 
@@ -95,7 +95,7 @@ First, pull the latest version of the image.
 docker pull netdata/netdata:latest
 ```
 
-You will then need to stop and remove any containers using the `netdata/netdata` image. Replace `netdata` if you changed
+Next, to stop and remove any containers using the `netdata/netdata` image. Replace `netdata` if you changed
 it from the default in our [Docker installation instructions](../docker/README.md#run-netdata-with-the-docker-command).
 
 ```bash
@@ -128,9 +128,9 @@ If you installed Netdata on your macOS system using Homebrew, you can explictly 
 brew upgrade netdata
 ```
 
-Homebrew will download the latest Netdata via the
-[formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb), ensure all dependencies are met,
-and update Netdata via reinstallation.
+Homebrew downloads the latest Netdata via the
+[formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb), ensures all dependencies are met,
+and updates Netdata via reinstallation.
 
 ## Manual installation from Git
 
@@ -143,8 +143,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packag
 ```
 
 Then, navigate to the directory where you first cloned the Netdata repository, pull the latest source code, and run
-`netdata-install.sh` again. This process will compile Netdata with the latest source code and update it via
-reinstallation. 
+`netdata-install.sh` again. This process compiles Netdata with the latest source code and updates it via reinstallation. 
 
 ```bash
 cd /path/to/netdata/git
@@ -153,6 +152,6 @@ sudo ./netdata-installer.sh
 ```
 
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
-> want to retain those settings, you will need to set them again during this process.
+> want to retain those settings, you need to set them again during this process.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FUPDATE&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
