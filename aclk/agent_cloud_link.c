@@ -1605,8 +1605,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
 
-//#define EYE_FRIENDLY
-
 /*
  * Take a buffer, encode it and rewrite it
  *
@@ -1614,10 +1612,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
 
 BUFFER *aclk_encode_response(BUFFER *contents)
 {
-#ifdef EYE_FRIENDLY
-
-    return contents;
-#else
     char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
 
@@ -1654,7 +1648,6 @@ BUFFER *aclk_encode_response(BUFFER *contents)
 
     freez(tmp_buffer);
     return contents;
-#endif
 }
 
 /*
@@ -1686,7 +1679,7 @@ void aclk_send_alarm_metadata()
     debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, "\n}\n}");
-    aclk_send_message(ACLK_ALARMS_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
     debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
 
     freez(msg_id);
@@ -1713,7 +1706,7 @@ int aclk_send_info_metadata()
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
-    aclk_send_message(ACLK_METADATA_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_METADATA_TOPIC, local_buffer->buffer, msg_id);
     debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
     freez(msg_id);
 
@@ -1776,7 +1769,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     rrdset2json(st, local_buffer, NULL, NULL, 1);
     buffer_sprintf(local_buffer, "\t\n}");
 
-    aclk_send_message(ACLK_CHART_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_CHART_TOPIC, local_buffer->buffer, msg_id);
 
     freez(msg_id);
     buffer_free(local_buffer);
