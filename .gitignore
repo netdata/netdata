@@ -67,6 +67,7 @@ cgroup-network
 !cgroup-network/
 
 networkviewer.plugin
+!networkviewer.plugin/
 
 ebpf_process.plugin
 !ebpf_process.plugin/
