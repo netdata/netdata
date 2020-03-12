@@ -1158,7 +1158,6 @@ static int read_config_file(const char *path) {
 }
 
 static void update_dimensions() {
-    return ;
     if (connection_controller.pti) {
         parse_text_input_t *r = connection_controller.pti;
         while (r) {
