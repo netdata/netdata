@@ -994,7 +994,7 @@ install_react_dashboard() {
        copy_react_dashboard "${tmp}/build" && \
        rm -rf "${tmp}"
     then
-      if run "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" react ; then
+      if run "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-switch-dashboard.sh" react ; then
         run_ok "React dashboard installed."
       else
         run_failed "Failed to switch to React dashboard."
