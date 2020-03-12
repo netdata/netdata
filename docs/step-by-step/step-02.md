@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Step 2. Get to know Netdata's dashboard"
+date: 2020-03-11
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-02.md
 ---
 -->
@@ -26,6 +27,11 @@ In this step of the Netdata guide, you'll learn how to:
 -   [See raised alarms and the alarm log](#see-raised-alarms-and-the-alarm-log)
 
 Let's get started!
+
+<details markdown="1"><summary>Like shortcuts? Watch our six-minute quickstart video for Netdata's dashboard.</summary>
+<iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<p>Once you've finished, <a href="#whats-next">skip ahead</a> or scroll down for the text-based dashboard quickstart.</p>
+</details>
 
 ## Visit and explore the dashboard
 

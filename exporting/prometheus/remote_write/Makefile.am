@@ -3,15 +3,12 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-SUBDIRS = \
-    tests \
-    graphite \
-    json \
-    opentsdb \
-    prometheus \
-    aws_kinesis \
+CLEANFILES = \
+    remote_write.pb.cc \
+    remote_write.pb.h \
     $(NULL)
 
 dist_noinst_DATA = \
+    remote_write.proto \
     README.md \
     $(NULL)

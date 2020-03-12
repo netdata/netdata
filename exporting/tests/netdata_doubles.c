@@ -91,6 +91,25 @@ const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
     return RRD_MEMORY_MODE_NONE_NAME;
 }
 
+calculated_number rrdvar2number(RRDVAR *rv)
+{
+    (void)rv;
+    return 0;
+}
+
+int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data)
+{
+    (void)host;
+    (void)callback;
+    (void)data;
+    return 0;
+}
+
+void rrdset_update_heterogeneous_flag(RRDSET *st)
+{
+    (void)st;
+}
+
 time_t __mock_rrddim_query_oldest_time(RRDDIM *rd)
 {
     (void)rd;

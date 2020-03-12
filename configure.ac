@@ -1316,6 +1316,8 @@ AC_CONFIG_FILES([
     exporting/graphite/Makefile
     exporting/json/Makefile
     exporting/opentsdb/Makefile
+    exporting/prometheus/Makefile
+    exporting/prometheus/remote_write/Makefile
     exporting/aws_kinesis/Makefile
     exporting/tests/Makefile
     health/Makefile
