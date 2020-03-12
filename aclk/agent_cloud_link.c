@@ -1281,7 +1281,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         return;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response");
+        error("Could not retrieve challenge from auth response: %s", payload);
         return;
     }
 
@@ -1440,8 +1440,8 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        sleep_usec(USEC_PER_MS * 5);
-        //static int stress_counter = 0;
+        sleep_usec(USEC_PER_MS * 50);
+        static int stress_counter = 0;
         //if (stress_counter++ % 500 == 0)
         //    aclk_send_stress_test(2000000);
 
@@ -1716,10 +1716,30 @@ int aclk_send_info_metadata()
     return 0;
 }
 
+void aclk_send_stress_test(size_t size)
+{
+    unsigned char *buffer = mallocz(size);
+    if (buffer != NULL)
+    {
+        for(size_t i=0; i<size; i++)
+            buffer[i] = 'x';
+        buffer[size-1] = 0;
+        time_t time_created = now_realtime_sec();
+        sprintf(buffer,"{\"type\":\"stress\", \"timestamp\":%u,\"payload\":", time_created);
+        buffer[strlen(buffer)] = '"';
+        buffer[size-2] = '}';
+        buffer[size-3] = '"';
+        aclk_send_message(ACLK_METADATA_TOPIC, buffer, NULL);
+        error("Sending stress of size %zu at time %u", size, time_created);
+    }
+    free(buffer);
+}
+
 // Send info metadata message to the cloud if the link is established
 // or on request
 int aclk_send_metadata()
 {
+
     aclk_send_info_metadata();
     aclk_send_alarm_metadata();
 
