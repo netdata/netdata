@@ -4,6 +4,7 @@ name: Coverity Scan
 on:
   schedule:
     - cron: '0 1 * * *'
+  pull_request:
 jobs:
   coverity:
     if: github.repository == 'netdata/netdata'
@@ -18,6 +19,7 @@ jobs:
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
       - name: Run coverity-scan
         env:
+          REPOSITORY: 'netdata/netdata'
           COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
           COVERITY_SCAN_SUBMIT_MAIL: ${{ secrets.COVERITY_SCAN_SUBMIT_MAIL }}
         run: |
