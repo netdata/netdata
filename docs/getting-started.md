@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Getting started guide"
+date: 2020-03-11
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started.md
 ---
 -->
@@ -25,6 +26,10 @@ Open up your web browser of choice and navigate to `http://YOUR-HOST:19999`. Wel
 
 ![Animated GIF of navigating to the
 dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
+
+<details markdown="1"><summary>Want to see the dashboard and its features in action? Check out our video.</summary>
+<iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</details>
 
 **What's next?**: 
 

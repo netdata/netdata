@@ -295,7 +295,7 @@ void backend_set_prometheus_variables(int *default_port,
 #endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-    *brc = process_prometheus_remote_write_response;
+    *brc = backends_process_prometheus_remote_write_response;
 #endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 }
 
@@ -439,7 +439,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
         return BACKEND_TYPE_JSON;
     }
     else if (!strcmp(type, "prometheus_remote_write")) {
-        return  BACKEND_TYPE_PROMETHEUS;
+        return  BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE;
     }
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
@@ -557,12 +557,12 @@ void *backends_main(void *ptr) {
             backend_set_opentsdb_http_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
-        case BACKEND_TYPE_PROMETHEUS: {
+        case BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE: {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             do_prometheus_remote_write = 1;
 
             http_request_header = buffer_create(1);
-            init_write_request();
+            backends_init_write_request();
 #else
             error("BACKEND: Prometheus remote write support isn't compiled");
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
@@ -724,7 +724,7 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
         if(do_prometheus_remote_write)
-            clear_write_request();
+            backends_clear_write_request();
 #endif
         rrd_rdlock();
         RRDHOST *host;
@@ -755,7 +755,7 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             if(do_prometheus_remote_write) {
-                rrd_stats_remote_write_allmetrics_prometheus(
+                backends_rrd_stats_remote_write_allmetrics_prometheus(
                     host
                     , __hostname
                     , global_backend_prefix
@@ -1048,7 +1048,7 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
                 if(do_prometheus_remote_write) {
-                    size_t data_size = get_write_request_size();
+                    size_t data_size = backends_get_write_request_size();
 
                     if(unlikely(!data_size)) {
                         error("BACKEND: write request size is out of range");
@@ -1057,7 +1057,7 @@ void *backends_main(void *ptr) {
 
                     buffer_flush(b);
                     buffer_need_bytes(b, data_size);
-                    if(unlikely(pack_write_request(b->buffer, &data_size))) {
+                    if(unlikely(backends_pack_write_request(b->buffer, &data_size))) {
                         error("BACKEND: cannot pack write request");
                         continue;
                     }
@@ -1137,7 +1137,7 @@ void *backends_main(void *ptr) {
         if(do_prometheus_remote_write && failures) {
             (void) buffer_on_failures;
             failures = 0;
-            chart_lost_bytes = chart_buffered_bytes = get_write_request_size(); // estimated write request size
+            chart_lost_bytes = chart_buffered_bytes = backends_get_write_request_size(); // estimated write request size
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         } else
@@ -1209,7 +1209,7 @@ cleanup:
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     buffer_free(http_request_header);
     if(do_prometheus_remote_write)
-        protocol_buffers_shutdown();
+        backends_protocol_buffers_shutdown();
 #endif
 
 #if HAVE_MONGOC

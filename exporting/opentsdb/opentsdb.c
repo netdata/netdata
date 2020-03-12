@@ -29,6 +29,9 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
+    instance->send_header = NULL;
+    instance->check_response = exporting_discard_response;
+
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {
         error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
@@ -66,6 +69,9 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
+
+    instance->send_header = NULL;
+    instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {

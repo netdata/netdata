@@ -65,6 +65,7 @@ int setup_rrdhost()
     rd->name = strdupz("dimension_name");
     rd->last_collected_value = 123000321;
     rd->last_collected_time.tv_sec = 15051;
+    rd->collections_counter++;
     rd->next = NULL;
 
     rd->state = calloc(1, sizeof(*rd->state));

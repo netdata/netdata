@@ -5,6 +5,7 @@
 #include "json/json.h"
 #include "opentsdb/opentsdb.h"
 #include "aws_kinesis/aws_kinesis.h"
+#include "prometheus/remote_write/remote_write.h"
 
 /**
  * Initialize connectors
@@ -36,6 +37,12 @@ int init_connectors(struct engine *engine)
             case BACKEND_TYPE_OPENTSDB_USING_HTTP:
                 if (init_opentsdb_http_instance(instance) != 0)
                     return 1;
+                break;
+            case BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE:
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+                if (init_prometheus_remote_write_instance(instance) != 0)
+                    return 1;
+#endif
                 break;
             case BACKEND_TYPE_KINESIS:
 #if HAVE_KINESIS
