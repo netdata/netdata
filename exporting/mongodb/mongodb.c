@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define BACKENDS_INTERNALS
+#define EXPORTING_INTERNALS
 #include "mongodb.h"
 #include <mongoc.h>
 
@@ -20,24 +20,24 @@ int mongodb_init(const char *uri_string,
 
     uri = mongoc_uri_new_with_error(uri_string, &error);
     if(unlikely(!uri)) {
-        error("BACKEND: failed to parse URI: %s. Error message: %s", uri_string, error.message);
+        error("EXPORTING: failed to parse URI: %s. Error message: %s", uri_string, error.message);
         return 1;
     }
 
     int32_t socket_timeout = mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, default_socket_timeout);
     if(!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
-        error("BACKEND: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
+        error("EXPORTING: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
         return 1;
     };
 
     mongodb_client = mongoc_client_new_from_uri(uri);
     if(unlikely(!mongodb_client)) {
-        error("BACKEND: failed to create a new client");
+        error("EXPORTING: failed to create a new client");
         return 1;
     }
 
     if(!mongoc_client_set_appname(mongodb_client, "netdata")) {
-        error("BACKEND: failed to set client appname");
+        error("EXPORTING: failed to set client appname");
     };
 
     mongodb_collection = mongoc_client_get_collection(mongodb_client, database_string, collection_string);
@@ -76,7 +76,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
         insert[n_documents] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
         if(unlikely(!insert[n_documents])) {
-           error("BACKEND: %s", error.message);
+           error("EXPORTING: %s", error.message);
            free_bson(insert, n_documents);
            return 1;
         }
@@ -87,7 +87,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
     }
 
     if(unlikely(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
-       error("BACKEND: %s", error.message);
+       error("EXPORTING: %s", error.message);
        free_bson(insert, n_documents);
        return 1;
     }
@@ -124,7 +124,7 @@ int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
-    debug(D_BACKEND, "BACKEND: opening config file '%s'", filename);
+    debug(D_BACKEND, "EXPORTING: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
@@ -137,14 +137,14 @@ int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **
 
         s = trim(buffer);
         if(!s || *s == '#') {
-            debug(D_BACKEND, "BACKEND: ignoring line %d of file '%s', it is empty.", line, filename);
+            debug(D_BACKEND, "EXPORTING: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
 
         char *name = s;
         char *value = strchr(s, '=');
         if(unlikely(!value)) {
-            error("BACKEND: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
+            error("EXPORTING: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
         *value = '\0';
@@ -154,7 +154,7 @@ int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **
         value = trim(value);
 
         if(unlikely(!name || *name == '#')) {
-            error("BACKEND: ignoring line %d of file '%s', name is empty.", line, filename);
+            error("EXPORTING: ignoring line %d of file '%s', name is empty.", line, filename);
             continue;
         }
 
@@ -177,7 +177,7 @@ int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **
     fclose(fp);
 
     if(unlikely(!collection || !*collection)) {
-        error("BACKEND: collection name is a mandatory MongoDB parameter, but it is not configured");
+        error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
