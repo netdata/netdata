@@ -50,7 +50,11 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
 ## `.deb` or `.rpm` packages
 
-If you installed Netdata with `.deb` or `.rpm` packages, use your distribution's package manager update Netdata.
+If you installed Netdata with `.deb` or `.rpm` packages, use your distribution's package manager update Netdata. Any
+custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) will persist during this
+process.
+
+Your package manager will grab a new package from our hosted repository, update Netdata, and restart it.
 
 ```bash
 apt-get install netdata     # Ubuntu/Debian
@@ -61,18 +65,18 @@ zypper in netdata           # openSUSE
 
 > You may need to escalate privileges using `sudo`.
 
-Your package manager will grab a new package from our hosted repository, update Netdata, and restart it.
-
 ## Pre-built static binary for 64-bit systems (`kickstart-static64.sh`)
 
-To update the pre-built static binary, run the `kickstart-static64.sh` script again.
+If you installed Netdata using the pre-built static binary, run the `kickstart-static64.sh` script again to update
+Netdata. Any custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) will persist
+during this process.
+
+This script will download the latest Netdata source (either the nightly or stable version), compile Netdata, and update
+it via reinstallation.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
-
-This script will download the latest Netdata source (either the nightly or stable version) and update Netdata via
-reinstallation.
 
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
 > want to retain those settings, you will need to set them again during this process. See the [`kickstart-static64.sh`
@@ -100,7 +104,21 @@ docker rm netdata
 ```
 
 You can now re-create your Netdata container using the `docker` command or a `docker-compose.yml` file. See our [Docker
-installation instructions](../docker/README.md#run-netdata-with-the-docker-command) for details.
+installation instructions](../docker/README.md#run-netdata-with-the-docker-command) for details. For example, using the
+`docker` command:
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata
+```
 
 ## macOS
 
@@ -110,7 +128,9 @@ If you installed Netdata on your macOS system using Homebrew, you can explictly 
 brew upgrade netdata
 ```
 
-Homebrew will download the latest Netdata via the [formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb), ensure all dependencies are met, and update Netdata via reinstallation.
+Homebrew will download the latest Netdata via the
+[formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb), ensure all dependencies are met,
+and update Netdata via reinstallation.
 
 ## Manual installation from Git
 
@@ -123,15 +143,14 @@ bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packag
 ```
 
 Then, navigate to the directory where you first cloned the Netdata repository, pull the latest source code, and run
-`netdata-install.sh` again.
+`netdata-install.sh` again. This process will compile Netdata with the latest source code and update it via
+reinstallation. 
 
 ```bash
 cd /path/to/netdata/git
 git pull origin master
 sudo ./netdata-installer.sh
 ```
-
-This process will re-compile Netdata with the latest source code, compile it, and install it.
 
 > ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
 > want to retain those settings, you will need to set them again during this process.
