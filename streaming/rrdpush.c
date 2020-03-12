@@ -44,7 +44,8 @@ typedef struct {
 } stream_encoded_t;
 
 static struct config stream_config = {
-        .sections = NULL,
+        .first_section = NULL,
+        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
@@ -168,7 +169,7 @@ int configured_as_master() {
     int is_master = 0;
 
     appconfig_wrlock(&stream_config);
-    for (section = stream_config.sections; section; section = section->next) {
+    for (section = stream_config.first_section; section; section = section->next) {
         uuid_t uuid;
 
         if (uuid_parse(section->name, uuid) != -1 &&

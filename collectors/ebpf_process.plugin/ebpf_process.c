@@ -809,7 +809,7 @@ static inline void set_log_file(char *ptr) {
 }
 
 static void set_global_values() {
-    struct section *sec = collector_config.sections;
+    struct section *sec = collector_config.first_section;
     while(sec) {
         if(!strcasecmp(sec->name, "global")) {
             struct config_option *values = sec->values;

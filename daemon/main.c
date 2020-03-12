@@ -6,7 +6,8 @@ int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 struct config netdata_config = {
-        .sections = NULL,
+        .first_section = NULL,
+        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
