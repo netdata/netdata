@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 1 * * *'
   pull_request:
+    paths:
+      - .github/workflows/coverity.yml
+      - coverity-scan.sh
 jobs:
   coverity:
     if: github.repository == 'netdata/netdata'
