@@ -10,13 +10,36 @@ struct aclk_lws_wss_perconnect_data {
     int todo;
 };
 
-struct lws_wss_packet_buffer {
-    unsigned char *data;
-    size_t data_size;
-    struct lws_wss_packet_buffer *next;
-};
-
 static struct aclk_lws_wss_engine_instance *engine_instance = NULL;
+
+void lws_wss_check_queues(size_t *write_len, size_t *read_len)
+{
+    if (write_len != NULL)
+    {
+        *write_len = 0;
+        if (engine_instance != NULL)
+        {
+            aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
+
+            struct lws_wss_packet_buffer *write_b;
+            size_t w;
+            for(w=0, write_b = engine_instance->write_buffer_head; write_b != NULL; write_b = write_b->next)
+                w++;
+            *write_len = w;
+            aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
+        }
+    }
+    if (read_len != NULL)
+    {
+        *read_len = 0;
+        if (engine_instance != NULL)
+        {
+            aclk_lws_mutex_lock(&engine_instance->read_buf_mutex);
+            *read_len = lws_ring_get_count_waiting_elements(engine_instance->read_ringbuffer, NULL);
+            aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);
+        }
+    }
+}
 
 static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void *data, size_t size)
 {

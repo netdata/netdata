@@ -1410,8 +1410,10 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-
-        info("loop state first_init_%d connected=%d connecting=%d", first_init, aclk_connected, aclk_connecting);
+        size_t write_q, read_q;
+        lws_wss_check_queues(&write_q, &read_q);
+        info("loop state first_init_%d connected=%d connecting=%d wq=%zu rq=%zu",
+             first_init, aclk_connected, aclk_connecting, write_q, read_q);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
