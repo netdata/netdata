@@ -175,9 +175,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
         handle->descr = descr;
 
-        uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
-        handle->page_correlation_id = pg_cache->committed_page_index.latest_corr_id++;
-        uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
+        handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
         if (0 == rd->rrdset->rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
