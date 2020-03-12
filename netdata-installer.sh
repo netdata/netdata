@@ -563,6 +563,13 @@ bundle_libwebsockets() {
 bundle_libwebsockets
 
 # -----------------------------------------------------------------------------
+# If we have the dashboard switching logic, make sure we're on the classic
+# dashboard during the install (updates don't work correctly otherwise).
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ] ; then
+  "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
+fi
+
+# -----------------------------------------------------------------------------
 echo >&2
 progress "Run autotools to configure the build environment"
 
