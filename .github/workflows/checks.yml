@@ -37,3 +37,33 @@ jobs:
       - name: Compare generated Dashboard vs. Backed up Dashboard
         run: |
           diff -sNrdu /tmp/dashboard.js web/gui/dashboard.js
+  dist-checks:
+    name: Dist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare environment
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
+                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
+                                  libnetfilter-acct-dev
+      - name: Configure
+        run: |
+          autoreconf -ivf
+          ./configure \
+            --with-zlib \
+            --with-math \
+            --with-user=netdata \
+            CFLAGS=-O2
+      - name: Make dist
+        run: |
+          make dist
+      - name: Verify & Set distfile
+        run: |
+          ls -lah netdata-*.tar.gz
+          echo "::set-env name=DISTFILE::$(ls netdata-*.tar.gz)"
+      - name: Run run_install_with_dist_file.sh
+        run: |
+          ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"

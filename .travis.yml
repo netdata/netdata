@@ -107,26 +107,6 @@ jobs:
       env: DEVEL="true"
       after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
-    - name: Run 'make dist' validation
-      before_script: mkdir /tmp/netdata-makedist-test
-      script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
-        - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
-        - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" /bin/bash -c "autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2"
-        - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make dist
-        - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
-        - .travis/run_install_with_dist_file.sh
-        - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make distclean
-      git:
-        depth: false
-      after_script: rm -rf /tmp/netdata-makedist-test
-      after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
-
-
     - stage: Artifacts validation
       name: Unit Testing
       script:
