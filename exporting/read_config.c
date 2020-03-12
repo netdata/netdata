@@ -150,7 +150,7 @@ BACKEND_TYPE exporting_select_type(const char *type)
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return BACKEND_TYPE_JSON;
     } else if (!strcmp(type, "prometheus_remote_write")) {
-        return BACKEND_TYPE_PROMETHEUS;
+        return BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
@@ -252,7 +252,7 @@ struct engine *read_exporting_config()
             strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "hostname", netdata_configured_hostname));
         engine->config.prefix = strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "prefix", "netdata"));
         engine->config.update_every =
-            exporter_get_number(CONFIG_SECTION_EXPORTING, EXPORTER_UPDATE_EVERY, EXPORTER_UPDATE_EVERY_DEFAULT);
+            exporter_get_number(CONFIG_SECTION_EXPORTING, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
     }
 
     while (tmp_ci_list) {
@@ -265,6 +265,13 @@ struct engine *read_exporting_config()
             error("Unknown exporting connector type");
             goto next_connector_instance;
         }
+
+#ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
+        if (tmp_ci_list->backend_type == BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE) {
+            error("Prometheus Remote Write support isn't compiled");
+            goto next_connector_instance;
+        }
+#endif
 
 #ifndef HAVE_KINESIS
         if (tmp_ci_list->backend_type == BACKEND_TYPE_KINESIS) {
@@ -285,48 +292,58 @@ struct engine *read_exporting_config()
         tmp_instance->config.name = strdupz(tmp_ci_list->local_ci.instance_name);
 
         tmp_instance->config.destination =
-            strdupz(exporter_get(instance_name, EXPORTER_DESTINATION, EXPORTER_DESTINATION_DEFAULT));
+            strdupz(exporter_get(instance_name, "destination", "localhost"));
 
         tmp_instance->config.update_every =
-            exporter_get_number(instance_name, EXPORTER_UPDATE_EVERY, EXPORTER_UPDATE_EVERY_DEFAULT);
+            exporter_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
         tmp_instance->config.buffer_on_failures =
-            exporter_get_number(instance_name, EXPORTER_BUF_ONFAIL, EXPORTER_BUF_ONFAIL_DEFAULT);
+            exporter_get_number(instance_name, "buffer on failures", 10);
 
         tmp_instance->config.timeoutms =
-            exporter_get_number(instance_name, EXPORTER_TIMEOUT_MS, EXPORTER_TIMEOUT_MS_DEFAULT);
+            exporter_get_number(instance_name, "timeout ms", 10000);
 
         tmp_instance->config.charts_pattern = simple_pattern_create(
-            exporter_get(instance_name, EXPORTER_SEND_CHART_MATCH, EXPORTER_SEND_CHART_MATCH_DEFAULT),
+            exporter_get(instance_name, "send charts matching", "*"),
             NULL,
             SIMPLE_PATTERN_EXACT);
 
         tmp_instance->config.hosts_pattern = simple_pattern_create(
-            exporter_get(instance_name, EXPORTER_SEND_HOST_MATCH, EXPORTER_SEND_HOST_MATCH_DEFAULT),
+            exporter_get(instance_name, "send hosts matching", "localhost *"),
             NULL,
             SIMPLE_PATTERN_EXACT);
 
         char *data_source =
-            exporter_get(instance_name, EXPORTER_DATA_SOURCE, EXPORTER_DATA_SOURCE_DEFAULT);
+            exporter_get(instance_name, "data source", "average");
 
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
 
         if (exporter_get_boolean(
-                instance_name, EXPORTER_SEND_CONFIGURED_LABELS, EXPORTER_SEND_CONFIGURED_LABELS_DEFAULT))
+                instance_name, "send configured labels", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
 
         if (exporter_get_boolean(
-                instance_name, EXPORTER_SEND_AUTOMATIC_LABELS, EXPORTER_SEND_AUTOMATIC_LABELS_DEFAULT))
+                instance_name, "send automatic labels", CONFIG_BOOLEAN_NO))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
-        if (exporter_get_boolean(instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT))
+        if (exporter_get_boolean(instance_name, "send names instead of ids", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
+
+        if (tmp_instance->config.type == BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE) {
+            struct prometheus_remote_write_specific_config *connector_specific_config =
+                callocz(1, sizeof(struct prometheus_remote_write_specific_config));
+
+            tmp_instance->config.connector_specific_config = connector_specific_config;
+
+            connector_specific_config->remote_write_path = strdupz(exporter_get(
+                instance_name, "remote write URL path", "/receive"));
+        }
 
         if (tmp_instance->config.type == BACKEND_TYPE_KINESIS) {
             struct aws_kinesis_specific_config *connector_specific_config =
@@ -335,13 +352,13 @@ struct engine *read_exporting_config()
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
             connector_specific_config->stream_name = strdupz(exporter_get(
-                instance_name, EXPORTER_KINESIS_STREAM_NAME, EXPORTER_KINESIS_STREAM_NAME_DEFAULT));
+                instance_name, "stream name", "netdata"));
 
             connector_specific_config->auth_key_id = strdupz(exporter_get(
-                instance_name, EXPORTER_AWS_ACCESS_KEY_ID, ""));
+                instance_name, "aws_access_key_id", ""));
 
             connector_specific_config->secure_key = strdupz(exporter_get(
-                instance_name, EXPORTER_AWS_SECRET_ACCESS_KEY, ""));
+                instance_name, "aws_secret_access_key", ""));
         }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -359,7 +376,7 @@ struct engine *read_exporting_config()
                 strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
             engine->config.prefix = strdupz(config_get(instance_name, "prefix", "netdata"));
             engine->config.update_every =
-                config_get_number(instance_name, EXPORTER_UPDATE_EVERY, EXPORTER_UPDATE_EVERY_DEFAULT);
+                config_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
         }
 
 next_connector_instance:
