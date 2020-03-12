@@ -6,7 +6,3 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 dist_noinst_DATA = \
     README.md \
     $(NULL)
-
-dist_libconfig_DATA = \
-    mongodb.conf \
-    $(NULL)

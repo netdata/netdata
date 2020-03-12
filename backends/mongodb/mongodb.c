@@ -47,7 +47,7 @@ int backends_mongodb_init(const char *uri_string,
     return 0;
 }
 
-void free_bson(bson_t **insert, size_t n_documents) {
+void backends_free_bson(bson_t **insert, size_t n_documents) {
     size_t i;
 
     for(i = 0; i < n_documents; i++)
@@ -77,7 +77,7 @@ int backends_mongodb_insert(char *data, size_t n_metrics) {
 
         if(unlikely(!insert[n_documents])) {
            error("BACKEND: %s", error.message);
-           free_bson(insert, n_documents);
+           backends_free_bson(insert, n_documents);
            return 1;
         }
 
@@ -88,11 +88,11 @@ int backends_mongodb_insert(char *data, size_t n_metrics) {
 
     if(unlikely(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
        error("BACKEND: %s", error.message);
-       free_bson(insert, n_documents);
+       backends_free_bson(insert, n_documents);
        return 1;
     }
 
-    free_bson(insert, n_documents);
+    backends_free_bson(insert, n_documents);
 
     return 0;
 }

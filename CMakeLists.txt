@@ -662,6 +662,11 @@ set(KINESIS_EXPORTING_FILES
         exporting/aws_kinesis/aws_kinesis_put_record.h
         )
 
+set(MONGODB_EXPORTING_FILES
+        exporting/mongodb/mongodb.c
+        exporting/mongodb/mongodb.h
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -782,7 +787,7 @@ ENDIF()
 IF(libmongoc-1.0_FOUND)
     message(STATUS "mongodb backend: enabled")
 
-    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES})
+    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
 ELSE()
@@ -1053,6 +1058,12 @@ if(ENABLE_BACKEND_KINESIS)
         -Wl,--wrap=kinesis_init
         -Wl,--wrap=kinesis_put_record
         -Wl,--wrap=kinesis_get_result
+    )
+endif()
+if(ENABLE_BACKEND_MONGODB)
+    list(APPEND EXPORTING_ENGINE_FILES ${MONGODB_EXPORTING_FILES})
+    list(
+        APPEND MONGODB_LINK_OPTIONS
     )
 endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
