@@ -28,8 +28,8 @@ switch_dashboard() {
 
     for dashboard in classic react ; do
         # shellcheck disable=SC2013
-        for path in $(cat ${webdir}-${dashboard}/.files) ; do
-            rm -f "${webdir}/${path}"
+        for item in $(cat ${webdir}-${dashboard}/.files) ; do
+            rm -f "${webdir}/${item}"
         done
     done
 
