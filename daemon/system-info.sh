@@ -308,7 +308,7 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
         fi
 
         DISK_DETECTION="df"
-        DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +1 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -u -k '1,2n,4n' | awk '{print $2}' | tr '\n' '+' | head -c -1) * 1024))
+        DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | tr '\n' '+' | rev | cut -f 2- -d '+' | rev) * 1024))
 elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         types='ufs'
 
