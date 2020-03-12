@@ -119,19 +119,25 @@ typedef struct netdata_port_list {
 }netdata_port_list_t;
 
 typedef struct netdata_control_connection{
-    avl_tree_lock port_stat_ipv4;
-    avl_tree_lock port_stat_ipv6;
-
-    avl_tree_lock port_list;
+    avl_tree_lock port_stat_tcp_ipv4;
+    avl_tree_lock port_stat_udp_ipv4;
+    avl_tree_lock port_stat_tcp_ipv6;
+    avl_tree_lock port_stat_udp_ipv6;
 
     netdata_conn_stats_t *tree;
     netdata_conn_stats_t *last_connection;
 
-    netdata_port_stats_t *ports_ipv4;
-    netdata_port_stats_t *last_port_ipv4;
+    netdata_port_stats_t *ports_tcp_ipv4;
+    netdata_port_stats_t *last_port_tcp_ipv4;
 
-    netdata_port_stats_t *ports_ipv6;
-    netdata_port_stats_t *last_port_ipv6;
+    netdata_port_stats_t *ports_udp_ipv4;
+    netdata_port_stats_t *last_port_udp_ipv4;
+
+    netdata_port_stats_t *ports_tcp_ipv6;
+    netdata_port_stats_t *last_port_tcp_ipv6;
+
+    netdata_port_stats_t *ports_udp_ipv6;
+    netdata_port_stats_t *last_port_udp_ipv6;
 
     uint16_t maxports;
     parse_text_input_t *pti;
