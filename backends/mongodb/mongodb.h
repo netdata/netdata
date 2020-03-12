@@ -5,11 +5,11 @@
 
 #include "backends/backends.h"
 
-extern int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string, const int32_t socket_timeout);
+extern int backends_mongodb_init(const char *uri_string, const char *database_string, const char *collection_string, const int32_t socket_timeout);
 
-extern int mongodb_insert(char *data, size_t n_metrics);
+extern int backends_mongodb_insert(char *data, size_t n_metrics);
 
-extern void mongodb_cleanup();
+extern void backends_mongodb_cleanup();
 
 extern int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **collection_p);
 

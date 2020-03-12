@@ -9,7 +9,7 @@
 mongoc_client_t *mongodb_client;
 mongoc_collection_t *mongodb_collection;
 
-int mongodb_init(const char *uri_string,
+int backends_mongodb_init(const char *uri_string,
                  const char *database_string,
                  const char *collection_string,
                  int32_t default_socket_timeout) {
@@ -56,7 +56,7 @@ void free_bson(bson_t **insert, size_t n_documents) {
     free(insert);
 }
 
-int mongodb_insert(char *data, size_t n_metrics) {
+int backends_mongodb_insert(char *data, size_t n_metrics) {
     bson_t **insert = calloc(n_metrics, sizeof(bson_t *));
     bson_error_t error;
     char *start = data, *end = data;
@@ -97,7 +97,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
     return 0;
 }
 
-void mongodb_cleanup() {
+void backends_mongodb_cleanup() {
     mongoc_collection_destroy(mongodb_collection);
     mongoc_client_destroy(mongodb_client);
     mongoc_cleanup();
