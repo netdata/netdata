@@ -4,6 +4,10 @@ name: Coverity Scan
 on:
   schedule:
     - cron: '0 1 * * *'
+  pull_request:
+    paths:
+      - .github/workflows/coverity.yml
+      - coverity-scan.sh
 jobs:
   coverity:
     if: github.repository == 'netdata/netdata'
@@ -12,12 +16,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Prepare environment
+        env:
+          DEBIAN_FRONTEND: 'noninteractive'
         run: |
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
-                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
+          ./packaging/installer/install-required-packages.sh \
+            --dont-wait --non-interactive netdata
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev \
+                                  libcups2-dev libsnappy-dev libprotobuf-dev \
+                                  libprotoc-dev libssl-dev protobuf-compiler \
+                                  libnetfilter-acct-dev
       - name: Run coverity-scan
         env:
+          REPOSITORY: 'netdata/netdata'
           COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
           COVERITY_SCAN_SUBMIT_MAIL: ${{ secrets.COVERITY_SCAN_SUBMIT_MAIL }}
         run: |
