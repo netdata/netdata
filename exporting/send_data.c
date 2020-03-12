@@ -98,11 +98,14 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     struct stats *stats = &instance->stats;
 
+    int ret = 0;
     if (instance->send_header)
-        instance->send_header(sock, instance);
+        ret = instance->send_header(sock, instance);
 
-    ssize_t written;
-    written = send(*sock, buffer_tostring(buffer), len, flags);
+    ssize_t written = -1;
+
+    if (!ret)
+        written = send(*sock, buffer_tostring(buffer), len, flags);
 
     if(written != -1 && (size_t)written == len) {
         // we sent the data successfully

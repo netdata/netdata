@@ -14,8 +14,9 @@ char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
  *
  * @param sock a communication socket.
  * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
  */
-void prometheus_remote_write_send_header(int *sock, struct instance *instance)
+int prometheus_remote_write_send_header(int *sock, struct instance *instance)
 {
     int flags = 0;
 #ifdef MSG_NOSIGNAL
@@ -40,8 +41,15 @@ void prometheus_remote_write_send_header(int *sock, struct instance *instance)
         instance->engine->config.hostname,
         buffer_strlen((BUFFER *)instance->buffer));
 
-    send(*sock, buffer_tostring(header), buffer_strlen(header), flags);
+    size_t header_len = buffer_strlen(header);
+    ssize_t written = send(*sock, buffer_tostring(header), header_len, flags);
+
     buffer_flush(header);
+
+    if (written != -1 && (size_t)written == header_len)
+        return 0;
+    else
+        return 1;
 }
 
 /**

@@ -820,7 +820,7 @@ static void test_prometheus_remote_write_send_header(void **state)
     expect_value(__wrap_send, len, 125);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
-    prometheus_remote_write_send_header(&sock, instance);
+    assert_int_equal(prometheus_remote_write_send_header(&sock, instance),0);
 
     free(connector_specific_config->remote_write_path);
 }
