@@ -1412,7 +1412,6 @@ void *aclk_main(void *ptr)
         static int first_init = 0;
 
         info("loop state first_init_%d connected=%d connecting=%d", first_init, aclk_connected, aclk_connecting);
-        sleep_usec(USEC_PER_MS * 500);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
@@ -1439,7 +1438,10 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        sleep_usec(USEC_PER_MS * 100);
+        sleep_usec(USEC_PER_MS * 5);
+        //static int stress_counter = 0;
+        //if (stress_counter++ % 500 == 0)
+        //    aclk_send_stress_test(2000000);
 
         // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {

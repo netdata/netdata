@@ -487,7 +487,7 @@ abort:
 void aclk_lws_wss_service_loop()
 {
     if (engine_instance)
-        lws_service(engine_instance->lws_context, 0);
+        lws_service(engine_instance->lws_context, -1);
 }
 
 // in case the MQTT connection disconnect while lws transport is still operational
