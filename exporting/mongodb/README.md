@@ -1,36 +1,28 @@
-# MongoDB backend
+# MongoDB exporting connector
 
 ## Prerequisites
 
-To use MongoDB as a backend, `libmongoc` 1.7.0 or higher should be
-[installed](http://mongoc.org/libmongoc/current/installing.html) first. Next, Netdata should be re-installed from the
-source. The installer will detect that the required libraries are now available.
+To use MongoDB as an external storage for long-term archiving, you should first
+[install](http://mongoc.org/libmongoc/current/installing.html) `libmongoc` 1.7.0 or higher. Next, re-install Netdata
+from the source, which detects that the required library is now available.
 
 ## Configuration
 
-To enable data sending to the MongoDB backend set the following options in `netdata.conf`:
+To enable data exporting to a MongoDB database, run `./edit-config exporting.conf`
+in the Netdata configuration directory and set the following options:
 
 ```conf
-[backend]
+[mongodb:my_instance]
     enabled = yes
-    type = mongodb
+    uri = mongodb://<hostname>
+    database = your_database_name
+    collection = your_collection_name
 ```
 
-In the Netdata configuration directory run `./edit-config mongodb.conf` and set [MongoDB
-URI](https://docs.mongodb.com/manual/reference/connection-string/), database name, and collection name:
+You can find more information about `uri` in the MongoDB
+[documentation]](https://docs.mongodb.com/manual/reference/connection-string/)
 
-```yaml
-# URI
-uri = mongodb://<hostname>
+The default socket timeout depends on the exporting connector update interval. The timeout is 500 ms shorter than the
+interval (but not less than 1000 ms). You can alter the timeout using the `sockettimeoutms` MongoDB URI option.
 
-# database name
-database = your_database_name
-
-# collection name
-collection = your_collection_name
-```
-
-The default socket timeout depends on the backend update interval. The timeout is 500 ms shorter than the interval (but
-not less than 1000 ms). You can alter the timeout using the `sockettimeoutms` MongoDB URI option.
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2Fmongodb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2Fmongodb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
