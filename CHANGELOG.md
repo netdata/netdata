@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- Change topics for ACLK [\#8374](https://github.com/netdata/netdata/pull/8374) ([amoss](https://github.com/amoss))
+- Add proper parsing/stripping of comments around docs frontmatter [\#8372](https://github.com/netdata/netdata/pull/8372) ([joelhans](https://github.com/joelhans))
+- new version of godplugin and pulsar alarms, dashboard info [\#8364](https://github.com/netdata/netdata/pull/8364) ([ilyam8](https://github.com/ilyam8))
 - Fix MDX parsing in installation guide [\#8362](https://github.com/netdata/netdata/pull/8362) ([joelhans](https://github.com/joelhans))
 - ebpf plugin info typo fix  [\#8360](https://github.com/netdata/netdata/pull/8360) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK according to results of the smoke-test. [\#8358](https://github.com/netdata/netdata/pull/8358) ([amoss](https://github.com/amoss))
+- Improve Pull Request template to have a shorter testing section with enhanced instructions [\#8357](https://github.com/netdata/netdata/pull/8357) ([prologic](https://github.com/prologic))
 - Add packaging/bundle-lws.sh to dist\_noinst\_DATA \(was missed\) [\#8356](https://github.com/netdata/netdata/pull/8356) ([prologic](https://github.com/prologic))
 - Remove possible erroneous blank line causing Travis to fail possibly and default to magical behaviour [\#8355](https://github.com/netdata/netdata/pull/8355) ([prologic](https://github.com/prologic))
 - Bulk add frontmatter to all documentation [\#8354](https://github.com/netdata/netdata/pull/8354) ([joelhans](https://github.com/joelhans))
@@ -225,7 +229,6 @@
 - Support static builds for Prometheus remote write [\#7691](https://github.com/netdata/netdata/pull/7691) ([Ehekatl](https://github.com/Ehekatl))
 - Adds a Dockerfile.docs for more easily and reproducibly building/rebuilding docs [\#7688](https://github.com/netdata/netdata/pull/7688) ([prologic](https://github.com/prologic))
 - Fix setuid for freeipmi.plugin in Docker images [\#7684](https://github.com/netdata/netdata/pull/7684) ([lassebm](https://github.com/lassebm))
-- Fixes for pfSense Installation [\#7665](https://github.com/netdata/netdata/pull/7665) ([prologic](https://github.com/prologic))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
