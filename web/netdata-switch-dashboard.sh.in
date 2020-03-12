@@ -33,7 +33,7 @@ switch_dashboard() {
         done
     done
 
-    cp -a "${path}" "${webdir}"
+    cp -a "${path}/." "${webdir}"
     exit 0
 }
 
