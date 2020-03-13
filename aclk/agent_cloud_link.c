@@ -1442,8 +1442,8 @@ void *aclk_main(void *ptr)
         _link_event_loop();
         sleep_usec(USEC_PER_MS * 50);
         static int stress_counter = 0;
-        //if (stress_counter++ % 500 == 0)
-        //    aclk_send_stress_test(2000000);
+        if (stress_counter++ % 10 == 0 && write_q==0)
+            aclk_send_stress_test(2000000);
 
         // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {
