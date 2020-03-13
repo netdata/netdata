@@ -898,15 +898,16 @@ void *aclk_query_main_thread(void *ptr)
         time_t checkpoint;
 
         checkpoint = now_realtime_sec() - last_init_sequence;
-        info("Waiting for agent collectors to initialize");
-        sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
+        info("Waiting for agent collectors to initialize last activity %ld seconds ago" , checkpoint);
         if (checkpoint > ACLK_STABLE_TIMEOUT) {
             agent_state = AGENT_STABLE;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
 #ifdef ACLK_DEBUG
             _dump_connector_list();
 #endif
+            break;
         }
+        sleep_usec(USEC_PER_SEC * 1);
     }
 
     while (!netdata_exit) {
@@ -1396,6 +1397,10 @@ void *aclk_main(void *ptr)
         }
         if (!create_private_key() && !_mqtt_lib_init())
             break;
+
+        if (netdata_exit)
+            goto exited;
+
         sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
@@ -1841,6 +1846,11 @@ int aclk_handle_cloud_request(char *payload)
     struct aclk_request cloud_to_agent = {
         .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
     };
+
+    if (unlikely(agent_state == AGENT_INITIALIZING)) {
+        debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
+        return 0;
+    }
 
     if (unlikely(!payload)) {
         debug(D_ACLK, "ACLK incoming message is empty");
