@@ -2,7 +2,6 @@
 
 #define EXPORTING_INTERNALS
 #include "mongodb.h"
-#include <mongoc.h>
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
@@ -103,4 +102,137 @@ void mongodb_cleanup() {
     mongoc_cleanup();
 
     return;
+}
+
+/**
+ * Initialize MongoDB connector instance
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int init_mongodb_instance(struct instance *instance)
+{
+    instance->worker = mongodb_connector_worker;
+
+    instance->start_batch_formatting = NULL;
+    instance->start_host_formatting = format_host_labels_json_plaintext;
+    instance->start_chart_formatting = NULL;
+
+    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
+        instance->metric_formatting = format_dimension_collected_json_plaintext;
+    else
+        instance->metric_formatting = format_dimension_stored_json_plaintext;
+
+    instance->end_chart_formatting = NULL;
+    instance->end_host_formatting = flush_host_labels;
+    instance->end_batch_formatting = NULL;
+
+    instance->send_header = NULL;
+    instance->check_response = NULL;
+
+    instance->buffer = (void *)buffer_create(0);
+    if (!instance->buffer) {
+        error("EXPORTING: cannot create buffer for MongoDB exporting connector instance %s", instance->config.name);
+        return 1;
+    }
+    uv_mutex_init(&instance->mutex);
+    uv_cond_init(&instance->cond_var);
+
+    struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    struct mongodb_specific_data *connector_specific_data = callocz(1, sizeof(struct mongodb_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    instance->config.timeoutms =
+        (instance->config.update_every >= 2) ? (instance->engine->config.update_every * MSEC_PER_SEC - 500) : 1000;
+
+    if (!instance->engine->mongoc_initialized) {
+        if (unlikely(mongodb_init(
+                connector_specific_config->uri,
+                connector_specific_config->database,
+                connector_specific_config->collection,
+                instance->config.timeoutms))) {
+            error("EXPORTING: cannot initialize MongoDB exporting connector");
+            return 1;
+        }
+        instance->engine->mongoc_initialized = 1;
+    }
+
+    mongodb_init(
+        connector_specific_config->uri,
+        connector_specific_config->database,
+        connector_specific_config->collection,
+        instance->config.timeoutms);
+
+    return 0;
+}
+
+/**
+ * MongoDB connector worker
+ *
+ * Runs in a separate thread for every instance.
+ *
+ * @param instance_p an instance data structure.
+ */
+void mongodb_connector_worker(void *instance_p)
+{
+    struct instance *instance = (struct instance *)instance_p;
+    struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
+
+    while (!netdata_exit) {
+        struct stats *stats = &instance->stats;
+
+        uv_mutex_lock(&instance->mutex);
+        uv_cond_wait(&instance->cond_var, &instance->mutex);
+
+        BUFFER *buffer = (BUFFER *)instance->buffer;
+        size_t buffer_len = buffer_strlen(buffer);
+
+        size_t sent = 0;
+
+        while (sent < buffer_len) {
+            const char *first_char = buffer_tostring(buffer) + sent;
+
+            debug(
+                D_BACKEND,
+                "EXPORTING: mongodb_insert(): uri = %s, database = %s, collection = %s, buffer = %zu",
+                connector_specific_config->uri,
+                connector_specific_config->database,
+                connector_specific_config->collection,
+                buffer_len);
+
+            if (likely(!mongodb_insert((char *)first_char, (size_t)stats->chart_buffered_metrics))) {
+                sent += buffer_len;
+                stats->chart_transmission_successes++;
+                stats->chart_receptions++;
+            } else {
+                // oops! we couldn't send (all or some of the) data
+                error(
+                    "EXPORTING: failed to write data to the database '%s'. "
+                    "Willing to write %zu bytes, wrote %zu bytes.",
+                    connector_specific_config->uri, buffer_len, 0UL);
+
+                stats->chart_transmission_failures++;
+                stats->chart_data_lost_events++;
+                stats->chart_lost_bytes += buffer_len;
+                stats->chart_lost_metrics += stats->chart_buffered_metrics;
+
+                break;
+            }
+
+            if (unlikely(netdata_exit))
+                break;
+        }
+
+        stats->chart_sent_bytes += sent;
+        if (likely(sent == buffer_len))
+            stats->chart_sent_metrics = stats->chart_buffered_metrics;
+
+        buffer_flush(buffer);
+
+        uv_mutex_unlock(&instance->mutex);
+
+#ifdef UNIT_TESTING
+        break;
+#endif
+    }
 }
