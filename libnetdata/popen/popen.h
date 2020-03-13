@@ -11,6 +11,8 @@
 extern FILE *mypopen(const char *command, volatile pid_t *pidptr);
 extern FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env);
 extern int mypclose(FILE *fp, pid_t pid);
+extern int netdata_spawn(const char *command, volatile pid_t *pidptr);
+extern int netdata_spawn_waitpid(pid_t pid);
 extern void myp_init(void);
 extern void myp_free(void);
 extern int myp_reap(pid_t pid);

@@ -78,8 +78,12 @@ static void myp_del(pid_t pid) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, char **env) {
-    FILE *fp;
+/* use_pipe flag definitions */
+#define NO_PIPE_NULL_STDOUT 0 // Don't create a pipe, set stdout to /dev/null
+#define USE_PIPE 1  // Create a pipe like popen()
+
+static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t use_pipe) {
+    FILE *fp = (FILE *)1; // set to 1 to differentiate from NULL when running NO_PIPE_NULL_STDOUT
     int pipefd[2], error;
     pid_t pid;
     char *const spawn_argv[] = {
@@ -91,23 +95,33 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    if (pipe(pipefd) == -1)
-        return NULL;
-    if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
-        goto error_after_pipe;
+    if (USE_PIPE == use_pipe) {
+        if (pipe(pipefd) == -1)
+            return NULL;
+        if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
+            goto error_after_pipe;
+        }
     }
 
     // Mark all files to be closed by the exec() stage of posix_spawn()
     int i;
-    for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
-        if(i != STDIN_FILENO && i != STDERR_FILENO)
-            (void)fcntl(i, F_SETFD, FD_CLOEXEC);
+    for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
+        if (i != STDIN_FILENO && i != STDERR_FILENO && !(NO_PIPE_NULL_STDOUT == use_pipe && i == STDOUT_FILENO))
+            (void) fcntl(i, F_SETFD, FD_CLOEXEC);
+    }
 
     if (!posix_spawn_file_actions_init(&fa)) {
-        // move the pipe to stdout in the child
-        if (posix_spawn_file_actions_adddup2(&fa, pipefd[PIPE_WRITE], STDOUT_FILENO)) {
-            error("posix_spawn_file_actions_adddup2() failed");
-            goto error_after_posix_spawn_file_actions_init;
+        if (USE_PIPE == use_pipe) {
+            // move the pipe to stdout in the child
+            if (posix_spawn_file_actions_adddup2(&fa, pipefd[PIPE_WRITE], STDOUT_FILENO)) {
+                error("posix_spawn_file_actions_adddup2() failed");
+                goto error_after_posix_spawn_file_actions_init;
+            }
+        } else { // NO_PIPE_NULL_STDOUT == use_pipe
+            if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", 0, O_WRONLY)) {
+                error("posix_spawn_file_actions_addopen() failed");
+                // this is not a fatal error
+            }
         }
     } else {
         error("posix_spawn_file_actions_init() failed.");
@@ -136,10 +150,14 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     } else {
         myp_add_unlock();
         error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
-        fclose(fp);
-        fp = NULL;
+        if (USE_PIPE == use_pipe) {
+            fclose(fp);
+            fp = NULL;
+        }
     }
-    close(pipefd[PIPE_WRITE]);
+    if (USE_PIPE == use_pipe) {
+        close(pipefd[PIPE_WRITE]);
+    }
 
     if (!error) {
         // posix_spawnattr_init() succeeded
@@ -155,12 +173,14 @@ error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
 error_after_pipe:
-    if (fp)
-        fclose(fp);
-    else
-        close(pipefd[PIPE_READ]);
+    if (USE_PIPE == use_pipe) {
+        if (fp)
+            fclose(fp);
+        else
+            close(pipefd[PIPE_READ]);
 
-    close(pipefd[PIPE_WRITE]);
+        close(pipefd[PIPE_WRITE]);
+    }
     return NULL;
 }
 
@@ -222,26 +242,34 @@ int myp_reap(pid_t pid) {
 }
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
-    return custom_popene(command, pidptr, environ);
+    return custom_popene(command, pidptr, environ, USE_PIPE);
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
-    return custom_popene(command, pidptr, env);
+    return custom_popene(command, pidptr, env, USE_PIPE);
 }
 
-int mypclose(FILE *fp, pid_t pid) {
+// returns 0 on success, -1 on failure
+int netdata_spawn(const char *command, volatile pid_t *pidptr) {
+    FILE *fp = custom_popene(command, pidptr, environ, NO_PIPE_NULL_STDOUT);
+    return (fp != NULL) ? 0 : -1;
+}
+
+int custom_pclose(FILE *fp, pid_t pid) {
     int ret;
     siginfo_t info;
 
     debug(D_EXIT, "Request to mypclose() on pid %d", pid);
 
-    // close the pipe fd
-    // this is required in musl
-    // without it the childs do not exit
-    close(fileno(fp));
+    if (fp) {
+        // close the pipe fd
+        // this is required in musl
+        // without it the childs do not exit
+        close(fileno(fp));
 
-    // close the pipe file pointer
-    fclose(fp);
+        // close the pipe file pointer
+        fclose(fp);
+    }
 
     errno = 0;
 
@@ -284,4 +312,14 @@ int mypclose(FILE *fp, pid_t pid) {
         error("Cannot waitid() for pid %d", pid);
     
     return 0;
+}
+
+int mypclose(FILE *fp, pid_t pid)
+{
+    return custom_pclose(fp, pid);
+}
+
+int netdata_spawn_waitpid(pid_t pid)
+{
+    return custom_pclose(NULL, pid);
 }
