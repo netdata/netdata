@@ -231,7 +231,7 @@ static void only_root(void **state)
     //char expected_url_repr[4096];
     //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
 
-    expect_string(__wrap_mysendfile, filename, "XXX");
+    expect_string(__wrap_mysendfile, filename, "/");
 
     web_client_process_request(w);
 
