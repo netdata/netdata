@@ -1850,7 +1850,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     buffer_sprintf(local_buffer, "\n}");
-    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, aclk_encode_response(local_buffer)->buffer, 0, 1, ACLK_CMD_ALARM);
+    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, local_buffer->buffer, 0, 1, ACLK_CMD_ALARM);
 
     freez(msg_id);
     buffer_free(local_buffer);
