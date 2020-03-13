@@ -898,7 +898,6 @@ void *aclk_query_main_thread(void *ptr)
         time_t checkpoint;
 
         checkpoint = now_realtime_sec() - last_init_sequence;
-        info("Waiting for agent collectors to initialize last activity %ld seconds ago" , checkpoint);
         if (checkpoint > ACLK_STABLE_TIMEOUT) {
             agent_state = AGENT_STABLE;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
@@ -907,6 +906,7 @@ void *aclk_query_main_thread(void *ptr)
 #endif
             break;
         }
+        info("Waiting for agent collectors to initialize. Last activity was %ld seconds ago" , checkpoint);
         sleep_usec(USEC_PER_SEC * 1);
     }
 
