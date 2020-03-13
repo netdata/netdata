@@ -33,7 +33,7 @@ struct aclk_lws_wss_engine_callbacks {
 
 struct lws_wss_packet_buffer {
     unsigned char *data;
-    size_t data_size;
+    size_t data_size, written;
     struct lws_wss_packet_buffer *next;
 };
 

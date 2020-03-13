@@ -68,6 +68,7 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void *data
         new->data = mallocz(LWS_PRE + size);
         memcpy(new->data + LWS_PRE, data, size);
         new->data_size = size;
+        new->written = 0;
     }
     return new;
 }
@@ -415,13 +416,24 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
     switch (reason) {
         case LWS_CALLBACK_CLIENT_WRITEABLE:
             aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
-            data = lws_wss_packet_buffer_pop(&engine_instance->write_buffer_head);
+            data = engine_instance->write_buffer_head;
             if (likely(data)) {
-                rc = lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
-                error("lws_write(%u)=%d",data->data_size,rc);
-                lws_wss_packet_buffer_free(data);
+                size_t bytes_left = data->data_size - data->written;
+                if ( bytes_left > 65536 )
+                    bytes_left = 65536;
+                rc = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
+                error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
+                data->written += bytes_left;
+                if (data->written == data->data_size)
+                {
+                    lws_wss_packet_buffer_pop(&engine_instance->write_buffer_head);
+                    lws_wss_packet_buffer_free(data);
+                }
                 if (engine_instance->write_buffer_head)
+                {
+                    error("Req write");
                     lws_callback_on_writable(engine_instance->lws_wsi);
+                }
             }
             aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
             return retval;
@@ -531,7 +543,13 @@ abort:
 void aclk_lws_wss_service_loop()
 {
     if (engine_instance)
-        lws_service(engine_instance->lws_context, -1);
+    {
+        if (engine_instance->lws_wsi) {
+            lws_cancel_service(engine_instance->lws_context);
+            lws_callback_on_writable(engine_instance->lws_wsi);
+        }
+        lws_service(engine_instance->lws_context, 0);
+    }
 }
 
 // in case the MQTT connection disconnect while lws transport is still operational
