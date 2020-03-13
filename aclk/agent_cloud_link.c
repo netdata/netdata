@@ -1504,7 +1504,7 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
     }
 
     ACLK_LOCK;
-    rc = _link_send_message(final_topic, message, &mid);
+    rc = _link_send_message(final_topic, (unsigned char *)message, &mid);
     // TODO: link the msg_id with the mid so we can trace it
     ACLK_UNLOCK;
 
@@ -1720,19 +1720,19 @@ int aclk_send_info_metadata()
 
 void aclk_send_stress_test(size_t size)
 {
-    unsigned char *buffer = mallocz(size);
+    char *buffer = mallocz(size);
     if (buffer != NULL)
     {
         for(size_t i=0; i<size; i++)
             buffer[i] = 'x';
         buffer[size-1] = 0;
         time_t time_created = now_realtime_sec();
-        sprintf(buffer,"{\"type\":\"stress\", \"timestamp\":%u,\"payload\":", time_created);
+        sprintf(buffer,"{\"type\":\"stress\", \"timestamp\":%ld,\"payload\":", time_created);
         buffer[strlen(buffer)] = '"';
         buffer[size-2] = '}';
         buffer[size-3] = '"';
         aclk_send_message(ACLK_METADATA_TOPIC, buffer, NULL);
-        error("Sending stress of size %zu at time %u", size, time_created);
+        error("Sending stress of size %zu at time %ld", size, time_created);
     }
     free(buffer);
 }
