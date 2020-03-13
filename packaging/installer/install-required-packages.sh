@@ -652,14 +652,14 @@ declare -A pkg_json_c_dev=(
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="bridge-utils"
 )
 
 declare -A pkg_chrony=(
   ['gentoo']="net-misc/chrony"
   ['clearlinux']="time-server-basic"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="chrony"
 )
 
@@ -702,7 +702,7 @@ declare -A pkg_gdb=(
 
 declare -A pkg_iotop=(
   ['gentoo']="sys-process/iotop"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="iotop"
 )
 
@@ -712,7 +712,7 @@ declare -A pkg_iproute2=(
   ['gentoo']="sys-apps/iproute2"
   ['sabayon']="sys-apps/iproute2"
   ['clearlinux']="iproute2"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="iproute"
 
   # exceptions
@@ -722,7 +722,7 @@ declare -A pkg_iproute2=(
 declare -A pkg_ipset=(
   ['gentoo']="net-firewall/ipset"
   ['clearlinux']="network-basic"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="ipset"
 )
 
@@ -733,7 +733,7 @@ declare -A pkg_jq=(
 
 declare -A pkg_iptables=(
   ['gentoo']="net-firewall/iptables"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="iptables"
 )
 
@@ -789,28 +789,28 @@ declare -A pkg_lm_sensors=(
   ['rhel']="lm_sensors"
   ['suse']="sensors"
   ['clearlinux']="lm-sensors"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="lm_sensors"
 )
 
 declare -A pkg_logwatch=(
   ['gentoo']="sys-apps/logwatch"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="logwatch"
 )
 
 declare -A pkg_lxc=(
   ['gentoo']="app-emulation/lxc"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="lxc"
 )
 
 declare -A pkg_mailutils=(
   ['gentoo']="net-mail/mailutils"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="mailutils"
 )
 
@@ -859,7 +859,7 @@ declare -A pkg_nodejs=(
 
 declare -A pkg_postfix=(
   ['gentoo']="mail-mta/postfix"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="postfix"
 )
 
@@ -883,7 +883,7 @@ declare -A pkg_python=(
   ['default']="python"
 
   # Exceptions
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['centos-8']="python2"
 )
 
@@ -913,7 +913,7 @@ declare -A pkg_python3_mysqldb=(
   ['rhel']="WARNING|"
   ['suse']="WARNING|"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="WARNING|"
 
   # exceptions
@@ -940,7 +940,7 @@ declare -A pkg_python_psycopg2=(
   ['rhel']="python-psycopg2"
   ['suse']="python-psycopg2"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="python-psycopg2"
 )
 
@@ -954,7 +954,7 @@ declare -A pkg_python3_psycopg2=(
   ['rhel']="WARNING|"
   ['suse']="WARNING|"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="WARNING|"
 )
 
@@ -963,7 +963,7 @@ declare -A pkg_python_pip=(
   ['gentoo']="dev-python/pip"
   ['sabayon']="dev-python/pip"
   ['clearlinux']="python-basic"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="python-pip"
 )
 
@@ -987,7 +987,7 @@ declare -A pkg_python_pymongo=(
   ['gentoo']="dev-python/pymongo"
   ['suse']="python-pymongo"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="python-pymongo"
 )
 
@@ -999,7 +999,7 @@ declare -A pkg_python3_pymongo=(
   ['gentoo']="dev-python/pymongo"
   ['suse']="python3-pymongo"
   ['clearlinux']="WARNING|"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="python3-pymongo"
 )
 
@@ -1013,7 +1013,7 @@ declare -A pkg_python_requests=(
   ['rhel']="python-requests"
   ['suse']="python-requests"
   ['clearlinux']="python-extras"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="python-requests"
   ['alpine-3.1.4']="WARNING|"
   ['alpine-3.2.3']="WARNING|"
@@ -1029,7 +1029,7 @@ declare -A pkg_python3_requests=(
   ['rhel']="WARNING|"
   ['suse']="WARNING|"
   ['clearlinux']="python-extras"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="WARNING|"
 )
 
@@ -1106,7 +1106,7 @@ declare -A pkg_sudo=(
 
 declare -A pkg_sysstat=(
   ['gentoo']="app-admin/sysstat"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="sysstat"
 )
 
@@ -1135,7 +1135,7 @@ declare -A pkg_ulogd=(
   ['clearlinux']="WARNING|"
   ['gentoo']="app-admin/ulogd"
   ['arch']="ulogd"
-  ['macos']="WAARNING|"
+  ['macos']="WARNING|"
   ['default']="ulogd2"
 )
 
