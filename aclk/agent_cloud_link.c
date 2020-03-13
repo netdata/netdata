@@ -3,6 +3,8 @@
 #include "libnetdata/libnetdata.h"
 #include "agent_cloud_link.h"
 
+#include <libwebsockets.h>
+
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
 //       agent startup phase.
@@ -946,73 +948,197 @@ static void aclk_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+#define DATAMAXLEN 1024*16
+char data[DATAMAXLEN];
+int done = 0;
+
+static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
+{
+    int n;
+    char *ptr = data;
+    info("Callback %d", reason);
+
+    switch (reason) {
+    case LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ:
+        debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ");
+        lwsl_hexdump_notice(in, len);
+        return 0;
+    case LWS_CALLBACK_RECEIVE_CLIENT_HTTP:
+        debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP");
+        n = DATAMAXLEN;
+        if (lws_http_client_read(wsi, &ptr, &n) < 0)
+            return -1;
+        return 0;
+    case LWS_CALLBACK_WSI_DESTROY:
+        debug(D_ACLK, "LWS_CALLBACK_WSI_DESTROY");
+        done = 1;
+        return 0;
+    case LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP:
+        debug(D_ACLK, "LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP");
+        return 0;
+    case LWS_CALLBACK_CLOSED_CLIENT_HTTP:
+        debug(D_ACLK, "LWS_CALLBACK_CLOSED_CLIENT_HTTP");
+        return 0;
+    case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
+        debug(D_ACLK, "LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS");
+        return 0;
+    case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
+    {
+        debug(D_ACLK, "LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER");
+        if(lws_get_opaque_user_data(wsi)) {
+            unsigned char **p = (unsigned char **)in, *end = (*p) + len;
+            char* payload = lws_get_opaque_user_data(wsi);
+            int payload_len = strlen(payload);
+            char length_str[256];
+            snprintfz(length_str, 256, "%d", payload_len);
+
+            if (lws_add_http_header_by_token(wsi,
+                    WSI_TOKEN_HTTP_CONTENT_LENGTH,
+                    (unsigned char *)length_str, strlen(length_str), p, end))
+                return -1;
+            if (lws_add_http_header_by_token(wsi,
+                    WSI_TOKEN_HTTP_CONTENT_TYPE,
+                    (unsigned char *)ACLK_CONTENT_TYPE_JSON,
+                    strlen(ACLK_CONTENT_TYPE_JSON), p, end))
+                return -1;
+            lws_client_http_body_pending(wsi, 1);
+            lws_callback_on_writable(wsi);
+        }
+        return 0;
+    }
+    case LWS_CALLBACK_CLIENT_HTTP_WRITEABLE:
+        {
+            debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_WRITEABLE");
+            char* payload = lws_get_opaque_user_data(wsi);
+            if(payload) {
+                int payload_len = strlen(payload);
+                memcpy(&data[LWS_PRE], payload, payload_len);
+                if(payload_len != lws_write(wsi, &data[LWS_PRE], payload_len, LWS_WRITE_HTTP)) {
+                    error("lws_write error");
+                    return 1;
+                }
+
+                lws_client_http_body_pending(wsi, 0);
+            }
+            return 0;
+        }
+    case LWS_CALLBACK_CLIENT_HTTP_BIND_PROTOCOL:
+        debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_BIND_PROTOCOL");
+        return 0;
+    case LWS_CALLBACK_WSI_CREATE:
+        debug(D_ACLK, "LWS_CALLBACK_WSI_CREATE");
+        return 0;
+    case LWS_CALLBACK_PROTOCOL_INIT:
+        debug(D_ACLK, "LWS_CALLBACK_PROTOCOL_INIT");
+        return 0;
+    case LWS_CALLBACK_CLIENT_HTTP_DROP_PROTOCOL:
+        debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_DROP_PROTOCOL");
+        return 0;
+    case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
+        debug(D_ACLK, "LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED");
+        return 0;
+    case LWS_CALLBACK_GET_THREAD_ID:
+        debug(D_ACLK, "LWS_CALLBACK_GET_THREAD_ID");
+        return 0;
+    case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+        debug(D_ACLK, "LWS_CALLBACK_EVENT_WAIT_CANCELLED");
+        return 0;
+    case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
+        debug(D_ACLK, "LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION");
+        return 0;
+    case LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH:
+        debug(D_ACLK, "LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH");
+        return 0;
+    default:
+        debug(D_ACLK, "callback unknown");
+        return 0;
+    }
+}
+
+static const struct lws_protocols protocols[] = {
+    {
+        "http",
+        simple_https_client_callback,
+        0,
+        0,
+    },
+    { NULL, NULL, 0, 0 }
+};
+
+static void simple_hcc_log_divert(int level, const char *line)
+{
+    //TODO<underhood><PR-BLOCK>
+    error("Libwebsockets: %s", line);
+}
+
 int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
 {
-    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-    int rc=1;
+    error("SEND_HTTPS_REQUEST %s", method);
 
-    size_t payload_len = 0;
-    if (payload != NULL)
-        payload_len = strlen(payload);
+    struct lws_context_creation_info info;
+    struct lws_client_connect_info i;
+    struct lws_context *context;
 
-    buffer_flush(b);
-    buffer_sprintf(
-        b,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
-        "User-Agent: Netdata/rocks\r\n\r\n",
-        method, url, host, payload_len);
-    if (payload != NULL)
-        buffer_strcat(b, payload);
-    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", b->len, buffer_tostring(b));
-    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
+    int n = 0;
 
-    if (unlikely(sock == -1)) {
-        error("Handshake failed");
+    memset(&info, 0, sizeof info);
+
+    info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+    info.port = CONTEXT_PORT_NO_LISTEN;
+    info.protocols = protocols;
+
+
+    context = lws_create_context(&info);
+    if (!context) {
+        error("Error creating LWS context");
         return 1;
     }
 
-    SSL_CTX *ctx = security_initialize_openssl_client();
-    if (ctx==NULL) {
-        error("Cannot allocate SSL context");
-        goto exit_sock;
-    }
-    // Certificate chain: not updating the stores - do we need private CA roots?
-    // Calls to SSL_CTX_load_verify_locations would go here.
-    SSL *ssl = SSL_new(ctx);
-    if (ssl==NULL) {
-        error("Cannot allocate SSL");
-        goto exit_CTX;
-    }
-    SSL_set_fd(ssl, sock);
-    int err = SSL_connect(ssl);
-    if (err!=1) {
-        error("SSL_connect() failed with err=%d", err);
-        goto exit_SSL;
-    }
-    err = SSL_write(ssl, b->buffer, b->len);
-    if (err <= 0)
-    {
-        error("SSL_write() failed with err=%d", err);
-        goto exit_SSL;
-    }
+    lws_set_log_level(0xffffffff, simple_hcc_log_divert);
+
+
+    lws_service(context, 0);
+
+    memset(&i, 0, sizeof i); /* otherwise uninitialized garbage */
+    i.context = context;
+
+//TODO<underhood><PR-BLOCK>
+#ifndef ACLK_CHALLENGE_NOSSL
+#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
+    i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    info("LWS_HTTPS_CLIENT: Disabling SSL certificate checks");
+#else
+    i.ssl_connection = LCCSCF_USE_SSL;
+#endif
+#endif
+
+#ifndef ACLK_CHALLENGE_NOSSL
+    i.port = atoi(port);
+    i.address = host;
+#else
+    i.port = 9005;
+    i.adress = "127.0.0.1";
+#endif
+    i.path = url;
+
+    i.host = i.address;
+    i.origin = i.address;
+    i.method = method;
+    i.opaque_user_data = payload;
+
+    i.protocol = protocols[0].name;
+
+    lws_client_connect_via_info(&i);
+
+    done = 0;
+    while( n >= 0 && !done && !netdata_exit) n = lws_service(context, 0);
+
+    lws_context_destroy(context);
+
     buffer_flush(b);
-    int bytes_read = SSL_read(ssl, b->buffer, b->size);
-    if (bytes_read >= 0) {
-        debug(D_ACLK, "Received %d bytes in response", bytes_read);
-        b->len = bytes_read;
-    }
-    else {
-        error("No response available - SSL_read()=%d", bytes_read);
-    }
-    SSL_shutdown(ssl);
-    rc = 0;
-exit_SSL:
-    SSL_free(ssl);
-exit_CTX:
-    SSL_CTX_free(ctx);
-exit_sock:
-    close(sock);
-    return rc;
+    buffer_strcat(b, data);
+
+    return 0;
 }
 
 struct dictionary_singleton {
@@ -1267,12 +1393,8 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
-    char *payload = NULL;
-    payload = extract_payload(b);
-    if (payload==NULL) {
-      error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
-      return;
-    }
+    char *payload = strdupz(buffer_tostring(b)); //TODO<underhood> free?
+
     debug(D_ACLK, "Challenge response from cloud: %s", payload);
     if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
     {
@@ -1309,11 +1431,8 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         error("Challenge-response failed");
         return;
     }
-    payload = extract_payload(b);
-    if (payload==NULL) {
-      error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
-      return;
-    }
+
+    payload = strdupz(buffer_tostring(b));//TODO<underhood><PR-BLOCK>
     debug(D_ACLK, "Password response from cloud: %s", payload);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
