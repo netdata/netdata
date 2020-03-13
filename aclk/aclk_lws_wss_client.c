@@ -12,9 +12,29 @@ struct aclk_lws_wss_perconnect_data {
 
 static struct aclk_lws_wss_engine_instance *engine_instance = NULL;
 
-void lws_wss_check_queues(size_t *write_len, size_t *read_len)
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len)
 {
-    if (write_len != NULL)
+    if (write_len != NULL && write_len_bytes != NULL)
+    {
+        *write_len = 0;
+        *write_len_bytes = 0;
+        if (engine_instance != NULL)
+        {
+            aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
+
+            struct lws_wss_packet_buffer *write_b;
+            size_t w,wb;
+            for(w=0, wb=0, write_b = engine_instance->write_buffer_head; write_b != NULL; write_b = write_b->next)
+            {
+                w++;
+                wb += write_b->data_size;
+            }
+            *write_len = w;
+            *write_len_bytes = wb;
+            aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
+        }
+    }
+    else if (write_len != NULL)
     {
         *write_len = 0;
         if (engine_instance != NULL)
@@ -378,7 +398,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
 {
     UNUSED(user);
     struct lws_wss_packet_buffer *data;
-    int retval = 0;
+    int retval = 0, rc;
 
     // Callback servicing is forced when we are closed from above.
     if (engine_instance->upstream_reconnect_request) {
@@ -397,7 +417,8 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
             data = lws_wss_packet_buffer_pop(&engine_instance->write_buffer_head);
             if (likely(data)) {
-                lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
+                rc = lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
+                error("lws_write(%u)=%d",data->data_size,rc);
                 lws_wss_packet_buffer_free(data);
                 if (engine_instance->write_buffer_head)
                     lws_callback_on_writable(engine_instance->lws_wsi);

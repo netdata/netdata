@@ -77,7 +77,7 @@ void aclk_lws_wss_mqtt_layer_disconect_notif();
 void aclk_lws_connection_established();
 void aclk_lws_connection_data_received();
 void aclk_lws_connection_closed();
-void lws_wss_check_queues(size_t *write_len, size_t *read_len);
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 
 
 #endif
