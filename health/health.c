@@ -324,15 +324,12 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->exec_run_timestamp = now_realtime_sec();
 
     debug(D_HEALTH, "executing command '%s'", command_to_run);
-    FILE *fp = mypopen(command_to_run, &command_pid);
-    if(!fp) {
+    if (netdata_spawn(command_to_run, &command_pid)) {
         error("HEALTH: Cannot popen(\"%s\", \"r\").", command_to_run);
         goto done;
     }
     debug(D_HEALTH, "HEALTH reading from command (discarding command's output)");
-    char buffer[100 + 1];
-    while(fgets(buffer, 100, fp) != NULL) ;
-    ae->exec_code = mypclose(fp, command_pid);
+    ae->exec_code = netdata_spawn_waitpid(command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
     if(ae->exec_code != 0)
