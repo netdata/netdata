@@ -47,7 +47,6 @@ notifications:
 stages:
   # Mandatory runs, we always want these executed
   - name: Build process
-  - name: Artifacts validation
 
     # Nightly operations
   - name: Nightly operations
@@ -107,7 +106,6 @@ jobs:
       env: DEVEL="true"
       after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
-    - stage: Artifacts validation
     - name: Build/Install for ubuntu 18.04 (not containerized)
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
