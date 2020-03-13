@@ -35,6 +35,14 @@ typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
+typedef struct {
+    char *os_name;
+    char *os_id;
+    char *os_version;
+    char *kernel_name;
+    char *kernel_version;
+} stream_encoded_t;
+
 static struct config stream_config = {
         .sections = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -502,6 +510,33 @@ static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
     host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
 }
 
+void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
+{
+    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
+    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):"";
+    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):"";
+    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):"";
+    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):"";
+}
+
+void rrdpush_clean_encoded(stream_encoded_t *se)
+{
+    if (se->os_name)
+        freez(se->os_name);
+
+    if (se->os_id)
+        freez(se->os_id);
+
+    if (se->os_version)
+        freez(se->os_version);
+
+    if (se->kernel_name)
+        freez(se->kernel_name);
+
+    if (se->kernel_version)
+        freez(se->kernel_version);
+}
+
 //called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
@@ -563,6 +598,9 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
     */
+    stream_encoded_t se;
+    rrdpush_encode_variable(&se, host);
+
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
@@ -603,14 +641,14 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                  , host->timezone
                  , (host->tags) ? host->tags : ""
                  , STREAMING_PROTOCOL_CURRENT_VERSION
-                 , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
-                 , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
+                 , se.os_name
+                 , se.os_id
                  , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
-                 , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
+                 , se.os_version
                  , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
                  , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
-                 , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
-                 , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+                 , se.kernel_name
+                 , se.kernel_version
                  , (host->system_info->architecture) ? host->system_info->architecture : ""
                  , (host->system_info->virtualization) ? host->system_info->virtualization : ""
                  , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
@@ -631,6 +669,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                  , host->program_version
                  );
     http[eol] = 0x00;
+    rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
     if (!host->ssl.flags) {

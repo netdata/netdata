@@ -6,8 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
+- Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
+- Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
+- docs: fix go.d modules in the COLLECTORS.md [\#8380](https://github.com/netdata/netdata/pull/8380) ([ilyam8](https://github.com/ilyam8))
 - Change topics for ACLK [\#8374](https://github.com/netdata/netdata/pull/8374) ([amoss](https://github.com/amoss))
+- Migrate make dist validation to GHA Workflows [\#8373](https://github.com/netdata/netdata/pull/8373) ([prologic](https://github.com/prologic))
 - Add proper parsing/stripping of comments around docs frontmatter [\#8372](https://github.com/netdata/netdata/pull/8372) ([joelhans](https://github.com/joelhans))
+- Format of commit messages [\#8365](https://github.com/netdata/netdata/pull/8365) ([amoss](https://github.com/amoss))
 - new version of godplugin and pulsar alarms, dashboard info [\#8364](https://github.com/netdata/netdata/pull/8364) ([ilyam8](https://github.com/ilyam8))
 - Fix MDX parsing in installation guide [\#8362](https://github.com/netdata/netdata/pull/8362) ([joelhans](https://github.com/joelhans))
 - ebpf plugin info typo fix  [\#8360](https://github.com/netdata/netdata/pull/8360) ([ilyam8](https://github.com/ilyam8))
@@ -16,9 +22,11 @@
 - Add packaging/bundle-lws.sh to dist\_noinst\_DATA \(was missed\) [\#8356](https://github.com/netdata/netdata/pull/8356) ([prologic](https://github.com/prologic))
 - Remove possible erroneous blank line causing Travis to fail possibly and default to magical behaviour [\#8355](https://github.com/netdata/netdata/pull/8355) ([prologic](https://github.com/prologic))
 - Bulk add frontmatter to all documentation [\#8354](https://github.com/netdata/netdata/pull/8354) ([joelhans](https://github.com/joelhans))
+- Update paragraph on install-required-packages [\#8347](https://github.com/netdata/netdata/pull/8347) ([prologic](https://github.com/prologic))
 - Fix cosmetic error checking for CentOS 8 version in install-required-packages [\#8339](https://github.com/netdata/netdata/pull/8339) ([prologic](https://github.com/prologic))
 - Fixed typo [\#8335](https://github.com/netdata/netdata/pull/8335) ([peroxy](https://github.com/peroxy))
 - Fixed dependency names for Arch Linux. [\#8334](https://github.com/netdata/netdata/pull/8334) ([Ferroin](https://github.com/Ferroin))
+- Correct a typo in .travis/README.md [\#8333](https://github.com/netdata/netdata/pull/8333) ([felixonmars](https://github.com/felixonmars))
 - Rename the review workflow and be consistent about workflow and job names. [\#8332](https://github.com/netdata/netdata/pull/8332) ([prologic](https://github.com/prologic))
 - Migrate Travis based checks to Github Actions [\#8329](https://github.com/netdata/netdata/pull/8329) ([prologic](https://github.com/prologic))
 - Add retries for more Travis transient failures [\#8327](https://github.com/netdata/netdata/pull/8327) ([prologic](https://github.com/prologic))
@@ -32,6 +40,7 @@
 - Fixed missing folders in `/var/` by creating them during postinst [\#8314](https://github.com/netdata/netdata/pull/8314) ([SamK](https://github.com/SamK))
 - Add standards for abbreviations/acronyms to docs style guide [\#8313](https://github.com/netdata/netdata/pull/8313) ([joelhans](https://github.com/joelhans))
 - Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
+- Add a Prometheus Remote Write connector to the exporting engine [\#8292](https://github.com/netdata/netdata/pull/8292) ([vlvkobal](https://github.com/vlvkobal))
 - Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 - ACLK  cmake fixes [\#8280](https://github.com/netdata/netdata/pull/8280) ([underhood](https://github.com/underhood))
 - Added ability to change ID used to connect to ceph. [\#8276](https://github.com/netdata/netdata/pull/8276) ([paulmezz](https://github.com/paulmezz))
@@ -49,6 +58,7 @@
 - Adding support for ACLK build-configuration [\#8223](https://github.com/netdata/netdata/pull/8223) ([amoss](https://github.com/amoss))
 - Fix claiming script to reflect API changes on netdata.cloud [\#8220](https://github.com/netdata/netdata/pull/8220) ([cosmix](https://github.com/cosmix))
 - packaging/installer: fix bundle\_libwebsockets [\#8219](https://github.com/netdata/netdata/pull/8219) ([ilyam8](https://github.com/ilyam8))
+- Enconde slave fields [\#8216](https://github.com/netdata/netdata/pull/8216) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove the confusion around the multiple Dockerfile\(s\) we have [\#8214](https://github.com/netdata/netdata/pull/8214) ([prologic](https://github.com/prologic))
 - fixed typo [\#8213](https://github.com/netdata/netdata/pull/8213) ([shortpatti](https://github.com/shortpatti))
 - Retry transient failures from our lifecycle tests on Travis CI [\#8203](https://github.com/netdata/netdata/pull/8203) ([prologic](https://github.com/prologic))
@@ -81,7 +91,6 @@
 - Removed tmem stat collection from xenstat plugin for Xen 4.13 [\#7951](https://github.com/netdata/netdata/pull/7951) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 - Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
 - Cross-host docker builds [\#7754](https://github.com/netdata/netdata/pull/7754) ([amoss](https://github.com/amoss))
-- fix installation for ubuntu 14.04 [\#7690](https://github.com/netdata/netdata/pull/7690) ([Ehekatl](https://github.com/Ehekatl))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
@@ -226,9 +235,6 @@
 - .travis.yml: Reduce notifications [\#7714](https://github.com/netdata/netdata/pull/7714) ([knatsakis](https://github.com/knatsakis))
 - Make auto-updates work on kickstart-static64 installs. [\#7704](https://github.com/netdata/netdata/pull/7704) ([Ferroin](https://github.com/Ferroin))
 - Parse host tags [\#7702](https://github.com/netdata/netdata/pull/7702) ([vlvkobal](https://github.com/vlvkobal))
-- Support static builds for Prometheus remote write [\#7691](https://github.com/netdata/netdata/pull/7691) ([Ehekatl](https://github.com/Ehekatl))
-- Adds a Dockerfile.docs for more easily and reproducibly building/rebuilding docs [\#7688](https://github.com/netdata/netdata/pull/7688) ([prologic](https://github.com/prologic))
-- Fix setuid for freeipmi.plugin in Docker images [\#7684](https://github.com/netdata/netdata/pull/7684) ([lassebm](https://github.com/lassebm))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
