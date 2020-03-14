@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- ACLK: Improved the agent "pop-corning" phase [\#8398](https://github.com/netdata/netdata/pull/8398) ([stelfrag](https://github.com/stelfrag))
 - Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
 - Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
 - Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
@@ -233,8 +234,6 @@
 - Add Korean translation to docs [\#7723](https://github.com/netdata/netdata/pull/7723) ([cakrit](https://github.com/cakrit))
 - Control introduction of new languages in docs translation [\#7722](https://github.com/netdata/netdata/pull/7722) ([cakrit](https://github.com/cakrit))
 - .travis.yml: Reduce notifications [\#7714](https://github.com/netdata/netdata/pull/7714) ([knatsakis](https://github.com/knatsakis))
-- Make auto-updates work on kickstart-static64 installs. [\#7704](https://github.com/netdata/netdata/pull/7704) ([Ferroin](https://github.com/Ferroin))
-- Parse host tags [\#7702](https://github.com/netdata/netdata/pull/7702) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
