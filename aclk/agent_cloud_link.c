@@ -1125,6 +1125,7 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     i.origin = i.address;
     i.method = method;
     i.opaque_user_data = payload;
+    i.alpn = "http/1.1";
 
     i.protocol = protocols[0].name;
 
