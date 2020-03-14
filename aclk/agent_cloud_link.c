@@ -1413,8 +1413,8 @@ void *aclk_main(void *ptr)
         static int first_init = 0;
         size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
-             first_init, aclk_connected, aclk_connecting, write_q, read_q);
+        //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
+        //     first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
@@ -1441,10 +1441,12 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        //sleep_usec(USEC_PER_MS * 50);
-        static int stress_counter = 0;
-        if (stress_counter++ % 100 == 0 && write_q==0)
-            aclk_send_stress_test(2000000);
+        /*static int stress_counter = 0;
+        if (write_q_bytes==0 && stress_counter ++ >5)
+        {
+            aclk_send_stress_test(8000000);
+            stress_counter = 0;
+        }*/
 
         // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {
