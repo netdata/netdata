@@ -1281,7 +1281,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         return;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response");
+        error("Could not retrieve challenge from auth response: %s", payload);
         return;
     }
 
@@ -1362,6 +1362,7 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
  *
  * @return It always returns NULL
  */
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *query_thread;
@@ -1410,9 +1411,10 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-
-        info("loop state first_init_%d connected=%d connecting=%d", first_init, aclk_connected, aclk_connecting);
-        sleep_usec(USEC_PER_MS * 500);
+        size_t write_q, write_q_bytes, read_q;
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
+             first_init, aclk_connected, aclk_connecting, write_q, read_q);
         if (unlikely(!aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
@@ -1439,7 +1441,10 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        sleep_usec(USEC_PER_MS * 100);
+        //sleep_usec(USEC_PER_MS * 50);
+        static int stress_counter = 0;
+        if (stress_counter++ % 100 == 0 && write_q==0)
+            aclk_send_stress_test(2000000);
 
         // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {
@@ -1498,7 +1503,7 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
     }
 
     ACLK_LOCK;
-    rc = _link_send_message(final_topic, message, &mid);
+    rc = _link_send_message(final_topic, (unsigned char *)message, &mid);
     // TODO: link the msg_id with the mid so we can trace it
     ACLK_UNLOCK;
 
@@ -1603,8 +1608,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
 
-//#define EYE_FRIENDLY
-
 /*
  * Take a buffer, encode it and rewrite it
  *
@@ -1612,10 +1615,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
 
 BUFFER *aclk_encode_response(BUFFER *contents)
 {
-#ifdef EYE_FRIENDLY
-
-    return contents;
-#else
     char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
 
@@ -1652,7 +1651,6 @@ BUFFER *aclk_encode_response(BUFFER *contents)
 
     freez(tmp_buffer);
     return contents;
-#endif
 }
 
 /*
@@ -1684,7 +1682,7 @@ void aclk_send_alarm_metadata()
     debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, "\n}\n}");
-    aclk_send_message(ACLK_ALARMS_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
     debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
 
     freez(msg_id);
@@ -1711,7 +1709,7 @@ int aclk_send_info_metadata()
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
-    aclk_send_message(ACLK_METADATA_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_METADATA_TOPIC, local_buffer->buffer, msg_id);
     debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
     freez(msg_id);
 
@@ -1719,10 +1717,30 @@ int aclk_send_info_metadata()
     return 0;
 }
 
+void aclk_send_stress_test(size_t size)
+{
+    char *buffer = mallocz(size);
+    if (buffer != NULL)
+    {
+        for(size_t i=0; i<size; i++)
+            buffer[i] = 'x';
+        buffer[size-1] = 0;
+        time_t time_created = now_realtime_sec();
+        sprintf(buffer,"{\"type\":\"stress\", \"timestamp\":%ld,\"payload\":", time_created);
+        buffer[strlen(buffer)] = '"';
+        buffer[size-2] = '}';
+        buffer[size-3] = '"';
+        aclk_send_message(ACLK_METADATA_TOPIC, buffer, NULL);
+        error("Sending stress of size %zu at time %ld", size, time_created);
+    }
+    free(buffer);
+}
+
 // Send info metadata message to the cloud if the link is established
 // or on request
 int aclk_send_metadata()
 {
+
     aclk_send_info_metadata();
     aclk_send_alarm_metadata();
 
@@ -1774,7 +1792,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     rrdset2json(st, local_buffer, NULL, NULL, 1);
     buffer_sprintf(local_buffer, "\t\n}");
 
-    aclk_send_message(ACLK_CHART_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_CHART_TOPIC, local_buffer->buffer, msg_id);
 
     freez(msg_id);
     buffer_free(local_buffer);
@@ -1833,7 +1851,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     buffer_sprintf(local_buffer, "\n}");
-    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, aclk_encode_response(local_buffer)->buffer, 0, 1, ACLK_CMD_ALARM);
+    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, local_buffer->buffer, 0, 1, ACLK_CMD_ALARM);
 
     freez(msg_id);
     buffer_free(local_buffer);

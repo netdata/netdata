@@ -275,7 +275,7 @@ int _link_subscribe(char *topic, int qos)
  *
  */
 
-int _link_send_message(char *topic, char *message, int *mid)
+int _link_send_message(char *topic, unsigned char *message, int *mid)
 {
     int rc;
 
@@ -285,7 +285,7 @@ int _link_send_message(char *topic, char *message, int *mid)
         return rc;
 
     int msg_len = strlen(message);
-
+    error("Sending MQTT len=%d starts %02x %02x %02x", msg_len, message[0], message[1], message[2]);
     rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
 
     // TODO: Add better handling -- error will flood the logfile here
