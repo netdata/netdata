@@ -1,9 +1,8 @@
 #ifndef ACLK_LWS_WSS_CLIENT_H
 #define ACLK_LWS_WSS_CLIENT_H
 
-#include <libwebsockets.h>
-
 #include "libnetdata/libnetdata.h"
+#include "aclk_common.h"
 
 // This is as define because ideally the ACLK at high level
 // can do mosqitto writes and reads only from one thread

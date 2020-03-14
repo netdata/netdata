@@ -2,8 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "agent_cloud_link.h"
-
-#include <libwebsockets.h>
+#include "aclk_common.h"
 
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
