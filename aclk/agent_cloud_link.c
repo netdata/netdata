@@ -949,29 +949,42 @@ static void aclk_main_cleanup(void *ptr)
 }
 
 #define DATAMAXLEN 1024*16
-char data[DATAMAXLEN];
-int done = 0;
+#define SMALL_BUFFER 16
+
+struct simple_hcc_data {
+    char data[DATAMAXLEN];
+    char* payload;
+    int response_code;
+    int done;
+};
+
 
 static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     int n;
-    char *ptr = data;
-    info("Callback %d", reason);
+    char *ptr;
+    char buffer[SMALL_BUFFER];
+    struct simple_hcc_data *perconn_data = lws_get_opaque_user_data(wsi);
 
     switch (reason) {
     case LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ:
         debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ");
-        lwsl_hexdump_notice(in, len);
         return 0;
     case LWS_CALLBACK_RECEIVE_CLIENT_HTTP:
         debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP");
+        if(!perconn_data) {
+            error("Missing Per Connect Data");
+            return -1;
+        }
+        ptr = (char*)perconn_data->data;
         n = DATAMAXLEN;
         if (lws_http_client_read(wsi, &ptr, &n) < 0)
             return -1;
         return 0;
     case LWS_CALLBACK_WSI_DESTROY:
         debug(D_ACLK, "LWS_CALLBACK_WSI_DESTROY");
-        done = 1;
+        if(perconn_data)
+            perconn_data->done = 1;
         return 0;
     case LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP:
         debug(D_ACLK, "LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP");
@@ -983,18 +996,13 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
         debug(D_ACLK, "LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS");
         return 0;
     case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
-    {
         debug(D_ACLK, "LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER");
-        if(lws_get_opaque_user_data(wsi)) {
+        if(perconn_data && perconn_data->payload) {
             unsigned char **p = (unsigned char **)in, *end = (*p) + len;
-            char* payload = lws_get_opaque_user_data(wsi);
-            int payload_len = strlen(payload);
-            char length_str[256];
-            snprintfz(length_str, 256, "%d", payload_len);
-
+            snprintfz(buffer, SMALL_BUFFER, "%zu", strlen(perconn_data->payload));
             if (lws_add_http_header_by_token(wsi,
                     WSI_TOKEN_HTTP_CONTENT_LENGTH,
-                    (unsigned char *)length_str, strlen(length_str), p, end))
+                    (unsigned char *)buffer, strlen(buffer), p, end))
                 return -1;
             if (lws_add_http_header_by_token(wsi,
                     WSI_TOKEN_HTTP_CONTENT_TYPE,
@@ -1005,23 +1013,20 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
             lws_callback_on_writable(wsi);
         }
         return 0;
-    }
     case LWS_CALLBACK_CLIENT_HTTP_WRITEABLE:
-        {
-            debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_WRITEABLE");
-            char* payload = lws_get_opaque_user_data(wsi);
-            if(payload) {
-                int payload_len = strlen(payload);
-                memcpy(&data[LWS_PRE], payload, payload_len);
-                if(payload_len != lws_write(wsi, &data[LWS_PRE], payload_len, LWS_WRITE_HTTP)) {
-                    error("lws_write error");
-                    return 1;
-                }
-
-                lws_client_http_body_pending(wsi, 0);
+        debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_WRITEABLE");
+        if(perconn_data && perconn_data->payload) {
+            n = strlen(perconn_data->payload);
+            memcpy(&perconn_data->data[LWS_PRE], perconn_data->payload, n);
+            if(n != lws_write(wsi, (unsigned char*)&perconn_data->data[LWS_PRE], n, LWS_WRITE_HTTP)) {
+                error("lws_write error");
+                return 1;
             }
-            return 0;
+            lws_client_http_body_pending(wsi, 0);
+            // clean for subsequent reply read
+            perconn_data->data[0] = 0;
         }
+        return 0;
     case LWS_CALLBACK_CLIENT_HTTP_BIND_PROTOCOL:
         debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_BIND_PROTOCOL");
         return 0;
@@ -1050,7 +1055,7 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
         debug(D_ACLK, "LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH");
         return 0;
     default:
-        debug(D_ACLK, "callback unknown");
+        debug(D_ACLK, "Unknown callback %d", (int)reason);
         return 0;
     }
 }
@@ -1067,7 +1072,6 @@ static const struct lws_protocols protocols[] = {
 
 static void simple_hcc_log_divert(int level, const char *line)
 {
-    //TODO<underhood><PR-BLOCK>
     error("Libwebsockets: %s", line);
 }
 
@@ -1078,6 +1082,9 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     struct lws_context_creation_info info;
     struct lws_client_connect_info i;
     struct lws_context *context;
+
+    struct simple_hcc_data *data = callocz(1, sizeof(struct simple_hcc_data));
+    data->payload = payload;
 
     int n = 0;
 
@@ -1094,50 +1101,42 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
         return 1;
     }
 
-    lws_set_log_level(0xffffffff, simple_hcc_log_divert);
-
+    lws_set_log_level(LLL_ERR | LLL_WARN, simple_hcc_log_divert);
 
     lws_service(context, 0);
 
     memset(&i, 0, sizeof i); /* otherwise uninitialized garbage */
     i.context = context;
 
-//TODO<underhood><PR-BLOCK>
-#ifndef ACLK_CHALLENGE_NOSSL
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
     i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
-    info("LWS_HTTPS_CLIENT: Disabling SSL certificate checks");
+    info("Disabling SSL certificate checks");
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
-#endif
 
-#ifndef ACLK_CHALLENGE_NOSSL
     i.port = atoi(port);
     i.address = host;
-#else
-    i.port = 9005;
-    i.adress = "127.0.0.1";
-#endif
     i.path = url;
 
     i.host = i.address;
     i.origin = i.address;
     i.method = method;
-    i.opaque_user_data = payload;
+    i.opaque_user_data = data;
     i.alpn = "http/1.1";
 
     i.protocol = protocols[0].name;
 
     lws_client_connect_via_info(&i);
 
-    done = 0;
-    while( n >= 0 && !done && !netdata_exit) n = lws_service(context, 0);
+    while( n >= 0 && !data->done && !netdata_exit) n = lws_service(context, 0);
 
     lws_context_destroy(context);
 
     buffer_flush(b);
-    buffer_strcat(b, data);
+    buffer_strcat(b, data->data);
+
+    freez(data);
 
     return 0;
 }
@@ -1369,6 +1368,7 @@ int host_end = pos;
 
 void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
+    int parse_result;
     debug(D_ACLK, "Performing challenge-response sequence");
     if (aclk_password != NULL)
     {
@@ -1394,10 +1394,12 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
     // Force null-termination?
-    char *payload = strdupz(buffer_tostring(b)); //TODO<underhood> free?
+    char *payload = strdupz(buffer_tostring(b));
 
     debug(D_ACLK, "Challenge response from cloud: %s", payload);
-    if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
+    parse_result = json_parse(payload, &challenge, json_extract_singleton);
+    freez(payload);
+    if ( parse_result != JSON_OK)
     {
         freez(challenge.result);
         error("Could not parse the json response with the challenge: %s", payload);
@@ -1437,7 +1439,9 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     debug(D_ACLK, "Password response from cloud: %s", payload);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    if (json_parse(payload, &password, json_extract_singleton) != JSON_OK)
+    parse_result = json_parse(payload, &password, json_extract_singleton);
+    freez(payload);
+    if ( parse_result != JSON_OK)
     {
         freez(password.result);
         error("Could not parse the json response with the password: %s", payload);
