@@ -27,7 +27,7 @@ void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *re
             for(w=0, wb=0, write_b = engine_instance->write_buffer_head; write_b != NULL; write_b = write_b->next)
             {
                 w++;
-                wb += write_b->data_size;
+                wb += write_b->data_size - write_b->written;
             }
             *write_len = w;
             *write_len_bytes = wb;
@@ -399,7 +399,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
 {
     UNUSED(user);
     struct lws_wss_packet_buffer *data;
-    int retval = 0, rc;
+    int retval = 0;
 
     // Callback servicing is forced when we are closed from above.
     if (engine_instance->upstream_reconnect_request) {
@@ -419,21 +419,19 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             data = engine_instance->write_buffer_head;
             if (likely(data)) {
                 size_t bytes_left = data->data_size - data->written;
-                if ( bytes_left > 65536 )
-                    bytes_left = 65536;
-                rc = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
-                error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
-                data->written += bytes_left;
+                if ( bytes_left > FRAGMENT_SIZE)
+                    bytes_left = FRAGMENT_SIZE;
+                int n = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
+                if (n>=0)
+                    data->written += n;
+                //error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
                 if (data->written == data->data_size)
                 {
                     lws_wss_packet_buffer_pop(&engine_instance->write_buffer_head);
                     lws_wss_packet_buffer_free(data);
                 }
                 if (engine_instance->write_buffer_head)
-                {
-                    error("Req write");
                     lws_callback_on_writable(engine_instance->lws_wsi);
-                }
             }
             aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
             return retval;
@@ -544,10 +542,10 @@ void aclk_lws_wss_service_loop()
 {
     if (engine_instance)
     {
-        if (engine_instance->lws_wsi) {
+        /*if (engine_instance->lws_wsi) {
             lws_cancel_service(engine_instance->lws_context);
             lws_callback_on_writable(engine_instance->lws_wsi);
-        }
+        }*/
         lws_service(engine_instance->lws_context, 0);
     }
 }
