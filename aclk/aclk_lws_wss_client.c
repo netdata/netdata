@@ -421,7 +421,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 size_t bytes_left = data->data_size - data->written;
                 if ( bytes_left > FRAGMENT_SIZE)
                     bytes_left = FRAGMENT_SIZE;
-                data->written += lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
+                int n = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
+                if (n>=0)
+                    data->written += n;
                 //error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
                 if (data->written == data->data_size)
                 {
