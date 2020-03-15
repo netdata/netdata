@@ -284,7 +284,7 @@ int _link_send_message(char *topic, unsigned char *message, int *mid)
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         return rc;
 
-    int msg_len = strlen(message);
+    int msg_len = strlen((char*)message);
     error("Sending MQTT len=%d starts %02x %02x %02x", msg_len, message[0], message[1], message[2]);
     rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
 

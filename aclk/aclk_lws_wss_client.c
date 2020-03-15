@@ -190,7 +190,7 @@ failure_cleanup_2:
     return 1;
 }
 
-void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_instance)
+void aclk_lws_wss_client_destroy()
 {
     if (engine_instance == NULL)
         return;

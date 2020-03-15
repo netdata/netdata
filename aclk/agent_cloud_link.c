@@ -177,7 +177,6 @@ static int create_private_key()
     char err[512];
     ERR_error_string_n(ERR_get_error(), err, sizeof(err));
     error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
-    freez(err);
 
 biofailed:
     freez(private_key);
