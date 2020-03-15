@@ -7,12 +7,12 @@
 
 #include "aclk_lws_wss_client.h"
 
-#define DATAMAXLEN 1024*16
 #define SMALL_BUFFER 16
 
 struct simple_hcc_data {
-    char data[DATAMAXLEN];
-    char* payload;
+    char *data;
+    size_t data_size;
+    char *payload;
     int response_code;
     int done;
 };
@@ -34,8 +34,8 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
             error("Missing Per Connect Data");
             return -1;
         }
-        ptr = (char*)perconn_data->data;
-        n = DATAMAXLEN;
+        ptr = perconn_data->data;
+        n = perconn_data->data_size;
         if (lws_http_client_read(wsi, &ptr, &n) < 0)
             return -1;
         return 0;
@@ -77,9 +77,15 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
         debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_WRITEABLE");
         if(perconn_data && perconn_data->payload) {
             n = strlen(perconn_data->payload);
+            if(perconn_data->data_size < LWS_PRE + n + 1) {
+                error("Buffer given is not big enough");
+                return 1;
+            }
+
             memcpy(&perconn_data->data[LWS_PRE], perconn_data->payload, n);
             if(n != lws_write(wsi, (unsigned char*)&perconn_data->data[LWS_PRE], n, LWS_WRITE_HTTP)) {
                 error("lws_write error");
+                perconn_data->data[0] = 0;
                 return 1;
             }
             lws_client_http_body_pending(wsi, 0);
@@ -135,7 +141,7 @@ static void simple_hcc_log_divert(int level, const char *line)
     error("Libwebsockets: %s", line);
 }
 
-int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
+int aclk_send_https_request(char *method, char *host, char *port, char *url, char *b, size_t b_size, char *payload)
 {
     info("%s %s", __func__, method);
 
@@ -144,6 +150,9 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     struct lws_context *context;
 
     struct simple_hcc_data *data = callocz(1, sizeof(struct simple_hcc_data));
+    data->data = b;
+    data->data[0] = 0;
+    data->data_size = b_size;
     data->payload = payload;
 
     int n = 0;
@@ -230,8 +239,6 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
 
     lws_context_destroy(context);
 
-    buffer_flush(b);
-    buffer_strcat(b, data->data);
     n = data->response_code;
 
     freez(data);

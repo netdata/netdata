@@ -1174,7 +1174,7 @@ int host_end = pos;
 
 void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
-    int parse_result;
+    char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     debug(D_ACLK, "Performing challenge-response sequence");
     if (aclk_password != NULL)
     {
@@ -1182,40 +1182,34 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         aclk_password = NULL;
     }
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
-    BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     // TODO - target host?
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
     {
         error("Agent was not claimed - cannot perform challenge/response");
-        return;
+        goto CLEANUP;
     }
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
-    if(send_https_request("GET", aclk_hostname, aclk_port, url, b, NULL))
+    if(aclk_send_https_request("GET", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
         error("Challenge failed");
-        return;
+        goto CLEANUP;
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
-    // Force null-termination?
-    char *payload = strdupz(buffer_tostring(b));
 
-    debug(D_ACLK, "Challenge response from cloud: %s", payload);
-    parse_result = json_parse(payload, &challenge, json_extract_singleton);
-    freez(payload);
-    if ( parse_result != JSON_OK)
+    debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
+    if ( json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
     {
         freez(challenge.result);
-        error("Could not parse the json response with the challenge: %s", payload);
-        return;
+        error("Could not parse the json response with the challenge: %s", data_buffer);
+        goto CLEANUP;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response: %s", payload);
-        return;
+        error("Could not retrieve challenge from auth response: %s", data_buffer);
+        goto CLEANUP;
     }
-
 
 
     size_t challenge_len = strlen(challenge.result);
@@ -1235,28 +1229,25 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if(send_https_request("POST", aclk_hostname, aclk_port, url, b, response_json))
+    if(aclk_send_https_request("POST", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
         error("Challenge-response failed");
-        return;
+        goto CLEANUP;
     }
 
-    payload = strdupz(buffer_tostring(b));//TODO<underhood><PR-BLOCK>
-    debug(D_ACLK, "Password response from cloud: %s", payload);
+    debug(D_ACLK, "Password response from cloud: %s", data_buffer);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    parse_result = json_parse(payload, &password, json_extract_singleton);
-    freez(payload);
-    if ( parse_result != JSON_OK)
+    if ( json_parse(data_buffer, &password, json_extract_singleton) != JSON_OK)
     {
         freez(password.result);
-        error("Could not parse the json response with the password: %s", payload);
-        return;
+        error("Could not parse the json response with the password: %s", data_buffer);
+        goto CLEANUP;
     }
 
     if (password.result == NULL ) {
         error("Could not retrieve password from auth response");
-        return;
+        goto CLEANUP;
     }
     if (aclk_password != NULL )
         freez(aclk_password);
@@ -1264,7 +1255,9 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         aclk_username = strdupz(agent_id);
     aclk_password = password.result;
 
-    buffer_free(b);
+CLEANUP:
+    freez(data_buffer);
+    return;
 }
 
 static void aclk_try_to_connect(char *hostname, char *port, int port_num)
