@@ -1078,7 +1078,7 @@ static void simple_hcc_log_divert(int level, const char *line)
 
 int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
 {
-    error("SEND_HTTPS_REQUEST %s", method);
+    info("%s %s", __func__, method);
 
     struct lws_context_creation_info info;
     struct lws_client_connect_info i;
@@ -1088,6 +1088,7 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
     data->payload = payload;
 
     int n = 0;
+    time_t timestamp;
 
     //TODO -> deduplicate (aclk_lws_wss_connect)
     static const char *proxy = NULL;
@@ -1156,7 +1157,17 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
 
     lws_client_connect_via_info(&i);
 
-    while( n >= 0 && !data->done && !netdata_exit) n = lws_service(context, 0);
+    // libwebsockets handle connection timeouts already
+    // this adds additional safety in case of bug in LWS
+    timestamp = now_monotonic_sec();
+    while( n >= 0 && !data->done && !netdata_exit) {
+        n = lws_service(context, 0);
+        if( now_monotonic_sec() - timestamp > SEND_HTTPS_REQUEST_TIMEOUT ) {
+            data->data[0] = 0;
+            data->done = 1;
+            error("Servicing LWS took too long.");
+        }
+    }
 
     lws_context_destroy(context);
 
