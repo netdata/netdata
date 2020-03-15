@@ -16,6 +16,8 @@ int _mqtt_lib_init();
 int _link_subscribe(char *topic, int qos);
 int _link_send_message(char *topic, unsigned char *message, int *mid);
 const char *_link_strerror(int rc);
+int _link_set_lwt(char *topic, int qos);
+
 
 int aclk_handle_cloud_request(char *);
 

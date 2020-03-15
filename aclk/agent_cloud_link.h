@@ -29,6 +29,15 @@
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
+#define ACLK_LWT_MSG    "{ \
+\"type\" : \"disconnect\", \
+\"version\" : 1, \
+\"msg-id\" : \"%s\", \
+\"timestamp\" : %ld, \
+\"payload\" : \"%s\" \
+}"
+
+
 struct aclk_request {
     char *type_id;
     char *msg_id;

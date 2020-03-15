@@ -944,6 +944,8 @@ static void aclk_main_cleanup(void *ptr)
     // Wakeup thread to cleanup
     QUERY_THREAD_WAKEUP;
 
+    aclk_shutdown();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -1451,6 +1453,7 @@ void aclk_disconnect()
     if (likely(aclk_connected))
         info("Disconnect detected (%"PRIu64" queued queries)", aclk_queue.count);
     aclk_subscribed = 0;
+    aclk_will_set = 0;
     aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
     aclk_connected = 0;

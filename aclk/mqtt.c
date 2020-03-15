@@ -131,6 +131,8 @@ static int _mqtt_create_connection(char *username, char *password)
         return MOSQ_ERR_UNKNOWN;
     }
 
+    _link_set_lwt("outbound/meta", 2);
+
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
     mosquitto_publish_callback_set(mosq, publish_callback);
@@ -244,10 +246,36 @@ void _link_shutdown()
             break;
     };
 
+    _link_event_loop();
+
     mosquitto_destroy(mosq);
     mosq = NULL;
 
     aclk_lws_wss_client_destroy();
+}
+
+
+int _link_set_lwt(char *sub_topic, int qos)
+{
+    int rc;
+    char topic[ACLK_MAX_TOPIC + 1];
+    char payload[sizeof(ACLK_LWT_MSG)+128+1];
+    char *final_topic;
+
+    final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
+    if (unlikely(!final_topic)) {
+        errno = 0;
+        error("Unable to build outgoing topic; truncated?");
+        return 1;
+    }
+
+    time_t time_created = now_realtime_sec();
+    char *msg_id = create_uuid();
+    snprintfz(payload, sizeof(ACLK_LWT_MSG)+128, ACLK_LWT_MSG, msg_id, time_created, "unexpected");
+    freez(msg_id);
+
+    rc = mosquitto_will_set(mosq, topic, strlen(payload), (const void *) payload, qos, 1);
+    return rc;
 }
 
 int _link_subscribe(char *topic, int qos)
