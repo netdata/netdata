@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef ACLK_LWS_WSS_CLIENT_H
 #define ACLK_LWS_WSS_CLIENT_H
 
@@ -78,6 +80,8 @@ void aclk_lws_connection_established();
 void aclk_lws_connection_data_received();
 void aclk_lws_connection_closed();
 void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
+
+int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks);
 
 #define FRAGMENT_SIZE 4096
 #endif

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
@@ -188,7 +190,7 @@ failure_cleanup_2:
     return 1;
 }
 
-void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_instance)
+void aclk_lws_wss_client_destroy()
 {
     if (engine_instance == NULL)
         return;
@@ -204,89 +206,18 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_ins
 #endif
 }
 
-static int _aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
-{
-	char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks) {
+    char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-	if(!proxy)
-		return -1;
+    if(!proxy)
+        return -1;
 
-	proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+    proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-	if(!*proxy)
-		return -1;
+    if(!*proxy)
+        return -1;
 
-	return lws_set_socks(vhost, proxy);
-}
-
-// helper function to censor user&password
-// for logging purposes
-static void safe_log_proxy_censor(char *proxy) {
-    size_t length = strlen(proxy);
-    char *auth = proxy+length-1;
-    char *cur;
-
-    while( (auth >= proxy) && (*auth != '@') )
-        auth--;
-
-    //if not found or @ is first char do nothing
-    if(auth<=proxy)
-        return;
-
-    cur = strstr(proxy, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-    if(!cur)
-        cur = proxy;
-    else
-        cur += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-
-    while(cur < auth) {
-        *cur='X';
-        cur++;
-    }
-}
-
-static inline void safe_log_proxy_error(char *str, const char *proxy) {
-    char *log = strdupz(proxy);
-    safe_log_proxy_censor(log);
-    error("%s Provided Value:\"%s\"", str, log);
-    freez(log);
-}
-
-static inline int check_socks_enviroment(const char **proxy) {
-    char *tmp = getenv("socks_proxy");
-
-    if(!tmp)
-        return 1;
-
-    if(aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
-        *proxy = tmp;
-        return 0;
-    }
-
-    safe_log_proxy_error("Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", tmp);
-    return 1;
-}
-
-static const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
-    const char *proxy = config_get(CONFIG_SECTION_ACLK, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
-    *type = PROXY_DISABLED;
-
-    if(strcmp(proxy, "none") == 0)
-        return proxy;
-
-    if(strcmp(proxy, ACLK_PROXY_ENV) == 0) {
-        if(check_socks_enviroment(&proxy) == 0)
-            *type = PROXY_TYPE_SOCKS5;
-        return proxy;
-    }
-
-    *type = aclk_verify_proxy(proxy);
-    if(*type == PROXY_TYPE_UNKNOWN) {
-        *type = PROXY_DISABLED;
-        safe_log_proxy_error("Config var \"" ACLK_PROXY_CONFIG_VAR "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", proxy);
-    }
-
-    return proxy;
+    return lws_set_socks(vhost, proxy);
 }
 
 // Return code indicates if connection attempt has started async.
@@ -338,7 +269,7 @@ int aclk_lws_wss_connect(char *host, int port)
         safe_log_proxy_censor(log);
         info("Connecting using SOCKS5 proxy:\"%s\"", log);
         freez(log);
-        if(_aclk_wss_set_socks(vhost, proxy))
+        if(aclk_wss_set_socks(vhost, proxy))
             error("LWS failed to accept socks proxy.");
         break;
     default:

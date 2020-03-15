@@ -2,6 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "agent_cloud_link.h"
+#include "aclk_lws_https_client.h"
 
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
@@ -176,7 +177,6 @@ static int create_private_key()
     char err[512];
     ERR_error_string_n(ERR_get_error(), err, sizeof(err));
     error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
-    freez(err);
 
 biofailed:
     freez(private_key);
@@ -946,75 +946,6 @@ static void aclk_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
-{
-    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-    int rc=1;
-
-    size_t payload_len = 0;
-    if (payload != NULL)
-        payload_len = strlen(payload);
-
-    buffer_flush(b);
-    buffer_sprintf(
-        b,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
-        "User-Agent: Netdata/rocks\r\n\r\n",
-        method, url, host, payload_len);
-    if (payload != NULL)
-        buffer_strcat(b, payload);
-    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", b->len, buffer_tostring(b));
-    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
-
-    if (unlikely(sock == -1)) {
-        error("Handshake failed");
-        return 1;
-    }
-
-    SSL_CTX *ctx = security_initialize_openssl_client();
-    if (ctx==NULL) {
-        error("Cannot allocate SSL context");
-        goto exit_sock;
-    }
-    // Certificate chain: not updating the stores - do we need private CA roots?
-    // Calls to SSL_CTX_load_verify_locations would go here.
-    SSL *ssl = SSL_new(ctx);
-    if (ssl==NULL) {
-        error("Cannot allocate SSL");
-        goto exit_CTX;
-    }
-    SSL_set_fd(ssl, sock);
-    int err = SSL_connect(ssl);
-    if (err!=1) {
-        error("SSL_connect() failed with err=%d", err);
-        goto exit_SSL;
-    }
-    err = SSL_write(ssl, b->buffer, b->len);
-    if (err <= 0)
-    {
-        error("SSL_write() failed with err=%d", err);
-        goto exit_SSL;
-    }
-    buffer_flush(b);
-    int bytes_read = SSL_read(ssl, b->buffer, b->size);
-    if (bytes_read >= 0) {
-        debug(D_ACLK, "Received %d bytes in response", bytes_read);
-        b->len = bytes_read;
-    }
-    else {
-        error("No response available - SSL_read()=%d", bytes_read);
-    }
-    SSL_shutdown(ssl);
-    rc = 0;
-exit_SSL:
-    SSL_free(ssl);
-exit_CTX:
-    SSL_CTX_free(ctx);
-exit_sock:
-    close(sock);
-    return rc;
-}
-
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -1242,6 +1173,7 @@ int host_end = pos;
 
 void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
+    char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     debug(D_ACLK, "Performing challenge-response sequence");
     if (aclk_password != NULL)
     {
@@ -1249,42 +1181,34 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         aclk_password = NULL;
     }
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
-    BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     // TODO - target host?
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
     {
         error("Agent was not claimed - cannot perform challenge/response");
-        return;
+        goto CLEANUP;
     }
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
-    if(send_https_request("GET", aclk_hostname, aclk_port, url, b, NULL))
+    if(aclk_send_https_request("GET", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
         error("Challenge failed");
-        return;
+        goto CLEANUP;
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
-    // Force null-termination?
-    char *payload = NULL;
-    payload = extract_payload(b);
-    if (payload==NULL) {
-      error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
-      return;
-    }
-    debug(D_ACLK, "Challenge response from cloud: %s", payload);
-    if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
+
+    debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
+    if ( json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
     {
         freez(challenge.result);
-        error("Could not parse the json response with the challenge: %s", payload);
-        return;
+        error("Could not parse the json response with the challenge: %s", data_buffer);
+        goto CLEANUP;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response: %s", payload);
-        return;
+        error("Could not retrieve challenge from auth response: %s", data_buffer);
+        goto CLEANUP;
     }
-
 
 
     size_t challenge_len = strlen(challenge.result);
@@ -1304,29 +1228,25 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if(send_https_request("POST", aclk_hostname, aclk_port, url, b, response_json))
+    if(aclk_send_https_request("POST", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
         error("Challenge-response failed");
-        return;
+        goto CLEANUP;
     }
-    payload = extract_payload(b);
-    if (payload==NULL) {
-      error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
-      return;
-    }
-    debug(D_ACLK, "Password response from cloud: %s", payload);
+
+    debug(D_ACLK, "Password response from cloud: %s", data_buffer);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    if (json_parse(payload, &password, json_extract_singleton) != JSON_OK)
+    if ( json_parse(data_buffer, &password, json_extract_singleton) != JSON_OK)
     {
         freez(password.result);
-        error("Could not parse the json response with the password: %s", payload);
-        return;
+        error("Could not parse the json response with the password: %s", data_buffer);
+        goto CLEANUP;
     }
 
     if (password.result == NULL ) {
         error("Could not retrieve password from auth response");
-        return;
+        goto CLEANUP;
     }
     if (aclk_password != NULL )
         freez(aclk_password);
@@ -1334,7 +1254,9 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         aclk_username = strdupz(agent_id);
     aclk_password = password.result;
 
-    buffer_free(b);
+CLEANUP:
+    freez(data_buffer);
+    return;
 }
 
 static void aclk_try_to_connect(char *hostname, char *port, int port_num)
