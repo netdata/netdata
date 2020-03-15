@@ -987,6 +987,8 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
         return 0;
     case LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP:
         debug(D_ACLK, "LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP");
+        if(perconn_data)
+            perconn_data->response_code = lws_http_client_http_response(wsi);
         return 0;
     case LWS_CALLBACK_CLOSED_CLIENT_HTTP:
         debug(D_ACLK, "LWS_CALLBACK_CLOSED_CLIENT_HTTP");
@@ -1160,10 +1162,10 @@ int send_https_request(char *method, char *host, char *port, char *url, BUFFER *
 
     buffer_flush(b);
     buffer_strcat(b, data->data);
+    n = data->response_code;
 
     freez(data);
-
-    return 0;
+    return (n < 200 || n >= 300);
 }
 
 struct dictionary_singleton {
