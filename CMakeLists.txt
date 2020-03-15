@@ -616,6 +616,8 @@ set(ACLK_PLUGIN_FILES
         aclk/agent_cloud_link.h
         aclk/aclk_lws_wss_client.c
         aclk/aclk_lws_wss_client.h
+        aclk/aclk_lws_https_client.c
+        aclk/aclk_lws_https_client.h
         aclk/mqtt.c
         aclk/mqtt.h
         )

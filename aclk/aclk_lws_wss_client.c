@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
 #include "../daemon/common.h"
+#include "aclk_common.h"
 
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
@@ -201,6 +204,20 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_ins
     pthread_mutex_destroy(&engine_instance->write_buf_mutex);
     pthread_mutex_destroy(&engine_instance->read_buf_mutex);
 #endif
+}
+
+int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks) {
+    char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+
+    if(!proxy)
+        return -1;
+
+    proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+
+    if(!*proxy)
+        return -1;
+
+    return lws_set_socks(vhost, proxy);
 }
 
 // Return code indicates if connection attempt has started async.

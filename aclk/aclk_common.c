@@ -105,17 +105,3 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
 
     return proxy;
 }
-
-int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks) {
-    char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-
-    if(!proxy)
-        return -1;
-
-    proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-
-    if(!*proxy)
-        return -1;
-
-    return lws_set_socks(vhost, proxy);
-}

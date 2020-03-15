@@ -29,9 +29,6 @@
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
-#define ACLK_CONTENT_TYPE_JSON "application/json"
-#define SEND_HTTPS_REQUEST_TIMEOUT 30
-
 struct aclk_request {
     char *type_id;
     char *msg_id;
