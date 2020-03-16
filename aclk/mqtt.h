@@ -20,5 +20,6 @@ int _link_set_lwt(char *topic, int qos);
 
 
 int aclk_handle_cloud_request(char *);
+extern char *get_topic(char *sub_topic, char *final_topic, int max_size);
 
 #endif //NETDATA_MQTT_H

@@ -937,7 +937,7 @@ void *aclk_query_main_thread(void *ptr)
 // Thread cleanup
 static void aclk_main_cleanup(void *ptr)
 {
-    char payload[sizeof(ACLK_LWT_MSG)+128+1];
+    char payload[512];
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -950,7 +950,16 @@ static void aclk_main_cleanup(void *ptr)
         // Send a graceful disconnect message
         time_t time_created = now_realtime_sec();
         char *msg_id = create_uuid();
-        snprintfz(payload, sizeof(ACLK_LWT_MSG) + 128, ACLK_LWT_MSG, msg_id, time_created, "graceful");
+
+        snprintfz(
+            payload, 511,
+            "{ \"type\": \"disconnect\","
+            " \"msg-id\": \"%s\","
+            " \"timestamp\": %ld,"
+            " \"version\": %d,"
+            " \"payload\": \"graceful\" }",
+            msg_id, time_created, ACLK_VERSION);
+
         aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
         freez(msg_id);
 

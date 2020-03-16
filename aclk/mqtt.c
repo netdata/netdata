@@ -265,7 +265,7 @@ int _link_set_lwt(char *sub_topic, int qos)
 {
     int rc;
     char topic[ACLK_MAX_TOPIC + 1];
-    char payload[sizeof(ACLK_LWT_MSG)+128+1];
+    char payload[512];
     char *final_topic;
 
     final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
@@ -277,7 +277,16 @@ int _link_set_lwt(char *sub_topic, int qos)
 
     time_t time_created = now_realtime_sec();
     char *msg_id = create_uuid();
-    snprintfz(payload, sizeof(ACLK_LWT_MSG)+128, ACLK_LWT_MSG, msg_id, time_created, "unexpected");
+
+    snprintfz(
+        payload, 511,
+        "{ \"type\": \"disconnect\","
+        " \"msg-id\": \"%s\","
+        " \"timestamp\": %ld,"
+        " \"version\": %d,"
+        " \"payload\": \"unexpected\" }",
+        msg_id, time_created, ACLK_VERSION);
+
     freez(msg_id);
 
     rc = mosquitto_will_set(mosq, topic, strlen(payload), (const void *) payload, qos, 0);
