@@ -101,6 +101,7 @@ ID="unknown"
 ROOMS=""
 HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
+SHOW_JSON=0
 
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
@@ -125,6 +126,7 @@ do
                 -id=*) ID=${arg:4} ;;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;
+                -json) SHOW_JSON=1 ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
         esac
@@ -184,6 +186,11 @@ cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
 }
 EMBED_JSON
 
+if [ "${SHOW_JSON}" == 1 ] ; then
+    echo "Request to server:"
+    cat "${CLAIMING_DIR}/tmpin.txt"
+fi
+
 
 if [ "${URLTOOL}" = "curl" ] ; then
         URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
@@ -214,6 +221,11 @@ if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
         echo >&2 "Failed to connect to ${URL_BASE}"
         rm -f "${CLAIMING_DIR}/tmpout.txt"
         exit 4
+fi
+
+if [ "${SHOW_JSON}" == 1 ] ; then
+    echo "Response from server:"
+    cat "${CLAIMING_DIR}/tmpout.txt"
 fi
 
 HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
