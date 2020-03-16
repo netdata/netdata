@@ -138,7 +138,7 @@ do
 done
 
 # if curl not installed give warning SOCKS can't be used
-if [[ "${URLTOOL}" != "curl" && "${PROXY}" = socks* ]] ; then
+if [[ "${URLTOOL}" != "curl" && "${PROXY:0:5}" = socks ]] ; then
         echo >&2 "wget doesn't support SOCKS. Please install curl or disable SOCKS proxy."
         exit 1
 fi
