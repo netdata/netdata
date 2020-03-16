@@ -207,7 +207,7 @@ if [ -r "${CLOUD_CERTIFICATE_FILE}" ] ; then
         fi
 fi
 
-eval "${URLCOMMAND} \"${TARGET_URL}\"" | tee "${CLAIMING_DIR}/tmpout.txt"
+eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
 URLCOMMAND_EXIT_CODE=$?
 if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
 # We consider the server issuing an error response a successful attempt at communicating
