@@ -197,7 +197,7 @@ if [ "${URLTOOL}" = "curl" ] ; then
 	URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
 	if [ "${NOPROXY}" = "yes" ] ; then
 		URLCOMMAND="${URLCOMMAND} -x \"\""
-	else
+	elif [ -n "${PROXY}" ] ; then
 		URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
 	fi
 else
