@@ -15,8 +15,6 @@ int mongodb_init(const char *uri_string,
     mongoc_uri_t *uri;
     bson_error_t error;
 
-    mongoc_init();
-
     uri = mongoc_uri_new_with_error(uri_string, &error);
     if(unlikely(!uri)) {
         error("EXPORTING: failed to parse URI: %s. Error message: %s", uri_string, error.message);
@@ -99,7 +97,6 @@ int mongodb_insert(char *data, size_t n_metrics) {
 void mongodb_cleanup() {
     mongoc_collection_destroy(mongodb_collection);
     mongoc_client_destroy(mongodb_client);
-    mongoc_cleanup();
 
     return;
 }
@@ -146,22 +143,18 @@ int init_mongodb_instance(struct instance *instance)
         (instance->config.update_every >= 2) ? (instance->engine->config.update_every * MSEC_PER_SEC - 500) : 1000;
 
     if (!instance->engine->mongoc_initialized) {
-        if (unlikely(mongodb_init(
-                instance->config.destination,
-                connector_specific_config->database,
-                connector_specific_config->collection,
-                instance->config.timeoutms))) {
-            error("EXPORTING: cannot initialize MongoDB exporting connector");
-            return 1;
-        }
+        mongoc_init();
         instance->engine->mongoc_initialized = 1;
     }
 
-    mongodb_init(
-        instance->config.destination,
-        connector_specific_config->database,
-        connector_specific_config->collection,
-        instance->config.timeoutms);
+    if (unlikely(mongodb_init(
+            instance->config.destination,
+            connector_specific_config->database,
+            connector_specific_config->collection,
+            instance->config.timeoutms))) {
+        error("EXPORTING: cannot initialize MongoDB exporting connector");
+        return 1;
+    }
 
     return 0;
 }
@@ -235,4 +228,6 @@ void mongodb_connector_worker(void *instance_p)
         break;
 #endif
     }
+
+    mongodb_cleanup();
 }
