@@ -612,6 +612,8 @@ set(CLAIM_PLUGIN_FILES
         )
 
 set(ACLK_PLUGIN_FILES
+        aclk/aclk_common.c
+        aclk/aclk_common.h
         aclk/agent_cloud_link.c
         aclk/agent_cloud_link.h
         aclk/aclk_lws_wss_client.c
