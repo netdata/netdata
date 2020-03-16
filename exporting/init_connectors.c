@@ -6,6 +6,7 @@
 #include "opentsdb/opentsdb.h"
 #include "aws_kinesis/aws_kinesis.h"
 #include "prometheus/remote_write/remote_write.h"
+#include "mongodb/mongodb.h"
 
 /**
  * Initialize connectors
@@ -47,6 +48,12 @@ int init_connectors(struct engine *engine)
             case BACKEND_TYPE_KINESIS:
 #if HAVE_KINESIS
                 if (init_aws_kinesis_instance(instance) != 0)
+                    return 1;
+#endif
+                break;
+            case BACKEND_TYPE_MONGODB:
+#if HAVE_MONGOC
+                if (init_mongodb_instance(instance) != 0)
                     return 1;
 #endif
                 break;
