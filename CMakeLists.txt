@@ -1059,6 +1059,7 @@ endif()
         PRIVATE
         -DUNIT_TESTING
     )
+    target_include_directories(${TEST_NAME}_testdriver PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
     target_link_options(
         ${TEST_NAME}_testdriver
         PRIVATE
