@@ -170,7 +170,7 @@ if [ ! -f "${CLAIMING_DIR}/public.pem" ] ; then
         fi
 fi
 
-TARGET_URL="${URL_BASE}/api/v1/spaces/nodes/${ID}"
+TARGET_URL="${URL_BASE%/}/api/v1/spaces/nodes/${ID}"
 # shellcheck disable=SC2002
 KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
 # shellcheck disable=SC2001
