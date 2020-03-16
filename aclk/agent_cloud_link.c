@@ -943,26 +943,28 @@ static void aclk_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    // Wakeup thread to cleanup
-    QUERY_THREAD_WAKEUP;
+    if (is_agent_claimed()) {
 
-    // Send a graceful disconnect message
-    time_t time_created = now_realtime_sec();
-    char *msg_id = create_uuid();
-    snprintfz(payload, sizeof(ACLK_LWT_MSG) + 128, ACLK_LWT_MSG, msg_id, time_created, "graceful");
-    aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
-    freez(msg_id);
+        // Wakeup thread to cleanup
+        QUERY_THREAD_WAKEUP;
+        // Send a graceful disconnect message
+        time_t time_created = now_realtime_sec();
+        char *msg_id = create_uuid();
+        snprintfz(payload, sizeof(ACLK_LWT_MSG) + 128, ACLK_LWT_MSG, msg_id, time_created, "graceful");
+        aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
+        freez(msg_id);
 
-    _link_event_loop();
-    sleep_usec(USEC_PER_MS * 100);
-    _link_event_loop();
+        _link_event_loop();
+        sleep_usec(USEC_PER_MS * 100);
+        _link_event_loop();
 
-    aclk_shutting_down = 1;
-    _link_shutdown();
-    aclk_lws_wss_mqtt_layer_disconect_notif();
+        aclk_shutting_down = 1;
+        _link_shutdown();
+        aclk_lws_wss_mqtt_layer_disconect_notif();
 
-    sleep_usec(USEC_PER_MS * 100);
-    _link_event_loop();
+        sleep_usec(USEC_PER_MS * 100);
+        _link_event_loop();
+    }
 
     info("Disconnected");
 
