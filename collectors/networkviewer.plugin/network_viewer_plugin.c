@@ -41,16 +41,9 @@ void netdata_cleanup_and_exit(int ret) {
 //Netdata eBPF library
 void *libnetdatanv = NULL;
 int (*load_bpf_file)(char *, int) = NULL;
-int (*set_bpf_perf_event)(int, int);
-int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
-int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
-void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
 int *map_fd = NULL;
-
-//Perf event variables
-static int pmu_fd[NETDATA_MAX_PROCESSOR];
-static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
-int page_cnt = 8;
+//Libbpf (It is necessary to have at least kernel 4.10)
+int (*bpf_map_lookup_elem)(int, const void *, void *);
 
 netdata_network_t *outgoing_table = NULL;
 netdata_network_t *ingoing_table = NULL;
@@ -62,12 +55,19 @@ static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 static char *plugin_dir = PLUGINS_DIR;
 
-uint32_t *econn_udp = NULL;
-uint64_t *ibytes_udp = NULL;
-uint64_t *ebytes_udp = NULL;
-uint32_t *econn_tcp = NULL;
-uint64_t *ibytes_tcp = NULL;
-uint64_t *ebytes_tcp = NULL;
+uint64_t *conn = NULL;
+uint64_t *ibytes = NULL;
+uint64_t *ebytes = NULL;
+
+uint64_t *hash_values = NULL;
+netdata_network_stat_t *aggregated_data = NULL;
+
+pthread_mutex_t lock;
+
+static char *dimension_names[NETDATA_SOCKET_LENGTH] = { "send", "receive", "retransmit", "close"
+                                                        , "receive", "send" };
+static char *id_names[NETDATA_SOCKET_LENGTH] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_retransmit_skb", "tcp_close"
+                                                 , "udp_recvmsg", "udp_sendmsg"  };
 
 //protocols used with this collector
 static char *protocols[] = { "tcp", "udp" };
@@ -77,6 +77,7 @@ int thread_finished = 0;
 static int nprocs;
 
 int event_pid = 0;
+static int mykernel = 0;
 netdata_ebpf_events_t collector_events[] = {
     { .type = 'p', .name = "tcp_sendmsg" },
     { .type = 'p', .name = "tcp_clean_rbuf" },
@@ -90,50 +91,29 @@ netdata_ebpf_events_t collector_events[] = {
 static int close_plugin = 0;
 
 // ----------------------------------------------------------------------
+static void clean_network(netdata_network_t *ptr) {
+    netdata_network_t *move = ptr->next;
+    netdata_network_t *next;
 
-static int unmap_memory() {
-    int i;
-    int size = sysconf(_SC_PAGESIZE)*(page_cnt + 1);
-    for ( i = 0 ; i < nprocs ; i++ ) {
-        if (perf_event_unmap(headers[i], size) < 0) {
-            fprintf(stderr,"[NETWORK VIEWER] CANNOT unmap headers\n");
-            return -1;
-        }
+    while (move) {
+        next = move->next;
 
-        close(pmu_fd[i]);
+        free(move);
+
+        move = next;
     }
 
-    return 0;
+    free(ptr);
 }
 
 static void clean_networks() {
-    netdata_network_t *move;
-    netdata_network_t *next;
 
-    if(outgoing_table) {
-        move = outgoing_table->next;
-        while (move) {
-            next = move->next;
-
-            free(move);
-
-            move = next;
-        }
-
-        free(outgoing_table);
+    if (outgoing_table) {
+        clean_network(outgoing_table);
     }
 
     if(ingoing_table) {
-        move = ingoing_table->next;
-        while (move) {
-            next = move->next;
-
-            free(move);
-
-            move = next;
-        }
-
-        free(ingoing_table);
+        clean_network(ingoing_table);
     }
 }
 
@@ -150,7 +130,7 @@ void clean_port_index(netdata_port_stats_t *r) {
     if (ncs) {
         ncs = (netdata_port_stats_t *)avl_remove_lock(ptr, (avl *)r);
         if (ncs != r) {
-            //error("[NETWORK VIEWER] Cannot remove a port");
+            //error("[NETWORK VIEWER] internal error");
         }
     }
 }
@@ -168,18 +148,6 @@ void clean_ports(netdata_port_stats_t *clean) {
     }
     free(clean);
 }
-
-/* NETWORK VIEWER
-void clean_connections() {
-    netdata_conn_stats_t *move = connection_controller.tree->next;
-    while (move) {
-        netdata_conn_stats_t *next = move->next;
-        free(move);
-        move = next;
-    }
-    free(connection_controller.tree);
-}
- */
 
 void clean_port_list( netdata_port_list_t *clean) {
     netdata_port_list_t *move = clean->next;
@@ -210,13 +178,6 @@ static void int_exit(int sig) {
     if(!thread_finished) {
         return;
     }
-
-    unmap_memory();
-    /* NETWORK VIEWER
-    if(connection_controller.tree) {
-        clean_connections();
-    }
-     */
 
     if(connection_controller.ports_tcp_ipv4) {
         clean_ports(connection_controller.ports_tcp_ipv4);
@@ -253,28 +214,24 @@ static void int_exit(int sig) {
         }
     }
 
-    if (econn_udp) {
-        freez(econn_udp);
+    if (conn) {
+        freez(conn);
     }
 
-    if (ibytes_udp) {
-        freez(ibytes_udp);
+    if (ibytes) {
+        freez(ibytes);
     }
 
-    if (ebytes_udp) {
-        freez(ebytes_udp);
+    if (ebytes) {
+        freez(ebytes);
     }
 
-    if (econn_tcp) {
-        freez(econn_tcp);
+    if (hash_values) {
+        freez(hash_values);
     }
 
-    if (ibytes_tcp) {
-        freez(ibytes_tcp);
-    }
-
-    if (ebytes_tcp) {
-        freez(ebytes_tcp);
+    if (aggregated_data) {
+        freez(aggregated_data);
     }
 
     if(libnetdatanv) {
@@ -318,45 +275,6 @@ static void int_exit(int sig) {
 
 // ----------------------------------------------------------------------
 
-static int is_ip_inside_this_range(in_addr_t val, netdata_network_t *lnn) {
-    while (lnn) {
-        in_addr_t ip = lnn->first;
-        in_addr_t mask = lnn->netmask;
-
-        if ((ip & mask) == (val & mask)) {
-            return 1;
-        }
-
-        lnn = lnn->next;
-    }
-
-    return 0;
-}
-
-static inline int is_ip_inside_table(in_addr_t src, in_addr_t dst) {
-    return (is_ip_inside_this_range(src, outgoing_table) &&  is_ip_inside_this_range(dst, ingoing_table));
-}
-
-void netdata_set_port_stats(netdata_port_stats_t *p, uint16_t dport, uint8_t protocol) {
-    char port[8];
-    struct servent *sname;
-
-    p->port = dport;
-    p->protocol = protocol;
-
-    char *proto = (protocol == 6)?protocols[0]:protocols[1];
-    sname = getservbyport(dport,proto);
-    if (sname) {
-        p->dimension = strdup(sname->s_name);
-    } else {
-        snprintf(port, 8, "%d", ntohs(p->port) );
-        p->dimension = strdup(port);
-    }
-    p->next = NULL ;
-}
-
-
-// ----------------------------------------------------------------------
 static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group, int priority,int istcp) {
     printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d 1 ''\n"
             , family
@@ -374,26 +292,139 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
     }
 }
 
-static void netdata_create_charts() {
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV6, "TCP receive size from specific port.", "bytes/s", "Socket", 1000, 1);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV6, "TCP request size to specific port.", "bytes/s", "Socket", 999, 1);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_IPV6, "TCP active connections per port.", "active connections", "Socket", 998, 1);
+static void netdata_create_global_chart(char *family, char *name, char *msg, char *axis, char *group
+                                        , int priority,netdata_network_stat_t *ad, uint32_t end) {
+    uint32_t i;
+    printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d 1 ''\n"
+            , family
+            , name
+            , msg
+            , axis
+            , group
+            , priority);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV6, "UDP receive size from specific port.", "bytes/s", "Socket", 997, 0);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV6, "UDP request size to specific port.", "bytes/s", "Socket", 996, 0);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_IPV6, "UDP active connections per port.", "active connections", "Socket", 995, 0);
-
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV4, "TCP receive size from specific port.", "bytes/s", "Socket", 994, 1);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV4, "TCP request size to specific port.", "bytes/s", "Socket", 993, 1);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_IPV4, "TCP active connections per port.", "active connections", "Socket", 992, 1);
-
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV4, "UDP receive size from specific port.", "bytes/s","Socket", 991, 0);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV4, "UDP request size to specific port.", "bytes/s","Socket", 990, 0);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_IPV4, "UDP active connections per port.", "active connections","Socket", 989, 0);
-
+    for (i = 0; i < end ; i++) {
+        printf("DIMENSION %s %s absolute 1 1\n", ad[i].name, ad[i].dimension);
+    }
 }
 
-static void write_connection(char *name, uint32_t *bytes, int istcp) {
+static void netdata_create_charts() {
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_TCP_INBOUND_IPV6
+                        , "TCP receive size from specific port."
+                        , "bytes/s"
+                        , NETWORK_VIEWER_TCP_GROUP
+                        , 998
+                        , 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_TCP_OUTBOUND_IPV6
+                        , "TCP request size to specific port."
+                        , "bytes/s"
+                        , NETWORK_VIEWER_TCP_GROUP
+                        , 997
+                        , 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_TCP_CONNECTION_IPV6
+                        , "TCP active connections per port."
+                        , "active connections"
+                        , NETWORK_VIEWER_TCP_GROUP
+                        , 996
+                        , 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_UDP_INBOUND_IPV6
+                        , "UDP receive size from specific port."
+                        , "bytes/s"
+                        , NETWORK_VIEWER_UDP_GROUP
+                        , 995
+                        , 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_UDP_OUTBOUND_IPV6
+                        , "UDP request size to specific port."
+                        , "bytes/s"
+                        , NETWORK_VIEWER_UDP_GROUP
+                        , 994
+                        , 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_UDP_CONNECTION_IPV6
+                        , "UDP active connections per port."
+                        , "active connections"
+                        , NETWORK_VIEWER_UDP_GROUP
+                        , 993
+                        , 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_TCP_INBOUND_IPV4
+                        , "TCP receive size from specific port."
+                        , "bytes/s"
+                        , NETWORK_VIEWER_TCP_GROUP
+                        , 992
+                        , 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_TCP_OUTBOUND_IPV4
+                        , "TCP request size to specific port."
+                        , "bytes/s"
+                        , NETWORK_VIEWER_TCP_GROUP
+                        , 991
+                        , 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_TCP_CONNECTION_IPV4
+                        , "TCP active connections per port."
+                        , "active connections"
+                        , NETWORK_VIEWER_TCP_GROUP
+                        , 990
+                        , 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                         , NETWORK_VIEWER_UDP_INBOUND_IPV4
+                         , "UDP receive size from specific port."
+                         , "bytes/s"
+                         ,NETWORK_VIEWER_UDP_GROUP
+                         , 989
+                         , 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_UDP_OUTBOUND_IPV4
+                        , "UDP request size to specific port."
+                        , "bytes/s"
+                        ,NETWORK_VIEWER_UDP_GROUP
+                        , 988
+                        , 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY
+                        , NETWORK_VIEWER_UDP_CONNECTION_IPV4
+                        , "UDP active connections per port."
+                        , "active connections"
+                        ,NETWORK_VIEWER_UDP_GROUP
+                        , 987
+                        , 0);
+
+    netdata_create_global_chart(NETWORK_VIEWER_FAMILY
+                               , NETWORK_VIEWER_TCP_FUNCTION_CALL
+                               , "Number of calls realized to TCP functions inside kernel."
+                               , "Calls"
+                               , NETWORK_VIEWER_TCP_GROUP
+                               , 986
+                               , aggregated_data
+                               , 4);
+
+    netdata_create_global_chart(NETWORK_VIEWER_FAMILY
+                                , NETWORK_VIEWER_UDP_FUNCTION_CALL
+                                , "Number of calls realized to UDP functions inside kernel."
+                                , "Calls"
+                                , NETWORK_VIEWER_UDP_GROUP
+                                , 986
+                                , &aggregated_data[4]
+                                , 2);
+}
+
+static void write_connection(char *name, uint64_t *bytes, int istcp) {
     printf( "BEGIN %s.%s\n"
             , NETWORK_VIEWER_FAMILY
             , name);
@@ -426,45 +457,48 @@ static void write_traffic(char *name, uint64_t *bytes, int istcp) {
     printf("END\n");
 }
 
+static void write_global_chart(char *name, netdata_network_stat_t *data, uint32_t end) {
+    printf( "BEGIN %s.%s\n"
+            , NETWORK_VIEWER_FAMILY
+            , name);
+
+    uint32_t i;
+    for (i = 0; i < end ; i++) {
+        printf("SET %s = %lld\n", data[i].name, (long long) data[i].nvalue);
+    }
+
+    printf("END\n");
+}
+
 static void netdata_publish_data(netdata_port_stats_t *move, int version, int protocol) {
     //fill content
-    uint16_t tcp = 0;
-    uint16_t udp = 0;
+    uint16_t i = 0;
 
-    uint64_t *ibytes;
-    uint64_t *ebytes;
-    uint32_t *econn;
+    uint64_t *libytes;
+    uint64_t *lebytes;
+    uint64_t *lconn;
+
     while (move) {
-        if (move->protocol == 6) {//tcp
-            ibytes = &ibytes_tcp[tcp];
-            ebytes = &ebytes_tcp[tcp];
-            econn = &econn_tcp[tcp];
-            tcp++;
-        } else {
-            ibytes = &ibytes_udp[udp];
-            ebytes = &ebytes_udp[udp];
-            econn = &econn_udp[udp];
-            udp++;
-        }
+        libytes = &ibytes[i];
+        lebytes = &ebytes[i];
+        lconn = &conn[i];
+        i++;
 
         if(move->inow != move->iprev) {
-            if(move->itot) {
-                *ibytes = move->inow - move->iprev;
-                *ebytes = move->enow - move->eprev;
-                *econn = move->etot - move->itot;
-            } else {
-                *ibytes = 0;
-                *ebytes = 0;
-                *econn = 0;
-            }
+            *libytes = move->inow - move->iprev;
+            *lebytes = move->enow - move->eprev;
+            *lconn = (move->entot - move->enprev) + (move->intot - move->inprev);
+
 
             move->iprev = move->inow;
             move->eprev = move->enow;
-            move->itot = move->etot;
+            move->inprev = move->intot;
+            move->enprev = move->entot;
         } else {
-            *ibytes = 0;
-            *ebytes = 0;
-            *econn = 0;
+            *libytes = 0;
+            *lebytes = 0;
+            *lconn = 0;
+
         }
 
         move = move->next;
@@ -472,23 +506,23 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version, int pr
 
     if (version == AF_INET) {
         if (protocol == 6) {
-            write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV4, ibytes_tcp, 1);
-            write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV4, ebytes_tcp, 1);
-            write_connection(NETWORK_VIEWER_TCP_CONNECTION_IPV4, econn_tcp, 1);
+            write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV4, ibytes, 1);
+            write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV4, ebytes, 1);
+            write_connection(NETWORK_VIEWER_TCP_CONNECTION_IPV4, conn, 1);
         } else {
-            write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV4, ibytes_udp, 0);
-            write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV4, ebytes_udp, 0);
-            write_connection(NETWORK_VIEWER_UDP_CONNECTION_IPV4, econn_udp, 0);
+            write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV4, ibytes, 0);
+            write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV4, ebytes, 0);
+            write_connection(NETWORK_VIEWER_UDP_CONNECTION_IPV4, conn, 0);
         }
     } else {
         if (protocol == 6) {
-            write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ibytes_tcp, 1);
-            write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV6, ebytes_tcp, 1);
-            write_connection(NETWORK_VIEWER_TCP_CONNECTION_IPV6, econn_tcp, 1);
+            write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ibytes, 1);
+            write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV6, ebytes, 1);
+            write_connection(NETWORK_VIEWER_TCP_CONNECTION_IPV6, conn, 1);
         } else {
-            write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ibytes_udp, 0);
-            write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV6, ebytes_udp, 0);
-            write_connection(NETWORK_VIEWER_UDP_CONNECTION_IPV6, econn_udp, 0);
+            write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ibytes, 0);
+            write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV6, ebytes, 0);
+            write_connection(NETWORK_VIEWER_UDP_CONNECTION_IPV6, conn, 0);
         }
     }
 }
@@ -504,10 +538,14 @@ void *network_viewer_publisher(void *ptr) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        pthread_mutex_lock(&lock);
         netdata_publish_data(connection_controller.ports_tcp_ipv4, AF_INET, 6);
-        netdata_publish_data(connection_controller.ports_udp_ipv4, AF_INET, 17);
         netdata_publish_data(connection_controller.ports_tcp_ipv6, AF_INET6, 6);
         netdata_publish_data(connection_controller.ports_udp_ipv6, AF_INET6, 17);
+        netdata_publish_data(connection_controller.ports_udp_ipv4, AF_INET, 17);
+        write_global_chart(NETWORK_VIEWER_TCP_FUNCTION_CALL, aggregated_data, 4);
+        write_global_chart(NETWORK_VIEWER_UDP_FUNCTION_CALL, &aggregated_data[4], 2);
+        pthread_mutex_unlock(&lock);
 
         fflush(stdout);
     }
@@ -516,119 +554,6 @@ void *network_viewer_publisher(void *ptr) {
 }
 
 // ----------------------------------------------------------------------
-/* NETWORK VIEWER CODE
-void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) {
-    uint16_t family = e->family;
-    ncs->first = e->first;
-    ncs->ct = e->ct;
-
-    ncs->saddr.addr32[0] = e->saddr.addr32[0];
-    ncs->daddr.addr32[0] = e->daddr.addr32[0];
-    if (family == AF_INET6) {
-        ncs->saddr.addr32[1] = e->saddr.addr32[1];
-        ncs->saddr.addr32[2] = e->saddr.addr32[2];
-        ncs->saddr.addr32[3] = e->saddr.addr32[3];
-
-        ncs->daddr.addr32[1] = e->daddr.addr32[1];
-        ncs->daddr.addr32[2] = e->daddr.addr32[2];
-        ncs->daddr.addr32[3] = e->daddr.addr32[3];
-    }
-
-    ncs->dport = e->dport;
-    ncs->retransmit = e->retransmit;
-    ncs->sent = e->sent;
-    ncs->recv = e->recv;
-
-    ncs->protocol = e->protocol;
-    ncs->family = family;
-
-    ncs->remove_time = (!e->removeme)?0:time(NULL) + 5;
-
-    ncs->next = NULL;
-}
-
-void netdata_update_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) {
-    ncs->ct = e->ct;
-
-    ncs->retransmit += e->retransmit;
-    ncs->sent += e->sent;
-    ncs->recv += e->recv;
-
-    ncs->remove_time = (!e->removeme)?0:time(NULL) + 5;
-}
-
-netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
-    netdata_conn_stats_t *ncs = callocz(1, sizeof(netdata_conn_stats_t));
-    if(ncs) {
-        netdata_set_conn_stats(ncs, e);
-    }
-
-    return ncs;
-}
-*/
-
-void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
-    if(!e->removeme) {
-        p->inow += e->recv;
-        p->enow += e->sent;
-        p->etot += 1;
-    }
-
-    /* NETWORK VIEWER CODE
-    netdata_conn_stats_t *ret;
-    netdata_conn_stats_t search = { .daddr.addr32[0] = e->daddr.addr32[0], .saddr.addr32[0] = e->saddr.addr32[0], .dport = e->dport };
-    netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_search_lock(&p->destination_port, (avl *)&search);
-    if (!ncs) {
-        ncs = store_new_connection_stat(e);
-        if(ncs) {
-            p->etot += 1;
-
-            if (!connection_controller.tree) {
-                connection_controller.last_connection = ncs;
-                ncs->prev = NULL;
-                connection_controller.tree = ncs;
-            } else {
-                connection_controller.last_connection->next = ncs;
-                ncs->prev = connection_controller.last_connection;
-                connection_controller.last_connection = ncs;
-            }
-
-            ret = (netdata_conn_stats_t *)avl_insert_lock(&p->destination_port, (avl *)ncs);
-            if(ret != ncs) {
-                error("[NETWORK VIEWER] Cannot insert a new connection to index.");
-            } else {
-                connection_controller.last_connection->next = ncs;
-                ncs->prev = connection_controller.last_connection;
-                connection_controller.last_connection = ncs;
-            }
-        }
-    } else {
-        netdata_update_conn_stats(ncs, e);
-    }
-
-    if(ncs && e->removeme) {
-        ret = (netdata_conn_stats_t *)avl_remove_lock(&p->destination_port, (avl *)ncs);
-        if (ret != ncs) {
-            error("[NETWORK VIEWER] Cannot remove a connection from index.");
-        }
-
-        p->etot -= 1;
-
-        if(ncs == connection_controller.tree) {
-            connection_controller.tree = ncs->next;
-            ncs->prev = NULL;
-        } else {
-            ret = ncs->prev;
-            if(ret) {
-                ret->next  = ncs->next;
-            }
-        }
-
-        free(ncs);
-    }
-     */
-}
-
 static int compare_destination_ip(void *a, void *b) {
     netdata_conn_stats_t *conn1 = (netdata_conn_stats_t *)a;
     netdata_conn_stats_t *conn2 = (netdata_conn_stats_t *)b;
@@ -660,6 +585,24 @@ static int compare_destination_ip(void *a, void *b) {
     return ret;
 }
 
+void netdata_set_port_stats(netdata_port_stats_t *p, uint16_t dport, uint8_t protocol) {
+    char port[8];
+    struct servent *sname;
+
+    p->port = dport;
+    p->protocol = protocol;
+
+    char *proto = (protocol == 6)?protocols[0]:protocols[1];
+    sname = getservbyport(dport,proto);
+    if (sname) {
+        p->dimension = strdup(sname->s_name);
+    } else {
+        snprintf(port, 8, "%d", ntohs(p->port) );
+        p->dimension = strdup(port);
+    }
+    p->next = NULL ;
+}
+
 netdata_port_stats_t *store_new_port_stat(uint16_t dport, uint8_t protocol) {
     netdata_port_stats_t *p = callocz(1, sizeof(netdata_port_stats_t));
 
@@ -667,46 +610,6 @@ netdata_port_stats_t *store_new_port_stat(uint16_t dport, uint8_t protocol) {
     avl_init_lock(&p->destination_port, compare_destination_ip);
 
     return p;
-}
-
-static netdata_port_stats_t *is_monitored_port(uint16_t port, uint8_t protocol, uint16_t family) {
-    netdata_port_stats_t search_proto = { .port = port, .protocol = protocol };
-    netdata_port_stats_t *ans;
-
-    if (protocol == 6) {
-        ans = (netdata_port_stats_t *)avl_search_lock((family == AF_INET)?&connection_controller.port_stat_tcp_ipv4:&connection_controller.port_stat_tcp_ipv6, (avl *)&search_proto);
-    } else {
-        ans = (netdata_port_stats_t *)avl_search_lock((family == AF_INET)?&connection_controller.port_stat_udp_ipv4:&connection_controller.port_stat_udp_ipv6, (avl *)&search_proto);
-    }
-    return ans;
-}
-
-int netdata_store_bpf(void *data, int size) {
-    (void)size;
-
-    if(close_plugin)
-        return 0; //LIBBPF_PERF_EVENT_DONE
-
-    netdata_kern_stats_t *e = data;
-    if(!e->dport) {
-        return -2;//LIBBPF_PERF_EVENT_CONT;
-    }
-
-    netdata_port_stats_t *pp = is_monitored_port(e->dport, e->protocol, e->family) ;
-    if(!pp) {
-        return -2;//LIBBPF_PERF_EVENT_CONT;
-    }
-
-    if(e->family == AF_INET) {
-        int inside = is_ip_inside_table(e->saddr.addr32[0], e->daddr.addr32[0]);
-        if(inside < 0) {
-            return -2;//LIBBPF_PERF_EVENT_CONT;
-        }
-    }
-
-    netdata_update_port_stats(pp, e);
-
-    return -2; //LIBBPF_PERF_EVENT_CONT;
 }
 
 static int compare_port(void *a, void *b) {
@@ -732,10 +635,78 @@ static int compare_port(void *a, void *b) {
     return ret;
 }
 
+static void move_from_kernel2user_global() {
+    uint64_t idx;
+    uint64_t res[NETDATA_SOCKET_LENGTH];
+
+    uint64_t *val = hash_values;
+    for (idx = 0; idx < NETDATA_SOCKET_LENGTH; idx++) {
+        if (!bpf_map_lookup_elem(map_fd[2], &idx, val)) {
+            uint64_t total = 0;
+            int i;
+            int end = (mykernel < 265984)?1:nprocs;
+            for (i = 0; i < end; i++)
+                total += val[i];
+
+            res[idx] = total;
+        } else {
+            res[idx] = 0;
+        }
+    }
+
+    for (idx = 0 ; idx < NETDATA_SOCKET_LENGTH; idx++ )  {
+        uint64_t value = res[idx];
+        netdata_network_stat_t *w = &aggregated_data[idx];
+        w->rvalue = value;
+
+        if(w->pvalue) {
+            w->nvalue = (value >= w->pvalue)?value - w->pvalue: w->pvalue - value;
+        } else {
+            w->nvalue = 0;
+        }
+
+        w->pvalue =  w->rvalue;
+    }
+}
+
+void netdata_read_data(netdata_port_stats_t *ipv4, netdata_port_stats_t *ipv6, int protocol) {
+    int fd = (protocol == 6)?map_fd[3]:map_fd[4];
+    netdata_port_statistc_t val;
+    while (ipv4) {
+        if (!bpf_map_lookup_elem(fd, &ipv4->port, &val)) {
+            ipv4->inow = val.data_received_ipv4;
+            ipv4->intot = val.count_received_ipv4;
+            ipv4->enow = val.data_sent_ipv4;
+            ipv4->entot = val.count_sent_ipv4;
+
+            ipv6->inow = val.data_received_ipv6;
+            ipv6->intot = val.count_received_ipv6;
+            ipv6->enow = val.data_sent_ipv6;
+            ipv6->entot = val.count_sent_ipv6;
+         }
+
+        ipv4 = ipv4->next;
+        ipv6 = ipv6->next;
+    }
+}
+
 void *network_viewer_collector(void *ptr) {
     (void)ptr;
 
-    netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while(!close_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        pthread_mutex_lock(&lock);
+        move_from_kernel2user_global();
+
+        netdata_read_data(connection_controller.ports_tcp_ipv4, connection_controller.ports_tcp_ipv6 , 6);
+        netdata_read_data(connection_controller.ports_udp_ipv4, connection_controller.ports_udp_ipv6, 17);
+        pthread_mutex_unlock(&lock);
+    }
 
     return NULL;
 }
@@ -771,27 +742,9 @@ int network_viewer_load_libraries() {
             return -1;
         }
 
-        set_bpf_perf_event = dlsym(libnetdatanv, "set_bpf_perf_event");
+        bpf_map_lookup_elem = dlsym(libnetdatanv, "bpf_map_lookup_elem");
         if ((err = dlerror()) != NULL) {
-            error("[NETWORK VIEWER] Cannot find set_bpf_perf_event: %s", err);
-            return -1;
-        }
-
-        netdata_perf_loop_multi = dlsym(libnetdatanv, "netdata_perf_loop_multi");
-        if ((err = dlerror()) != NULL) {
-            error("[NETWORK VIEWER] Cannot find my_perf_loop_multi: %s", err);
-            return -1;
-        }
-
-        perf_event_unmap =  dlsym(libnetdatanv, "perf_event_unmap");
-        if ((err = dlerror()) != NULL) {
-            error("[NETWORK VIEWER] Cannot find perf_event_mmap: %s", err);
-            return -1;
-        }
-
-        perf_event_mmap_header =  dlsym(libnetdatanv, "perf_event_mmap_header");
-        if ((err = dlerror()) != NULL) {
-            error("[NETWORK VIEWER] Cannot find perf_event_mmap_header: %s", err);
+            error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
             return -1;
         }
     }
@@ -811,26 +764,7 @@ int network_viewer_load_ebpf() {
     return 0;
 }
 
-static int map_memory() {
-    nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-    if ( nprocs > NETDATA_MAX_PROCESSOR ) {
-        nprocs = NETDATA_MAX_PROCESSOR;
-    }
-
-    int i;
-    for ( i = 0 ; i < nprocs ; i++ ) {
-        pmu_fd[i] = set_bpf_perf_event(i, 0);
-
-        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
-            error("[NETWORK VIEWER] Cannot map header used to transfer data.");
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port, int version, uint8_t protocol) {
+static int port_stat_link_list(netdata_port_list_t *pl, uint16_t port, int version, uint8_t protocol) {
     netdata_port_stats_t *pp = NULL;
     netdata_port_stats_t *rp;
 
@@ -974,17 +908,17 @@ netdata_port_list_t *netdata_list_ports(char *ports, int protocol) {
                     end = 0;
                 } else {
                     *dash = 0x00;
-                    i = (uint16_t) strtol(vport,NULL, 10);
+                    i = (uint16_t) strtol(vport, NULL,  10);
                     dash++;
-                    end = (uint16_t) strtol(dash,NULL, 10);
+                    end = (uint16_t) strtol(dash, NULL,  10);
                 }
 
                 for ( ; i <= end ; i++) {
                     counter++;
-                    set = (netdata_port_list_t *) callocz(1,sizeof(netdata_port_list_t));
+                    set = (netdata_port_list_t *) callocz(1, sizeof(netdata_port_list_t));
                     if(set) {
                         if (!dash) {
-                            port = htons((uint16_t)strtol(vport,NULL,10));
+                            port = htons((uint16_t)strtol(vport, NULL, 10));
                         } else {
                             port = htons(i);
                         }
@@ -1027,7 +961,7 @@ netdata_network_t *netdata_list_ips(char *ips, int outgoing) {
         int i;
         int end = (outgoing)?3:4;
         for (i = (outgoing)?0:3; i < end ; i++) {
-            set = (netdata_network_t *) callocz(1,sizeof(netdata_network_t));
+            set = (netdata_network_t *) callocz(1, sizeof(netdata_network_t));
             if(set) {
                 network = inet_addr(pips[i]);
                 set->ipv4addr = network;
@@ -1078,7 +1012,7 @@ netdata_network_t *netdata_list_ips(char *ips, int outgoing) {
                     if(strlen(vmask) > 3) {
                         network = inet_addr(vmask);
                     } else {
-                        network = htonl(~(0xffffffff >> strtol(vmask,NULL,10)));
+                        network = htonl(~(0xffffffff >> strtol(vmask, NULL, 10)));
                     }
                     set->netmask = network;
 
@@ -1195,42 +1129,45 @@ static void update_dimensions() {
 }
 
 int allocate_publish_vectors() {
-    if(ebytes_tcp) {
+    if(ebytes) {
         return 0;
     }
 
     size_t length = (size_t)connection_controller.maxports;
-    econn_udp = (uint32_t *)callocz(length, sizeof(uint32_t));
-    if(!econn_udp) {
+    conn = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!conn) {
         return -1;
     }
 
-    ibytes_udp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!ibytes_udp) {
+    ibytes = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!ibytes) {
         return -1;
     }
 
-    ebytes_udp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!ebytes_udp) {
+    ebytes = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!ebytes) {
         return -1;
     }
 
-    econn_tcp = (uint32_t *)callocz(length, sizeof(uint32_t));
-    if(!econn_tcp) {
+    hash_values = (uint64_t *)callocz(nprocs, sizeof(uint64_t));
+    if(!hash_values) {
         return -1;
     }
 
-    ibytes_tcp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!ibytes_udp) {
-        return -1;
-    }
-
-    ebytes_tcp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!ebytes_udp) {
+    aggregated_data = (netdata_network_stat_t *)callocz(NETDATA_SOCKET_LENGTH, sizeof(netdata_network_stat_t));
+    if(!aggregated_data) {
         return -1;
     }
 
     return 0;
+}
+
+void set_aggregated_labels() {
+    int i;
+    for (i = 0; i < NETDATA_SOCKET_LENGTH; i++) {
+        aggregated_data[i].dimension = dimension_names[i];
+        aggregated_data[i].name = id_names[i];
+    }
 }
 
 void parse_config() {
@@ -1296,13 +1233,12 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    mykernel =  get_kernel_version();
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("[NETWORK VIEWER] setrlimit(RLIMIT_MEMLOCK)");
         return 1;
     }
-
-    page_cnt *= sysconf(_SC_NPROCESSORS_ONLN);
 
     if (argc > 1) {
         update_every = (int)strtol(argv[1], NULL, 10);
@@ -1322,11 +1258,6 @@ int main(int argc, char **argv) {
         error("[NETWORK VIEWER] Cannot load eBPF program.");
         thread_finished++;
         int_exit(3);
-    }
-
-    if (map_memory()) {
-        thread_finished++;
-        int_exit(4);
     }
 
     if(!outgoing_table) {
@@ -1369,6 +1300,13 @@ int main(int argc, char **argv) {
         thread_finished++;
         int_exit(8);
     }
+
+    if (pthread_mutex_init(&lock, NULL)) {
+        thread_finished++;
+        int_exit(9);
+    }
+
+    set_aggregated_labels();
 
     pthread_attr_t attr;
     pthread_attr_init(&attr);

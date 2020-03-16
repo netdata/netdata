@@ -41,6 +41,7 @@
 # include "../../libnetdata/locks/locks.h"
 # include "../../libnetdata/avl/avl.h"
 # include "../../libnetdata/clocks/clocks.h"
+# include "../../libnetdata/ebpf/ebpf.h"
 
 union netdata_ip {
     __u64 addr64[2];
@@ -60,6 +61,18 @@ typedef struct {
     uint16_t family;
     uint8_t removeme;
 }netdata_kern_stats_t;
+
+typedef struct netdata_port_statistic {
+    uint64_t count_sent_ipv4;
+    uint64_t count_sent_ipv6;
+    uint64_t data_sent_ipv4;
+    uint64_t data_sent_ipv6;
+
+    uint64_t count_received_ipv4;
+    uint64_t count_received_ipv6;
+    uint64_t data_received_ipv4;
+    uint64_t data_received_ipv6;
+} netdata_port_statistc_t;
 
 typedef struct parse_text_input{
     char *value;
@@ -90,17 +103,20 @@ typedef struct  netdata_conn_stats{
 typedef struct  netdata_port_stats {
     avl avl;
 
+    uint64_t ct;
     uint16_t port;
     uint8_t protocol;
     uint16_t family;
 
     uint64_t iprev;
     uint64_t inow;
-    uint32_t itot;
+    uint64_t intot;
+    uint64_t inprev;
 
     uint64_t eprev;
     uint64_t enow;
-    uint32_t etot;
+    uint64_t entot;
+    uint64_t enprev;
 
     char *dimension;
 
@@ -151,7 +167,18 @@ typedef struct netdata_network {
     struct netdata_network *next;
 } netdata_network_t;
 
+typedef struct netdata_network_stat {
+    char *dimension;
+    char *name;
+
+    uint64_t pvalue;
+    uint64_t nvalue;
+    uint64_t rvalue;
+}netdata_network_stat_t;
+
 # define NETDATA_MAX_PROCESSOR 512
+
+# define NETDATA_SOCKET_LENGTH 6
 
 # define NETDATA_MAX_DIMENSION 50
 
@@ -176,5 +203,10 @@ typedef struct netdata_network {
 # define NETWORK_VIEWER_UDP_CONNECTION_IPV6 "udp_conn_ipv6"
 //# define NETWORK_VIEWER_CHART15 "UDP_conn_inbound_ipv6"
 
+# define NETWORK_VIEWER_TCP_FUNCTION_CALL "tcp_fcnt_count"
+# define NETWORK_VIEWER_UDP_FUNCTION_CALL "udp_fcnt_count"
+
+# define NETWORK_VIEWER_TCP_GROUP "TCP Socket"
+# define NETWORK_VIEWER_UDP_GROUP "UDP Socket"
 
 #endif
