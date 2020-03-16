@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Support SOCKS5 in ACLK Challenge/Response and rewrite with LWS [\#8404](https://github.com/netdata/netdata/pull/8404) ([underhood](https://github.com/underhood))
+- ACLK: Fixes the type value for alarm updates [\#8403](https://github.com/netdata/netdata/pull/8403) ([stelfrag](https://github.com/stelfrag))
+- Improved the performance of the ACLK. \(\#8391\) [\#8401](https://github.com/netdata/netdata/pull/8401) ([amoss](https://github.com/amoss))
+- Perf fixes [\#8399](https://github.com/netdata/netdata/pull/8399) ([amoss](https://github.com/amoss))
+- ACLK: Improved the agent "pop-corning" phase [\#8398](https://github.com/netdata/netdata/pull/8398) ([stelfrag](https://github.com/stelfrag))
 - Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
 - Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
 - Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
@@ -28,6 +33,7 @@
 - Fixed dependency names for Arch Linux. [\#8334](https://github.com/netdata/netdata/pull/8334) ([Ferroin](https://github.com/Ferroin))
 - Correct a typo in .travis/README.md [\#8333](https://github.com/netdata/netdata/pull/8333) ([felixonmars](https://github.com/felixonmars))
 - Rename the review workflow and be consistent about workflow and job names. [\#8332](https://github.com/netdata/netdata/pull/8332) ([prologic](https://github.com/prologic))
+- Migrate Tests from Travis CI to Github Workflows [\#8331](https://github.com/netdata/netdata/pull/8331) ([prologic](https://github.com/prologic))
 - Migrate Travis based checks to Github Actions [\#8329](https://github.com/netdata/netdata/pull/8329) ([prologic](https://github.com/prologic))
 - Add retries for more Travis transient failures [\#8327](https://github.com/netdata/netdata/pull/8327) ([prologic](https://github.com/prologic))
 - Removed extra printed `\n` [\#8326](https://github.com/netdata/netdata/pull/8326) ([Jiab77](https://github.com/Jiab77))
@@ -233,8 +239,6 @@
 - Add Korean translation to docs [\#7723](https://github.com/netdata/netdata/pull/7723) ([cakrit](https://github.com/cakrit))
 - Control introduction of new languages in docs translation [\#7722](https://github.com/netdata/netdata/pull/7722) ([cakrit](https://github.com/cakrit))
 - .travis.yml: Reduce notifications [\#7714](https://github.com/netdata/netdata/pull/7714) ([knatsakis](https://github.com/knatsakis))
-- Make auto-updates work on kickstart-static64 installs. [\#7704](https://github.com/netdata/netdata/pull/7704) ([Ferroin](https://github.com/Ferroin))
-- Parse host tags [\#7702](https://github.com/netdata/netdata/pull/7702) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

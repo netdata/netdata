@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
@@ -10,13 +12,56 @@ struct aclk_lws_wss_perconnect_data {
     int todo;
 };
 
-struct lws_wss_packet_buffer {
-    unsigned char *data;
-    size_t data_size;
-    struct lws_wss_packet_buffer *next;
-};
-
 static struct aclk_lws_wss_engine_instance *engine_instance = NULL;
+
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len)
+{
+    if (write_len != NULL && write_len_bytes != NULL)
+    {
+        *write_len = 0;
+        *write_len_bytes = 0;
+        if (engine_instance != NULL)
+        {
+            aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
+
+            struct lws_wss_packet_buffer *write_b;
+            size_t w,wb;
+            for(w=0, wb=0, write_b = engine_instance->write_buffer_head; write_b != NULL; write_b = write_b->next)
+            {
+                w++;
+                wb += write_b->data_size - write_b->written;
+            }
+            *write_len = w;
+            *write_len_bytes = wb;
+            aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
+        }
+    }
+    else if (write_len != NULL)
+    {
+        *write_len = 0;
+        if (engine_instance != NULL)
+        {
+            aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
+
+            struct lws_wss_packet_buffer *write_b;
+            size_t w;
+            for(w=0, write_b = engine_instance->write_buffer_head; write_b != NULL; write_b = write_b->next)
+                w++;
+            *write_len = w;
+            aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
+        }
+    }
+    if (read_len != NULL)
+    {
+        *read_len = 0;
+        if (engine_instance != NULL)
+        {
+            aclk_lws_mutex_lock(&engine_instance->read_buf_mutex);
+            *read_len = lws_ring_get_count_waiting_elements(engine_instance->read_ringbuffer, NULL);
+            aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);
+        }
+    }
+}
 
 static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void *data, size_t size)
 {
@@ -25,6 +70,7 @@ static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void *data
         new->data = mallocz(LWS_PRE + size);
         memcpy(new->data + LWS_PRE, data, size);
         new->data_size = size;
+        new->written = 0;
     }
     return new;
 }
@@ -144,7 +190,7 @@ failure_cleanup_2:
     return 1;
 }
 
-void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_instance)
+void aclk_lws_wss_client_destroy()
 {
     if (engine_instance == NULL)
         return;
@@ -160,89 +206,18 @@ void aclk_lws_wss_client_destroy(struct aclk_lws_wss_engine_instance *engine_ins
 #endif
 }
 
-static int _aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
-{
-	char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks) {
+    char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-	if(!proxy)
-		return -1;
+    if(!proxy)
+        return -1;
 
-	proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+    proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-	if(!*proxy)
-		return -1;
+    if(!*proxy)
+        return -1;
 
-	return lws_set_socks(vhost, proxy);
-}
-
-// helper function to censor user&password
-// for logging purposes
-static void safe_log_proxy_censor(char *proxy) {
-    size_t length = strlen(proxy);
-    char *auth = proxy+length-1;
-    char *cur;
-
-    while( (auth >= proxy) && (*auth != '@') )
-        auth--;
-
-    //if not found or @ is first char do nothing
-    if(auth<=proxy)
-        return;
-
-    cur = strstr(proxy, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-    if(!cur)
-        cur = proxy;
-    else
-        cur += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-
-    while(cur < auth) {
-        *cur='X';
-        cur++;
-    }
-}
-
-static inline void safe_log_proxy_error(char *str, const char *proxy) {
-    char *log = strdupz(proxy);
-    safe_log_proxy_censor(log);
-    error("%s Provided Value:\"%s\"", str, log);
-    freez(log);
-}
-
-static inline int check_socks_enviroment(const char **proxy) {
-    char *tmp = getenv("socks_proxy");
-
-    if(!tmp)
-        return 1;
-
-    if(aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
-        *proxy = tmp;
-        return 0;
-    }
-
-    safe_log_proxy_error("Environment var \"socks_proxy\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", tmp);
-    return 1;
-}
-
-static const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
-    const char *proxy = config_get(CONFIG_SECTION_ACLK, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
-    *type = PROXY_DISABLED;
-
-    if(strcmp(proxy, "none") == 0)
-        return proxy;
-
-    if(strcmp(proxy, ACLK_PROXY_ENV) == 0) {
-        if(check_socks_enviroment(&proxy) == 0)
-            *type = PROXY_TYPE_SOCKS5;
-        return proxy;
-    }
-
-    *type = aclk_verify_proxy(proxy);
-    if(*type == PROXY_TYPE_UNKNOWN) {
-        *type = PROXY_DISABLED;
-        safe_log_proxy_error("Config var \"" ACLK_PROXY_CONFIG_VAR "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", proxy);
-    }
-
-    return proxy;
+    return lws_set_socks(vhost, proxy);
 }
 
 // Return code indicates if connection attempt has started async.
@@ -294,7 +269,7 @@ int aclk_lws_wss_connect(char *host, int port)
         safe_log_proxy_censor(log);
         info("Connecting using SOCKS5 proxy:\"%s\"", log);
         freez(log);
-        if(_aclk_wss_set_socks(vhost, proxy))
+        if(aclk_wss_set_socks(vhost, proxy))
             error("LWS failed to accept socks proxy.");
         break;
     default:
@@ -372,10 +347,20 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
     switch (reason) {
         case LWS_CALLBACK_CLIENT_WRITEABLE:
             aclk_lws_mutex_lock(&engine_instance->write_buf_mutex);
-            data = lws_wss_packet_buffer_pop(&engine_instance->write_buffer_head);
+            data = engine_instance->write_buffer_head;
             if (likely(data)) {
-                lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
-                lws_wss_packet_buffer_free(data);
+                size_t bytes_left = data->data_size - data->written;
+                if ( bytes_left > FRAGMENT_SIZE)
+                    bytes_left = FRAGMENT_SIZE;
+                int n = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
+                if (n>=0)
+                    data->written += n;
+                //error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
+                if (data->written == data->data_size)
+                {
+                    lws_wss_packet_buffer_pop(&engine_instance->write_buffer_head);
+                    lws_wss_packet_buffer_free(data);
+                }
                 if (engine_instance->write_buffer_head)
                     lws_callback_on_writable(engine_instance->lws_wsi);
             }
@@ -487,7 +472,13 @@ abort:
 void aclk_lws_wss_service_loop()
 {
     if (engine_instance)
+    {
+        /*if (engine_instance->lws_wsi) {
+            lws_cancel_service(engine_instance->lws_context);
+            lws_callback_on_writable(engine_instance->lws_wsi);
+        }*/
         lws_service(engine_instance->lws_context, 0);
+    }
 }
 
 // in case the MQTT connection disconnect while lws transport is still operational

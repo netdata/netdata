@@ -487,6 +487,8 @@ ACLK_PLUGIN_FILES = \
     aclk/mqtt.h \
     aclk/aclk_lws_wss_client.c \
     aclk/aclk_lws_wss_client.h \
+    aclk/aclk_lws_https_client.c \
+    aclk/aclk_lws_https_client.h \
     $(NULL)
 
 EXPORTING_ENGINE_FILES = \
