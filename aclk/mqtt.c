@@ -274,7 +274,7 @@ int _link_set_lwt(char *sub_topic, int qos)
     snprintfz(payload, sizeof(ACLK_LWT_MSG)+128, ACLK_LWT_MSG, msg_id, time_created, "unexpected");
     freez(msg_id);
 
-    rc = mosquitto_will_set(mosq, topic, strlen(payload), (const void *) payload, qos, 1);
+    rc = mosquitto_will_set(mosq, topic, strlen(payload), (const void *) payload, qos, 0);
     return rc;
 }
 

@@ -1453,7 +1453,6 @@ void aclk_disconnect()
     if (likely(aclk_connected))
         info("Disconnect detected (%"PRIu64" queued queries)", aclk_queue.count);
     aclk_subscribed = 0;
-    aclk_will_set = 0;
     aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
     aclk_connected = 0;
