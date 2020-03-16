@@ -15,6 +15,11 @@ int mongodb_init(const char *uri_string,
     mongoc_uri_t *uri;
     bson_error_t error;
 
+    if(unlikely(!collection_string || !*collection_string)) {
+        error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
+        return 1;
+    }
+
     uri = mongoc_uri_new_with_error(uri_string, &error);
     if(unlikely(!uri)) {
         error("EXPORTING: failed to parse URI: %s. Error message: %s", uri_string, error.message);
