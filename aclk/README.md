@@ -2,7 +2,7 @@
 ---
 title: "Agent-cloud link (ACLK)"
 description: "The agent-cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud. 
-The ACLK uses MQTT over secure websockets to create, persist, and encrpyt the connect from end-to-end, and enable the 
+The ACLK uses MQTT over secure websockets to create, persist, and encrypt the connect from end-to-end, and enable the 
 features found in Netdata Cloud."
 date: 2020-03-16
 custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
@@ -12,32 +12,22 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 # Agent-cloud link (ACLK)
 
 The agent-cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud. The ACLK uses
-[MQTT](https://en.wikipedia.org/wiki/MQTT) over secure websockets to create, persist, and encrpyt the connect from
+[MQTT](https://en.wikipedia.org/wiki/MQTT) over secure websockets to create, persist, and encrypt the connect from
 end-to-end, and enable the features found in Netdata Cloud.
 
 The ACLK is a vital component of the entirely redesigned and re-architected Netdata Cloud.
 
-## What data is sent through the ACLK?
-
 _No data is exchanged with Netdata Cloud until you claim a node._ By claiming a node, you opt-in to sending data from
 your agent to Netdata Cloud via the ACLK.
 
-Three types of data are sent across the ACLK:
-
--   Configuration: Details available via an agent's [API's `info`
-    payload](https://registry.my-netdata.io/swagger/#/default/get_info) at `/api/v1/info`.
--   Alarms: States and trigger events.
--   Metrics: Information from the agent's API are redirected to a user's browser via the ACLK. However, this information
-    is only sent via the ACLK after a user explictly requests this information via the Netdata Cloud UI.
-
 ## Claim nodes with the ACLK
 
-In order to use the ACLK to add a node to Netdata Cloud, you must **claim** the node.
+To use the ACLK to add a node to Netdata Cloud, you must **claim** the node.
 
-Claiming nodes is a security feature. Through the process of claiming, you demonstate in a few ways that you have
+Claiming nodes is a security feature. Through the process of claiming, you demonstrate in a few ways that you have
 administrative access to that node and the configuration settings for its Netdata agent. By logging into the node, you
-prove you have access, and by running the `netdata-cloud.sh` script, you prove you have write access and thus
-administrative privileges.
+prove you have access, and by running the `netdata-cloud.sh` script, you prove you have write access and administrative
+privileges.
 
 The claiming process ensures the ACLK will never be used by a third party to add your node, and thus view your metrics,
 via their Netdata Cloud account.
@@ -54,7 +44,7 @@ netdata-cloud.sh --token 5AJRdC9H.XytDT8yWZB5psoy.BzCQz5IRm3uqo.nHNl9HQG3nEiTbPB
 The `netdata-cloud.sh` command takes two arguments:
 
 -   `--token`: The unique token to your Netdata Cloud account to establish the ACLK.
--   `--rooms`: A comma-separated list of the War Rooms you want to add this node to.
+-   `--rooms`: A comma-separated list of the War Rooms this node should belong to.
 
 > It may take up to 60 seconds for your node to connect to Netdata Cloud after executing the `netdata-cloud.sh` command.
 
@@ -63,9 +53,8 @@ data via the ACLK.
 
 ## Enable and configure the ACLK
 
-The ACLK is enabled by default if its prerequisites installed correctly. You do not need to explicitly configure the
-ACLK to connect to Netdata Cloud. There are configuration options in `netdata.conf`, but these do not need to be changed
-by users in ordinary circumstances.
+The ACLK is enabled by default if its prerequisites installed correctly, and the correct configuration is already set in
+your agent's `netdata.conf` file.
 
 > 🎆 Needed: Any other configuration settings?
 
@@ -74,11 +63,12 @@ by users in ordinary circumstances.
     cloud base url = https://up.netdata.cloud
 ```
 
-### Proxy users
+### Proxy configuration
 
-If your Netdata agent uses a proxy to reach the outside internet, you must set up a SOCKS5 proxy.
+If your Netdata agent uses a proxy to reach the outside internet, you must configure a SOCKS5 proxy using one of the
+following methods.
 
-> 🎆 Needed: Configuration options for proxy.
+> 🎆 Needed: Configuration options/env variables for proxy.
 
 ## Disable the ACLK
 
@@ -89,7 +79,8 @@ parameter, the installer does not download or compile any extra libraries, and t
 thus Netdata Cloud, does not exist.
 
 The second option is to change a runtime setting in your `netdata.conf` file. This setting will only stop the agent from
-attempting the connection, but will not prevent the installer from downloading and compiling the ACLK's dependencies.
+attempting any connection via the ACLK, but will not prevent the installer from downloading and compiling the ACLK's
+dependencies.
 
 > 🎆 Needed: Configuration flag for disabling ACLK.
 
@@ -100,7 +91,7 @@ attempting the connection, but will not prevent the installer from downloading a
 
 ## Troubleshooting
 
-The ACLK is a new and complex feature, but we're commited to maintaining compatibility across all of Netdata's
+The ACLK is a new and complex feature, but we're committed to maintaining compatibility across all of Netdata's
 installation base. The ACLK should work on every Netdata agent, but there may be edge cases of incompatibility our team
 is not yet aware of.
 
@@ -116,7 +107,7 @@ If the ACLK fails to build during manual installation, you may see one of the fo
     this node to Netdata Cloud.
 
 If your Netdata agent updates automatically, you can also look for error messages in `/var/log/netdata/error.log`. Try
-one of the following two commands to search for ACLK-related errrors.
+one of the following two commands to search for ACLK-related errors.
 
 ```bash
 less /var/log/netdata/error.log
