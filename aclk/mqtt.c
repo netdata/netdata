@@ -236,6 +236,9 @@ void _link_shutdown()
 {
     int rc;
 
+    if (likely(!mosq))
+        return;
+
     rc = mosquitto_disconnect(mosq);
     switch (rc) {
         case MOSQ_ERR_SUCCESS:
@@ -245,6 +248,9 @@ void _link_shutdown()
             info("MQTT invalid structure");
             break;
     };
+
+    if (netdata_exit)
+        return;
 
     _link_event_loop();
 

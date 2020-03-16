@@ -5,6 +5,7 @@
 #include "aclk_lws_https_client.h"
 #include "aclk_common.h"
 
+int aclk_shutting_down = 0;
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
 //       agent startup phase.
@@ -936,6 +937,7 @@ void *aclk_query_main_thread(void *ptr)
 // Thread cleanup
 static void aclk_main_cleanup(void *ptr)
 {
+    char payload[sizeof(ACLK_LWT_MSG)+128+1];
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -944,7 +946,25 @@ static void aclk_main_cleanup(void *ptr)
     // Wakeup thread to cleanup
     QUERY_THREAD_WAKEUP;
 
-    aclk_shutdown();
+    // Send a graceful disconnect message
+    time_t time_created = now_realtime_sec();
+    char *msg_id = create_uuid();
+    snprintfz(payload, sizeof(ACLK_LWT_MSG) + 128, ACLK_LWT_MSG, msg_id, time_created, "graceful");
+    aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
+    freez(msg_id);
+
+    _link_event_loop();
+    sleep_usec(USEC_PER_MS * 100);
+    _link_event_loop();
+
+    aclk_shutting_down = 1;
+    _link_shutdown();
+    aclk_lws_wss_mqtt_layer_disconect_notif();
+
+    sleep_usec(USEC_PER_MS * 100);
+    _link_event_loop();
+
+    info("Disconnected");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -1298,7 +1318,7 @@ void *aclk_main(void *ptr)
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
         //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
         //     first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
-        if (unlikely(!aclk_connected)) {
+        if (unlikely(!netdata_exit && !aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;

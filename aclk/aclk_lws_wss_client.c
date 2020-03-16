@@ -6,6 +6,8 @@
 #include "../daemon/common.h"
 #include "aclk_common.h"
 
+extern int aclk_shutting_down;
+
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
 struct aclk_lws_wss_perconnect_data {
@@ -320,6 +322,8 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "LWS_CALLBACK_CLIENT_ESTABLISHED";
         case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
             return "LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION";
+        case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+            return "LWS_CALLBACK_EVENT_WAIT_CANCELLED";
         default:
             // Not using an internal buffer here for thread-safety with unknown calling context.
             error("Unknown LWS callback %u", reason);
@@ -331,6 +335,13 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
     UNUSED(user);
     struct lws_wss_packet_buffer *data;
     int retval = 0;
+    static int lws_shutting_down = 0;
+
+    if (unlikely(aclk_shutting_down && !lws_shutting_down)) {
+            lws_shutting_down = 1;
+            retval = -1;
+            engine_instance->upstream_reconnect_request = 0;
+    }
 
     // Callback servicing is forced when we are closed from above.
     if (engine_instance->upstream_reconnect_request) {
