@@ -218,7 +218,7 @@ rm -f "${CLAIMING_DIR}/tmpin.txt"
 
 # Check if URLCOMMAND connected and received reply
 if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
-        echo >&2 "Failed to connect to ${URL_BASE}"
+        echo >&2 "Failed to connect to ${URL_BASE}, return code ${URLCOMMAND_EXIT_CODE}"
         rm -f "${CLAIMING_DIR}/tmpout.txt"
         exit 4
 fi
