@@ -101,7 +101,8 @@ ID="unknown"
 ROOMS=""
 HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
-SHOW_JSON=0
+VERBOSE=0
+INSECURE=0
 
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
@@ -126,7 +127,8 @@ do
                 -id=*) ID=${arg:4} ;;
                 -rooms=*) ROOMS=${arg:7} ;;
                 -hostname=*) HOSTNAME=${arg:10} ;;
-                -json) SHOW_JSON=1 ;;
+                -verbose) VERBOSE=1 ;;
+                -insecure) INSECURE=1 ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
         esac
@@ -186,7 +188,7 @@ cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
 }
 EMBED_JSON
 
-if [ "${SHOW_JSON}" == 1 ] ; then
+if [ "${VERBOSE}" == 1 ] ; then
     echo "Request to server:"
     cat "${CLAIMING_DIR}/tmpin.txt"
 fi
@@ -199,6 +201,15 @@ else
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
 fi
 
+if [ "${INSECURE}" == 1 ] ; then
+    if [ "${URLTOOL}" = "curl" ] ; then
+        URLCOMMAND="${URLCOMMAND} --insecure"
+    else
+        URLCOMMAND="${URLCOMMAND} --no-check-certificate"
+    fi
+
+fi
+
 if [ -r "${CLOUD_CERTIFICATE_FILE}" ] ; then
         if [ "${URLTOOL}" = "curl" ] ; then
                 URLCOMMAND="${URLCOMMAND} --cacert \"${CLOUD_CERTIFICATE_FILE}\""
@@ -207,6 +218,9 @@ if [ -r "${CLOUD_CERTIFICATE_FILE}" ] ; then
         fi
 fi
 
+if [ "${VERBOSE}" == 1 ]; then
+    echo "${URLCOMMAND} \"${TARGET_URL}\""
+fi
 eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
 URLCOMMAND_EXIT_CODE=$?
 if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
@@ -223,7 +237,7 @@ if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
         exit 4
 fi
 
-if [ "${SHOW_JSON}" == 1 ] ; then
+if [ "${VERBOSE}" == 1 ] ; then
     echo "Response from server:"
     cat "${CLAIMING_DIR}/tmpout.txt"
 fi
