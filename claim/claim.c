@@ -53,7 +53,7 @@ void claim_agent(char *claiming_arguments)
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     if( aclk_decode_base_url(cloud_base_url, &cloud_base_hostname, &cloud_base_port))
     {
-        error("Configuration error - cannot decode \"cloud base ur;\"");
+        error("Configuration error - cannot decode \"cloud base url\"");
         return;
     }
 
