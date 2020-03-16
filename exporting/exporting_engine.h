@@ -76,7 +76,6 @@ struct aws_kinesis_specific_config {
 };
 
 struct mongodb_specific_config {
-    char *uri;
     char *database;
     char *collection;
 };

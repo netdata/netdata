@@ -147,7 +147,7 @@ int init_mongodb_instance(struct instance *instance)
 
     if (!instance->engine->mongoc_initialized) {
         if (unlikely(mongodb_init(
-                connector_specific_config->uri,
+                instance->config.destination,
                 connector_specific_config->database,
                 connector_specific_config->collection,
                 instance->config.timeoutms))) {
@@ -158,7 +158,7 @@ int init_mongodb_instance(struct instance *instance)
     }
 
     mongodb_init(
-        connector_specific_config->uri,
+        instance->config.destination,
         connector_specific_config->database,
         connector_specific_config->collection,
         instance->config.timeoutms);
@@ -194,8 +194,8 @@ void mongodb_connector_worker(void *instance_p)
 
             debug(
                 D_BACKEND,
-                "EXPORTING: mongodb_insert(): uri = %s, database = %s, collection = %s, buffer = %zu",
-                connector_specific_config->uri,
+                "EXPORTING: mongodb_insert(): destination = %s, database = %s, collection = %s, buffer = %zu",
+                instance->config.destination,
                 connector_specific_config->database,
                 connector_specific_config->collection,
                 buffer_len);
@@ -209,7 +209,7 @@ void mongodb_connector_worker(void *instance_p)
                 error(
                     "EXPORTING: failed to write data to the database '%s'. "
                     "Willing to write %zu bytes, wrote %zu bytes.",
-                    connector_specific_config->uri, buffer_len, 0UL);
+                    instance->config.destination, buffer_len, 0UL);
 
                 stats->chart_transmission_failures++;
                 stats->chart_data_lost_events++;

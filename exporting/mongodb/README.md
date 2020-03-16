@@ -14,12 +14,12 @@ in the Netdata configuration directory and set the following options:
 ```conf
 [mongodb:my_instance]
     enabled = yes
-    uri = mongodb://<hostname>
+    destination = mongodb://<hostname>
     database = your_database_name
     collection = your_collection_name
 ```
 
-You can find more information about `uri` in the MongoDB
+You can find more information about the `destination` string URI format in the MongoDB
 [documentation]](https://docs.mongodb.com/manual/reference/connection-string/)
 
 The default socket timeout depends on the exporting connector update interval. The timeout is 500 ms shorter than the
