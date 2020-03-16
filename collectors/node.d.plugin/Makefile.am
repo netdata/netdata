@@ -51,6 +51,11 @@ dist_nodemodules_DATA = \
     node_modules/asn1-ber.js \
     $(NULL)
 
+nodemoduleslibdir=$(nodedir)/node_modules/lib
+dist_nodemoduleslib_DATA = \
+    node_modules/lib/mib.js \
+    $(NULL)
+
 nodemoduleslibberdir=$(nodedir)/node_modules/lib/ber
 dist_nodemoduleslibber_DATA = \
     node_modules/lib/ber/index.js \
