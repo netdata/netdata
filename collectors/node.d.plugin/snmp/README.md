@@ -217,6 +217,7 @@ Privacy protocols:
 
 -   "1" is `none`
 -   "2" is `des`
+-   "4" is `aes`
 
 For additional details please see [net-snmp module readme](https://github.com/markabrahams/node-net-snmp#snmpcreatev3session-target-user-options).
 
