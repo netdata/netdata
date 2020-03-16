@@ -1,0 +1,86 @@
+---
+# Runs Tests on Pushes to `master` and Pull Requests
+name: Tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**.c'
+      - '**.h'
+  pull_request:
+    paths:
+      - '**.c'
+      - '**.h'
+jobs:
+  unit-tests-legacy:
+    name: Unit Tests (legacy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare environment
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
+                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
+                                  libnetfilter-acct-dev
+      - name: Run ./tests/run-unit-tests.sh
+        env:
+          CFLAGS: "-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1"
+        run: |
+          ./tests/run-unit-tests.sh
+
+  unit-tests-cmocka:
+    name: Unit Tests (cmocka)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare environment
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
+                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
+                                  libnetfilter-acct-dev libmongoc-dev  libcmocka-dev
+      - name: Configure
+        run: |
+          autoreconf -ivf
+          ./configure
+      # XXX: Work-around for bug with libbson-1.0 in Ubuntu 18.04
+      # See: https://bugs.launchpad.net/ubuntu/+source/libmongoc/+bug/1790771
+      #      https://jira.mongodb.org/browse/CDRIVER-2818
+      - name: Fix libbson
+        run: |
+          pushd /usr/lib || exit 1
+          sudo ln -s /usr/include .
+          popd || exit 1
+      - name: Build
+        run: |
+          mkdir build-tmp
+          cd build-tmp
+          cmake \
+            -D UNIT_TESTING=1 \
+            -D BUILD_TESTING=1 \
+            -D CMAKE_BUILD_TYPE="Debug" \
+            -D BSON_LIBRARY=/usr/lib/x86_64-linux-gnu/libbson-1.0.so \
+            -D MONGOC_LIBRARY=/usr/lib/x86_64-linux-gnu/libmongoc-1.0.so \
+            ..
+          make
+      - name: Run ctest
+        run: |
+          cd build-tmp
+          ctest
+      - name: Prepare Artifacts
+        if: always()
+        run: |
+          mkdir logs
+          pushd build-tmp || exit 1
+          find . -type f -name '*.log' -exec cp {} ../logs/ \;
+          popd || exit 1
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v1
+        if: always()
+        with:
+          name: logs
+          path: logs

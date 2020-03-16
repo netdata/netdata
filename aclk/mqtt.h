@@ -14,7 +14,7 @@ int mqtt_attempt_connection(char *aclk_hostname, int aclk_port, char *username, 
 //int _link_lib_init();
 int _mqtt_lib_init();
 int _link_subscribe(char *topic, int qos);
-int _link_send_message(char *topic, char *message, int *mid);
+int _link_send_message(char *topic, unsigned char *message, int *mid);
 const char *_link_strerror(int rc);
 
 int aclk_handle_cloud_request(char *);

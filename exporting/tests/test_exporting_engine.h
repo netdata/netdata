@@ -9,6 +9,7 @@
 #include "exporting/graphite/graphite.h"
 #include "exporting/json/json.h"
 #include "exporting/opentsdb/opentsdb.h"
+#include "exporting/prometheus/remote_write/remote_write.h"
 #include "exporting/aws_kinesis/aws_kinesis.h"
 
 #include <stdarg.h>
@@ -95,6 +96,28 @@ int __mock_metric_formatting(struct instance *instance, RRDDIM *rd);
 int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
+
+void *__real_init_write_request();
+void *__wrap_init_write_request();
+
+void __real_add_host_info(
+    void *write_request_p,
+    const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp);
+void __wrap_add_host_info(
+    void *write_request_p,
+    const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp);
+
+void __real_add_label(void *write_request_p, char *key, char *value);
+void __wrap_add_label(void *write_request_p, char *key, char *value);
+
+void __real_add_metric(
+    void *write_request_p,
+    const char *name, const char *chart, const char *family, const char *dimension,
+    const char *instance, const double value, const int64_t timestamp);
+void __wrap_add_metric(
+    void *write_request_p,
+    const char *name, const char *chart, const char *family, const char *dimension,
+    const char *instance, const double value, const int64_t timestamp);
 
 void __wrap_aws_sdk_init();
 void __wrap_kinesis_init(

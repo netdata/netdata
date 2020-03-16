@@ -429,6 +429,10 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     font-size: 0.75rem;
 }
 
+.md-typeset details > summary {
+    font-weight: 400;
+}
+
 /* Support figures and figcaptions with some styling. */
 .md-typeset figure img {
     border-radius: 3px 3px 0 0;

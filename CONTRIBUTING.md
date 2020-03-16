@@ -198,6 +198,13 @@ Improvements must have the title "[Area or module] : [Added/Refactored/Improved/
 
 New collectors must have the title "[New collector] : [Name of collector]".
 
+#### Commit messages when PRs are merged
+
+When a PR gets squashed and merged into master, the title of the commit message (first line) must be the PR title
+followed by the PR number.
+
+The body of the commit message should be a short description of the work, preferably taken from the connected issue.
+
 ### PR approval process
 
 Each PR automatically [requires a review](https://help.github.com/articles/about-required-reviews-for-pull-requests/) from the code owners specified in `.github/CODEOWNERS`. Depending on the files contained in your PR, several people may be need to approve it.

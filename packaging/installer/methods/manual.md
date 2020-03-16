@@ -19,9 +19,9 @@ To install the latest git version of Netdata, please follow these 2 steps:
 
 ## Prepare your system
 
-Try our experimental automatic requirements installer (no need to be root). This will try to find the packages that
-should be installed on your system to build and run Netdata. It supports most major Linux distributions released after
-2010:
+Use our automatic requirements installer (_no need to be `root`_), which attempts to find the packages that
+should be installed on your system to build and run Netdata. It supports a large variety of major Linux distributions
+and other operating systems and is regularly tested. You can find this tool [here](https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) or run it directly with `bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)`. Otherwise read on for how to get requires packages manually:
 
 -   **Alpine** Linux and its derivatives
     -   You have to install `bash` yourself, before using the installer.
