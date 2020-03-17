@@ -6,8 +6,8 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-mongoc_client_t *mongodb_client;
-mongoc_collection_t *mongodb_collection;
+static mongoc_client_t *mongodb_client;
+static mongoc_collection_t *mongodb_collection;
 
 int backends_mongodb_init(const char *uri_string,
                  const char *database_string,
