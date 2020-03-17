@@ -36,6 +36,12 @@ typedef struct heartbeat {
 #define CLOCK_MONOTONIC CLOCK_REALTIME
 #endif
 
+/* Prefer CLOCK_MONOTONIC_COARSE where available to reduce overhead. It has the same semantics as CLOCK_MONOTONIC */
+#ifndef CLOCK_MONOTONIC_COARSE
+/* fallback to CLOCK_MONOTONIC if not available */
+#define CLOCK_MONOTONIC_COARSE CLOCK_MONOTONIC
+#endif
+
 #ifndef CLOCK_BOOTTIME
 
 #ifdef CLOCK_UPTIME
@@ -43,7 +49,7 @@ typedef struct heartbeat {
 #define CLOCK_BOOTTIME CLOCK_UPTIME
 #else // CLOCK_UPTIME
 /* CLOCK_BOOTTIME falls back to CLOCK_MONOTONIC */
-#define CLOCK_BOOTTIME  CLOCK_MONOTONIC
+#define CLOCK_BOOTTIME  CLOCK_MONOTONIC_COARSE
 #endif // CLOCK_UPTIME
 
 #else // CLOCK_BOOTTIME
@@ -135,6 +141,12 @@ extern int sleep_usec(usec_t usec);
  * clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
  */
 void test_clock_boottime(void);
+
+/*
+ * When running a binary with CLOCK_MONOTONIC_COARSE defined on a system with a linux kernel older than Linux 2.6.32 the
+ * clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
+ */
+void test_clock_monotonic_coarse(void);
 
 extern collected_number uptime_msec(char *filename);
 

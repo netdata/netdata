@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Adds missing files to ACLK CMake build [\#8412](https://github.com/netdata/netdata/pull/8412) ([underhood](https://github.com/underhood))
+- Fix Prometheus Remote Write build [\#8411](https://github.com/netdata/netdata/pull/8411) ([vlvkobal](https://github.com/vlvkobal))
 - Support SOCKS5 in ACLK Challenge/Response and rewrite with LWS [\#8404](https://github.com/netdata/netdata/pull/8404) ([underhood](https://github.com/underhood))
 - ACLK: Fixes the type value for alarm updates [\#8403](https://github.com/netdata/netdata/pull/8403) ([stelfrag](https://github.com/stelfrag))
 - Improved the performance of the ACLK. \(\#8391\) [\#8401](https://github.com/netdata/netdata/pull/8401) ([amoss](https://github.com/amoss))
@@ -15,6 +17,7 @@
 - Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
 - Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
 - docs: fix go.d modules in the COLLECTORS.md [\#8380](https://github.com/netdata/netdata/pull/8380) ([ilyam8](https://github.com/ilyam8))
+- Fix streaming scaling [\#8375](https://github.com/netdata/netdata/pull/8375) ([mfundul](https://github.com/mfundul))
 - Change topics for ACLK [\#8374](https://github.com/netdata/netdata/pull/8374) ([amoss](https://github.com/amoss))
 - Migrate make dist validation to GHA Workflows [\#8373](https://github.com/netdata/netdata/pull/8373) ([prologic](https://github.com/prologic))
 - Add proper parsing/stripping of comments around docs frontmatter [\#8372](https://github.com/netdata/netdata/pull/8372) ([joelhans](https://github.com/joelhans))
@@ -238,7 +241,6 @@
 - Cleanup packaging/makeself/build-x86\_64-static.sh to use /bin/sh and remove use of sudo [\#7725](https://github.com/netdata/netdata/pull/7725) ([prologic](https://github.com/prologic))
 - Add Korean translation to docs [\#7723](https://github.com/netdata/netdata/pull/7723) ([cakrit](https://github.com/cakrit))
 - Control introduction of new languages in docs translation [\#7722](https://github.com/netdata/netdata/pull/7722) ([cakrit](https://github.com/cakrit))
-- .travis.yml: Reduce notifications [\#7714](https://github.com/netdata/netdata/pull/7714) ([knatsakis](https://github.com/knatsakis))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

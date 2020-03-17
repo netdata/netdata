@@ -550,18 +550,20 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
-    long rentries = config_get_number(config_section, "history", history_entries);
-    long entries = align_entries_to_pagesize(memory_mode, rentries);
-    if(entries != rentries) entries = config_set_number(config_section, "history", entries);
+    long entries;
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        // only sets it the first time
+        entries = config_get_number(config_section, "history", 5);
+    } else {
+        long rentries = config_get_number(config_section, "history", history_entries);
+        entries = align_entries_to_pagesize(memory_mode, rentries);
+        if (entries != rentries) entries = config_set_number(config_section, "history", entries);
 
-    if(memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
-        entries = config_set_number(config_section, "history", 10);
-
+        if (memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
+            entries = config_set_number(config_section, "history", 10);
+    }
     int enabled = config_get_boolean(config_section, "enabled", 1);
     if(!enabled) entries = 5;
-
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        entries = config_set_number(config_section, "history", 5);
 
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
