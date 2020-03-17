@@ -5,7 +5,6 @@
 
 #include "../daemon/common.h"
 #include "mqtt.h"
-#include "aclk_lws_wss_client.h"
 
 #define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
@@ -79,6 +78,7 @@ extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 //char    *get_base_topic();
 
 extern char *is_agent_claimed(void);
+extern void aclk_lws_wss_mqtt_layer_disconect_notif();
 char *create_uuid();
 
 // callbacks for agent cloud link
