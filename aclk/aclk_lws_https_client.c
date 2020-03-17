@@ -19,6 +19,7 @@ struct simple_hcc_data {
 
 static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
+    UNUSED(user);
     int n;
     char *ptr;
     char buffer[SMALL_BUFFER];
@@ -78,7 +79,7 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
         debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_WRITEABLE");
         if(perconn_data && perconn_data->payload) {
             n = strlen(perconn_data->payload);
-            if(perconn_data->data_size < LWS_PRE + n + 1) {
+            if(perconn_data->data_size < (size_t)LWS_PRE + n + 1) {
                 error("Buffer given is not big enough");
                 return 1;
             }
@@ -133,12 +134,16 @@ static const struct lws_protocols protocols[] = {
         simple_https_client_callback,
         0,
         0,
+        0,
+        0,
+        0
     },
-    { NULL, NULL, 0, 0 }
+    { NULL, NULL, 0, 0, 0, 0, 0 }
 };
 
 static void simple_hcc_log_divert(int level, const char *line)
 {
+    UNUSED(level);
     error("Libwebsockets: %s", line);
 }
 
