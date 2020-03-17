@@ -4,9 +4,18 @@
 #include "graphite/graphite.h"
 #include "json/json.h"
 #include "opentsdb/opentsdb.h"
-#include "aws_kinesis/aws_kinesis.h"
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
 #include "prometheus/remote_write/remote_write.h"
+#endif
+
+#if HAVE_KINESIS
+#include "aws_kinesis/aws_kinesis.h"
+#endif
+
+#if HAVE_MONGOC
 #include "mongodb/mongodb.h"
+#endif
 
 /**
  * Initialize connectors
