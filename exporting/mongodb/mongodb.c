@@ -5,44 +5,47 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-mongoc_client_t *mongodb_client;
-mongoc_collection_t *mongodb_collection;
+// mongoc_client_t *mongodb_client;
+// mongoc_collection_t *mongodb_collection;
 
-int mongodb_init(const char *uri_string,
-                 const char *database_string,
-                 const char *collection_string,
-                 int32_t default_socket_timeout) {
+int mongodb_init(struct instance *instance) {
+    struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
     mongoc_uri_t *uri;
     bson_error_t error;
 
-    if(unlikely(!collection_string || !*collection_string)) {
+    if(unlikely(!connector_specific_config->collection || !*connector_specific_config->collection)) {
         error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
-    uri = mongoc_uri_new_with_error(uri_string, &error);
+    uri = mongoc_uri_new_with_error(instance->config.destination, &error);
     if(unlikely(!uri)) {
-        error("EXPORTING: failed to parse URI: %s. Error message: %s", uri_string, error.message);
+        error("EXPORTING: failed to parse URI: %s. Error message: %s", instance->config.destination, error.message);
         return 1;
     }
 
-    int32_t socket_timeout = mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, default_socket_timeout);
+    int32_t socket_timeout =
+        mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, instance->config.timeoutms);
     if(!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
         error("EXPORTING: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
         return 1;
     };
 
-    mongodb_client = mongoc_client_new_from_uri(uri);
-    if(unlikely(!mongodb_client)) {
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+
+    connector_specific_data->client = mongoc_client_new_from_uri(uri);
+    if(unlikely(!connector_specific_data->client)) {
         error("EXPORTING: failed to create a new client");
         return 1;
     }
 
-    if(!mongoc_client_set_appname(mongodb_client, "netdata")) {
+    if(!mongoc_client_set_appname(connector_specific_data->client, "netdata")) {
         error("EXPORTING: failed to set client appname");
     };
 
-    mongodb_collection = mongoc_client_get_collection(mongodb_client, database_string, collection_string);
+    connector_specific_data->collection = mongoc_client_get_collection(
+        connector_specific_data->client, connector_specific_config->database, connector_specific_config->collection);
 
     mongoc_uri_destroy(uri);
 
@@ -58,7 +61,7 @@ void free_bson(bson_t **insert, size_t n_documents) {
     free(insert);
 }
 
-int mongodb_insert(char *data, size_t n_metrics) {
+int mongodb_insert(struct instance *instance, char *data, size_t n_metrics) {
     bson_t **insert = calloc(n_metrics, sizeof(bson_t *));
     bson_error_t error;
     char *start = data, *end = data;
@@ -88,7 +91,10 @@ int mongodb_insert(char *data, size_t n_metrics) {
         n_documents++;
     }
 
-    if(unlikely(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+
+    if(unlikely(!mongoc_collection_insert_many(connector_specific_data->collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
        error("EXPORTING: %s", error.message);
        free_bson(insert, n_documents);
        return 1;
@@ -99,9 +105,12 @@ int mongodb_insert(char *data, size_t n_metrics) {
     return 0;
 }
 
-void mongodb_cleanup() {
-    mongoc_collection_destroy(mongodb_collection);
-    mongoc_client_destroy(mongodb_client);
+void mongodb_cleanup(struct instance *instance) {
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+
+    mongoc_collection_destroy(connector_specific_data->collection);
+    mongoc_client_destroy(connector_specific_data->client);
 
     return;
 }
@@ -140,7 +149,6 @@ int init_mongodb_instance(struct instance *instance)
     uv_mutex_init(&instance->mutex);
     uv_cond_init(&instance->cond_var);
 
-    struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct mongodb_specific_data *connector_specific_data = callocz(1, sizeof(struct mongodb_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
 
@@ -152,11 +160,7 @@ int init_mongodb_instance(struct instance *instance)
         instance->engine->mongoc_initialized = 1;
     }
 
-    if (unlikely(mongodb_init(
-            instance->config.destination,
-            connector_specific_config->database,
-            connector_specific_config->collection,
-            instance->config.timeoutms))) {
+    if (unlikely(mongodb_init(instance))) {
         error("EXPORTING: cannot initialize MongoDB exporting connector");
         return 1;
     }
@@ -198,7 +202,7 @@ void mongodb_connector_worker(void *instance_p)
                 connector_specific_config->collection,
                 buffer_len);
 
-            if (likely(!mongodb_insert((char *)first_char, (size_t)stats->chart_buffered_metrics))) {
+            if (likely(!mongodb_insert(instance, (char *)first_char, (size_t)stats->chart_buffered_metrics))) {
                 sent += buffer_len;
                 stats->chart_transmission_successes++;
                 stats->chart_receptions++;
@@ -234,5 +238,5 @@ void mongodb_connector_worker(void *instance_p)
 #endif
     }
 
-    mongodb_cleanup();
+    mongodb_cleanup(instance);
 }

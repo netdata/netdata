@@ -12,11 +12,11 @@ struct mongodb_specific_data {
     mongoc_collection_t *collection;
 };
 
-extern int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string, const int32_t socket_timeout);
+extern int mongodb_init(struct instance *instance);
 
-extern int mongodb_insert(char *data, size_t n_metrics);
+extern int mongodb_insert(struct instance *instance, char *data, size_t n_metrics);
 
-extern void mongodb_cleanup();
+extern void mongodb_cleanup(struct instance *instance);
 
 int init_mongodb_instance(struct instance *instance);
 void mongodb_connector_worker(void *instance_p);
