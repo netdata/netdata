@@ -1196,9 +1196,6 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
 
-    if (strchr(data_buffer, '\n'))
-        *(strchr(data_buffer, '\n')) = '\0';
-
     debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
     if ( json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
     {
