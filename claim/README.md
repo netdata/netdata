@@ -31,6 +31,8 @@ following arguments:
     where AGENT_ID is the unique identifier of the agent. This is the agent's MACHINE_GUID by default.
 -hostname=HOSTNAME
     where HOSTNAME is the result of the hostname command by default.
+-proxy=PROXY_URL
+    where PROXY_URL is the endpoint of a SOCKS5 proxy.
 ```
 
 For example, the following command claims an agent and adds it to rooms `room1` and `room2`:
@@ -75,5 +77,27 @@ war-rooms.
 
 The user can also put the Cloud endpoint's full certificate chain in `claim.d/cloud_fullchain.pem` so that the agent
 can trust the endpoint if necessary.
+
+## Using a proxy
+
+Claiming can be performed through a SOCKS5 proxy. To do this when calling the script directly supply the proxy
+endpoint as:
+
+```
+netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -proxy=socks5h://127.0.0.1:11081
+```
+
+When claiming via the `netdata` binary set the following options in the config:
+```
+[agent_cloud_link]
+    proxy = socks5://X.X.X.X:YYYY
+```
+Proceed to claim using the command-line syntax:
+```
+/usr/sbin/netdata -D -W "claim -token=MYTOKEN1234567 -rooms=room1,room2"
+```
+
+Please note - if you supply the proxy endpoint in the configuration then it will also be used to tunnel
+the agent cloud link as well.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fclaim%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
