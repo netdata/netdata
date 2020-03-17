@@ -44,6 +44,8 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
 
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
+
 /*
  * Maintain a list of collectors and chart count
  * If all the charts of a collector are deleted
@@ -1285,7 +1287,6 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
  *
  * @return It always returns NULL
  */
-void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *query_thread;

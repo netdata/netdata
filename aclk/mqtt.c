@@ -176,6 +176,10 @@ static inline void _link_mosquitto_write()
 {
     int rc;
 
+    if (unlikely(!mosq)) {
+        return;
+    }
+
     rc = mosquitto_loop_misc(mosq);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         debug(D_ACLK, "ACLK: failure during mosquitto_loop_misc %s", mosquitto_strerror(rc));
@@ -248,16 +252,6 @@ void _link_shutdown()
             info("MQTT invalid structure");
             break;
     };
-
-    if (netdata_exit)
-        return;
-
-    _link_event_loop();
-
-    mosquitto_destroy(mosq);
-    mosq = NULL;
-
-    aclk_lws_wss_client_destroy();
 }
 
 
