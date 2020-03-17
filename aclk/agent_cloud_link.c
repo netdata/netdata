@@ -945,6 +945,7 @@ static void aclk_main_cleanup(void *ptr)
 
     if (is_agent_claimed() && aclk_connected) {
         size_t write_q, write_q_bytes, read_q;
+        time_t event_loop_timeout;
 
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
@@ -964,8 +965,9 @@ static void aclk_main_cleanup(void *ptr)
         aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
         freez(msg_id);
 
+        event_loop_timeout = now_realtime_sec() + 5;
         write_q = 1;
-        while (write_q) {
+        while (write_q && event_loop_timeout > now_realtime_sec()) {
             _link_event_loop();
             lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
         }
@@ -975,7 +977,8 @@ static void aclk_main_cleanup(void *ptr)
         aclk_lws_wss_mqtt_layer_disconect_notif();
 
         write_q = 1;
-        while (write_q) {
+        event_loop_timeout = now_realtime_sec() + 5;
+        while (write_q && event_loop_timeout > now_realtime_sec()) {
             _link_event_loop();
             lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
         }
