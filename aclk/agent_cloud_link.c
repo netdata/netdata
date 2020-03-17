@@ -943,7 +943,8 @@ static void aclk_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    if (is_agent_claimed() && mosq) {
+    if (is_agent_claimed() && aclk_connected) {
+        size_t write_q, write_q_bytes, read_q;
 
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
@@ -963,16 +964,21 @@ static void aclk_main_cleanup(void *ptr)
         aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
         freez(msg_id);
 
-        _link_event_loop();
-        sleep_usec(USEC_PER_MS * 100);
-        _link_event_loop();
+        write_q = 1;
+        while (write_q) {
+            _link_event_loop();
+            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        }
 
         aclk_shutting_down = 1;
         _link_shutdown();
         aclk_lws_wss_mqtt_layer_disconect_notif();
 
-        sleep_usec(USEC_PER_MS * 100);
-        _link_event_loop();
+        write_q = 1;
+        while (write_q) {
+            _link_event_loop();
+            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        }
     }
 
     info("Disconnected");
@@ -1190,6 +1196,9 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
 
+    if (strchr(data_buffer, '\n'))
+        *(strchr(data_buffer, '\n')) = '\0';
+
     debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
     if ( json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
     {
@@ -1198,7 +1207,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         goto CLEANUP;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response: %s", data_buffer);
+        error("Could not retrieve challenge from auth response: [%s]", data_buffer);
         goto CLEANUP;
     }
 
