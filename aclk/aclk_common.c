@@ -6,10 +6,25 @@ struct {
     ACLK_PROXY_TYPE type;
     const char *url_str;
 } supported_proxy_types[] = {
-    { .type = PROXY_TYPE_SOCKS5,   .url_str = "socks5" ACLK_PROXY_PROTO_ADDR_SEPARATOR  },
+    { .type = PROXY_TYPE_SOCKS5,   .url_str = "socks5"  ACLK_PROXY_PROTO_ADDR_SEPARATOR },
     { .type = PROXY_TYPE_SOCKS5,   .url_str = "socks5h" ACLK_PROXY_PROTO_ADDR_SEPARATOR },
+    { .type = PROXY_TYPE_HTTP,     .url_str = "http"    ACLK_PROXY_PROTO_ADDR_SEPARATOR },
     { .type = PROXY_TYPE_UNKNOWN,  .url_str = NULL                                      },
 };
+
+const char* aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type)
+{
+    switch(*type){
+        case PROXY_DISABLED:
+            return "disabled";
+        case PROXY_TYPE_HTTP:
+            return "HTTP";
+        case PROXY_TYPE_SOCKS5:
+            return "SOCKS";
+        default:
+            return "Unknown";
+    }
+}
 
 static inline ACLK_PROXY_TYPE aclk_find_proxy(const char *string)
 {
@@ -84,6 +99,21 @@ static inline int check_socks_enviroment(const char **proxy) {
     return 1;
 }
 
+static inline int check_http_enviroment(const char **proxy) {
+    char *tmp = getenv("http_proxy");
+
+    if(!tmp)
+        return 1;
+
+    if(aclk_verify_proxy(tmp) == PROXY_TYPE_HTTP) {
+        *proxy = tmp;
+        return 0;
+    }
+
+    safe_log_proxy_error("Environment var \"http_proxy\" defined but of unknown format. Supported syntax: \"http[s]://[user:pass@]host:ip\".", tmp);
+    return 1;
+}
+
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
     const char *proxy = config_get(CONFIG_SECTION_ACLK, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
     *type = PROXY_DISABLED;
@@ -94,6 +124,8 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
     if(strcmp(proxy, ACLK_PROXY_ENV) == 0) {
         if(check_socks_enviroment(&proxy) == 0)
             *type = PROXY_TYPE_SOCKS5;
+        else if(check_http_enviroment(&proxy) == 0)
+            *type = PROXY_TYPE_HTTP;
         return proxy;
     }
 
@@ -103,6 +135,21 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
         safe_log_proxy_error("Config var \"" ACLK_PROXY_CONFIG_VAR "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".", proxy);
     }
 
+    return proxy;
+}
+
+// helper function to read settings only once (static)
+// as claiming, challenge/response and ACLK
+// read the same thing, no need to parse again
+const char *aclk_get_proxy(ACLK_PROXY_TYPE *type)
+{
+    static const char *proxy = NULL;
+    static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
+
+    if (proxy_type == PROXY_NOT_SET)
+        proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
+
+    *type = proxy_type;
     return proxy;
 }
 

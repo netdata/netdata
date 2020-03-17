@@ -159,15 +159,7 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
     int n = 0;
     time_t timestamp;
 
-    //TODO -> deduplicate (aclk_lws_wss_connect)
-    static const char *proxy = NULL;
-    static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
     struct lws_vhost *vhost;
-    char *log;
-
-    if(proxy_type == PROXY_NOT_SET)
-        proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
-
 
     memset(&info, 0, sizeof info);
 
@@ -212,17 +204,8 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
     if(!vhost)
         fatal("Could not find the default LWS vhost.");
 
-    lws_set_socks(vhost, ":");
-    lws_set_proxy(vhost, ":");
-
-    if(proxy_type == PROXY_TYPE_SOCKS5) {
-        log = strdupz(proxy);
-        safe_log_proxy_censor(log);
-        info("Connecting using SOCKS5 proxy:\"%s\"", log);
-        freez(log);
-        if(aclk_wss_set_socks(vhost, proxy))
-            error("LWS failed to accept socks proxy.");
-    }
+    //set up proxy
+    aclk_wss_set_proxy(vhost);
 
     lws_client_connect_via_info(&i);
 
