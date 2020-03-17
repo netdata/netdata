@@ -1204,7 +1204,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         goto CLEANUP;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response: [%s]", data_buffer);
+        error("Could not retrieve challenge from auth response: %s", data_buffer);
         goto CLEANUP;
     }
 
