@@ -1060,7 +1060,7 @@ if(ENABLE_BACKEND_KINESIS)
         -Wl,--wrap=kinesis_get_result
     )
 endif()
-if(ENABLE_BACKEND_MONGODB)
+if(MONGOC_LIBRARIES)
     list(APPEND EXPORTING_ENGINE_FILES ${MONGODB_EXPORTING_FILES})
     list(
         APPEND MONGODB_LINK_OPTIONS
@@ -1072,7 +1072,12 @@ endif()
         PRIVATE
         -DUNIT_TESTING
     )
-    target_include_directories(${TEST_NAME}_testdriver PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+    target_include_directories(
+        ${TEST_NAME}_testdriver
+        PUBLIC
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${NETDATA_COMMON_INCLUDE_DIRS}
+    )
     target_link_options(
         ${TEST_NAME}_testdriver
         PRIVATE
