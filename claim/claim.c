@@ -69,10 +69,11 @@ void claim_agent(char *claiming_arguments)
     snprintfz(command_buffer,
               CLAIMING_COMMAND_LENGTH,
               "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s %s",
+
               proxy_flag,
-              cloud_base_url,
+              netdata_configured_hostname,
               localhost->machine_guid,
-              registry.cloud_base_url,
+              cloud_base_url,
               claiming_arguments);
 
     info("Executing agent claiming command 'netdata-claim.sh'");
