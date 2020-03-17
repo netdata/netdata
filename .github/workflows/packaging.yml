@@ -26,9 +26,10 @@ jobs:
           - ubuntu16.04
           - ubuntu18.04
           - ubuntu19.10
+          - centos7
+          - centos8
           - fedora30
           - fedora31
-          - centos7
           - opensuse15.1
         include:
           - platform: debian8
@@ -73,6 +74,20 @@ jobs:
             pkgcloudversion: "19.10"
             format: deb
             base_image: ubuntu
+          - platform: centos7
+            distro: centos
+            version: "7"
+            pkgclouddistro: Enterprise Linux
+            pkgcloudversion: "7.0"
+            format: rpm
+            base_image: centos
+          - platform: centos8
+            distro: centos
+            version: "8"
+            pkgclouddistro: Enterprise Linux
+            pkgcloudversion: "8.0"
+            format: rpm
+            base_image: centos
           - platform: fedora30
             distro: fedora
             version: "30"
@@ -87,13 +102,6 @@ jobs:
             pkgcloudversion: "31.0"
             format: rpm
             base_image: fedora
-          - platform: centos7
-            distro: centos
-            version: "7"
-            pkgclouddistro: Enterprise Linux
-            pkgcloudversion: "7.0"
-            format: rpm
-            base_image: centos
           - platform: opensuse15.1
             distro: opensuse
             version: "15.1"
