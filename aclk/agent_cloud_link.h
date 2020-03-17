@@ -5,6 +5,7 @@
 
 #include "../daemon/common.h"
 #include "mqtt.h"
+#include "aclk_lws_wss_client.h"
 
 #define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
@@ -73,7 +74,6 @@ void *aclk_main(void *ptr);
       .start_routine = aclk_main },
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
-extern void aclk_lws_wss_mqtt_layer_disconect_notif();
 
 //int     aclk_init();
 //char    *get_base_topic();

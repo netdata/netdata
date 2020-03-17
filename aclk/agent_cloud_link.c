@@ -943,7 +943,7 @@ static void aclk_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    if (is_agent_claimed()) {
+    if (is_agent_claimed() && mosq) {
 
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
@@ -1327,8 +1327,8 @@ void *aclk_main(void *ptr)
         static int first_init = 0;
         size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
-        //     first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
+        info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
+             first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
         if (unlikely(!netdata_exit && !aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
