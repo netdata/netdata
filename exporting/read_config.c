@@ -282,7 +282,7 @@ struct engine *read_exporting_config()
 #endif
 
 #ifndef HAVE_MONGOC
-        if (tmp_ci_list->backend_type == BACKEND_TYPE_MONGOC) {
+        if (tmp_ci_list->backend_type == BACKEND_TYPE_MONGODB) {
             error("MongoDB support isn't compiled");
             goto next_connector_instance;
         }
