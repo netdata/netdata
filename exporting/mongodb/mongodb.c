@@ -5,9 +5,6 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-// mongoc_client_t *mongodb_client;
-// mongoc_collection_t *mongodb_collection;
-
 int mongodb_init(struct instance *instance) {
     struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
     mongoc_uri_t *uri;
@@ -49,25 +46,68 @@ int mongodb_init(struct instance *instance) {
 
     mongoc_uri_destroy(uri);
 
+    // create a ring buffer
+    struct bson_buffer *first_buffer = NULL;
+
+    if (instance->config.buffer_on_failures < 2)
+        instance->config.buffer_on_failures = 1;
+    else
+        instance->config.buffer_on_failures -= 1;
+
+    for (int i = 0; i < instance->config.buffer_on_failures; i++) {
+        struct bson_buffer *current_buffer = callocz(1, sizeof(struct bson_buffer));
+
+        if (!connector_specific_data->first_buffer)
+            first_buffer = current_buffer;
+        else
+            current_buffer->next = connector_specific_data->first_buffer;
+
+        connector_specific_data->first_buffer = current_buffer;
+    }
+
+    first_buffer->next = connector_specific_data->first_buffer;
+    connector_specific_data->last_buffer = connector_specific_data->first_buffer;
+
     return 0;
 }
 
-void free_bson(bson_t **insert, size_t n_documents) {
+void free_bson(bson_t **insert, size_t documents_inserted) {
     size_t i;
 
-    for(i = 0; i < n_documents; i++)
+    for(i = 0; i < documents_inserted; i++)
         bson_destroy(insert[i]);
 
-    free(insert);
+    freez(insert);
 }
 
-int mongodb_insert(struct instance *instance, char *data, size_t n_metrics) {
-    bson_t **insert = calloc(n_metrics, sizeof(bson_t *));
-    bson_error_t error;
-    char *start = data, *end = data;
-    size_t n_documents = 0;
+/**
+ * Format a batch for the MongoDB connector
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int format_batch_mongodb(struct instance *instance)
+{
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+    struct stats *stats = &instance->stats;
 
-    while(*end && n_documents <= n_metrics) {
+    bson_t **insert = connector_specific_data->last_buffer->insert;
+    if (insert) {
+        // ring buffer is full, reuse the oldest element
+        connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
+        free_bson(insert, connector_specific_data->last_buffer->documents_inserted);
+    }
+    insert = callocz((size_t)stats->chart_buffered_metrics, sizeof(bson_t *));
+    connector_specific_data->last_buffer->insert = insert;
+
+    BUFFER *buffer = (BUFFER *)instance->buffer;
+    char *start = (char *)buffer_tostring(buffer);
+    char *end = start;
+
+    size_t documents_inserted = 0;
+
+    while(*end && documents_inserted <= (size_t)stats->chart_buffered_metrics) {
         while(*end && *end != '\n') end++;
 
         if(likely(*end)) {
@@ -78,29 +118,24 @@ int mongodb_insert(struct instance *instance, char *data, size_t n_metrics) {
             break;
         }
 
-        insert[n_documents] = bson_new_from_json((const uint8_t *)start, -1, &error);
+        bson_error_t error;
+        insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
-        if(unlikely(!insert[n_documents])) {
+        if(unlikely(!insert[documents_inserted])) {
            error("EXPORTING: %s", error.message);
-           free_bson(insert, n_documents);
+           free_bson(insert, documents_inserted);
            return 1;
         }
 
         start = end;
 
-        n_documents++;
+        documents_inserted++;
     }
 
-    struct mongodb_specific_data *connector_specific_data =
-        (struct mongodb_specific_data *)instance->connector_specific_data;
+    buffer_flush(buffer);
 
-    if(unlikely(!mongoc_collection_insert_many(connector_specific_data->collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
-       error("EXPORTING: %s", error.message);
-       free_bson(insert, n_documents);
-       return 1;
-    }
-
-    free_bson(insert, n_documents);
+    connector_specific_data->last_buffer->documents_inserted = documents_inserted;
+    connector_specific_data->last_buffer = connector_specific_data->last_buffer->next;
 
     return 0;
 }
@@ -136,7 +171,7 @@ int init_mongodb_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = NULL;
+    instance->end_batch_formatting = format_batch_mongodb;
 
     instance->send_header = NULL;
     instance->check_response = NULL;
@@ -179,6 +214,8 @@ void mongodb_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
     struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
 
     while (!netdata_exit) {
         struct stats *stats = &instance->stats;
@@ -186,52 +223,63 @@ void mongodb_connector_worker(void *instance_p)
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
 
-        BUFFER *buffer = (BUFFER *)instance->buffer;
-        size_t buffer_len = buffer_strlen(buffer);
+        bson_t **insert = connector_specific_data->first_buffer->insert;
+        size_t documents_inserted = connector_specific_data->first_buffer->documents_inserted;
 
-        size_t sent = 0;
-
-        while (sent < buffer_len) {
-            const char *first_char = buffer_tostring(buffer) + sent;
-
-            debug(
-                D_BACKEND,
-                "EXPORTING: mongodb_insert(): destination = %s, database = %s, collection = %s, buffer = %zu",
-                instance->config.destination,
-                connector_specific_config->database,
-                connector_specific_config->collection,
-                buffer_len);
-
-            if (likely(!mongodb_insert(instance, (char *)first_char, (size_t)stats->chart_buffered_metrics))) {
-                sent += buffer_len;
-                stats->chart_transmission_successes++;
-                stats->chart_receptions++;
-            } else {
-                // oops! we couldn't send (all or some of the) data
-                error(
-                    "EXPORTING: failed to write data to the database '%s'. "
-                    "Willing to write %zu bytes, wrote %zu bytes.",
-                    instance->config.destination, buffer_len, 0UL);
-
-                stats->chart_transmission_failures++;
-                stats->chart_data_lost_events++;
-                stats->chart_lost_bytes += buffer_len;
-                stats->chart_lost_metrics += stats->chart_buffered_metrics;
-
-                break;
-            }
-
-            if (unlikely(netdata_exit))
-                break;
-        }
-
-        stats->chart_sent_bytes += sent;
-        if (likely(sent == buffer_len))
-            stats->chart_sent_metrics = stats->chart_buffered_metrics;
-
-        buffer_flush(buffer);
+        connector_specific_data->first_buffer->insert = NULL;
+        connector_specific_data->first_buffer->documents_inserted = 0;
+        connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
 
         uv_mutex_unlock(&instance->mutex);
+
+        size_t data_size = 0;
+        for (size_t i = 0; i < documents_inserted; i++) {
+            data_size += insert[i]->len;
+        }
+
+        debug(
+            D_BACKEND,
+            "EXPORTING: mongodb_insert(): destination = %s, database = %s, collection = %s, data size = %zu",
+            instance->config.destination,
+            connector_specific_config->database,
+            connector_specific_config->collection,
+            data_size);
+
+        if (unlikely(documents_inserted == 0))
+            continue;
+
+        bson_error_t error;
+        if (likely(mongoc_collection_insert_many(
+                connector_specific_data->collection,
+                (const bson_t **)insert,
+                documents_inserted,
+                NULL,
+                NULL,
+                &error))) {
+            stats->chart_sent_bytes += data_size;
+            stats->chart_transmission_successes++;
+            stats->chart_receptions++;
+        } else {
+            // oops! we couldn't send (all or some of the) data
+            error("EXPORTING: %s", error.message);
+            error(
+                "EXPORTING: failed to write data to the database '%s'. "
+                "Willing to write %zu bytes, wrote %zu bytes.",
+                instance->config.destination, data_size, 0UL);
+
+            stats->chart_transmission_failures++;
+            stats->chart_data_lost_events++;
+            stats->chart_lost_bytes += data_size;
+            stats->chart_lost_metrics += stats->chart_buffered_metrics;
+        }
+
+        free_bson(insert, documents_inserted);
+
+        if (unlikely(netdata_exit))
+            break;
+
+        stats->chart_sent_bytes += data_size;
+        stats->chart_sent_metrics = stats->chart_buffered_metrics;
 
 #ifdef UNIT_TESTING
         break;

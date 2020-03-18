@@ -329,11 +329,11 @@ int end_batch_formatting(struct engine *engine)
  */
 int prepare_buffers(struct engine *engine)
 {
-    netdata_thread_disable_cancelability();
-    rrd_rdlock();
     if (start_batch_formatting(engine) != 0)
         return 1;
 
+    netdata_thread_disable_cancelability();
+    rrd_rdlock();
     RRDHOST *host;
     rrdhost_foreach_read(host)
     {
@@ -363,11 +363,11 @@ int prepare_buffers(struct engine *engine)
             return 1;
         rrdhost_unlock(host);
     }
+    rrd_unlock();
+    netdata_thread_enable_cancelability();
 
     if (end_batch_formatting(engine) != 0)
         return 1;
-    rrd_unlock();
-    netdata_thread_enable_cancelability();
 
     return 0;
 }

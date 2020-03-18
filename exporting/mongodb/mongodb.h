@@ -7,18 +7,27 @@
 #include "exporting/json/json.h"
 #include <mongoc.h>
 
+struct bson_buffer {
+    bson_t **insert;
+    size_t documents_inserted;
+
+    struct bson_buffer *next;
+};
+
 struct mongodb_specific_data {
     mongoc_client_t *client;
     mongoc_collection_t *collection;
+
+    bson_t **current_insert;
+    struct bson_buffer *first_buffer;
+    struct bson_buffer *last_buffer;
 };
 
-extern int mongodb_init(struct instance *instance);
-
-extern int mongodb_insert(struct instance *instance, char *data, size_t n_metrics);
-
-extern void mongodb_cleanup(struct instance *instance);
+int mongodb_init(struct instance *instance);
+void mongodb_cleanup(struct instance *instance);
 
 int init_mongodb_instance(struct instance *instance);
+int format_batch_mongodb(struct instance *instance);
 void mongodb_connector_worker(void *instance_p);
 
 #endif //NETDATA_EXPORTING_MONGODB_H
