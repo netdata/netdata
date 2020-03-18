@@ -859,7 +859,22 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);
-    buffer_strcat(wb, "\n\t]\n");
+    buffer_strcat(wb, "\n\t],\n");
+
+#ifdef ENABLE_CLOUD
+    buffer_strcat(wb, "\t\"cloud-enabled\": true,\n");
+#else
+    buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
+#endif
+#ifdef ENABLE_ACLK
+    buffer_strcat(wb, "\t\"cloud-available\": true,\n");
+#else
+    buffer_strcat(wb, "\t\"cloud-available\": false,\n");
+#endif
+    if (is_agent_claimed() == NULL)
+        buffer_strcat(wb, "\t\"agent-claimed\": false\n");
+    else
+        buffer_strcat(wb, "\t\"agent-claimed\": true\n");
 
     buffer_strcat(wb, "}");
     return 0;
