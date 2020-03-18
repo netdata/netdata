@@ -511,7 +511,13 @@ static void command_thread(void *arg)
         command_thread_error = ret;
         goto error_after_pipe_bind;
     }
-    if ((ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb))) {
+    ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb);
+    if (ret) {
+        /* Fallback to backlog of 1 */
+        info("uv_listen() failed with backlog = %d, falling back to backlog = 1.", SOMAXCONN);
+        ret = uv_listen((uv_stream_t *)&server_pipe, 1, connection_cb);
+    }
+    if (ret) {
         error("uv_listen(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_uv_listen;
