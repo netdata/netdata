@@ -8,6 +8,7 @@
 
 - Adds missing files to ACLK CMake build [\#8412](https://github.com/netdata/netdata/pull/8412) ([underhood](https://github.com/underhood))
 - Fix Prometheus Remote Write build [\#8411](https://github.com/netdata/netdata/pull/8411) ([vlvkobal](https://github.com/vlvkobal))
+- Fix outstanding problems in claiming and add SOCKS5 support. [\#8406](https://github.com/netdata/netdata/pull/8406) ([amoss](https://github.com/amoss))
 - Support SOCKS5 in ACLK Challenge/Response and rewrite with LWS [\#8404](https://github.com/netdata/netdata/pull/8404) ([underhood](https://github.com/underhood))
 - ACLK: Fixes the type value for alarm updates [\#8403](https://github.com/netdata/netdata/pull/8403) ([stelfrag](https://github.com/stelfrag))
 - Improved the performance of the ACLK. \(\#8391\) [\#8401](https://github.com/netdata/netdata/pull/8401) ([amoss](https://github.com/amoss))
@@ -240,7 +241,6 @@
 - Fixes support for read-only /lib on SystemD systems like CoreOS in  kickstart static64 [\#7726](https://github.com/netdata/netdata/pull/7726) ([prologic](https://github.com/prologic))
 - Cleanup packaging/makeself/build-x86\_64-static.sh to use /bin/sh and remove use of sudo [\#7725](https://github.com/netdata/netdata/pull/7725) ([prologic](https://github.com/prologic))
 - Add Korean translation to docs [\#7723](https://github.com/netdata/netdata/pull/7723) ([cakrit](https://github.com/cakrit))
-- Control introduction of new languages in docs translation [\#7722](https://github.com/netdata/netdata/pull/7722) ([cakrit](https://github.com/cakrit))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

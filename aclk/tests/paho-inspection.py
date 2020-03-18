@@ -27,6 +27,8 @@ def on_message(mqttc, obj, msg):
     print(f"Message {mtype} time={ts} size {len(api_msg)}", flush=True)
     now = time.time()
     print(f"Current {now} -> Delay {now-ts}", flush=True)
+    if mtype=="disconnect":
+        print(f"Message dump: {api_msg}", flush=True)
 
 def on_publish(mqttc, obj, mid):
     print("mid: "+str(mid), flush=True)

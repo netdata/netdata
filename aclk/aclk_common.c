@@ -105,3 +105,45 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type) {
 
     return proxy;
 }
+
+int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
+{
+int pos = 0;
+    if (!strncmp("https://", url, 8))
+    {
+        pos = 8;
+    }
+    else if (!strncmp("http://", url, 7))
+    {
+        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
+        return 1;
+    }
+int host_end = pos;
+    while( url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':' )
+        host_end++;
+    if (url[host_end] == 0)
+    {
+        *aclk_hostname = strdupz(url+pos);
+        *aclk_port = strdupz("443");
+        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+        return 0;
+    }
+    if (url[host_end] == ':')
+    {
+        *aclk_hostname = callocz(host_end - pos + 1, 1);
+        strncpy(*aclk_hostname, url+pos, host_end - pos);
+        int port_end = host_end + 1;
+        while (url[port_end] >= '0' && url[port_end] <= '9')
+            port_end++;
+        if (port_end - host_end > 6)
+        {
+            error("Port specified in %s is invalid", url);
+            return 0;
+        }
+        *aclk_port = callocz(port_end - host_end + 1, 1);
+        for(int i=host_end + 1; i < port_end; i++)
+            (*aclk_port)[i - host_end - 1] = url[i];
+    }
+    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+    return 0;
+}

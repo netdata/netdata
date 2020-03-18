@@ -76,16 +76,16 @@
 # Exit code: 15
 
 if command -v curl >/dev/null 2>&1 ; then
-	URLTOOL="curl"
+        URLTOOL="curl"
 elif command -v wget >/dev/null 2>&1 ; then
-	URLTOOL="wget"
+        URLTOOL="wget"
 else
-	echo >&2 "I need curl or wget to proceed, but neither is available on this system."
-	exit 3
+        echo >&2 "I need curl or wget to proceed, but neither is available on this system."
+        exit 3
 fi
 if ! command -v openssl >/dev/null 2>&1 ; then
-	echo >&2 "I need openssl to proceed, but neither is available on this system."
-	exit 3
+        echo >&2 "I need openssl to proceed, but it is not available on this system."
+        exit 3
 fi
 
 
@@ -101,35 +101,47 @@ ID="unknown"
 ROOMS=""
 HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
+VERBOSE=0
+INSECURE=0
 
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
-	ID="$(cat "${MACHINE_GUID_FILE}")"
+        ID="$(cat "${MACHINE_GUID_FILE}")"
 fi
 
 # get token from file
 if [ -r "${CLAIMING_DIR}/token" ]; then
-	TOKEN="$(cat "${CLAIMING_DIR}/token")"
+        TOKEN="$(cat "${CLAIMING_DIR}/token")"
 fi
 
 # get rooms from file
 if [ -r "${CLAIMING_DIR}/rooms" ]; then
-	ROOMS="$(cat "${CLAIMING_DIR}/rooms")"
+        ROOMS="$(cat "${CLAIMING_DIR}/rooms")"
 fi
 
 for arg in "$@"
 do
-	case $arg in
-		-token=*) TOKEN=${arg:7} ;;
-		-url=*) URL_BASE=${arg:5} ;;
-		-id=*) ID=${arg:4} ;;
-		-rooms=*) ROOMS=${arg:7} ;;
-		-hostname=*) HOSTNAME=${arg:10} ;;
-		*)  echo >&2 "Unknown argument ${arg}"
-		    exit 1 ;;
-	esac
-	shift 1
+        case $arg in
+                -token=*) TOKEN=${arg:7} ;;
+                -url=*) URL_BASE=${arg:5} ;;
+                -id=*) ID=${arg:4} ;;
+                -rooms=*) ROOMS=${arg:7} ;;
+                -hostname=*) HOSTNAME=${arg:10} ;;
+                -verbose) VERBOSE=1 ;;
+                -insecure) INSECURE=1 ;;
+                -proxy=socks*) PROXY=${arg:7} ;;
+                -noproxy) NOPROXY=yes ;;
+                *)  echo >&2 "Unknown argument ${arg}"
+                    exit 1 ;;
+        esac
+        shift 1
 done
+
+# if curl not installed give warning SOCKS can't be used
+if [[ "${URLTOOL}" != "curl" && "${PROXY:0:5}" = socks ]] ; then
+        echo >&2 "wget doesn't support SOCKS. Please install curl or disable SOCKS proxy."
+        exit 1
+fi
 
 echo >&2 "Token: ****************"
 echo >&2 "Base URL: $URL_BASE"
@@ -139,34 +151,34 @@ echo >&2 "Hostname: $HOSTNAME"
 
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
-	mkdir -p "${CLAIMING_DIR}" && chmod 0770 "${CLAIMING_DIR}"
+        mkdir -p "${CLAIMING_DIR}" && chmod 0770 "${CLAIMING_DIR}"
 # shellcheck disable=SC2181
-	if [ $? -ne 0 ] ; then
-		echo >&2 "Failed to create claiming working directory ${CLAIMING_DIR}"
-		exit 2
-	fi
+        if [ $? -ne 0 ] ; then
+                echo >&2 "Failed to create claiming working directory ${CLAIMING_DIR}"
+                exit 2
+        fi
 fi
 if [ ! -w "${CLAIMING_DIR}" ] ; then
-	echo >&2 "No write permission in claiming working directory ${CLAIMING_DIR}"
-	exit 2
+        echo >&2 "No write permission in claiming working directory ${CLAIMING_DIR}"
+        exit 2
 fi
 
 if [ ! -f "${CLAIMING_DIR}/private.pem" ] ; then
-	echo >&2 "Generating private/public key for the first time."
-	if ! openssl genrsa -out "${CLAIMING_DIR}/private.pem" 2048 ; then
-		echo >&2 "Failed to generate private/public key pair."
-		exit 2
-	fi
+        echo >&2 "Generating private/public key for the first time."
+        if ! openssl genrsa -out "${CLAIMING_DIR}/private.pem" 2048 ; then
+                echo >&2 "Failed to generate private/public key pair."
+                exit 2
+        fi
 fi
 if [ ! -f "${CLAIMING_DIR}/public.pem" ] ; then
-	echo >&2 "Extracting public key from private key."
-	if ! openssl rsa -in "${CLAIMING_DIR}/private.pem" -outform PEM -pubout -out "${CLAIMING_DIR}/public.pem" ; then
-		echo >&2 "Failed to extract public key."
-		exit 2
-	fi
+        echo >&2 "Extracting public key from private key."
+        if ! openssl rsa -in "${CLAIMING_DIR}/private.pem" -outform PEM -pubout -out "${CLAIMING_DIR}/public.pem" ; then
+                echo >&2 "Failed to extract public key."
+                exit 2
+        fi
 fi
 
-TARGET_URL="${URL_BASE}/api/v1/spaces/nodes/${ID}"
+TARGET_URL="${URL_BASE%/}/api/v1/spaces/nodes/${ID}"
 # shellcheck disable=SC2002
 KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
 # shellcheck disable=SC2001
@@ -184,57 +196,86 @@ cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
 }
 EMBED_JSON
 
+if [ "${VERBOSE}" == 1 ] ; then
+    echo "Request to server:"
+    cat "${CLAIMING_DIR}/tmpin.txt"
+fi
+
 
 if [ "${URLTOOL}" = "curl" ] ; then
-	URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+        URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+        if [ "${NOPROXY}" = "yes" ] ; then
+                URLCOMMAND="${URLCOMMAND} -x \"\""
+        elif [ -n "${PROXY}" ] ; then
+                URLCOMMAND="${URLCOMMAND} -x \"${PROXY}\""
+        fi
 else
-	URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
-	--body-file=\"${CLAIMING_DIR}/tmpin.txt\""
+        URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
+        --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
+        if [ "${NOPROXY}" = "yes" ] ; then
+                URLCOMMAND="${URLCOMMAND} --no-proxy"
+        fi
+fi
+
+if [ "${INSECURE}" == 1 ] ; then
+    if [ "${URLTOOL}" = "curl" ] ; then
+        URLCOMMAND="${URLCOMMAND} --insecure"
+    else
+        URLCOMMAND="${URLCOMMAND} --no-check-certificate"
+    fi
 fi
 
 if [ -r "${CLOUD_CERTIFICATE_FILE}" ] ; then
-	if [ "${URLTOOL}" = "curl" ] ; then
-		URLCOMMAND="${URLCOMMAND} --cacert \"${CLOUD_CERTIFICATE_FILE}\""
-	else
-		URLCOMMAND="${URLCOMMAND} --ca-certificate \"${CLOUD_CERTIFICATE_FILE}\""
-	fi
+        if [ "${URLTOOL}" = "curl" ] ; then
+                URLCOMMAND="${URLCOMMAND} --cacert \"${CLOUD_CERTIFICATE_FILE}\""
+        else
+                URLCOMMAND="${URLCOMMAND} --ca-certificate \"${CLOUD_CERTIFICATE_FILE}\""
+        fi
 fi
 
-eval "${URLCOMMAND} \"${TARGET_URL}\"" | tee "${CLAIMING_DIR}/tmpout.txt"
+if [ "${VERBOSE}" == 1 ]; then
+    echo "${URLCOMMAND} \"${TARGET_URL}\""
+fi
+eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
 URLCOMMAND_EXIT_CODE=$?
 if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
 # We consider the server issuing an error response a successful attempt at communicating
-	URLCOMMAND_EXIT_CODE=0
+        URLCOMMAND_EXIT_CODE=0
 fi
 
 rm -f "${CLAIMING_DIR}/tmpin.txt"
 
 # Check if URLCOMMAND connected and received reply
 if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
-	echo >&2 "Failed to connect to ${URL_BASE}"
-	rm -f "${CLAIMING_DIR}/tmpout.txt"
-	exit 4
+        echo >&2 "Failed to connect to ${URL_BASE}, return code ${URLCOMMAND_EXIT_CODE}"
+        rm -f "${CLAIMING_DIR}/tmpout.txt"
+        exit 4
+fi
+
+if [ "${VERBOSE}" == 1 ] ; then
+    echo "Response from server:"
+    cat "${CLAIMING_DIR}/tmpout.txt"
 fi
 
 HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
 if [ "${HTTP_STATUS_CODE}" -ne 204 ] ; then
-	ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
-	case ${ERROR_MESSAGE} in
-		"ErrInvalidNodeID") EXIT_CODE=6 ;;
-		"ErrInvalidNodeName") EXIT_CODE=7 ;;
-		"ErrInvalidRoomID") EXIT_CODE=8 ;;
-		"ErrInvalidPublicKey") EXIT_CODE=9 ;;
-		"ErrForbidden") EXIT_CODE=10 ;;
-		"ErrAlreadyClaimed") EXIT_CODE=11 ;;
-		"ErrProcessingClaim") EXIT_CODE=12 ;;
-		"ErrInternalServerError") EXIT_CODE=13 ;;
-		"ErrGatewayTimeout") EXIT_CODE=14 ;;
-		"ErrServiceUnavailable") EXIT_CODE=15 ;;
-		*) EXIT_CODE=5 ;;
-	esac
-	echo >&2 "Failed to claim node."
-	rm -f "${CLAIMING_DIR}/tmpout.txt"
-	exit $EXIT_CODE
+        ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
+        case ${ERROR_MESSAGE} in
+                "ErrInvalidNodeID") EXIT_CODE=6 ;;
+                "ErrInvalidNodeName") EXIT_CODE=7 ;;
+                "ErrInvalidRoomID") EXIT_CODE=8 ;;
+                "ErrInvalidPublicKey") EXIT_CODE=9 ;;
+                "ErrForbidden") EXIT_CODE=10 ;;
+                "ErrAlreadyClaimed") EXIT_CODE=11 ;;
+                "ErrProcessingClaim") EXIT_CODE=12 ;;
+                "ErrInternalServerError") EXIT_CODE=13 ;;
+                "ErrGatewayTimeout") EXIT_CODE=14 ;;
+                "ErrServiceUnavailable") EXIT_CODE=15 ;;
+                *) EXIT_CODE=5 ;;
+        esac
+        echo >&2 "Failed to claim node."
+        rm -f "${CLAIMING_DIR}/tmpout.txt"
+        exit $EXIT_CODE
 fi
 
 rm -f "${CLAIMING_DIR}/tmpout.txt"
