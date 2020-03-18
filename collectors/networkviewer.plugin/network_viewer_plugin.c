@@ -59,7 +59,7 @@ uint64_t *conn = NULL;
 uint64_t *ibytes = NULL;
 uint64_t *ebytes = NULL;
 
-uint64_t *hash_values = NULL;
+uint32_t *hash_values = NULL;
 netdata_network_stat_t *aggregated_data = NULL;
 
 pthread_mutex_t lock;
@@ -636,17 +636,18 @@ static int compare_port(void *a, void *b) {
 }
 
 static void move_from_kernel2user_global() {
-    uint64_t idx;
-    uint64_t res[NETDATA_SOCKET_LENGTH];
+    uint32_t idx;
+    uint32_t res[NETDATA_SOCKET_LENGTH];
 
-    uint64_t *val = hash_values;
+    uint32_t *val = hash_values;
     for (idx = 0; idx < NETDATA_SOCKET_LENGTH; idx++) {
         if (!bpf_map_lookup_elem(map_fd[2], &idx, val)) {
-            uint64_t total = 0;
+            uint32_t total = 0;
             int i;
             int end = (mykernel < 265984)?1:nprocs;
-            for (i = 0; i < end; i++)
+            for (i = 0; i < end; i++) {
                 total += val[i];
+            }
 
             res[idx] = total;
         } else {
@@ -655,7 +656,7 @@ static void move_from_kernel2user_global() {
     }
 
     for (idx = 0 ; idx < NETDATA_SOCKET_LENGTH; idx++ )  {
-        uint64_t value = res[idx];
+        uint32_t value = res[idx];
         netdata_network_stat_t *w = &aggregated_data[idx];
         w->rvalue = value;
 
@@ -1149,7 +1150,7 @@ int allocate_publish_vectors() {
         return -1;
     }
 
-    hash_values = (uint64_t *)callocz(nprocs, sizeof(uint64_t));
+    hash_values = (uint32_t *)callocz(nprocs, sizeof(uint64_t));
     if(!hash_values) {
         return -1;
     }
@@ -1172,6 +1173,10 @@ void set_aggregated_labels() {
 
 void parse_config() {
     connection_controller.maxports = 0;
+    nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs > NETDATA_MAX_PROCESSOR) {
+        nprocs = NETDATA_MAX_PROCESSOR;
+    }
 
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     if(!user_config_dir)
