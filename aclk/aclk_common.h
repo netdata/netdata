@@ -16,5 +16,8 @@ typedef enum aclk_proxy_type {
 #define ACLK_PROXY_CONFIG_VAR "proxy"
 
 ACLK_PROXY_TYPE aclk_verify_proxy(const char *string);
+const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
+void safe_log_proxy_censor(char *proxy);
+int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port);
 
 #endif //ACLK_COMMON_H

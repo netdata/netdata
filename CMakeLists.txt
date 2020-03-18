@@ -612,10 +612,14 @@ set(CLAIM_PLUGIN_FILES
         )
 
 set(ACLK_PLUGIN_FILES
+        aclk/aclk_common.c
+        aclk/aclk_common.h
         aclk/agent_cloud_link.c
         aclk/agent_cloud_link.h
         aclk/aclk_lws_wss_client.c
         aclk/aclk_lws_wss_client.h
+        aclk/aclk_lws_https_client.c
+        aclk/aclk_lws_https_client.h
         aclk/mqtt.c
         aclk/mqtt.h
         )
@@ -1057,6 +1061,7 @@ endif()
         PRIVATE
         -DUNIT_TESTING
     )
+    target_include_directories(${TEST_NAME}_testdriver PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
     target_link_options(
         ${TEST_NAME}_testdriver
         PRIVATE

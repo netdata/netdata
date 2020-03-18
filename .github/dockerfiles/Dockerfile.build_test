@@ -1,0 +1,11 @@
+ARG BASE
+
+FROM ${BASE}
+
+ARG PRE
+ENV PRE=${PRE}
+
+COPY . /netdata
+
+RUN /bin/sh /netdata/prep-cmd.sh
+RUN /netdata/packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all

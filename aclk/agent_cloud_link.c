@@ -2,7 +2,10 @@
 
 #include "libnetdata/libnetdata.h"
 #include "agent_cloud_link.h"
+#include "aclk_lws_https_client.h"
+#include "aclk_common.h"
 
+int aclk_shutting_down = 0;
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
 //       agent startup phase.
@@ -40,6 +43,8 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait);
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
+
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 
 /*
  * Maintain a list of collectors and chart count
@@ -176,7 +181,6 @@ static int create_private_key()
     char err[512];
     ERR_error_string_n(ERR_get_error(), err, sizeof(err));
     error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
-    freez(err);
 
 biofailed:
     freez(private_key);
@@ -299,12 +303,6 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     // Ignore all commands while we wait for the agent to initialize
     if (unlikely(waiting_init))
         return 0;
-
-    // Ignore all commands if agent not stable and reset the last_init_sequence mark
-    if (agent_state == AGENT_INITIALIZING) {
-        last_init_sequence = now_realtime_sec();
-        return 0;
-    }
 
     run_after = now_realtime_sec() + run_after;
 
@@ -689,7 +687,10 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
         return;
     }
 
-    aclk_queue_query("connector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
+    if (unlikely(agent_state == AGENT_INITIALIZING))
+        last_init_sequence = now_realtime_sec();
+    else
+        aclk_queue_query("connector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
 
     COLLECTOR_UNLOCK;
 }
@@ -721,7 +722,10 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_UNLOCK;
 
-    aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
+    if (unlikely(agent_state == AGENT_INITIALIZING))
+        last_init_sequence = now_realtime_sec();
+    else
+        aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
 
     _free_collector(tmp_collector);
 }
@@ -898,15 +902,16 @@ void *aclk_query_main_thread(void *ptr)
         time_t checkpoint;
 
         checkpoint = now_realtime_sec() - last_init_sequence;
-        info("Waiting for agent collectors to initialize");
-        sleep_usec(USEC_PER_SEC * ACLK_STABLE_TIMEOUT);
         if (checkpoint > ACLK_STABLE_TIMEOUT) {
             agent_state = AGENT_STABLE;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
 #ifdef ACLK_DEBUG
             _dump_connector_list();
 #endif
+            break;
         }
+        info("Waiting for agent collectors to initialize. Last activity was %ld seconds ago" , checkpoint);
+        sleep_usec(USEC_PER_SEC * 1);
     }
 
     while (!netdata_exit) {
@@ -934,84 +939,56 @@ void *aclk_query_main_thread(void *ptr)
 // Thread cleanup
 static void aclk_main_cleanup(void *ptr)
 {
+    char payload[512];
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
 
-    // Wakeup thread to cleanup
-    QUERY_THREAD_WAKEUP;
+    if (is_agent_claimed() && aclk_connected) {
+        size_t write_q, write_q_bytes, read_q;
+        time_t event_loop_timeout;
+
+        // Wakeup thread to cleanup
+        QUERY_THREAD_WAKEUP;
+        // Send a graceful disconnect message
+        time_t time_created = now_realtime_sec();
+        char *msg_id = create_uuid();
+
+        snprintfz(
+            payload, 511,
+            "{ \"type\": \"disconnect\","
+            " \"msg-id\": \"%s\","
+            " \"timestamp\": %ld,"
+            " \"version\": %d,"
+            " \"payload\": \"graceful\" }",
+            msg_id, time_created, ACLK_VERSION);
+
+        aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
+        freez(msg_id);
+
+        event_loop_timeout = now_realtime_sec() + 5;
+        write_q = 1;
+        while (write_q && event_loop_timeout > now_realtime_sec()) {
+            _link_event_loop();
+            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        }
+
+        aclk_shutting_down = 1;
+        _link_shutdown();
+        aclk_lws_wss_mqtt_layer_disconect_notif();
+
+        write_q = 1;
+        event_loop_timeout = now_realtime_sec() + 5;
+        while (write_q && event_loop_timeout > now_realtime_sec()) {
+            _link_event_loop();
+            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        }
+    }
+
+    info("Disconnected");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-}
-
-int send_https_request(char *method, char *host, char *port, char *url, BUFFER *b, char *payload)
-{
-    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-    int rc=1;
-
-    size_t payload_len = 0;
-    if (payload != NULL)
-        payload_len = strlen(payload);
-
-    buffer_flush(b);
-    buffer_sprintf(
-        b,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
-        "User-Agent: Netdata/rocks\r\n\r\n",
-        method, url, host, payload_len);
-    if (payload != NULL)
-        buffer_strcat(b, payload);
-    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", b->len, buffer_tostring(b));
-    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, port, &timeout);
-
-    if (unlikely(sock == -1)) {
-        error("Handshake failed");
-        return 1;
-    }
-
-    SSL_CTX *ctx = security_initialize_openssl_client();
-    if (ctx==NULL) {
-        error("Cannot allocate SSL context");
-        goto exit_sock;
-    }
-    // Certificate chain: not updating the stores - do we need private CA roots?
-    // Calls to SSL_CTX_load_verify_locations would go here.
-    SSL *ssl = SSL_new(ctx);
-    if (ssl==NULL) {
-        error("Cannot allocate SSL");
-        goto exit_CTX;
-    }
-    SSL_set_fd(ssl, sock);
-    int err = SSL_connect(ssl);
-    if (err!=1) {
-        error("SSL_connect() failed with err=%d", err);
-        goto exit_SSL;
-    }
-    err = SSL_write(ssl, b->buffer, b->len);
-    if (err <= 0)
-    {
-        error("SSL_write() failed with err=%d", err);
-        goto exit_SSL;
-    }
-    buffer_flush(b);
-    int bytes_read = SSL_read(ssl, b->buffer, b->size);
-    if (bytes_read >= 0) {
-        debug(D_ACLK, "Received %d bytes in response", bytes_read);
-        b->len = bytes_read;
-    }
-    else {
-        error("No response available - SSL_read()=%d", bytes_read);
-    }
-    SSL_shutdown(ssl);
-    rc = 0;
-exit_SSL:
-    SSL_free(ssl);
-exit_CTX:
-    SSL_CTX_free(ctx);
-exit_sock:
-    close(sock);
-    return rc;
 }
 
 struct dictionary_singleton {
@@ -1197,50 +1174,9 @@ unsigned int line_len=0;
     return NULL;
 }
 
-static int decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
-{
-int pos = 0;
-    if (!strncmp("https://", url, 8))
-    {
-        pos = 8;
-    }
-    else if (!strncmp("http://", url, 7))
-    {
-        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
-        return 1;
-    }
-int host_end = pos;
-    while( url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':' )
-        host_end++;
-    if (url[host_end] == 0)
-    {
-        *aclk_hostname = strdupz(url+pos);
-        *aclk_port = strdupz("443");
-        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
-        return 0;
-    }
-    if (url[host_end] == ':')
-    {
-        *aclk_hostname = callocz(host_end - pos + 1, 1);
-        strncpy(*aclk_hostname, url+pos, host_end - pos);
-        int port_end = host_end + 1;
-        while (url[port_end] >= '0' && url[port_end] <= '9')
-            port_end++;
-        if (port_end - host_end > 6)
-        {
-            error("Port specified in %s is invalid", url);
-            return 0;
-        }
-        *aclk_port = callocz(port_end - host_end + 1, 1);
-        for(int i=host_end + 1; i < port_end; i++)
-            (*aclk_port)[i - host_end - 1] = url[i];
-    }
-    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
-    return 0;
-}
-
 void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
+    char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     debug(D_ACLK, "Performing challenge-response sequence");
     if (aclk_password != NULL)
     {
@@ -1248,42 +1184,34 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         aclk_password = NULL;
     }
     // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
-    BUFFER *b = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     // TODO - target host?
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
     {
         error("Agent was not claimed - cannot perform challenge/response");
-        return;
+        goto CLEANUP;
     }
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
-    if(send_https_request("GET", aclk_hostname, aclk_port, url, b, NULL))
+    if(aclk_send_https_request("GET", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
         error("Challenge failed");
-        return;
+        goto CLEANUP;
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
-    // Force null-termination?
-    char *payload = NULL;
-    payload = extract_payload(b);
-    if (payload==NULL) {
-      error("Could not find payload in http response #1 (the challenge):\n%s", b->buffer);
-      return;
-    }
-    debug(D_ACLK, "Challenge response from cloud: %s", payload);
-    if (json_parse(payload, &challenge, json_extract_singleton) != JSON_OK)
+
+    debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
+    if ( json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
     {
         freez(challenge.result);
-        error("Could not parse the json response with the challenge: %s", payload);
-        return;
+        error("Could not parse the json response with the challenge: %s", data_buffer);
+        goto CLEANUP;
     }
     if (challenge.result == NULL ) {
-        error("Could not retrieve challenge from auth response");
-        return;
+        error("Could not retrieve challenge from auth response: %s", data_buffer);
+        goto CLEANUP;
     }
-
 
 
     size_t challenge_len = strlen(challenge.result);
@@ -1303,29 +1231,25 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if(send_https_request("POST", aclk_hostname, aclk_port, url, b, response_json))
+    if(aclk_send_https_request("POST", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
         error("Challenge-response failed");
-        return;
+        goto CLEANUP;
     }
-    payload = extract_payload(b);
-    if (payload==NULL) {
-      error("Could not find payload in http response #2 (the password):\n%s", b->buffer);
-      return;
-    }
-    debug(D_ACLK, "Password response from cloud: %s", payload);
+
+    debug(D_ACLK, "Password response from cloud: %s", data_buffer);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    if (json_parse(payload, &password, json_extract_singleton) != JSON_OK)
+    if ( json_parse(data_buffer, &password, json_extract_singleton) != JSON_OK)
     {
         freez(password.result);
-        error("Could not parse the json response with the password: %s", payload);
-        return;
+        error("Could not parse the json response with the password: %s", data_buffer);
+        goto CLEANUP;
     }
 
     if (password.result == NULL ) {
         error("Could not retrieve password from auth response");
-        return;
+        goto CLEANUP;
     }
     if (aclk_password != NULL )
         freez(aclk_password);
@@ -1333,7 +1257,9 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
         aclk_username = strdupz(agent_id);
     aclk_password = password.result;
 
-    buffer_free(b);
+CLEANUP:
+    freez(data_buffer);
+    return;
 }
 
 static void aclk_try_to_connect(char *hostname, char *port, int port_num)
@@ -1380,7 +1306,7 @@ void *aclk_main(void *ptr)
     char *aclk_port = NULL;
     uint32_t port_num = 0;
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
-    if( decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port))
+    if( aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port))
     {
         error("Configuration error - cannot use agent cloud link");
         return NULL;
@@ -1396,6 +1322,10 @@ void *aclk_main(void *ptr)
         }
         if (!create_private_key() && !_mqtt_lib_init())
             break;
+
+        if (netdata_exit)
+            goto exited;
+
         sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
@@ -1405,10 +1335,11 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-
-        info("loop state first_init_%d connected=%d connecting=%d", first_init, aclk_connected, aclk_connecting);
-        sleep_usec(USEC_PER_MS * 500);
-        if (unlikely(!aclk_connected)) {
+        size_t write_q, write_q_bytes, read_q;
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
+        //   first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
+        if (unlikely(!netdata_exit && !aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
@@ -1434,7 +1365,12 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        sleep_usec(USEC_PER_MS * 100);
+        /*static int stress_counter = 0;
+        if (write_q_bytes==0 && stress_counter ++ >5)
+        {
+            aclk_send_stress_test(8000000);
+            stress_counter = 0;
+        }*/
 
         // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {
@@ -1493,7 +1429,7 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
     }
 
     ACLK_LOCK;
-    rc = _link_send_message(final_topic, message, &mid);
+    rc = _link_send_message(final_topic, (unsigned char *)message, &mid);
     // TODO: link the msg_id with the mid so we can trace it
     ACLK_UNLOCK;
 
@@ -1598,8 +1534,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
 
-//#define EYE_FRIENDLY
-
 /*
  * Take a buffer, encode it and rewrite it
  *
@@ -1607,10 +1541,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
 
 BUFFER *aclk_encode_response(BUFFER *contents)
 {
-#ifdef EYE_FRIENDLY
-
-    return contents;
-#else
     char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
 
@@ -1647,7 +1577,6 @@ BUFFER *aclk_encode_response(BUFFER *contents)
 
     freez(tmp_buffer);
     return contents;
-#endif
 }
 
 /*
@@ -1679,7 +1608,7 @@ void aclk_send_alarm_metadata()
     debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, "\n}\n}");
-    aclk_send_message(ACLK_ALARMS_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
     debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
 
     freez(msg_id);
@@ -1706,7 +1635,7 @@ int aclk_send_info_metadata()
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
-    aclk_send_message(ACLK_METADATA_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_METADATA_TOPIC, local_buffer->buffer, msg_id);
     debug(D_ACLK, "Metadata %s encoded has %zu bytes", msg_id, local_buffer->len);
     freez(msg_id);
 
@@ -1714,10 +1643,30 @@ int aclk_send_info_metadata()
     return 0;
 }
 
+void aclk_send_stress_test(size_t size)
+{
+    char *buffer = mallocz(size);
+    if (buffer != NULL)
+    {
+        for(size_t i=0; i<size; i++)
+            buffer[i] = 'x';
+        buffer[size-1] = 0;
+        time_t time_created = now_realtime_sec();
+        sprintf(buffer,"{\"type\":\"stress\", \"timestamp\":%ld,\"payload\":", time_created);
+        buffer[strlen(buffer)] = '"';
+        buffer[size-2] = '}';
+        buffer[size-3] = '"';
+        aclk_send_message(ACLK_METADATA_TOPIC, buffer, NULL);
+        error("Sending stress of size %zu at time %ld", size, time_created);
+    }
+    free(buffer);
+}
+
 // Send info metadata message to the cloud if the link is established
 // or on request
 int aclk_send_metadata()
 {
+
     aclk_send_info_metadata();
     aclk_send_alarm_metadata();
 
@@ -1737,7 +1686,7 @@ void aclk_single_update_enable()
 // Trigged by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
-    if (unlikely(agent_state != AGENT_STABLE))
+    if (unlikely(agent_state == AGENT_INITIALIZING))
         return;
 
     aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
@@ -1769,7 +1718,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     rrdset2json(st, local_buffer, NULL, NULL, 1);
     buffer_sprintf(local_buffer, "\t\n}");
 
-    aclk_send_message(ACLK_CHART_TOPIC, aclk_encode_response(local_buffer)->buffer, msg_id);
+    aclk_send_message(ACLK_CHART_TOPIC, local_buffer->buffer, msg_id);
 
     freez(msg_id);
     buffer_free(local_buffer);
@@ -1789,7 +1738,10 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (unlikely(aclk_disable_single_updates))
         return 0;
 
-    aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd);
+    if (unlikely(agent_state == AGENT_INITIALIZING))
+        last_init_sequence = now_realtime_sec();
+    else
+        aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd);
     return 0;
 #endif
 }
@@ -1801,7 +1753,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     if (host != localhost)
         return 0;
 
-    if (agent_state != AGENT_STABLE)
+    if (unlikely(agent_state == AGENT_INITIALIZING))
         return 0;
 
     /*
@@ -1818,14 +1770,14 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     char *msg_id = create_uuid();
 
     buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "alarms", msg_id);
+    aclk_create_header(local_buffer, "status-change", msg_id);
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     health_alarm_entry2json_nolock(local_buffer, ae, host);
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     buffer_sprintf(local_buffer, "\n}");
-    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, aclk_encode_response(local_buffer)->buffer, 0, 1, ACLK_CMD_ALARM);
+    aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, local_buffer->buffer, 0, 1, ACLK_CMD_ALARM);
 
     freez(msg_id);
     buffer_free(local_buffer);
@@ -1841,6 +1793,11 @@ int aclk_handle_cloud_request(char *payload)
     struct aclk_request cloud_to_agent = {
         .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
     };
+
+    if (unlikely(agent_state == AGENT_INITIALIZING)) {
+        debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
+        return 0;
+    }
 
     if (unlikely(!payload)) {
         debug(D_ACLK, "ACLK incoming message is empty");

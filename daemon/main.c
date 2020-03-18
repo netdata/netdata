@@ -6,7 +6,8 @@ int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 struct config netdata_config = {
-        .sections = NULL,
+        .first_section = NULL,
+        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
@@ -1148,6 +1149,7 @@ int main(int argc, char **argv) {
             mallopt(M_ARENA_MAX, 1);
 #endif
         test_clock_boottime();
+        test_clock_monotonic_coarse();
 
         // prepare configuration environment variables for the plugins
 
