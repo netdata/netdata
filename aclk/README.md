@@ -4,7 +4,7 @@ title: "Agent-cloud link (ACLK)"
 description: "The agent-cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud. 
 The ACLK uses MQTT over secure websockets to create, persist, and encrypt the connect from end-to-end, and enable the 
 features found in Netdata Cloud."
-date: 2020-03-16
+date: 2020-03-18
 custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 ---
 -->
@@ -18,38 +18,8 @@ end-to-end, and enable the features found in Netdata Cloud.
 The ACLK is a vital component of the entirely redesigned and re-architected Netdata Cloud.
 
 _No data is exchanged with Netdata Cloud until you claim a node._ By claiming a node, you opt-in to sending data from
-your agent to Netdata Cloud via the ACLK.
-
-## Claim nodes with the ACLK
-
-To use the ACLK to add a node to Netdata Cloud, you must **claim** the node.
-
-Claiming nodes is a security feature. Through the process of claiming, you demonstrate in a few ways that you have
-administrative access to that node and the configuration settings for its Netdata agent. By logging into the node, you
-prove you have access, and by running the `netdata-cloud.sh` script, you prove you have write access and administrative
-privileges.
-
-The claiming process ensures the ACLK will never be used by a third party to add your node, and thus view your metrics,
-via their Netdata Cloud account.
-
-When you first sign in to the new Netdata Cloud, it will help onboard you to the new platform by asking you to **claim**
-any nodes you want to add to Netdata Cloud. The claiming process involves running a command, provided to you by the
-onboarding process, on each node to establish the token and use the ACLK to create a connection between the node and
-Netdata Cloud.
-
-```bash
-netdata-cloud.sh --token 5AJRdC9H.XytDT8yWZB5psoy.BzCQz5IRm3uqo.nHNl9HQG3nEiTbPBxu_qYW2xdeFsEqFboD2.sf6zVPuveRtK3Xc1ouuDOS9hiCCLJRx1IBvktsvD16zH57tfCYh3kWxjEQH4 --rooms general,web
-```
-
-The `netdata-cloud.sh` command takes two arguments:
-
--   `--token`: The unique token to your Netdata Cloud account to establish the ACLK.
--   `--rooms`: A comma-separated list of the War Rooms this node should belong to.
-
-> It may take up to 60 seconds for your node to connect to Netdata Cloud after executing the `netdata-cloud.sh` command.
-
-When a user of a Space visits an agent claimed by that Space, they automatically grant that agent access to their Cloud
-data via the ACLK.
+your agent to Netdata Cloud via the ACLK. Read our [claiming documentation](../claim/README.md) for details on node
+claiming.
 
 ## Enable and configure the ACLK
 
@@ -72,15 +42,14 @@ following methods.
 
 ## Disable the ACLK
 
-If you would prefer to disable the ACLK and not use Netdata Cloud, you have two options.
+If you would prefer to disable the ACLK and not use Netdata Cloud, you have two options:
 
-The first option is to pass `--disable-cloud` to `netdata-installer.sh` during installation. When you pass this
-parameter, the installer does not download or compile any extra libraries, and the agent behaves as though the ACLK, and
-thus Netdata Cloud, does not exist.
+1.  Pass `--disable-cloud` to `netdata-installer.sh` during installation. When you pass this parameter, the installer
+    does not download or compile any extra libraries, and the agent behaves as though the ACLK, and thus Netdata Cloud,
+    does not exist.
 
-The second option is to change a runtime setting in your `netdata.conf` file. This setting will only stop the agent from
-attempting any connection via the ACLK, but will not prevent the installer from downloading and compiling the ACLK's
-dependencies.
+2.  Change a runtime setting in your `netdata.conf` file. This setting only stops the agent from attempting any
+    connection via the ACLK, but does not prevent the installer from downloading and compiling the ACLK's dependencies.
 
 > 🎆 Needed: Configuration flag for disabling ACLK.
 
@@ -114,7 +83,7 @@ less /var/log/netdata/error.log
 grep ACLK /var/log/netdata/error.log
 ```
 
-To ACLK troubleshooting help from our engineers, [create an issue on
+To get ACLK troubleshooting help from our engineers, [create an issue on
 GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality).
 Include any error messages you might have seen during the installation process, or in `/var/log/netdata/error.log`. We
 will update this troubleshooting section with specific workarounds for common issues.

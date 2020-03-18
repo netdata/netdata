@@ -1,6 +1,8 @@
 <!--
 ---
 title: "Agent claiming"
+description: 
+date: 2020-03-18
 custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 ---
 -->
@@ -9,11 +11,23 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 
 Agent claiming is part of the onboarding process when creating a workspace in Netdata Cloud. Each workspace gets its own
 common invitation mechanism, which begins with the administrators of the workspace creating a **claiming-token**. They,
-or other users is their organization, can then use the claiming-token to add an agent to their workspace.
+or other users is their organization, can then use the claiming-token to add an agent to their workspace using the
+[agent-cloud link](../aclk/README.md).
+
+Claiming nodes is a security feature. Through the process of claiming, you demonstrate in a few ways that you have
+administrative access to that node and the configuration settings for its Netdata agent. By logging into the node, you
+prove you have access, and by using the claiming script or the Netdata command line, you prove you have write access and
+administrative privileges.
+
+The claiming process ensures the ACLK will never be used by a third party to add your node, and thus view your metrics,
+via their Netdata Cloud account.
 
 To claim a Netdata agent, you first send a claiming request to Netdata Cloud (from the agent node). Once the
 Netdata Cloud validates the claiming request of the agent (based on the claiming token), and returns a successful
 result, the node is considered claimed.
+
+> It may take up to 60 seconds for your node to connect to Netdata Cloud after executing the `netdata-claim.sh` command
+> or using the Netdata command line.
 
 ## Claiming script
 
