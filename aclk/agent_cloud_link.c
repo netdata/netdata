@@ -5,6 +5,7 @@
 #include "aclk_lws_https_client.h"
 #include "aclk_common.h"
 
+int aclk_shutting_down = 0;
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
 //       agent startup phase.
@@ -42,6 +43,8 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait);
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
+
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 
 /*
  * Maintain a list of collectors and chart count
@@ -936,13 +939,54 @@ void *aclk_query_main_thread(void *ptr)
 // Thread cleanup
 static void aclk_main_cleanup(void *ptr)
 {
+    char payload[512];
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
 
-    // Wakeup thread to cleanup
-    QUERY_THREAD_WAKEUP;
+    if (is_agent_claimed() && aclk_connected) {
+        size_t write_q, write_q_bytes, read_q;
+        time_t event_loop_timeout;
+
+        // Wakeup thread to cleanup
+        QUERY_THREAD_WAKEUP;
+        // Send a graceful disconnect message
+        time_t time_created = now_realtime_sec();
+        char *msg_id = create_uuid();
+
+        snprintfz(
+            payload, 511,
+            "{ \"type\": \"disconnect\","
+            " \"msg-id\": \"%s\","
+            " \"timestamp\": %ld,"
+            " \"version\": %d,"
+            " \"payload\": \"graceful\" }",
+            msg_id, time_created, ACLK_VERSION);
+
+        aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
+        freez(msg_id);
+
+        event_loop_timeout = now_realtime_sec() + 5;
+        write_q = 1;
+        while (write_q && event_loop_timeout > now_realtime_sec()) {
+            _link_event_loop();
+            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        }
+
+        aclk_shutting_down = 1;
+        _link_shutdown();
+        aclk_lws_wss_mqtt_layer_disconect_notif();
+
+        write_q = 1;
+        event_loop_timeout = now_realtime_sec() + 5;
+        while (write_q && event_loop_timeout > now_realtime_sec()) {
+            _link_event_loop();
+            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+        }
+    }
+
+    info("Disconnected");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -1243,7 +1287,6 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
  *
  * @return It always returns NULL
  */
-void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *query_thread;
@@ -1295,8 +1338,8 @@ void *aclk_main(void *ptr)
         size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
         //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
-        //     first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
-        if (unlikely(!aclk_connected)) {
+        //   first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
+        if (unlikely(!netdata_exit && !aclk_connected)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
