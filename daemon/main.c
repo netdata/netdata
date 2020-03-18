@@ -1338,6 +1338,15 @@ int main(int argc, char **argv) {
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
+#ifndef ENABLE_ACLK
+    send_statistics("ACLK_DISABLED", "-", "-");
+#ifdef ACLK_NO_LWS
+    send_statistics("BUILD_FAIL_LWS", "-", "-");
+#endif
+#ifdef ACLK_NO_LIBMOSQ
+    send_statistics("BUILD_FAIL_MOSQ", "-", "-");
+#endif
+#endif
 
     // ------------------------------------------------------------------------
     // unblock signals
