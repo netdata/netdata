@@ -497,7 +497,7 @@ static void command_thread(void *arg)
     }
     async.data = NULL;
 
-    ret = uv_pipe_init(loop, &server_pipe, 1);
+    ret = uv_pipe_init(loop, &server_pipe, 0);
     if (ret) {
         error("uv_pipe_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
