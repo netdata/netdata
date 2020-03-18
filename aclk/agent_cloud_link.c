@@ -3,6 +3,7 @@
 #include "libnetdata/libnetdata.h"
 #include "agent_cloud_link.h"
 #include "aclk_lws_https_client.h"
+#include "aclk_common.h"
 
 // State-machine for the on-connect metadata transmission.
 // TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
@@ -1129,48 +1130,6 @@ unsigned int line_len=0;
     return NULL;
 }
 
-static int decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
-{
-int pos = 0;
-    if (!strncmp("https://", url, 8))
-    {
-        pos = 8;
-    }
-    else if (!strncmp("http://", url, 7))
-    {
-        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
-        return 1;
-    }
-int host_end = pos;
-    while( url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':' )
-        host_end++;
-    if (url[host_end] == 0)
-    {
-        *aclk_hostname = strdupz(url+pos);
-        *aclk_port = strdupz("443");
-        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
-        return 0;
-    }
-    if (url[host_end] == ':')
-    {
-        *aclk_hostname = callocz(host_end - pos + 1, 1);
-        strncpy(*aclk_hostname, url+pos, host_end - pos);
-        int port_end = host_end + 1;
-        while (url[port_end] >= '0' && url[port_end] <= '9')
-            port_end++;
-        if (port_end - host_end > 6)
-        {
-            error("Port specified in %s is invalid", url);
-            return 0;
-        }
-        *aclk_port = callocz(port_end - host_end + 1, 1);
-        for(int i=host_end + 1; i < port_end; i++)
-            (*aclk_port)[i - host_end - 1] = url[i];
-    }
-    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
-    return 0;
-}
-
 void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
     char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -1304,7 +1263,7 @@ void *aclk_main(void *ptr)
     char *aclk_port = NULL;
     uint32_t port_num = 0;
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
-    if( decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port))
+    if( aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port))
     {
         error("Configuration error - cannot use agent cloud link");
         return NULL;
