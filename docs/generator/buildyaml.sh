@@ -145,8 +145,8 @@ navpart 1 . "README" ""
 
 navpart 1 . . "Why Netdata?" 
 
-echo -ne " - 'docs/why-netdata.md'
-- 'docs/Demo-Sites.md'
+echo -ne "  - 'docs/why-netdata.md'
+    - 'docs/Demo-Sites.md'
 - Installation:
     - 'packaging/installer/README.md'
     - Other methods:
@@ -296,8 +296,4 @@ echo -ne "- Additional information:
     - SECURITY.md
     - CHANGELOG.md
 "
-navpart 2 packaging/makeself "" "" 4
-navpart 2 libnetdata "" "libnetdata" 4
-navpart 2 contrib
-navpart 2 tests "" "" 2
-navpart 2 diagrams/data_structures
+
