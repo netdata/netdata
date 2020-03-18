@@ -2,7 +2,7 @@
 
 #define BACKENDS_INTERNALS
 #include "mongodb.h"
-#include <mongoc/mongoc.h>
+#include <mongoc.h>
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 

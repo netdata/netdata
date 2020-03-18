@@ -276,7 +276,11 @@ pkg_check_modules(SNAPPY snappy)
 # -----------------------------------------------------------------------------
 # Detect libmongoc
 
-find_package(mongoc-1.0 1.7 REQUIRED)
+find_package(libmongoc-1.0)
+# later we use:
+# ${MONGOC_LIBRARIES}
+# ${MONGOC_INCLUDE_DIRS}
+
 
 # -----------------------------------------------------------------------------
 # netdata files
@@ -780,11 +784,12 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # mongodb backend
 
-IF(mongoc-1.0_FOUND)
+IF(libmongoc-1.0_FOUND)
     message(STATUS "mongodb backend: enabled")
 
     list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
-    list(APPEND NETDATA_COMMON_LIBRARIES mongo::mongoc_shared)
+    list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
 ELSE()
     message(STATUS "mongodb backend: disabled (requires mongoc library)")
 ENDIF()
@@ -1055,7 +1060,7 @@ if(ENABLE_BACKEND_KINESIS)
         -Wl,--wrap=kinesis_get_result
     )
 endif()
-if(mongoc-1.0_FOUND)
+if(MONGOC_LIBRARIES)
     list(APPEND EXPORTING_ENGINE_FILES ${MONGODB_EXPORTING_FILES})
     list(
         APPEND MONGODB_LINK_OPTIONS

@@ -5,7 +5,7 @@
 
 #include "exporting/exporting_engine.h"
 #include "exporting/json/json.h"
-#include <mongoc/mongoc.h>
+#include <mongoc.h>
 
 struct mongodb_specific_data {
     mongoc_client_t *client;
