@@ -920,6 +920,7 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_SHUTDOWN:
                 shutdown = 1;
+                ctx->drop_metrics_under_page_cache_pressure = 0;
                 break;
             case RRDENG_READ_PAGE:
                 do_read_extent(wc, &cmd.read_page.page_cache_descr, 1, 0);
