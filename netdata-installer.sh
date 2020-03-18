@@ -1328,11 +1328,11 @@ get_compatible_kernel_for_ebpf() {
   kpkg=
 
   if [ "${rhver}" -ge 0080000000  ] ; then
-    echo >&2 " Using eBPF Kernel Package built against RH Linux 4.18"
-    kpkg="8"
+    echo >&2 " Using eBPF Kernel Package built against RH Linux 4.18.0"
+    kpkg="4_18_0"
   elif [ "${rhver}" -ge 0070061810  ] ; then
-    echo >&2 " Using eBPF Kernel Package built against RH Linux 3.10"
-    kpkg="7"
+    echo >&2 " Using eBPF Kernel Package built against RH Linux 3.10.0"
+    kpkg="3_10_0"
   elif [ "${kver}" -ge 005000000 ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
     kpkg="5_4_20"
