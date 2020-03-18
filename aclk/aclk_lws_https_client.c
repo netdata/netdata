@@ -35,9 +35,10 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
             return -1;
         }
         ptr = perconn_data->data;
-        n = perconn_data->data_size;
+        n = perconn_data->data_size - 1;
         if (lws_http_client_read(wsi, &ptr, &n) < 0)
             return -1;
+        ptr[n] = '\0';
         return 0;
     case LWS_CALLBACK_WSI_DESTROY:
         debug(D_ACLK, "LWS_CALLBACK_WSI_DESTROY");
