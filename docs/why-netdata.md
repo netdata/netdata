@@ -24,15 +24,14 @@ date: 2020-03-18
 ---
 -->
 
-
-
 # Why Netdata?
 
-etdata has a different approach to monitoring because SysAdmins, DevOps, and Developers designed it for troubleshooting performance problems, not just visualizing metrics. Unlike other monitoring solutions that focus on metrics visualization, Netdata helps troubleshoot slowdowns without touching the console. So, everything is a bit different.
+Netdata has a different approach to monitoring because SysAdmins, DevOps, and Developers designed it for troubleshooting performance problems, not just visualizing metrics. Unlike other monitoring solutions that focus on metrics visualization, Netdata helps troubleshoot slowdowns without touching the console. So, everything is a bit different.
+ 
+It's fast and efficient and designed to permanently run on all systems (physical & virtual servers, containers, IoT devices), without disrupting their core function. It's distributed and provides unparalleled insights, in real-time, of everything happening on your systems. That means it monitors thousands of high-resolution metrics per node; 1s granularity instead of 10s at best. That's super fast!
+ 
+With Netdata, you get results immediately in a meaningful presentation that helps you understand the metrics. Netdata's dashboard is interactive, instead of just an abstract view and optimized for anomaly detection. Netdata stores and retrieves data records that are part of a "time series" and doesn't touch the disks while it runs.
 
-t's fast and efficient and designed to permanently run on all systems (physical & virtual servers, containers, IoT devices), without disrupting their core function. It's distributed and provides unparalleled insights, in real-time, of everything happening on your systems. That means it monitors thousands of high-resolution metrics per node; 1s granularity instead of 10s at best. That's super fast!
-
-ith Netdata, you get results immediately in a meaningful presentation that helps you understand the metrics. Netdata's dashboard is interactive, instead of just an abstract view and optimized for anomaly detection. Netdata stores and retrieves data records that are part of a "time series" and doesn't touch the disks while it runs.
        
 See how Netdata compares to other monitoring solutions:
        
