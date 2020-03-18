@@ -91,8 +91,48 @@ int get_kernel_version() {
     return ((int)(str2l(major)*65536) + (int)(str2l(minor)*256) + (int)str2l(patch));
 }
 
+static int has_redhat_release()
+{
+    char out[256];
+    int major,minor;
+    FILE *fp = fopen("/etc/redhat-release", "r");
+
+    if (fp) {
+        major = 0;
+        minor = -1;
+        if (fread(out, sizeof(char), 255, fp) > 4 ) {
+            char *end = strchr(out, '.');
+            char *start;
+            if (end) {
+                *end = 0x0;
+
+                if (end > out) {
+                    start = end - 1;
+
+                    major = strtol( start, NULL, 10);
+                    start = ++end;
+
+                    end++;
+                    if(end) {
+                        end = 0x00;
+                        minor = strtol( start, NULL, 10);
+                    } else {
+                        minor = -1;
+                    }
+                }
+            }
+        }
+
+        fclose(fp);
+        return ((major*256) + minor);
+    } else {
+        return -1;
+    }
+}
+
 static int has_ebpf_kernel_version(int version) {
-    return (version >= 264960);
+    // Kernel 4.11.0 or RH > 7.5
+    return (version >= 264960 || has_redhat_release() >= 1797);
 }
 
 int has_condition_to_run(int version) {
