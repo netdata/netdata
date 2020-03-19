@@ -757,10 +757,12 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         aclk_create_header(local_buffer, "http", this_query->msg_id);
 
-        if (rc != HTTP_RESP_OK || strcmp(mysep ? mysep + 1 : "noop", "badge.svg") == 0)
-            buffer_sprintf(local_buffer, "\"%s\"", aclk_encode_response(w->response.data)->buffer);
-        else
-            buffer_sprintf(local_buffer, "%s", aclk_encode_response(w->response.data)->buffer);
+        //if (rc != HTTP_RESP_OK || strcmp(mysep ? mysep + 1 : "noop", "badge.svg") == 0)
+        buffer_sprintf(
+            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\"\n}", rc, aclk_encode_response(w->response.data)->buffer);
+        //else
+        //    buffer_sprintf(local_buffer, "{\n\"code\": %d,\n\"body\": %s\n}", rc,
+        //      aclk_encode_response(w->response.data)->buffer);
 
         buffer_sprintf(local_buffer, "\n}");
 
