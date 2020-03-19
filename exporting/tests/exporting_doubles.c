@@ -269,13 +269,13 @@ int32_t __wrap_mongoc_uri_get_option_as_int32(const mongoc_uri_t *uri, const cha
     return mock_type(int32_t);
 }
 
-int32_t __wrap_mongoc_uri_set_option_as_int32(const mongoc_uri_t *uri, const char *option, int32_t fallback)
+bool __wrap_mongoc_uri_set_option_as_int32 (const mongoc_uri_t *uri, const char *option, int32_t value)
 {
     function_called();
     check_expected_ptr(uri);
     check_expected_ptr(option);
-    check_expected(fallback);
-    return mock_type(int32_t);
+    check_expected(value);
+    return mock_type(bool);
 }
 
 mongoc_client_t * __wrap_mongoc_client_new_from_uri (const mongoc_uri_t *uri)

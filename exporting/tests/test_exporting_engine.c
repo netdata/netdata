@@ -1090,15 +1090,15 @@ static void test_init_mongodb_instance(void **state)
 
     expect_function_call(__wrap_mongoc_uri_get_option_as_int32);
     expect_value(__wrap_mongoc_uri_get_option_as_int32, uri, 0xf1);
-    expect_value(__wrap_mongoc_uri_get_option_as_int32, option, MONGOC_URI_SOCKETTIMEOUTMS);
+    expect_string(__wrap_mongoc_uri_get_option_as_int32, option, MONGOC_URI_SOCKETTIMEOUTMS);
     expect_value(__wrap_mongoc_uri_get_option_as_int32, fallback, 1000);
     will_return(__wrap_mongoc_uri_get_option_as_int32, 1000);
 
     expect_function_call(__wrap_mongoc_uri_set_option_as_int32);
     expect_value(__wrap_mongoc_uri_set_option_as_int32, uri, 0xf1);
-    expect_value(__wrap_mongoc_uri_set_option_as_int32, option, MONGOC_URI_SOCKETTIMEOUTMS);
-    expect_value(__wrap_mongoc_uri_set_option_as_int32, fallback, 1000);
-    will_return(__wrap_mongoc_uri_set_option_as_int32, 1000);
+    expect_string(__wrap_mongoc_uri_set_option_as_int32, option, MONGOC_URI_SOCKETTIMEOUTMS);
+    expect_value(__wrap_mongoc_uri_set_option_as_int32, value, 1000);
+    will_return(__wrap_mongoc_uri_set_option_as_int32, true);
 
     expect_function_call(__wrap_mongoc_client_new_from_uri);
     expect_value(__wrap_mongoc_client_new_from_uri, uri, 0xf1);
