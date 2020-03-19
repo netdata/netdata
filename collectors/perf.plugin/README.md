@@ -42,9 +42,9 @@ Hardware cache events:
 2.  L1D prefetch cache operations
 3.  L1I cache operations
 4.  LL cache operations
-5.  Data Translation Lookaside Buffer (DTLB) cache operations
-6.  Instruction Translation Lookaside Buffer (ITLB) cache operations
-7.  Proxy Binding Unit (PBU) cache operations
+5.  Data translation lookaside Buffer (DTLB) cache operations
+6.  Instruction translation lookaside Buffer (ITLB) cache operations
+7.  Proxy binding unit (PBU) cache operations
 
 ## Configuration
 
