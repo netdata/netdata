@@ -143,23 +143,10 @@ nav:"
 
 navpart 1 . "README" ""
 
-navpart 1 . . "About Netdata"
+navpart 1 . . "Why Netdata?" 
 
-echo -ne "    - 'docs/what-is-netdata.md'
-    - 'docs/Demo-Sites.md'
-    - 'docs/netdata-security.md'
-    - 'docs/anonymous-statistics.md'
-    - 'docs/Donations-netdata-has-received.md'
-    - 'docs/a-github-star-is-important.md'
-    - REDISTRIBUTED.md
-    - CHANGELOG.md
-    - SECURITY.md
-- Why Netdata:
-    - 'docs/why-netdata/README.md'
-    - 'docs/why-netdata/1s-granularity.md'
-    - 'docs/why-netdata/unlimited-metrics.md'
-    - 'docs/why-netdata/meaningful-presentation.md'
-    - 'docs/why-netdata/immediate-results.md'
+echo -ne " - 'docs/why-netdata.md'
+  - 'docs/Demo-Sites.md'
 - Installation:
     - 'packaging/installer/README.md'
     - Other methods:
