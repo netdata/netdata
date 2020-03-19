@@ -1568,7 +1568,6 @@ BUFFER *aclk_encode_response(BUFFER *contents)
                 *dst++ = to_hex(*src);
                 break;
             case '\"':
-            case '\'':
                 *dst++ = '\\';
                 *dst++ = *src;
                 break;
