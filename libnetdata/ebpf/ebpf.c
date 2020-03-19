@@ -132,7 +132,7 @@ static int has_redhat_release()
 
 static int has_ebpf_kernel_version(int version) {
     // Kernel 4.11.0 or RH > 7.5
-    return (version >= 264960 || has_redhat_release() >= 1797);
+    return (version >= NETDATA_MINIMUM_EBPF_KERNEL || has_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
 }
 
 int has_condition_to_run(int version) {
