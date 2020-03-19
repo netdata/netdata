@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/opentsd
 
 # OpenTSDB with HTTP
 
-Netdata can easily communicate with Open Time Series Database (OpenTSDB) using HTTP API. To enable this channel, set the following options in your
+Netdata can easily communicate with OpenTSDB, a time series database (TSDB) implementation, using HTTP API. To enable this channel, set the following options in your
 `netdata.conf`:
 
 ```conf
