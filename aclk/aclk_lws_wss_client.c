@@ -208,21 +208,23 @@ void aclk_lws_wss_client_destroy()
 #endif
 }
 
-static int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks) {
+static int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
+{
     char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-    if(!proxy)
+    if (!proxy)
         return -1;
 
     proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-    if(!*proxy)
+    if (!*proxy)
         return -1;
 
     return lws_set_socks(vhost, proxy);
 }
 
-void aclk_wss_set_proxy(struct lws_vhost *vhost){
+void aclk_wss_set_proxy(struct lws_vhost *vhost)
+{
     const char *proxy;
     ACLK_PROXY_TYPE proxy_type;
     char *log;
@@ -232,28 +234,28 @@ void aclk_wss_set_proxy(struct lws_vhost *vhost){
     lws_set_socks(vhost, ":");
     lws_set_proxy(vhost, ":");
 
-    if(proxy_type == PROXY_TYPE_UNKNOWN) {
+    if (proxy_type == PROXY_TYPE_UNKNOWN) {
         error("Unknown proxy type");
         return;
     }
 
-    if(proxy_type == PROXY_TYPE_SOCKS5 || proxy_type == PROXY_TYPE_HTTP) {
+    if (proxy_type == PROXY_TYPE_SOCKS5 || proxy_type == PROXY_TYPE_HTTP) {
         log = strdupz(proxy);
         safe_log_proxy_censor(log);
         info("Connecting using %s proxy:\"%s\"", aclk_proxy_type_to_s(&proxy_type), log);
         freez(log);
     }
-    if(proxy_type == PROXY_TYPE_SOCKS5) {
-        if(aclk_wss_set_socks(vhost, proxy))
+    if (proxy_type == PROXY_TYPE_SOCKS5) {
+        if (aclk_wss_set_socks(vhost, proxy))
             error("LWS failed to accept socks proxy.");
         return;
     }
-    if(proxy_type == PROXY_TYPE_HTTP) {
-        if(lws_set_proxy(vhost, proxy))
+    if (proxy_type == PROXY_TYPE_HTTP) {
+        if (lws_set_proxy(vhost, proxy))
             error("LWS failed to accept http proxy.");
         return;
     }
-    if(proxy_type != PROXY_DISABLED)
+    if (proxy_type != PROXY_DISABLED)
         error("Unknown proxy type");
 }
 
