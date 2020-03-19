@@ -15,7 +15,7 @@ Netdata is built around 4 principles:
 
 1.  **[Per second data collection for all metrics.](1s-granularity.md)**
 
-    _It is impossible to monitor a 2 second Service Level Agreement (SLA), with 10 second metrics._
+    _It is impossible to monitor a 2 second service-level agreement (SLA), with 10-second metrics._
 
 2.  **[Collect and visualize all the metrics from all possible sources.](unlimited-metrics.md)**
 
