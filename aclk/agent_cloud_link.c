@@ -1552,12 +1552,12 @@ BUFFER *aclk_encode_response(BUFFER *contents)
     while (*src) {
         switch (*src) {
             case '\n':
-                *dst++ = '\\';
-                *dst++ = 'n';
-                break;
+//                *dst++ = '\\';
+//                *dst++ = 'n';
+//                break;
             case '\t':
-                *dst++ = '\\';
-                *dst++ = 't';
+//                *dst++ = '\\';
+//                *dst++ = 't';
                 break;
             case 0x01 ... 0x08:
             case 0x0b ... 0x1F:
