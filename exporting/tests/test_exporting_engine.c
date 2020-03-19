@@ -977,6 +977,7 @@ static void test_init_aws_kinesis_instance(void **state)
     expect_string(__wrap_kinesis_init, access_key_id, "test_auth_key_id");
     expect_string(__wrap_kinesis_init, secret_key, "test_secure_key");
     expect_value(__wrap_kinesis_init, timeout, 10000);
+
     assert_int_equal(init_aws_kinesis_instance(instance), 0);
 
     assert_ptr_equal(instance->worker, aws_kinesis_connector_worker);
@@ -1065,6 +1066,94 @@ static void test_aws_kinesis_connector_worker(void **state)
     free(connector_specific_config->secure_key);
 }
 #endif // HAVE_KINESIS
+
+#if HAVE_MONGOC
+static void test_init_mongodb_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+
+    struct mongodb_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct mongodb_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->database = strdupz("test_database");
+    connector_specific_config->collection = strdupz("test_collection");
+    instance->config.buffer_on_failures = 10;
+
+    expect_function_call(__wrap_mongoc_init);
+    expect_function_call(__wrap_mongoc_uri_new_with_error);
+    expect_string(__wrap_mongoc_uri_new_with_error, uri_string, "localhost");
+    expect_not_value(__wrap_mongoc_uri_new_with_error, error, NULL);
+    will_return(__wrap_mongoc_uri_new_with_error, 0xf1);
+
+    expect_function_call(__wrap_mongoc_uri_get_option_as_int32);
+    expect_value(__wrap_mongoc_uri_get_option_as_int32, uri, 0xf1);
+    expect_value(__wrap_mongoc_uri_get_option_as_int32, option, MONGOC_URI_SOCKETTIMEOUTMS);
+    expect_value(__wrap_mongoc_uri_get_option_as_int32, fallback, 1000);
+    will_return(__wrap_mongoc_uri_get_option_as_int32, 1000);
+
+    expect_function_call(__wrap_mongoc_uri_set_option_as_int32);
+    expect_value(__wrap_mongoc_uri_set_option_as_int32, uri, 0xf1);
+    expect_value(__wrap_mongoc_uri_set_option_as_int32, option, MONGOC_URI_SOCKETTIMEOUTMS);
+    expect_value(__wrap_mongoc_uri_set_option_as_int32, fallback, 1000);
+    will_return(__wrap_mongoc_uri_set_option_as_int32, 1000);
+
+    expect_function_call(__wrap_mongoc_client_new_from_uri);
+    expect_value(__wrap_mongoc_client_new_from_uri, uri, 0xf1);
+    will_return(__wrap_mongoc_client_new_from_uri, 0xf2);
+
+    expect_function_call(__wrap_mongoc_client_set_appname);
+    expect_value(__wrap_mongoc_client_set_appname, client, 0xf2);
+    expect_string(__wrap_mongoc_client_set_appname, appname, "netdata");
+    will_return(__wrap_mongoc_client_set_appname, true);
+
+    expect_function_call(__wrap_mongoc_client_get_collection);
+    expect_value(__wrap_mongoc_client_get_collection, client, 0xf2);
+    expect_string(__wrap_mongoc_client_get_collection, db, "test_database");
+    expect_string(__wrap_mongoc_client_get_collection, collection, "test_collection");
+    will_return(__wrap_mongoc_client_get_collection, 0xf3);
+
+    expect_function_call(__wrap_mongoc_uri_destroy);
+    expect_value(__wrap_mongoc_uri_destroy, uri, 0xf1);
+
+    assert_int_equal(init_mongodb_instance(instance), 0);
+
+    assert_ptr_equal(instance->worker, mongodb_connector_worker);
+    assert_ptr_equal(instance->start_batch_formatting, NULL);
+    assert_ptr_equal(instance->start_host_formatting, format_host_labels_json_plaintext);
+    assert_ptr_equal(instance->start_chart_formatting, NULL);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_json_plaintext);
+    assert_ptr_equal(instance->end_chart_formatting, NULL);
+    assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
+    assert_ptr_equal(instance->end_batch_formatting, format_batch_mongodb);
+    assert_ptr_equal(instance->send_header, NULL);
+    assert_ptr_equal(instance->check_response, NULL);
+
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+
+    assert_ptr_not_equal(instance->connector_specific_data, NULL);
+
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+    size_t number_of_buffers = 1;
+    struct bson_buffer *current_buffer = connector_specific_data->first_buffer;
+    while (current_buffer->next != connector_specific_data->first_buffer) {
+        current_buffer = current_buffer->next;
+        number_of_buffers++;
+        if (number_of_buffers == (size_t)(instance->config.buffer_on_failures + 1)) {
+            number_of_buffers = 0;
+            break;
+        }
+    }
+    assert_int_equal(number_of_buffers, 9);
+
+    free(connector_specific_config->database);
+    free(connector_specific_config->collection);
+}
+#endif // HAVE_MONGOC
 
 int main(void)
 {
@@ -1166,6 +1255,14 @@ int main(void)
     };
 
     test_res += cmocka_run_group_tests_name("kinesis_exporting_connector", kinesis_tests, NULL, NULL);
+#endif
+
+#if HAVE_MONGOC
+    const struct CMUnitTest mongodb_tests[] = {
+        cmocka_unit_test_setup_teardown(test_init_mongodb_instance, setup_configured_engine, teardown_configured_engine),
+    };
+
+    test_res += cmocka_run_group_tests_name("mongodb_exporting_connector", mongodb_tests, NULL, NULL);
 #endif
 
     return test_res;
