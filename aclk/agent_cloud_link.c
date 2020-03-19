@@ -1545,6 +1545,7 @@ BUFFER *aclk_encode_response(BUFFER *contents)
 {
     char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
+    int in_quote;
 
     src = contents->buffer;
     dst = tmp_buffer;
@@ -1554,7 +1555,11 @@ BUFFER *aclk_encode_response(BUFFER *contents)
                 *dst++ = '\\';
                 *dst++ = 'n';
                 break;
-            case 0x01 ... 0x09:
+            case '\t':
+                *dst++ = '\\';
+                *dst++ = 't';
+                break;
+            case 0x01 ... 0x08:
             case 0x0b ... 0x1F:
                 *dst++ = '\\';
                 *dst++ = '0';
@@ -1795,6 +1800,8 @@ int aclk_handle_cloud_request(char *payload)
     struct aclk_request cloud_to_agent = {
         .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
     };
+
+    error("Incoming %s", payload);
 
     if (unlikely(agent_state == AGENT_INITIALIZING)) {
         debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
