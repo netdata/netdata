@@ -189,7 +189,7 @@ USAGE: ${PROGRAM} [options]
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
-  --disable-cloud            Disable the agent-cloud link, required for Netdata Cloud functionality.
+  --disable-cloud            Disable all cloud functionality.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -277,7 +277,11 @@ while [ -n "${1}" ]; do
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
       NETDATA_DISABLE_CLOUD=1
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-aclk/} --disable-aclk"
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
+      ;;
+    "--cloud-testing")          # Temporary, until we flip the feature flag. Internal use only
+      NETDATA_DISABLE_CLOUD=0
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --enable-cloud"
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
