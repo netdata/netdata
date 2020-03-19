@@ -71,6 +71,69 @@ int mongodb_init(struct instance *instance) {
     return 0;
 }
 
+void mongodb_cleanup(struct instance *instance) {
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+
+    mongoc_collection_destroy(connector_specific_data->collection);
+    mongoc_client_destroy(connector_specific_data->client);
+
+    return;
+}
+
+/**
+ * Initialize MongoDB connector instance
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int init_mongodb_instance(struct instance *instance)
+{
+    instance->worker = mongodb_connector_worker;
+
+    instance->start_batch_formatting = NULL;
+    instance->start_host_formatting = format_host_labels_json_plaintext;
+    instance->start_chart_formatting = NULL;
+
+    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
+        instance->metric_formatting = format_dimension_collected_json_plaintext;
+    else
+        instance->metric_formatting = format_dimension_stored_json_plaintext;
+
+    instance->end_chart_formatting = NULL;
+    instance->end_host_formatting = flush_host_labels;
+    instance->end_batch_formatting = format_batch_mongodb;
+
+    instance->send_header = NULL;
+    instance->check_response = NULL;
+
+    instance->buffer = (void *)buffer_create(0);
+    if (!instance->buffer) {
+        error("EXPORTING: cannot create buffer for MongoDB exporting connector instance %s", instance->config.name);
+        return 1;
+    }
+    uv_mutex_init(&instance->mutex);
+    uv_cond_init(&instance->cond_var);
+
+    struct mongodb_specific_data *connector_specific_data = callocz(1, sizeof(struct mongodb_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    instance->config.timeoutms =
+        (instance->config.update_every >= 2) ? (instance->engine->config.update_every * MSEC_PER_SEC - 500) : 1000;
+
+    if (!instance->engine->mongoc_initialized) {
+        mongoc_init();
+        instance->engine->mongoc_initialized = 1;
+    }
+
+    if (unlikely(mongodb_init(instance))) {
+        error("EXPORTING: cannot initialize MongoDB exporting connector");
+        return 1;
+    }
+
+    return 0;
+}
+
 void free_bson(bson_t **insert, size_t documents_inserted) {
     size_t i;
 
@@ -136,69 +199,6 @@ int format_batch_mongodb(struct instance *instance)
 
     connector_specific_data->last_buffer->documents_inserted = documents_inserted;
     connector_specific_data->last_buffer = connector_specific_data->last_buffer->next;
-
-    return 0;
-}
-
-void mongodb_cleanup(struct instance *instance) {
-    struct mongodb_specific_data *connector_specific_data =
-        (struct mongodb_specific_data *)instance->connector_specific_data;
-
-    mongoc_collection_destroy(connector_specific_data->collection);
-    mongoc_client_destroy(connector_specific_data->client);
-
-    return;
-}
-
-/**
- * Initialize MongoDB connector instance
- *
- * @param instance an instance data structure.
- * @return Returns 0 on success, 1 on failure.
- */
-int init_mongodb_instance(struct instance *instance)
-{
-    instance->worker = mongodb_connector_worker;
-
-    instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = format_host_labels_json_plaintext;
-    instance->start_chart_formatting = NULL;
-
-    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
-        instance->metric_formatting = format_dimension_collected_json_plaintext;
-    else
-        instance->metric_formatting = format_dimension_stored_json_plaintext;
-
-    instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = format_batch_mongodb;
-
-    instance->send_header = NULL;
-    instance->check_response = NULL;
-
-    instance->buffer = (void *)buffer_create(0);
-    if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for MongoDB exporting connector instance %s", instance->config.name);
-        return 1;
-    }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
-
-    struct mongodb_specific_data *connector_specific_data = callocz(1, sizeof(struct mongodb_specific_data));
-    instance->connector_specific_data = (void *)connector_specific_data;
-
-    instance->config.timeoutms =
-        (instance->config.update_every >= 2) ? (instance->engine->config.update_every * MSEC_PER_SEC - 500) : 1000;
-
-    if (!instance->engine->mongoc_initialized) {
-        mongoc_init();
-        instance->engine->mongoc_initialized = 1;
-    }
-
-    if (unlikely(mongodb_init(instance))) {
-        error("EXPORTING: cannot initialize MongoDB exporting connector");
-        return 1;
-    }
 
     return 0;
 }
