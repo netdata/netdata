@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- Fixed JSON parsing [\#8426](https://github.com/netdata/netdata/pull/8426) ([stelfrag](https://github.com/stelfrag))
 - Adds missing files to ACLK CMake build [\#8412](https://github.com/netdata/netdata/pull/8412) ([underhood](https://github.com/underhood))
 - Fix Prometheus Remote Write build [\#8411](https://github.com/netdata/netdata/pull/8411) ([vlvkobal](https://github.com/vlvkobal))
+- ACLK: Implemented Last Will and Testament [\#8410](https://github.com/netdata/netdata/pull/8410) ([stelfrag](https://github.com/stelfrag))
 - Fix outstanding problems in claiming and add SOCKS5 support. [\#8406](https://github.com/netdata/netdata/pull/8406) ([amoss](https://github.com/amoss))
 - Support SOCKS5 in ACLK Challenge/Response and rewrite with LWS [\#8404](https://github.com/netdata/netdata/pull/8404) ([underhood](https://github.com/underhood))
 - ACLK: Fixes the type value for alarm updates [\#8403](https://github.com/netdata/netdata/pull/8403) ([stelfrag](https://github.com/stelfrag))
@@ -236,11 +238,6 @@
 - Update stop-notifications-alarms.md [\#7737](https://github.com/netdata/netdata/pull/7737) ([yasharne](https://github.com/yasharne))
 - Adds Docker based build system for Binary Packages, CI/CD, Smoke Testing and Development. [\#7735](https://github.com/netdata/netdata/pull/7735) ([prologic](https://github.com/prologic))
 - Do not alert the \#automation channel on checksum failures that will fail a PR in CI anyway [\#7733](https://github.com/netdata/netdata/pull/7733) ([prologic](https://github.com/prologic))
-- installer: include go.d.plugin version v0.14.1 [\#7732](https://github.com/netdata/netdata/pull/7732) ([ilyam8](https://github.com/ilyam8))
-- Fix a check for nfnetlink\_conntrack.h [\#7727](https://github.com/netdata/netdata/pull/7727) ([vlvkobal](https://github.com/vlvkobal))
-- Fixes support for read-only /lib on SystemD systems like CoreOS in  kickstart static64 [\#7726](https://github.com/netdata/netdata/pull/7726) ([prologic](https://github.com/prologic))
-- Cleanup packaging/makeself/build-x86\_64-static.sh to use /bin/sh and remove use of sudo [\#7725](https://github.com/netdata/netdata/pull/7725) ([prologic](https://github.com/prologic))
-- Add Korean translation to docs [\#7723](https://github.com/netdata/netdata/pull/7723) ([cakrit](https://github.com/cakrit))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
