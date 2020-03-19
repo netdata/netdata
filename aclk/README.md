@@ -7,4 +7,4 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 
 # Agent-cloud link (ACLK)
 
-This is the Agent Cloud Link (ACLK) information file.
+This is the agent cloud link (ACLK) information file
