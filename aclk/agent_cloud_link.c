@@ -1376,7 +1376,7 @@ void *aclk_main(void *ptr)
 
         // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {
-            aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
+            aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 1);
         }
 
         if (unlikely(!query_thread)) {
