@@ -131,6 +131,8 @@ static int _mqtt_create_connection(char *username, char *password)
         return MOSQ_ERR_UNKNOWN;
     }
 
+    _link_set_lwt("outbound/meta", 2);
+
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
     mosquitto_publish_callback_set(mosq, publish_callback);
@@ -173,6 +175,10 @@ static int _link_mqtt_connect(char *aclk_hostname, int aclk_port)
 static inline void _link_mosquitto_write()
 {
     int rc;
+
+    if (unlikely(!mosq)) {
+        return;
+    }
 
     rc = mosquitto_loop_misc(mosq);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
@@ -234,6 +240,9 @@ void _link_shutdown()
 {
     int rc;
 
+    if (likely(!mosq))
+        return;
+
     rc = mosquitto_disconnect(mosq);
     switch (rc) {
         case MOSQ_ERR_SUCCESS:
@@ -243,11 +252,39 @@ void _link_shutdown()
             info("MQTT invalid structure");
             break;
     };
+}
 
-    mosquitto_destroy(mosq);
-    mosq = NULL;
 
-    aclk_lws_wss_client_destroy();
+int _link_set_lwt(char *sub_topic, int qos)
+{
+    int rc;
+    char topic[ACLK_MAX_TOPIC + 1];
+    char payload[512];
+    char *final_topic;
+
+    final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
+    if (unlikely(!final_topic)) {
+        errno = 0;
+        error("Unable to build outgoing topic; truncated?");
+        return 1;
+    }
+
+    time_t time_created = now_realtime_sec();
+    char *msg_id = create_uuid();
+
+    snprintfz(
+        payload, 511,
+        "{ \"type\": \"disconnect\","
+        " \"msg-id\": \"%s\","
+        " \"timestamp\": %ld,"
+        " \"version\": %d,"
+        " \"payload\": \"unexpected\" }",
+        msg_id, time_created, ACLK_VERSION);
+
+    freez(msg_id);
+
+    rc = mosquitto_will_set(mosq, topic, strlen(payload), (const void *) payload, qos, 0);
+    return rc;
 }
 
 int _link_subscribe(char *topic, int qos)
