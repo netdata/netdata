@@ -17,10 +17,10 @@ keywords:
   - autonomous
   - integrations
   - integrate with other monitoring tools
-  - visual anomaly detection
+  - anomaly detection
   - time-series database
   - unlimited metrics
-date: 2020-03-18
+date: 2020-03-19
 ---
 -->
 
