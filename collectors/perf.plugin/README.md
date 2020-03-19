@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/perf.
 
 # perf.plugin
 
-`perf.plugin` collects system-wide CPU performance statistics from Performance Monitoring Units (PMUs) using
+`perf.plugin` collects system-wide CPU performance statistics from performance monitoring units (PMUs) using
 the `perf_event_open()` system call.
 
 ## Important Notes
