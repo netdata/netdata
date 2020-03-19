@@ -280,7 +280,7 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
       ;;
     "--cloud-testing")          # Temporary, until we flip the feature flag. Internal use only
-      NETDATA_DISABLE_CLOUD=0
+      unset NETDATA_DISABLE_CLOUD
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --enable-cloud"
       ;;
     "--install")
@@ -472,6 +472,7 @@ copy_libmosquitto() {
 
 bundle_libmosquitto() {
   if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+    echo "Skipping cloud"
     return 0
   fi
 
