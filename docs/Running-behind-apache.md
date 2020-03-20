@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!--
 ---
 title: "Netdata via apache's mod_proxy"
@@ -5,7 +6,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-beh
 ---
 -->
 
+# Netdata via apache's mod_proxy
+=======
 # Netdata via Apache's mod_proxy
+>>>>>>> scrubbing the collectors for correct use of acronyms
 
 Below you can find instructions for configuring an Apache server to:
 
