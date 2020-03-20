@@ -994,7 +994,7 @@ install_react_dashboard() {
        copy_react_dashboard "${tmp}/build" && \
        rm -rf "${tmp}"
     then
-      if run "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-switch-dashboard.sh" react ; then
+      if run "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-switch-dashboard.sh" "${NETDATA_SELECTED_DASHBOARD:-react}" ; then
         run_ok "React dashboard installed."
       else
         run_failed "Failed to switch to React dashboard."
@@ -1561,6 +1561,7 @@ REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
+NETDATA_SELECTED_DASHBOARD="${NETDATA_SELECTED_DASHBOARD:-react}"
 EOF
 run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 

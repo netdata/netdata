@@ -5,6 +5,7 @@
 set -e
 
 webdir="@webdir_POST@"
+configdir="@configdir_POST@"
 
 usage() {
     cat << EOF
@@ -34,6 +35,15 @@ switch_dashboard() {
     done
 
     cp -a "${path}/." "${webdir}"
+
+    if [ -e "${configdir}/.environment" ] ; then
+        if grep -q NETDATA_SELECTED_DASHBOARD "${configdir}/.environment" ; then
+            sed -E "s/^NETDATA_SELECTED_DASHBOARD=\".*\"$/NETDATA_SELECTED_DASHBOARD=\"${new}\"/" "${configdir}/.environment"
+        else
+            echo "NETDATA_SELECTED_DASHBOARD=\"${new}\"" >> "${configdir}/.environment"
+        fi
+    fi
+
     exit 0
 }
 
