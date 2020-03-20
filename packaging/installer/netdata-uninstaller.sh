@@ -454,7 +454,7 @@ uninstall_ebpf() {
   if [ -z "${libdir}" ]; then
     echo >&2 "Unable to find the system lib directory we installed eBPF ebpf_kernel.so to ..."
     user_input "Press ENTER to search your system (which may take some time) ..."
-    find / -type f -name 'bpf_kernel.so' -o -name 'bpf_kernel.so.o'
+    find / -type f -name 'libbpf_kernel.so' -o -name 'libbpf_kernel.so.0'
     echo >&2 "Please manually delete these files"
     return 1
   fi
