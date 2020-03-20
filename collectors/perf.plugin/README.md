@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/perf.
 
 # perf.plugin
 
-`perf.plugin` collects system-wide CPU performance statistics from Performance Monitoring Units (PMUs) using
+`perf.plugin` collects system-wide CPU performance statistics from performance monitoring units (PMUs) using
 the `perf_event_open()` system call.
 
 ## Important Notes
@@ -42,9 +42,9 @@ Hardware cache events:
 2.  L1D prefetch cache operations
 3.  L1I cache operations
 4.  LL cache operations
-5.  Data Translation Lookaside Buffer (DTLB) cache operations
-6.  Instruction Translation Lookaside Buffer (ITLB) cache operations
-7.  Proxy Binding Unit (PBU) cache operations
+5.  Data translation lookaside Buffer (DTLB) cache operations
+6.  Instruction translation lookaside Buffer (ITLB) cache operations
+7.  Proxy binding unit (PBU) cache operations
 
 ## Configuration
 

@@ -22,7 +22,7 @@ For configurations that involve building and running the agent alone, we still u
 `docker-compose` for consistency with more complex configurations. The more complex
 configurations allow the agent to be run in conjunction with parts of the cloud
 infrastructure (these parts of the code are not public), or with external brokers
-(such as VerneMQ for MQ Telemetry Transport (MQTT)), or with other external tools (such as Time Series Database (TSDB) to allow the agent to
+(such as VerneMQ for MQ Telemetry Transport (MQTT)), or with other external tools (such as a time series database (TSDB) to allow the agent to
 export metrics). Note: no external TSDB scenarios are available in the first iteration,
 they will be added in subsequent iterations.
 
@@ -124,4 +124,3 @@ Notes:
 * We are currently limited to arch because of restrictions on libwebsockets
 * There is not yet a good way to configure the target agent container from the docker-compose command line.
 * Several other containers should be in this compose (a paho client, tshark etc).
-
