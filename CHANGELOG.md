@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix the ACLK installation with the installer switch [\#8443](https://github.com/netdata/netdata/pull/8443) ([amoss](https://github.com/amoss))
+- health: add dns\_query module alarm [\#8434](https://github.com/netdata/netdata/pull/8434) ([ilyam8](https://github.com/ilyam8))
+- Add the new cloud info in the info endpoint [\#8430](https://github.com/netdata/netdata/pull/8430) ([amoss](https://github.com/amoss))
 - Fixed JSON parsing [\#8426](https://github.com/netdata/netdata/pull/8426) ([stelfrag](https://github.com/stelfrag))
+- Fixed response payload to match the new specification [\#8420](https://github.com/netdata/netdata/pull/8420) ([stelfrag](https://github.com/stelfrag))
 - Adds missing files to ACLK CMake build [\#8412](https://github.com/netdata/netdata/pull/8412) ([underhood](https://github.com/underhood))
 - Fix Prometheus Remote Write build [\#8411](https://github.com/netdata/netdata/pull/8411) ([vlvkobal](https://github.com/vlvkobal))
 - ACLK: Implemented Last Will and Testament [\#8410](https://github.com/netdata/netdata/pull/8410) ([stelfrag](https://github.com/stelfrag))
@@ -16,6 +20,7 @@
 - Improved the performance of the ACLK. \(\#8391\) [\#8401](https://github.com/netdata/netdata/pull/8401) ([amoss](https://github.com/amoss))
 - Perf fixes [\#8399](https://github.com/netdata/netdata/pull/8399) ([amoss](https://github.com/amoss))
 - ACLK: Improved the agent "pop-corning" phase [\#8398](https://github.com/netdata/netdata/pull/8398) ([stelfrag](https://github.com/stelfrag))
+- Fix broken dependencies for Ubuntu 19.10 \(eoan\) [\#8397](https://github.com/netdata/netdata/pull/8397) ([prologic](https://github.com/prologic))
 - Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
 - Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
 - Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
@@ -235,9 +240,6 @@
 - Improve styling of documentation site and use Algolia search [\#7753](https://github.com/netdata/netdata/pull/7753) ([joelhans](https://github.com/joelhans))
 - multiple files: fix typos [\#7752](https://github.com/netdata/netdata/pull/7752) ([schneiderl](https://github.com/schneiderl))
 - on cloud error, inform user to update their netdata. [\#7750](https://github.com/netdata/netdata/pull/7750) ([jacekkolasa](https://github.com/jacekkolasa))
-- Update stop-notifications-alarms.md [\#7737](https://github.com/netdata/netdata/pull/7737) ([yasharne](https://github.com/yasharne))
-- Adds Docker based build system for Binary Packages, CI/CD, Smoke Testing and Development. [\#7735](https://github.com/netdata/netdata/pull/7735) ([prologic](https://github.com/prologic))
-- Do not alert the \#automation channel on checksum failures that will fail a PR in CI anyway [\#7733](https://github.com/netdata/netdata/pull/7733) ([prologic](https://github.com/prologic))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
