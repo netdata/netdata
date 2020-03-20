@@ -183,7 +183,7 @@ Open-source solutions rely almost entirely on configuration, leaving you to go t
 #### What do others do?
 
 *    They focus on providing a platform "for building your monitoring," providing tools to collect metrics, store them, visualize them, check them, and query them. 
-*    They offer a basic set of pre-configured metrics, dashboards, and alarms, assuming you configure the rest you may need. What a waste of time trying to understand what the metrics are, how to visualize them, how to configure alarms for them, and how to query them when issues arise.
+*    They offer a basic set of pre-configured metrics, dashboards, and alarms, assuming you configure the rest you may need. Trying to understand what metrics mean, how to visualize them, how to configure alarms for them, and how to query them when issues arise is a waste of time.
 
 #### What does Netdata do?
 
