@@ -197,6 +197,11 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
         for (int i = host_end + 1; i < port_end; i++)
             (*aclk_port)[i - host_end - 1] = url[i];
     }
+    if (url[host_end] == '/') {
+        *aclk_port = strdupz("443");
+        *aclk_hostname = callocz(1, host_end - pos + 1);
+        strncpy(*aclk_hostname, url+pos, host_end - pos);
+    }
     info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
     return 0;
 }
