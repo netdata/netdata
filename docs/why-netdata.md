@@ -129,7 +129,7 @@ Of course, since Netdata is also about [meaningful presentation](#meaningful-pre
 
 ### Meaningful presentation
 
-Our world has become information-oriented and data-driven, and we're crazy about metrics. So, it becomes essential to know how to interpret meaningful information from the data. 
+Our world has become information-oriented and data-driven, and we're crazy about metrics. You need to know how to interpret meaningful information from the data. 
 
 Metrics have a context, a meaning, and a way to interpret them, the presentation of data requires skills and understanding of data. It is necessary to make use of collected data, which must be processed to put to any use or application. 
 
