@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "CEPH monitoring with Netdata"
@@ -7,9 +6,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 -->
 
 # CEPH monitoring with Netdata
-=======
-# Ceph monitoring with Netdata
->>>>>>> scrubbing the collectors for correct use of acronyms
 
 Monitors the Ceph cluster usage and consumption data of a server, and produces:
 
