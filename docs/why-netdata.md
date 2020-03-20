@@ -168,7 +168,7 @@ Netdata can be browsed by humans, even if the database has 100,000 unique metric
 
 **Here's why Netdata is different:**
 
-*    The dashboard is enriched with information that is useful for most people. Netdata includes the community knowledge and expertise about the metrics right in the dashboard to improve clarity.
+*    Netdata enriches its dashboard with information that is useful for most people. Netdata includes the community knowledge and expertise about the metrics right in the dashboard to improve clarity.
 
 *    The metrics are incorporated into the database where they get converted, stored, and organized into a human-friendly format.  For example, CPU utilization in Netdata gets stored as percentages instead of kernel ticks.
 
