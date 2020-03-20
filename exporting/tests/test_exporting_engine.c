@@ -1153,6 +1153,39 @@ static void test_init_mongodb_instance(void **state)
     free(connector_specific_config->database);
     free(connector_specific_config->collection);
 }
+
+static void test_format_batch_mongodb(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+    struct stats *stats = &instance->stats;
+
+    struct mongodb_specific_data *connector_specific_data =
+        mallocz(sizeof(struct mongodb_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    struct bson_buffer *current_buffer = callocz(1, sizeof(struct bson_buffer));
+    connector_specific_data->first_buffer = current_buffer;
+    connector_specific_data->first_buffer->next = current_buffer;
+    connector_specific_data->last_buffer = current_buffer;
+
+    BUFFER *buffer = buffer_create(0);
+    buffer_sprintf(buffer, "{ \"metric\": \"test_metric\" }\n");
+    instance->buffer = buffer;
+    stats->chart_buffered_metrics = 1;
+
+    assert_int_equal(format_batch_mongodb(instance), 0);
+
+    assert_int_equal(connector_specific_data->last_buffer->documents_inserted, 1);
+    assert_int_equal(buffer_strlen(buffer), 0);
+
+    size_t len;
+    char *str = bson_as_canonical_extended_json (connector_specific_data->last_buffer->insert[0], &len);
+    assert_string_equal(str, "{ \"metric\" : \"test_metric\" }");
+
+    freez(str);
+    buffer_free(buffer);
+}
 #endif // HAVE_MONGOC
 
 int main(void)
@@ -1260,6 +1293,7 @@ int main(void)
 #if HAVE_MONGOC
     const struct CMUnitTest mongodb_tests[] = {
         cmocka_unit_test_setup_teardown(test_init_mongodb_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(test_format_batch_mongodb, setup_configured_engine, teardown_configured_engine),
     };
 
     test_res += cmocka_run_group_tests_name("mongodb_exporting_connector", mongodb_tests, NULL, NULL);
