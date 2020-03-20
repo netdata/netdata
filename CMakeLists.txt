@@ -1073,6 +1073,7 @@ if(MONGOC_LIBRARIES)
         -Wl,--wrap=mongoc_client_set_appname
         -Wl,--wrap=mongoc_client_get_collection
         -Wl,--wrap=mongoc_uri_destroy
+        -Wl,--wrap=mongoc_collection_insert_many
     )
 endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})

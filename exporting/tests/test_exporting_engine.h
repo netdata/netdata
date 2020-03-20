@@ -146,7 +146,16 @@ mongoc_client_t *__wrap_mongoc_client_new_from_uri(const mongoc_uri_t *uri);
 bool __wrap_mongoc_client_set_appname(mongoc_client_t *client, const char *appname);
 mongoc_collection_t *
 __wrap_mongoc_client_get_collection(mongoc_client_t *client, const char *db, const char *collection);
+mongoc_collection_t *
+__real_mongoc_client_get_collection(mongoc_client_t *client, const char *db, const char *collection);
 void __wrap_mongoc_uri_destroy (mongoc_uri_t *uri);
+bool __wrap_mongoc_collection_insert_many(
+    mongoc_collection_t *collection,
+    const bson_t **documents,
+    size_t n_documents,
+    const bson_t *opts,
+    bson_t *reply,
+    bson_error_t *error);
 
 // -----------------------------------------------------------------------
 // fixtures

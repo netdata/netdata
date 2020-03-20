@@ -1186,6 +1186,60 @@ static void test_format_batch_mongodb(void **state)
     freez(str);
     buffer_free(buffer);
 }
+
+static void test_mongodb_connector_worker(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    struct mongodb_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct mongodb_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->database = strdupz("test_database");
+
+    struct mongodb_specific_data *connector_specific_data = callocz(1, sizeof(struct mongodb_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+    connector_specific_config->collection = strdupz("test_collection");
+
+    struct bson_buffer *buffer = callocz(1, sizeof(struct bson_buffer));
+    buffer->documents_inserted = 1;
+    connector_specific_data->first_buffer = buffer;
+    connector_specific_data->first_buffer->next = buffer;
+
+    connector_specific_data->first_buffer->insert = callocz(1, sizeof(bson_t *));
+    bson_error_t error;
+    connector_specific_data->first_buffer->insert[0] =
+        bson_new_from_json((const uint8_t *)"{ \"test_key\" : \"test_value\" }", -1, &error);
+
+    connector_specific_data->client = mongoc_client_new("mongodb://localhost");
+    connector_specific_data->collection = __real_mongoc_client_get_collection(
+        connector_specific_data->client, "test_database", "test_collection");
+
+    expect_function_call(__wrap_mongoc_collection_insert_many);
+    expect_value(__wrap_mongoc_collection_insert_many, collection, connector_specific_data->collection);
+    expect_value(__wrap_mongoc_collection_insert_many, documents, connector_specific_data->first_buffer->insert);
+    expect_value(__wrap_mongoc_collection_insert_many, n_documents, 1);
+    expect_value(__wrap_mongoc_collection_insert_many, opts, NULL);
+    expect_value(__wrap_mongoc_collection_insert_many, reply, NULL);
+    expect_not_value(__wrap_mongoc_collection_insert_many, error, NULL);
+    will_return(__wrap_mongoc_collection_insert_many, true);
+
+    mongodb_connector_worker(instance);
+
+    assert_ptr_equal(connector_specific_data->first_buffer->insert, NULL);
+    assert_int_equal(connector_specific_data->first_buffer->documents_inserted, 0);
+    assert_ptr_equal(connector_specific_data->first_buffer, connector_specific_data->first_buffer->next);
+
+    struct stats *stats = &instance->stats;
+    assert_int_equal(stats->chart_sent_bytes, 60);
+    assert_int_equal(stats->chart_transmission_successes, 1);
+    assert_int_equal(stats->chart_receptions, 1);
+    assert_int_equal(stats->chart_sent_bytes, 60);
+    assert_int_equal(stats->chart_sent_metrics, 0);
+
+    free(connector_specific_config->database);
+    free(connector_specific_config->collection);
+}
 #endif // HAVE_MONGOC
 
 int main(void)
@@ -1292,8 +1346,12 @@ int main(void)
 
 #if HAVE_MONGOC
     const struct CMUnitTest mongodb_tests[] = {
-        cmocka_unit_test_setup_teardown(test_init_mongodb_instance, setup_configured_engine, teardown_configured_engine),
-        cmocka_unit_test_setup_teardown(test_format_batch_mongodb, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_init_mongodb_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_batch_mongodb, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_mongodb_connector_worker, setup_configured_engine, teardown_configured_engine),
     };
 
     test_res += cmocka_run_group_tests_name("mongodb_exporting_connector", mongodb_tests, NULL, NULL);

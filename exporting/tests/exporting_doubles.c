@@ -308,4 +308,22 @@ void __wrap_mongoc_uri_destroy (mongoc_uri_t *uri)
     function_called();
     check_expected_ptr(uri);
 }
+
+bool __wrap_mongoc_collection_insert_many(
+    mongoc_collection_t *collection,
+    const bson_t **documents,
+    size_t n_documents,
+    const bson_t *opts,
+    bson_t *reply,
+    bson_error_t *error)
+{
+    function_called();
+    check_expected_ptr(collection);
+    check_expected_ptr(documents);
+    check_expected(n_documents);
+    check_expected_ptr(opts);
+    check_expected_ptr(reply);
+    check_expected_ptr(error);
+    return mock_type(bool);
+}
 #endif // HAVE_MONGOC

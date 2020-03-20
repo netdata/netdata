@@ -926,6 +926,7 @@ if ENABLE_BACKEND_MONGODB
         -Wl,--wrap=mongoc_client_set_appname \
         -Wl,--wrap=mongoc_client_get_collection \
         -Wl,--wrap=mongoc_uri_destroy \
+        -Wl,--wrap=mongoc_collection_insert_many \
         $(NULL)
 endif
 endif
