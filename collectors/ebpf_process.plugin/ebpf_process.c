@@ -38,16 +38,7 @@ void netdata_cleanup_and_exit(int ret) {
 //Netdata eBPF library
 void *libnetdata = NULL;
 int (*load_bpf_file)(char *, int) = NULL;
-int (*set_bpf_perf_event)(int, int);
-int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
-int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
-void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
 int *map_fd = NULL;
-
-//Perf event variables
-static int pmu_fd[NETDATA_MAX_PROCESSOR];
-static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
-int page_cnt = 8;
 
 //Libbpf (It is necessary to have at least kernel 4.10)
 int (*bpf_map_lookup_elem)(int, const void *, void *);
@@ -67,7 +58,7 @@ static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
 static int mode = 2;
-static int debug_log = 0;
+static int developer_mode = 0;
 static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
@@ -104,21 +95,6 @@ void open_developer_log() {
         developer_log = fopen(filename, "a");
 }
 
-static int unmap_memory() {
-    int i;
-    int size = (int)sysconf(_SC_PAGESIZE)*(page_cnt + 1);
-    for ( i = 0 ; i < nprocs ; i++ ) {
-        if (perf_event_unmap(headers[i], size) < 0) {
-            fprintf(stderr,"[EBPF PROCESS] CANNOT unmap headers.\n");
-            return -1;
-        }
-
-        close(pmu_fd[i]);
-    }
-
-    return 0;
-}
-
 static void int_exit(int sig)
 {
     close_plugin = 1;
@@ -136,10 +112,6 @@ static void int_exit(int sig)
     if (publish_aggregated) {
         free(publish_aggregated);
         publish_aggregated = NULL;
-    }
-
-    if(mode == 1 && debug_log) {
-        unmap_memory();
     }
 
     if (libnetdata) {
@@ -178,7 +150,7 @@ static void int_exit(int sig)
             int sid = setsid();
             if(sid >= 0) {
                 sleep(1);
-                if(debug_log) {
+                if(developer_mode) {
                     open_developer_log();
                 }
                 debug(D_EXIT, "Wait for father %d die", event_pid);
@@ -580,7 +552,7 @@ static int netdata_store_bpf(void *data, int size) {
     if (close_plugin)
         return 0;
 
-    if(!debug_log)
+    if(!developer_mode)
         return -2; //LIBBPF_PERF_EVENT_CONT;
 
     netdata_error_report_t *e = data;
@@ -596,8 +568,7 @@ void *process_log(void *ptr)
 {
     (void) ptr;
 
-    if (mode == 1 && debug_log) {
-        netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
+    if (mode == 1 && developer_mode) {
     }
 
     return NULL;
@@ -653,18 +624,6 @@ static void build_complete_path(char *out, size_t length,char *path, char *filen
     }
 }
 
-static int map_memory() {
-    int i;
-    for (i = 0; i < nprocs; i++) {
-        pmu_fd[i] = set_bpf_perf_event(i, 2);
-
-        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
-            return -1;
-        }
-    }
-    return 0;
-}
-
 static int ebpf_load_libraries()
 {
     char *err = NULL;
@@ -695,29 +654,6 @@ static int ebpf_load_libraries()
         }
 
         if(mode == 1) {
-            set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
-                return -1;
-            }
-
-            perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
-                return -1;
-            }
-
-            perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
-                return -1;
-            }
-
-            netdata_perf_loop_multi = dlsym(libnetdata, "netdata_perf_loop_multi");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find netdata_perf_loop_multi: %s", err);
-                return -1;
-            }
         }
     }
 
@@ -769,8 +705,6 @@ void set_global_variables() {
     if(!netdata_configured_log_dir)
         netdata_configured_log_dir = LOG_DIR;
 
-    page_cnt *= (int)sysconf(_SC_NPROCESSORS_ONLN);
-
     nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (nprocs > NETDATA_MAX_PROCESSOR) {
         nprocs = NETDATA_MAX_PROCESSOR;
@@ -790,17 +724,21 @@ static void change_collector_event() {
 static inline void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
         mode = 0;
-    /*
-    else if (!strcasecmp(ptr, "dev"))
-        mode = 1;
-        */
-    else
-        change_collector_event();
 }
 
-static inline void enable_debug(char *ptr) {
+static inline void enable_develop_mode(char *ptr) {
     if (!strcasecmp(ptr, "yes"))
-        debug_log = 1;
+        developer_mode = 1;
+}
+
+static inline void adjust_to_developer() {
+    if (!developer_mode) {
+        change_collector_event();
+        return;
+    }
+
+    mode = 1;
+    open_developer_log();
 }
 
 static inline void set_log_file(char *ptr) {
@@ -816,9 +754,11 @@ static void set_global_values() {
             while(values) {
                 if(!strcasecmp(values->name, "load"))
                     what_to_load(values->value);
-                else if(!strcasecmp(values->name, "debug log"))
-                    enable_debug(values->value);
+                else if(!strcasecmp(values->name, "developer mode"))
+                    enable_develop_mode(values->value);
                 else if(!strcasecmp(values->name, "use stdout"))
+                    set_log_file(values->value);
+                else if(!strcasecmp(values->name, "log format"))
                     set_log_file(values->value);
 
                 values = values->next;
@@ -826,6 +766,8 @@ static void set_global_values() {
         }
         sec = sec->next;
     }
+
+    adjust_to_developer();
 }
 
 static int load_collector_file(char *path) {
@@ -896,23 +838,11 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
-    if(mode == 1 && debug_log) {
-        if(map_memory()) {
-            thread_finished++;
-            error("[EBPF_PROCESS] Cannot map memory used with perf events.");
-            int_exit(6);
-        }
-    }
-
     set_global_labels();
-
-    if(debug_log) {
-        open_developer_log();
-    }
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
-        int_exit(7);
+        int_exit(6);
     }
 
     pthread_attr_t attr;
@@ -929,7 +859,7 @@ int main(int argc, char **argv)
         if ( ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot create threads.");
             thread_finished++;
-            int_exit(8);
+            int_exit(7);
         }
     }
 
@@ -937,7 +867,7 @@ int main(int argc, char **argv)
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot join threads.");
             thread_finished++;
-            int_exit(9);
+            int_exit(8);
         }
     }
 

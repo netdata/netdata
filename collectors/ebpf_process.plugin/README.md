@@ -207,6 +207,20 @@ following values: ​
 -   `return`: In this mode, Netdata also monitors the calls to function. In the `entry` mode, Netdata only traces kernel
     functions, but with `return`, Netdata also monitors the return of each function. This mode creates more charts, but
     also creates an overhead of roughly 110 nanosections for each function call.
+    
+#### developer mode
+
+The developer mode is a feature that Netdata is bringing to give more details about errors that happen with the monitored
+function. 
+
+Case this option is set to `yes`, Netdata will store inside `developer.log` that is inside your log directory, normally
+  `/var/log/netdata/`, information about the hour that an error happeb, the software that generates the error and the 
+error information.
+
+#### log format
+
+When `developer mode` is enabled, Netdata allows you select two different formats for the developer report, ltsv 
+(the default mode) and json.
 
 ## Performance
 
