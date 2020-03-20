@@ -55,7 +55,7 @@ We built Netdata around four principles:
 4.  [**Immediate results**](#immediate-results). Just install and use it.
  
 ### 1s granularity
-Any performance monitoring solution that does not go down to per second collection, and visualization of the data is useless.  It makes you happy to have it, but it doesn't help you more than that, unfortunately.
+Any performance monitoring solution that does not go down to per-second collection and visualization of the data is useless. It makes you happy to have it, but it doesn't help you more than that, unfortunately.
  
 The world is going real-time, and today, response time affects the customer experience significantly, so SLAs are tighter than ever before. That's why high-resolution metrics are required to monitor and troubleshoot systems and applications effectively.
  
