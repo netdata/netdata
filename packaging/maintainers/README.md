@@ -40,7 +40,7 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 | System | URL | Core Developer | Package Maintainer
 |:-:|:-:|:-:|:-:|
-| macOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
+| MacOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
 
 ---
 

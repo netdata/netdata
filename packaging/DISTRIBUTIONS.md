@@ -45,9 +45,9 @@ have complete visibility over the range of support.
 | Versions 8.x | RHEL |  &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | Fedora 30 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | Fedora 31 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| CentOS 6.x | CentOS | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| CentOS 7.x | CentOS | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| CentOS 8.x | CentOS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| CentOS 6.x | Cent OS | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| CentOS 7.x | Cent OS | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
+| CentOS 8.x | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | openSUSE Leap 15.1 | openSUSE | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | openSUSE Tumbleweed | openSUSE | &#10004; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10004; | &#63;
 | SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
@@ -55,7 +55,7 @@ have complete visibility over the range of support.
 | SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | Alpine | Alpine | &#10004; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | Arch Linux (latest) | Arch | &#10004; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| All other Linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| All other linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10004; | &#63;
 
 ## x86 Architecture
 
@@ -73,9 +73,9 @@ have complete visibility over the range of support.
 | Versions 8.x | RHEL |  &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | Fedora 30 | Fedora | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | Fedora 31 | Fedora | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10007; | &#10007; | &#10007; | &#63;
-| CentOS 6.x | CentOS | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
-| CentOS 7.x | CentOS | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
-| CentOS 8.x | CentOS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| CentOS 6.x | Cent OS | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
+| CentOS 7.x | Cent OS | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
+| CentOS 8.x | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | openSUSE Leap 15.1 | openSUSE | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | openSUSE Tumbleweed | openSUSE | &#10007; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10007; | &#63;
 | SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10007; | &#63;
@@ -83,7 +83,7 @@ have complete visibility over the range of support.
 | SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10007; | &#63;
 | Alpine | Alpine | &#10007; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10007; | &#63;
 | Arch Linux (latest) | Arch | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
-| All other Linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10007; | &#63;
+| All other linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10007; | &#63;
 
 ## Supported functionalities across different distribution channels
 
@@ -125,7 +125,7 @@ This is the brand new database engine capability of netdata. It is a mandatory f
 
 #### Encryption Support (HTTPS)
 
-This is Netdata's Transport Layer Security (TLS) capability that incorporates encryption on the web server and the APIs between master and slaves. Also a mandatory facility for Netdata, but remains optional for users who are limited or not interested in tight security
+This is Netdata's TLS capability that incorporates encryption on the web server and the APIs between master and slaves. Also a mandatory facility for Netdata, but remains optional for users who are limited or not interested in tight security
 
 |make/make install|netdata-installer.sh|kickstart.sh|kickstart-static64.sh|Docker image|RPM packaging|DEB packaging|
 |:---------------:|:------------------:|:----------:|:-------------------:|:----------:|:-----------:|:-----------:|
