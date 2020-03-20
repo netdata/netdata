@@ -7,6 +7,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 -->
 
 # ISC Bind monitoring with Netdata
+=======
+# ISC BIND monitoring with Netdata
+>>>>>>> scrubbing the collectors for correct use of acronyms
 
 Collects Name server summary performance statistics using `rndc` tool.
 
