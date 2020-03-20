@@ -1342,6 +1342,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Report ACLK build failure
 #ifndef ENABLE_ACLK
+    error("This agent doesn't have ACLK.");
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
     if( netdata_anonymous_statistics_enabled > 0 && access( filename, F_OK ) ) { // -1 -> not initialized
