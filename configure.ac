@@ -161,14 +161,27 @@ AC_ARG_ENABLE(
     ,
     [enable_jsonc="detect"]
 )
-if test "${ACLK}" = "yes"; then
+
+# -----------------------------------------------------------------------------
+# Check if cloud is enabled and if the functionality is available
+
 AC_ARG_ENABLE(
-    [aclk],
-    ,
-    [aclk_required="${enableval}"],
-    [aclk_required="detect"]
+    [cloud],
+    [AS_HELP_STRING([--disable-cloud],
+                    [Disables all cloud functionality])],
+    [],
+    [enable_cloud="no"]
 )
+
+AC_MSG_CHECKING([if cloud functionality should be enabled])
+if test "${enable_cloud}" != "no"; then
+    AC_DEFINE([ENABLE_CLOUD], [1], [netdata cloud functionality])
+    aclk_required="detect"
+else
+    aclk_required="no"
 fi
+AC_MSG_RESULT([${enable_cloud}])
+AM_CONDITIONAL([ENABLE_CLOUD], [test "${enable_cloud}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -543,8 +556,7 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # ACLK
 
-#currently env var ACLK must be set to 'yes' to even consider building ACLK
-if test "${ACLK}" = "yes"; then
+if test "$enable_cloud" = "yes"; then
     AC_MSG_CHECKING([if libmosquitto static lib is present])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
         HAVE_libmosquitto_a="yes"
@@ -1257,6 +1269,7 @@ AC_ARG_ENABLE(
      [],
      [enable_unit_tests="yes"]
 )
+
 
 PKG_CHECK_MODULES(
     [CMOCKA],
