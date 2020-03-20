@@ -104,7 +104,7 @@ For many people, monitoring is about:
 -   Detecting outages
 -   Capacity planning
 
-However, **slowdowns are 10 times more common** compared to outages (check slide 14 of [Online Performance is Business Performance ](https://www.slideshare.net/KenGodskind/alertsitetrac) reported by Trac Research/AlertSite). Designing a monitoring system targeting only outages and capacity planning solves just a tiny part of the operational problems we face. Check also [Downtime vs. Slowtime: Which Hurts More?](https://dzone.com/articles/downtime-vs-slowtime-which-hurts-more).
+However, **slowdowns are ten times more common** compared to outages (check slide 14 of [Online Performance is Business Performance ](https://www.slideshare.net/KenGodskind/alertsitetrac) reported by Trac Research/AlertSite). Designing a monitoring system targeting only outages and capacity planning solves just a tiny part of the operational problems we face. Check also [Downtime vs. Slowtime: Which Hurts More?](https://dzone.com/articles/downtime-vs-slowtime-which-hurts-more).
 
 All metrics are important, and all metrics should be available when you need them.  For example, to troubleshoot a slowdown, all the metrics are needed, since the real cause of a slowdown is probably quite complex. If we knew the possible reasons, chances are we would have fixed them before they become a problem.
 
