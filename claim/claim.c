@@ -13,13 +13,16 @@ static char *claiming_errors[] = {
         "Missing dependencies",                         // 3
         "Failure to connect to endpoint",               // 4
         "Unknown HTTP error message",                   // 5
-        "invalid agent id",                             // 6
-        "invalid public key",                           // 7
-        "token has expired",                            // 8
-        "invalid token",                                // 9
-        "duplicate agent id",                           // 10
-        "claimed in another workspace",                 // 11
-        "internal server error"                         // 12
+        "invalid node id",                              // 6
+        "invalid node name",                            // 7
+        "invalid room id",                              // 8
+        "invalid public key",                           // 9
+        "token expired/token not found/invalid token",  // 10
+        "already claimed",                              // 11
+        "processing claiming",                          // 12
+        "Internal Server Error",                        // 13
+        "Gateway Timeout",                              // 14
+        "Service Unavailable"                           // 15
 };
 
 
