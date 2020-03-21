@@ -98,7 +98,7 @@ void claim_agent(char *claiming_arguments)
         return;
     }
     errno = 0;
-    unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]);
+    unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]) - 1;
 
     if ((unsigned)exit_code > maximum_known_exit_code) {
         error("Agent failed to be claimed with an unknown error.");
