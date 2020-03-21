@@ -203,7 +203,7 @@ fi
 
 
 if [ "${URLTOOL}" = "curl" ] ; then
-        URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+        URLCOMMAND="curl --connect-timeout 5 --retry 0 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"\""
         elif [ -n "${PROXY}" ] ; then
@@ -258,27 +258,29 @@ if [ "${VERBOSE}" == 1 ] ; then
 fi
 
 HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
-if [ "${HTTP_STATUS_CODE}" -ne 204 ] ; then
-        ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
-        case ${ERROR_MESSAGE} in
-                "ErrInvalidNodeID") EXIT_CODE=6 ;;
-                "ErrInvalidNodeName") EXIT_CODE=7 ;;
-                "ErrInvalidRoomID") EXIT_CODE=8 ;;
-                "ErrInvalidPublicKey") EXIT_CODE=9 ;;
-                "ErrForbidden") EXIT_CODE=10 ;;
-                "ErrAlreadyClaimed") EXIT_CODE=11 ;;
-                "ErrProcessingClaim") EXIT_CODE=12 ;;
-                "ErrInternalServerError") EXIT_CODE=13 ;;
-                "ErrGatewayTimeout") EXIT_CODE=14 ;;
-                "ErrServiceUnavailable") EXIT_CODE=15 ;;
-                *) EXIT_CODE=5 ;;
-        esac
-        echo >&2 "Failed to claim node."
+
+if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
-        exit $EXIT_CODE
+        echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id"
+        rm -f "${CLAIMING_DIR}/token"
+        echo >&2 "Node was successfully claimed."
+        exit 0
 fi
 
+ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
+case ${ERROR_MESSAGE} in
+        "ErrInvalidNodeID") EXIT_CODE=6 ;;
+        "ErrInvalidNodeName") EXIT_CODE=7 ;;
+        "ErrInvalidRoomID") EXIT_CODE=8 ;;
+        "ErrInvalidPublicKey") EXIT_CODE=9 ;;
+        "ErrForbidden") EXIT_CODE=10 ;;
+        "ErrAlreadyClaimed") EXIT_CODE=11 ;;
+        "ErrProcessingClaim") EXIT_CODE=12 ;;
+        "ErrInternalServerError") EXIT_CODE=13 ;;
+        "ErrGatewayTimeout") EXIT_CODE=14 ;;
+        "ErrServiceUnavailable") EXIT_CODE=15 ;;
+        *) EXIT_CODE=5 ;;
+esac
+echo >&2 "Failed to claim node."
 rm -f "${CLAIMING_DIR}/tmpout.txt"
-echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id"
-rm -f "${CLAIMING_DIR}/token"
-echo >&2 "Node was successfully claimed."
+exit $EXIT_CODE

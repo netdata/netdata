@@ -21,6 +21,7 @@
 - Perf fixes [\#8399](https://github.com/netdata/netdata/pull/8399) ([amoss](https://github.com/amoss))
 - ACLK: Improved the agent "pop-corning" phase [\#8398](https://github.com/netdata/netdata/pull/8398) ([stelfrag](https://github.com/stelfrag))
 - Fix broken dependencies for Ubuntu 19.10 \(eoan\) [\#8397](https://github.com/netdata/netdata/pull/8397) ([prologic](https://github.com/prologic))
+- Update the update instructions with per-method details [\#8394](https://github.com/netdata/netdata/pull/8394) ([joelhans](https://github.com/joelhans))
 - Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
 - Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
 - Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
@@ -239,7 +240,6 @@
 - Small updates to dash.html [\#7757](https://github.com/netdata/netdata/pull/7757) ([tnyeanderson](https://github.com/tnyeanderson))
 - Improve styling of documentation site and use Algolia search [\#7753](https://github.com/netdata/netdata/pull/7753) ([joelhans](https://github.com/joelhans))
 - multiple files: fix typos [\#7752](https://github.com/netdata/netdata/pull/7752) ([schneiderl](https://github.com/schneiderl))
-- on cloud error, inform user to update their netdata. [\#7750](https://github.com/netdata/netdata/pull/7750) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
