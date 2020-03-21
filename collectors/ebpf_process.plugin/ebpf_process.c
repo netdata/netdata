@@ -42,6 +42,8 @@ int *map_fd = NULL;
 
 //Libbpf (It is necessary to have at least kernel 4.10)
 int (*bpf_map_lookup_elem)(int, const void *, void *);
+int (*bpf_map_get_next_key)(int, const void *, void *);
+int (*bpf_map_delete_elem)(int, const void *);
 
 static char *plugin_dir = PLUGINS_DIR;
 static char *user_config_dir = CONFIG_DIR;
@@ -60,6 +62,7 @@ static int close_plugin = 0;
 static int mode = 2;
 static int developer_mode = 0;
 static int use_stdout = 0;
+static int use_json = 0;
 struct config collector_config;
 static int mykernel = 0;
 static int nprocs;
@@ -546,29 +549,77 @@ void *process_collector(void *ptr)
     return NULL;
 }
 
-static int netdata_store_bpf(void *data, int size) {
-    (void)size;
+static void collector_log_date(char *buffer, size_t len) {
+    if(unlikely(!buffer || !len))
+        return;
 
-    if (close_plugin)
-        return 0;
+    time_t t;
+    struct tm *tmp, tmbuf;
 
-    if(!developer_mode)
-        return -2; //LIBBPF_PERF_EVENT_CONT;
+    t = now_realtime_sec();
+    tmp = localtime_r(&t, &tmbuf);
 
-    netdata_error_report_t *e = data;
-    fprintf(developer_log
-            ,"%llu %s %u: %s, %d\n"
-            , now_realtime_usec() ,e->comm, e->pid, dimension_names[e->type], e->err);
-    fflush(developer_log);
+    if (tmp == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
 
-    return -2; //LIBBPF_PERF_EVENT_CONT;
+    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
+        buffer[0] = '\0';
+
+    buffer[len - 1] = '\0';
+}
+
+static int netdata_store_log() {
+    int counter = 0;
+    int limit = 200;
+    char *fields[] = {"Timestamp", "Task", "PID", "Function", "Error Number", "Error Message"};
+
+    netdata_error_report_t ner;
+    uint64_t key = 0, next_key;
+    int fd = map_fd[2];
+    char ct[256];
+    while(bpf_map_get_next_key(fd, &key, &next_key) ) {
+        bpf_map_lookup_elem(fd, &next_key, &ner);
+
+        collector_log_date(ct, 255);
+        int err = -ner.err;
+        fprintf(developer_log
+                , (!use_stdout)?
+                "%s:%s %s:%s %s:%u %s:%s %s:%d %s:%s\n":
+                "{\"%s\":\"%s\",\"%s\":\"%s\",\"%s\":\"%u\",\"%s\":\"%s\",\"%s\":\"%d\",\"%s\":\"%s\"}\n"
+                , fields[0], ct
+                , fields[1], ner.comm
+                , fields[2], ner.pid
+                , fields[3], id_names[ner.type]
+                , fields[4], err
+                , fields[5], (err < 134)?strerror(err): ""
+        );
+
+        bpf_map_delete_elem(fd, &next_key);
+        counter++;
+        if (counter == limit) {
+            break;
+        }
+    }
+
+    return 0;
 }
 
 void *process_log(void *ptr)
 {
     (void) ptr;
 
-    if (mode == 1 && developer_mode) {
+    if (developer_mode) {
+        usec_t step = 500000ULL;
+        heartbeat_t hb;
+        heartbeat_init(&hb);
+        while(!close_plugin) {
+            usec_t dt = heartbeat_next(&hb, step);
+            (void) dt;
+
+            netdata_store_log();
+        }
     }
 
     return NULL;
@@ -654,6 +705,17 @@ static int ebpf_load_libraries()
         }
 
         if(mode == 1) {
+            bpf_map_get_next_key = dlsym(libnetdata, "bpf_map_get_next_key");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find bpf_map_get_next_key: %s", err);
+                return -1;
+            }
+
+            bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find bpf_map_delete_elem: %s", err);
+                return -1;
+            }
         }
     }
 
@@ -746,6 +808,13 @@ static inline void set_log_file(char *ptr) {
         use_stdout = 1;
 }
 
+static inline void set_log_format(char *ptr) {
+    if (!strcasecmp(ptr, "json"))
+        use_json = 1;
+    else if (!strcasecmp(ptr, "ltsv"))
+        use_json = 0;
+}
+
 static void set_global_values() {
     struct section *sec = collector_config.first_section;
     while(sec) {
@@ -759,7 +828,7 @@ static void set_global_values() {
                 else if(!strcasecmp(values->name, "use stdout"))
                     set_log_file(values->value);
                 else if(!strcasecmp(values->name, "log format"))
-                    set_log_file(values->value);
+                    set_log_format(values->value);
 
                 values = values->next;
             }
