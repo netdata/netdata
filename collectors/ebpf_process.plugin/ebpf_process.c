@@ -576,27 +576,29 @@ static int netdata_store_log() {
     char *fields[] = {"Timestamp", "Task", "PID", "Function", "Error Number", "Error Message"};
 
     netdata_error_report_t ner;
-    uint64_t key = 0, next_key;
+    uint64_t key = 0, next_key = 0;
     int fd = map_fd[2];
     char ct[256];
-    while(bpf_map_get_next_key(fd, &key, &next_key) ) {
-        bpf_map_lookup_elem(fd, &next_key, &ner);
+    while(!bpf_map_get_next_key(fd, &key, &next_key)) {
+        if (!bpf_map_lookup_elem(fd, &next_key, &ner)) {
+            fprintf(stderr,"KILLME %d\n", developer_mode);
+            collector_log_date(ct, 255);
+            int err = -ner.err;
+            fprintf(developer_log
+                    , (!use_json)?
+                      "%s:%s\t%s:%s\t%s:%u\t%s:%s\t%s:%d\t%s:%s\n":
+                      "{\"%s\":\"%s\",\"%s\":\"%s\",\"%s\":\"%u\",\"%s\":\"%s\",\"%s\":\"%d\",\"%s\":\"%s\"}\n"
+                    , fields[0], ct
+                    , fields[1], ner.comm
+                    , fields[2], ner.pid
+                    , fields[3], id_names[ner.type]
+                    , fields[4], err
+                    , fields[5], (err < 134)?strerror(err): ""
+            );
 
-        collector_log_date(ct, 255);
-        int err = -ner.err;
-        fprintf(developer_log
-                , (!use_stdout)?
-                "%s:%s %s:%s %s:%u %s:%s %s:%d %s:%s\n":
-                "{\"%s\":\"%s\",\"%s\":\"%s\",\"%s\":\"%u\",\"%s\":\"%s\",\"%s\":\"%d\",\"%s\":\"%s\"}\n"
-                , fields[0], ct
-                , fields[1], ner.comm
-                , fields[2], ner.pid
-                , fields[3], id_names[ner.type]
-                , fields[4], err
-                , fields[5], (err < 134)?strerror(err): ""
-        );
+            bpf_map_delete_elem(fd, &next_key);
+        }
 
-        bpf_map_delete_elem(fd, &next_key);
         counter++;
         if (counter == limit) {
             break;
