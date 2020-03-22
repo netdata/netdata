@@ -581,7 +581,6 @@ static int netdata_store_log() {
     char ct[64];
     while(!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (!bpf_map_lookup_elem(fd, &next_key, &ner)) {
-            fprintf(stderr,"KILLME %d\n", developer_mode);
             collector_log_date(ct, 63);
             int err = -ner.err;
             fprintf(developer_log
