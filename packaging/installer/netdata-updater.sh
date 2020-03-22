@@ -204,7 +204,7 @@ update() {
 logfile=
 tmpdir=
 
-trap cleanup 0 1 2 3 6
+trap cleanup EXIT
 
 # Usually stored in /etc/netdata/.environment
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
