@@ -594,7 +594,7 @@ stop_all_netdata() {
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] || [ -n "$(builtin type -P netdatacli)" ]; then
+  if [ -n "$(netdata_pids)" ] && [ -n "$(builtin type -P netdatacli)" ]; then
     netdatacli shutdown-agent
     sleep 20
   fi
