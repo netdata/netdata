@@ -117,7 +117,9 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
                 break;
             }
             if (!strcmp(e->name, "payload")) {
-                data->payload = strdupz(e->data.string);
+                size_t len = strlen(e->data.string);
+                data->payload = mallocz(len);
+                url_decode_r(data->payload, e->data.string, len);
                 break;
             }
             break;
@@ -1303,7 +1305,6 @@ void *aclk_main(void *ptr)
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 
-
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
     uint32_t port_num = 0;
@@ -1416,7 +1417,7 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
 
     UNUSED(msg_id);
 
-    if(!aclk_connected)
+    if (!aclk_connected)
         return 0;
 
     if (unlikely(!message))
