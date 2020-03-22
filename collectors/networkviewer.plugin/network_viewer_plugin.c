@@ -80,7 +80,7 @@ int event_pid = 0;
 static int mykernel = 0;
 netdata_ebpf_events_t collector_events[] = {
     { .type = 'p', .name = "tcp_sendmsg" },
-    { .type = 'p', .name = "tcp_clean_rbuf" },
+    { .type = 'p', .name = "tcp_cleanup_rbuf" },
     { .type = 'p', .name = "tcp_retransmit_skb" },
     { .type = 'p', .name = "tcp_close" },
     { .type = 'p', .name = "udp_recvmsg" },
