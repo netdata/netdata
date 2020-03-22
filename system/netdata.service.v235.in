@@ -21,7 +21,7 @@ PIDFile=netdata/netdata.pid
 ExecStart=@sbindir_POST@/netdata -P $PIDFILE -D
 
 # saving a big db on slow disks may need some time
-TimeoutStopSec=60
+TimeoutStopSec=150
 
 # restart netdata if it crashes
 Restart=on-failure
