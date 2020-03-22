@@ -119,7 +119,8 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
             if (!strcmp(e->name, "payload")) {
                 size_t len = strlen(e->data.string);
                 data->payload = mallocz(len);
-                url_decode_r(data->payload, e->data.string, len);
+                if (unlikely(!url_decode_r(data->payload, e->data.string, len)))
+                    strcpy(data->payload, e->data.string);
                 break;
             }
             break;
