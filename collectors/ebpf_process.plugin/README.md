@@ -220,7 +220,27 @@ error information.
 #### log format
 
 When `developer mode` is enabled, Netdata allows you select two different formats for the developer report, ltsv 
-(the default mode) and json.
+(the default mode) and json. To demonstrate the difference between both, we got a report from the same python script that
+ we call in different time, firstly we demonstrate the output using ltsv
+ 
+```
+Timestamp:2020-03-22 21:58:46   Task:python     PID:11512       Function:do_sys_open    Error Number:2  Error Message:No such file or directory
+```
+
+and now the json output
+
+```
+{"Timestamp":"2020-03-22 22:47:40","Task":"python","PID":"14106","Function":"do_sys_open","Error Number":"2","Error Message":"No such file or directory"}
+```
+
+Both messages have the following fields:
+
+-  `Timestamp`: The date and time that the value was stored in the log.
+-  `Task`: The name of the task that created the error, this name is the same value found into `/proc/PID/status`.
+-  `PID`: The PID of the task that raised the error.
+-  `Function`: The function called inside the kernel.
+-  `Error Number`: The error returned from the function.
+-  `Error Message`: When it is available, Netdata also writes the description about the error.
 
 ## Performance
 
