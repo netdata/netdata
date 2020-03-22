@@ -63,10 +63,12 @@ inbound = 0.0.0.0/0
 ### Destination Ports
 
 Netdata is capable to monitor all the 65536 ports, but this will slow down the chart rendering, to avoid this problem 
-Netdata selected 50 most common ports as default ports to monitor.
+Netdata selected 50 most common ports as default ports to monitor. These ports are split in two groups according the 
+protocol:
 
 ```
-destination_ports = 20-23, 25,43,53,80,88,110,118,123,135, 137 138 139 143, 156, 194, 389, 443, 445, 464, 465, 513, 520, 530, 546, 547, 563, 631, 636, 691, 749, 901, 989, 990, 993, 995, 1381, 1433 1434 1512 1525 3389 3306 5432 6000 8080 19999
+tcp_destination_ports = 20-23, 25,43,80,88,110,118,135, 137 138 139 143, 156, 194, 389, 443, 445, 464, 465, 513, 520, 530, 546, 547, 563, 631, 636, 691, 749, 901, 989, 990, 993, 995, 1381, 1433 1434 1512 1525 3389 3306 5432 6000 8080 19999
+udp_destination_ports = 53,123,135, 137 138 139 143 19999
 ```
 
 we also allow different separators (either space or comma) for the destination ports, pay attention for the fact that 
