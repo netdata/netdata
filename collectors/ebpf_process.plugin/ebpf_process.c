@@ -578,11 +578,11 @@ static int netdata_store_log() {
     netdata_error_report_t ner;
     uint64_t key = 0, next_key = 0;
     int fd = map_fd[2];
-    char ct[256];
+    char ct[64];
     while(!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (!bpf_map_lookup_elem(fd, &next_key, &ner)) {
             fprintf(stderr,"KILLME %d\n", developer_mode);
-            collector_log_date(ct, 255);
+            collector_log_date(ct, 63);
             int err = -ner.err;
             fprintf(developer_log
                     , (!use_json)?
