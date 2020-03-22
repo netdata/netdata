@@ -13,13 +13,16 @@ static char *claiming_errors[] = {
         "Missing dependencies",                         // 3
         "Failure to connect to endpoint",               // 4
         "Unknown HTTP error message",                   // 5
-        "invalid agent id",                             // 6
-        "invalid public key",                           // 7
-        "token has expired",                            // 8
-        "invalid token",                                // 9
-        "duplicate agent id",                           // 10
-        "claimed in another workspace",                 // 11
-        "internal server error"                         // 12
+        "invalid node id",                              // 6
+        "invalid node name",                            // 7
+        "invalid room id",                              // 8
+        "invalid public key",                           // 9
+        "token expired/token not found/invalid token",  // 10
+        "already claimed",                              // 11
+        "processing claiming",                          // 12
+        "Internal Server Error",                        // 13
+        "Gateway Timeout",                              // 14
+        "Service Unavailable"                           // 15
 };
 
 
@@ -95,7 +98,7 @@ void claim_agent(char *claiming_arguments)
         return;
     }
     errno = 0;
-    unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]);
+    unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]) - 1;
 
     if ((unsigned)exit_code > maximum_known_exit_code) {
         error("Agent failed to be claimed with an unknown error.");
