@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix syntax error in claiming script. [\#8452](https://github.com/netdata/netdata/pull/8452) ([mfundul](https://github.com/mfundul))
 - Fix the ACLK installation with the installer switch [\#8443](https://github.com/netdata/netdata/pull/8443) ([amoss](https://github.com/amoss))
 - health: add dns\_query module alarm [\#8434](https://github.com/netdata/netdata/pull/8434) ([ilyam8](https://github.com/ilyam8))
 - Add the new cloud info in the info endpoint [\#8430](https://github.com/netdata/netdata/pull/8430) ([amoss](https://github.com/amoss))
