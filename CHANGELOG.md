@@ -7,6 +7,8 @@
 **Merged pull requests:**
 
 - Fix syntax error in claiming script. [\#8452](https://github.com/netdata/netdata/pull/8452) ([mfundul](https://github.com/mfundul))
+- Improve installer output re newlines [\#8447](https://github.com/netdata/netdata/pull/8447) ([prologic](https://github.com/prologic))
+- Fixes support for uninstalling the eBPF collector in the uninstaller and fixes a minor bug [\#8444](https://github.com/netdata/netdata/pull/8444) ([prologic](https://github.com/prologic))
 - Fix the ACLK installation with the installer switch [\#8443](https://github.com/netdata/netdata/pull/8443) ([amoss](https://github.com/amoss))
 - health: add dns\_query module alarm [\#8434](https://github.com/netdata/netdata/pull/8434) ([ilyam8](https://github.com/ilyam8))
 - Add the new cloud info in the info endpoint [\#8430](https://github.com/netdata/netdata/pull/8430) ([amoss](https://github.com/amoss))
@@ -109,7 +111,6 @@
 - Remove OpenSUSE Leap 15.0 from CI. [\#7990](https://github.com/netdata/netdata/pull/7990) ([Ferroin](https://github.com/Ferroin))
 - Removed tmem stat collection from xenstat plugin for Xen 4.13 [\#7951](https://github.com/netdata/netdata/pull/7951) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 - Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
-- Cross-host docker builds [\#7754](https://github.com/netdata/netdata/pull/7754) ([amoss](https://github.com/amoss))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
@@ -239,8 +240,6 @@
 - Fix the formatting of the trailer line in the Debian changelog template. [\#7763](https://github.com/netdata/netdata/pull/7763) ([Ferroin](https://github.com/Ferroin))
 - Filter out lxc cgroups which are not useful [\#7760](https://github.com/netdata/netdata/pull/7760) ([vlvkobal](https://github.com/vlvkobal))
 - Small updates to dash.html [\#7757](https://github.com/netdata/netdata/pull/7757) ([tnyeanderson](https://github.com/tnyeanderson))
-- Improve styling of documentation site and use Algolia search [\#7753](https://github.com/netdata/netdata/pull/7753) ([joelhans](https://github.com/joelhans))
-- multiple files: fix typos [\#7752](https://github.com/netdata/netdata/pull/7752) ([schneiderl](https://github.com/schneiderl))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
