@@ -4,7 +4,7 @@ title: "Agent-cloud link (ACLK)"
 description: "The agent-cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud. 
 The ACLK uses MQTT over secure websockets to create, persist, and encrypt the connection from end-to-end, and enable 
 the features found in Netdata Cloud."
-date: 2020-03-18
+date: 2020-03-23
 custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 ---
 -->
@@ -29,8 +29,6 @@ Read our [claiming documentation](../claim/README.md) for details on node claimi
 The ACLK is enabled by default if its prerequisites installed correctly, and the correct configuration is already set in
 your agent's `netdata.conf` file.
 
-> 🎆 Needed: Any other configuration settings?
-
 ```conf
 [cloud]
     cloud base url = https://up.netdata.cloud
@@ -38,10 +36,21 @@ your agent's `netdata.conf` file.
 
 ### Proxy configuration
 
-If your Netdata agent uses a proxy to reach the outside internet, you must configure a SOCKS5 proxy using one of the
-following methods.
+If your Netdata agent uses a proxy to reach the outside internet, you must configure a SOCKS5 proxy in the
+`[agent_cloud_link]` section of your `netdata.conf` file. By default, the section looks like the following:
 
-> 🎆 Needed: Configuration options/env variables for proxy.
+```conf
+[agent_cloud_link]
+    proxy = env
+```
+
+The `proxy` setting takes a few different values:
+
+-   `env`: Netdata reads the environment variables `http_proxy` and `socks_proxy` to discover the correct
+    proxy settings.
+-   `none`: Do not use any proxy, even if system is configured otherwise.
+-   `socks5[h]://[user:pass@]host:ip`: Netdata uses the specified SOCKS proxy.
+-   `http://[user:pass@]host:ip`: Netdata uses the specified HTTP proxy.
 
 ## Disable the ACLK
 
@@ -90,3 +99,7 @@ To get ACLK troubleshooting help from our engineers, [create an issue on
 GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality).
 Include any error messages you might have seen during the installation process, or in `/var/log/netdata/error.log`. We
 will update this troubleshooting section with specific workarounds for common issues.
+
+## What's next?
+
+If the ACLK is working on your node, you can move on to the [claiming process](../claim/README.md).
