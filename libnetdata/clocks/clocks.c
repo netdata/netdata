@@ -87,6 +87,18 @@ inline int now_monotonic_timeval(struct timeval *tv) {
     return now_timeval(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC, tv);
 }
 
+inline time_t now_monotonic_high_precision_sec(void) {
+    return now_sec(CLOCK_MONOTONIC);
+}
+
+inline usec_t now_monotonic_high_precision_usec(void) {
+    return now_usec(CLOCK_MONOTONIC);
+}
+
+inline int now_monotonic_high_precision_timeval(struct timeval *tv) {
+    return now_timeval(CLOCK_MONOTONIC, tv);
+}
+
 inline time_t now_boottime_sec(void) {
     return now_sec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
                    likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
