@@ -360,7 +360,8 @@ void aclk_lws_wss_fail_report()
     if (netdata_anonymous_statistics_enabled <= 0)
         return;
 
-    buf = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    // guess - most of the callback will be 1-99 + ',' + \0
+    buf = buffer_create((ACLK_LWS_CALLBACK_HISTORY * 2) + 10);
 
     for (i = 0; i < ACLK_LWS_CALLBACK_HISTORY; i++)
         if (engine_instance->lws_callback_history[i]) {
