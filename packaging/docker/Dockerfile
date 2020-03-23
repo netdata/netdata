@@ -38,6 +38,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
+    mv /usr/sbin/netdata-claim.sh    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     cp -rp /deps/* /app/usr/local/ && \
     chmod +x /app/usr/sbin/run.sh
