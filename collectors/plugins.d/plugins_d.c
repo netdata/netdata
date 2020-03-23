@@ -627,10 +627,15 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 store = words[3];
             else {
                 store = callocz(PLUGINSD_LINE_MAX + 1, sizeof(char));
+                size_t remaining = PLUGINSD_LINE_MAX;
                 char *move = store;
                 int i = 3;
                 while (i < w) {
                     size_t length = strlen(words[i]);
+                    if ((length + 1) >= remaining)
+                        break;
+
+                    remaining -= (length +1);
                     memcpy(move, words[i], length);
                     move += length;
                     *move++ = ' ';
