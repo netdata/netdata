@@ -221,7 +221,7 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
 unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 {
     /* it's twice the number of producers since we pin 2 pages per producer */
-    return ctx->max_cache_pages + 2 * (unsigned long)ctx->stats.metric_API_producers;
+    return ctx->max_cache_pages + 2 * (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
@@ -231,7 +231,7 @@ unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
 {
     /* it's twice the number of producers since we pin 2 pages per producer */
-    return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->stats.metric_API_producers;
+    return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
@@ -240,8 +240,8 @@ unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
  */
 unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx)
 {
-    /* We remove the active pages of the producers from the calculation and only allow 50% of the extra pinned pages */
-    return ctx->cache_pages_low_watermark + (unsigned long)ctx->stats.metric_API_producers / 2;
+    /* We remove the active pages of the producers from the calculation and only allow the extra pinned pages */
+    return ctx->cache_pages_low_watermark + (unsigned long)ctx->metric_API_max_producers;
 }
 
 /*
