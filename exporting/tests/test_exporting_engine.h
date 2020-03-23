@@ -141,14 +141,14 @@ int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, siz
 void __wrap_mongoc_init();
 mongoc_uri_t *__wrap_mongoc_uri_new_with_error(const char *uri_string, bson_error_t *error);
 int32_t __wrap_mongoc_uri_get_option_as_int32(const mongoc_uri_t *uri, const char *option, int32_t fallback);
-bool __wrap_mongoc_uri_set_option_as_int32 (const mongoc_uri_t *uri, const char *option, int32_t value);
+bool __wrap_mongoc_uri_set_option_as_int32(const mongoc_uri_t *uri, const char *option, int32_t value);
 mongoc_client_t *__wrap_mongoc_client_new_from_uri(const mongoc_uri_t *uri);
 bool __wrap_mongoc_client_set_appname(mongoc_client_t *client, const char *appname);
 mongoc_collection_t *
 __wrap_mongoc_client_get_collection(mongoc_client_t *client, const char *db, const char *collection);
 mongoc_collection_t *
 __real_mongoc_client_get_collection(mongoc_client_t *client, const char *db, const char *collection);
-void __wrap_mongoc_uri_destroy (mongoc_uri_t *uri);
+void __wrap_mongoc_uri_destroy(mongoc_uri_t *uri);
 bool __wrap_mongoc_collection_insert_many(
     mongoc_collection_t *collection,
     const bson_t **documents,

@@ -1075,8 +1075,7 @@ static void test_init_mongodb_instance(void **state)
 
     instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
 
-    struct mongodb_specific_config *connector_specific_config =
-        callocz(1, sizeof(struct mongodb_specific_config));
+    struct mongodb_specific_config *connector_specific_config = callocz(1, sizeof(struct mongodb_specific_config));
     instance->config.connector_specific_config = connector_specific_config;
     connector_specific_config->database = strdupz("test_database");
     connector_specific_config->collection = strdupz("test_collection");
@@ -1160,8 +1159,7 @@ static void test_format_batch_mongodb(void **state)
     struct instance *instance = engine->instance_root;
     struct stats *stats = &instance->stats;
 
-    struct mongodb_specific_data *connector_specific_data =
-        mallocz(sizeof(struct mongodb_specific_data));
+    struct mongodb_specific_data *connector_specific_data = mallocz(sizeof(struct mongodb_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
 
     struct bson_buffer *current_buffer = callocz(1, sizeof(struct bson_buffer));
@@ -1180,7 +1178,7 @@ static void test_format_batch_mongodb(void **state)
     assert_int_equal(buffer_strlen(buffer), 0);
 
     size_t len;
-    char *str = bson_as_canonical_extended_json (connector_specific_data->last_buffer->insert[0], &len);
+    char *str = bson_as_canonical_extended_json(connector_specific_data->last_buffer->insert[0], &len);
     assert_string_equal(str, "{ \"metric\" : \"test_metric\" }");
 
     freez(str);
@@ -1192,8 +1190,7 @@ static void test_mongodb_connector_worker(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
-    struct mongodb_specific_config *connector_specific_config =
-        callocz(1, sizeof(struct mongodb_specific_config));
+    struct mongodb_specific_config *connector_specific_config = callocz(1, sizeof(struct mongodb_specific_config));
     instance->config.connector_specific_config = connector_specific_config;
     connector_specific_config->database = strdupz("test_database");
 
@@ -1212,8 +1209,8 @@ static void test_mongodb_connector_worker(void **state)
         bson_new_from_json((const uint8_t *)"{ \"test_key\" : \"test_value\" }", -1, &error);
 
     connector_specific_data->client = mongoc_client_new("mongodb://localhost");
-    connector_specific_data->collection = __real_mongoc_client_get_collection(
-        connector_specific_data->client, "test_database", "test_collection");
+    connector_specific_data->collection =
+        __real_mongoc_client_get_collection(connector_specific_data->client, "test_database", "test_collection");
 
     expect_function_call(__wrap_mongoc_collection_insert_many);
     expect_value(__wrap_mongoc_collection_insert_many, collection, connector_specific_data->collection);

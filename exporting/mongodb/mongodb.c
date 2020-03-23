@@ -5,25 +5,26 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-int mongodb_init(struct instance *instance) {
+int mongodb_init(struct instance *instance)
+{
     struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
     mongoc_uri_t *uri;
     bson_error_t error;
 
-    if(unlikely(!connector_specific_config->collection || !*connector_specific_config->collection)) {
+    if (unlikely(!connector_specific_config->collection || !*connector_specific_config->collection)) {
         error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
     uri = mongoc_uri_new_with_error(instance->config.destination, &error);
-    if(unlikely(!uri)) {
+    if (unlikely(!uri)) {
         error("EXPORTING: failed to parse URI: %s. Error message: %s", instance->config.destination, error.message);
         return 1;
     }
 
     int32_t socket_timeout =
         mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, instance->config.timeoutms);
-    if(!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
+    if (!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
         error("EXPORTING: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
         return 1;
     };
@@ -32,12 +33,12 @@ int mongodb_init(struct instance *instance) {
         (struct mongodb_specific_data *)instance->connector_specific_data;
 
     connector_specific_data->client = mongoc_client_new_from_uri(uri);
-    if(unlikely(!connector_specific_data->client)) {
+    if (unlikely(!connector_specific_data->client)) {
         error("EXPORTING: failed to create a new client");
         return 1;
     }
 
-    if(!mongoc_client_set_appname(connector_specific_data->client, "netdata")) {
+    if (!mongoc_client_set_appname(connector_specific_data->client, "netdata")) {
         error("EXPORTING: failed to set client appname");
     };
 
@@ -71,7 +72,8 @@ int mongodb_init(struct instance *instance) {
     return 0;
 }
 
-void mongodb_cleanup(struct instance *instance) {
+void mongodb_cleanup(struct instance *instance)
+{
     struct mongodb_specific_data *connector_specific_data =
         (struct mongodb_specific_data *)instance->connector_specific_data;
 
@@ -134,10 +136,11 @@ int init_mongodb_instance(struct instance *instance)
     return 0;
 }
 
-void free_bson(bson_t **insert, size_t documents_inserted) {
+void free_bson(bson_t **insert, size_t documents_inserted)
+{
     size_t i;
 
-    for(i = 0; i < documents_inserted; i++)
+    for (i = 0; i < documents_inserted; i++)
         bson_destroy(insert[i]);
 
     freez(insert);
@@ -170,24 +173,24 @@ int format_batch_mongodb(struct instance *instance)
 
     size_t documents_inserted = 0;
 
-    while(*end && documents_inserted <= (size_t)stats->chart_buffered_metrics) {
-        while(*end && *end != '\n') end++;
+    while (*end && documents_inserted <= (size_t)stats->chart_buffered_metrics) {
+        while (*end && *end != '\n')
+            end++;
 
-        if(likely(*end)) {
+        if (likely(*end)) {
             *end = '\0';
             end++;
-        }
-        else {
+        } else {
             break;
         }
 
         bson_error_t error;
         insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
-        if(unlikely(!insert[documents_inserted])) {
-           error("EXPORTING: %s", error.message);
-           free_bson(insert, documents_inserted);
-           return 1;
+        if (unlikely(!insert[documents_inserted])) {
+            error("EXPORTING: %s", error.message);
+            free_bson(insert, documents_inserted);
+            return 1;
         }
 
         start = end;
