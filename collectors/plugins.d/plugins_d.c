@@ -642,6 +642,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             }
 
             new_labels = add_label_to_list(new_labels, words[1], store, strtol(words[2], NULL, 10));
+            if (store != words[3])
+                freez(store);
         }
         else if(likely(hash == OVERWRITE_HASH && !strcmp(s, PLUGINSD_KEYWORD_OVERWRITE))) {
             debug(D_PLUGINSD, "requested a OVERWITE a variable");
