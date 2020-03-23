@@ -5,6 +5,12 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
+/**
+ * Initialize MongoDB connector specific data, including a ring buffer
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int mongodb_init(struct instance *instance)
 {
     struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
@@ -72,6 +78,11 @@ int mongodb_init(struct instance *instance)
     return 0;
 }
 
+/**
+ * Clean a MongoDB connector instance up
+ *
+ * @param instance an instance data structure.
+ */
 void mongodb_cleanup(struct instance *instance)
 {
     struct mongodb_specific_data *connector_specific_data =
@@ -84,7 +95,7 @@ void mongodb_cleanup(struct instance *instance)
 }
 
 /**
- * Initialize MongoDB connector instance
+ * Initialize a MongoDB connector instance
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
@@ -136,6 +147,12 @@ int init_mongodb_instance(struct instance *instance)
     return 0;
 }
 
+/**
+ * Free an array of BSON structures
+ *
+ * @param insert an array of documents.
+ * @param documents_inserted the number of documents inserted.
+ */
 void free_bson(bson_t **insert, size_t documents_inserted)
 {
     size_t i;
