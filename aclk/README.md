@@ -21,5 +21,5 @@ Parameter proxy can take one of the following values:
 
 - `env` - the default (try to read environment variables `http_proxy` and `socks_proxy`)
 - `none` - do not use any proxy (even if system configured otherwise)
-- `socks5[h]://[user:pass@]host:ip` - will use this proxy
-- `http://[user:pass@]host:ip` - will use this socks proxy
+- `socks5[h]://[user:pass@]host:ip` - will use specified socks proxy
+- `http://[user:pass@]host:ip` - will use specified http proxy
