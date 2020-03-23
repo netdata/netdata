@@ -1547,19 +1547,13 @@ BUFFER *aclk_encode_response(BUFFER *contents)
 {
     char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
-    int in_quote;
 
     src = contents->buffer;
     dst = tmp_buffer;
     while (*src) {
         switch (*src) {
             case '\n':
-//                *dst++ = '\\';
-//                *dst++ = 'n';
-//                break;
             case '\t':
-//                *dst++ = '\\';
-//                *dst++ = 't';
                 break;
             case 0x01 ... 0x08:
             case 0x0b ... 0x1F:
