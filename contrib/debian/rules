@@ -6,6 +6,8 @@ DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 TOP = $(CURDIR)/debian/netdata
 TEMPTOP = $(CURDIR)/debian/tmp
 
+BASE_CONFIG = system/netdata.conf
+
 SYSTEMD_VERSION = $(shell /bin/sh -c "systemd --version 2>&1 | head -n 1 | cut -f 2 -d ' '")
 
 ifeq ($(shell test $(SYSTEMD_VERSION) -ge 235 && echo "1"), 1)
@@ -29,6 +31,7 @@ override_dh_installinit:
 	echo "SystemD Version: $(SYSTEMD_VERSION)"
 	echo "Using SystemD Unit: $(SYSTEMD_UNIT)"
 	cp -v $(SYSTEMD_UNIT) debian/netdata.service
+	cp -v $(BASE_CONFIG) debian/netdata.conf
 
 	dh_installinit
 
