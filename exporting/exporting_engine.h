@@ -199,4 +199,6 @@ void simple_connector_worker(void *instance_p);
 
 int send_internal_metrics(struct engine *engine);
 
+#include "exporting/prometheus/prometheus.h"
+
 #endif /* NETDATA_EXPORTING_ENGINE_H */

@@ -280,8 +280,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     BUFFER *wb,
     const char *prefix,
     EXPORTING_OPTIONS exporting_options,
-    time_t after,
-    time_t before,
     int allhosts,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
@@ -433,7 +431,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     if (as_collected) {
                         // we need as-collected / raw data
 
-                        if (unlikely(rd->last_collected_time.tv_sec < after))
+                        if (unlikely(rd->last_collected_time.tv_sec < instance->after))
                             continue;
 
                         const char *t = "gauge", *h = "gives";
@@ -562,7 +560,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     } else {
                         // we need average or sum of the data
 
-                        time_t first_t = after, last_t = before;
+                        time_t first_t = instance->after;
+                        time_t last_t = instance->before;
                         calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
                         if (!isnan(value) && !isinf(value)) {
@@ -649,13 +648,13 @@ static inline time_t prometheus_preparation(
 
     int first_seen = 0;
     if (!after) {
-        after = now - instance->engine->config.update_every;
+        after = now - instance->config.update_every;
         first_seen = 1;
     }
 
     if (after > now) {
         // oops! this should never happen
-        after = now - instance->engine->config.update_every;
+        after = now - instance->config.update_every;
     }
 
     if (output_options & PROMETHEUS_OUTPUT_HELP) {
@@ -685,8 +684,16 @@ static inline time_t prometheus_preparation(
     return after;
 }
 
+static struct instance *prometheus_exporter_instance = NULL;
+
+static struct instance *init_prometheus_exporter_instance()
+{
+    struct instance * instance= callocz(1, sizeof(struct instance));
+
+    return instance;
+}
+
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
-    struct instance *instance,
     RRDHOST *host,
     BUFFER *wb,
     const char *server,
@@ -694,17 +701,19 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     EXPORTING_OPTIONS exporting_options,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    time_t before = now_realtime_sec();
+    if (unlikely(!prometheus_exporter_instance))
+        prometheus_exporter_instance = init_prometheus_exporter_instance();
+
+    prometheus_exporter_instance->before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(instance, host, wb, exporting_options, server, before, output_options);
+    prometheus_exporter_instance->after = prometheus_preparation(prometheus_exporter_instance, host, wb, exporting_options, server, prometheus_exporter_instance->before, output_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        instance, host, wb, prefix, exporting_options, after, before, 0, output_options);
+        prometheus_exporter_instance, host, wb, prefix, exporting_options, 0, output_options);
 }
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
-    struct instance *instance,
     RRDHOST *host,
     BUFFER *wb,
     const char *server,
@@ -712,16 +721,19 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     EXPORTING_OPTIONS exporting_options,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    time_t before = now_realtime_sec();
+    if (unlikely(!prometheus_exporter_instance))
+        prometheus_exporter_instance = init_prometheus_exporter_instance();
+
+    prometheus_exporter_instance->before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(instance, host, wb, exporting_options, server, before, output_options);
+    prometheus_exporter_instance->after = prometheus_preparation(prometheus_exporter_instance, host, wb, exporting_options, server, prometheus_exporter_instance->before, output_options);
 
     rrd_rdlock();
     rrdhost_foreach_read(host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            instance, host, wb, prefix, exporting_options, after, before, 1, output_options);
+            prometheus_exporter_instance, host, wb, prefix, exporting_options, 1, output_options);
     }
     rrd_unlock();
 }
