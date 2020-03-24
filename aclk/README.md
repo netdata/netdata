@@ -34,10 +34,14 @@ your agent's `netdata.conf` file.
     cloud base url = https://up.netdata.cloud
 ```
 
+Unless your node uses a proxy to connect with the internet, you do not need to configure the ACLK further. See the next
+step for proxy configuration.
+
 ### Proxy configuration
 
-If your Netdata agent uses a proxy to reach the outside internet, you must configure a SOCKS5 proxy in the
-`[agent_cloud_link]` section of your `netdata.conf` file. By default, the section looks like the following:
+If your Netdata agent uses a proxy to reach the outside internet, you must configure a SOCKS5 or HTTP proxy in the
+`[agent_cloud_link]` section of your `netdata.conf` file. A SOCKS5 proxy is preferred. By default, the section looks
+like the following:
 
 ```conf
 [agent_cloud_link]
@@ -46,8 +50,8 @@ If your Netdata agent uses a proxy to reach the outside internet, you must confi
 
 The `proxy` setting takes a few different values:
 
--   `env`: Netdata reads the environment variables `http_proxy` and `socks_proxy` to discover the correct
-    proxy settings.
+-   `env`: Netdata reads the environment variables `socks_proxy` and `http_proxy` to discover the correct
+    proxy settings. A 
 -   `none`: Do not use any proxy, even if system is configured otherwise.
 -   `socks5[h]://[user:pass@]host:ip`: Netdata uses the specified SOCKS proxy.
 -   `http://[user:pass@]host:ip`: Netdata uses the specified HTTP proxy.
@@ -99,7 +103,3 @@ To get ACLK troubleshooting help from our engineers, [create an issue on
 GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality).
 Include any error messages you might have seen during the installation process, or in `/var/log/netdata/error.log`. We
 will update this troubleshooting section with specific workarounds for common issues.
-
-## What's next?
-
-If the ACLK is working on your node, you can move on to the [claiming process](../claim/README.md).
