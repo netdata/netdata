@@ -40,6 +40,6 @@ class Service(SimpleService):
         #dimension_id = 'expected1'
         #self.charts['cpu'].add_dimension([dimension_id])
         #data[dimension_id] = self.random.randint(0, 100)
-        data[['expected']] = self.random.randint(0, 100)
+        data['expected'] = self.random.randint(0, 100)
         return data
 
