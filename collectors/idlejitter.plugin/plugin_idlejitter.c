@@ -54,9 +54,9 @@ void *cpuidlejitter_main(void *ptr) {
         if(netdata_exit) break;
 
         while(elapsed < update_every_ut) {
-            now_monotonic_timeval(&before);
+            now_monotonic_high_precision_timeval(&before);
             sleep_usec(sleep_ut);
-            now_monotonic_timeval(&after);
+            now_monotonic_high_precision_timeval(&after);
 
             usec_t dt = dt_usec(&after, &before);
             elapsed += dt;

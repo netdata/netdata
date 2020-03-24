@@ -183,6 +183,7 @@ struct rrdengine_instance {
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
+    unsigned long metric_API_max_producers;
 
     struct rrdengine_statistics stats;
 };

@@ -15,6 +15,7 @@ char cmd_prefix_by_status[] = {
         CMD_PREFIX_ERROR
 };
 
+static int command_server_initialized = 0;
 static int command_thread_error;
 static int command_thread_shutdown;
 static unsigned clients = 0;
@@ -496,7 +497,7 @@ static void command_thread(void *arg)
     }
     async.data = NULL;
 
-    ret = uv_pipe_init(loop, &server_pipe, 1);
+    ret = uv_pipe_init(loop, &server_pipe, 0);
     if (ret) {
         error("uv_pipe_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
@@ -510,7 +511,13 @@ static void command_thread(void *arg)
         command_thread_error = ret;
         goto error_after_pipe_bind;
     }
-    if ((ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb))) {
+    ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb);
+    if (ret) {
+        /* Fallback to backlog of 1 */
+        info("uv_listen() failed with backlog = %d, falling back to backlog = 1.", SOMAXCONN);
+        ret = uv_listen((uv_stream_t *)&server_pipe, 1, connection_cb);
+    }
+    if (ret) {
         error("uv_listen(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_uv_listen;
@@ -563,6 +570,9 @@ void commands_init(void)
     int error;
 
     sanity_check();
+    if (command_server_initialized)
+        return;
+
     info("Initializing command server.");
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         uv_mutex_init(&command_lock_array[i]);
@@ -587,6 +597,8 @@ void commands_init(void)
         }
         goto after_error;
     }
+
+    command_server_initialized = 1;
     return;
 
 after_error:
@@ -596,6 +608,9 @@ after_error:
 void commands_exit(void)
 {
     cmd_t i;
+
+    if (!command_server_initialized)
+        return;
 
     command_thread_shutdown = 1;
     info("Shutting down command server.");
@@ -608,4 +623,5 @@ void commands_exit(void)
     }
     uv_rwlock_destroy(&exclusive_rwlock);
     info("Command server has stopped.");
+    command_server_initialized = 0;
 }
