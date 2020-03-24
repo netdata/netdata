@@ -51,7 +51,7 @@ like the following:
 The `proxy` setting takes a few different values:
 
 -   `env`: Netdata reads the environment variables `socks_proxy` and `http_proxy` to discover the correct
-    proxy settings. A 
+    proxy settings.
 -   `none`: Do not use any proxy, even if system is configured otherwise.
 -   `socks5[h]://[user:pass@]host:ip`: Netdata uses the specified SOCKS proxy.
 -   `http://[user:pass@]host:ip`: Netdata uses the specified HTTP proxy.
