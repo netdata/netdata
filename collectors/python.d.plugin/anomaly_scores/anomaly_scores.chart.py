@@ -17,7 +17,6 @@ CHARTS = {
     'cpu': {
         'options': [None, 'A random number', 'random number', 'random', 'random', 'line'],
         'lines': [
-            ['expected']
         ]
     }
 }
