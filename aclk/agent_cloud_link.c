@@ -1752,7 +1752,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (unlikely(agent_state == AGENT_INITIALIZING))
         last_init_sequence = now_realtime_sec();
     else {
-        if (unlikley(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd)))
+        if (unlikely(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd)))
             debug(D_ACLK, "ACLK failed to queue chart_update command");
     }
     return 0;
