@@ -17,7 +17,7 @@ CHARTS = {
     'cpu': {
         'options': [None, 'CPU Anomaly Scores ', 'value', 'anomaly_scores', 'anomaly_scores.cpu', 'line'],
         'lines': [
-            'expected'
+            'expected', 'actual', 'error'
         ]
     }
 }
@@ -36,10 +36,24 @@ class Service(SimpleService):
 
     def get_data(self):
         data = dict()
-        self.debug('get expected value')
-        dimension_id = ''.join(['expected'])
+
+        dimension_id = 'expected'
+        expected = self.random.randint(0, 100)
         if dimension_id not in self.charts['cpu']:
             self.charts['cpu'].add_dimension([dimension_id])
-        data[dimension_id] = self.random.randint(0, 100)
+        data[dimension_id] = expected
+
+        dimension_id = 'actual'
+        actual = self.random.randint(0, 100)
+        if dimension_id not in self.charts['cpu']:
+            self.charts['cpu'].add_dimension([dimension_id])
+        data[dimension_id] = actual
+
+        dimension_id = 'error'
+        error = actual - expected
+        if dimension_id not in self.charts['cpu']:
+            self.charts['cpu'].add_dimension([dimension_id])
+        data[dimension_id] = error
+
         return data
 
