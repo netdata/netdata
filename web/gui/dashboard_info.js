@@ -196,9 +196,9 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
-    'aclk_test': {
-        title: 'ACLK Test Generator',
-        info: 'For internal use to perform integration testing.'
+    'anomaly_scores': {
+        title: 'Anomaly Scores',
+        info: 'Anomaly Scores.'
     },
 
     'example': {
