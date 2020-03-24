@@ -36,6 +36,7 @@ class Service(SimpleService):
 
     def get_data(self):
         data = dict()
+        self.debug('get expected value')
         dimension_id = 'expected'
         self.charts['cpu'].add_dimension([dimension_id])
         data[dimension_id] = self.random.randint(0, 100)
