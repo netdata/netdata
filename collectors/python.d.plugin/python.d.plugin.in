@@ -170,7 +170,7 @@ def multi_path_find(name, *paths):
 
 def load_module(name):
     abs_path = os.path.join(DIRS.modules, '{0}{1}'.format(name, MODULE_SUFFIX))
-    module = SourceFileLoader(name, abs_path)
+    module = SourceFileLoader('pythond_' + name, abs_path)
     if isinstance(module, types.ModuleType):
         return module
     return module.load_module()
