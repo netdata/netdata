@@ -1,5 +1,8 @@
 # MongoDB exporting connector
 
+You can use the MongoDB connector and the experimental [exporting engine](../README.md) to archive your agent's metrics
+to a MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
+
 ## Prerequisites
 
 To use MongoDB as an external storage for long-term archiving, you should first
@@ -20,7 +23,7 @@ in the Netdata configuration directory and set the following options:
 ```
 
 You can find more information about the `destination` string URI format in the MongoDB
-[documentation]](https://docs.mongodb.com/manual/reference/connection-string/)
+[documentation](https://docs.mongodb.com/manual/reference/connection-string/)
 
 The default socket timeout depends on the exporting connector update interval. The timeout is 500 ms shorter than the
 interval (but not less than 1000 ms). You can alter the timeout using the `sockettimeoutms` MongoDB URI option.
