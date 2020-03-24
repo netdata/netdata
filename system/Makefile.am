@@ -7,6 +7,7 @@ CLEANFILES = \
     netdata-openrc \
     netdata.logrotate \
     netdata.service \
+    netdata.service.v235 \
     netdata-init-d \
     netdata-lsb \
     netdata-freebsd \
@@ -28,6 +29,7 @@ nodist_noinst_DATA = \
     netdata-openrc \
     netdata.logrotate \
     netdata.service \
+    netdata.service.v235 \
     netdata-init-d \
     netdata-lsb \
     netdata-freebsd \
@@ -39,6 +41,7 @@ dist_noinst_DATA = \
     netdata-openrc.in \
     netdata.logrotate.in \
     netdata.service.in \
+    netdata.service.v235.in \
     netdata-init-d.in \
     netdata-lsb.in \
     netdata-freebsd.in \
