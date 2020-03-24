@@ -6,6 +6,14 @@ DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 TOP = $(CURDIR)/debian/netdata
 TEMPTOP = $(CURDIR)/debian/tmp
 
+SYSTEMD_VERSION = $(shell /bin/sh -c "systemd --version 2>&1 | head -n 1 | cut -f 2 -d ' '")
+
+ifeq ($(shell test $(SYSTEMD_VERSION) -ge 235 && echo "1"), 1)
+SYSTEMD_UNIT = system/netdata.service.v235
+else
+SYSTEMD_UNIT = system/netdata.service
+endif
+
 %:
 	# For jessie and beyond
 	#
@@ -16,6 +24,13 @@ TEMPTOP = $(CURDIR)/debian/tmp
 	# make to debian/control.
 	#
 	#dh $@ --with autoreconf
+
+override_dh_installinit:
+	echo "SystemD Version: $(SYSTEMD_VERSION)"
+	echo "Using SystemD Unit: $(SYSTEMD_UNIT)"
+	cp -v $(SYSTEMD_UNIT) debian/netdata.service
+
+	dh_installinit
 
 override_dh_auto_configure:
 	packaging/bundle-mosquitto.sh .
