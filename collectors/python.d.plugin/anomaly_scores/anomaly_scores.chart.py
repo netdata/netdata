@@ -15,7 +15,7 @@ ORDER = [
 
 CHARTS = {
     'cpu': {
-        'options': [None, 'CPU Anomaly Scores ', 'value', 'anomaly_scores', 'anomaly_scores.cpu', 'line'],
+        'options': [None, 'CPU Anomaly Scores ', 'value', 'cpu', 'anomaly_scores.cpu', 'line'],
         'lines': [
             'expected'
         ]
