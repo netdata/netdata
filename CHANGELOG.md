@@ -6,13 +6,17 @@
 
 **Merged pull requests:**
 
+- Adding the claiming script to the multi-stage whitelist [\#8465](https://github.com/netdata/netdata/pull/8465) ([amoss](https://github.com/amoss))
+- Memory leak with labels on stream [\#8460](https://github.com/netdata/netdata/pull/8460) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix syntax error in claiming script. [\#8452](https://github.com/netdata/netdata/pull/8452) ([mfundul](https://github.com/mfundul))
 - Improve installer output re newlines [\#8447](https://github.com/netdata/netdata/pull/8447) ([prologic](https://github.com/prologic))
 - Fixes support for uninstalling the eBPF collector in the uninstaller and fixes a minor bug [\#8444](https://github.com/netdata/netdata/pull/8444) ([prologic](https://github.com/prologic))
 - Fix the ACLK installation with the installer switch [\#8443](https://github.com/netdata/netdata/pull/8443) ([amoss](https://github.com/amoss))
+- Add high precision timer support for plugins such as idlejitter. [\#8441](https://github.com/netdata/netdata/pull/8441) ([mfundul](https://github.com/mfundul))
 - health: add dns\_query module alarm [\#8434](https://github.com/netdata/netdata/pull/8434) ([ilyam8](https://github.com/ilyam8))
 - Add the new cloud info in the info endpoint [\#8430](https://github.com/netdata/netdata/pull/8430) ([amoss](https://github.com/amoss))
 - Fixed JSON parsing [\#8426](https://github.com/netdata/netdata/pull/8426) ([stelfrag](https://github.com/stelfrag))
+- Fix flushing error threshold [\#8425](https://github.com/netdata/netdata/pull/8425) ([mfundul](https://github.com/mfundul))
 - Fixed response payload to match the new specification [\#8420](https://github.com/netdata/netdata/pull/8420) ([stelfrag](https://github.com/stelfrag))
 - Adds missing files to ACLK CMake build [\#8412](https://github.com/netdata/netdata/pull/8412) ([underhood](https://github.com/underhood))
 - Fix Prometheus Remote Write build [\#8411](https://github.com/netdata/netdata/pull/8411) ([vlvkobal](https://github.com/vlvkobal))
@@ -234,12 +238,6 @@
 - Add a missing parameter to the allmetrics endpoint in Swagger Editor [\#7776](https://github.com/netdata/netdata/pull/7776) ([vlvkobal](https://github.com/vlvkobal))
 - Issue 7488 docker labels [\#7770](https://github.com/netdata/netdata/pull/7770) ([amoss](https://github.com/amoss))
 - Fix notification report [\#7769](https://github.com/netdata/netdata/pull/7769) ([thiagoftsm](https://github.com/thiagoftsm))
-- Limit PR labeler runs to the main repo. [\#7768](https://github.com/netdata/netdata/pull/7768) ([Ferroin](https://github.com/Ferroin))
-- Add an environment variable check to Travis configuration to allow disabling nightlies. [\#7765](https://github.com/netdata/netdata/pull/7765) ([Ferroin](https://github.com/Ferroin))
-- add swagger docu for `fixed\_width\_lbl` and `fixed\_width\_val` [\#7764](https://github.com/netdata/netdata/pull/7764) ([underhood](https://github.com/underhood))
-- Fix the formatting of the trailer line in the Debian changelog template. [\#7763](https://github.com/netdata/netdata/pull/7763) ([Ferroin](https://github.com/Ferroin))
-- Filter out lxc cgroups which are not useful [\#7760](https://github.com/netdata/netdata/pull/7760) ([vlvkobal](https://github.com/vlvkobal))
-- Small updates to dash.html [\#7757](https://github.com/netdata/netdata/pull/7757) ([tnyeanderson](https://github.com/tnyeanderson))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
