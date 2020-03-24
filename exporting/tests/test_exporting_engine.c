@@ -1204,9 +1204,9 @@ static void test_mongodb_connector_worker(void **state)
     connector_specific_data->first_buffer->next = buffer;
 
     connector_specific_data->first_buffer->insert = callocz(1, sizeof(bson_t *));
-    bson_error_t error;
+    bson_error_t bson_error;
     connector_specific_data->first_buffer->insert[0] =
-        bson_new_from_json((const uint8_t *)"{ \"test_key\" : \"test_value\" }", -1, &error);
+        bson_new_from_json((const uint8_t *)"{ \"test_key\" : \"test_value\" }", -1, &bson_error);
 
     connector_specific_data->client = mongoc_client_new("mongodb://localhost");
     connector_specific_data->collection =

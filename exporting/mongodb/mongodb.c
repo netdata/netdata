@@ -15,16 +15,17 @@ int mongodb_init(struct instance *instance)
 {
     struct mongodb_specific_config *connector_specific_config = instance->config.connector_specific_config;
     mongoc_uri_t *uri;
-    bson_error_t error;
+    bson_error_t bson_error;
 
     if (unlikely(!connector_specific_config->collection || !*connector_specific_config->collection)) {
         error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
-    uri = mongoc_uri_new_with_error(instance->config.destination, &error);
+    uri = mongoc_uri_new_with_error(instance->config.destination, &bson_error);
     if (unlikely(!uri)) {
-        error("EXPORTING: failed to parse URI: %s. Error message: %s", instance->config.destination, error.message);
+        error(
+            "EXPORTING: failed to parse URI: %s. Error message: %s", instance->config.destination, bson_error.message);
         return 1;
     }
 
@@ -201,11 +202,11 @@ int format_batch_mongodb(struct instance *instance)
             break;
         }
 
-        bson_error_t error;
-        insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &error);
+        bson_error_t bson_error;
+        insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &bson_error);
 
         if (unlikely(!insert[documents_inserted])) {
-            error("EXPORTING: %s", error.message);
+            error("EXPORTING: %s", bson_error.message);
             free_bson(insert, documents_inserted);
             return 1;
         }
@@ -268,20 +269,20 @@ void mongodb_connector_worker(void *instance_p)
         if (unlikely(documents_inserted == 0))
             continue;
 
-        bson_error_t error;
+        bson_error_t bson_error;
         if (likely(mongoc_collection_insert_many(
                 connector_specific_data->collection,
                 (const bson_t **)insert,
                 documents_inserted,
                 NULL,
                 NULL,
-                &error))) {
+                &bson_error))) {
             stats->chart_sent_bytes += data_size;
             stats->chart_transmission_successes++;
             stats->chart_receptions++;
         } else {
             // oops! we couldn't send (all or some of the) data
-            error("EXPORTING: %s", error.message);
+            error("EXPORTING: %s", bson_error.message);
             error(
                 "EXPORTING: failed to write data to the database '%s'. "
                 "Willing to write %zu bytes, wrote %zu bytes.",
