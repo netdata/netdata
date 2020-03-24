@@ -17,6 +17,7 @@ CHARTS = {
     'cpu': {
         'options': [None, 'A random number', 'random number', 'random', 'random', 'line'],
         'lines': [
+            'expected'
         ]
     }
 }
@@ -36,7 +37,7 @@ class Service(SimpleService):
     def get_data(self):
         data = dict()
         self.debug('get expected value')
-        dimension_id = 'expected'
+        dimension_id = 'expected1'
         self.charts['cpu'].add_dimension([dimension_id])
         data[dimension_id] = self.random.randint(0, 100)
         return data
