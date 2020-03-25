@@ -56,8 +56,6 @@ include dovecot/Makefile.inc
 include elasticsearch/Makefile.inc
 include energid/Makefile.inc
 include example/Makefile.inc
-include example2/Makefile.inc
-include example3/Makefile.inc
 include exim/Makefile.inc
 include fail2ban/Makefile.inc
 include freeradius/Makefile.inc

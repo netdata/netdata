@@ -96,19 +96,16 @@ class Service(SimpleService):
 
             dimension_id = 'error'
             error = abs(actual - expected)
-            if dimension_id not in self.charts[chart]:
-                self.charts[chart].add_dimension([dimension_id])
+            self.add_dimension(chart, dimension_id)
             data[dimension_id] = error
 
             chart_score = f'{chart}_score'
-            if chart_score not in self.charts['scores']:
-                self.charts['scores'].add_dimension([chart_score])
+            self.add_dimension(chart, dimension_id)
             data[chart_score] = error
 
             anomalies = 1 if error >= 9 else 0
             chart_anomalies = f'{chart}_anomalies'
-            if chart_anomalies not in self.charts['anomalies']:
-                self.charts['anomalies'].add_dimension([chart_anomalies])
+            self.add_dimension('anomalies', chart_anomalies)
             data[chart_anomalies] = anomalies
 
         return data
