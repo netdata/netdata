@@ -264,11 +264,15 @@ int aclk_lws_wss_connect(char *host, int port)
 {
     struct lws_client_connect_info i;
     struct lws_vhost *vhost;
+    int n;
 
     if (!engine_instance) {
         return aclk_lws_wss_client_init(host, port);
         // PROTOCOL_INIT callback will call again.
     }
+
+    for (n = 0; n < ACLK_LWS_CALLBACK_HISTORY; n++)
+        engine_instance->lws_callback_history[n] = 0;
 
     if (engine_instance->lws_wsi) {
         error("Already Connected. Only one connection supported at a time.");
@@ -346,12 +350,42 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "unknown";
     }
 }
+
+void aclk_lws_wss_fail_report()
+{
+    int i;
+    int anything_to_send = 0;
+    BUFFER *buf;
+
+    if (netdata_anonymous_statistics_enabled <= 0)
+        return;
+
+    // guess - most of the callback will be 1-99 + ',' + \0
+    buf = buffer_create((ACLK_LWS_CALLBACK_HISTORY * 2) + 10);
+
+    for (i = 0; i < ACLK_LWS_CALLBACK_HISTORY; i++)
+        if (engine_instance->lws_callback_history[i]) {
+            buffer_sprintf(buf, "%s%d", (i ? "," : ""), engine_instance->lws_callback_history[i]);
+            anything_to_send = 1;
+        }
+
+    if (anything_to_send)
+        send_statistics("ACLK_CONN_FAIL", "FAIL", buffer_tostring(buf));
+
+    buffer_free(buf);
+}
+
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     UNUSED(user);
     struct lws_wss_packet_buffer *data;
     int retval = 0;
     static int lws_shutting_down = 0;
+    int i;
+
+    for (i = ACLK_LWS_CALLBACK_HISTORY - 1; i > 0; i--)
+        engine_instance->lws_callback_history[i] = engine_instance->lws_callback_history[i - 1];
+    engine_instance->lws_callback_history[0] = (int)reason;
 
     if (unlikely(aclk_shutting_down && !lws_shutting_down)) {
             lws_shutting_down = 1;
@@ -443,6 +477,8 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             return -1;                       // the callback response is ignored, hope the above remains true
         case LWS_CALLBACK_WSI_DESTROY:
             aclk_lws_wss_clear_io_buffers(engine_instance);
+            if (!engine_instance->websocket_connection_up)
+                aclk_lws_wss_fail_report();
             engine_instance->lws_wsi = NULL;
             engine_instance->websocket_connection_up = 0;
             aclk_lws_connection_closed();
