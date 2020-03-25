@@ -68,7 +68,7 @@ class Service(SimpleService):
         for chart in ['cpu', 'load', 'disk', 'network']:
 
             dimension_id = 'expected'
-            expected = self.random.randint(0, 100)
+            expected = self.random.randint(0, 50)
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = expected
@@ -84,6 +84,7 @@ class Service(SimpleService):
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = error
+            data[chart] = error
 
         return data
 
