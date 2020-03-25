@@ -129,7 +129,7 @@ do
                 -hostname=*) HOSTNAME=${arg:10} ;;
                 -verbose) VERBOSE=1 ;;
                 -insecure) INSECURE=1 ;;
-                -proxy=socks*) PROXY=${arg:7} ;;
+                -proxy=*) PROXY=${arg:7} ;;
                 -noproxy) NOPROXY=yes ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
@@ -148,6 +148,7 @@ echo >&2 "Base URL: $URL_BASE"
 echo >&2 "Id: $ID"
 echo >&2 "Rooms: $ROOMS"
 echo >&2 "Hostname: $HOSTNAME"
+echo >&2 "Proxy: $PROXY"
 
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
@@ -214,6 +215,8 @@ else
         --body-file=\"${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} --no-proxy"
+        elif [ "${PROXY:0:4}" = http ] ; then
+                URLCOMMAND="export http_proxy=${PROXY}; ${URLCOMMAND}"
         fi
 fi
 
