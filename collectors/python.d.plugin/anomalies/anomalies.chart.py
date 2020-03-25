@@ -76,14 +76,14 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        np.random.seed(42)
+        #np.random.seed(42)
 
         data = dict()
 
         for chart in ['cpu', 'load', 'disk', 'network']:
 
-            expected = np.random.randint(0, 50)
-            actual = expected + np.random.randint(-10, 10)
+            expected = randint(0, 50)
+            actual = expected + randint(-10, 10)
             error = abs(actual - expected)
             anomalies = 1 if error >= 9 else 0
 
