@@ -196,7 +196,7 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
-    'anomaly_scores': {
+    'anomaly': {
         title: 'Anomaly Scores',
         icon: '<i class="fas fa-flask"></i>',
         info: 'Anomaly Scores.'
