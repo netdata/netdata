@@ -14,38 +14,45 @@ ORDER = [
     'load',
     'disk',
     'network',
-    'all'
+    'scores',
+    'anomalies',
 ]
 
 CHARTS = {
     'cpu': {
-        'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomaly_scores.cpu', 'line'],
+        'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
         'lines': [
             'expected', 'actual', 'error'
         ]
     },
     'load': {
-        'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomaly_scores.load', 'line'],
+        'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomalies.load', 'line'],
         'lines': [
             'expected', 'actual', 'error'
         ]
     },
     'disk': {
-        'options': [None, 'Disk Anomaly Scores', 'value', 'disk', 'anomaly_scores.disk', 'line'],
+        'options': [None, 'Disk Anomaly Scores', 'value', 'disk', 'anomalies.disk', 'line'],
         'lines': [
             'expected', 'actual', 'error'
         ]
     },
     'network': {
-        'options': [None, 'Network Anomaly Scores', 'value', 'network', 'anomaly_scores.network', 'line'],
+        'options': [None, 'Network Anomaly Scores', 'value', 'network', 'anomalies.network', 'line'],
         'lines': [
             'expected', 'actual', 'error'
         ]
     },
-    'all': {
-        'options': [None, 'All Anomaly Scores', 'value', 'all', 'anomaly_scores.all', 'line'],
+    'scores': {
+        'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
             'cpu_score', 'load_score', 'disk_score', 'network_score'
+        ]
+    },
+    'anomalies': {
+        'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'line'],
+        'lines': [
+            'cpu_anomaly', 'load_anomaly', 'disk_anomaly', 'network_anomaly'
         ]
     },
 }
@@ -86,9 +93,15 @@ class Service(SimpleService):
             data[dimension_id] = error
 
             chart_score = f'{chart}_score'
-            if chart_score not in self.charts['all']:
-                self.charts['all'].add_dimension([chart_score])
+            if chart_score not in self.charts['scores']:
+                self.charts['scores'].add_dimension([chart_score])
             data[chart_score] = error
+
+            anomalies = 1 if error > 5 else 0
+            chart_anomalies = f'{chart}_anomalies'
+            if chart_anomalies not in self.charts['anomalies']:
+                self.charts['anomalies'].add_dimension([chart_anomalies])
+            data[chart_anomalies] = anomalies
 
         return data
 
