@@ -31,7 +31,7 @@ your agent's `netdata.conf` file.
 
 ```conf
 [cloud]
-    cloud base url = https://up.netdata.cloud
+    cloud base url = https://app.netdata.cloud
 ```
 
 Unless your node uses a proxy to connect with the internet, you do not need to configure the ACLK further. See the next
