@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from random import SystemRandom, randint
-import numpy as np
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -64,7 +63,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        #self.random = SystemRandom()
+        self.random = SystemRandom()
 
     @staticmethod
     def check():
@@ -75,8 +74,6 @@ class Service(SimpleService):
             self.charts[chart].add_dimension([dimension_id])
 
     def get_data(self):
-
-        #np.random.seed(42)
 
         data = dict()
 
