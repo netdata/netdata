@@ -93,7 +93,7 @@ class Service(SimpleService):
                 ('error', error),
             ]
             for dimension_id, dimension_data in insert:
-                self.add_dimension(chart, dimension_id)
+                #self.add_dimension(chart, dimension_id)
                 data[dimension_id] = dimension_data
 
             chart_score = f'{chart}_score'
