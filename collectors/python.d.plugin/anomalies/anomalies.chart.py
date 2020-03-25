@@ -82,7 +82,7 @@ class Service(SimpleService):
             expected = randint(0, 50)
             actual = expected + randint(-10, 10)
             error = abs(actual - expected)
-            anomalies = 1 if error >= 10 else 0
+            anomalies = 1 if error >= 9 else 0
 
             data['expected'] = expected
             data['actual'] = actual
