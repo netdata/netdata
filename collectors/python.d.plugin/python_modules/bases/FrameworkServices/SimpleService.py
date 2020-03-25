@@ -60,6 +60,7 @@ class SimpleService(PythonDLimitedLogger, object):
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
     """
+
     def __init__(self, configuration, name=''):
         """
         :param configuration: <dict>
@@ -70,7 +71,7 @@ class SimpleService(PythonDLimitedLogger, object):
         self.order = list()
         self.definitions = dict()
 
-        self.module_name = self.__module__
+        self.module_name = self.__module__.lstrip('pythond_')
         self.job_name = configuration.pop('job_name')
         self.override_name = configuration.pop('override_name')
         self.fake_name = None
