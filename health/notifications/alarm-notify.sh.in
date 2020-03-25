@@ -1918,8 +1918,8 @@ send_dynatrace() {
   local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=$(cat <<EOF
 {
-  "title": "Netdata Alarm from ${host}",
-  "source" : "NetData Alarm",
+  "title": "NetData Alarm from ${host}",
+  "source" : "${DYNATRACE_ANNOTATION_TYPE}",
   "description" : "${description}",
   "eventType": "${DYNATRACE_EVENT}",
    "attachRules":{
