@@ -16,7 +16,7 @@ See [the Dynatrace documentation](https://www.dynatrace.com/support/help/extend-
 You need:
 
 1.  Dynatrace Server. You can use the same on all your Netdata servers but make sure the server is network visible from your Netdata hosts.
-The Dynatrace server should be with protocol prefixed (http:// or https://), example https://monitor.illumineit.com
+The Dynatrace server should be with protocol prefixed (`http://` or `https://`). For example: `https://monitor.example.com`
 This is a required parameter.
 2.  API Token. Generate a secure access API token that enables access to your Dynatrace monitoring data via the REST-based API.
 Generate a Dynatrace API authentication token. On your Dynatrace server goto Settings --> Integration --> Dynatrace API --> Generate token
