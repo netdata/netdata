@@ -29,8 +29,8 @@ This is a required parameter.
 4. Generate a Server Tag. On your Dynatrace Server go to Settings --> Tags --> Manually applied tags and create the Tag
 The Netdata alarm is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
 This is a required parameter.
-5. Specify the Dynatrace event. This can be one of CUSTOM_INFO, CUSTOM_ANNOTATION, CUSTOM_CONFIGURATION, CUSTOM_DEPLOYMENT
-The default value is CUSTOM_INFO
+5. Specify the Dynatrace event. This can be one of `CUSTOM_INFO`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, and `CUSTOM_DEPLOYMENT`. 
+The default value is `CUSTOM_INFO`.
 This is a required parameter.
 6. Specify the annotation type. Practically this is the source of the Dynatrace event. Put whatever it fits you, for example 
 _NetData Alarm_ that is also the default value.
