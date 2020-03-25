@@ -31,7 +31,6 @@ override_dh_installinit:
 	echo "SystemD Version: $(SYSTEMD_VERSION)"
 	echo "Using SystemD Unit: $(SYSTEMD_UNIT)"
 	cp -v $(SYSTEMD_UNIT) debian/netdata.service
-	cp -v $(BASE_CONFIG) debian/netdata.conf
 
 	dh_installinit
 
@@ -46,6 +45,8 @@ debian/%.postinst: debian/%.postinst.in
 	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
 
 override_dh_install: debian/netdata.postinst
+	cp -v $(BASE_CONFIG) debian/netdata.conf
+
 	dh_install
 
 	# Set the CUPS plugin install rule
