@@ -81,7 +81,7 @@ void aclk_lws_connection_data_received();
 void aclk_lws_connection_closed();
 void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 
-int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks);
+void aclk_wss_set_proxy(struct lws_vhost *vhost);
 
 #define FRAGMENT_SIZE 4096
 #endif
