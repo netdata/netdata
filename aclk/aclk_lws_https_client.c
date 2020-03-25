@@ -19,6 +19,7 @@ struct simple_hcc_data {
 
 static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
+    UNUSED(user);
     int n;
     char *ptr;
     char buffer[SMALL_BUFFER];
@@ -78,7 +79,7 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
         debug(D_ACLK, "LWS_CALLBACK_CLIENT_HTTP_WRITEABLE");
         if(perconn_data && perconn_data->payload) {
             n = strlen(perconn_data->payload);
-            if(perconn_data->data_size < LWS_PRE + n + 1) {
+            if(perconn_data->data_size < (size_t)LWS_PRE + n + 1) {
                 error("Buffer given is not big enough");
                 return 1;
             }
@@ -133,12 +134,16 @@ static const struct lws_protocols protocols[] = {
         simple_https_client_callback,
         0,
         0,
+        0,
+        0,
+        0
     },
-    { NULL, NULL, 0, 0 }
+    { NULL, NULL, 0, 0, 0, 0, 0 }
 };
 
 static void simple_hcc_log_divert(int level, const char *line)
 {
+    UNUSED(level);
     error("Libwebsockets: %s", line);
 }
 
@@ -159,15 +164,7 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
     int n = 0;
     time_t timestamp;
 
-    //TODO -> deduplicate (aclk_lws_wss_connect)
-    static const char *proxy = NULL;
-    static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
     struct lws_vhost *vhost;
-    char *log;
-
-    if(proxy_type == PROXY_NOT_SET)
-        proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
-
 
     memset(&info, 0, sizeof info);
 
@@ -212,17 +209,8 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
     if(!vhost)
         fatal("Could not find the default LWS vhost.");
 
-    lws_set_socks(vhost, ":");
-    lws_set_proxy(vhost, ":");
-
-    if(proxy_type == PROXY_TYPE_SOCKS5) {
-        log = strdupz(proxy);
-        safe_log_proxy_censor(log);
-        info("Connecting using SOCKS5 proxy:\"%s\"", log);
-        freez(log);
-        if(aclk_wss_set_socks(vhost, proxy))
-            error("LWS failed to accept socks proxy.");
-    }
+    //set up proxy
+    aclk_wss_set_proxy(vhost);
 
     lws_client_connect_via_info(&i);
 

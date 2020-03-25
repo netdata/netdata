@@ -64,9 +64,9 @@ void claim_agent(char *claiming_arguments)
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
 
-    proxy_str = aclk_lws_wss_get_proxy_setting(&proxy_type);
+    proxy_str = aclk_get_proxy(&proxy_type);
 
-    if(proxy_type == PROXY_TYPE_SOCKS5)
+    if (proxy_type == PROXY_TYPE_SOCKS5 || proxy_type == PROXY_TYPE_HTTP)
         snprintf(proxy_flag, CLAIMING_PROXY_LENGTH, "-proxy=\"%s\"", proxy_str);
 
     snprintfz(command_buffer,
