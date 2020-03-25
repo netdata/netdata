@@ -11,3 +11,4 @@ dist_pythonconfig_DATA += anomalies/anomalies.conf
 # do not install these files, but include them in the distribution
 dist_noinst_DATA       += anomalies/README.md anomalies/Makefile.inc
 
+
