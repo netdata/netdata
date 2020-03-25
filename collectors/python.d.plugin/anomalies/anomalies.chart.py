@@ -76,6 +76,8 @@ class Service(SimpleService):
 
     def get_data(self):
 
+        np.random.seed(0)
+
         data = dict()
 
         for chart in ['cpu', 'load', 'disk', 'network']:
@@ -90,24 +92,6 @@ class Service(SimpleService):
             data['error'] = error
             data[f'{chart}_score'] = error
             data[f'{chart}_anomalies'] = anomalies
-
-            # insert data
-            #insert = [
-            #    ('expected', expected),
-            #    ('actual', actual),
-            #    ('error', error),
-            #]
-            #for dimension_id, dimension_data in insert:
-                #self.add_dimension(chart, dimension_id)
-                #data[dimension_id] = dimension_data
-
-            #chart_score = f'{chart}_score'
-            #self.add_dimension('scores', chart_score)
-            #data[chart_score] = error
-
-            #chart_anomalies = f'{chart}_anomalies'
-            #self.add_dimension('anomalies', chart_anomalies)
-            #data[chart_anomalies] = anomalies
 
         return data
 
