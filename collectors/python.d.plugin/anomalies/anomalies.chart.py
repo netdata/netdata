@@ -76,7 +76,7 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        #np.random.seed(0)
+        np.random.seed(42)
 
         data = dict()
 
