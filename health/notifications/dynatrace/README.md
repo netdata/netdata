@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Dynatrace
 
-Dynatrace allows you to receive notification using their Events REST API.
+Dynatrace allows you to receive notifications using their Events REST API.
 
 For more details, see [Events API - POST an event](https://www.dynatrace.com/support/help/extend-dynatrace/dynatrace-api/environment-api/events/post-event/).
 
