@@ -84,6 +84,9 @@ class Service(SimpleService):
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = error
+
+            if chart not in self.charts['all']:
+                self.charts['all'].add_dimension([chart])
             data[chart] = error
 
         return data
