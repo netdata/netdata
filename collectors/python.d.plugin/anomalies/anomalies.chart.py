@@ -70,21 +70,28 @@ class Service(SimpleService):
     def check():
         return True
 
+    def add_dimension(self, chart, dimension_id):
+        if dimension_id not in self.charts[chart]:
+            self.charts[chart].add_dimension([dimension_id])
+
     def get_data(self):
+
+        def add_dimension(self, chart, dimension_id):
+            if dimension_id not in self.charts[chart]:
+                self.charts[chart].add_dimension([dimension_id])
+
         data = dict()
 
         for chart in ['cpu', 'load', 'disk', 'network']:
 
             dimension_id = 'expected'
             expected = np.random.randint(0, 50)
-            if dimension_id not in self.charts[chart]:
-                self.charts[chart].add_dimension([dimension_id])
+            self.add_dimension(chart, dimension_id)
             data[dimension_id] = expected
 
             dimension_id = 'actual'
             actual = expected + np.random.randint(-10, 10)
-            if dimension_id not in self.charts[chart]:
-                self.charts[chart].add_dimension([dimension_id])
+            self.add_dimension(chart, dimension_id)
             data[dimension_id] = actual
 
             dimension_id = 'error'
