@@ -45,7 +45,7 @@ CHARTS = {
     'all': {
         'options': [None, 'All Anomaly Scores', 'value', 'all', 'anomaly_scores.all', 'line'],
         'lines': [
-            'cpu', 'load', 'disk', 'network'
+            'cpu_score', 'load_score', 'disk_score', 'network_score'
         ]
     },
 }
@@ -85,9 +85,10 @@ class Service(SimpleService):
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = error
 
-            if chart not in self.charts['all']:
-                self.charts['all'].add_dimension([chart])
-            data[chart] = error
+            chart_score = f'{chart}_score'
+            if chart_score not in self.charts['all']:
+                self.charts['all'].add_dimension([chart_score])
+            data[chart_score] = error
 
         return data
 
