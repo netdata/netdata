@@ -23,37 +23,37 @@ CHARTS = {
     'cpu': {
         'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
         'lines': [
-            'expected', 'actual', 'error'
+            ['expected'], ['actual'], ['error']
         ]
     },
     'load': {
         'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomalies.load', 'line'],
         'lines': [
-            'expected', 'actual', 'error'
+            ['expected'], ['actual'], ['error']
         ]
     },
     'disk': {
         'options': [None, 'Disk Anomaly Scores', 'value', 'disk', 'anomalies.disk', 'line'],
         'lines': [
-            'expected', 'actual', 'error'
+            ['expected'], ['actual'], ['error']
         ]
     },
     'network': {
         'options': [None, 'Network Anomaly Scores', 'value', 'network', 'anomalies.network', 'line'],
         'lines': [
-            'expected', 'actual', 'error'
+            ['expected'], ['actual'], ['error']
         ]
     },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
-            'cpu_score', 'load_score', 'disk_score', 'network_score'
+            ['cpu_score'], ['load_score'], ['disk_score'], ['network_score']
         ]
     },
     'anomalies': {
         'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'line'],
         'lines': [
-            'cpu_anomaly', 'load_anomaly', 'disk_anomaly', 'network_anomaly'
+            ['cpu_anomaly'], ['load_anomaly'], ['disk_anomaly'], ['network_anomaly']
         ]
     },
 }
