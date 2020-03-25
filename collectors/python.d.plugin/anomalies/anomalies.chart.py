@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from random import SystemRandom, randint
+import numpy as np
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -75,13 +76,13 @@ class Service(SimpleService):
         for chart in ['cpu', 'load', 'disk', 'network']:
 
             dimension_id = 'expected'
-            expected = randint(0, 50)
+            expected = np.random.randint(0, 50)
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = expected
 
             dimension_id = 'actual'
-            actual = expected + randint(-10, 10)
+            actual = expected + np.random.randint(-10, 10)
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = actual
