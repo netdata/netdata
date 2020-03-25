@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Installer creates claim.d but is run as root, patch to correct ownership [\#8475](https://github.com/netdata/netdata/pull/8475) ([amoss](https://github.com/amoss))
+- Added Docker build arg to pass extra options to installer. [\#8472](https://github.com/netdata/netdata/pull/8472) ([Ferroin](https://github.com/Ferroin))
 - Adding the claiming script to the multi-stage whitelist [\#8465](https://github.com/netdata/netdata/pull/8465) ([amoss](https://github.com/amoss))
 - Memory leak with labels on stream [\#8460](https://github.com/netdata/netdata/pull/8460) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix syntax error in claiming script. [\#8452](https://github.com/netdata/netdata/pull/8452) ([mfundul](https://github.com/mfundul))
@@ -236,8 +238,6 @@
 - Fix libuv IPC pipe cleanup problem [\#7778](https://github.com/netdata/netdata/pull/7778) ([mfundul](https://github.com/mfundul))
 - Drop dirty dbengine pages if disk cannot keep up [\#7777](https://github.com/netdata/netdata/pull/7777) ([mfundul](https://github.com/mfundul))
 - Add a missing parameter to the allmetrics endpoint in Swagger Editor [\#7776](https://github.com/netdata/netdata/pull/7776) ([vlvkobal](https://github.com/vlvkobal))
-- Issue 7488 docker labels [\#7770](https://github.com/netdata/netdata/pull/7770) ([amoss](https://github.com/amoss))
-- Fix notification report [\#7769](https://github.com/netdata/netdata/pull/7769) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
