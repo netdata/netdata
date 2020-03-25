@@ -87,7 +87,7 @@ class Service(SimpleService):
             data[dimension_id] = actual
 
             dimension_id = 'error'
-            error = actual - expected
+            error = abs(actual - expected)
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = error
