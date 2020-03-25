@@ -97,7 +97,7 @@ class Service(SimpleService):
                 self.charts['scores'].add_dimension([chart_score])
             data[chart_score] = error
 
-            anomalies = 1 if error > 5 else 0
+            anomalies = 1 if error >= 9 else 0
             chart_anomalies = f'{chart}_anomalies'
             if chart_anomalies not in self.charts['anomalies']:
                 self.charts['anomalies'].add_dimension([chart_anomalies])
