@@ -11,6 +11,10 @@ priority = 90000
 
 ORDER = [
     'cpu',
+    'load',
+    'disk',
+    'network',
+    'all'
 ]
 
 CHARTS = {
@@ -19,7 +23,31 @@ CHARTS = {
         'lines': [
             'expected', 'actual', 'error'
         ]
-    }
+    },
+    'load': {
+        'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomaly_scores.load', 'line'],
+        'lines': [
+            'expected', 'actual', 'error'
+        ]
+    },
+    'disk': {
+        'options': [None, 'Disk Anomaly Scores', 'value', 'disk', 'anomaly_scores.disk', 'line'],
+        'lines': [
+            'expected', 'actual', 'error'
+        ]
+    },
+    'network': {
+        'options': [None, 'Network Anomaly Scores', 'value', 'network', 'anomaly_scores.network', 'line'],
+        'lines': [
+            'expected', 'actual', 'error'
+        ]
+    },
+    'all': {
+        'options': [None, 'All Anomaly Scores', 'value', 'all', 'anomaly_scores.all', 'line'],
+        'lines': [
+            'cpu', 'load', 'disk', 'network'
+        ]
+    },
 }
 
 
@@ -37,23 +65,25 @@ class Service(SimpleService):
     def get_data(self):
         data = dict()
 
-        dimension_id = 'expected'
-        expected = self.random.randint(0, 100)
-        if dimension_id not in self.charts['cpu']:
-            self.charts['cpu'].add_dimension([dimension_id])
-        data[dimension_id] = expected
+        for chart in ['cpu', 'load', 'disk', 'network']:
 
-        dimension_id = 'actual'
-        actual = expected + self.random.randint(-10, 10)
-        if dimension_id not in self.charts['cpu']:
-            self.charts['cpu'].add_dimension([dimension_id])
-        data[dimension_id] = actual
+            dimension_id = 'expected'
+            expected = self.random.randint(0, 100)
+            if dimension_id not in self.charts[chart]:
+                self.charts[chart].add_dimension([dimension_id])
+            data[dimension_id] = expected
 
-        dimension_id = 'error'
-        error = actual - expected
-        if dimension_id not in self.charts['cpu']:
-            self.charts['cpu'].add_dimension([dimension_id])
-        data[dimension_id] = error
+            dimension_id = 'actual'
+            actual = expected + self.random.randint(-10, 10)
+            if dimension_id not in self.charts[chart]:
+                self.charts[chart].add_dimension([dimension_id])
+            data[dimension_id] = actual
+
+            dimension_id = 'error'
+            error = actual - expected
+            if dimension_id not in self.charts[chart]:
+                self.charts[chart].add_dimension([dimension_id])
+            data[dimension_id] = error
 
         return data
 
