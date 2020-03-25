@@ -3,7 +3,7 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from random import SystemRandom
+from random import SystemRandom, randint
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -75,13 +75,13 @@ class Service(SimpleService):
         for chart in ['cpu', 'load', 'disk', 'network']:
 
             dimension_id = 'expected'
-            expected = self.random.randint(0, 50)
+            expected = randint(0, 50)
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = expected
 
             dimension_id = 'actual'
-            actual = expected + self.random.randint(-10, 10)
+            actual = expected + randint(-10, 10)
             if dimension_id not in self.charts[chart]:
                 self.charts[chart].add_dimension([dimension_id])
             data[dimension_id] = actual
