@@ -119,11 +119,11 @@ setup_terminal() {
 setup_terminal || echo > /dev/null
 
 run_ok() {
-  printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
 }
 
 run_failed() {
-  printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
 }
 
 ESCAPED_PRINT_METHOD=
@@ -159,16 +159,16 @@ run() {
 
   printf "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" >&2
   escaped_print >&2 "${@}"
-  printf "%s" "${TPUT_RESET}\n" >&2
+  printf "%s\n" "${TPUT_RESET}" >&2
 
   "${@}"
 
   local ret=$?
   if [ ${ret} -ne 0 ]; then
-    run_failed "${*}"
+    run_failed
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
   else
-    run_ok "${*}"
+    run_ok
     printf >> "${run_logfile}" "OK\n"
   fi
 
@@ -187,7 +187,7 @@ portable_del_group() {
       run groupdel "${groupname}" && return 0
     else
       echo >&2 "Group ${groupname} already removed in a previous step."
-      run_ok "${*}"
+      run_ok
     fi
   fi
 
