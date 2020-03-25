@@ -64,7 +64,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.random = SystemRandom()
+        #self.random = SystemRandom()
 
     @staticmethod
     def check():
@@ -76,7 +76,7 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        np.random.seed(0)
+        #np.random.seed(0)
 
         data = dict()
 
