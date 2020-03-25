@@ -11,7 +11,6 @@ Dynatrace allows you to receive notification using their Events REST API.
 
 For more details, see [Events API - POST an event](https://www.dynatrace.com/support/help/extend-dynatrace/dynatrace-api/environment-api/events/post-event/).
 
-https://www.dynatrace.com/support/help/extend-dynatrace/dynatrace-api/environment-api/events/post-event/
 
 
 You need:
@@ -35,4 +34,3 @@ The default value is CUSTOM_INFO
 This is a required parameter.
 6. Specify the annotation type. Practically this is the source of the Dynatrace event. Put whatever it fits you, for example 
 _NetData Alarm_ that is also the default value.
-
