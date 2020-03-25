@@ -44,7 +44,7 @@ class Service(SimpleService):
         data[dimension_id] = expected
 
         dimension_id = 'actual'
-        actual = self.random.randint(0, 100)
+        actual = expected + self.random.randint(-10, 10)
         if dimension_id not in self.charts['cpu']:
             self.charts['cpu'].add_dimension([dimension_id])
         data[dimension_id] = actual
