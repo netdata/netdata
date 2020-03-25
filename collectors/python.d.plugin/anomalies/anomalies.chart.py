@@ -88,7 +88,7 @@ class Service(SimpleService):
             data['actual'] = actual
             data['error'] = error
             data[f'{chart}_score'] = error
-            data[f'{chart}_anomalies'] = anomalies
+            data[f'{chart}_anomaly'] = anomalies
 
         return data
 
