@@ -87,7 +87,7 @@ static void test_read_exporting_config(void **state)
     assert_ptr_not_equal(instance, NULL);
     assert_ptr_equal(instance->next, NULL);
     assert_ptr_equal(instance->engine, engine);
-    assert_int_equal(instance->config.type, BACKEND_TYPE_GRAPHITE);
+    assert_int_equal(instance->config.type, EXPORTING_CONNECTOR_TYPE_GRAPHITE);
     assert_string_equal(instance->config.destination, "localhost");
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);

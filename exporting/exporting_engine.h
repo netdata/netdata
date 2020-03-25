@@ -42,10 +42,22 @@ typedef enum exporting_options {
      (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
       label->label_source != LABEL_SOURCE_NETDATA_CONF))
 
+typedef enum exporting_connector_types {
+    EXPORTING_CONNECTOR_TYPE_UNKNOWN,                   // Invalid type
+    EXPORTING_CONNECTOR_TYPE_GRAPHITE,                  // Send plain text to Graphite
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET,     // Send data to OpenTSDB using telnet API
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP,       // Send data to OpenTSDB using HTTP API
+    EXPORTING_CONNECTOR_TYPE_JSON,                      // Stores the data using JSON.
+    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE,   // The user selected to use Prometheus backend
+    EXPORTING_CONNECTOR_TYPE_KINESIS,                   // Send message to AWS Kinesis
+    EXPORTING_CONNECTOR_TYPE_MONGODB,                   // Send data to MongoDB collection
+    EXPORTING_CONNECTOR_TYPE_NUM                        // Number of backend types
+} EXPORTING_CONNECTOR_TYPE;
+
 struct engine;
 
 struct instance_config {
-    BACKEND_TYPE type;
+    EXPORTING_CONNECTOR_TYPE type;
 
     const char *name;
     const char *destination;
@@ -153,7 +165,7 @@ struct engine {
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
-BACKEND_TYPE exporting_select_type(const char *type);
+EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
 
 int init_connectors(struct engine *engine);
 

@@ -140,24 +140,24 @@ int get_connector_instance(struct connector_instance *target_ci)
  *
  * @return It returns the connector id.
  */
-BACKEND_TYPE exporting_select_type(const char *type)
+EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
 {
     if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
-        return BACKEND_TYPE_GRAPHITE;
+        return EXPORTING_CONNECTOR_TYPE_GRAPHITE;
     } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-        return BACKEND_TYPE_OPENTSDB_USING_TELNET;
+        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET;
     } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-        return BACKEND_TYPE_OPENTSDB_USING_HTTP;
+        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP;
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
-        return BACKEND_TYPE_JSON;
+        return EXPORTING_CONNECTOR_TYPE_JSON;
     } else if (!strcmp(type, "prometheus_remote_write")) {
-        return BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE;
+        return EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
-        return BACKEND_TYPE_KINESIS;
+        return EXPORTING_CONNECTOR_TYPE_KINESIS;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
-        return BACKEND_TYPE_MONGODB;
+        return EXPORTING_CONNECTOR_TYPE_MONGODB;
 
-    return BACKEND_TYPE_UNKNOWN;
+    return EXPORTING_CONNECTOR_TYPE_UNKNOWN;
 }
 
 EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EXPORTING_OPTIONS exporting_options) {
@@ -195,7 +195,7 @@ struct engine *read_exporting_config()
     static struct engine *engine = NULL;
     struct connector_instance_list {
         struct connector_instance local_ci;
-        BACKEND_TYPE backend_type;
+        EXPORTING_CONNECTOR_TYPE backend_type;
 
         struct connector_instance_list *next;
     };
@@ -262,20 +262,20 @@ struct engine *read_exporting_config()
 
         info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
-        if (tmp_ci_list->backend_type == BACKEND_TYPE_UNKNOWN) {
+        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_UNKNOWN) {
             error("Unknown exporting connector type");
             goto next_connector_instance;
         }
 
 #ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
-        if (tmp_ci_list->backend_type == BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE) {
+        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
             error("Prometheus Remote Write support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef HAVE_KINESIS
-        if (tmp_ci_list->backend_type == BACKEND_TYPE_KINESIS) {
+        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_KINESIS) {
             error("AWS Kinesis support isn't compiled");
             goto next_connector_instance;
         }
@@ -343,7 +343,7 @@ struct engine *read_exporting_config()
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
 
-        if (tmp_instance->config.type == BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE) {
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
             struct prometheus_remote_write_specific_config *connector_specific_config =
                 callocz(1, sizeof(struct prometheus_remote_write_specific_config));
 
@@ -353,7 +353,7 @@ struct engine *read_exporting_config()
                 instance_name, "remote write URL path", "/receive"));
         }
 
-        if (tmp_instance->config.type == BACKEND_TYPE_KINESIS) {
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS) {
             struct aws_kinesis_specific_config *connector_specific_config =
                 callocz(1, sizeof(struct aws_kinesis_specific_config));
 
