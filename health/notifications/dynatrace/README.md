@@ -15,7 +15,7 @@ For more details, see [Events API - POST an event](https://www.dynatrace.com/sup
 
 You need:
 
-1.  The Dynatrace Server. You can use the same on all your Netdata servers but make sure the server is network visible from your NetData hosts.
+1.  Dynatrace Server. You can use the same on all your Netdata servers but make sure the server is network visible from your Netdata hosts.
 The Dynatrace server should be with protocol prefixed (http:// or https://), example https://monitor.illumineit.com
 This is a required parameter.
 2.  API Token. Generate a secure access API token that enables access to your Dynatrace monitoring data via the REST-based API.
