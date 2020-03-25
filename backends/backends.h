@@ -27,10 +27,6 @@ typedef enum backend_types {
     BACKEND_TYPE_NUM                        // Number of backend types
 } BACKEND_TYPE;
 
-#ifdef ENABLE_EXPORTING
-#include "exporting/exporting_engine.h"
-#endif
-
 typedef int (**backend_response_checker_t)(BUFFER *);
 typedef int (**backend_request_formatter_t)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS);
 
