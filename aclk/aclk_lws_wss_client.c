@@ -383,7 +383,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
     static int lws_shutting_down = 0;
     int i;
 
-    for (i = ACLK_LWS_CALLBACK_HISTORY; i > 0; i--)
+    for (i = ACLK_LWS_CALLBACK_HISTORY - 1; i > 0; i--)
         engine_instance->lws_callback_history[i] = engine_instance->lws_callback_history[i - 1];
     engine_instance->lws_callback_history[0] = (int)reason;
 
