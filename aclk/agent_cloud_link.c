@@ -765,8 +765,10 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         aclk_create_header(local_buffer, "http", this_query->msg_id);
 
+        char *encoded_response = aclk_encode_response(w->response.data);
+
         buffer_sprintf(
-            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\"\n}", rc, aclk_encode_response(w->response.data)->buffer);
+            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\"\n}", rc, encoded_response);
 
         buffer_sprintf(local_buffer, "\n}");
 
@@ -775,6 +777,7 @@ int aclk_execute_query(struct aclk_query *this_query)
         buffer_free(w->response.data);
         freez(w);
         buffer_free(local_buffer);
+        freez(encoded_response);
         return 0;
     }
     return 1;
@@ -1546,14 +1549,15 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
  *
  */
 
-BUFFER *aclk_encode_response(BUFFER *contents)
+char *aclk_encode_response(BUFFER *contents)
 {
     char *tmp_buffer = mallocz(contents->len * 2);
     char *src, *dst;
+    size_t content_size = contents->len;
 
     src = contents->buffer;
     dst = tmp_buffer;
-    while (*src) {
+    while (content_size > 0) {
         switch (*src) {
             case '\n':
             case '\t':
@@ -1574,14 +1578,11 @@ BUFFER *aclk_encode_response(BUFFER *contents)
                 *dst++ = *src;
         }
         src++;
+        content_size--;
     }
     *dst = '\0';
 
-    buffer_flush(contents);
-    buffer_sprintf(contents, "%s", tmp_buffer);
-
-    freez(tmp_buffer);
-    return contents;
+    return tmp_buffer;
 }
 
 /*
