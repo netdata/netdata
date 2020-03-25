@@ -198,6 +198,7 @@ netdataDashboard.menu = {
 
     'anomaly_scores': {
         title: 'Anomaly Scores',
+        icon: '<i class="fas fa-flask"></i>',
         info: 'Anomaly Scores.'
     },
 
