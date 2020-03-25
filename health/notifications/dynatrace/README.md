@@ -26,7 +26,7 @@ This is a required parameter.
 https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all
 In that case, my space is _2a93fe0e-4cd5-469a-9d0d-1a064235cfce_
 This is a required parameter.
-4. Generate a Server Tag. On your Dynatrace Server go to Settings --> Tags --> Manually applied tags and create the Tag
+4. Generate a Server Tag. On your Dynatrace Server, go to **Settings** --> **Tags** --> **Manually applied tags** and create the Tag.
 The Netdata alarm is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
 This is a required parameter.
 5. Specify the Dynatrace event. This can be one of `CUSTOM_INFO`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, and `CUSTOM_DEPLOYMENT`. 
