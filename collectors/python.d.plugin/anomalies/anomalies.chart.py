@@ -76,10 +76,6 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        def add_dimension(self, chart, dimension_id):
-            if dimension_id not in self.charts[chart]:
-                self.charts[chart].add_dimension([dimension_id])
-
         data = dict()
 
         for chart in ['cpu', 'load', 'disk', 'network']:
@@ -100,7 +96,7 @@ class Service(SimpleService):
             data[dimension_id] = error
 
             chart_score = f'{chart}_score'
-            self.add_dimension(chart, dimension_id)
+            self.add_dimension('scores', chart_score)
             data[chart_score] = error
 
             anomalies = 1 if error >= 9 else 0
