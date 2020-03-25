@@ -1276,7 +1276,14 @@ install_apt_get() {
   read -r -a apt_opts <<< "$opts"
 
   # update apt repository caches
-  run ${sudo} apt-get "${apt_opts[@]}" update
+
+  echo >&2 "NOTE: Running apt-get update and updating your APT caches ..."
+  if [ "${version}" = 8 ]; then
+    echo >&2 "WARNING: You seem to be on Debian 8 (jessie) which is old enough we have to disable Check-Valid-Until checks"
+    run ${sudo} apt-get "${apt_opts[@]}" -o Acquire::Check-Valid-Until=false update
+  else
+    run ${sudo} apt-get "${apt_opts[@]}" update
+  fi
 
   # install the required packages
   run ${sudo} apt-get "${apt_opts[@]}" install "${@}"
