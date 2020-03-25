@@ -5,9 +5,9 @@
 # IT IS REQUIRED TO REFERENCE ALL FILES RELATIVE TO THE PARENT
 
 # install these files
-dist_python_DATA       += anomaly_scores/anomaly_scores.chart.py
-dist_pythonconfig_DATA += anomaly_scores/anomaly_scores.conf
+dist_python_DATA       += anomalies/anomalies.chart.py
+dist_pythonconfig_DATA += anomalies/anomalies.conf
 
 # do not install these files, but include them in the distribution
-dist_noinst_DATA       += anomaly_scores/README.md anomaly_scores/Makefile.inc
+dist_noinst_DATA       += anomalies/README.md anomalies/Makefile.inc
 

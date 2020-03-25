@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: anomaly_scores netdata python.d module
+# Description: anomalies netdata python.d module
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
