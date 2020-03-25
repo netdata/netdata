@@ -80,26 +80,26 @@ class Service(SimpleService):
 
         for chart in ['cpu', 'load', 'disk', 'network']:
 
-            dimension_id = 'expected'
+            # data
             expected = np.random.randint(0, 50)
-            self.add_dimension(chart, dimension_id)
-            data[dimension_id] = expected
-
-            dimension_id = 'actual'
             actual = expected + np.random.randint(-10, 10)
-            self.add_dimension(chart, dimension_id)
-            data[dimension_id] = actual
-
-            dimension_id = 'error'
             error = abs(actual - expected)
-            self.add_dimension(chart, dimension_id)
-            data[dimension_id] = error
+            anomalies = 1 if error >= 9 else 0
+
+            # insert data
+            insert = [
+                ('expected', expected),
+                ('actual', actual),
+                ('error', error),
+            ]
+            for dimension_id, dimension_data in insert:
+                self.add_dimension(chart, dimension_id)
+                data[dimension_id] = dimension_data
 
             chart_score = f'{chart}_score'
             self.add_dimension('scores', chart_score)
             data[chart_score] = error
 
-            anomalies = 1 if error >= 9 else 0
             chart_anomalies = f'{chart}_anomalies'
             self.add_dimension('anomalies', chart_anomalies)
             data[chart_anomalies] = anomalies
