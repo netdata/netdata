@@ -62,6 +62,32 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
+HOST_PORT = 'london.my-netdata.io'
+
+def tmp_get_data():
+
+    data = dict()
+
+    for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
+        after = -1
+        url = f'http://{HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        response = requests.get(url)
+        raw_data = response.json()['data'][0][1:]
+
+        actual = np.mean(raw_data)
+        rand_error_pct = randint(-20, 20) / 100
+        expected = actual + (rand_error_pct * actual)
+        error = abs(actual - expected)
+        error_pct = error / actual
+        anomalies = 1.0 if error_pct > 0.1 else 0.0
+
+        data[f'{chart}_expected'] = expected
+        data[f'{chart}_actual'] = actual
+        data[f'{chart}_error'] = error
+        data[f'{chart}_score'] = error
+        data[f'{chart}_anomaly'] = anomalies
+
+    return data
 
 
 class Service(SimpleService):
@@ -77,27 +103,14 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        data = dict()
-
-        for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
-
-            after = -1
-            url = f'http://{HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
-            response = requests.get(url)
-            raw_data = response.json()['data'][0][1:]
-
-            actual = np.mean(raw_data)
-            rand_error_pct = randint(-20, 20) / 100
-            expected = actual + (rand_error_pct * actual)
-            error = abs(actual - expected)
-            error_pct = error / actual
-            anomalies = 1.0 if error_pct > 0.1 else 0.0
-
-            data[f'{chart}_expected'] = expected
-            data[f'{chart}_actual'] = actual
-            data[f'{chart}_error'] = error
-            data[f'{chart}_score'] = error
-            data[f'{chart}_anomaly'] = anomalies
+        data = tmp_get_data()
 
         return data
 
+#%%
+
+tmp_get_data()
+
+#%%
+
+#%%
