@@ -7,6 +7,14 @@ SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+const char *tls_version=NULL;
+const char *tls_ciphers=NULL;
+const char *ciphers[] = {
+        "ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA",
+        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA",
+        "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256" };
+#endif
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 /**
@@ -49,32 +57,75 @@ void security_openssl_library()
 #endif
 }
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+/**
+ * TLS Select Ciphers
+ *
+ * Select the ciphers based in the user input
+ *
+ * @param version the TLS version selected
+ *
+ * @return It returns the cipher list based in the protocol version
+ */
+const char *tls_select_ciphers(int version) {
+    if (tls_ciphers && strcmp(tls_ciphers, "none") != 0)
+        return tls_ciphers;
+
+    if (version == TLS1_1_VERSION)
+        return ciphers[0];
+    else if (version == TLS1_2_VERSION)
+        return ciphers[1];
+
+    return ciphers[2];
+}
+/**
+ * TLS version
+ *
+ * Returns the TLS version depending of the user input.
+ *
+ * @param lversion is the user input.
+ *
+ * @return it returns the version number.
+ */
+int tls_select_version(const char *lversion) {
+    if (!strcmp(lversion, "1.1"))
+        return TLS1_1_VERSION;
+    else if (!strcmp(lversion, "1.2"))
+        return TLS1_2_VERSION;
+    else if (!strcmp(lversion, "1.3"))
+        return TLS1_3_VERSION;
+
+    return TLS_MAX_VERSION;
+}
+#endif
+
 /**
  * OpenSSL common options
  *
  * Clients and SERVER have common options, this function is responsible to set them in the context.
  *
- * @param ctx
+ * @param ctx the initialized SSL context.
+ * @param side 0 means server, and 1 client.
  */
-void security_openssl_common_options(SSL_CTX *ctx) {
+void security_openssl_common_options(SSL_CTX *ctx, int side) {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    static char *ciphers = {"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"};
+    if (!side) {
+        int version =  tls_select_version(tls_version) ;
+        const char *cipher = tls_select_ciphers(version);
 #endif
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-    SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
-    //We are avoiding the TLS v1.3 for while, because Google Chrome
-    //is giving the message net::ERR_SSL_VERSION_INTERFERENCE with it.
-    SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
-#endif
-    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+        SSL_CTX_set_min_proto_version(ctx, version);
+        SSL_CTX_set_max_proto_version(ctx, version);
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if (!SSL_CTX_set_cipher_list(ctx, ciphers)) {
-        error("SSL error. cannot set the cipher list");
+        if (!SSL_CTX_set_cipher_list(ctx, cipher)) {
+            error("SSL error. cannot set the cipher list");
+        }
     }
 #endif
+
+    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 }
 
 /**
@@ -92,7 +143,7 @@ SSL_CTX * security_initialize_openssl_client() {
     ctx = SSL_CTX_new(TLS_client_method());
 #endif
     if(ctx) {
-        security_openssl_common_options(ctx);
+        security_openssl_common_options(ctx, 1);
     }
 
     return ctx;
@@ -128,7 +179,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 
     SSL_CTX_use_certificate_chain_file(ctx, security_cert);
 #endif
-    security_openssl_common_options(ctx);
+    security_openssl_common_options(ctx, 0);
 
     SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
 

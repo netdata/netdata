@@ -67,11 +67,11 @@ The API requests are serviced as follows:
 
 ### Enabling TLS support
 
-Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data between a slave and its master, via the TLS 1.2 protocol.
+Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data between a slave and its master, via the TLS protocol.
 
 Inbound unix socket connections are unaffected, regardless of the TLS settings.\
 ??? info "Differences in TLS and SSL terminology"
-    While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol, it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS` or `TLS/SSL`.
+    While Netdata uses Transport Layer Security (TLS) to encrypt communications rather than the obsolete SSL protocol, it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS` or `TLS/SSL`.
 
 To enable TLS, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
 
@@ -95,6 +95,21 @@ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out
 ```sh
 openssl speed rsa2048 rsa4096
 ```
+
+### Select TLS version
+
+Since version 1.21 Netdata accepts `tls key` and `tls certificate` as replacement of the options `ssl key` and `ssl certificate`, 
+ but you do not need to change your `netdata.conf` case you are using old `ssl` variables, because old options are kept due compatibility.
+
+Netdata also brings two new options related to TLS, now you can specify the TLS version and the ciphers that you want to use:
+
+```conf
+[web]
+    tls key = 1.3
+    tls ciphers = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
+```
+
+case you do not specify these optons, Netdata will try to use the highest options available on your system.
 
 #### TLS/SSL enforcement
 

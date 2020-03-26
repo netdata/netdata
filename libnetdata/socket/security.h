@@ -33,6 +33,11 @@ extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+extern const char *tls_version;
+extern const char *ciphers[];
+extern const char *tls_ciphers;
+#endif
 extern int netdata_validate_server;
 extern int security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
