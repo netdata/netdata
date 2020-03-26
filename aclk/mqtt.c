@@ -270,6 +270,7 @@ int _link_set_lwt(char *sub_topic, int qos)
     }
 
     time_t time_created = now_realtime_sec();
+    nsec_t time_created_ns = now_realtime_nsec();
     char *msg_id = create_uuid();
 
     snprintfz(
@@ -277,9 +278,10 @@ int _link_set_lwt(char *sub_topic, int qos)
         "{ \"type\": \"disconnect\","
         " \"msg-id\": \"%s\","
         " \"timestamp\": %ld,"
+        " \"timestamp-ns\": %llu,"
         " \"version\": %d,"
         " \"payload\": \"unexpected\" }",
-        msg_id, time_created, ACLK_VERSION);
+        msg_id, time_created, time_created_ns, ACLK_VERSION);
 
     freez(msg_id);
 
