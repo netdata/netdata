@@ -1301,7 +1301,6 @@ int main(int argc, char **argv) {
 
     if (claiming_pending_arguments)
          claim_agent(claiming_pending_arguments);
-    load_claiming_state();
 
     // ------------------------------------------------------------------------
     // enable log flood protection
