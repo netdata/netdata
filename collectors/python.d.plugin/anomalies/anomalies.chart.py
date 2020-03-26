@@ -77,9 +77,9 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
-#HOST_PORT = 'london.my-netdata.io'
 
-def tmp_get_data(host=None):
+
+def get_raw_data(host=None):
 
     if host is None:
         host = HOST_PORT
@@ -128,13 +128,14 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        data = tmp_get_data()
+        data = get_raw_data()
 
         return data
 
+
 #%%
 
-#data = tmp_get_data('london.my-netdata.io')
+#data = get_raw_data('london.my-netdata.io')
 #print(data)
 
 #%%
