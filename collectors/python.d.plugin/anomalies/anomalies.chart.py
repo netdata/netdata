@@ -17,6 +17,7 @@ priority = 1
 ORDER = [
     'cpu',
     'load',
+    'ram',
     'io',
     'net',
     'scores',
@@ -27,51 +28,61 @@ CHARTS = {
     'cpu': {
         'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
         'lines': [
-            ['cpu_expected', 'CPU Expected', 'absolute', 1, 100],
-            ['cpu_actual', 'CPU Actual', 'absolute', 1, 100],
-            ['cpu_error', 'Error', 'absolute', 1, 100]
+            ['cpu_expected', 'cpu expected', 'absolute', 1, 100],
+            ['cpu_actual', 'cpu actual', 'absolute', 1, 100],
+            ['cpu_error', 'error', 'absolute', 1, 100]
         ]
     },
     'load': {
         'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomalies.load', 'line'],
         'lines': [
-            ['load_expected', None, 'absolute', 1, 100],
-            ['load_actual', None, 'absolute', 1, 100],
-            ['load_error', None, 'absolute', 1, 100]
+            ['load_expected', 'load expected', 'absolute', 1, 100],
+            ['load_actual', 'load actual', 'absolute', 1, 100],
+            ['load_error', 'error', 'absolute', 1, 100]
+        ]
+    },
+    'ram': {
+        'options': [None, 'RAM Anomaly Scores', 'value', 'ram', 'anomalies.ram', 'line'],
+        'lines': [
+            ['ram_expected', 'ram expected', 'absolute', 1, 100],
+            ['ram_actual', 'ram actual', 'absolute', 1, 100],
+            ['ram_error', 'error', 'absolute', 1, 100]
         ]
     },
     'io': {
         'options': [None, 'IO Anomaly Scores', 'value', 'io', 'anomalies.io', 'line'],
         'lines': [
-            ['io_expected', None, 'absolute', 1, 100],
-            ['io_actual', None, 'absolute', 1, 100],
-            ['io_error', None, 'absolute', 1, 100]
+            ['io_expected', 'io expected', 'absolute', 1, 100],
+            ['io_actual', 'io actual', 'absolute', 1, 100],
+            ['io_error', 'error', 'absolute', 1, 100]
         ]
     },
     'net': {
         'options': [None, 'Network Anomaly Scores', 'value', 'net', 'anomalies.net', 'line'],
         'lines': [
-            ['net_expected', None, 'absolute', 1, 100],
-            ['net_actual', None, 'absolute', 1, 100],
-            ['net_error', None, 'absolute', 1, 100]
+            ['net_expected', 'net expected', 'absolute', 1, 100],
+            ['net_actual', 'net actual', 'absolute', 1, 100],
+            ['net_error', 'error', 'absolute', 1, 100]
         ]
     },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
-            ['cpu_score', None, 'absolute', 1, 100],
-            ['load_score', None, 'absolute', 1, 100],
-            ['io_score', None, 'absolute', 1, 100],
-            ['net_score', None, 'absolute', 1, 100]
+            ['cpu_score', 'cpu score', 'absolute', 1, 100],
+            ['load_score', 'load score', 'absolute', 1, 100],
+            ['ram_score', 'ram score', 'absolute', 1, 100],
+            ['io_score', 'io score', 'absolute', 1, 100],
+            ['net_score', 'net score', 'absolute', 1, 100]
         ]
     },
     'anomalies': {
         'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'line'],
         'lines': [
-            ['cpu_anomaly', None, 'absolute', 1, 1],
-            ['load_anomaly', None, 'absolute', 1, 1],
-            ['io_anomaly', None, 'absolute', 1, 1],
-            ['net_anomaly', None, 'absolute', 1, 1]
+            ['cpu_anomaly', 'cpu anomaly', 'absolute', 1, 1],
+            ['load_anomaly', 'load anomaly', 'absolute', 1, 1],
+            ['ram_anomaly', 'ram anomaly', 'absolute', 1, 1],
+            ['io_anomaly', 'io anomaly', 'absolute', 1, 1],
+            ['net_anomaly', 'net anomaly', 'absolute', 1, 1]
         ]
     },
 }
