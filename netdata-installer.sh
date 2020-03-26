@@ -1283,7 +1283,7 @@ function get_kernel_version() {
 
 function get_rh_version() {
   if [ ! -f /etc/redhat-release ] ; then
-     echo "000000000"
+     printf "000000000"
      return
   fi
 
