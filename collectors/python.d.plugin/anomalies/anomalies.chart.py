@@ -146,8 +146,8 @@ class Service(SimpleService):
 
 #%%
 
-data = get_raw_data('frankfurt.my-netdata.io')
-print(data)
+#data = get_raw_data('frankfurt.my-netdata.io')
+#print(data)
 
 #%%
 
