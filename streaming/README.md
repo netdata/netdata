@@ -242,6 +242,8 @@ When TLS/SSL is enabled on the slave, the default behavior will be to not connec
     ssl skip certificate verification = yes
 ```
 
+Since version 1.21 Netdata also supports the option `tls skip certificate validation` that has the same action of the previous option.
+
 #### Trusted certificate
 
 If you've enabled [certificate verification](#certificate-verification), you might see errors from the OpenSSL library when there's a problem with checking the certificate chain (`X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`). More importantly, OpenSSL will reject self-signed certificates.
