@@ -88,9 +88,9 @@ int _mqtt_lib_init()
 
     // show library info so can have it in the logfile
     //libmosq_version = mosquitto_lib_version(&libmosq_major, &libmosq_minor, &libmosq_revision);
-    ca_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link cert", "*");
-    server_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link server cert", "*");
-    server_key = config_get(CONFIG_SECTION_ACLK, "agent cloud link server key", "*");
+    ca_crt = config_get(CONFIG_SECTION_CLOUD, "link cert", "*");
+    server_crt = config_get(CONFIG_SECTION_CLOUD, "link server cert", "*");
+    server_key = config_get(CONFIG_SECTION_CLOUD, "link server key", "*");
 
     if (ca_crt[0] == '*') {
         freez(ca_crt);
