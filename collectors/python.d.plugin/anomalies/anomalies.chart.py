@@ -11,7 +11,7 @@ import requests
 import numpy as np
 
 
-priority = 90000
+priority = 1
 
 ORDER = [
     'cpu',
@@ -112,7 +112,7 @@ class Service(SimpleService):
 
 #%%
 
-#data = tmp_get_data('newyork.my-netdata.io')
+#data = tmp_get_data('london.my-netdata.io')
 #print(data)
 
 #%%
