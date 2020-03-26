@@ -156,7 +156,7 @@ def get_raw_data(host=None):
         expected = np.mean(abs(df.values[1:]))
         error_abs = abs(actual - expected)
         error_pct = error_abs / expected
-        anomalies = 1.0 if error_pct >= 0.8 else 0.0
+        anomalies = 1.0 if error_pct >= 0.9 else 0.0
 
         # add data
         data[f'{chart}_expected'] = expected * 1000
