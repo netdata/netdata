@@ -23,6 +23,7 @@ ORDER = [
     'ip',
     'ipv6',
     'processes',
+    'intr',
     'scores',
     'anomalies',
 ]
@@ -92,6 +93,14 @@ CHARTS = {
             ['processes_error', 'error', 'absolute', 1, 1000]
         ]
     },
+    'intr': {
+        'options': [None, 'Interrupts Anomaly Scores', 'value', 'intr', 'anomalies.intr', 'line'],
+        'lines': [
+            ['intr_expected', 'expected', 'absolute', 1, 1000],
+            ['intr_actual', 'processes', 'absolute', 1, 1000],
+            ['intr_error', 'error', 'absolute', 1, 1000]
+        ]
+    },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
@@ -103,6 +112,7 @@ CHARTS = {
             ['ip_score', 'ip', 'absolute', 1, 1000],
             ['ipv6_score', 'ipv6', 'absolute', 1, 1000],
             ['processes_score', 'processes', 'absolute', 1, 1000],
+            ['intr_score', 'intr', 'absolute', 1, 1000],
         ]
     },
     'anomalies': {
@@ -115,7 +125,8 @@ CHARTS = {
             ['net_anomaly', 'net', 'absolute', 1, 1],
             ['ip_anomaly', 'ip', 'absolute', 1, 1],
             ['ipv6_anomaly', 'ipv6', 'absolute', 1, 1],
-            ['processes_anomaly', 'processes', 'absolute', 1, 1]
+            ['processes_anomaly', 'processes', 'absolute', 1, 1],
+            ['intr_anomaly', 'intr', 'absolute', 1, 1],
         ]
     },
 }
