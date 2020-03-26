@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-# Description: anomalies netdata python.d module
-# Author: andrewm4894
-# SPDX-License-Identifier: GPL-3.0-or-later
+#%%
 
 from random import SystemRandom, randint
 
@@ -58,40 +55,52 @@ CHARTS = {
 }
 
 
-class Service(SimpleService):
-    def __init__(self, configuration=None, name=None):
-        SimpleService.__init__(self, configuration=configuration, name=name)
-        self.order = ORDER
-        self.definitions = CHARTS
-        self.random = SystemRandom()
+def get_data():
 
-    @staticmethod
-    def check():
-        return True
+    data = dict()
 
-    def get_data():
+    for chart in ['cpu', 'load', 'io', 'net']:
 
-        data = dict()
+        host = 'london.my-netdata.io'
+        after = -1
+        url = f'https://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        response = requests.get(url)
+        raw_data = response.json()['data'][0][1:]
 
-        for chart in ['cpu', 'load', 'io', 'net']:
-            host = 'london.my-netdata.io'
-            after = -1
-            url = f'https://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
-            response = requests.get(url)
-            raw_data = response.json()['data'][0][1:]
+        actual = np.mean(raw_data)
+        rand_error_pct = randint(-10, 10) / 100
+        expected = actual + (rand_error_pct * actual)
+        error = abs(actual - expected)
+        error_pct = error / actual
+        anomalies = 1 if error_pct > 0.01 else 0
 
-            actual = np.mean(raw_data)
-            rand_error_pct = randint(-10, 10) / 100
-            expected = actual + (rand_error_pct * actual)
-            error = abs(actual - expected)
-            error_pct = error / actual
-            anomalies = 1 if error_pct > 0.01 else 0
+        data[f'{chart}_expected'] = expected
+        data[f'{chart}_actual'] = actual
+        data[f'{chart}_error'] = error
+        data[f'{chart}_score'] = error
+        data[f'{chart}_anomaly'] = anomalies
 
-            data[f'{chart}_expected'] = expected
-            data[f'{chart}_actual'] = actual
-            data[f'{chart}_error'] = error
-            data[f'{chart}_score'] = error
-            data[f'{chart}_anomaly'] = anomalies
+    return data
 
-        return data
+#%%
 
+get_data()
+
+#%%
+
+import numpy as np
+import pandas as pd
+import requests
+
+
+
+
+#%%
+
+5 / 100
+
+#%%
+
+(randint(-10, 10) / 100)
+
+#%%
