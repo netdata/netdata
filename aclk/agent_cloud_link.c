@@ -927,7 +927,8 @@ void *aclk_query_main_thread(void *ptr)
         if (unlikely(!aclk_metadata_submitted)) {
             aclk_metadata_submitted = ACLK_METADATA_CMD_QUEUED;
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
-                debug(D_ACLK, "ACLK failed to queue on_connect command");
+                errno = 0;
+                error("ACLK failed to queue on_connect command");
                 aclk_metadata_submitted = 0;
             }
         }
@@ -1700,8 +1701,12 @@ void aclk_alarm_reload()
     if (unlikely(agent_state == AGENT_INITIALIZING))
         return;
 
-    if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
-        debug(D_ACLK, "ACLK failed to queue on_connect command on alarm reload");
+    if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
+        if (likely(aclk_connected)) {
+            errno = 0;
+            error("ACLK failed to queue on_connect command on alarm reload");
+        }
+    }
 }
 //rrd_stats_api_v1_chart(RRDSET *st, BUFFER *buf)
 
@@ -1753,8 +1758,12 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (unlikely(agent_state == AGENT_INITIALIZING))
         last_init_sequence = now_realtime_sec();
     else {
-        if (unlikely(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd)))
-            debug(D_ACLK, "ACLK failed to queue chart_update command");
+        if (unlikely(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd))) {
+            if (likely(aclk_connected)) {
+                errno = 0;
+                error("ACLK failed to queue chart_update command");
+            }
+        }
     }
     return 0;
 #endif
@@ -1792,8 +1801,12 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 
     buffer_sprintf(local_buffer, "\n}");
 
-    if (unlikely(aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, local_buffer->buffer, 0, 1, ACLK_CMD_ALARM)))
-        debug(D_ACLK, "ACLK failed to queue alarm_command on alarm_update");
+    if (unlikely(aclk_queue_query(ACLK_ALARMS_TOPIC, NULL, msg_id, local_buffer->buffer, 0, 1, ACLK_CMD_ALARM))) {
+        if (likely(aclk_connected)) {
+            errno = 0;
+            error("ACLK failed to queue alarm_command on alarm_update");
+        }
+    }
 
     freez(msg_id);
     buffer_free(local_buffer);
