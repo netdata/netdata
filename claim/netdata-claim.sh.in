@@ -113,7 +113,7 @@ if [ -n "$CONF_USER" ]; then
 fi
 
 
-if [ "$(whoami)" != "$NETDATA_USER"]; then
+if [ "$(whoami)" != "$NETDATA_USER" ]; then
     echo >&2 "This script must be run by the $NETDATA_USER user account"
     exit 7
 fi
