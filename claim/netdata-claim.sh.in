@@ -267,7 +267,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
         echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; exit 2)
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; exit 2)
-        (netdata-cli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0)
+        (netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0)
         echo "The claim was successful but the agent could not be notified - it requires a restart to connect to the cloud"
         exit 6
 fi
