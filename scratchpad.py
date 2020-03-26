@@ -54,17 +54,17 @@ CHARTS = {
     },
 }
 
-DEFAULT_HOST_PORT = '127.0.0.1:19999'
-DEFAULT_HOST_PORT = 'london.my-netdata.io'
+HOST_PORT = '127.0.0.1:19999'
+HOST_PORT = 'london.my-netdata.io'
 
 def get_data():
 
     data = dict()
 
-    for chart in ['cpu', 'load', 'io', 'net']:
+    for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         after = -1
-        url = f'https://{DEFAULT_HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        url = f'https://{HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         raw_data = response.json()['data'][0][1:]
 
@@ -98,7 +98,7 @@ import requests
 
 #%%
 
-5 / 100
+randint(-10, 10) // 100
 
 #%%
 

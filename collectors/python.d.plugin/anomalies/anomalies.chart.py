@@ -62,6 +62,7 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
+HOST_PORT = 'london.my-netdata.io'
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
