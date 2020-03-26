@@ -1355,8 +1355,9 @@ int main(int argc, char **argv) {
 #endif
         int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
         if (fd == -1)
-            fatal("Cannot create file '%s'. Please fix this.", filename);
-        close(fd);
+            error("Cannot create file '%s'. Please fix this.", filename);
+        else
+            close(fd);
     }
 #endif
 
