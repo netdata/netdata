@@ -7,6 +7,10 @@ from random import SystemRandom, randint
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
+import requests
+import numpy as np
+
+
 priority = 90000
 
 ORDER = [

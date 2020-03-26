@@ -54,6 +54,8 @@ CHARTS = {
     },
 }
 
+DEFAULT_HOST = '127.0.0.1'
+DEFAULT_PORT = 19999
 
 def get_data():
 
@@ -61,9 +63,8 @@ def get_data():
 
     for chart in ['cpu', 'load', 'io', 'net']:
 
-        host = 'london.my-netdata.io'
         after = -1
-        url = f'https://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        url = f'https://{DEFAULT_HOST}:{DEFAULT_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         raw_data = response.json()['data'][0][1:]
 
