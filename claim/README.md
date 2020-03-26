@@ -2,7 +2,7 @@
 ---
 title: "Agent claiming"
 description: 
-date: 2020-03-18
+date: 2020-03-26
 custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 ---
 -->
@@ -97,21 +97,38 @@ can trust the endpoint if necessary.
 Claiming can be performed through a SOCKS5 proxy. To do this when calling the script directly supply the proxy
 endpoint as:
 
-```
+```bash
 netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -proxy=socks5h://127.0.0.1:11081
 ```
 
 When claiming via the `netdata` binary set the following options in the config:
+
 ```
 [cloud]
     proxy = socks5://X.X.X.X:YYYY
 ```
+
 Proceed to claim using the command-line syntax:
-```
+
+```conf
 /usr/sbin/netdata -D -W "claim -token=MYTOKEN1234567 -rooms=room1,room2"
 ```
 
 Please note - if you supply the proxy endpoint in the configuration then it will also be used to tunnel
 the agent cloud link as well.
+
+## Unclaim (remove) an agent from Netdata Cloud
+
+The best method to remove an agent from Netdata cloud is to unclaim it by deleting the `claim.d/` directory in your
+Netdata configuration directory.
+
+```bash
+cd /etc/netdata   # Replace with your Netdata configuration directory, if not /etc/netdata/
+rm -rf claim.d/
+```
+
+> You may need to use `sudo` or another method of elevating your privileges.
+
+Once you delete the `claim.d/` directory, the ACLK disconnects and Netdata Cloud removes the node from your account.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fclaim%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
