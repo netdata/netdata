@@ -69,7 +69,7 @@ class Service(SimpleService):
     def check():
         return True
 
-    def get_data():
+    def get_data(self):
 
         data = dict()
 
