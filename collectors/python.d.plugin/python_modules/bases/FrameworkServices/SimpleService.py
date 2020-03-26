@@ -55,6 +55,12 @@ class RuntimeCounters:
             self.penalty = round(min(self.retries * self.update_every / 2, MAX_PENALTY))
 
 
+def clean_module_name(name):
+    if name.startswith('pythond_'):
+        return name[8:]
+    return name
+
+
 class SimpleService(PythonDLimitedLogger, object):
     """
     Prototype of Service class.
@@ -71,7 +77,7 @@ class SimpleService(PythonDLimitedLogger, object):
         self.order = list()
         self.definitions = dict()
 
-        self.module_name = self.__module__.lstrip('pythond_')
+        self.module_name = clean_module_name(self.__module__)
         self.job_name = configuration.pop('job_name')
         self.override_name = configuration.pop('override_name')
         self.fake_name = None
