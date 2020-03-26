@@ -74,7 +74,7 @@ class Service(SimpleService):
         data = dict()
 
         for chart in ['cpu', 'load', 'io', 'net']:
-            host = 'london.my-netdata.io'
+            host = 'localhost:19999'
             after = -1
             url = f'https://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
             response = requests.get(url)
