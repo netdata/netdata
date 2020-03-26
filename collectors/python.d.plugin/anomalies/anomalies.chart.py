@@ -62,7 +62,7 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
-HOST_PORT = 'london.my-netdata.io'
+#HOST_PORT = 'london.my-netdata.io'
 
 def tmp_get_data():
 
