@@ -9,6 +9,7 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 import requests
 import numpy as np
+import pandas as pd
 
 
 priority = 1
@@ -88,13 +89,16 @@ def tmp_get_data(host=None):
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         # get data
-        after = -10
+        after = -2
         url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
-        raw_data = response.json()['data'][0][1:]
+        response_json = response.json()
+        raw_data = response_json['data']
+        df = pd.DataFrame(raw_data, columns=response_json['labels'])
+        df = df.set_index('time')
 
         # create data for lines
-        actual = np.mean(raw_data)
+        actual = np.mean(abs(df.values))
         rand_error_pct = randint(-20, 20) / 100
         expected = actual + (rand_error_pct * actual)
         error = abs(actual - expected)
@@ -102,10 +106,10 @@ def tmp_get_data(host=None):
         anomalies = 1.0 if error_pct > 0.1 else 0.0
 
         # add data
-        data[f'{chart}_expected'] = expected * 100
-        data[f'{chart}_actual'] = actual * 100
-        data[f'{chart}_error'] = error * 100
-        data[f'{chart}_score'] = error * 100
+        data[f'{chart}_expected'] = (expected * 100)
+        data[f'{chart}_actual'] = (actual * 100)
+        data[f'{chart}_error'] = (error * 100)
+        data[f'{chart}_score'] = (error * 100)
         data[f'{chart}_anomaly'] = anomalies
 
     return data
@@ -134,5 +138,7 @@ class Service(SimpleService):
 #print(data)
 
 #%%
+
+df
 
 #%%
