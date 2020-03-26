@@ -22,7 +22,7 @@ ORDER = [
     'net',
     'ip',
     'ipv6',
-    'processes'
+    'processes',
     'scores',
     'anomalies',
 ]
