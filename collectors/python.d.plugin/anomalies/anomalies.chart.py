@@ -62,7 +62,7 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
-HOST_PORT = 'london.my-netdata.io'
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -79,7 +79,7 @@ class Service(SimpleService):
 
         data = dict()
 
-        for chart in ['cpu', 'load', 'io', 'net']:
+        for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
             after = -1
             url = f'http://{HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
