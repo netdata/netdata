@@ -1916,7 +1916,9 @@ EOF
 send_dynatrace() {
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
   local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
-  local payload=$(cat <<EOF
+  local payload=""
+  
+  payload=$(cat <<EOF
 {
   "title": "NetData Alarm from ${host}",
   "source" : "${DYNATRACE_ANNOTATION_TYPE}",
