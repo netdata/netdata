@@ -21,6 +21,7 @@ ORDER = [
     'io',
     'net',
     'ip',
+    'ipv6',
     'scores',
     'anomalies',
 ]
@@ -74,6 +75,14 @@ CHARTS = {
             ['ip_error', 'error', 'absolute', 1, 1000]
         ]
     },
+    'ipv6': {
+        'options': [None, 'Network IPv6 Anomaly Scores', 'value', 'ipv6', 'anomalies.ipv6', 'line'],
+        'lines': [
+            ['ipv6_expected', 'expected', 'absolute', 1, 1000],
+            ['ipv6_actual', 'ipv6', 'absolute', 1, 1000],
+            ['ipv6_error', 'error', 'absolute', 1, 1000]
+        ]
+    },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
@@ -82,7 +91,8 @@ CHARTS = {
             ['ram_score', 'ram', 'absolute', 1, 1000],
             ['io_score', 'io', 'absolute', 1, 1000],
             ['net_score', 'net', 'absolute', 1, 1000],
-            ['ip_score', 'ip', 'absolute', 1, 1000]
+            ['ip_score', 'ip', 'absolute', 1, 1000],
+            ['ipv6_score', 'ipv6', 'absolute', 1, 1000],
         ]
     },
     'anomalies': {
@@ -93,7 +103,8 @@ CHARTS = {
             ['ram_anomaly', 'ram', 'absolute', 1, 1],
             ['io_anomaly', 'io', 'absolute', 1, 1],
             ['net_anomaly', 'net', 'absolute', 1, 1],
-            ['ip_anomaly', 'ip', 'absolute', 1, 1]
+            ['ip_anomaly', 'ip', 'absolute', 1, 1],
+            ['ipv6_anomaly', 'ipv6', 'absolute', 1, 1]
         ]
     },
 }
