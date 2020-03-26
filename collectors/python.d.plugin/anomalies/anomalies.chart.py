@@ -29,71 +29,71 @@ CHARTS = {
     'cpu': {
         'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
         'lines': [
-            ['cpu_expected', 'cpu expected', 'absolute', 1, 1000],
-            ['cpu_actual', 'cpu actual', 'absolute', 1, 1000],
+            ['cpu_expected', 'expected', 'absolute', 1, 1000],
+            ['cpu_actual', 'cpu', 'absolute', 1, 1000],
             ['cpu_error', 'error', 'absolute', 1, 1000]
         ]
     },
     'load': {
         'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomalies.load', 'line'],
         'lines': [
-            ['load_expected', 'load expected', 'absolute', 1, 1000],
-            ['load_actual', 'load actual', 'absolute', 1, 1000],
+            ['load_expected', 'expected', 'absolute', 1, 1000],
+            ['load_actual', 'load', 'absolute', 1, 1000],
             ['load_error', 'error', 'absolute', 1, 1000]
         ]
     },
     'ram': {
         'options': [None, 'RAM Anomaly Scores', 'value', 'ram', 'anomalies.ram', 'line'],
         'lines': [
-            ['ram_expected', 'ram expected', 'absolute', 1, 1000],
-            ['ram_actual', 'ram actual', 'absolute', 1, 1000],
+            ['ram_expected', 'expected', 'absolute', 1, 1000],
+            ['ram_actual', 'ram', 'absolute', 1, 1000],
             ['ram_error', 'error', 'absolute', 1, 1000]
         ]
     },
     'io': {
         'options': [None, 'IO Anomaly Scores', 'value', 'io', 'anomalies.io', 'line'],
         'lines': [
-            ['io_expected', 'io expected', 'absolute', 1, 1000],
-            ['io_actual', 'io actual', 'absolute', 1, 1000],
+            ['io_expected', 'expected', 'absolute', 1, 1000],
+            ['io_actual', 'io', 'absolute', 1, 1000],
             ['io_error', 'error', 'absolute', 1, 1000]
         ]
     },
     'net': {
         'options': [None, 'Network Anomaly Scores', 'value', 'net', 'anomalies.net', 'line'],
         'lines': [
-            ['net_expected', 'net expected', 'absolute', 1, 1000],
-            ['net_actual', 'net actual', 'absolute', 1, 1000],
+            ['net_expected', 'expected', 'absolute', 1, 1000],
+            ['net_actual', 'net', 'absolute', 1, 1000],
             ['net_error', 'error', 'absolute', 1, 1000]
         ]
     },
     'ip': {
         'options': [None, 'Network IP Anomaly Scores', 'value', 'ip', 'anomalies.ip', 'line'],
         'lines': [
-            ['ip_expected', 'ip expected', 'absolute', 1, 1000],
-            ['ip_actual', 'ip actual', 'absolute', 1, 1000],
+            ['ip_expected', 'expected', 'absolute', 1, 1000],
+            ['ip_actual', 'ip', 'absolute', 1, 1000],
             ['ip_error', 'error', 'absolute', 1, 1000]
         ]
     },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
-            ['cpu_score', 'cpu score', 'absolute', 1, 1000],
-            ['load_score', 'load score', 'absolute', 1, 1000],
-            ['ram_score', 'ram score', 'absolute', 1, 1000],
-            ['io_score', 'io score', 'absolute', 1, 1000],
-            ['net_score', 'net score', 'absolute', 1, 1000],
-            ['ip_score', 'ip score', 'absolute', 1, 1000]
+            ['cpu_score', 'cpu', 'absolute', 1, 1000],
+            ['load_score', 'load', 'absolute', 1, 1000],
+            ['ram_score', 'ram', 'absolute', 1, 1000],
+            ['io_score', 'io', 'absolute', 1, 1000],
+            ['net_score', 'net', 'absolute', 1, 1000],
+            ['ip_score', 'ip', 'absolute', 1, 1000]
         ]
     },
     'anomalies': {
         'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'stacked'],
         'lines': [
-            ['cpu_anomaly', 'cpu anomaly', 'absolute', 1, 1],
-            ['load_anomaly', 'load anomaly', 'absolute', 1, 1],
-            ['ram_anomaly', 'ram anomaly', 'absolute', 1, 1],
-            ['io_anomaly', 'io anomaly', 'absolute', 1, 1],
-            ['net_anomaly', 'net anomaly', 'absolute', 1, 1],
-            ['ip_anomaly', 'ip anomaly', 'absolute', 1, 1]
+            ['cpu_anomaly', 'cpu', 'absolute', 1, 1],
+            ['load_anomaly', 'load', 'absolute', 1, 1],
+            ['ram_anomaly', 'ram', 'absolute', 1, 1],
+            ['io_anomaly', 'io', 'absolute', 1, 1],
+            ['net_anomaly', 'net', 'absolute', 1, 1],
+            ['ip_anomaly', 'ip', 'absolute', 1, 1]
         ]
     },
 }
