@@ -120,7 +120,7 @@ def get_raw_data(host=None):
         data[f'{chart}_expected'] = (expected * 100)
         data[f'{chart}_actual'] = (actual * 100)
         data[f'{chart}_error'] = (error * 100)
-        data[f'{chart}_score'] = (error * 100)
+        data[f'{chart}_score'] = (error_pct * 100)
         data[f'{chart}_anomaly'] = anomalies
 
     return data
