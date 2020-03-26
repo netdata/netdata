@@ -87,11 +87,11 @@ class Service(SimpleService):
             raw_data = response.json()['data'][0][1:]
 
             actual = np.mean(raw_data)
-            rand_error_pct = randint(-10, 10) / 100
+            rand_error_pct = randint(-20, 20) / 100
             expected = actual + (rand_error_pct * actual)
             error = abs(actual - expected)
             error_pct = error / actual
-            anomalies = 1 if error_pct > 0.1 else 0
+            anomalies = 1.0 if error_pct > 0.1 else 0.0
 
             data[f'{chart}_expected'] = expected
             data[f'{chart}_actual'] = actual
