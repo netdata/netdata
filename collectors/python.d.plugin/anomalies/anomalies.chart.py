@@ -114,8 +114,8 @@ class Service(SimpleService):
 
 #%%
 
-data = tmp_get_data('london.my-netdata.io')
-print(data)
+#data = tmp_get_data('london.my-netdata.io')
+#print(data)
 
 #%%
 
