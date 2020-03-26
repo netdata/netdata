@@ -76,7 +76,7 @@ CHARTS = {
         ]
     },
     'anomalies': {
-        'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'line'],
+        'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'stacked'],
         'lines': [
             ['cpu_anomaly', 'cpu anomaly', 'absolute', 1, 1],
             ['load_anomaly', 'load anomaly', 'absolute', 1, 1],
