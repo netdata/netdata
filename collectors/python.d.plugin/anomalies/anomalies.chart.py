@@ -26,7 +26,9 @@ CHARTS = {
     'cpu': {
         'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
         'lines': [
-            ['cpu_expected'], ['cpu_actual'], ['cpu_error']
+            ['cpu_expected', None, 'absolute', 1, 100],
+            ['cpu_actual', None, 'absolute', 1, 100],
+            ['cpu_error', None, 'absolute', 1, 100]
         ]
     },
     'load': {
@@ -84,10 +86,10 @@ def tmp_get_data(host=None):
         error_pct = error / actual
         anomalies = 1.0 if error_pct > 0.1 else 0.0
 
-        data[f'{chart}_expected'] = expected
-        data[f'{chart}_actual'] = actual
-        data[f'{chart}_error'] = error
-        data[f'{chart}_score'] = error
+        data[f'{chart}_expected'] = expected * 1000
+        data[f'{chart}_actual'] = actual * 1000
+        data[f'{chart}_error'] = error * 1000
+        data[f'{chart}_score'] = error * 1000
         data[f'{chart}_anomaly'] = anomalies
 
     return data
@@ -112,8 +114,8 @@ class Service(SimpleService):
 
 #%%
 
-#data = tmp_get_data('london.my-netdata.io')
-#print(data)
+data = tmp_get_data('london.my-netdata.io')
+print(data)
 
 #%%
 
