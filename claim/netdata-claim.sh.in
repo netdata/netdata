@@ -95,7 +95,6 @@ fi
 # defaults to allow running this script by hand
 
 [ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
-NETDATA_USER="@netdatauser_POST@"
 MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
 CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
 TOKEN="unknown"
@@ -106,9 +105,16 @@ HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
+NETDATA_USER=netdata
+
+CONF_USER=$(grep 'run as user' "${NETDATA_USER_CONFIG_DIR}/netdata.conf" 2>/dev/null)
+if [ -n "$CONF_USER" ]; then
+    NETDATA_USER=$(echo "$CONF_USER" | sed 's/^[^=]*=[ \t]*//' | sed 's/[ \t]*$//')
+fi
+
 
 if [ "$(whoami)" != "$NETDATA_USER"]; then
-    echo "This script must be run by the $NETDATA_USER user account"
+    echo >&2 "This script must be run by the $NETDATA_USER user account"
     exit 7
 fi
 
@@ -139,6 +145,7 @@ do
                 -insecure) INSECURE=1 ;;
                 -proxy=*) PROXY=${arg:7} ;;
                 -noproxy) NOPROXY=yes ;;
+                -user=*) NETDATA_USER=${arg:6} ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
         esac
@@ -157,6 +164,7 @@ echo >&2 "Id: $ID"
 echo >&2 "Rooms: $ROOMS"
 echo >&2 "Hostname: $HOSTNAME"
 echo >&2 "Proxy: $PROXY"
+echo >&2 "Netdata user: $NETDATA_USER"
 
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
