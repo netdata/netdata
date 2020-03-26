@@ -90,7 +90,7 @@ class Service(SimpleService):
             expected = actual + (rand_error_pct * actual)
             error = abs(actual - expected)
             error_pct = error / actual
-            anomalies = 1 if error_pct > 0.01 else 0
+            anomalies = 1 if error_pct > 0.1 else 0
 
             data[f'{chart}_expected'] = expected
             data[f'{chart}_actual'] = actual
