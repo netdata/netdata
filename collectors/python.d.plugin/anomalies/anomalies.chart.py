@@ -133,7 +133,7 @@ def get_raw_data(host=None):
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         # get data
-        url = f'http://{host}/api/v1/data?chart=system.{chart}&after={N}&format=json'
+        url = f'http://{host}/api/v1/data?chart=system.{chart}&after=-{N}&format=json'
         response = requests.get(url)
         response_json = response.json()
         raw_data = response_json['data']
@@ -177,7 +177,7 @@ class Service(SimpleService):
 
 #%%
 
-#data = get_raw_data('frankfurt.my-netdata.io')
+#data = get_raw_data('london.my-netdata.io')
 #print(data)
 
 #%%
