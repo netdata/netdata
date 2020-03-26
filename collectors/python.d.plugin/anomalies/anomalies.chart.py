@@ -20,6 +20,7 @@ ORDER = [
     'ram',
     'io',
     'net',
+    'ip',
     'scores',
     'anomalies',
 ]
@@ -65,6 +66,14 @@ CHARTS = {
             ['net_error', 'error', 'absolute', 1, 1000]
         ]
     },
+    'ip': {
+        'options': [None, 'Network IP Anomaly Scores', 'value', 'ip', 'anomalies.ip', 'line'],
+        'lines': [
+            ['ip_expected', 'ip expected', 'absolute', 1, 1000],
+            ['ip_actual', 'ip actual', 'absolute', 1, 1000],
+            ['ip_error', 'error', 'absolute', 1, 1000]
+        ]
+    },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
@@ -72,7 +81,8 @@ CHARTS = {
             ['load_score', 'load score', 'absolute', 1, 1000],
             ['ram_score', 'ram score', 'absolute', 1, 1000],
             ['io_score', 'io score', 'absolute', 1, 1000],
-            ['net_score', 'net score', 'absolute', 1, 1000]
+            ['net_score', 'net score', 'absolute', 1, 1000],
+            ['ip_score', 'ip score', 'absolute', 1, 1000]
         ]
     },
     'anomalies': {
@@ -82,7 +92,8 @@ CHARTS = {
             ['load_anomaly', 'load anomaly', 'absolute', 1, 1],
             ['ram_anomaly', 'ram anomaly', 'absolute', 1, 1],
             ['io_anomaly', 'io anomaly', 'absolute', 1, 1],
-            ['net_anomaly', 'net anomaly', 'absolute', 1, 1]
+            ['net_anomaly', 'net anomaly', 'absolute', 1, 1],
+            ['ip_anomaly', 'ip anomaly', 'absolute', 1, 1]
         ]
     },
 }
