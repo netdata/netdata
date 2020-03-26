@@ -26,39 +26,51 @@ CHARTS = {
     'cpu': {
         'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
         'lines': [
-            ['cpu_expected', None, 'absolute', 1, 100],
-            ['cpu_actual', None, 'absolute', 1, 100],
-            ['cpu_error', None, 'absolute', 1, 100]
+            ['cpu_expected', 'CPU Expected', 'absolute', 1, 100],
+            ['cpu_actual', 'CPU Actual', 'absolute', 1, 100],
+            ['cpu_error', 'Error', 'absolute', 1, 100]
         ]
     },
     'load': {
         'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomalies.load', 'line'],
         'lines': [
-            ['load_expected'], ['load_actual'], ['load_error']
+            ['load_expected', None, 'absolute', 1, 100],
+            ['load_actual', None, 'absolute', 1, 100],
+            ['load_error', None, 'absolute', 1, 100]
         ]
     },
     'io': {
         'options': [None, 'IO Anomaly Scores', 'value', 'io', 'anomalies.io', 'line'],
         'lines': [
-            ['io_expected'], ['io_actual'], ['io_error']
+            ['io_expected', None, 'absolute', 1, 100],
+            ['io_actual', None, 'absolute', 1, 100],
+            ['io_error', None, 'absolute', 1, 100]
         ]
     },
     'net': {
         'options': [None, 'Network Anomaly Scores', 'value', 'net', 'anomalies.net', 'line'],
         'lines': [
-            ['net_expected'], ['net_actual'], ['net_error']
+            ['net_expected', None, 'absolute', 1, 100],
+            ['net_actual', None, 'absolute', 1, 100],
+            ['net_error', None, 'absolute', 1, 100]
         ]
     },
     'scores': {
         'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
         'lines': [
-            ['cpu_score'], ['load_score'], ['io_score'], ['net_score']
+            ['cpu_score', None, 'absolute', 1, 100],
+            ['load_score', None, 'absolute', 1, 100],
+            ['io_score', None, 'absolute', 1, 100],
+            ['net_score', None, 'absolute', 1, 100]
         ]
     },
     'anomalies': {
         'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'line'],
         'lines': [
-            ['cpu_anomaly'], ['load_anomaly'], ['io_anomaly'], ['net_anomaly']
+            ['cpu_anomaly', None, 'absolute', 1, 1],
+            ['load_anomaly', None, 'absolute', 1, 1],
+            ['io_anomaly', None, 'absolute', 1, 1],
+            ['net_anomaly', None, 'absolute', 1, 1]
         ]
     },
 }
@@ -86,10 +98,10 @@ def tmp_get_data(host=None):
         error_pct = error / actual
         anomalies = 1.0 if error_pct > 0.1 else 0.0
 
-        data[f'{chart}_expected'] = expected * 1000
-        data[f'{chart}_actual'] = actual * 1000
-        data[f'{chart}_error'] = error * 1000
-        data[f'{chart}_score'] = error * 1000
+        data[f'{chart}_expected'] = expected * 100
+        data[f'{chart}_actual'] = actual * 100
+        data[f'{chart}_error'] = error * 100
+        data[f'{chart}_score'] = error * 100
         data[f'{chart}_anomaly'] = anomalies
 
     return data
@@ -114,8 +126,8 @@ class Service(SimpleService):
 
 #%%
 
-#data = tmp_get_data('london.my-netdata.io')
-#print(data)
+data = tmp_get_data('london.my-netdata.io')
+print(data)
 
 #%%
 
