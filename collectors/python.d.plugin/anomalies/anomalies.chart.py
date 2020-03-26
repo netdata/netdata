@@ -86,11 +86,14 @@ def tmp_get_data(host=None):
     data = dict()
 
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
+
+        # get data
         after = -10
         url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         raw_data = response.json()['data'][0][1:]
 
+        # create data for lines
         actual = np.mean(raw_data)
         rand_error_pct = randint(-20, 20) / 100
         expected = actual + (rand_error_pct * actual)
@@ -98,6 +101,7 @@ def tmp_get_data(host=None):
         error_pct = error / actual
         anomalies = 1.0 if error_pct > 0.1 else 0.0
 
+        # add data
         data[f'{chart}_expected'] = expected * 100
         data[f'{chart}_actual'] = actual * 100
         data[f'{chart}_error'] = error * 100
@@ -126,8 +130,8 @@ class Service(SimpleService):
 
 #%%
 
-data = tmp_get_data('london.my-netdata.io')
-print(data)
+#data = tmp_get_data('london.my-netdata.io')
+#print(data)
 
 #%%
 
