@@ -92,7 +92,7 @@ int tls_select_version(const char *lversion) {
         return TLS1_1_VERSION;
     else if (!strcmp(lversion, "1.2"))
         return TLS1_2_VERSION;
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= 0x1010101bL
     else if (!strcmp(lversion, "1.3"))
         return TLS1_3_VERSION;
 #endif
