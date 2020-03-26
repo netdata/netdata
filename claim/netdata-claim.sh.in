@@ -11,6 +11,7 @@
 # Exit code: 4 - Failure to connect to endpoint
 # Exit code: 5 - Unknown HTTP error message
 # Exit code: 6 - The CLI didn't work
+# Exit code: 7 - Wrong user
 #
 # OK: Agent claimed successfully
 # HTTP Status code: 204
@@ -94,6 +95,7 @@ fi
 # defaults to allow running this script by hand
 
 [ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+NETDATA_USER="@netdatauser_POST@"
 MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
 CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
 TOKEN="unknown"
@@ -104,6 +106,11 @@ HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
+
+if [ "$(whoami)" != "$NETDATA_USER"]; then
+    echo "This script must be run by the $NETDATA_USER user account"
+    exit 7
+fi
 
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
@@ -268,7 +275,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; exit 2)
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; exit 2)
         (netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0)
-        echo "The claim was successful but the agent could not be notified - it requires a restart to connect to the cloud"
+        echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
         exit 6
 fi
 
