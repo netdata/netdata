@@ -117,7 +117,7 @@ def get_raw_data(host=None):
         response_json = response.json()
         raw_data = response_json['data']
         df = pd.DataFrame(raw_data, columns=response_json['labels'])
-        df = df.set_index('time')
+        df = df.set_index('time').dropna()
 
         # create data for lines
         actual = np.mean(abs(df.values[0]))
@@ -127,11 +127,11 @@ def get_raw_data(host=None):
         anomalies = 1.0 if error_pct >= 0.8 else 0.0
 
         # add data
-        data[f'{chart}_expected'] = int(expected * 1000)
-        data[f'{chart}_actual'] = int(actual * 1000)
-        data[f'{chart}_error'] = int(error_abs * 1000)
-        data[f'{chart}_score'] = int(error_pct * 1000)
-        data[f'{chart}_anomaly'] = int(anomalies)
+        data[f'{chart}_expected'] = expected * 1000
+        data[f'{chart}_actual'] = actual * 1000
+        data[f'{chart}_error'] = error_abs * 1000
+        data[f'{chart}_score'] = error_pct * 1000
+        data[f'{chart}_anomaly'] = anomalies
 
     return data
 
