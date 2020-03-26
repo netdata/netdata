@@ -10,10 +10,6 @@ const char *security_cert=NULL;
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
-const char *ciphers[] = {
-        "ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA",
-        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA",
-        "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256" };
 #endif
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
@@ -59,26 +55,6 @@ void security_openssl_library()
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 /**
- * TLS Select Ciphers
- *
- * Select the ciphers based in the user input
- *
- * @param version the TLS version selected
- *
- * @return It returns the cipher list based in the protocol version
- */
-const char *tls_select_ciphers(int version) {
-    if (tls_ciphers && strcmp(tls_ciphers, "none") != 0)
-        return tls_ciphers;
-
-    if (version == TLS1_1_VERSION)
-        return ciphers[0];
-    else if (version == TLS1_2_VERSION)
-        return ciphers[1];
-
-    return ciphers[2];
-}
-/**
  * TLS version
  *
  * Returns the TLS version depending of the user input.
@@ -113,7 +89,7 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     if (!side) {
         int version =  tls_select_version(tls_version) ;
-        const char *cipher = tls_select_ciphers(version);
+ //       const char *cipher = tls_select_ciphers(version);
 #endif
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
@@ -121,8 +97,10 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
         SSL_CTX_set_min_proto_version(ctx, version);
         SSL_CTX_set_max_proto_version(ctx, version);
 
-        if (!SSL_CTX_set_cipher_list(ctx, cipher)) {
-            error("SSL error. cannot set the cipher list");
+        if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
+            if (!SSL_CTX_set_cipher_list(ctx, tls_ciphers)) {
+                error("SSL error. cannot set the cipher list");
+            }
         }
     }
 #endif

@@ -35,7 +35,6 @@ extern const char *security_key;
 extern const char *security_cert;
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 extern const char *tls_version;
-extern const char *ciphers[];
 extern const char *tls_ciphers;
 #endif
 extern int netdata_validate_server;
