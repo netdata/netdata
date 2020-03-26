@@ -64,8 +64,40 @@ void security_openssl_library()
  * @return it returns the version number.
  */
 int tls_select_version(const char *lversion) {
-    if (!strcmp(lversion, "1.1"))
+    if (!strcmp(lversion, "1"))
+        return TLS1_VERSION;
+    else if (!strcmp(lversion, "1.1"))
         return TLS1_1_VERSION;
+    else if (!strcmp(lversion, "1.2"))
+        return TLS1_2_VERSION;
+#if OPENSSL_VERSION_NUMBER >= 0x1010101bL
+    else if (!strcmp(lversion, "1.3"))
+        return TLS1_3_VERSION;
+#endif
+
+    return TLS_MAX_VERSION;
+}
+#endif
+
+/**
+ * OpenSSL common options
+ *
+ * Clients and SERVER have common options, this function is responsible to set them in the context.
+ *
+ * @param ctx the initialized SSL context.
+ * @param side 0 means server, and 1 client.
+ */
+void security_openssl_common_options(SSL_CTX *ctx, int side) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    if (!side) {
+        int version =  tls_select_version(tls_version) ;
+        //       const char *cipher = tls_select_ciphers(version);
+#endif
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+#else
+        SSL_CTX_set_min_proto_version(ctx, version);
+        SSL_CTX_set_max_proto_version(ctx, version);
     else if (!strcmp(lversion, "1.2"))
         return TLS1_2_VERSION;
 #if OPENSSL_VERSION_NUMBER >= 0x1010101bL
