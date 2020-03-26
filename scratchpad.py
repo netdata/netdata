@@ -54,8 +54,8 @@ CHARTS = {
     },
 }
 
-DEFAULT_HOST = '127.0.0.1'
-DEFAULT_PORT = 19999
+DEFAULT_HOST_PORT = '127.0.0.1:19999'
+DEFAULT_HOST_PORT = 'london.my-netdata.io'
 
 def get_data():
 
@@ -64,7 +64,7 @@ def get_data():
     for chart in ['cpu', 'load', 'io', 'net']:
 
         after = -1
-        url = f'https://{DEFAULT_HOST}:{DEFAULT_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        url = f'https://{DEFAULT_HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         raw_data = response.json()['data'][0][1:]
 
@@ -73,7 +73,7 @@ def get_data():
         expected = actual + (rand_error_pct * actual)
         error = abs(actual - expected)
         error_pct = error / actual
-        anomalies = 1 if error_pct > 0.01 else 0
+        anomalies = 1.0 if error_pct > 0.01 else 0.0
 
         data[f'{chart}_expected'] = expected
         data[f'{chart}_actual'] = actual
