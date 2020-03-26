@@ -54,7 +54,7 @@ static inline nsec_t now_nsec(clockid_t clk_id) {
         error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
-    return (nsec_t)ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
+    return (nsec_t) ts.tv_nsec;
 }
 
 static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
