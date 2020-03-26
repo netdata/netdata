@@ -100,7 +100,7 @@ def get_raw_data(host=None):
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         # get data
-        after = -10
+        after = -100
         url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         response_json = response.json()
@@ -114,7 +114,7 @@ def get_raw_data(host=None):
         expected = actual + (rand_error_pct * actual)
         error = abs(actual - expected)
         error_pct = error / actual
-        anomalies = 1.0 if error_pct > 0.1 else 0.0
+        anomalies = 1.0 if error_pct > 0.15 else 0.0
 
         # add data
         data[f'{chart}_expected'] = int(expected * 1000)
@@ -146,8 +146,8 @@ class Service(SimpleService):
 
 #%%
 
-#data = get_raw_data('newyork.my-netdata.io')
-#print(data)
+data = get_raw_data('frankfurt.my-netdata.io')
+print(data)
 
 #%%
 
