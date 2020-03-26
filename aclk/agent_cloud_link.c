@@ -513,7 +513,7 @@ static void _free_collector(struct _collector *collector)
  *
  */
 #ifdef ACLK_DEBUG
-static void _dump_connector_list()
+static void _dump_collector_list()
 {
     struct _collector *tmp_collector;
 
@@ -547,7 +547,7 @@ static void _dump_connector_list()
  * This will cleanup the collector list
  *
  */
-static void _reset_connector_list()
+static void _reset_collector_list()
 {
     struct _collector *tmp_collector, *next_collector;
 
@@ -694,7 +694,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
     if (unlikely(agent_state == AGENT_INITIALIZING))
         last_init_sequence = now_realtime_sec();
     else {
-        if (unlikely(aclk_queue_query("connector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
+        if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
             debug(D_ACLK, "ACLK failed to queue on_connect command on collector addition");
     }
 
@@ -731,7 +731,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     if (unlikely(agent_state == AGENT_INITIALIZING))
         last_init_sequence = now_realtime_sec();
     else {
-        if (unlikely(aclk_queue_query("connector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
+        if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
             debug(D_ACLK, "ACLK failed to queue on_connect command on collector deletion");
     }
 
@@ -887,7 +887,7 @@ static void aclk_query_thread_cleanup(void *ptr)
 
     COLLECTOR_LOCK;
 
-    _reset_connector_list();
+    _reset_collector_list();
     freez(collector_list);
 
     COLLECTOR_UNLOCK;
@@ -915,7 +915,7 @@ void *aclk_query_main_thread(void *ptr)
             agent_state = AGENT_STABLE;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
 #ifdef ACLK_DEBUG
-            _dump_connector_list();
+            _dump_collector_list();
 #endif
             break;
         }
