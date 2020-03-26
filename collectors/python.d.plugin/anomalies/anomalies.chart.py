@@ -111,7 +111,7 @@ def get_raw_data(host=None):
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         # get data
-        after = -100
+        after = -20
         url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         response_json = response.json()
