@@ -110,7 +110,7 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
-
+N = 20
 
 def get_raw_data(host=None):
 
@@ -122,8 +122,7 @@ def get_raw_data(host=None):
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         # get data
-        after = -20
-        url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        url = f'http://{host}/api/v1/data?chart=system.{chart}&after={N}&format=json'
         response = requests.get(url)
         response_json = response.json()
         raw_data = response_json['data']
