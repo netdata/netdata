@@ -102,7 +102,7 @@ CHARTS = {
             ['net_score', 'net', 'absolute', 1, 1000],
             ['ip_score', 'ip', 'absolute', 1, 1000],
             ['ipv6_score', 'ipv6', 'absolute', 1, 1000],
-            ['processes_score', 'ipv6', 'absolute', 1, 1000],
+            ['processes_score', 'processes', 'absolute', 1, 1000],
         ]
     },
     'anomalies': {
@@ -115,7 +115,7 @@ CHARTS = {
             ['net_anomaly', 'net', 'absolute', 1, 1],
             ['ip_anomaly', 'ip', 'absolute', 1, 1],
             ['ipv6_anomaly', 'ipv6', 'absolute', 1, 1],
-            ['processes_anomaly', 'ipv6', 'absolute', 1, 1]
+            ['processes_anomaly', 'processes', 'absolute', 1, 1]
         ]
     },
 }
