@@ -114,7 +114,7 @@ def get_raw_data(host=None):
         expected = actual + (rand_error_pct * actual)
         error_abs = abs(actual - expected)
         error_pct = error_abs / expected
-        anomalies = 1.0 if error_pct > 0.15 else 0.0
+        anomalies = 1.0 if error_pct >= 0.19 else 0.0
 
         # add data
         data[f'{chart}_expected'] = int(expected * 1000)
