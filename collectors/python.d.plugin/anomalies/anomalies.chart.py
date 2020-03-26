@@ -100,7 +100,7 @@ def get_raw_data(host=None):
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
 
         # get data
-        after = -100
+        after = -1
         url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         response_json = response.json()
@@ -112,14 +112,14 @@ def get_raw_data(host=None):
         actual = np.mean(abs(df.values))
         rand_error_pct = randint(-20, 20) / 100
         expected = actual + (rand_error_pct * actual)
-        error = abs(actual - expected)
-        error_pct = error / actual
+        error_abs = abs(actual - expected)
+        error_pct = error_abs / expected
         anomalies = 1.0 if error_pct > 0.15 else 0.0
 
         # add data
         data[f'{chart}_expected'] = int(expected * 1000)
         data[f'{chart}_actual'] = int(actual * 1000)
-        data[f'{chart}_error'] = int(error * 1000)
+        data[f'{chart}_error'] = int(error_abs * 1000)
         data[f'{chart}_score'] = int(error_pct * 1000)
         data[f'{chart}_anomaly'] = int(anomalies)
 
