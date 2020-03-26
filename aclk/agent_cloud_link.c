@@ -955,7 +955,7 @@ static void aclk_main_cleanup(void *ptr)
         QUERY_THREAD_WAKEUP;
         // Send a graceful disconnect message
         time_t time_created = now_realtime_sec();
-        nsec_t time_created_ns = now_realtime_nsec();
+        nsec_t time_created_ns = (now_realtime_usec() - (time_created * USEC_PER_SEC)) * NSEC_PER_USEC;
         char *msg_id = create_uuid();
 
         snprintfz(
@@ -1526,7 +1526,7 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
     }
 
     time_created = now_realtime_sec();
-    time_created_ns = now_realtime_nsec();
+    time_created_ns = (now_realtime_usec() - (time_created * USEC_PER_SEC)) * NSEC_PER_USEC;
 
     buffer_sprintf(
         dest,

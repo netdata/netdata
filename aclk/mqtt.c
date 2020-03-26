@@ -270,7 +270,7 @@ int _link_set_lwt(char *sub_topic, int qos)
     }
 
     time_t time_created = now_realtime_sec();
-    nsec_t time_created_ns = now_realtime_nsec();
+    nsec_t time_created_ns = (now_realtime_usec() - (time_created * USEC_PER_SEC)) * NSEC_PER_USEC;
     char *msg_id = create_uuid();
 
     snprintfz(

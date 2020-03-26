@@ -48,15 +48,6 @@ static inline usec_t now_usec(clockid_t clk_id) {
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
-static inline nsec_t now_nsec(clockid_t clk_id) {
-    struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        error("clock_gettime(%d, &timespec) failed.", clk_id);
-        return 0;
-    }
-    return (nsec_t) ts.tv_nsec;
-}
-
 static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
@@ -78,10 +69,6 @@ inline time_t now_realtime_sec(void) {
 
 inline usec_t now_realtime_usec(void) {
     return now_usec(CLOCK_REALTIME);
-}
-
-inline nsec_t now_realtime_nsec(void) {
-    return now_nsec(CLOCK_REALTIME);
 }
 
 inline int now_realtime_timeval(struct timeval *tv) {
