@@ -64,13 +64,16 @@ CHARTS = {
 HOST_PORT = '127.0.0.1:19999'
 #HOST_PORT = 'london.my-netdata.io'
 
-def tmp_get_data():
+def tmp_get_data(host=None):
+
+    if host is None:
+        host = HOST_PORT
 
     data = dict()
 
     for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
-        after = -1
-        url = f'http://{HOST_PORT}/api/v1/data?chart=system.{chart}&after={after}&format=json'
+        after = -10
+        url = f'http://{host}/api/v1/data?chart=system.{chart}&after={after}&format=json'
         response = requests.get(url)
         raw_data = response.json()['data'][0][1:]
 
@@ -109,7 +112,8 @@ class Service(SimpleService):
 
 #%%
 
-tmp_get_data()
+#data = tmp_get_data('newyork.my-netdata.io')
+#print(data)
 
 #%%
 
