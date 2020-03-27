@@ -286,7 +286,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR}
         fi
-        (netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && set -e; exit 0)
+        netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
         echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
         exit 6
 fi
