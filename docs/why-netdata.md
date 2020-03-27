@@ -27,26 +27,26 @@ date: 2020-03-18
 
 
 # Why Netdata?
-
-etdata has a different approach to monitoring because SysAdmins, DevOps, and Developers designed it for troubleshooting performance problems, not just visualizing metrics. Unlike other monitoring solutions that focus on metrics visualization, Netdata helps troubleshoot slowdowns without touching the console. So, everything is a bit different.
-
-t's fast and efficient and designed to permanently run on all systems (physical & virtual servers, containers, IoT devices), without disrupting their core function. It's distributed and provides unparalleled insights, in real-time, of everything happening on your systems. That means it monitors thousands of high-resolution metrics per node; 1s granularity instead of 10s at best. That's super fast!
-
-ith Netdata, you get results immediately in a meaningful presentation that helps you understand the metrics. Netdata's dashboard is interactive, instead of just an abstract view and optimized for anomaly detection. Netdata stores and retrieves data records that are part of a "time series" and doesn't touch the disks while it runs.
-       
+ 
+Netdata has a different approach to monitoring because SysAdmins, DevOps, and Developers designed it for troubleshooting performance problems, not just visualizing metrics. Unlike other monitoring solutions that focus on metrics visualization, Netdata helps troubleshoot slowdowns without touching the console. Everything is a bit different.
+ 
+It's fast and efficient and designed to permanently run on all systems (physical & virtual servers, containers, IoT devices), without disrupting their core function. It's distributed and provides unparalleled insights, in real-time, of everything happening on your systems. That means it monitors thousands of high-resolution metrics per node; 1s granularity instead of 10s at best. That's super fast!
+ 
+With Netdata, you get results immediately in a meaningful presentation that helps you understand the metrics. Netdata's dashboard is interactive, instead of just an abstract view and optimized for anomaly detection. Netdata stores and retrieves data records that are part of a "time series" and doesn't touch the disks while it runs.
+ 
 See how Netdata compares to other monitoring solutions:
-       
-| Netdata | others (open-source and commercial) |
-| :-----: | :---------------------------------: |
-| **High resolution metrics** (1s granularity) | Low resolution metrics (10s granularity at best) |
-| Monitors everything, **thousands of metrics per node** | Monitor just a few metrics |
-| UI is super fast, optimized for **anomaly detection** | UI is good for just an abstract view |
-| **Meaningful presentation**, to help you understand the metrics | You have to know the metrics before you start |
-| Install and get results **immediately** | Long preparation is required to get any useful results |
-| Use it for **troubleshooting** performance problems | Use them to get *statistics of past performance* |
-| **Kills the console** for tracing performance issues | The console is always required for troubleshooting |
-| Requires **zero dedicated resources** | Require large dedicated resources|
-
+ 
+| Netdata | others (open-source and commercial)|
+|:-----:|:---------------------------------:|
+| **High resolution metrics** (1s granularity)|Low resolution metrics (10s granularity at best)|
+| Monitors everything, **thousands of metrics per node**|Monitor just a few metrics|
+| UI is super fast, optimized for **anomaly detection**|UI is good for just an abstract view|
+| **Meaningful presentation**, to help you understand the metrics|You have to know the metrics before you start|
+| Install and get results **immediately**|Long preparation is required to get any useful results|
+| Use it for **troubleshooting** performance problems|Use them to get *statistics of past performance*|
+| **Kills the console** for tracing performance issues|The console is always required for troubleshooting|
+| Requires **zero dedicated resources**|Require large dedicated resources|
+ 
 ## Netdata's features
 Netdata is free, open-source software that currently runs on Linux, FreeBSD, and macOS.  It runs autonomously, without any third-party components, or it can integrate with existing monitoring toolchains, like Prometheus, Graphite, OpenTSDB, Kafka, Grafana, and more.
  
