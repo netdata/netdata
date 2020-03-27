@@ -13,13 +13,16 @@ static char *claiming_errors[] = {
         "Missing dependencies",                         // 3
         "Failure to connect to endpoint",               // 4
         "Unknown HTTP error message",                   // 5
-        "invalid agent id",                             // 6
-        "invalid public key",                           // 7
-        "token has expired",                            // 8
-        "invalid token",                                // 9
-        "duplicate agent id",                           // 10
-        "claimed in another workspace",                 // 11
-        "internal server error"                         // 12
+        "invalid node id",                              // 6
+        "invalid node name",                            // 7
+        "invalid room id",                              // 8
+        "invalid public key",                           // 9
+        "token expired/token not found/invalid token",  // 10
+        "already claimed",                              // 11
+        "processing claiming",                          // 12
+        "Internal Server Error",                        // 13
+        "Gateway Timeout",                              // 14
+        "Service Unavailable"                           // 15
 };
 
 
@@ -38,8 +41,8 @@ extern struct registry registry;
 /* rrd_init() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
-#ifndef ENABLE_ACLK
-    info("The claiming feature is under development and still subject to change before the next release");
+#ifndef ENABLE_CLOUD
+    info("The claiming feature has been disabled");
     return;
 #endif
 
@@ -61,9 +64,9 @@ void claim_agent(char *claiming_arguments)
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
 
-    proxy_str = aclk_lws_wss_get_proxy_setting(&proxy_type);
+    proxy_str = aclk_get_proxy(&proxy_type);
 
-    if(proxy_type == PROXY_TYPE_SOCKS5)
+    if (proxy_type == PROXY_TYPE_SOCKS5 || proxy_type == PROXY_TYPE_HTTP)
         snprintf(proxy_flag, CLAIMING_PROXY_LENGTH, "-proxy=\"%s\"", proxy_str);
 
     snprintfz(command_buffer,
@@ -95,7 +98,7 @@ void claim_agent(char *claiming_arguments)
         return;
     }
     errno = 0;
-    unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]);
+    unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]) - 1;
 
     if ((unsigned)exit_code > maximum_known_exit_code) {
         error("Agent failed to be claimed with an unknown error.");

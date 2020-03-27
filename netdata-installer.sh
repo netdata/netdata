@@ -48,6 +48,10 @@ defer_error() {
   NETDATA_DEFERRED_ERRORS="${NETDATA_DEFERRED_ERRORS}\n* ${1}"
 }
 
+defer_error_highlighted() {
+  NETDATA_DEFERRED_ERRORS="${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_DEFERRED_ERRORS}\n* ${1}${TPUT_RESET}"
+}
+
 print_deferred_errors() {
   if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
     echo >&2
@@ -280,7 +284,7 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
       ;;
     "--cloud-testing")          # Temporary, until we flip the feature flag. Internal use only
-      NETDATA_DISABLE_CLOUD=0
+      unset NETDATA_DISABLE_CLOUD
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --enable-cloud"
       ;;
     "--install")
@@ -472,6 +476,7 @@ copy_libmosquitto() {
 
 bundle_libmosquitto() {
   if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+    echo "Skipping cloud"
     return 0
   fi
 
@@ -502,11 +507,11 @@ bundle_libmosquitto() {
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
-      defer_error "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+      defer_error_highlighted "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
-    defer_error "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
   fi
 }
 
@@ -556,11 +561,11 @@ bundle_libwebsockets() {
       run_ok "libwebsockets built and prepared."
     else
       run_failed "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-      defer_error "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+      defer_error_highlighted "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-    defer_error "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
   fi
 }
 

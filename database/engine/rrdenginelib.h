@@ -28,8 +28,10 @@ typedef uintptr_t rrdeng_stats_t;
 
 #ifdef __ATOMIC_RELAXED
 #define rrd_atomic_fetch_add(p, n) __atomic_fetch_add(p, n, __ATOMIC_RELAXED)
+#define rrd_atomic_add_fetch(p, n) __atomic_add_fetch(p, n, __ATOMIC_RELAXED)
 #else
 #define rrd_atomic_fetch_add(p, n) __sync_fetch_and_add(p, n)
+#define rrd_atomic_add_fetch(p, n) __sync_add_and_fetch(p, n)
 #endif
 
 #define rrd_stat_atomic_add(p, n) rrd_atomic_fetch_add(p, n)

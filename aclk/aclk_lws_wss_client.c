@@ -208,18 +208,55 @@ void aclk_lws_wss_client_destroy()
 #endif
 }
 
-int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks) {
+static int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
+{
     char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-    if(!proxy)
+    if (!proxy)
         return -1;
 
     proxy += strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
 
-    if(!*proxy)
+    if (!*proxy)
         return -1;
 
     return lws_set_socks(vhost, proxy);
+}
+
+void aclk_wss_set_proxy(struct lws_vhost *vhost)
+{
+    const char *proxy;
+    ACLK_PROXY_TYPE proxy_type;
+    char *log;
+
+    proxy = aclk_get_proxy(&proxy_type);
+
+    lws_set_socks(vhost, ":");
+    lws_set_proxy(vhost, ":");
+
+    if (proxy_type == PROXY_TYPE_UNKNOWN) {
+        error("Unknown proxy type");
+        return;
+    }
+
+    if (proxy_type == PROXY_TYPE_SOCKS5 || proxy_type == PROXY_TYPE_HTTP) {
+        log = strdupz(proxy);
+        safe_log_proxy_censor(log);
+        info("Connecting using %s proxy:\"%s\"", aclk_proxy_type_to_s(&proxy_type), log);
+        freez(log);
+    }
+    if (proxy_type == PROXY_TYPE_SOCKS5) {
+        if (aclk_wss_set_socks(vhost, proxy))
+            error("LWS failed to accept socks proxy.");
+        return;
+    }
+    if (proxy_type == PROXY_TYPE_HTTP) {
+        if (lws_set_proxy(vhost, proxy))
+            error("LWS failed to accept http proxy.");
+        return;
+    }
+    if (proxy_type != PROXY_DISABLED)
+        error("Unknown proxy type");
 }
 
 // Return code indicates if connection attempt has started async.
@@ -227,22 +264,28 @@ int aclk_lws_wss_connect(char *host, int port)
 {
     struct lws_client_connect_info i;
     struct lws_vhost *vhost;
-    static const char *proxy = NULL;
-    static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
-    char *log;
+    int n;
 
     if (!engine_instance) {
         return aclk_lws_wss_client_init(host, port);
         // PROTOCOL_INIT callback will call again.
     }
 
-    if(proxy_type == PROXY_NOT_SET)
-        proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
+    for (n = 0; n < ACLK_LWS_CALLBACK_HISTORY; n++)
+        engine_instance->lws_callback_history[n] = 0;
 
     if (engine_instance->lws_wsi) {
         error("Already Connected. Only one connection supported at a time.");
         return 0;
     }
+
+    memset(&i, 0, sizeof(i));
+    i.context = engine_instance->lws_context;
+    i.port = engine_instance->port;
+    i.address = engine_instance->host;
+    i.path = "/mqtt";
+    i.host = engine_instance->host;
+    i.protocol = "mqtt";
 
     // from LWS docu:
     // If option LWS_SERVER_OPTION_EXPLICIT_VHOSTS is given, no vhost is
@@ -253,33 +296,10 @@ int aclk_lws_wss_connect(char *host, int port)
     if(!vhost)
         fatal("Could not find the default LWS vhost.");
 
-    memset(&i, 0, sizeof(i));
-    i.context = engine_instance->lws_context;
-    i.port = engine_instance->port;
-    i.address = engine_instance->host;
-    i.path = "/mqtt";
-    i.host = engine_instance->host;
-    i.protocol = "mqtt";
-
-    switch (proxy_type) {
-    case PROXY_DISABLED:
-        lws_set_socks(vhost, ":");
-        lws_set_proxy(vhost, ":");
-        break;
-    case PROXY_TYPE_SOCKS5:
-        log = strdupz(proxy);
-        safe_log_proxy_censor(log);
-        info("Connecting using SOCKS5 proxy:\"%s\"", log);
-        freez(log);
-        if(aclk_wss_set_socks(vhost, proxy))
-            error("LWS failed to accept socks proxy.");
-        break;
-    default:
-        error("The proxy could not be set. Unknown proxy type.");
-    }
+    aclk_wss_set_proxy(vhost);
 
 #ifdef ACLK_SSL_ALLOW_SELF_SIGNED
-    i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK | LCCSCF_ALLOW_INSECURE;
     info("Disabling SSL certificate checks");
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
@@ -330,12 +350,42 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "unknown";
     }
 }
+
+void aclk_lws_wss_fail_report()
+{
+    int i;
+    int anything_to_send = 0;
+    BUFFER *buf;
+
+    if (netdata_anonymous_statistics_enabled <= 0)
+        return;
+
+    // guess - most of the callback will be 1-99 + ',' + \0
+    buf = buffer_create((ACLK_LWS_CALLBACK_HISTORY * 2) + 10);
+
+    for (i = 0; i < ACLK_LWS_CALLBACK_HISTORY; i++)
+        if (engine_instance->lws_callback_history[i]) {
+            buffer_sprintf(buf, "%s%d", (i ? "," : ""), engine_instance->lws_callback_history[i]);
+            anything_to_send = 1;
+        }
+
+    if (anything_to_send)
+        send_statistics("ACLK_CONN_FAIL", "FAIL", buffer_tostring(buf));
+
+    buffer_free(buf);
+}
+
 static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     UNUSED(user);
     struct lws_wss_packet_buffer *data;
     int retval = 0;
     static int lws_shutting_down = 0;
+    int i;
+
+    for (i = ACLK_LWS_CALLBACK_HISTORY - 1; i > 0; i--)
+        engine_instance->lws_callback_history[i] = engine_instance->lws_callback_history[i - 1];
+    engine_instance->lws_callback_history[0] = (int)reason;
 
     if (unlikely(aclk_shutting_down && !lws_shutting_down)) {
             lws_shutting_down = 1;
@@ -427,6 +477,8 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             return -1;                       // the callback response is ignored, hope the above remains true
         case LWS_CALLBACK_WSI_DESTROY:
             aclk_lws_wss_clear_io_buffers(engine_instance);
+            if (!engine_instance->websocket_connection_up)
+                aclk_lws_wss_fail_report();
             engine_instance->lws_wsi = NULL;
             engine_instance->websocket_connection_up = 0;
             aclk_lws_connection_closed();

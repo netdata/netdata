@@ -1265,14 +1265,6 @@ validate_install_apt_get() {
 }
 
 install_apt_get() {
-  # download the latest package info
-  if [ "${DRYRUN}" -eq 1 ]; then
-    echo >&2 " >> IMPORTANT << "
-    echo >&2 "    Please make sure your system is up to date"
-    echo >&2 "    by running:  ${sudo} apt-get update  "
-    echo >&2
-  fi
-
   local opts=""
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
@@ -1282,6 +1274,16 @@ install_apt_get() {
   fi
 
   read -r -a apt_opts <<< "$opts"
+
+  # update apt repository caches
+
+  echo >&2 "NOTE: Running apt-get update and updating your APT caches ..."
+  if [ "${version}" = 8 ]; then
+    echo >&2 "WARNING: You seem to be on Debian 8 (jessie) which is old enough we have to disable Check-Valid-Until checks"
+    run ${sudo} apt-get "${apt_opts[@]}" -o Acquire::Check-Valid-Until=false update
+  else
+    run ${sudo} apt-get "${apt_opts[@]}" update
+  fi
 
   # install the required packages
   run ${sudo} apt-get "${apt_opts[@]}" install "${@}"
@@ -1712,7 +1714,7 @@ while [ -n "${1}" ]; do
     netdata-all)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_NODEJS=1
-      if [ "${pv}" -eq 2 ] ; then
+      if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MYSQL=1
         PACKAGES_NETDATA_PYTHON_POSTGRES=1
@@ -1742,7 +1744,7 @@ while [ -n "${1}" ]; do
       ;;
 
     python-mysql | mysql-python | mysqldb | netdata-mysql)
-      if [ "${pv}" -eq 2 ] ; then
+      if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MYSQL=1
       else
@@ -1752,7 +1754,7 @@ while [ -n "${1}" ]; do
       ;;
 
     python-postgres | postgres-python | psycopg2 | netdata-postgres)
-      if [ "${pv}" -eq 2 ] ; then
+      if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_POSTGRES=1
       else
@@ -1762,7 +1764,7 @@ while [ -n "${1}" ]; do
       ;;
 
     python-pymongo)
-      if [ "${pv}" -eq 2 ] ; then
+      if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
       else
@@ -1795,7 +1797,7 @@ while [ -n "${1}" ]; do
     demo | all)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_NODEJS=1
-      if [ "${pv}" -eq 2 ] ; then
+      if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MYSQL=1
         PACKAGES_NETDATA_PYTHON_POSTGRES=1

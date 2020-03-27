@@ -106,7 +106,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_alarm_reload();
 void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
-BUFFER *aclk_encode_response(BUFFER *contents);
+char *aclk_encode_response(BUFFER *contents);
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 void aclk_single_update_enable();
