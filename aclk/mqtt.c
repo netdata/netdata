@@ -269,8 +269,9 @@ int _link_set_lwt(char *sub_topic, int qos)
         return 1;
     }
 
-    time_t time_created = now_realtime_sec();
-    usec_t time_created_offset_usec = (now_realtime_usec() % USEC_PER_SEC);
+    usec_t time_created_offset_usec = now_realtime_usec();
+    time_t time_created = time_created_offset_usec / USEC_PER_SEC;
+    time_created_offset_usec = time_created_offset_usec % USEC_PER_SEC;
 
     char *msg_id = create_uuid();
 
