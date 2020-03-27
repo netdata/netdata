@@ -196,7 +196,7 @@ echo -ne "    - 'docs/Performance.md'
 "
 
 navpart 1 docs/security "" "Security" 1
-echo -ne "  - 'docs/netdata-security.md'
+echo -ne "    - 'docs/netdata-security.md'
 "
 
 navpart 1 collectors README "Collecting metrics"
