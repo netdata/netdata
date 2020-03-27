@@ -148,7 +148,7 @@ do
         shift 1
 done
 
-if [ "$EUID" != "0" -a "$(whoami)" != "$NETDATA_USER" ]; then
+if [ "$EUID" != "0" ] && [ "$(whoami)" != "$NETDATA_USER" ]; then
     echo >&2 "This script must be run by the $NETDATA_USER user account"
     exit 7
 fi
