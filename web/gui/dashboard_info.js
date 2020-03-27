@@ -202,6 +202,12 @@ netdataDashboard.menu = {
         info: 'Anomaly scores relating to key system metrics.'
     },
 
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Z scores scores relating to key system metrics.'
+    },
+
     'example': {
         title: 'Example Charts',
         info: 'Example charts, demonstrating the external plugin architecture.'
