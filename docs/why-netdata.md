@@ -2,7 +2,7 @@
 ---
 title: "Why Netdata"
 description: "Netdata has a different approach to monitoring because SysAdmins, DevOps, and Developers designed it for troubleshooting performance problems, not just visualizing metrics. Unlike other monitoring solutions that focus on metrics visualization, Netdata helps troubleshoot slowdowns without touching the console. So, everything is a bit different."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata.md
 keywords:
   - 1s granularity
   - per second data collection
