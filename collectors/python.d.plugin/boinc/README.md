@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # BOINC monitoring with Netdata
 
-Monitors task counts for the Berkely Open Infrastructure Networking Computing (BOINC) distributed computing client using the same remote procedure call (RPC) interface that the BOINC monitoring GUI does.
+Monitors task counts for the Berkely Open Infrastructure Networking Computing (BOINC) distributed computing client using the same Remote Procedure Call (RPC) interface that the BOINC monitoring GUI does.
 
 It provides charts tracking the total number of tasks and active tasks, as well as ones tracking each of the possible states for tasks.
 
