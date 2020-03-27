@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "Netdata via apache's mod_proxy"
