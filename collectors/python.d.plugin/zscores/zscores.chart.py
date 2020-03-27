@@ -79,7 +79,7 @@ def get_raw_data(self, host=None):
                     self.charts['zscores'].add_dimension([f'{chart}.{col}'])
                 except:
                     pass
-            data[f'{chart}.{col}'] = df[col].values[0] * 100
+            data[f'{chart}.{col}'] = df[col].values[0] * 1000
 
     return data
 
