@@ -362,10 +362,12 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     buffer_tostring(instance->labels),
                     now_realtime_usec() / USEC_PER_MS);
             } else {
-                buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
+                buffer_sprintf(
+                    wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
+                buffer_sprintf(
+                    wb, "netdata_host_tags{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
             }
         }
 
@@ -390,10 +392,17 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         if (instance->labels && buffer_tostring(instance->labels)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
-                    wb, "netdata_host_tags_info{%s} 1 %llu\n", buffer_tostring(instance->labels), now_realtime_usec() / USEC_PER_MS);
+                    wb,
+                    "netdata_host_tags_info{%s} 1 %llu\n",
+                    buffer_tostring(instance->labels),
+                    now_realtime_usec() / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{%s} 1 %llu\n", buffer_tostring(instance->labels), now_realtime_usec() / USEC_PER_MS);
+                buffer_sprintf(
+                    wb,
+                    "netdata_host_tags{%s} 1 %llu\n",
+                    buffer_tostring(instance->labels),
+                    now_realtime_usec() / USEC_PER_MS);
             } else {
                 buffer_sprintf(wb, "netdata_host_tags_info{%s} 1\n", buffer_tostring(instance->labels));
 
@@ -740,7 +749,14 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     prometheus_exporter_instance->before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    prometheus_exporter_instance->after = prometheus_preparation(prometheus_exporter_instance, host, wb, exporting_options, server, prometheus_exporter_instance->before, output_options);
+    prometheus_exporter_instance->after = prometheus_preparation(
+        prometheus_exporter_instance,
+        host,
+        wb,
+        exporting_options,
+        server,
+        prometheus_exporter_instance->before,
+        output_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
         prometheus_exporter_instance, host, wb, prefix, exporting_options, 0, output_options);
@@ -760,7 +776,14 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     prometheus_exporter_instance->before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    prometheus_exporter_instance->after = prometheus_preparation(prometheus_exporter_instance, host, wb, exporting_options, server, prometheus_exporter_instance->before, output_options);
+    prometheus_exporter_instance->after = prometheus_preparation(
+        prometheus_exporter_instance,
+        host,
+        wb,
+        exporting_options,
+        server,
+        prometheus_exporter_instance->before,
+        output_options);
 
     rrd_rdlock();
     rrdhost_foreach_read(host)

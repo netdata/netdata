@@ -14,10 +14,10 @@
 extern struct config exporting_config;
 
 #define EXPORTING_UPDATE_EVERY_OPTION_NAME "update every"
-#define EXPORTING_UPDATE_EVERY_DEFAULT     10
+#define EXPORTING_UPDATE_EVERY_DEFAULT 10
 
 typedef enum exporting_options {
-    EXPORTING_OPTION_NONE                   = 0,
+    EXPORTING_OPTION_NON                    = 0,
 
     EXPORTING_SOURCE_DATA_AS_COLLECTED      = (1 << 0),
     EXPORTING_SOURCE_DATA_AVERAGE           = (1 << 1),
@@ -43,15 +43,15 @@ typedef enum exporting_options {
       label->label_source != LABEL_SOURCE_NETDATA_CONF))
 
 typedef enum exporting_connector_types {
-    EXPORTING_CONNECTOR_TYPE_UNKNOWN,                   // Invalid type
-    EXPORTING_CONNECTOR_TYPE_GRAPHITE,                  // Send plain text to Graphite
-    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET,     // Send data to OpenTSDB using telnet API
-    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP,       // Send data to OpenTSDB using HTTP API
-    EXPORTING_CONNECTOR_TYPE_JSON,                      // Stores the data using JSON.
-    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE,   // The user selected to use Prometheus backend
-    EXPORTING_CONNECTOR_TYPE_KINESIS,                   // Send message to AWS Kinesis
-    EXPORTING_CONNECTOR_TYPE_MONGODB,                   // Send data to MongoDB collection
-    EXPORTING_CONNECTOR_TYPE_NUM                        // Number of backend types
+    EXPORTING_CONNECTOR_TYPE_UNKNOWN,                 // Invalid type
+    EXPORTING_CONNECTOR_TYPE_GRAPHITE,                // Send plain text to Graphite
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET,   // Send data to OpenTSDB using telnet API
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP,     // Send data to OpenTSDB using HTTP API
+    EXPORTING_CONNECTOR_TYPE_JSON,                    // Stores the data using JSON.
+    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // The user selected to use Prometheus backend
+    EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
+    EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
+    EXPORTING_CONNECTOR_TYPE_NUM                      // Number of backend types
 } EXPORTING_CONNECTOR_TYPE;
 
 struct engine;

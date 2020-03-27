@@ -2,11 +2,11 @@
 
 #include "exporting_engine.h"
 
-struct config exporting_config = {.first_section = NULL,
-                                  .last_section = NULL,
-                                  .mutex = NETDATA_MUTEX_INITIALIZER,
-                                  .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
-                                            .rwlock = AVL_LOCK_INITIALIZER}};
+struct config exporting_config = { .first_section = NULL,
+                                   .last_section = NULL,
+                                   .mutex = NETDATA_MUTEX_INITIALIZER,
+                                   .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                              .rwlock = AVL_LOCK_INITIALIZER } };
 
 struct instance *prometheus_exporter_instance = NULL;
 
@@ -14,7 +14,7 @@ static _CONNECTOR_INSTANCE *find_instance(const char *section)
 {
     _CONNECTOR_INSTANCE *local_ci;
 
-    local_ci = add_connector_instance(NULL, NULL);  // Get root section
+    local_ci = add_connector_instance(NULL, NULL); // Get root section
     if (unlikely(!local_ci))
         return local_ci;
 
@@ -39,12 +39,10 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
     local_ci = find_instance(section);
 
     if (!local_ci)
-        return NULL;    // TODO: Check if it is meaningful to return default_value
+        return NULL; // TODO: Check if it is meaningful to return default_value
 
     return appconfig_get(
-        root,
-        local_ci->instance_name,
-        name,
+        root, local_ci->instance_name, name,
         appconfig_get(
             root, local_ci->connector_name, name, appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
@@ -59,16 +57,12 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
     local_ci = find_instance(section);
 
     if (!local_ci)
-        return 0;       // TODO: Check if it is meaningful to return default_value
+        return 0; // TODO: Check if it is meaningful to return default_value
 
     return appconfig_get_boolean(
-        root,
-        local_ci->instance_name,
-        name,
+        root, local_ci->instance_name, name,
         appconfig_get_boolean(
-            root,
-            local_ci->connector_name,
-            name,
+            root, local_ci->connector_name, name,
             appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
@@ -82,16 +76,12 @@ long long expconfig_get_number(struct config *root, const char *section, const c
     local_ci = find_instance(section);
 
     if (!local_ci)
-        return 0;   // TODO: Check if it is meaningful to return default_value
+        return 0; // TODO: Check if it is meaningful to return default_value
 
     return appconfig_get_number(
-        root,
-        local_ci->instance_name,
-        name,
+        root, local_ci->instance_name, name,
         appconfig_get_number(
-            root,
-            local_ci->connector_name,
-            name,
+            root, local_ci->connector_name, name,
             appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
@@ -109,7 +99,7 @@ int get_connector_instance(struct connector_instance *target_ci)
     static _CONNECTOR_INSTANCE *local_ci = NULL;
     _CONNECTOR_INSTANCE *global_connector_instance;
 
-    global_connector_instance = find_instance(NULL);       // Fetch head of instances
+    global_connector_instance = find_instance(NULL); // Fetch head of instances
 
     if (unlikely(!global_connector_instance))
         return 0;
@@ -161,20 +151,19 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
     return EXPORTING_CONNECTOR_TYPE_UNKNOWN;
 }
 
-EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EXPORTING_OPTIONS exporting_options) {
-    if(!strcmp(data_source, "raw") || !strcmp(data_source, "as collected") || !strcmp(data_source, "as-collected") || !strcmp(data_source, "as_collected") || !strcmp(data_source, "ascollected")) {
+EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EXPORTING_OPTIONS exporting_options)
+{
+    if (!strcmp(data_source, "raw") || !strcmp(data_source, "as collected") || !strcmp(data_source, "as-collected") ||
+        !strcmp(data_source, "as_collected") || !strcmp(data_source, "ascollected")) {
         exporting_options |= EXPORTING_SOURCE_DATA_AS_COLLECTED;
         exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_AS_COLLECTED);
-    }
-    else if(!strcmp(data_source, "average")) {
+    } else if (!strcmp(data_source, "average")) {
         exporting_options |= EXPORTING_SOURCE_DATA_AVERAGE;
         exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_AVERAGE);
-    }
-    else if(!strcmp(data_source, "sum") || !strcmp(data_source, "volume")) {
+    } else if (!strcmp(data_source, "sum") || !strcmp(data_source, "volume")) {
         exporting_options |= EXPORTING_SOURCE_DATA_SUM;
         exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_SUM);
-    }
-    else {
+    } else {
         error("EXPORTING: invalid data data_source method '%s'.", data_source);
     }
 
@@ -268,8 +257,7 @@ struct engine *read_exporting_config()
         if (exporter_get_boolean(local_ci.instance_name, "enabled", 0)) {
             info(
                 "Instance (%s) on connector (%s) is enabled and scheduled for activation",
-                local_ci.instance_name,
-                local_ci.connector_name);
+                local_ci.instance_name, local_ci.connector_name);
 
             tmp_ci_list = (struct connector_instance_list *)callocz(1, sizeof(struct connector_instance_list));
             memcpy(&tmp_ci_list->local_ci, &local_ci, sizeof(local_ci));
@@ -293,8 +281,8 @@ struct engine *read_exporting_config()
         engine->config.hostname =
             strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "hostname", netdata_configured_hostname));
         engine->config.prefix = strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "prefix", "netdata"));
-        engine->config.update_every =
-            exporter_get_number(CONFIG_SECTION_EXPORTING, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
+        engine->config.update_every = exporter_get_number(
+            CONFIG_SECTION_EXPORTING, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
     }
 
     while (tmp_ci_list) {
@@ -340,41 +328,31 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.name = strdupz(tmp_ci_list->local_ci.instance_name);
 
-        tmp_instance->config.destination =
-            strdupz(exporter_get(instance_name, "destination", "localhost"));
+        tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", "localhost"));
 
         tmp_instance->config.update_every =
             exporter_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
-        tmp_instance->config.buffer_on_failures =
-            exporter_get_number(instance_name, "buffer on failures", 10);
+        tmp_instance->config.buffer_on_failures = exporter_get_number(instance_name, "buffer on failures", 10);
 
-        tmp_instance->config.timeoutms =
-            exporter_get_number(instance_name, "timeout ms", 10000);
+        tmp_instance->config.timeoutms = exporter_get_number(instance_name, "timeout ms", 10000);
 
-        tmp_instance->config.charts_pattern = simple_pattern_create(
-            exporter_get(instance_name, "send charts matching", "*"),
-            NULL,
-            SIMPLE_PATTERN_EXACT);
+        tmp_instance->config.charts_pattern =
+            simple_pattern_create(exporter_get(instance_name, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
 
         tmp_instance->config.hosts_pattern = simple_pattern_create(
-            exporter_get(instance_name, "send hosts matching", "localhost *"),
-            NULL,
-            SIMPLE_PATTERN_EXACT);
+            exporter_get(instance_name, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
-        char *data_source =
-            exporter_get(instance_name, "data source", "average");
+        char *data_source = exporter_get(instance_name, "data source", "average");
 
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
 
-        if (exporter_get_boolean(
-                instance_name, "send configured labels", CONFIG_BOOLEAN_YES))
+        if (exporter_get_boolean(instance_name, "send configured labels", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
 
-        if (exporter_get_boolean(
-                instance_name, "send automatic labels", CONFIG_BOOLEAN_NO))
+        if (exporter_get_boolean(instance_name, "send automatic labels", CONFIG_BOOLEAN_NO))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
         else
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
@@ -390,8 +368,8 @@ struct engine *read_exporting_config()
 
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
-            connector_specific_config->remote_write_path = strdupz(exporter_get(
-                instance_name, "remote write URL path", "/receive"));
+            connector_specific_config->remote_write_path =
+                strdupz(exporter_get(instance_name, "remote write URL path", "/receive"));
         }
 
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS) {
@@ -400,14 +378,11 @@ struct engine *read_exporting_config()
 
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
-            connector_specific_config->stream_name = strdupz(exporter_get(
-                instance_name, "stream name", "netdata"));
+            connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", "netdata"));
 
-            connector_specific_config->auth_key_id = strdupz(exporter_get(
-                instance_name, "aws_access_key_id", ""));
+            connector_specific_config->auth_key_id = strdupz(exporter_get(instance_name, "aws_access_key_id", ""));
 
-            connector_specific_config->secure_key = strdupz(exporter_get(
-                instance_name, "aws_secret_access_key", ""));
+            connector_specific_config->secure_key = strdupz(exporter_get(instance_name, "aws_secret_access_key", ""));
         }
 
         if (tmp_instance->config.type == BACKEND_TYPE_MONGODB) {
@@ -434,14 +409,13 @@ struct engine *read_exporting_config()
 #endif
 
         if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
-            engine->config.hostname =
-                strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
+            engine->config.hostname = strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
             engine->config.prefix = strdupz(config_get(instance_name, "prefix", "netdata"));
             engine->config.update_every =
                 config_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
         }
 
-next_connector_instance:
+    next_connector_instance:
         tmp_ci_list1 = tmp_ci_list->next;
         freez(tmp_ci_list);
         tmp_ci_list = tmp_ci_list1;

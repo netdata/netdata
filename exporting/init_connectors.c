@@ -77,7 +77,7 @@ int init_connectors(struct engine *engine)
             error("EXPORTING: cannot create tread worker. uv_thread_create(): %s", uv_strerror(error));
             return 1;
         }
-        char threadname[NETDATA_THREAD_NAME_MAX+1];
+        char threadname[NETDATA_THREAD_NAME_MAX + 1];
         snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "EXPORTING-%zu", instance->index);
         uv_thread_set_name_np(instance->thread, threadname);
     }
