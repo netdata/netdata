@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "Fail2ban monitoring with Netdata"
