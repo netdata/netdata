@@ -95,7 +95,6 @@ As we've mentioned earlier, Netdata does things slightly different, and for a go
 
 *    Netdata is just FAST because optimization is a core product feature. On modern hardware, Netdata can collect metrics with a rate of above 1M metrics per second per core (this includes everything, parsing data sources, interpolating data, storing data in the time-series database, etc.). So, for a few thousand metrics per second per node, Netdata needs negligible CPU resources (just 1-2% of a single core). 
 
-So, for Netdata 1s granularity is easy, the natural outcome!
 
 ### Unlimited metrics
 Collecting all the metrics breaks the first rule of every monitoring textbook: "collect only the metrics you need," "collect only the metrics you understand." Unfortunately, this does **not** work! Filtering out most metrics is like reading a book by skipping most of its pages.
