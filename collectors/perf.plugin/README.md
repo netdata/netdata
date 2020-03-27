@@ -44,7 +44,7 @@ Hardware cache events:
 4.  LL cache operations
 5.  DTLB cache operations
 6.  ITLB cache operations
-7.  Proxy binding unit (PBU) cache operations
+7.  PBU cache operations
 
 ## Configuration
 
