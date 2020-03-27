@@ -106,6 +106,7 @@ CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
 NETDATA_USER=netdata
+[ -z "$EUID" ] && EUID="$(id -u)"
 
 CONF_USER=$(grep 'run as user' "${NETDATA_USER_CONFIG_DIR}/netdata.conf" 2>/dev/null)
 if [ -n "$CONF_USER" ]; then
@@ -113,7 +114,7 @@ if [ -n "$CONF_USER" ]; then
 fi
 
 
-if [ "$(whoami)" != "$NETDATA_USER" ]; then
+if [ "$EUID" != "0" -a "$(whoami)" != "$NETDATA_USER" ]; then
     echo >&2 "This script must be run by the $NETDATA_USER user account"
     exit 7
 fi
@@ -282,6 +283,9 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
         echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; exit 2)
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; exit 2)
+        if [ "$EUID" == "0" ]; then
+            chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR}
+        fi
         (netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0)
         echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
         exit 6
