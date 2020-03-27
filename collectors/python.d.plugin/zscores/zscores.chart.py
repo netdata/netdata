@@ -60,7 +60,7 @@ def get_raw_data(self, host=None):
         for col in df.columns:
             if col not in self.charts['zscores']:
                 self.charts['zscores'].add_dimension([col])
-            data[f'{chart}.{col}'] = df[col].tail(1).values[0]
+            data[f'{chart}.{col}'] = df[col].values[0]
 
     return data
 
