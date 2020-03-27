@@ -59,7 +59,10 @@ def get_raw_data(self, host=None):
 
         for col in df.columns:
             if col not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([f'{chart}.{col}'])
+                try:
+                    self.charts['zscores'].add_dimension([f'{chart}.{col}'])
+                except:
+                    pass
             data[f'{chart}.{col}'] = df[col].values[0]
 
     return data
