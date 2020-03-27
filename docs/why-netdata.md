@@ -135,10 +135,10 @@ Metrics have a context, a meaning, and a way to interpret them, the presentation
 
 The presentation should move from the data and to the insight and action that results from it. 
 
-In other words, 
-_What happened there?_
-and
-_What do we do about it?_
+In other words,   
+_What happened there?_  
+and  
+_What do we do about it?_  
 
 Data is meaningful if we have some way to act upon it, which helps you make an assessment. But even if all the metrics are collected, an even more significant challenge is revealed. What do you do with them, and how do you use them?
 
