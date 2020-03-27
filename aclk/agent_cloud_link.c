@@ -22,7 +22,7 @@ static char *aclk_password = NULL;
 
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
-static int aclk_connected = 0;
+int aclk_connected = 0;             // Exposed in the web-api
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
