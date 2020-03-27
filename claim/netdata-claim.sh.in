@@ -105,6 +105,7 @@ HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
+RELOAD=1
 NETDATA_USER=netdata
 [ -z "$EUID" ] && EUID="$(id -u)"
 
@@ -141,6 +142,7 @@ do
                 -insecure) INSECURE=1 ;;
                 -proxy=*) PROXY=${arg:7} ;;
                 -noproxy) NOPROXY=yes ;;
+                -noreload) RELOAD=0 ;;
                 -user=*) NETDATA_USER=${arg:6} ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
@@ -285,6 +287,9 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
+        fi
+        if [ "${RELOAD}" == "0"] ; then
+            exit 0
         fi
         netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
         echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"

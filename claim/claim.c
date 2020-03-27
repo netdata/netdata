@@ -71,7 +71,7 @@ void claim_agent(char *claiming_arguments)
 
     snprintfz(command_buffer,
               CLAIMING_COMMAND_LENGTH,
-              "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s %s",
+              "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s -noreload %s",
 
               proxy_flag,
               netdata_configured_hostname,
