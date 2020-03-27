@@ -94,7 +94,7 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        data = get_raw_data(self)
+        data = get_raw_data()
 
         return data
 
