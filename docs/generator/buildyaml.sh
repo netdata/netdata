@@ -143,7 +143,7 @@ nav:"
 
 navpart 1 . "README" ""
 
-navpart 1 . . "Why Netdata?" 
+navpart 1 . . "Why Netdata?"
 
 echo -ne "    - 'docs/why-netdata.md'
 - 'docs/Demo-Sites.md'
