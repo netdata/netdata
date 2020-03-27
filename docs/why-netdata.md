@@ -20,7 +20,6 @@ keywords:
   - visual anomaly detection
   - time-series database
   - unlimited metrics
-date: 2020-03-18
 ---
 -->
 
