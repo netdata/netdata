@@ -28,6 +28,8 @@ CHARTS = {
             ['system.load.load1', None, 'absolute', 1, 100],
             ['system.load.load5', None, 'absolute', 1, 100],
             ['system.load.load15', None, 'absolute', 1, 100],
+            ['system.ram.free', None, 'absolute', 1, 100],
+            ['system.ram.used', None, 'absolute', 1, 100],
             ['system.io.in', None, 'absolute', 1, 100],
             ['system.io.out', None, 'absolute', 1, 100],
             ['system.pgpgio.in', None, 'absolute', 1, 100],
@@ -54,7 +56,7 @@ def get_raw_data(self, host=None):
 
     data = dict()
 
-    for chart in ['system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr']:
+    for chart in ['system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr']:
 
         # get data
         url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
