@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 
-priority = 1
+priority = 2
 
 ORDER = [
     'zscores',
