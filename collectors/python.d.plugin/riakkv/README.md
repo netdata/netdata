@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "RiakKV monitoring with Netdata"
