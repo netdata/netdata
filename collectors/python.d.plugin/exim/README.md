@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Exim monitoring with Netdata
 
-Simple module executing `exim -bpc` to grab the Experimental Internet Mailer (Exim) queue.
+Simple module executing `exim -bpc` to grab the Exim queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.
 
 ## Requirements
