@@ -111,8 +111,6 @@ extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
 extern int now_realtime_timeval(struct timeval *tv);
 extern time_t now_realtime_sec(void);
 extern usec_t now_realtime_usec(void);
-extern nsec_t now_realtime_nsec(void);
-
 
 extern int now_monotonic_timeval(struct timeval *tv);
 extern time_t now_monotonic_sec(void);

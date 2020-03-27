@@ -955,7 +955,7 @@ static void aclk_main_cleanup(void *ptr)
         QUERY_THREAD_WAKEUP;
         // Send a graceful disconnect message
         time_t time_created = now_realtime_sec();
-        nsec_t time_created_ns = (now_realtime_usec() - (time_created * USEC_PER_SEC)) * NSEC_PER_USEC;
+        usec_t time_created_offset_usec = (now_realtime_usec() % USEC_PER_SEC);
         char *msg_id = create_uuid();
 
         snprintfz(
@@ -963,10 +963,10 @@ static void aclk_main_cleanup(void *ptr)
             "{ \"type\": \"disconnect\","
             " \"msg-id\": \"%s\","
             " \"timestamp\": %ld,"
-            " \"timestamp-ns\": %llu,"
+            " \"timestamp-offset-usec\": %llu,"
             " \"version\": %d,"
             " \"payload\": \"graceful\" }",
-            msg_id, time_created, time_created_ns, ACLK_VERSION);
+            msg_id, time_created, time_created_offset_usec, ACLK_VERSION);
 
         aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
         freez(msg_id);
@@ -1516,7 +1516,7 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
 {
     uuid_t uuid;
     time_t time_created;
-    nsec_t time_created_ns;
+    usec_t time_created_usec_offset;
     char uuid_str[36 + 1];
 
     if (unlikely(!msg_id)) {
@@ -1526,17 +1526,17 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
     }
 
     time_created = now_realtime_sec();
-    time_created_ns = (now_realtime_usec() - (time_created * USEC_PER_SEC)) * NSEC_PER_USEC;
+    time_created_usec_offset = (now_realtime_usec() % USEC_PER_SEC);
 
     buffer_sprintf(
         dest,
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
         "\t\"timestamp\": %ld,\n"
-        "\t\"timestamp-ns\": %llu,\n"
+        "\t\"timestamp-offset-usec\": %llu,\n"
         "\t\"version\": %d,\n"
         "\t\"payload\": ",
-        type, msg_id, time_created, time_created_ns, ACLK_VERSION);
+        type, msg_id, time_created, time_created_usec_offset, ACLK_VERSION);
 
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
