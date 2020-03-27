@@ -204,7 +204,7 @@ netdataDashboard.menu = {
 
     'zscores': {
         title: 'Z-Scores',
-        icon: '<i class="fas fa-suprise"></i>',
+        icon: '<i class="fas fa-exclamation"></i>',
         info: 'Z scores scores relating to key system metrics.'
     },
 
