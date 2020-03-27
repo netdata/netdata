@@ -62,7 +62,7 @@ void security_openssl_library()
  * @return it returns the version number.
  */
 int tls_select_version(const char *lversion) {
-    if (!strcmp(lversion, "1"))
+    if (!strcmp(lversion, "1") || !strcmp(lversion, "1.0"))
         return TLS1_VERSION;
     else if (!strcmp(lversion, "1.1"))
         return TLS1_1_VERSION;
@@ -89,12 +89,11 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_WITH_TLS_13
     if (!side) {
         int version =  tls_select_version(tls_version) ;
- //       const char *cipher = tls_select_ciphers(version);
 #endif
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_WITH_TLS_13
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-        SSL_CTX_set_min_proto_version(ctx, version);
+        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
         SSL_CTX_set_max_proto_version(ctx, version);
 
         if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {

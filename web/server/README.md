@@ -110,9 +110,9 @@ You can also specify the TLS version and the ciphers that you want to use:
     tls ciphers = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
 ```
 
-If you do not specify these options, Netdata will use the highest options available on your system.
+If you do not specify these options, Netdata will use the highest available protocol version on your system and the default cipher list for that protocol provided by your TLS implementation.
 
-While Netdata accepts all the TLS version as arguments (`1`, `1.1`, `1.2` and `1.3`), we recommend you use `1.3` for the most secure encryption.
+While Netdata accepts all the TLS version as arguments (`1` or `1.0`, `1.1`, `1.2` and `1.3`), we recommend you use `1.3` for the most secure encryption.
 
 #### TLS/SSL enforcement
 
