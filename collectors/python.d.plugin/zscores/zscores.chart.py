@@ -27,7 +27,7 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
-N = 100
+N = 500
 
 def get_raw_data(self, host=None):
 
@@ -36,7 +36,7 @@ def get_raw_data(self, host=None):
 
     data = dict()
 
-    for chart in ['system.cpu']:
+    for chart in ['system.cpu', 'system.load']:
 
         # get data
         url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
