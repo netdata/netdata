@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!--
 ---
 title: "ISC Bind monitoring with Netdata"
