@@ -162,6 +162,8 @@ struct engine {
     struct instance *instance_root;
 };
 
+extern struct instance *prometheus_exporter_instance;
+
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();

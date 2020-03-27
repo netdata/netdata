@@ -211,6 +211,9 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
  */
 void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 {
+    if (unlikely(!sending_labels_configured(instance)))
+        return;
+
     if (!instance->labels)
         instance->labels = buffer_create(1024);
 
@@ -218,6 +221,9 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
     rrdhost_check_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
+        if (!should_send_label(instance, label))
+            continue;
+
         char key[PROMETHEUS_ELEMENT_MAX + 1];
         char value[PROMETHEUS_ELEMENT_MAX + 1];
 
@@ -720,15 +726,6 @@ static inline time_t prometheus_preparation(
     return after;
 }
 
-static struct instance *prometheus_exporter_instance = NULL;
-
-static struct instance *init_prometheus_exporter_instance()
-{
-    struct instance * instance= callocz(1, sizeof(struct instance));
-
-    return instance;
-}
-
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     RRDHOST *host,
     BUFFER *wb,
@@ -738,7 +735,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     if (unlikely(!prometheus_exporter_instance))
-        prometheus_exporter_instance = init_prometheus_exporter_instance();
+        return;
 
     prometheus_exporter_instance->before = now_realtime_sec();
 
@@ -758,7 +755,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     if (unlikely(!prometheus_exporter_instance))
-        prometheus_exporter_instance = init_prometheus_exporter_instance();
+        return;
 
     prometheus_exporter_instance->before = now_realtime_sec();
 

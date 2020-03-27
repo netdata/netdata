@@ -8,6 +8,7 @@ struct config exporting_config = {.first_section = NULL,
                                   .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
                                             .rwlock = AVL_LOCK_INITIALIZER}};
 
+struct instance *prometheus_exporter_instance = NULL;
 
 static _CONNECTOR_INSTANCE *find_instance(const char *section)
 {
@@ -219,6 +220,46 @@ struct engine *read_exporting_config()
     }
 
     freez(filename);
+
+#define prometheus_config_get(name, value)                                                                             \
+    appconfig_get(                                                                                                     \
+        &exporting_config, CONFIG_SECTION_PROMETHEUS, name,                                                            \
+        appconfig_get(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
+#define prometheus_config_get_number(name, value)                                                                      \
+    appconfig_get_number(                                                                                              \
+        &exporting_config, CONFIG_SECTION_PROMETHEUS, name,                                                            \
+        appconfig_get_number(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
+#define prometheus_config_get_boolean(name, value)                                                                     \
+    appconfig_get_boolean(                                                                                             \
+        &exporting_config, CONFIG_SECTION_PROMETHEUS, name,                                                            \
+        appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, name, value))
+
+    if (!prometheus_exporter_instance) {
+        prometheus_exporter_instance = callocz(1, sizeof(struct instance));
+
+        prometheus_exporter_instance->config.update_every =
+            prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
+
+        if (prometheus_config_get_boolean("send names instead of ids", CONFIG_BOOLEAN_YES))
+            prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
+        else
+            prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
+
+        if (prometheus_config_get_boolean("send configured labels", CONFIG_BOOLEAN_YES))
+            prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+        else
+            prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+
+        if (prometheus_config_get_boolean("send automatic labels", CONFIG_BOOLEAN_NO))
+            prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+        else
+            prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+        prometheus_exporter_instance->config.charts_pattern =
+            simple_pattern_create(prometheus_config_get("send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
+        prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
+            prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
+    }
 
     // TODO: change BACKEND to EXPORTING
     while (get_connector_instance(&local_ci)) {
