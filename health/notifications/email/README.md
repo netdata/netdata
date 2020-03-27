@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Email
 
-You need a working `sendmail` command for email alerts to work. Almost all mail transfer agents (MTAs) provide a `sendmail` interface.
+You need a working `sendmail` command for email alerts to work. Almost all Mail Transfer Agents (MTAs) provide a `sendmail` interface.
 
 Netdata sends all emails as user `netdata`, so make sure your `sendmail` works for local users.
 
