@@ -49,6 +49,7 @@ See how Netdata compares to other monitoring solutions:
 Netdata is free, open-source software that currently runs on Linux, FreeBSD, and macOS.  It runs autonomously, without any third-party components, or it can integrate with existing monitoring toolchains, like Prometheus, Graphite, OpenTSDB, Kafka, Grafana, and more.
  
 We built Netdata around four principles:
+
 1.  [**1s granularity**](#1s-granularity). It is impossible to monitor a 2 second SLA, with 10-second metrics.
 2.  [**Unlimited metrics**](#unlimited-metrics). To troubleshoot slowdowns, we need all the available metrics.
 3.  [**Meaningful presentation**](#meaningful-presentation). The monitoring tool should know all the metrics. Users should not!
