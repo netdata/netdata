@@ -162,7 +162,7 @@ def get_raw_data(host=None):
         data[f'{chart}_expected'] = expected * 1000
         data[f'{chart}_actual'] = actual * 1000
         data[f'{chart}_error'] = error_abs * 1000
-        data[f'{chart}_score'] = np.sqrt(error_pct * 1000)
+        data[f'{chart}_score'] = np.sqrt(error_pct) * 1000
         data[f'{chart}_anomaly'] = anomalies
 
     return data
