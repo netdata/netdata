@@ -114,11 +114,6 @@ if [ -n "$CONF_USER" ]; then
 fi
 
 
-if [ "$EUID" != "0" -a "$(whoami)" != "$NETDATA_USER" ]; then
-    echo >&2 "This script must be run by the $NETDATA_USER user account"
-    exit 7
-fi
-
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
         ID="$(cat "${MACHINE_GUID_FILE}")"
@@ -152,6 +147,11 @@ do
         esac
         shift 1
 done
+
+if [ "$EUID" != "0" -a "$(whoami)" != "$NETDATA_USER" ]; then
+    echo >&2 "This script must be run by the $NETDATA_USER user account"
+    exit 7
+fi
 
 # if curl not installed give warning SOCKS can't be used
 if [[ "${URLTOOL}" != "curl" && "${PROXY:0:5}" = socks ]] ; then
