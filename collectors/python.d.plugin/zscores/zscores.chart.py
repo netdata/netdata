@@ -73,7 +73,7 @@ def get_raw_data(host=None):
         s = df.std(ddof=0).shift(1)
         # get zscore
         df = (df - m) / s
-        df = df.clip(-10, 10).dropna(axis=1, how='all').tail(1)
+        df = df.dropna(axis=1, how='all').tail(1).clip(-10, 10)
 
         for col in df.columns:
             data[f'{chart}.{col}'] = df[col].values[0] * 1000
