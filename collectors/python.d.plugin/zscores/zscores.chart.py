@@ -22,6 +22,12 @@ CHARTS = {
     'zscores': {
         'options': [None, 'Z Scores', 'value', 'zscores', 'anomalies.zscores', 'line'],
         'lines': [
+            ['system.cpu.user', None, 1, 1000],
+            ['system.cpu.system', None, 1, 1000],
+            ['system.cpu.softirq', None, 1, 1000],
+            ['system.load.load1', None, 1, 1000],
+            ['system.load.load5', None, 1, 1000],
+            ['system.load.load15', None, 1, 1000],
         ]
     },
 }
@@ -63,7 +69,7 @@ def get_raw_data(self, host=None):
                     self.charts['zscores'].add_dimension([f'{chart}.{col}'])
                 except:
                     pass
-            data[f'{chart}.{col}'] = df[col].values[0]
+            data[f'{chart}.{col}'] = abs(df[col].values[0]) * 1000
 
     return data
 
