@@ -98,10 +98,11 @@ openssl speed rsa2048 rsa4096
 
 ### Select TLS version
 
-Since version 1.21 Netdata accepts `tls key` and `tls certificate` as replacement of the options `ssl key` and `ssl certificate`, 
- but you do not need to change your `netdata.conf` case you are using old `ssl` variables, because old options are kept due compatibility.
+Beginning with version 1.21, Netdata accepts `tls key` and `tls certificate` as replacement of the settings `ssl key` and `ssl certificate`. 
 
-Netdata also brings two new options related to TLS, now you can specify the TLS version and the ciphers that you want to use:
+You do not need to change your `netdata.conf` if you are using the previous `ssl` settings, because these are kept for backward compatibility.
+
+You can also specify the TLS version and the ciphers that you want to use:
 
 ```conf
 [web]
@@ -109,10 +110,9 @@ Netdata also brings two new options related to TLS, now you can specify the TLS 
     tls ciphers = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
 ```
 
-case you do not specify these options, Netdata will use the highest options available on your system.
+If you do not specify these options, Netdata will use the highest options available on your system.
 
-An important note about the `tls version`, Netdata accepts all the TLS version as arguments (`1`, `1.1`, `1.2` and `1.3`), but
- only the last option is considered safe.
+While Netdata accepts all the TLS version as arguments (`1`, `1.1`, `1.2` and `1.3`), we recommend you use `1.3` for the most secure encryption.
 
 #### TLS/SSL enforcement
 
