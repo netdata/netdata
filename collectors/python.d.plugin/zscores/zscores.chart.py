@@ -49,6 +49,7 @@ CHARTS = {
 HOST_PORT = '127.0.0.1:19999'
 N = 500
 
+
 def get_raw_data(host=None):
 
     if host is None:
