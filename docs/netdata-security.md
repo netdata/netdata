@@ -68,7 +68,7 @@ Until we add a distributed authentication method to Netdata, you have the follow
 
 #### Expose Netdata only in a private LAN
 
-If your organisation has a private administration and management Local Area Network (LAN), you can bind Netdata on this network interface on all your servers. This is done in `Netdata.conf` with these settings:
+If your organisation has a private administration and management LAN, you can bind Netdata on this network interface on all your servers. This is done in `Netdata.conf` with these settings:
 
 ```
 [web]
