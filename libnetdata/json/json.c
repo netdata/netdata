@@ -299,7 +299,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
     memcpy(&ne, e, sizeof(JSON_ENTRY));
     ne.type = JSON_ARRAY;
     ne.data.items = t[start].size;
-    ne.callback_function = NULL;
+    ne.callback_function = e->callback_function;
     ne.name[0]='\0';
     ne.fullname[0]='\0';
     if(e->callback_function) e->callback_function(&ne);
@@ -365,7 +365,7 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
     ne.original_string = &js[t[start].start];
     memcpy(&ne, e, sizeof(JSON_ENTRY));
     ne.type = JSON_OBJECT;
-    ne.callback_function = NULL;
+    ne.callback_function = e->callback_function;
     if(e->callback_function) e->callback_function(&ne);
     js[t[start].end] = old;
 

@@ -45,7 +45,7 @@ Our CI/CD lifecycle contains three different execution entry points:
 3) A scheduled job runs on master once per day: Travis will run on master at the scheduled interval
 
 To accommodate all three entry points our CI/CD workflow has a set of steps that run on all three entry points.
-Once all these steps are successfull, then our pipeline executes another subset of steps for entry points 2 and 3.
+Once all these steps are successful, then our pipeline executes another subset of steps for entry points 2 and 3.
 In travis terms the "steps" are "Stages" and within each stage we execute a set of activities called "jobs" in travis.
 
 ### Always run: Stages that running on all three execution entry points

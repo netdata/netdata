@@ -814,7 +814,7 @@ void timer_cb(uv_timer_t* handle)
         uv_rwlock_rdlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = pg_cache->committed_page_index.nr_committed_pages;
         uv_rwlock_rdunlock(&pg_cache->committed_page_index.lock);
-        producers = ctx->stats.metric_API_producers;
+        producers = ctx->metric_API_max_producers;
         /* are flushable pages more than 25% of the maximum page cache size */
         high_watermark = (ctx->max_cache_pages * 25LLU) / 100;
         low_watermark = (ctx->max_cache_pages * 5LLU) / 100; /* 5%, must be smaller than high_watermark */
@@ -920,6 +920,7 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_SHUTDOWN:
                 shutdown = 1;
+                ctx->drop_metrics_under_page_cache_pressure = 0;
                 break;
             case RRDENG_READ_PAGE:
                 do_read_extent(wc, &cmd.read_page.page_cache_descr, 1, 0);

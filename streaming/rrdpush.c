@@ -35,8 +35,17 @@ typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
+typedef struct {
+    char *os_name;
+    char *os_id;
+    char *os_version;
+    char *kernel_name;
+    char *kernel_version;
+} stream_encoded_t;
+
 static struct config stream_config = {
-        .sections = NULL,
+        .first_section = NULL,
+        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
@@ -160,7 +169,7 @@ int configured_as_master() {
     int is_master = 0;
 
     appconfig_wrlock(&stream_config);
-    for (section = stream_config.sections; section; section = section->next) {
+    for (section = stream_config.first_section; section; section = section->next) {
         uuid_t uuid;
 
         if (uuid_parse(section->name, uuid) != -1 &&
@@ -502,6 +511,33 @@ static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
     host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
 }
 
+void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
+{
+    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
+    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):"";
+    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):"";
+    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):"";
+    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):"";
+}
+
+void rrdpush_clean_encoded(stream_encoded_t *se)
+{
+    if (se->os_name)
+        freez(se->os_name);
+
+    if (se->os_id)
+        freez(se->os_id);
+
+    if (se->os_version)
+        freez(se->os_version);
+
+    if (se->kernel_name)
+        freez(se->kernel_name);
+
+    if (se->kernel_version)
+        freez(se->kernel_version);
+}
+
 //called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
@@ -563,6 +599,9 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
     */
+    stream_encoded_t se;
+    rrdpush_encode_variable(&se, host);
+
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
@@ -603,14 +642,14 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                  , host->timezone
                  , (host->tags) ? host->tags : ""
                  , STREAMING_PROTOCOL_CURRENT_VERSION
-                 , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
-                 , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
+                 , se.os_name
+                 , se.os_id
                  , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
-                 , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
+                 , se.os_version
                  , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
                  , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
-                 , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
-                 , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+                 , se.kernel_name
+                 , se.kernel_version
                  , (host->system_info->architecture) ? host->system_info->architecture : ""
                  , (host->system_info->virtualization) ? host->system_info->virtualization : ""
                  , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
@@ -631,6 +670,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                  , host->program_version
                  );
     http[eol] = 0x00;
+    rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
     if (!host->ssl.flags) {
@@ -1041,35 +1081,6 @@ static void log_stream_connection(const char *client_ip, const char *client_port
     log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
 
-static RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY get_multiple_connections_strategy(struct config *c, const char *section, const char *name, RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY def) {
-    char *value;
-    switch(def) {
-        default:
-        case RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW:
-            value = "allow";
-            break;
-
-        case RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW:
-            value = "deny";
-            break;
-    }
-
-    value = appconfig_get(c, section, name, value);
-
-    RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY ret = def;
-
-    if(strcasecmp(value, "allow") == 0 || strcasecmp(value, "permit") == 0 || strcasecmp(value, "accept") == 0)
-        ret = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
-
-    else if(strcasecmp(value, "deny") == 0 || strcasecmp(value, "reject") == 0 || strcasecmp(value, "block") == 0)
-        ret = RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW;
-
-    else
-        error("Invalid stream config value at section [%s], setting '%s', value '%s'", section, name, value);
-
-    return ret;
-}
-
 static int rrdpush_receive(int fd
                            , const char *key
                            , const char *hostname
@@ -1098,7 +1109,6 @@ static int rrdpush_receive(int fd
     char *rrdpush_api_key = default_rrdpush_api_key;
     char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
     time_t alarms_delay = 60;
-    RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY rrdpush_multiple_connections_strategy = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
 
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
@@ -1125,9 +1135,6 @@ static int rrdpush_receive(int fd
     rrdpush_api_key = appconfig_get(&stream_config, key, "default proxy api key", rrdpush_api_key);
     rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
 
-    rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, key, "multiple connections", rrdpush_multiple_connections_strategy);
-    rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, machine_guid, "multiple connections", rrdpush_multiple_connections_strategy);
-
     rrdpush_send_charts_matching = appconfig_get(&stream_config, key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
@@ -1140,26 +1147,40 @@ static int rrdpush_receive(int fd
         close(fd);
         return 1;
     }
-    else
-        host = rrdhost_find_or_create(
-                hostname
-                , registry_hostname
-                , machine_guid
-                , os
-                , timezone
-                , tags
-                , program_name
-                , program_version
-                , update_every
-                , history
-                , mode
-                , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
-                , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
-                , rrdpush_destination
-                , rrdpush_api_key
-                , rrdpush_send_charts_matching
-                , system_info
-        );
+
+    /*
+     * Quick path for rejecting multiple connections. Don't take any locks so that progress is made. The same
+     * condition will be checked again below, while holding the global and host writer locks. Any potential false
+     * positives will not cause harm. Data hazards with host deconstruction will be handled when reference counting
+     * is implemented.
+     */
+    host = rrdhost_find_by_guid(machine_guid, 0);
+    if(host && host->connected_senders > 0) {
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
+        close(fd);
+        return 0;
+    }
+
+    host = rrdhost_find_or_create(
+            hostname
+            , registry_hostname
+            , machine_guid
+            , os
+            , timezone
+            , tags
+            , program_name
+            , program_version
+            , update_every
+            , history
+            , mode
+            , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
+            , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
+            , rrdpush_destination
+            , rrdpush_api_key
+            , rrdpush_send_charts_matching
+            , system_info
+    );
 
     if(!host) {
         close(fd);
@@ -1240,18 +1261,11 @@ static int rrdpush_receive(int fd
 
     rrdhost_wrlock(host);
     if(host->connected_senders > 0) {
-        switch(rrdpush_multiple_connections_strategy) {
-            case RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW:
-                info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. If multiple netdata are pushing metrics for the same charts, at the same time, the result is unexpected.", host->hostname, client_ip, client_port);
-                break;
-
-            case RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW:
-                rrdhost_unlock(host);
-                log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
-                info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
-                fclose(fp);
-                return 0;
-        }
+        rrdhost_unlock(host);
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
+        fclose(fp);
+        return 0;
     }
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);

@@ -264,7 +264,7 @@ run() {
 
   printf >&2 "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
   escaped_print >&2 "${@}"
-  printf >&2 "%s" "${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_RESET}"
 
   "${@}"
 
@@ -594,7 +594,7 @@ stop_all_netdata() {
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] || [ -n "$(builtin type -P netdatacli)" ]; then
+  if [ -n "$(netdata_pids)" ] && [ -n "$(builtin type -P netdatacli)" ]; then
     netdatacli shutdown-agent
     sleep 20
   fi

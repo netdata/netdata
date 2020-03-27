@@ -42,12 +42,10 @@ except ImportError:
 
 PY_VERSION = sys.version_info[:2]  # (major=3, minor=7, micro=3, releaselevel='final', serial=0)
 
-
 if PY_VERSION > (3, 1):
     from importlib.machinery import SourceFileLoader
 else:
     from imp import load_source as SourceFileLoader
-
 
 ENV_NETDATA_USER_CONFIG_DIR = 'NETDATA_USER_CONFIG_DIR'
 ENV_NETDATA_STOCK_CONFIG_DIR = 'NETDATA_STOCK_CONFIG_DIR'
@@ -64,7 +62,6 @@ def add_pythond_packages():
 
 
 add_pythond_packages()
-
 
 from bases.collection import safe_print
 from bases.loggers import PythonDLogger
@@ -173,7 +170,7 @@ def multi_path_find(name, *paths):
 
 def load_module(name):
     abs_path = os.path.join(DIRS.modules, '{0}{1}'.format(name, MODULE_SUFFIX))
-    module = SourceFileLoader(name, abs_path)
+    module = SourceFileLoader('pythond_' + name, abs_path)
     if isinstance(module, types.ModuleType):
         return module
     return module.load_module()
@@ -590,7 +587,7 @@ class Plugin:
                     job.init()
                 except Exception as error:
                     self.log.warning("{0}[{1}] : unhandled exception on init : {2}, skipping the job".format(
-                                     job.module_name, job.real_name, repr(error)))
+                        job.module_name, job.real_name, repr(error)))
                     job.status = JOB_STATUS_DROPPED
                     continue
 
@@ -598,7 +595,7 @@ class Plugin:
                 ok = job.check()
             except Exception as error:
                 self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job".format(
-                                 job.module_name, job.real_name, repr(error)))
+                    job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
             if not ok:
@@ -611,7 +608,7 @@ class Plugin:
                 job.create()
             except Exception as error:
                 self.log.warning("{0}[{1}] : unhandled exception on create : {2}, skipping the job".format(
-                               job.module_name, job.real_name, repr(error)))
+                    job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
 

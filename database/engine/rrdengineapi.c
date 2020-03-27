@@ -175,9 +175,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
         handle->descr = descr;
 
-        uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
-        handle->page_correlation_id = pg_cache->committed_page_index.latest_corr_id++;
-        uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
+        handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
         if (0 == rd->rrdset->rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
@@ -191,9 +189,21 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;
     if (unlikely(INVALID_TIME == descr->start_time)) {
+        unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
         descr->start_time = point_in_time;
 
-        rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
+        new_metric_API_producers = rrd_atomic_add_fetch(&ctx->stats.metric_API_producers, 1);
+        while (unlikely(new_metric_API_producers > (old_metric_API_max_producers = ctx->metric_API_max_producers))) {
+            /* Increase ctx->metric_API_max_producers */
+            ret_metric_API_max_producers = ulong_compare_and_swap(&ctx->metric_API_max_producers,
+                                                                  old_metric_API_max_producers,
+                                                                  new_metric_API_producers);
+            if (old_metric_API_max_producers == ret_metric_API_max_producers) {
+                /* success */
+                break;
+            }
+        }
+
         pg_cache_insert(ctx, handle->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(handle->page_index, descr);
@@ -793,6 +803,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     strncpyz(ctx->dbfiles_path, dbfiles_path, sizeof(ctx->dbfiles_path) - 1);
     ctx->dbfiles_path[sizeof(ctx->dbfiles_path) - 1] = '\0';
     ctx->drop_metrics_under_page_cache_pressure = rrdeng_drop_metrics_under_page_cache_pressure;
+    ctx->metric_API_max_producers = 0;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->worker_config.ctx = ctx;

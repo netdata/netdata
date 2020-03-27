@@ -6,7 +6,8 @@ int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 struct config netdata_config = {
-        .sections = NULL,
+        .first_section = NULL,
+        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
@@ -1148,6 +1149,7 @@ int main(int argc, char **argv) {
             mallopt(M_ARENA_MAX, 1);
 #endif
         test_clock_boottime();
+        test_clock_monotonic_coarse();
 
         // prepare configuration environment variables for the plugins
 
@@ -1336,6 +1338,28 @@ int main(int argc, char **argv) {
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
+
+    // ------------------------------------------------------------------------
+    // Report ACLK build failure
+#ifndef ENABLE_ACLK
+    error("This agent doesn't have ACLK.");
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
+    if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
+        send_statistics("ACLK_DISABLED", "-", "-");
+#ifdef ACLK_NO_LWS
+        send_statistics("BUILD_FAIL_LWS", "-", "-");
+#endif
+#ifdef ACLK_NO_LIBMOSQ
+        send_statistics("BUILD_FAIL_MOSQ", "-", "-");
+#endif
+        int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
+        if (fd == -1)
+            error("Cannot create file '%s'. Please fix this.", filename);
+        else
+            close(fd);
+    }
+#endif
 
     // ------------------------------------------------------------------------
     // unblock signals

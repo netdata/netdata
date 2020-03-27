@@ -12,6 +12,14 @@ ARG RELEASE_CHANNEL=nightly
 
 ENV JUDY_VER 1.0.5
 
+ARG CFLAGS
+
+ENV CFLAGS=$CFLAGS
+
+ARG EXTRA_INSTALL_OPTS
+
+ENV EXTRA_INSTALL_OPTS=$EXTRA_INSTALL_OPTS
+
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
@@ -19,7 +27,7 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
-   ./netdata-installer.sh --dont-wait --dont-start-it \
+   ./netdata-installer.sh --dont-wait --dont-start-it ${EXTRA_INSTALL_OPTS} \
    $([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)
 
 # files to one directory
@@ -38,6 +46,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
+    mv /usr/sbin/netdata-claim.sh    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     cp -rp /deps/* /app/usr/local/ && \
     chmod +x /app/usr/sbin/run.sh
@@ -88,6 +97,8 @@ RUN \
         /var/cache/netdata \
         /var/lib/netdata \
         /var/log/netdata && \
+    chown -R netdata:netdata /etc/netdata/claim.d && \
+    chmod 0700 /etc/netdata/claim.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \

@@ -8,6 +8,7 @@ SUBDIRS = \
     graphite \
     json \
     opentsdb \
+    prometheus \
     aws_kinesis \
     $(NULL)
 

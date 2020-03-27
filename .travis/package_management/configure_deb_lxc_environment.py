@@ -90,6 +90,9 @@ if str(os.environ["BUILD_STRING"]).count("ubuntu/xenial") == 1:
 if str(os.environ["BUILD_STRING"]).count("debian/buster") == 1:
     common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
     common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.buster', 'contrib/debian/control'])
+if str(os.environ["BUILD_STRING"]).count("debian/eoan") == 1:
+    common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
+    common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.eoan', 'contrib/debian/control'])
 
 common.prepare_version_source(dest_archive, friendly_version, tag=tag)
 

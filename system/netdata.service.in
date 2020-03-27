@@ -21,7 +21,7 @@ ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/run/netdata
 PermissionsStartOnly=true
 
 # saving a big db on slow disks may need some time
-TimeoutStopSec=60
+TimeoutStopSec=150
 
 # restart netdata if it crashes
 Restart=on-failure

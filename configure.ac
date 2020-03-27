@@ -161,14 +161,27 @@ AC_ARG_ENABLE(
     ,
     [enable_jsonc="detect"]
 )
-if test "${ACLK}" = "yes"; then
+
+# -----------------------------------------------------------------------------
+# Check if cloud is enabled and if the functionality is available
+
 AC_ARG_ENABLE(
-    [aclk],
-    ,
-    [aclk_required="${enableval}"],
-    [aclk_required="detect"]
+    [cloud],
+    [AS_HELP_STRING([--disable-cloud],
+                    [Disables all cloud functionality])],
+    [],
+    [enable_cloud="no"]
 )
+
+AC_MSG_CHECKING([if cloud functionality should be enabled])
+if test "${enable_cloud}" != "no"; then
+    AC_DEFINE([ENABLE_CLOUD], [1], [netdata cloud functionality])
+    aclk_required="detect"
+else
+    aclk_required="no"
 fi
+AC_MSG_RESULT([${enable_cloud}])
+AM_CONDITIONAL([ENABLE_CLOUD], [test "${enable_cloud}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -543,13 +556,13 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # ACLK
 
-#currently env var ACLK must be set to 'yes' to even consider building ACLK
-if test "${ACLK}" = "yes"; then
+if test "$enable_cloud" = "yes"; then
     AC_MSG_CHECKING([if libmosquitto static lib is present])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
         HAVE_libmosquitto_a="yes"
     else
         HAVE_libmosquitto_a="no"
+        AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
 
@@ -559,6 +572,7 @@ if test "${ACLK}" = "yes"; then
         HAVE_libwebsockets_a="yes"
     else
         HAVE_libwebsockets_a="no"
+        AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
     fi
     AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 
@@ -1088,7 +1102,7 @@ if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotob
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS} -Iexporting/prometheus/remote_write"
     CXX11FLAG="-std=c++11"
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
 else
@@ -1258,6 +1272,7 @@ AC_ARG_ENABLE(
      [enable_unit_tests="yes"]
 )
 
+
 PKG_CHECK_MODULES(
     [CMOCKA],
     [cmocka],
@@ -1316,6 +1331,8 @@ AC_CONFIG_FILES([
     exporting/graphite/Makefile
     exporting/json/Makefile
     exporting/opentsdb/Makefile
+    exporting/prometheus/Makefile
+    exporting/prometheus/remote_write/Makefile
     exporting/aws_kinesis/Makefile
     exporting/tests/Makefile
     health/Makefile

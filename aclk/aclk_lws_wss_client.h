@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef ACLK_LWS_WSS_CLIENT_H
 #define ACLK_LWS_WSS_CLIENT_H
 
@@ -13,6 +15,8 @@
 #define ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED 1
 
 #define ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES (128 * 1024)
+
+#define ACLK_LWS_CALLBACK_HISTORY 10
 
 #ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
 #define aclk_lws_mutex_init(x) netdata_mutex_init(x)
@@ -31,7 +35,11 @@ struct aclk_lws_wss_engine_callbacks {
     void (*connection_closed)();
 };
 
-struct lws_wss_packet_buffer;
+struct lws_wss_packet_buffer {
+    unsigned char *data;
+    size_t data_size, written;
+    struct lws_wss_packet_buffer *next;
+};
 
 struct aclk_lws_wss_engine_instance {
     //target host/port for connection
@@ -57,6 +65,8 @@ struct aclk_lws_wss_engine_instance {
 
     int data_to_read;
     int upstream_reconnect_request;
+
+    int lws_callback_history[ACLK_LWS_CALLBACK_HISTORY];
 };
 
 void aclk_lws_wss_client_destroy();
@@ -73,6 +83,9 @@ void aclk_lws_wss_mqtt_layer_disconect_notif();
 void aclk_lws_connection_established();
 void aclk_lws_connection_data_received();
 void aclk_lws_connection_closed();
+void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
 
+void aclk_wss_set_proxy(struct lws_vhost *vhost);
 
+#define FRAGMENT_SIZE 4096
 #endif

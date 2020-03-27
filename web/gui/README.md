@@ -1,6 +1,7 @@
 <!--
 ---
 title: "The standard web dashboard"
+date: 2020-03-11
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
 ---
 -->
@@ -25,6 +26,10 @@ HTML, CSS, and JavaScript files that make up the standard dashboard. You don't
 have to configure anything to access it, although you can adjust [your
 settings](../server/#other-netdataconf-web-section-options) in the
 `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
+
+<details markdown="1"><summary>Want to see the dashboard and its features in action? Check out our video.</summary>
+<iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</details>
 
 ## Navigating the standard dashboard
 
