@@ -34,6 +34,8 @@ CHARTS = {
             ['system.pgpgio.out', None, 'absolute', 1, 100],
             ['system.net.sent', None, 'absolute', 1, 100],
             ['system.net.received', None, 'absolute', 1, 100],
+            ['system.ip.sent', None, 'absolute', 1, 100],
+            ['system.ip.received', None, 'absolute', 1, 100],
             ['system.processes.running', None, 'absolute', 1, 100],
             ['system.intr.interrupts', None, 'absolute', 1, 100],
         ]
@@ -50,7 +52,7 @@ def get_raw_data(self, host=None):
 
     data = dict()
 
-    for chart in ['system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.net', 'system.processes', 'system.intr']:
+    for chart in ['system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.processes', 'system.intr']:
 
         # get data
         url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
