@@ -49,7 +49,7 @@ CHARTS = {
 HOST_PORT = '127.0.0.1:19999'
 N = 500
 
-def get_raw_data(self, host=None):
+def get_raw_data(host=None):
 
     if host is None:
         host = HOST_PORT
@@ -66,23 +66,15 @@ def get_raw_data(self, host=None):
         df = pd.DataFrame(raw_data, columns=response_json['labels'])
         df = df.set_index('time').dropna().sort_index()
 
-        # get rolling df
-        r = df.expanding()
         # get mean
-        m = r.mean().shift(1)
+        m = df.mean().shift(1)
         # get standard deviation
-        s = r.std(ddof=0).shift(1)
+        s = df.std(ddof=0).shift(1)
         # get zscore
         df = (df - m) / s
-
-        df = df.dropna(axis=1, how='all').tail(1)
+        df = df.clip(-10, 10).dropna(axis=1, how='all').tail(1)
 
         for col in df.columns:
-            if col not in self.charts['zscores']:
-                try:
-                    self.charts['zscores'].add_dimension([f'{chart}.{col}'])
-                except:
-                    pass
             data[f'{chart}.{col}'] = df[col].values[0] * 1000
 
     return data
