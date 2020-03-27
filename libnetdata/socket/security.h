@@ -28,6 +28,8 @@ struct netdata_ssl{
     int flags; //The flags for SSL connection
 };
 
+#define OPENSSL_VERSION_WITH_TLS_13 0x10100000L
+
 extern SSL_CTX *netdata_opentsdb_ctx;
 extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
