@@ -126,7 +126,7 @@ So, why do monitoring solutions and SaaS providers filter out metrics?
 
 Netdata collects, stores, and visualizes everything, every single metric exposed by systems and applications. The console should not provide more metrics.  Because of Netdata's distributed nature, the number of metrics collected does not have any noticeable effect on the performance or the cost of the monitoring infrastructure.
 
-Of course, since Netdata is also about [meaningful presentation](meaningful-presentation.md), the number of metrics makes Netdata development slower.  So, we need to have a good understanding of the metrics before adding them to Netdata. We organize the metrics, add information related to them, configure alarms for them, so that you, the Netdata users, have the best out-of-the-box experience and all the information required to kill the console for troubleshooting slowdowns.
+Of course, since Netdata is also about [meaningful presentation](#meaningful-presentation), the number of metrics makes Netdata development slower.  So, we need to have a good understanding of the metrics before adding them to Netdata. We organize the metrics, add information related to them, configure alarms for them, so that you, the Netdata users, have the best out-of-the-box experience and all the information required to kill the console for troubleshooting slowdowns.
 
 ### Meaningful presentation
 
