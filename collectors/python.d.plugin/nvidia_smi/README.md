@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # NVIDIA GPU monitoring with Netdata
 
-Monitors performance metrics (memory usage, fan speed, Peripheral Component Interconnect Express (PCIe) bandwidth utilization, temperature, etc.) using `nvidia-smi` CLI tool.
+Monitors performance metrics (memory usage, fan speed, PCI Express (PCIe) bandwidth utilization, temperature, etc.) using `nvidia-smi` CLI tool.
 
 
 **Requirements and Notes:**
