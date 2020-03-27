@@ -145,7 +145,7 @@ navpart 1 . "README" ""
 
 navpart 1 . . "Why Netdata?" 
 
-echo -ne " - 'docs/why-netdata.md'
+echo -ne "  - 'docs/why-netdata.md'
   - 'docs/Demo-Sites.md'
 - Installation:
     - 'packaging/installer/README.md'
