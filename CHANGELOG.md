@@ -6,8 +6,14 @@
 
 **Merged pull requests:**
 
+- Adds install-fake-charts.d.sh to gitignore [\#8502](https://github.com/netdata/netdata/pull/8502) ([underhood](https://github.com/underhood))
+- Improved ACLK  [\#8498](https://github.com/netdata/netdata/pull/8498) ([stelfrag](https://github.com/stelfrag))
+- Fix openSUSE 15.1 RPM Package Buidls [\#8494](https://github.com/netdata/netdata/pull/8494) ([prologic](https://github.com/prologic))
+- python.d/SimpleService: fix module name [\#8492](https://github.com/netdata/netdata/pull/8492) ([ilyam8](https://github.com/ilyam8))
 - Fix install-required-packages script to self-update apt [\#8491](https://github.com/netdata/netdata/pull/8491) ([prologic](https://github.com/prologic))
+- Relaxes SSL checks for testing [\#8489](https://github.com/netdata/netdata/pull/8489) ([underhood](https://github.com/underhood))
 - packaging/docker: add --build-arg CFLAGS support [\#8485](https://github.com/netdata/netdata/pull/8485) ([nicolasparada](https://github.com/nicolasparada))
+- installer: update go.d.plugin version to v0.18.0 [\#8477](https://github.com/netdata/netdata/pull/8477) ([ilyam8](https://github.com/ilyam8))
 - Installer creates claim.d but is run as root, patch to correct ownership [\#8475](https://github.com/netdata/netdata/pull/8475) ([amoss](https://github.com/amoss))
 - python.d.plugin: add prefix to the module name during loading source file [\#8474](https://github.com/netdata/netdata/pull/8474) ([ilyam8](https://github.com/ilyam8))
 - Added Docker build arg to pass extra options to installer. [\#8472](https://github.com/netdata/netdata/pull/8472) ([Ferroin](https://github.com/Ferroin))
@@ -23,6 +29,7 @@
 - Add high precision timer support for plugins such as idlejitter. [\#8441](https://github.com/netdata/netdata/pull/8441) ([mfundul](https://github.com/mfundul))
 - health: add dns\_query module alarm [\#8434](https://github.com/netdata/netdata/pull/8434) ([ilyam8](https://github.com/ilyam8))
 - Add the new cloud info in the info endpoint [\#8430](https://github.com/netdata/netdata/pull/8430) ([amoss](https://github.com/amoss))
+- Report Why ACLK build failed [\#8429](https://github.com/netdata/netdata/pull/8429) ([underhood](https://github.com/underhood))
 - Fake collector to provoke ACLK messages [\#8427](https://github.com/netdata/netdata/pull/8427) ([amoss](https://github.com/amoss))
 - Fixed JSON parsing [\#8426](https://github.com/netdata/netdata/pull/8426) ([stelfrag](https://github.com/stelfrag))
 - Fix flushing error threshold [\#8425](https://github.com/netdata/netdata/pull/8425) ([mfundul](https://github.com/mfundul))
@@ -234,8 +241,6 @@
 - Improve the system-info.sh script to report CPU and RAM meta-data. [\#7815](https://github.com/netdata/netdata/pull/7815) ([Ferroin](https://github.com/Ferroin))
 - Attempt to use system service manager to shut down Netdata. [\#7814](https://github.com/netdata/netdata/pull/7814) ([Ferroin](https://github.com/Ferroin))
 - add possibility to change badge text font color [\#7809](https://github.com/netdata/netdata/pull/7809) ([underhood](https://github.com/underhood))
-- bug\_report improvements [\#7805](https://github.com/netdata/netdata/pull/7805) ([ilyam8](https://github.com/ilyam8))
-- node.d/snmp: snmpv3 support [\#7802](https://github.com/netdata/netdata/pull/7802) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
