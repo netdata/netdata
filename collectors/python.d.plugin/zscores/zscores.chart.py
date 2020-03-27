@@ -22,20 +22,20 @@ CHARTS = {
     'zscores': {
         'options': [None, 'Z Scores', 'value', 'zscores', 'anomalies.zscores', 'line'],
         'lines': [
-            ['system.cpu.user', None, 1, 1000],
-            ['system.cpu.system', None, 1, 1000],
-            ['system.cpu.softirq', None, 1, 1000],
-            ['system.load.load1', None, 1, 1000],
-            ['system.load.load5', None, 1, 1000],
-            ['system.load.load15', None, 1, 1000],
-            ['system.io.in', None, 1, 1000],
-            ['system.io.out', None, 1, 1000],
-            ['system.pgpgio.in', None, 1, 1000],
-            ['system.pgpgio.out', None, 1, 1000],
-            ['system.net.sent', None, 1, 1000],
-            ['system.net.received', None, 1, 1000],
-            ['system.processes.running', None, 1, 1000],
-            ['system.intr.interrupts', None, 1, 1000],
+            ['system.cpu.user', None, 'absolute', 1, 100],
+            ['system.cpu.system', None, 'absolute', 1, 100],
+            ['system.cpu.softirq', None, 'absolute', 1, 100],
+            ['system.load.load1', None, 'absolute', 1, 100],
+            ['system.load.load5', None, 'absolute', 1, 100],
+            ['system.load.load15', None, 'absolute', 1, 100],
+            ['system.io.in', None, 'absolute', 1, 100],
+            ['system.io.out', None, 'absolute', 1, 100],
+            ['system.pgpgio.in', None, 'absolute', 1, 100],
+            ['system.pgpgio.out', None, 'absolute', 1, 100],
+            ['system.net.sent', None, 'absolute', 1, 100],
+            ['system.net.received', None, 'absolute', 1, 100],
+            ['system.processes.running', None, 'absolute', 1, 100],
+            ['system.intr.interrupts', None, 'absolute', 1, 100],
         ]
     },
 }
@@ -77,7 +77,7 @@ def get_raw_data(self, host=None):
                     self.charts['zscores'].add_dimension([f'{chart}.{col}'])
                 except:
                     pass
-            data[f'{chart}.{col}'] = abs(df[col].values[0]) * 1000
+            data[f'{chart}.{col}'] = df[col].values[0] * 100
 
     return data
 
