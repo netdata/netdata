@@ -288,7 +288,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
-        if [ "${RELOAD}" == "0"] ; then
+        if [ "${RELOAD}" == "0" ] ; then
             exit 0
         fi
         netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
