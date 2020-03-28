@@ -1,0 +1,5 @@
+---
+extends: default
+
+rules:
+  document-start: disable
