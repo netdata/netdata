@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Remove stackscale demo link and clean up page [\#8509](https://github.com/netdata/netdata/pull/8509) ([joelhans](https://github.com/joelhans))
 - Adds install-fake-charts.d.sh to gitignore [\#8502](https://github.com/netdata/netdata/pull/8502) ([underhood](https://github.com/underhood))
 - Improved ACLK  [\#8498](https://github.com/netdata/netdata/pull/8498) ([stelfrag](https://github.com/stelfrag))
 - Fix openSUSE 15.1 RPM Package Buidls [\#8494](https://github.com/netdata/netdata/pull/8494) ([prologic](https://github.com/prologic))
@@ -237,10 +238,6 @@
 - Adds ReviewDog CI checks for JavaScript [\#7828](https://github.com/netdata/netdata/pull/7828) ([prologic](https://github.com/prologic))
 - Adds ReviewDog CI checks for Golang [\#7827](https://github.com/netdata/netdata/pull/7827) ([prologic](https://github.com/prologic))
 - Don't remove groups/users in Debian postrm [\#7817](https://github.com/netdata/netdata/pull/7817) ([prologic](https://github.com/prologic))
-- node.d/snmp.node.js: format code [\#7816](https://github.com/netdata/netdata/pull/7816) ([ilyam8](https://github.com/ilyam8))
-- Improve the system-info.sh script to report CPU and RAM meta-data. [\#7815](https://github.com/netdata/netdata/pull/7815) ([Ferroin](https://github.com/Ferroin))
-- Attempt to use system service manager to shut down Netdata. [\#7814](https://github.com/netdata/netdata/pull/7814) ([Ferroin](https://github.com/Ferroin))
-- add possibility to change badge text font color [\#7809](https://github.com/netdata/netdata/pull/7809) ([underhood](https://github.com/underhood))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
