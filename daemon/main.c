@@ -1340,6 +1340,28 @@ int main(int argc, char **argv) {
     send_statistics("START", "-",  "-");
 
     // ------------------------------------------------------------------------
+    // Report ACLK build failure
+#ifndef ENABLE_ACLK
+    error("This agent doesn't have ACLK.");
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
+    if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
+        send_statistics("ACLK_DISABLED", "-", "-");
+#ifdef ACLK_NO_LWS
+        send_statistics("BUILD_FAIL_LWS", "-", "-");
+#endif
+#ifdef ACLK_NO_LIBMOSQ
+        send_statistics("BUILD_FAIL_MOSQ", "-", "-");
+#endif
+        int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
+        if (fd == -1)
+            error("Cannot create file '%s'. Please fix this.", filename);
+        else
+            close(fd);
+    }
+#endif
+
+    // ------------------------------------------------------------------------
     // unblock signals
 
     signals_unblock();
