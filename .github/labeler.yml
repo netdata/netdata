@@ -10,6 +10,10 @@
 #
 # Please keep the labels sorted and deduplicated.
 
+ACLK:
+  - aclk/*
+  - aclk/**/*
+
 area/backends:
   - backends/*
   - backends/**/*
