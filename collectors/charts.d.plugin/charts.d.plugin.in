@@ -612,6 +612,12 @@ debug "run_charts='$run_charts'"
 
 [ -z "$run_charts" ] && fatal "No charts to collect data from."
 
+keepalive() {
+  if [ ! -t 1 ] && ! printf "\n"; then
+    chartsd_cleanup
+  fi
+}
+
 declare -A charts_last_update=() charts_update_every=() charts_retries=() charts_next_update=() charts_run_counter=() charts_serial_failures=()
 global_update() {
 	local exit_at \
@@ -642,6 +648,8 @@ global_update() {
 
 	# the main loop
 	while [ "${#next_charts[@]}" -gt 0 ]; do
+	  keepalive
+
 		c=$((c + 1))
 		now_charts=("${next_charts[@]}")
 		next_charts=()
