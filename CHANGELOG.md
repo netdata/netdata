@@ -129,11 +129,9 @@
 - Remove Fedora 29 from CI and packaging. [\#8100](https://github.com/netdata/netdata/pull/8100) ([Ferroin](https://github.com/Ferroin))
 - Cleans up CODEOWNERS for the build system itself \(not to be confused with packaging\) [\#8098](https://github.com/netdata/netdata/pull/8098) ([prologic](https://github.com/prologic))
 - added requirements for exim. Issue \#8087 [\#8096](https://github.com/netdata/netdata/pull/8096) ([petarkozic](https://github.com/petarkozic))
-- Update the manual install documentation with better info. [\#8088](https://github.com/netdata/netdata/pull/8088) ([Ferroin](https://github.com/Ferroin))
 - Remove Ubuntu 19.04 from CI and packaging. [\#8040](https://github.com/netdata/netdata/pull/8040) ([Ferroin](https://github.com/Ferroin))
 - Remove OpenSUSE Leap 15.0 from CI. [\#7990](https://github.com/netdata/netdata/pull/7990) ([Ferroin](https://github.com/Ferroin))
 - Removed tmem stat collection from xenstat plugin for Xen 4.13 [\#7951](https://github.com/netdata/netdata/pull/7951) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
-- Tutorials to support v1.20 release [\#7943](https://github.com/netdata/netdata/pull/7943) ([joelhans](https://github.com/joelhans))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
@@ -237,7 +235,6 @@
 - Remove all refernces to .keep files [\#7829](https://github.com/netdata/netdata/pull/7829) ([prologic](https://github.com/prologic))
 - Adds ReviewDog CI checks for JavaScript [\#7828](https://github.com/netdata/netdata/pull/7828) ([prologic](https://github.com/prologic))
 - Adds ReviewDog CI checks for Golang [\#7827](https://github.com/netdata/netdata/pull/7827) ([prologic](https://github.com/prologic))
-- Don't remove groups/users in Debian postrm [\#7817](https://github.com/netdata/netdata/pull/7817) ([prologic](https://github.com/prologic))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
