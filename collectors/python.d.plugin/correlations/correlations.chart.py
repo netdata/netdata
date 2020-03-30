@@ -27,7 +27,7 @@ CHARTS = {
 
 
 HOST_PORT = '127.0.0.1:19999'
-AFTER = 500
+AFTER = 200
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
