@@ -35,13 +35,14 @@ CHARTS_IN_SCOPE = [
 ]
 
 
-def get_raw_data(self=None, host=None):
+def get_raw_data(host: str = None) -> pd.DataFrame:
 
     if host is None:
         host = HOST_PORT
 
-    data = dict()
+    df = pd.DataFrame(columns=['time'])
 
+    # get all relevant data
     for chart in CHARTS_IN_SCOPE:
 
         # get data
@@ -51,31 +52,35 @@ def get_raw_data(self=None, host=None):
         raw_data = response_json['data']
 
         # create df
-        df = pd.DataFrame(raw_data, columns=response_json['labels'])
-        df = df.set_index('time').dropna().sort_index()
+        df_chart = pd.DataFrame(raw_data, columns=response_json['labels'])
+        df_chart = df_chart.rename(
+            columns={col: f'{chart}.{col}' for col in df_chart.columns[df_chart.columns != 'time']}
+        )
+        df = df.merge(df_chart, on='time', how='outer')
 
-        print(df.shape)
-        print(df.head())
+    df = df.set_index('time')
+    df = df.ffill()
 
-        # get mean
-        m = df.mean()
-        # get standard deviation
-        s = df.std(ddof=0)
-        # get zscore
-        df = (df - m) / s
-        df = df.tail(1).dropna(axis=1, how='all').clip(-10, 10)
+    return df
 
-        for col in df.columns:
 
-            dimension_id = f'{chart}.{col}'
+def process_data(self=None, df: pd.DataFrame = None) -> dict:
 
-            if self:
+    data = dict()
 
-                if dimension_id not in self.charts['zscores']:
+    # get mean
+    m = df.mean()
+    # get standard deviation
+    s = df.std(ddof=0)
+    # get zscore
+    df = (df - m) / s
+    df = df.tail(1).dropna(axis=1, how='all').clip(-10, 10)
 
-                    self.charts['zscores'].add_dimension([dimension_id, None, 'absolute', 1, 100])
-
-            data[dimension_id] = df[col].values[0] * 1000
+    for col in df.columns:
+        if self:
+            if col not in self.charts['zscores']:
+                self.charts['zscores'].add_dimension([col, None, 'absolute', 1, 1000])
+        data[col] = df[col].values[0] * 1000
 
     return data
 
@@ -101,8 +106,14 @@ class Service(SimpleService):
 
 #%%
 
-#data = get_raw_data(host='london.my-netdata.io')
+#df = get_raw_data(host='london.my-netdata.io')
+#data = process_data(df=df)
+#print(df)
 #print(data)
+
+#%%
+
+#%%
 
 #%%
 
