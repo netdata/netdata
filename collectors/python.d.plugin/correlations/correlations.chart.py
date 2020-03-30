@@ -114,7 +114,7 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.random = SystemRandom()
         self.counter = 1
-        self.data = list()
+        self.data = []
 
     @staticmethod
     def check():
@@ -159,3 +159,4 @@ class Service(SimpleService):
 
 #%%
 
+#%%
