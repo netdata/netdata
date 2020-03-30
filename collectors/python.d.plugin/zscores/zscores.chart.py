@@ -57,7 +57,7 @@ def get_raw_data(self=None, host=None):
 
     data = dict()
 
-    for chart in ['system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr', 'system.forks']:
+    for chart in ['system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat']:
 
         # get data
         url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
