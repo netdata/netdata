@@ -32,6 +32,7 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
 ]
+CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
 
 
 def get_raw_data(host: str = None, after: int = 500, charts: list = None) -> pd.DataFrame:
@@ -77,6 +78,11 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
                 self.charts['correlations'].add_dimension([col, None, 'absolute', 1, 1000])
         data[col] = df[col].values[0] * 1000
 
+    if 'counter' not in self.charts['correlations']:
+        self.charts['correlations'].add_dimension(['counter', None, 'absolute', 1, 1])
+    self.counter += 1
+    data['counter'] = self.counter
+
     return data
 
 
@@ -87,6 +93,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
+        self.counter = 1
 
     @staticmethod
     def check():
@@ -111,6 +118,3 @@ class Service(SimpleService):
 
 #%%
 
-#%%
-
-#%%
