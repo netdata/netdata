@@ -807,6 +807,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     rrdhost_unlock(host);
 }
 
+extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 {
     buffer_strcat(wb, "{\n");
@@ -872,9 +873,15 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
 #endif
     if (is_agent_claimed() == NULL)
-        buffer_strcat(wb, "\t\"agent-claimed\": false\n");
+        buffer_strcat(wb, "\t\"agent-claimed\": false,\n");
     else
-        buffer_strcat(wb, "\t\"agent-claimed\": true\n");
+        buffer_strcat(wb, "\t\"agent-claimed\": true,\n");
+#ifdef ENABLE_ACLK
+    if (aclk_connected)
+        buffer_strcat(wb, "\t\"aclk-available\": true\n");
+    else
+#endif
+        buffer_strcat(wb, "\t\"aclk-available\": false\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "}");
     return 0;

@@ -89,7 +89,7 @@ netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -proxy=socks5h://127.0
 
 When claiming via the `netdata` binary set the following options in the config:
 ```
-[agent_cloud_link]
+[cloud]
     proxy = socks5://X.X.X.X:YYYY
 ```
 Proceed to claim using the command-line syntax:

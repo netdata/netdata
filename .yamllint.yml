@@ -3,8 +3,13 @@ yaml-files:
   - '*.yaml'
   - '*.yml'
   - '.yamllint'
+  - 'collectors/python.d.plugin/*.conf'
+  - 'collectors/python.d.plugin/*/*.conf'
 
 rules:
+  line-length:
+    max: 120
+    level: warning
   braces: enable
   brackets: enable
   colons: enable
