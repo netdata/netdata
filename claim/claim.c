@@ -41,10 +41,10 @@ extern struct registry registry;
 /* rrd_init() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
-#ifndef ENABLE_CLOUD
-    info("The claiming feature has been disabled");
-    return;
-#endif
+    if (!netdata_cloud_setting) {
+        error("Refusing to claim agent -> cloud functionality has been disabled");
+        return;
+    }
 
     int exit_code;
     pid_t command_pid;

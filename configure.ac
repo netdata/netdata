@@ -181,7 +181,7 @@ else
     aclk_required="no"
 fi
 AC_MSG_RESULT([${enable_cloud}])
-AM_CONDITIONAL([ENABLE_CLOUD], [test "${enable_cloud}" = "yes"])
+AM_CONDITIONAL([DISABLE_CLOUD], [test "${enable_cloud}" = "no"])
 
 # -----------------------------------------------------------------------------
 # netdata required checks

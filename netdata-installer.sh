@@ -283,10 +283,6 @@ while [ -n "${1}" ]; do
       NETDATA_DISABLE_CLOUD=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
       ;;
-    "--cloud-testing")          # Temporary, until we flip the feature flag. Internal use only
-      unset NETDATA_DISABLE_CLOUD
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --enable-cloud"
-      ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1

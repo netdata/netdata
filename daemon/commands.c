@@ -186,7 +186,7 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
     (void)args;
     (void)message;
 
-#ifndef ENABLE_CLOUD
+#ifdef DISABLE_CLOUD
     info("The claiming feature has been disabled");
     return CMD_STATUS_FAILURE;
 #endif
@@ -194,6 +194,10 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
     info("Cloud functionality is not enabled because of missing dependencies at build-time.");
     return CMD_STATUS_FAILURE;
 #endif
+    if (!netdata_cloud_setting) {
+        error("Cannot reload claiming status -> cloud functionality has been disabled");
+        return CMD_STATUS_FAILURE;
+    }
 
     error_log_limit_unlimited();
     info("COMMAND: Reloading Agent Claiming configuration.");
