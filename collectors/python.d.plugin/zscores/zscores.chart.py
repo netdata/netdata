@@ -80,7 +80,7 @@ def get_raw_data(self=None, host=None):
             dimension_id = f'{chart}.{col}'
             if self:
                 if dimension_id not in self.charts['zscores']:
-                    self.charts['zscores'].add_dimension([dimension_id])
+                    self.charts['zscores'].add_dimension([dimension_id, None, 'absolute', 1, 100])
             data[dimension_id] = df[col].values[0] * 1000
 
     return data
