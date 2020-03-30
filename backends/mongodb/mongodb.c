@@ -6,10 +6,10 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-mongoc_client_t *mongodb_client;
-mongoc_collection_t *mongodb_collection;
+static mongoc_client_t *mongodb_client;
+static mongoc_collection_t *mongodb_collection;
 
-int mongodb_init(const char *uri_string,
+int backends_mongodb_init(const char *uri_string,
                  const char *database_string,
                  const char *collection_string,
                  int32_t default_socket_timeout) {
@@ -47,7 +47,7 @@ int mongodb_init(const char *uri_string,
     return 0;
 }
 
-void free_bson(bson_t **insert, size_t n_documents) {
+void backends_free_bson(bson_t **insert, size_t n_documents) {
     size_t i;
 
     for(i = 0; i < n_documents; i++)
@@ -56,7 +56,7 @@ void free_bson(bson_t **insert, size_t n_documents) {
     free(insert);
 }
 
-int mongodb_insert(char *data, size_t n_metrics) {
+int backends_mongodb_insert(char *data, size_t n_metrics) {
     bson_t **insert = calloc(n_metrics, sizeof(bson_t *));
     bson_error_t error;
     char *start = data, *end = data;
@@ -77,7 +77,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
 
         if(unlikely(!insert[n_documents])) {
            error("BACKEND: %s", error.message);
-           free_bson(insert, n_documents);
+           backends_free_bson(insert, n_documents);
            return 1;
         }
 
@@ -88,16 +88,16 @@ int mongodb_insert(char *data, size_t n_metrics) {
 
     if(unlikely(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
        error("BACKEND: %s", error.message);
-       free_bson(insert, n_documents);
+       backends_free_bson(insert, n_documents);
        return 1;
     }
 
-    free_bson(insert, n_documents);
+    backends_free_bson(insert, n_documents);
 
     return 0;
 }
 
-void mongodb_cleanup() {
+void backends_mongodb_cleanup() {
     mongoc_collection_destroy(mongodb_collection);
     mongoc_client_destroy(mongodb_client);
     mongoc_cleanup();

@@ -662,6 +662,11 @@ set(KINESIS_EXPORTING_FILES
         exporting/aws_kinesis/aws_kinesis_put_record.h
         )
 
+set(MONGODB_EXPORTING_FILES
+        exporting/mongodb/mongodb.c
+        exporting/mongodb/mongodb.h
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -782,7 +787,7 @@ ENDIF()
 IF(libmongoc-1.0_FOUND)
     message(STATUS "mongodb backend: enabled")
 
-    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES})
+    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES} ${MONGODB_EXPORTING_FILES})
     list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
     list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
 ELSE()
@@ -1033,8 +1038,9 @@ if(BUILD_TESTING)
         exporting/tests/system_doubles.c
         )
     set(TEST_NAME exporting_engine)
-    set(KINESIS_LINK_OPTIONS)
     set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)
+    set(KINESIS_LINK_OPTIONS)
+    set(MONGODB_LINK_OPTIONS)
 if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     list(APPEND EXPORTING_ENGINE_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(
@@ -1055,13 +1061,33 @@ if(ENABLE_BACKEND_KINESIS)
         -Wl,--wrap=kinesis_get_result
     )
 endif()
+if(MONGOC_LIBRARIES)
+    list(APPEND EXPORTING_ENGINE_FILES ${MONGODB_EXPORTING_FILES})
+    list(
+        APPEND MONGODB_LINK_OPTIONS
+        -Wl,--wrap=mongoc_init
+        -Wl,--wrap=mongoc_uri_new_with_error
+        -Wl,--wrap=mongoc_uri_get_option_as_int32
+        -Wl,--wrap=mongoc_uri_set_option_as_int32
+        -Wl,--wrap=mongoc_client_new_from_uri
+        -Wl,--wrap=mongoc_client_set_appname
+        -Wl,--wrap=mongoc_client_get_collection
+        -Wl,--wrap=mongoc_uri_destroy
+        -Wl,--wrap=mongoc_collection_insert_many
+    )
+endif()
     add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
         ${TEST_NAME}_testdriver
         PRIVATE
         -DUNIT_TESTING
     )
-    target_include_directories(${TEST_NAME}_testdriver PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+    target_include_directories(
+        ${TEST_NAME}_testdriver
+        PUBLIC
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${NETDATA_COMMON_INCLUDE_DIRS}
+    )
     target_link_options(
         ${TEST_NAME}_testdriver
         PRIVATE
@@ -1086,8 +1112,9 @@ endif()
         -Wl,--wrap=recv
         -Wl,--wrap=send
         -Wl,--wrap=connect_to_one_of
-        ${KINESIS_LINK_OPTIONS}
         ${PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS}
+        ${KINESIS_LINK_OPTIONS}
+        ${MONGODB_LINK_OPTIONS}
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

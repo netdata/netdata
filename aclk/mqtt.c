@@ -88,9 +88,9 @@ int _mqtt_lib_init()
 
     // show library info so can have it in the logfile
     //libmosq_version = mosquitto_lib_version(&libmosq_major, &libmosq_minor, &libmosq_revision);
-    ca_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link cert", "*");
-    server_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link server cert", "*");
-    server_key = config_get(CONFIG_SECTION_ACLK, "agent cloud link server key", "*");
+    ca_crt = config_get(CONFIG_SECTION_CLOUD, "link cert", "*");
+    server_crt = config_get(CONFIG_SECTION_CLOUD, "link server cert", "*");
+    server_key = config_get(CONFIG_SECTION_CLOUD, "link server key", "*");
 
     if (ca_crt[0] == '*') {
         freez(ca_crt);
@@ -269,7 +269,10 @@ int _link_set_lwt(char *sub_topic, int qos)
         return 1;
     }
 
-    time_t time_created = now_realtime_sec();
+    usec_t time_created_offset_usec = now_realtime_usec();
+    time_t time_created = time_created_offset_usec / USEC_PER_SEC;
+    time_created_offset_usec = time_created_offset_usec % USEC_PER_SEC;
+
     char *msg_id = create_uuid();
 
     snprintfz(
@@ -277,9 +280,10 @@ int _link_set_lwt(char *sub_topic, int qos)
         "{ \"type\": \"disconnect\","
         " \"msg-id\": \"%s\","
         " \"timestamp\": %ld,"
+        " \"timestamp-offset-usec\": %llu,"
         " \"version\": %d,"
         " \"payload\": \"unexpected\" }",
-        msg_id, time_created, ACLK_VERSION);
+        msg_id, time_created, time_created_offset_usec, ACLK_VERSION);
 
     freez(msg_id);
 
@@ -322,7 +326,7 @@ int _link_send_message(char *topic, unsigned char *message, int *mid)
         return rc;
 
     int msg_len = strlen((char*)message);
-    error("Sending MQTT len=%d starts %02x %02x %02x", msg_len, message[0], message[1], message[2]);
+    info("Sending MQTT len=%d starts %02x %02x %02x", msg_len, message[0], message[1], message[2]);
     rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
 
     // TODO: Add better handling -- error will flood the logfile here

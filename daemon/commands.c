@@ -186,8 +186,10 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
     (void)args;
     (void)message;
 
-    info("The claiming feature is still in development and subject to change before the next release");
+#ifndef ENABLE_CLOUD
+    info("The claiming feature has been disabled");
     return CMD_STATUS_FAILURE;
+#endif
 
     error_log_limit_unlimited();
     info("COMMAND: Reloading Agent Claiming configuration.");

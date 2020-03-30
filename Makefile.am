@@ -519,6 +519,11 @@ KINESIS_EXPORTING_FILES = \
     exporting/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
+MONGODB_EXPORTING_FILES = \
+    exporting/mongodb/mongodb.c \
+    exporting/mongodb/mongodb.h \
+    $(NULL)
+
 KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis.c \
     backends/aws_kinesis/aws_kinesis.h \
@@ -765,6 +770,13 @@ exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote
 
 endif
 
+if ENABLE_EXPORTING
+if ENABLE_BACKEND_MONGODB
+    netdata_SOURCES += $(MONGODB_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
+endif
+endif
+
 if ENABLE_BACKEND_MONGODB
     netdata_SOURCES += $(MONGODB_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
@@ -900,6 +912,21 @@ if ENABLE_BACKEND_KINESIS
         -Wl,--wrap=kinesis_init \
         -Wl,--wrap=kinesis_put_record \
         -Wl,--wrap=kinesis_get_result \
+        $(NULL)
+endif
+if ENABLE_BACKEND_MONGODB
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(MONGODB_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_MONGOC_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=mongoc_init \
+        -Wl,--wrap=mongoc_uri_new_with_error \
+        -Wl,--wrap=mongoc_uri_get_option_as_int32 \
+        -Wl,--wrap=mongoc_uri_set_option_as_int32 \
+        -Wl,--wrap=mongoc_client_new_from_uri \
+        -Wl,--wrap=mongoc_client_set_appname \
+        -Wl,--wrap=mongoc_client_get_collection \
+        -Wl,--wrap=mongoc_uri_destroy \
+        -Wl,--wrap=mongoc_collection_insert_many \
         $(NULL)
 endif
 endif
