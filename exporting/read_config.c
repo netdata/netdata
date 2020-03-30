@@ -281,6 +281,13 @@ struct engine *read_exporting_config()
         }
 #endif
 
+#ifndef HAVE_MONGOC
+        if (tmp_ci_list->backend_type == BACKEND_TYPE_MONGODB) {
+            error("MongoDB support isn't compiled");
+            goto next_connector_instance;
+        }
+#endif
+
         tmp_instance = (struct instance *)callocz(1, sizeof(struct instance));
         tmp_instance->next = engine->instance_root;
         engine->instance_root = tmp_instance;
@@ -360,6 +367,19 @@ struct engine *read_exporting_config()
 
             connector_specific_config->secure_key = strdupz(exporter_get(
                 instance_name, "aws_secret_access_key", ""));
+        }
+
+        if (tmp_instance->config.type == BACKEND_TYPE_MONGODB) {
+            struct mongodb_specific_config *connector_specific_config =
+                callocz(1, sizeof(struct mongodb_specific_config));
+
+            tmp_instance->config.connector_specific_config = connector_specific_config;
+
+            connector_specific_config->database = strdupz(exporter_get(
+                instance_name, "database", ""));
+
+            connector_specific_config->collection = strdupz(exporter_get(
+                instance_name, "collection", ""));
         }
 
 #ifdef NETDATA_INTERNAL_CHECKS

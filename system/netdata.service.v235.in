@@ -14,11 +14,11 @@ CacheDirectory=netdata
 StateDirectory=netdata
 LogsDirectory=netdata
 RuntimeDirectoryMode=0775
-StateDirectoryMode=0750
-CacheDirectoryMode=0750
-LogsDirectoryMode=0750
-PIDFile=netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P $PIDFILE -D
+StateDirectoryMode=0755
+CacheDirectoryMode=0755
+LogsDirectoryMode=2750
+EnvironmentFile=-/etc/default/netdata
+ExecStart=/usr/sbin/netdata -D $EXTRA_OPTS
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=60

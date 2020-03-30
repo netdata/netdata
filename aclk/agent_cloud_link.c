@@ -22,7 +22,7 @@ static char *aclk_password = NULL;
 
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
-static int aclk_connected = 0;
+int aclk_connected = 0;             // Exposed in the web-api
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -965,17 +965,21 @@ static void aclk_main_cleanup(void *ptr)
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
         // Send a graceful disconnect message
-        time_t time_created = now_realtime_sec();
         char *msg_id = create_uuid();
+
+        usec_t time_created_offset_usec = now_realtime_usec();
+        time_t time_created = time_created_offset_usec / USEC_PER_SEC;
+        time_created_offset_usec = time_created_offset_usec % USEC_PER_SEC;
 
         snprintfz(
             payload, 511,
             "{ \"type\": \"disconnect\","
             " \"msg-id\": \"%s\","
             " \"timestamp\": %ld,"
+            " \"timestamp-offset-usec\": %llu,"
             " \"version\": %d,"
             " \"payload\": \"graceful\" }",
-            msg_id, time_created, ACLK_VERSION);
+            msg_id, time_created, time_created_offset_usec, ACLK_VERSION);
 
         aclk_send_message(ACLK_METADATA_TOPIC, payload, msg_id);
         freez(msg_id);
@@ -1209,7 +1213,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
     if(aclk_send_https_request("GET", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
-        error("Challenge failed");
+        error("Challenge failed: %s", data_buffer);
         goto CLEANUP;
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
@@ -1246,7 +1250,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
     if(aclk_send_https_request("POST", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
-        error("Challenge-response failed");
+        error("Challenge-response failed: %s", data_buffer);
         goto CLEANUP;
     }
 
@@ -1522,7 +1526,6 @@ void aclk_shutdown()
 inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
 {
     uuid_t uuid;
-    time_t time_created;
     char uuid_str[36 + 1];
 
     if (unlikely(!msg_id)) {
@@ -1531,16 +1534,19 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         msg_id = uuid_str;
     }
 
-    time_created = now_realtime_sec();
+    usec_t time_created_offset_usec = now_realtime_usec();
+    time_t time_created = time_created_offset_usec / USEC_PER_SEC;
+    time_created_offset_usec = time_created_offset_usec % USEC_PER_SEC;
 
     buffer_sprintf(
         dest,
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
         "\t\"timestamp\": %ld,\n"
+        "\t\"timestamp-offset-usec\": %llu,\n"
         "\t\"version\": %d,\n"
         "\t\"payload\": ",
-        type, msg_id, time_created, ACLK_VERSION);
+        type, msg_id, time_created, time_created_offset_usec, ACLK_VERSION);
 
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }

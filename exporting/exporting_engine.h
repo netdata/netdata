@@ -75,6 +75,11 @@ struct aws_kinesis_specific_config {
     char *secure_key;
 };
 
+struct mongodb_specific_config {
+    char *database;
+    char *collection;
+};
+
 struct engine_config {
     const char *prefix;
     const char *hostname;
@@ -140,6 +145,7 @@ struct engine {
     time_t now;
 
     int aws_sdk_initialized;
+    int mongoc_initialized;
 
     struct instance *instance_root;
 };
