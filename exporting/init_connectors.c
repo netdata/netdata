@@ -60,7 +60,7 @@ int init_connectors(struct engine *engine)
                     return 1;
 #endif
                 break;
-            case BACKEND_TYPE_MONGODB:
+            case EXPORTING_CONNECTOR_TYPE_MONGODB:
 #if HAVE_MONGOC
                 if (init_mongodb_instance(instance) != 0)
                     return 1;

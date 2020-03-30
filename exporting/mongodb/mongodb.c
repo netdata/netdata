@@ -208,7 +208,7 @@ int format_batch_mongodb(struct instance *instance)
         insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &bson_error);
 
         if (unlikely(!insert[documents_inserted])) {
-            error("EXPORTING: %s", bson_error.message);
+            error("EXPORTING: Failed creating a BSON document from a JSON string \"%s\" : %s", start, bson_error.message);
             free_bson(insert, documents_inserted);
             return 1;
         }

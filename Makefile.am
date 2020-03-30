@@ -755,15 +755,8 @@ exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote
 
 endif
 
-if ENABLE_EXPORTING
 if ENABLE_BACKEND_MONGODB
-    netdata_SOURCES += $(MONGODB_EXPORTING_FILES)
-    netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
-endif
-endif
-
-if ENABLE_BACKEND_MONGODB
-    netdata_SOURCES += $(MONGODB_BACKEND_FILES)
+    netdata_SOURCES += $(MONGODB_BACKEND_FILES) $(MONGODB_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif
 
