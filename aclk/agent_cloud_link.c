@@ -1213,7 +1213,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
     if(aclk_send_https_request("GET", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
-        error("Challenge failed");
+        error("Challenge failed: %s", data_buffer);
         goto CLEANUP;
     }
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
@@ -1250,7 +1250,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
     if(aclk_send_https_request("POST", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
-        error("Challenge-response failed");
+        error("Challenge-response failed: %s", data_buffer);
         goto CLEANUP;
     }
 
