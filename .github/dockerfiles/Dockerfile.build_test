@@ -3,9 +3,10 @@ ARG BASE
 FROM ${BASE}
 
 ARG PRE
-ENV PRE=${PRE}
 
-COPY . /netdata
+RUN /bin/sh -c 'if [ -n "${PRE}" ]; then /bin/sh -c "${PRE}"; if [ $? -ne 0 ]; then printf "ERROR: PRE failed:\n%s\n" "${PRE}"; exit 1; fi; fi'
 
-RUN /bin/sh /netdata/prep-cmd.sh
+WORKDIR /netdata
+COPY . .
+
 RUN /netdata/packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
