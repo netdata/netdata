@@ -22,26 +22,6 @@ CHARTS = {
     'zscores': {
         'options': [None, 'Z Scores', 'value', 'zscores', 'anomalies.zscores', 'line'],
         'lines': [
-            ['system.cpu.user', None, 'absolute', 1, 100],
-            ['system.cpu.system', None, 'absolute', 1, 100],
-            ['system.cpu.softirq', None, 'absolute', 1, 100],
-            ['system.load.load1', None, 'absolute', 1, 100],
-            ['system.load.load5', None, 'absolute', 1, 100],
-            ['system.load.load15', None, 'absolute', 1, 100],
-            ['system.ram.free', None, 'absolute', 1, 100],
-            ['system.ram.used', None, 'absolute', 1, 100],
-            ['system.io.in', None, 'absolute', 1, 100],
-            ['system.io.out', None, 'absolute', 1, 100],
-            ['system.pgpgio.in', None, 'absolute', 1, 100],
-            ['system.pgpgio.out', None, 'absolute', 1, 100],
-            ['system.net.sent', None, 'absolute', 1, 100],
-            ['system.net.received', None, 'absolute', 1, 100],
-            ['system.ip.sent', None, 'absolute', 1, 100],
-            ['system.ip.received', None, 'absolute', 1, 100],
-            ['system.ipv6.sent', None, 'absolute', 1, 100],
-            ['system.ipv6.received', None, 'absolute', 1, 100],
-            ['system.processes.running', None, 'absolute', 1, 100],
-            ['system.intr.interrupts', None, 'absolute', 1, 100],
         ]
     },
 }
