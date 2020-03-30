@@ -49,6 +49,7 @@ include boinc/Makefile.inc
 include ceph/Makefile.inc
 include chrony/Makefile.inc
 include couchdb/Makefile.inc
+include correlations/Makefile.inc
 include dnsdist/Makefile.inc
 include dns_query_time/Makefile.inc
 include dockerd/Makefile.inc

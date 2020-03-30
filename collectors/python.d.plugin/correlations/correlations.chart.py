@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: zscores netdata python.d module
+# Description: correlations netdata python.d module
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -11,15 +11,15 @@ import requests
 import pandas as pd
 
 
-priority = 2
+priority = 3
 
 ORDER = [
-    'zscores',
+    'correlations',
 ]
 
 CHARTS = {
-    'zscores': {
-        'options': [None, 'Z Scores', 'value', 'zscores', 'zscores.zscores', 'line'],
+    'correlations': {
+        'options': [None, 'Z Scores', 'value', 'correlations', 'correlations.correlations', 'line'],
         'lines': [
         ]
     },
@@ -64,16 +64,16 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
 
     data = dict()
 
-    m = df.mean()
-    s = df.std(ddof=0)
-    # get zscore
-    df = (df - m) / s
-    df = df.tail(1).dropna(axis=1, how='all').clip(-10, 10)
+    df = df.corr().stack().reset_index().rename(columns={0: 'value'})
+    df['variable'] = df['level_0'] + '__' + df['level_1']
+    df = df[['variable', 'value']]
+    df['idx'] = 1
+    df = df.pivot(index='idx', columns='variable', values='value')
 
     for col in df.columns:
         if self:
-            if col not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([col, None, 'absolute', 1, 1000])
+            if col not in self.charts['correlations']:
+                self.charts['correlations'].add_dimension([col, None, 'absolute', 1, 1000])
         data[col] = df[col].values[0] * 1000
 
     return data
@@ -101,17 +101,15 @@ class Service(SimpleService):
 
 #%%
 
-df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
+#df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
 #data = process_data(df=df)
-print(df)
+#print(df)
 #print(data)
 
 #%%
 
-df_corr = df.corr().stack().reset_index().rename(columns={0:'value'})
-df_corr['variable'] = df_corr['level_0'] + '__' + df_corr['level_1']
-df_corr = df_corr[['variable', 'value']]
-df_corr['idx'] = 1
-df_corr = df_corr.pivot(index='idx', columns='variable', values='value')
+#%%
+
+#%%
 
 #%%

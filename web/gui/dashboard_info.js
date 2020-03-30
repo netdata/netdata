@@ -207,6 +207,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-exclamation"></i>',
         info: 'Z scores scores relating to key system metrics.'
     },
+    
+    'correlations': {
+        title: 'Correlations',
+        icon: '<i class="fas fa-drafting-compass"></i>',
+        info: 'Cross correlations relating to key system metrics.'
+    },
 
     'example': {
         title: 'Example Charts',
