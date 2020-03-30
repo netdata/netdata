@@ -1334,6 +1334,7 @@ AC_CONFIG_FILES([
     exporting/prometheus/Makefile
     exporting/prometheus/remote_write/Makefile
     exporting/aws_kinesis/Makefile
+    exporting/mongodb/Makefile
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile

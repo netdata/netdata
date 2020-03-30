@@ -596,7 +596,7 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
+            if(likely(!backends_mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
                 backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
                 do_mongodb = 1;
             }
@@ -910,10 +910,10 @@ void *backends_main(void *ptr) {
             while(sent < buffer_len) {
                 const char *first_char = buffer_tostring(b);
 
-                debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
+                debug(D_BACKEND, "BACKEND: backends_mongodb_insert(): uri = %s, database = %s, collection = %s, \
                       buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
-                if(likely(!mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics))) {
+                if(likely(!backends_mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics))) {
                     sent += buffer_len;
                     chart_transmission_successes++;
                     chart_receptions++;
@@ -1214,7 +1214,7 @@ cleanup:
 
 #if HAVE_MONGOC
     if(do_mongodb) {
-        mongodb_cleanup();
+        backends_mongodb_cleanup();
         freez(mongodb_uri);
         freez(mongodb_database);
         freez(mongodb_collection);
