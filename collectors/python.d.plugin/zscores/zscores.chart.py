@@ -49,8 +49,13 @@ def get_raw_data(self=None, host=None):
         response = requests.get(url)
         response_json = response.json()
         raw_data = response_json['data']
+
+        # create df
         df = pd.DataFrame(raw_data, columns=response_json['labels'])
         df = df.set_index('time').dropna().sort_index()
+
+        print(df.shape)
+        print(df.head())
 
         # get mean
         m = df.mean()
