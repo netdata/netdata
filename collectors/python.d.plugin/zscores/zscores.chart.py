@@ -50,7 +50,7 @@ HOST_PORT = '127.0.0.1:19999'
 N = 500
 
 
-def get_raw_data(self,host=None):
+def get_raw_data(self=None, host=None):
 
     if host is None:
         host = HOST_PORT
@@ -76,7 +76,12 @@ def get_raw_data(self,host=None):
         df = df.tail(1).dropna(axis=1, how='all').clip(-10, 10)
 
         for col in df.columns:
-            data[f'{chart}.{col}'] = df[col].values[0] * 1000
+
+            dimension_id = f'{chart}.{col}'
+            if self:
+                if dimension_id not in self.charts['zscores']:
+                    self.charts['zscores'].add_dimension([dimension_id])
+            data[dimension_id] = df[col].values[0] * 1000
 
     return data
 
@@ -101,7 +106,7 @@ class Service(SimpleService):
 
 #%%
 
-#data = get_raw_data('london.my-netdata.io')
+#data = get_raw_data(host='london.my-netdata.io')
 #print(data)
 
 #%%
