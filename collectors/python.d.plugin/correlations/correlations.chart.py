@@ -120,9 +120,12 @@ class Service(SimpleService):
     def check():
         return True
 
+    def append_data(self, data):
+        self.data.append(data)
+
     def get_data(self):
 
-        self.data = self.data.append(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+        self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
         df = data_to_df(self.data)
         df = df_long_to_wide(df)
