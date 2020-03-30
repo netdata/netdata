@@ -210,7 +210,7 @@ netdataDashboard.menu = {
     
     'correlations': {
         title: 'Correlations',
-        icon: '<i class="fas fa-drafting-compass"></i>',
+        icon: '<i class="fas fa-random"></i>',
         info: 'Cross correlations relating to key system metrics.'
     },
 
