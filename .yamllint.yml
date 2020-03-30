@@ -5,6 +5,9 @@ yaml-files:
   - '.yamllint'
 
 rules:
+  line-length:
+    max: 120
+    level: warning
   braces: enable
   brackets: enable
   colons: enable
