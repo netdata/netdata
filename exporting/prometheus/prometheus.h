@@ -34,4 +34,6 @@ size_t prometheus_name_copy(char *d, const char *s, size_t usable);
 size_t prometheus_label_copy(char *d, const char *s, size_t usable);
 char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits);
 
+void format_host_labels_prometheus(struct instance *instance, RRDHOST *host);
+
 #endif //NETDATA_EXPORTING_PROMETHEUS_H

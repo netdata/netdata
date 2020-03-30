@@ -17,7 +17,6 @@
 inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 {
     RRDHOST *host = st->rrdhost;
-    (void)host;
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
@@ -80,6 +79,9 @@ static struct prometheus_server {
  */
 static inline time_t prometheus_server_last_access(const char *server, RRDHOST *host, time_t now)
 {
+#ifdef UNIT_TESTING
+    return 0;
+#endif
     static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
 
     uint32_t hash = simple_hash(server);
@@ -169,7 +171,7 @@ inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
  * @param s a source sting.
  * @param usable the number of characters to copy.
  * @param showoldunits set this flag to 1 to show old (before v1.12) units.
- * @return Returns the length of the copied string.
+ * @return Returns the destination string.
  */
 inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits)
 {

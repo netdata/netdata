@@ -166,6 +166,8 @@ int setup_rrdhost();
 int teardown_rrdhost();
 int setup_initialized_engine(void **state);
 int teardown_initialized_engine(void **state);
+int setup_prometheus(void **state);
+int teardown_prometheus(void **state);
 
 void init_connectors_in_tests(struct engine *engine);
 
