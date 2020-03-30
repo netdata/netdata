@@ -7,6 +7,13 @@
 // PROMETHEUS
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
+/**
+ * Check if a chart can be sent to an external databese
+ *
+ * @param instance an instance data structure.
+ * @param st a chart.
+ * @return Returns 1 if the chart can be sent, 0 otherwise.
+ */
 inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 {
     RRDHOST *host = st->rrdhost;
@@ -24,7 +31,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
             rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
             debug(
                 D_BACKEND,
-                "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.",
+                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
                 st->id,
                 host->hostname);
             return 0;
@@ -34,7 +41,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
     if (unlikely(!rrdset_is_available_for_backends(st))) {
         debug(
             D_BACKEND,
-            "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.",
+            "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
             st->id,
             host->hostname);
         return 0;
@@ -42,10 +49,10 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 
     if (unlikely(
             st->rrd_memory_mode == RRD_MEMORY_MODE_NONE &&
-            !(BACKEND_OPTIONS_DATA_SOURCE(instance->config.options) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
+            !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
         debug(
             D_BACKEND,
-            "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.",
+            "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
             st->id,
             host->hostname,
             rrd_memory_mode_name(host->rrd_memory_mode));
@@ -63,6 +70,14 @@ static struct prometheus_server {
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
+/**
+ * Get the last time when a Prometheus server scraped the Netdata Prometheus exporter.
+ *
+ * @param server the name of the Prometheus server.
+ * @param host a data collecting host.
+ * @param now actual time.
+ * @return Returns the last time when the server accessed Netdata, or 0 if it is the first occurrence.
+ */
 static inline time_t prometheus_server_last_access(const char *server, RRDHOST *host, time_t now)
 {
     static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -93,6 +108,14 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     return 0;
 }
 
+/**
+ * Copy and sanitize name.
+ *
+ * @param d a destination string.
+ * @param s a source sting.
+ * @param usable the number of characters to copy.
+ * @return Returns the length of the copied string.
+ */
 inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 {
     size_t n;
@@ -110,6 +133,14 @@ inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
     return n;
 }
 
+/**
+ * Copy and sanitize label.
+ *
+ * @param d a destination string.
+ * @param s a source sting.
+ * @param usable the number of characters to copy.
+ * @return Returns the length of the copied string.
+ */
 inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
 {
     size_t n;
@@ -131,6 +162,15 @@ inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
     return n;
 }
 
+/**
+ * Copy and sanitize units.
+ *
+ * @param d a destination string.
+ * @param s a source sting.
+ * @param usable the number of characters to copy.
+ * @param showoldunits set this flag to 1 to show old (before v1.12) units.
+ * @return Returns the length of the copied string.
+ */
 inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits)
 {
     const char *sorig = s;
@@ -252,6 +292,13 @@ struct host_variables_callback_options {
     char name[PROMETHEUS_VARIABLE_MAX + 1];
 };
 
+/**
+ * Print host variables.
+ *
+ * @param rv a variable.
+ * @param data callback options.
+ * @return Returns 1 if the chart can be sent, 0 otherwise.
+ */
 static int print_host_variables(RRDVAR *rv, void *data)
 {
     struct host_variables_callback_options *opts = data;
@@ -311,6 +358,17 @@ static int print_host_variables(RRDVAR *rv, void *data)
     return 0;
 }
 
+/**
+ * Write metrics in Prometheus format to a buffer.
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @param wb the buffer to fill with metrics.
+ * @param prefix a prefix for every metric.
+ * @param exporting_options options to configure what data is exported.
+ * @param allhosts set to 1 if host instance should be in the output for tags.
+ * @param output_options options to configure the format of the output.
+ */
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     struct instance *instance,
     RRDHOST *host,
@@ -683,6 +741,18 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdhost_unlock(host);
 }
 
+/**
+ * Get the last time time when a server accessed Netdata. Write information about an API request to a buffer.
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @param wb the buffer to write to.
+ * @param exporting_options options to configure what data is exported.
+ * @param server the name of a Prometheus server..
+ * @param now actual time.
+ * @param output_options options to configure the format of the output.
+ * @return Returns the last time when the server accessed Netdata.
+ */
 static inline time_t prometheus_preparation(
     struct instance *instance,
     RRDHOST *host,
@@ -735,6 +805,16 @@ static inline time_t prometheus_preparation(
     return after;
 }
 
+/**
+ * Write metrics and auxiliary information for one host to a buffer.
+ *
+ * @param host a data collecting host.
+ * @param wb the buffer to write to.
+ * @param server the name of a Prometheus server.
+ * @param prefix a prefix for every metric.
+ * @param exporting_options options to configure what data is exported.
+ * @param output_options options to configure the format of the output.
+ */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     RRDHOST *host,
     BUFFER *wb,
@@ -762,6 +842,16 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
         prometheus_exporter_instance, host, wb, prefix, exporting_options, 0, output_options);
 }
 
+/**
+ * Write metrics and auxiliary information for all hosts to a buffer.
+ *
+ * @param host a data collecting host.
+ * @param wb the buffer to write to.
+ * @param server the name of a Prometheus server.
+ * @param prefix a prefix for every metric.
+ * @param exporting_options options to configure what data is exported.
+ * @param output_options options to configure the format of the output.
+ */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     RRDHOST *host,
     BUFFER *wb,
