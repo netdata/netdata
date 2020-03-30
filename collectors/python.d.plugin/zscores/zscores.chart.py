@@ -101,7 +101,7 @@ class Service(SimpleService):
 
 #%%
 
-#df = get_raw_data(host='london.my-netdata.io')
+#df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
 #data = process_data(df=df)
 #print(df)
 #print(data)
