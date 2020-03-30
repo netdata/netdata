@@ -19,7 +19,7 @@ ORDER = [
 
 CHARTS = {
     'correlations': {
-        'options': [None, 'Z Scores', 'value', 'correlations', 'correlations.correlations', 'line'],
+        'options': [None, 'Z Scores', 'value', 'correlations', 'correlations.correlations', 'stacked'],
         'lines': [
         ]
     },
