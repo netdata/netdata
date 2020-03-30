@@ -27,12 +27,36 @@ CHARTS = {
 
 
 HOST_PORT = '127.0.0.1:19999'
-AFTER = 60*3
+N = 60
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
 ]
 CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
+
+
+def get_allmetrics(host: str = None, charts: list = None):
+    url = f'http://{host}/api/v1/allmetrics?format=json'
+    response = requests.get(url)
+    raw_data = response.json()
+    data = []
+    for k in raw_data:
+        if k in charts:
+            time = raw_data[k]['last_updated']
+            dimensions = raw_data[k]['dimensions']
+            for dimension in dimensions:
+                data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+    return data
+
+
+def data_to_df(data):
+    df = pd.DataFrame([item for sublist in data for item in sublist], columns=['time', 'chart', 'variable', 'value'])
+    return df
+
+
+def df_long_to_wide(df):
+    df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
+    return df
 
 
 def get_raw_data(host: str = None, after: int = 500, charts: list = None) -> pd.DataFrame:
@@ -74,14 +98,10 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
 
     for col in df.columns:
         if self:
+            self.counter += 1
             if col not in self.charts['correlations']:
                 self.charts['correlations'].add_dimension([col, None, 'absolute', 1, 1000])
         data[col] = df[col].values[0] * 1000
-
-    if 'counter' not in self.charts['correlations']:
-        self.charts['correlations'].add_dimension(['counter', None, 'absolute', 1, 1])
-    self.counter += 1
-    data['counter'] = self.counter
 
     return data
 
@@ -94,6 +114,7 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.random = SystemRandom()
         self.counter = 1
+        self.data = list()
 
     @staticmethod
     def check():
@@ -101,7 +122,10 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        df = get_raw_data(host=HOST_PORT, after=AFTER, charts=CHARTS_IN_SCOPE)
+        self.data = self.data.append(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+        self.data = self.data[-N:]
+        df = data_to_df(self.data)
+        df = df_long_to_wide(df)
         data = process_data(self, df)
 
         return data
@@ -109,12 +133,29 @@ class Service(SimpleService):
 
 #%%
 
-#df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
-#data = process_data(df=df)
-#print(df)
-#print(data)
+#import time
+
+#data1 = get_allmetrics(host='london.my-netdata.io', charts=CHARTS_IN_SCOPE)
+#time.sleep(1)
+#data2 = get_allmetrics(host='london.my-netdata.io', charts=CHARTS_IN_SCOPE)
+#time.sleep(1)
+#data3 = get_allmetrics(host='london.my-netdata.io', charts=CHARTS_IN_SCOPE)
 
 #%%
+
+#data = list()
+#data.append(data1)
+#data.append(data2)
+#data.append(data3)
+#df = data_to_df(data)
+
+#%%
+
+#df = df_long_to_wide(df)
+
+#%%
+
+#df_tmp.corr()
 
 #%%
 
