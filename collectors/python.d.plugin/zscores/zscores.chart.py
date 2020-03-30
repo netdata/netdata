@@ -26,8 +26,13 @@ CHARTS = {
     },
 }
 
+
 HOST_PORT = '127.0.0.1:19999'
 N = 500
+CHARTS_IN_SCOPE = [
+    'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
+    'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
+]
 
 
 def get_raw_data(self=None, host=None):
@@ -37,7 +42,7 @@ def get_raw_data(self=None, host=None):
 
     data = dict()
 
-    for chart in ['system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat']:
+    for chart in CHARTS_IN_SCOPE:
 
         # get data
         url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
@@ -58,15 +63,20 @@ def get_raw_data(self=None, host=None):
         for col in df.columns:
 
             dimension_id = f'{chart}.{col}'
+
             if self:
+
                 if dimension_id not in self.charts['zscores']:
+
                     self.charts['zscores'].add_dimension([dimension_id, None, 'absolute', 1, 100])
+
             data[dimension_id] = df[col].values[0] * 1000
 
     return data
 
 
 class Service(SimpleService):
+
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
