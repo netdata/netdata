@@ -8,7 +8,6 @@ from random import SystemRandom, randint
 from bases.FrameworkServices.SimpleService import SimpleService
 
 import requests
-import numpy as np
 import pandas as pd
 
 
@@ -28,25 +27,22 @@ CHARTS = {
 
 
 HOST_PORT = '127.0.0.1:19999'
-N = 500
+AFTER = 500
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
 ]
 
 
-def get_raw_data(host: str = None) -> pd.DataFrame:
-
-    if host is None:
-        host = HOST_PORT
+def get_raw_data(host: str = None, after: int = 500, charts: list = None) -> pd.DataFrame:
 
     df = pd.DataFrame(columns=['time'])
 
     # get all relevant data
-    for chart in CHARTS_IN_SCOPE:
+    for chart in charts:
 
         # get data
-        url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
+        url = f'http://{host}/api/v1/data?chart={chart}&after=-{after}&format=json'
         response = requests.get(url)
         response_json = response.json()
         raw_data = response_json['data']
@@ -68,9 +64,7 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
 
     data = dict()
 
-    # get mean
     m = df.mean()
-    # get standard deviation
     s = df.std(ddof=0)
     # get zscore
     df = (df - m) / s
@@ -99,7 +93,8 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        data = get_raw_data(self)
+        df = get_raw_data(host=HOST_PORT, after=AFTER, charts=CHARTS_IN_SCOPE)
+        data = process_data(self, df)
 
         return data
 
