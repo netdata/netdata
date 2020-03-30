@@ -3,6 +3,8 @@ yaml-files:
   - '*.yaml'
   - '*.yml'
   - '.yamllint'
+  - 'collectors/python.d.plugin/*.conf'
+  - 'collectors/python.d.plugin/*/*.conf'
 
 rules:
   line-length:
