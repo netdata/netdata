@@ -19,7 +19,7 @@ ORDER = [
 
 CHARTS = {
     'correlations': {
-        'options': [None, 'Z Scores', 'value', 'correlations', 'correlations.correlations', 'stacked'],
+        'options': [None, 'Z Scores', 'value', 'correlations', 'correlations.correlations', 'line'],
         'lines': [
         ]
     },
@@ -27,7 +27,7 @@ CHARTS = {
 
 
 HOST_PORT = '127.0.0.1:19999'
-AFTER = 300
+AFTER = 60*2
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
