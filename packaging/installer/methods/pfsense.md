@@ -26,7 +26,8 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.17.1.txz
 
 **Note:** If you receive a `Not Found` error during the last two commands above, you will either need to manually look
 in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its
-URL instead, or you can try manually changing the netdata version in the URL to the latest version.  
+URL instead, or you can try manually changing the netdata version in the URL to the latest version.
+**Note 2:** On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should drop the python package from the install list.
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
