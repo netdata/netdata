@@ -96,7 +96,7 @@ typedef struct netdata_error_report {
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
 # define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
 
-# define NETDATA_DEVELOPER_LOG_FILE "developer.log"
+# define NETDATA_DEVELOPER_LOG_FILE "developer_process.log"
 
 # define NETDATA_MAX_PROCESSOR 512
 

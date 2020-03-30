@@ -213,7 +213,7 @@ following values: ​
 The developer mode is a feature that Netdata is bringing to give more details about errors that happen with the monitored
 function. 
 
-Case this option is set to `yes`, Netdata will store inside `developer.log` that is inside your log directory, normally
+Case this option is set to `yes`, Netdata will store inside `developer_process.log` that is inside your log directory, normally
   `/var/log/netdata/`, information about the hour that an error happeb, the software that generates the error and the 
 error information.
 
