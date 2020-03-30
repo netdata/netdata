@@ -387,24 +387,24 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     format_host_labels_prometheus(instance, host);
 
+    if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(
+            wb,
+            "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n",
+            hostname,
+            host->program_name,
+            host->program_version,
+            now_realtime_usec() / USEC_PER_MS);
+    else
+        buffer_sprintf(
+            wb,
+            "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n",
+            hostname,
+            host->program_name,
+            host->program_version);
+
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if (allhosts) {
-        if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n",
-                hostname,
-                host->program_name,
-                host->program_version,
-                now_realtime_usec() / USEC_PER_MS);
-        else
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n",
-                hostname,
-                host->program_name,
-                host->program_version);
-
         if (instance->labels && buffer_tostring(instance->labels)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
@@ -433,22 +433,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
         snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
     } else {
-        if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n",
-                hostname,
-                host->program_name,
-                host->program_version,
-                now_realtime_usec() / USEC_PER_MS);
-        else
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n",
-                hostname,
-                host->program_name,
-                host->program_version);
-
         if (instance->labels && buffer_tostring(instance->labels)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
