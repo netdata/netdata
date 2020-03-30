@@ -1107,6 +1107,22 @@ components:
           type: number
           nullable: true
           description: Chart health red threshold.
+    alarms_values:
+      type: object
+      properties:
+        hostname:
+          type: string
+          description: The hostname of the netdata server.
+        chart-name.alarm-name:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int32
+            value:
+              type: number
+            status:
+              type: string
     alarm_variables:
       type: object
       properties:
