@@ -50,14 +50,14 @@ HOST_PORT = '127.0.0.1:19999'
 N = 500
 
 
-def get_raw_data(host=None):
+def get_raw_data(self,host=None):
 
     if host is None:
         host = HOST_PORT
 
     data = dict()
 
-    for chart in ['system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr']:
+    for chart in ['system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.intr', 'system.forks']:
 
         # get data
         url = f'http://{host}/api/v1/data?chart={chart}&after=-{N}&format=json'
@@ -94,7 +94,7 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        data = get_raw_data()
+        data = get_raw_data(self)
 
         return data
 
