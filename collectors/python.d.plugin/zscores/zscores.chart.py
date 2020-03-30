@@ -101,17 +101,11 @@ class Service(SimpleService):
 
 #%%
 
-df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
+#df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
 #data = process_data(df=df)
-print(df)
+#print(df)
 #print(data)
 
 #%%
-
-df_corr = df.corr().stack().reset_index().rename(columns={0:'value'})
-df_corr['variable'] = df_corr['level_0'] + '__' + df_corr['level_1']
-df_corr = df_corr[['variable', 'value']]
-df_corr['idx'] = 1
-df_corr = df_corr.pivot(index='idx', columns='variable', values='value')
 
 #%%
