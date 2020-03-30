@@ -40,19 +40,19 @@ step for proxy configuration.
 ### Proxy configuration
 
 If your Netdata agent uses a proxy to reach the outside internet, you must configure a SOCKS5 or HTTP proxy in the
-`[agent_cloud_link]` section of your `netdata.conf` file. A SOCKS5 proxy is preferred. By default, the section looks
+`[cloud]` section of your `netdata.conf` file. A SOCKS5 proxy is preferred. By default, the section looks
 like the following:
 
 ```conf
-[agent_cloud_link]
-    proxy = env
+[cloud]
+    proxy = none
 ```
 
 The `proxy` setting takes a few different values:
 
+-   `none`: Do not use any proxy, even if the system is configured otherwise.
 -   `env`: Netdata reads the environment variables `socks_proxy` and `http_proxy` to discover the correct
     proxy settings.
--   `none`: Do not use any proxy, even if system is configured otherwise.
 -   `socks5[h]://[user:pass@]host:ip`: Netdata uses the specified SOCKS proxy.
 -   `http://[user:pass@]host:ip`: Netdata uses the specified HTTP proxy.
 

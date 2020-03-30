@@ -98,12 +98,12 @@ Claiming can be performed through a SOCKS5 proxy. To do this when calling the sc
 endpoint as:
 
 ```bash
-netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -proxy=socks5h://127.0.0.1:11081
+netdata-claim.sh -proxy=socks5h://127.0.0.1:11081 -token=MYTOKEN1234567 -rooms=room1,room2
 ```
 
-When claiming via the `netdata` binary set the following options in the config:
+When claiming via the `netdata` binary, set the following options in your `netdata.conf` file:
 
-```
+```conf
 [cloud]
     proxy = socks5://X.X.X.X:YYYY
 ```
@@ -114,12 +114,12 @@ Proceed to claim using the command-line syntax:
 /usr/sbin/netdata -D -W "claim -token=MYTOKEN1234567 -rooms=room1,room2"
 ```
 
-Please note - if you supply the proxy endpoint in the configuration then it will also be used to tunnel
-the agent cloud link as well.
+> Please note: if you supply the proxy endpoint in the configuration then it will also be used to tunnel the agent cloud
+> link as well.
 
 ## Unclaim (remove) an agent from Netdata Cloud
 
-The best method to remove an agent from Netdata cloud is to unclaim it by deleting the `claim.d/` directory in your
+The best method to remove an agent from Netdata Cloud is to unclaim it by deleting the `claim.d/` directory in your
 Netdata configuration directory.
 
 ```bash
