@@ -561,6 +561,7 @@ if test "$enable_cloud" = "yes"; then
         HAVE_libmosquitto_a="yes"
     else
         HAVE_libmosquitto_a="no"
+        AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
 
@@ -570,6 +571,7 @@ if test "$enable_cloud" = "yes"; then
         HAVE_libwebsockets_a="yes"
     else
         HAVE_libwebsockets_a="no"
+        AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
     fi
     AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 

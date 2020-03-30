@@ -48,6 +48,10 @@ defer_error() {
   NETDATA_DEFERRED_ERRORS="${NETDATA_DEFERRED_ERRORS}\n* ${1}"
 }
 
+defer_error_highlighted() {
+  NETDATA_DEFERRED_ERRORS="${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_DEFERRED_ERRORS}\n* ${1}${TPUT_RESET}"
+}
+
 print_deferred_errors() {
   if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
     echo >&2
@@ -503,11 +507,11 @@ bundle_libmosquitto() {
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
-      defer_error "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+      defer_error_highlighted "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
-    defer_error "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
   fi
 }
 
@@ -557,11 +561,11 @@ bundle_libwebsockets() {
       run_ok "libwebsockets built and prepared."
     else
       run_failed "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-      defer_error "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+      defer_error_highlighted "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-    defer_error "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
   fi
 }
 

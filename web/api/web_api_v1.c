@@ -489,7 +489,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     st->last_accessed_time = now_realtime_sec();
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
-    long long after  = (after_str  && *after_str) ?str2l(after_str):0;
+    long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
     int       points = (points_str && *points_str)?str2i(points_str):0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 

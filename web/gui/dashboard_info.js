@@ -190,6 +190,11 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
+    'aclk_test': {
+        title: 'ACLK Test Generator',
+        info: 'For internal use to perform integration testing.'
+    },
+
     'example': {
         title: 'Example Charts',
         info: 'Example charts, demonstrating the external plugin architecture.'
