@@ -171,14 +171,4 @@ class Service(SimpleService):
 
 #%%
 
-import pandas as pd
-
-df = pd.DataFrame([(.2, .3), (.0, .6), (.6, .0), (.2, .1)],
-                  columns=['dogs', 'dogs'])
-df_corr = df.corr().stack().to_frame()
-
-#%%
-
-df_corr = df_corr.reset_index()
-
 #%%
