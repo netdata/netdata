@@ -163,11 +163,7 @@ class Service(SimpleService):
 
 #%%
 
-#df = df_long_to_wide(df)
-
 #%%
-
-#df_tmp.corr()
 
 #%%
 
