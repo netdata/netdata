@@ -6,6 +6,115 @@
 
 #define JSON_TOKENS 1024
 
+static inline char *output_characters(char *wstr, long unicode_char)
+{
+    char c1=0, c2=0, c3=0, c4=0;
+    int print_size=0;
+
+    if (unicode_char < 0x80) {
+        c1 = (unicode_char >> 0 & 0x7F | 0x00);
+        print_size = sprintf(wstr, "%%%2x", c1);
+    }
+    else if (unicode_char < 0x0800) {
+        c1 = (unicode_char >> 6 & 0x1F | 0xc0);
+        c2 = (unicode_char >> 0 & 0x3F | 0x80);
+        print_size = sprintf(wstr, "%%%2x%%%2x", c1, c2);
+    }
+    else if (unicode_char < 0x010000) {
+        c1 = (unicode_char >> 12 & 0x0F | 0xE0);
+        c2 = (unicode_char >> 6 & 0x3F | 0x80);
+        c3 = (unicode_char >> 0 & 0x3F | 0x80);
+        print_size = sprintf(wstr, "%%%2x%%%2x%%%2x", c1, c2, c3);
+    } else {
+        c1 = (unicode_char >> 18 & 0x07 | 0xF0);
+        c2 = (unicode_char >> 12 & 0x3F | 0x80);
+        c3 = (unicode_char >> 6 & 0x3F | 0x80);
+        c4 = (unicode_char >> 0 & 0x3F | 0x80);
+        print_size = sprintf(wstr, "%%%2x%%%2x%%%2x%%%2x", c1, c2, c3, c4);
+    }
+    return wstr + print_size;
+}
+
+char *decode_string(char *input)
+{
+    size_t len = strlen(input) * 2;
+    char *tmp = input;
+    char *wstr = (char *) mallocz(len + 1);
+    char *output = wstr;
+
+    while (*tmp) {
+        /* Backslash: Quoted symbol expected */
+        if (*tmp == '\\') {
+            long unicode_char = 0;
+            tmp++;
+            switch (*tmp) {
+                /* Allowed escaped symbols */
+                case '\"':
+                case '/':
+                case '\\':
+                    *wstr++ = *tmp;
+                    break;
+                case 'b':
+                    *wstr++ = '\b';
+                    break;
+                case 'f':
+                    *wstr++ = '\f';
+                    break;
+                case 'r':
+                    *wstr++ = '\r';
+                    break;
+                case 'n':
+                    *wstr++ = '\n';
+                    break;
+                case 't':
+                    *wstr++ = '\t';
+                    break;
+                    /* Allows escaped symbol \uXXXX */
+                case 'u':
+                    tmp++;
+                    int i = 0;
+                    for (; i < 4 && *tmp != '\0'; i++) {
+                        /* If it isn't a hex character we have an error */
+                        unicode_char = unicode_char << 4;
+                        switch (*tmp) {
+                            case 48 ... 57: /* 0-9 */
+                                unicode_char += (*tmp - 48);
+                                break;
+                            case 65 ... 70: /* A-F */
+                                unicode_char += (*tmp - 55);
+                                break;
+                            case 97 ... 102: /* a-f */
+                                unicode_char += (*tmp - 87);
+                                break;
+                            default:
+                                // Parser has checked that this won't happen
+                                break;
+                        }
+                        tmp++;
+                    }
+                    tmp--;
+                    // Need at most 12 bytes + \0. We will add more to have room
+                    if (wstr - output + 13 > len) {
+                        int offset = wstr - output;
+                        len = len + 32;
+                        output = reallocz(output, len + 1);
+                        wstr = output + offset;
+                    }
+                    wstr = output_characters(wstr, unicode_char);
+                    break;
+                    /* Unexpected symbol */
+                default:
+                    break;
+            }
+            tmp++;
+        }
+        else
+            *wstr++ = *tmp++;
+    }
+    *wstr = '\0';
+    return output;
+}
+
 int json_tokens = JSON_TOKENS;
 
 /**
@@ -224,8 +333,10 @@ size_t json_walk_string(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
     e->original_string = &js[t[start].start];
 
     e->type = JSON_STRING;
-    e->data.string = e->original_string;
-    if(e->callback_function) e->callback_function(e);
+    e->data.string = decode_string(e->original_string);
+    if (e->callback_function)
+        e->callback_function(e);
+    freez(e->data.string);
     js[t[start].end] = old;
     return 1;
 }
