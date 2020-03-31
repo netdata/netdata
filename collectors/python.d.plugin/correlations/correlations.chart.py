@@ -103,7 +103,7 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     print(df.shape)
     print(df.head(10))
     print('... reset_index ...')
-    df = df.reset_index()
+    df = df.reset_index(drop=True)
     print(df.shape)
     print(df.head(10))
     print('... enumerate ...')
