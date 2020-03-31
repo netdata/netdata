@@ -88,48 +88,15 @@ def get_raw_data(host: str = None, after: int = 500, charts: list = None) -> pd.
 def process_data(self=None, df: pd.DataFrame = None) -> dict:
 
     data = dict()
-    print(df.shape)
-    print(df.head(10))
-    print('... corr ...')
     df = df.corr()
-    print(df.shape)
-    print(df.head(10))
-    print('... clean index ...')
-    #print(df.columns)
-    #df = df.rename(columns={'variable': 'var'})
     df = df.rename_axis("var1", axis="index")
     df = df.rename_axis("var2", axis="columns")
-    #df.index = df.index.copy()
-    #df.columns.name = 'variable'
-    print(df.shape)
-    print(df.head(10))
-    print('... stack ...')
-    df = df.stack()
-    print(df.shape)
-    print(df.head(10))
-    print('... to_frame ...')
-    df = df.to_frame()
-    print(df.shape)
-    print(df.head(10))
-    #print('... enumerate ...')
-    #df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
-    #print(df.shape)
-    #print(df.head(10))
-    print('... reset_index ...')
-    df = df.reset_index()
-    print(df.shape)
-    print(df.head(10))
-    print('... rename ...')
-    df = df.rename(columns={0: 'value'})
+    df = df.stack().to_frame().reset_index().rename(columns={0: 'value'})
     df['variable'] = df['var1'] + '__' + df['var2']
-    df = df[df['var1']!=df['var2']]
+    df = df[df['var1'] != df['var2']]
     df = df[['variable', 'value']]
     df['idx'] = 1
     df = df.pivot(index='idx', columns='variable', values='value')
-    print('... done ...')
-    print(df.shape)
-    print(df.head(10))
-    print('... end print ...')
 
     for col in df.columns:
         if self:
