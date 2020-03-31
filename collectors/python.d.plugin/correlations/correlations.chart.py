@@ -90,18 +90,27 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     data = dict()
     print(df.shape)
     print(df.head(10))
+    print('... corr ...')
     df = df.corr()
     print(df.shape)
     print(df.head(10))
-    df = df.stack().to_frame()
+    print('... stack ...')
+    df = df.stack()
     print(df.shape)
     print(df.head(10))
+    print('... to_frame ...')
+    df = df.to_frame()
+    print(df.shape)
+    print(df.head(10))
+    print('... reset_index ...')
     df = df.reset_index()
     print(df.shape)
     print(df.head(10))
+    print('... enumerate ...')
     df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
     print(df.shape)
     print(df.head(10))
+    print('... END ...')
     df = df.rename(columns={0: 'value'})
     df['variable'] = df['level_0'] + '__' + df['level_1']
     df = df[df['level_0']!=df['level_1']]
@@ -180,5 +189,15 @@ class Service(SimpleService):
 #df_tmp.corr()
 
 #%%
+
+import pandas as pd
+
+df = pd.DataFrame([(.2, .3), (.0, .6), (.6, .0), (.2, .1)],
+                  columns=['dogs', 'dogs'])
+df_corr = df.corr().stack().to_frame()
+
+#%%
+
+df_corr = df_corr.reset_index()
 
 #%%
