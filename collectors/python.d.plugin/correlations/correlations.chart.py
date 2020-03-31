@@ -96,10 +96,10 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     df = df.stack().to_frame()
     print(df.shape)
     print(df.head(10))
-    df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
+    df = df.reset_index()
     print(df.shape)
     print(df.head(10))
-    df = df.reset_index()
+    df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
     print(df.shape)
     print(df.head(10))
     df = df.rename(columns={0: 'value'})
