@@ -95,7 +95,7 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     print(df.shape)
     print(df.head(10))
     print('... clean index ...')
-    print(df.columns)
+    #print(df.columns)
     #df = df.rename(columns={'variable': 'var'})
     df = df.rename_axis("var1", axis="index")
     df = df.rename_axis("var2", axis="columns")
@@ -111,21 +111,25 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     df = df.to_frame()
     print(df.shape)
     print(df.head(10))
-    print('... enumerate ...')
-    df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
-    print(df.shape)
-    print(df.head(10))
+    #print('... enumerate ...')
+    #df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
+    #print(df.shape)
+    #print(df.head(10))
     print('... reset_index ...')
     df = df.reset_index()
     print(df.shape)
     print(df.head(10))
     print('... rename ...')
     df = df.rename(columns={0: 'value'})
-    df['variable'] = df['level_0'] + '__' + df['level_1']
-    df = df[df['level_0']!=df['level_1']]
+    df['variable'] = df['var1'] + '__' + df['var2']
+    df = df[df['var1']!=df['var2']]
     df = df[['variable', 'value']]
     df['idx'] = 1
     df = df.pivot(index='idx', columns='variable', values='value')
+    print('... done ...')
+    print(df.shape)
+    print(df.head(10))
+    print('... end print ...')
 
     for col in df.columns:
         if self:
