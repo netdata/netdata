@@ -585,6 +585,7 @@ fi
 # Checking state in CI/CD
 run pwd
 run ls -l
+run rm -rf externaldeps/libwebsockets
 
 
 run ./configure \
