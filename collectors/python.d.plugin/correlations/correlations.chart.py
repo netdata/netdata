@@ -27,7 +27,7 @@ CHARTS = {
 
 
 HOST_PORT = '127.0.0.1:19999'
-N = 60
+N = 10
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
@@ -138,6 +138,7 @@ class Service(SimpleService):
         print(df.shape)
         print(df.head(10))
         data = process_data(self, df)
+        print(data)
 
         return data
 
