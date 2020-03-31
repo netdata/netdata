@@ -115,7 +115,7 @@ static jsmnerr_t jsmn_parse_primitive(jsmn_parser *parser, const char *js,
  *
  * @return It returns 0 on success and another integer otherwise
  */
-static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, char *js,
+static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
                                    size_t len, jsmntok_t *tokens, size_t num_tokens) {
     jsmntok_t *token;
 
@@ -146,7 +146,6 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, char *js,
 
         /* Backslash: Quoted symbol expected */
         if (c == '\\') {
-            long unicode_char = 0;
             parser->pos++;
             switch (js[parser->pos]) {
                 /* Allowed escaped symbols */
@@ -159,30 +158,15 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, char *js,
                     int i = 0;
                     for(; i < 4 && js[parser->pos] != '\0'; i++) {
                         /* If it isn't a hex character we have an error */
-                        unicode_char = unicode_char << 4;
-                        switch (js[parser->pos]) {
-                            case 48 ... 57: /* 0-9 */
-                                unicode_char += (js[parser->pos] - 48);
-                                break;
-                            case 65 ... 70: /* A-F */
-                                unicode_char += (js[parser->pos] - 55);
-                                break;
-                            case 97 ... 102: /* a-f */
-                                unicode_char += (js[parser->pos] - 87);
-                                break;
-                            default:
-                                parser->pos = start;
-                                return JSMN_ERROR_INVAL;
+                        if(!((js[parser->pos] >= 48 && js[parser->pos] <= 57) || /* 0-9 */
+                             (js[parser->pos] >= 65 && js[parser->pos] <= 70) || /* A-F */
+                             (js[parser->pos] >= 97 && js[parser->pos] <= 102))) { /* a-f */
+                            parser->pos = start;
+                            return JSMN_ERROR_INVAL;
                         }
                         parser->pos++;
                     }
-                    js[parser->pos-6] = (char) unicode_char;
-                    char *tmp = &js[parser->pos-1];
-                    while (*tmp) {
-                        *(tmp - 4) = *(tmp + 1);
-                        tmp++;
-                    }
-                    parser->pos = parser->pos - 5;
+                    parser->pos--;
                     break;
                     /* Unexpected symbol */
                 default:
