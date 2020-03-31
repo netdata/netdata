@@ -4173,6 +4173,9 @@ int main(int argc, char **argv) {
         usec_t dt = heartbeat_next(&hb, step);
 #endif
 
+        if (unlikely(write(fileno(stdout), "\n", 1) < 1 && errno == EPIPE))
+            fatal("Cannot write to a pipe");
+
         if(!collect_data_for_all_processes()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
