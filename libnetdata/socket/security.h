@@ -17,9 +17,14 @@
 
 # ifdef ENABLE_HTTPS
 
+#define OPENSSL_VERSION_095 0x00905100L
+#define OPENSSL_VERSION_097 0x0907000L
+#define OPENSSL_VERSION_110 0x10100000L
+#define OPENSSL_VERSION_111 0x10101000L
+
 #  include <openssl/ssl.h>
 #  include <openssl/err.h>
-#  if (SSLEAY_VERSION_NUMBER >= 0x0907000L) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
+#  if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
 #   include <openssl/conf.h>
 #  endif
 
@@ -33,6 +38,8 @@ extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;
+extern const char *tls_version;
+extern const char *tls_ciphers;
 extern int netdata_validate_server;
 extern int security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 

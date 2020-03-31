@@ -406,6 +406,9 @@ static void security_init(){
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
     security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
+    tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
+    tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
+
     security_openssl_library();
 }
 #endif
