@@ -7,10 +7,8 @@ SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_WITH_TLS_13
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
-#endif
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 /**
@@ -36,8 +34,8 @@ static void security_info_callback(const SSL *ssl, int where, int ret __maybe_un
  */
 void security_openssl_library()
 {
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_WITH_TLS_13
-# if (SSLEAY_VERSION_NUMBER >= 0x0907000L)
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+# if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
     OPENSSL_config(NULL);
 # endif
 
@@ -51,7 +49,7 @@ void security_openssl_library()
 #endif
 }
 
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_WITH_TLS_13
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
 /**
  * TLS version
  *
@@ -68,7 +66,7 @@ int tls_select_version(const char *lversion) {
         return TLS1_1_VERSION;
     else if (!strcmp(lversion, "1.2"))
         return TLS1_2_VERSION;
-#if OPENSSL_VERSION_NUMBER >= 0x1010101bL
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
     else if (!strcmp(lversion, "1.3"))
         return TLS1_3_VERSION;
 #endif
@@ -86,11 +84,11 @@ int tls_select_version(const char *lversion) {
  * @param side 0 means server, and 1 client.
  */
 void security_openssl_common_options(SSL_CTX *ctx, int side) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_WITH_TLS_13
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
     if (!side) {
         int version =  tls_select_version(tls_version) ;
 #endif
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_WITH_TLS_13
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
         SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
@@ -116,7 +114,7 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
  */
 SSL_CTX * security_initialize_openssl_client() {
     SSL_CTX *ctx;
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_WITH_TLS_13
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     ctx = SSL_CTX_new(SSLv23_client_method());
 #else
     ctx = SSL_CTX_new(TLS_client_method());
@@ -141,7 +139,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 	static int netdata_id_context = 1;
 
     //TO DO: Confirm the necessity to check return for other OPENSSL function
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_WITH_TLS_13
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 	ctx = SSL_CTX_new(SSLv23_server_method());
     if (!ctx) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
@@ -172,7 +170,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
     SSL_CTX_set_info_callback(ctx,security_info_callback);
 
-#if (OPENSSL_VERSION_NUMBER < 0x00905100L)
+#if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_095)
 	SSL_CTX_set_verify_depth(ctx,1);
 #endif
     debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
@@ -237,7 +235,7 @@ void security_clean_openssl() {
         SSL_CTX_free(netdata_opentsdb_ctx);
     }
 
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_WITH_TLS_13
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
     ERR_free_strings();
 #endif
 }

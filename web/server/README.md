@@ -98,11 +98,7 @@ openssl speed rsa2048 rsa4096
 
 ### Select TLS version
 
-Beginning with version 1.21, Netdata accepts `tls key` and `tls certificate` as replacement of the settings `ssl key` and `ssl certificate`. 
-
-You do not need to change your `netdata.conf` if you are using the previous `ssl` settings, because these are kept for backward compatibility.
-
-You can also specify the TLS version and the ciphers that you want to use:
+Beginning with version 1.21, you can also specify the TLS version and the ciphers that you want to use:
 
 ```conf
 [web]
