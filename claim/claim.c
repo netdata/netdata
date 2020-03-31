@@ -53,7 +53,7 @@ void claim_agent(char *claiming_arguments)
 
     char *cloud_base_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *cloud_base_port = NULL;
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
     if( aclk_decode_base_url(cloud_base_url, &cloud_base_hostname, &cloud_base_port))
     {
         error("Configuration error - cannot decode \"cloud base url\"");
@@ -71,7 +71,7 @@ void claim_agent(char *claiming_arguments)
 
     snprintfz(command_buffer,
               CLAIMING_COMMAND_LENGTH,
-              "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s %s",
+              "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s -noreload %s",
 
               proxy_flag,
               netdata_configured_hostname,
