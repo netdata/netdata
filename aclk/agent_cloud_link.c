@@ -1321,7 +1321,7 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
     uint32_t port_num = 0;
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
     if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
         error("Configuration error - cannot use agent cloud link");
         return NULL;

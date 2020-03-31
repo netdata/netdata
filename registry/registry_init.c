@@ -41,7 +41,7 @@ int registry_init(void) {
     registry.verify_cookies_redirects = config_get_boolean(CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
 
     // netdata.cloud configuration, if cloud_base_url == "", cloud functionality is disabled.
-    registry.cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
+    registry.cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 
     setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
