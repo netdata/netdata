@@ -96,7 +96,10 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     df = df.stack()
     print(df.shape)
     print(df.head(10))
-    df = df.reset_index().rename(columns={0: 'value'})
+    df = df.reset_index()
+    print(df.shape)
+    print(df.head(10))
+    df = df.rename(columns={0: 'value'})
     df['variable'] = df['level_0'] + '__' + df['level_1']
     df = df[df['level_0']!=df['level_1']]
     df = df[['variable', 'value']]
