@@ -93,7 +93,9 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     df = df.corr()
     print(df.shape)
     print(df.head(10))
-    df = df.stack()
+    df = df.stack().to_frame()
+    print(df.shape)
+    print(df.head(10))
     df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
     print(df.shape)
     print(df.head(10))
