@@ -1,6 +1,7 @@
 <!--
 ---
 title: "External build-system"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/build_external/README.md
 ---
 -->
@@ -9,7 +10,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/build_external/R
 
 This wraps the build-system in Docker so that the host system and the target system are
 decoupled. This allows:
-* Cross-compilation (e.g. linux development from MacOS)
+* Cross-compilation (e.g. linux development from macOS)
 * Cross-distro (e.g. using CentOS user-land while developing on Debian)
 * Multi-host scenarios (e.g. master/slave configurations)
 * Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
