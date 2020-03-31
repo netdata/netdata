@@ -94,6 +94,7 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     print(df.shape)
     print(df.head(10))
     df = df.stack()
+    df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
     print(df.shape)
     print(df.head(10))
     df = df.reset_index()
