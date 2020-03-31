@@ -96,7 +96,9 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     print(df.head(10))
     print('... clean index ...')
     print(df.columns)
-    df = df.rename(columns={'variable': 'var'})
+    #df = df.rename(columns={'variable': 'var'})
+    df = df.rename_axis("var1", axis="index")
+    df = df.rename_axis("var2", axis="columns")
     #df.index = df.index.copy()
     #df.columns.name = 'variable'
     print(df.shape)
