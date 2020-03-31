@@ -41,7 +41,7 @@ git pull
 
 if [ -n "${BUILD_NIGHTLY}" ] ; then
     echo "--- Tagging nightly build ---"
-    git tag "nightly-$(date -u +%Y%m%d)"
+    git tag "$(git describe --abbrev=0)-$(date -u +%Y%m%d)"
     push_change
 
     echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"

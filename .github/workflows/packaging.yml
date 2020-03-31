@@ -128,8 +128,18 @@ jobs:
       - name: Check Base Branch
         if: github.event_name == 'pull_request' || (github.event_name == 'create' && github.event.ref_type == 'tag')
         run: |
-          if [ "${{ github.event_name }}" == "create" ] && ( echo "${{ github.event.ref }}" | grep -q "nightly" ) && ( git branch --contains tags/${{ github.event.ref }} | grep -q master ); then
+          if [ "${{ github.event_name }}" == "create" ]; then
             echo ::set-env name=taggedrun::1
+            if ( echo "${{ github.event.ref }}" | grep -Eq '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+-[[:digit:]]{8}.*$' ) && ( git branch --contains tags/${{ github.event.ref }} | grep -q master ) ; then
+                echo ::set-env name=tagtpe::nightly
+                echo ::set-env name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}-edge
+            elif ( echo "${{ github.event.ref }}" | grep -Eq '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$' ) && ( git branch --contains tags/${{ github.event.ref }} | grep -q master ) ; then
+                echo ::set-env name=tagtype::release
+                echo ::set-env name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}
+            else
+                echo ::set-env name=tagtype::normal
+                echo ::set-env name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}-devel
+            fi
           else
             echo ::set-env name=taggedrun::0
           fi
@@ -166,12 +176,7 @@ jobs:
         run: |
           # This figures out the distribution ID for the upload.
           DIST_ID="$(curl https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/distributions.json | python3 .github/parse_packagecloud_dist_id.py ${{ matrix.format }} ${{ matrix.pkgclouddistro }} ${{ matrix.pkgcloudversion }})"
-          last_commit="$(git log -1 --pretty=format:"%s")"
-          REPO="${{ secrets.PACKAGE_CLOUD_REPO }}"
-          if echo "${last_commit}" | grep -qiE "\[build latest\]" ; then
-            REPO="${REPO}-edge"
-          fi
           for pkgfile in artifacts/*.${FORMAT} ; do
             curl -F "package[distro_version_id]=${BUILD_ID}" \
                  -F "package[package_file]=@${pkgfile}" \
-                 https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/repos/${{ secrets.PACKAGE_CLOUD_REPO }}/packages.json || exit 1
+                 https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/repos/${{ env.repo }}/packages.json || exit 1
