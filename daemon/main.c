@@ -400,25 +400,23 @@ static const char *verify_required_directory(const char *dir) {
 #ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
-    char common[8];
-    snprintfz(common, 7, "none");
-    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  common);
-    if (!strcmp(security_key, common)) {
+    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  "none");
+    if (!strcmp(security_key, "none")) {
         snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
         security_key    = config_get(CONFIG_SECTION_WEB, "tls key",  filename);
     }
 
-    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  common);
-    if (!strcmp(security_cert, common)) {
+    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  "none");
+    if (!strcmp(security_cert, "none")) {
         snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
         security_cert    = config_get(CONFIG_SECTION_WEB, "tls certificate",  filename);
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_WITH_TLS_13
     snprintfz(filename, FILENAME_MAX, "1.3");
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  filename);
 
-    tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  common);
+    tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
 #endif
 
     security_openssl_library();
