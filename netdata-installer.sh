@@ -582,6 +582,11 @@ if [ "$have_autotools" ]; then
   run autoreconf -ivf || exit 1
 fi
 
+# Checking state in CI/CD
+run pwd
+run ls -l
+
+
 run ./configure \
   --prefix="${NETDATA_PREFIX}/usr" \
   --sysconfdir="${NETDATA_PREFIX}/etc" \

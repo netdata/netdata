@@ -46,6 +46,7 @@ void claim_agent(char *claiming_arguments)
         return;
     }
 
+#ifndef DISABLE_CLOUD
     int exit_code;
     pid_t command_pid;
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
@@ -106,6 +107,7 @@ void claim_agent(char *claiming_arguments)
     }
     error("Agent failed to be claimed with the following error message:");
     error("\"%s\"", claiming_errors[exit_code]);
+#endif
 }
 
 void load_claiming_state(void)

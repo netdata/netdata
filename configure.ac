@@ -169,19 +169,18 @@ AC_ARG_ENABLE(
     [cloud],
     [AS_HELP_STRING([--disable-cloud],
                     [Disables all cloud functionality])],
-    [],
-    [enable_cloud="no"]
+    [ enable_cloud="$enableval" ],
+    [ enable_cloud="yes" ]
 )
 
 AC_MSG_CHECKING([if cloud functionality should be enabled])
-if test "${enable_cloud}" != "no"; then
-    AC_DEFINE([ENABLE_CLOUD], [1], [netdata cloud functionality])
-    aclk_required="detect"
-else
+if test "${enable_cloud}" = "no"; then
+    AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
     aclk_required="no"
+else
+    aclk_required="detect"
 fi
 AC_MSG_RESULT([${enable_cloud}])
-AM_CONDITIONAL([DISABLE_CLOUD], [test "${enable_cloud}" = "no"])
 
 # -----------------------------------------------------------------------------
 # netdata required checks
