@@ -88,8 +88,15 @@ def get_raw_data(host: str = None, after: int = 500, charts: list = None) -> pd.
 def process_data(self=None, df: pd.DataFrame = None) -> dict:
 
     data = dict()
-
-    df = df.corr().stack().reset_index().rename(columns={0: 'value'})
+    print(df.shape)
+    print(df.head(10))
+    df = df.corr()
+    print(df.shape)
+    print(df.head(10))
+    df = df.stack()
+    print(df.shape)
+    print(df.head(10))
+    df = df.reset_index().rename(columns={0: 'value'})
     df['variable'] = df['level_0'] + '__' + df['level_1']
     df = df[df['level_0']!=df['level_1']]
     df = df[['variable', 'value']]
@@ -128,7 +135,11 @@ class Service(SimpleService):
         self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
         df = data_to_df(self.data)
+        print(df.shape)
+        print(df.head(10))
         df = df_long_to_wide(df)
+        print(df.shape)
+        print(df.head(10))
         data = process_data(self, df)
 
         return data
