@@ -134,6 +134,8 @@ class Service(SimpleService):
 
         self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
+        print(f"length of self.data is {len(self.data)}")
+        print(self.data)
         df = data_to_df(self.data)
         print(df.shape)
         print(df.head(10))
