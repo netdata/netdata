@@ -556,9 +556,16 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # ACLK
 
 if test "$enable_cloud" = "yes"; then
-    AC_MSG_CHECKING([if libmosquitto static lib is present])
+    AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        HAVE_libmosquitto_a="yes"
+        LIBS_SAVES="$LIBS"
+        LIBS="externaldeps/mosquitto/libmosquitto.a"
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[int main (int argc, char **argv)) {
+                                             int m,mm,r;
+                                             mosquitto_lib_version(&m, &mm, &r);
+                                         }]]),
+                                        [HAVE_libmosquitto_a="yes"],
+                                        [HAVE_libmosquitto_a="no"]])
     else
         HAVE_libmosquitto_a="no"
         AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
