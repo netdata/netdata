@@ -10,6 +10,8 @@
 # Exit code: 3 - Missing dependencies
 # Exit code: 4 - Failure to connect to endpoint
 # Exit code: 5 - Unknown HTTP error message
+# Exit code: 6 - The CLI didn't work
+# Exit code: 7 - Wrong user
 #
 # OK: Agent claimed successfully
 # HTTP Status code: 204
@@ -96,13 +98,22 @@ fi
 MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
 CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
 TOKEN="unknown"
-URL_BASE="https://netdata.cloud"
+URL_BASE="https://app.netdata.cloud"
 ID="unknown"
 ROOMS=""
 HOSTNAME=$(hostname)
 CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
+RELOAD=1
+NETDATA_USER=netdata
+[ -z "$EUID" ] && EUID="$(id -u)"
+
+CONF_USER=$(grep '^[^#]*run as user[ \t]*=' "${NETDATA_USER_CONFIG_DIR}/netdata.conf" 2>/dev/null)
+if [ -n "$CONF_USER" ]; then
+    NETDATA_USER=$(echo "$CONF_USER" | sed 's/^[^=]*=[ \t]*//' | sed 's/[ \t]*$//')
+fi
+
 
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
@@ -131,11 +142,18 @@ do
                 -insecure) INSECURE=1 ;;
                 -proxy=*) PROXY=${arg:7} ;;
                 -noproxy) NOPROXY=yes ;;
+                -noreload) RELOAD=0 ;;
+                -user=*) NETDATA_USER=${arg:6} ;;
                 *)  echo >&2 "Unknown argument ${arg}"
                     exit 1 ;;
         esac
         shift 1
 done
+
+if [ "$EUID" != "0" ] && [ "$(whoami)" != "$NETDATA_USER" ]; then
+    echo >&2 "This script must be run by the $NETDATA_USER user account"
+    exit 7
+fi
 
 # if curl not installed give warning SOCKS can't be used
 if [[ "${URLTOOL}" != "curl" && "${PROXY:0:5}" = socks ]] ; then
@@ -149,6 +167,7 @@ echo >&2 "Id: $ID"
 echo >&2 "Rooms: $ROOMS"
 echo >&2 "Hostname: $HOSTNAME"
 echo >&2 "Proxy: $PROXY"
+echo >&2 "Netdata user: $NETDATA_USER"
 
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
@@ -264,10 +283,17 @@ HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print
 
 if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
-        echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id"
-        rm -f "${CLAIMING_DIR}/token"
-        echo >&2 "Node was successfully claimed."
-        exit 0
+        echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
+        if [ "$EUID" == "0" ]; then
+            chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
+        fi
+        if [ "${RELOAD}" == "0" ] ; then
+            exit 0
+        fi
+        netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
+        echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
+        exit 6
 fi
 
 ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')

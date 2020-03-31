@@ -60,6 +60,8 @@ dist_noinst_DATA = \
     package.json \
     docs \
     packaging/version \
+    packaging/dashboard.version \
+    packaging/dashboard.checksums \
     packaging/go.d.version \
     packaging/go.d.checksums \
     packaging/libwebsockets.version \
