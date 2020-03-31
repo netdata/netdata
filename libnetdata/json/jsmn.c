@@ -218,13 +218,12 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, char *js,
                     }
                     // The last character on unicode
                     char *tmp = &js[parser->pos-1];
-
                     // unicode symbol exists from parser (pos - 4, pos - 1)
                     // should be written on pos - 6
                     parser->pos = parser->pos - 6;
                     // position will be on last valid character and it will advanced
-                    parser->pos = parser->pos + output_characters(js[parser->pos], unicode_char);
-                    char *dest = js[parser->pos];
+                    parser->pos = parser->pos + output_characters(&js[parser->pos], unicode_char);
+                    char *dest = &js[parser->pos];
                     while (*tmp) {
                         *dest = *(tmp + 1);
                         tmp++;
