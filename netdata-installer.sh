@@ -536,6 +536,12 @@ bundle_libwebsockets() {
     return 0
   fi
 
+  if [ -z "$(command -v cmake)" ] ; then
+    run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    return 0
+  fi
+
   progress "Prepare libwebsockets"
 
   LIBWEBSOCKETS_PACKAGE_VERSION="$(cat packaging/libwebsockets.version)"
