@@ -95,8 +95,9 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     print(df.shape)
     print(df.head(10))
     print('... clean index ...')
-    df.index = df.index.copy()
-    df.columns.name = 'variable'
+    df = df.rename(columns={'variable': 'var'})
+    #df.index = df.index.copy()
+    #df.columns.name = 'variable'
     print(df.shape)
     print(df.head(10))
     print('... stack ...')
