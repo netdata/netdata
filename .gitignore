@@ -128,6 +128,7 @@ collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
 collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
+web/netdata-switch-dashboard.sh
 
 # installer generated files
 /netdata-uninstaller.sh
