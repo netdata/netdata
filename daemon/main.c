@@ -575,6 +575,21 @@ static void get_netdata_configured_variables() {
     get_system_HZ();
     get_system_cpus();
     get_system_pid_max();
+
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#ifdef DISABLE_CLOUD
+    netdata_cloud_setting = 0;
+#else
+    char *cloud = config_get(CONFIG_SECTION_GLOBAL, "netdata cloud", "coming soon");
+    if (!strcmp(cloud, "coming soon")) {
+        netdata_cloud_setting = 0;          // Note: this flips to 1 after the release
+    } else if (!strcmp(cloud, "enable")) {
+        netdata_cloud_setting = 1;
+    } else if (!strcmp(cloud, "disable")) {
+        netdata_cloud_setting = 0;
+    }
+#endif
 }
 
 static void get_system_timezone(void) {

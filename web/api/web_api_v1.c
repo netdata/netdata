@@ -862,10 +862,13 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     chartcollectors2json(host, wb);
     buffer_strcat(wb, "\n\t],\n");
 
-#ifdef ENABLE_CLOUD
-    buffer_strcat(wb, "\t\"cloud-enabled\": true,\n");
-#else
+#ifdef DISABLE_CLOUD
     buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
+#else
+    if (netdata_cloud_setting)
+        buffer_strcat(wb, "\t\"cloud-enabled\": true,\n");
+    else
+        buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
 #endif
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
