@@ -23,7 +23,7 @@ It produces:
     -   Time spent on indexing, refreshing, flushing
     -   Indexing and flushing latency
 
-3.  **Memory usage and garbace collection** charts:
+3.  **Memory usage and garbage collection** charts:
 
     -   JVM heap currently in use, committed
     -   Count of garbage collections
