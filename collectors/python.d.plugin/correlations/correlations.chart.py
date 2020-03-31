@@ -110,7 +110,7 @@ def process_data(self=None, df: pd.DataFrame = None) -> dict:
     df.columns = [f'{x}_{i}' for i, x in enumerate(df.columns, 1)]
     print(df.shape)
     print(df.head(10))
-    print('... END ...')
+    print('... rename ...')
     df = df.rename(columns={0: 'value'})
     df['variable'] = df['level_0'] + '__' + df['level_1']
     df = df[df['level_0']!=df['level_1']]
