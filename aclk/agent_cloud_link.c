@@ -1309,6 +1309,10 @@ void *aclk_main(void *ptr)
     struct netdata_static_thread *query_thread;
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
+    if (!netdata_cloud_setting) {
+        info("Killing ACLK thread -> cloud functionality has been disabled");
+        return NULL;
+    }
 
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
@@ -1755,6 +1759,9 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     UNUSED(chart_name);
     return 0;
 #else
+    if (!netdata_cloud_setting)
+        return 0;
+
     if (host != localhost)
         return 0;
 

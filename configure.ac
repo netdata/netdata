@@ -169,19 +169,18 @@ AC_ARG_ENABLE(
     [cloud],
     [AS_HELP_STRING([--disable-cloud],
                     [Disables all cloud functionality])],
-    [],
-    [enable_cloud="no"]
+    [ enable_cloud="$enableval" ],
+    [ enable_cloud="yes" ]
 )
 
 AC_MSG_CHECKING([if cloud functionality should be enabled])
-if test "${enable_cloud}" != "no"; then
-    AC_DEFINE([ENABLE_CLOUD], [1], [netdata cloud functionality])
-    aclk_required="detect"
-else
+if test "${enable_cloud}" = "no"; then
+    AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
     aclk_required="no"
+else
+    aclk_required="detect"
 fi
 AC_MSG_RESULT([${enable_cloud}])
-AM_CONDITIONAL([ENABLE_CLOUD], [test "${enable_cloud}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -557,9 +556,16 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # ACLK
 
 if test "$enable_cloud" = "yes"; then
-    AC_MSG_CHECKING([if libmosquitto static lib is present])
+    AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        HAVE_libmosquitto_a="yes"
+        LIBS_SAVES="$LIBS"
+        LIBS="externaldeps/mosquitto/libmosquitto.a"
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[int main (int argc, char **argv)) {
+                                             int m,mm,r;
+                                             mosquitto_lib_version(&m, &mm, &r);
+                                         }]]),
+                                        [HAVE_libmosquitto_a="yes"],
+                                        [HAVE_libmosquitto_a="no"]])
     else
         HAVE_libmosquitto_a="no"
         AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])

@@ -469,14 +469,18 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
-CLAIM_PLUGIN_FILES = \
+CLAIM_FILES = \
     claim/claim.c \
     claim/claim.h \
     $(NULL)
 
-ACLK_PLUGIN_FILES = \
+ACLK_FILES = \
     aclk/aclk_common.c \
     aclk/aclk_common.h \
+    $(NULL)
+
+if ENABLE_ACLK
+ACLK_FILES += \
     aclk/agent_cloud_link.c \
     aclk/agent_cloud_link.h \
     aclk/mqtt.c \
@@ -486,6 +490,9 @@ ACLK_PLUGIN_FILES = \
     aclk/aclk_lws_https_client.c \
     aclk/aclk_lws_https_client.h \
     $(NULL)
+endif
+
+
 
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
@@ -575,14 +582,9 @@ NETDATA_FILES = \
     $(STREAMING_PLUGIN_FILES) \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
-    $(CLAIM_PLUGIN_FILES) \
+    $(CLAIM_FILES) \
+    $(ACLK_FILES) \
     $(NULL)
-
-if ENABLE_ACLK
-    NETDATA_FILES += \
-        $(ACLK_PLUGIN_FILES) \
-        $(NULL)
-endif
 
 if FREEBSD
     NETDATA_FILES += \

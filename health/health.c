@@ -180,7 +180,8 @@ void health_reload_host(RRDHOST *host) {
  */
 void health_reload(void) {
 #ifdef ENABLE_ACLK
-    aclk_single_update_disable();
+    if (netdata_cloud_setting)
+        aclk_single_update_disable();
 #endif
     rrd_rdlock();
 
@@ -190,8 +191,10 @@ void health_reload(void) {
 
     rrd_unlock();
 #ifdef ENABLE_ACLK
-    aclk_single_update_enable();
-    aclk_alarm_reload();
+    if (netdata_cloud_setting) {
+        aclk_single_update_enable();
+        aclk_alarm_reload();
+    }
 #endif
 }
 
