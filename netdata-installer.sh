@@ -283,10 +283,6 @@ while [ -n "${1}" ]; do
       NETDATA_DISABLE_CLOUD=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
       ;;
-    "--cloud-testing")          # Temporary, until we flip the feature flag. Internal use only
-      unset NETDATA_DISABLE_CLOUD
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --enable-cloud"
-      ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -537,6 +533,12 @@ copy_libwebsockets() {
 
 bundle_libwebsockets() {
   if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ] ; then
+    run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     return 0
   fi
 

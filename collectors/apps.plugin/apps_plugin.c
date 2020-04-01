@@ -4173,6 +4173,12 @@ int main(int argc, char **argv) {
         usec_t dt = heartbeat_next(&hb, step);
 #endif
 
+        struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
+        if (unlikely(poll(&pollfd, 1, 0) < 0))
+            fatal("Cannot check if a pipe is available");
+        if (unlikely(pollfd.revents & POLLERR))
+            fatal("Cannot write to a pipe");
+
         if(!collect_data_for_all_processes()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");

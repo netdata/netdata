@@ -153,7 +153,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 #ifdef ENABLE_ACLK
-    aclk_update_alarm(host, ae);
+    if (netdata_cloud_setting)
+        aclk_update_alarm(host, ae);
 #endif
 }
 
