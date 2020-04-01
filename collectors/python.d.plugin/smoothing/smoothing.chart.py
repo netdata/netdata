@@ -79,7 +79,12 @@ class Service(SimpleService):
         #self.data = self.data[-N:]
         #self.debug(f"self.data={self.data}")
         #df = data_to_df(self.data)
-        df = data_to_df(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+        data = []
+        data1 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        data2 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        data.append(data1)
+        data.append(data2)
+        df = data_to_df(data)
         print(df.shape)
         print(df.head())
         df = df_long_to_wide(df)
