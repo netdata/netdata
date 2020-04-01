@@ -52,6 +52,10 @@ def data_to_df(data):
     df = pd.DataFrame([item for sublist in data for item in sublist], columns=['time', 'chart', 'variable', 'value'])
     return df
 
+def df_long_to_wide(df):
+    df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
+    return df
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -77,7 +81,10 @@ class Service(SimpleService):
         df = data_to_df(self.data)
         print(df.shape)
         print(df.head())
-        df = df.mean
+        df = df_long_to_wide(df)
+        print(df.shape)
+        print(df.head())
+        df = df.mean()
         print(df.shape)
         print(df.head())
 
