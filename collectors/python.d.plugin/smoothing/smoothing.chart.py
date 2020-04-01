@@ -42,6 +42,11 @@ def get_allmetrics(host: str = None, charts: list = None) -> list:
     return data
 
 
+def data_to_df(data):
+    df = pd.DataFrame([item for sublist in data for item in sublist], columns=['time', 'chart', 'variable', 'value'])
+    return df
+
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -62,7 +67,10 @@ class Service(SimpleService):
 
         self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
-        self.debug(self.data)
+        self.debug(f"self.data={self.data}")
+        df = data_to_df(self.data)
+        print(df.shape)
+        print(df.head())
 
         data = dict()
 
