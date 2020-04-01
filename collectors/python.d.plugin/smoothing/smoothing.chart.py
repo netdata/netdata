@@ -86,22 +86,20 @@ class Service(SimpleService):
 
         data = dict()
 
-        #for col in df.columns:
-        #    print(col)
-        #    chart = '.'.join(col.split('.')[0:2])
-        #    print(chart)
-        #    if col not in self.charts[chart]:
-        #        self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
-        #    data[col] = df[col].values[0] * 1000
+        for col in df.columns:
+            self.debug(f"col={col}")
+            chart = '.'.join(col.split('.')[0:2])
+            self.debug(f"chart={chart}")
+            if col not in self.charts[chart]:
+                self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
+            data[col] = df[col].values[0] * 1000
 
         #print(data)
 
         for i in range(1, 5):
             dimension_id = ''.join(['random', str(i)])
-
             if dimension_id not in self.charts['random']:
                 self.charts['random'].add_dimension([dimension_id])
-
             data[dimension_id] = self.random.randint(0, 100)
 
         return data
