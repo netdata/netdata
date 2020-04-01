@@ -79,8 +79,8 @@ class Service(SimpleService):
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
         df = data_to_df(self.data)
-        print(df.shape)
-        print(df.head())
+        #print(df.shape)
+        #print(df.head())
 
         #data = []
         #data1 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
