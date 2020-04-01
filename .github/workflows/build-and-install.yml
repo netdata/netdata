@@ -18,7 +18,6 @@ jobs:
           - 'archlinux:latest'
           - 'centos:8'
           - 'centos:7'
-          - 'centos:6'
           - 'debian:bullseye'
           - 'debian:buster'
           - 'debian:stretch'
