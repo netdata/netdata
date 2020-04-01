@@ -83,10 +83,10 @@ class Service(SimpleService):
 
         data = dict()
 
-        #for col in df.columns:
-        #    print(col)
-        #    chart = col.split('.')[0:1]
-        #    print(chart)
+        for col in df.columns:
+            print(col)
+            chart = col.split('.')[0:1]
+            print(chart)
         #    if col not in self.charts[chart]:
         #        self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
         #    data[col] = df[col].values[0] * 1000
