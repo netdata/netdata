@@ -79,27 +79,27 @@ class Service(SimpleService):
         #self.data = self.data[-N:]
         #self.debug(f"self.data={self.data}")
         #df = data_to_df(self.data)
-        data = []
-        data1 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        data2 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        data.append(data1)
-        data.append(data2)
-        df = data_to_df(data)
-        print(df.shape)
-        print(df.head())
-        df = df_long_to_wide(df)
-        print(df.shape)
-        print(df.head())
-        df = df.mean().to_frame().transpose()
-        print(df.shape)
-        print(df.head())
+        #data = []
+        #data1 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        #data2 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        #data.append(data1)
+        #data.append(data2)
+        #df = data_to_df(data)
+        #print(df.shape)
+        #print(df.head())
+        #df = df_long_to_wide(df)
+        #print(df.shape)
+        #print(df.head())
+        #df = df.mean().to_frame().transpose()
+        #print(df.shape)
+        #print(df.head())
 
         data = dict()
 
-        for col in df.columns:
-            print(col)
-            chart = '.'.join(col.split('.')[0:2])
-            print(chart)
+        #for col in df.columns:
+        #    print(col)
+        #    chart = '.'.join(col.split('.')[0:2])
+        #    print(chart)
         #    if col not in self.charts[chart]:
         #        self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
         #    data[col] = df[col].values[0] * 1000
