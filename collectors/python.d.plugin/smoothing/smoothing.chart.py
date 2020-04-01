@@ -23,6 +23,7 @@ CHARTS = {
     }
 }
 
+HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = ['system.cpu']
 N = 2
 
@@ -54,14 +55,22 @@ class Service(SimpleService):
     def check():
         return True
 
+    def append_data(self, data):
+        self.data.append(data)
+
     def get_data(self):
+
+        self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+        self.data = self.data[-N:]
+        self.debug(self.data)
+
         data = dict()
 
         for i in range(1, 4):
             dimension_id = ''.join(['random', str(i)])
 
-            if dimension_id not in self.charts['random']:
-                self.charts['random'].add_dimension([dimension_id])
+            if dimension_id not in self.charts['smoothing']:
+                self.charts['smoothing'].add_dimension([dimension_id])
 
             data[dimension_id] = self.random.randint(0, 100)
 
