@@ -11,6 +11,10 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 1
 
+HOST_PORT = '127.0.0.1:19999'
+CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
+N = 2
+
 ORDER = [
     'system.cpu',
     'system.load',
@@ -19,25 +23,16 @@ ORDER = [
 
 CHARTS = {
     'system.cpu': {
-        'options': [None, 'system.cpu', 'system.cpu', 'smoothing', 'system_cpu', 'line'],
+        'options': [None, 'system.cpu', f'system.cpu (ma{N})', 'cpu', 'system_cpu', 'line'],
         'lines': [
         ]
     },
     'system.load': {
-        'options': [None, 'system.load', 'system.load', 'smoothing', 'system_load', 'line'],
+        'options': [None, 'system.load', f'system.load (ma{N})', 'load', 'system_load', 'line'],
         'lines': [
         ]
     },
-    'random': {
-        'options': [None, 'random', 'random', 'smoothing', 'random', 'line'],
-        'lines': [
-        ]
-    }
 }
-
-HOST_PORT = '127.0.0.1:19999'
-CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
-N = 2
 
 
 def get_allmetrics(host: str = None, charts: list = None) -> list:
@@ -57,6 +52,7 @@ def get_allmetrics(host: str = None, charts: list = None) -> list:
 def data_to_df(data):
     df = pd.DataFrame([item for sublist in data for item in sublist], columns=['time', 'chart', 'variable', 'value'])
     return df
+
 
 def df_long_to_wide(df):
     df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
@@ -100,13 +96,5 @@ class Service(SimpleService):
             if name not in self.charts[chart]:
                 self.charts[chart].add_dimension([name, name, 'absolute', 1, 1000])
             data[name] = df[col].values[0] * 1000
-
-        #print(data)
-
-        #for i in range(1, 5):
-        #    dimension_id = ''.join(['random', str(i)])
-        #    if dimension_id not in self.charts['random']:
-        #        self.charts['random'].add_dimension([dimension_id])
-        #    data[dimension_id] = self.random.randint(0, 100)
 
         return data
