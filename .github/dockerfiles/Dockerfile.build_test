@@ -4,7 +4,7 @@ FROM ${BASE}
 
 ARG PRE
 
-RUN /bin/sh -c 'if [ -n "${PRE}" ]; then /bin/sh -c "${PRE}"; if [ $? -ne 0 ]; then printf "ERROR: PRE failed:\n%s\n" "${PRE}"; exit 1; fi; fi'
+RUN if [ -n "${PRE}" ]; then /bin/sh -c "${PRE}"; if [ $? -ne 0 ]; then printf "ERROR: PRE failed:\n%s\n" "${PRE}"; exit 1; fi; fi
 
 WORKDIR /netdata
 COPY . .
