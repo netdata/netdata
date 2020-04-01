@@ -111,6 +111,7 @@ system/netdata-openrc
 system/netdata-init-d
 system/netdata.logrotate
 system/netdata.service
+system/netdata.service.v235
 system/netdata.plist
 system/netdata-freebsd
 system/edit-config
