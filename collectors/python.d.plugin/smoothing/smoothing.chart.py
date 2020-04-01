@@ -74,12 +74,12 @@ class Service(SimpleService):
         self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
-        #df = data_to_df(self.data)
-        #print(df.shape)
-        #print(df.head())
-        #df = df.mean
-        #print(df.shape)
-        #print(df.head())
+        df = data_to_df(self.data)
+        print(df.shape)
+        print(df.head())
+        df = df.mean
+        print(df.shape)
+        print(df.head())
 
         data = dict()
 
