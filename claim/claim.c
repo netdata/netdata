@@ -107,8 +107,8 @@ void claim_agent(char *claiming_arguments)
     error("Agent failed to be claimed with the following error message:");
     error("\"%s\"", claiming_errors[exit_code]);
 #else
-    (void)claiming_arguments;
-    (void)claiming_errors;
+    UNUSED(claiming_arguments);
+    UNUSED(claiming_errors);
 #endif
 }
 
