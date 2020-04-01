@@ -79,8 +79,8 @@ class Service(SimpleService):
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
         df = data_to_df(self.data)
-        #print(df.shape)
-        #print(df.head())
+        self.debug(df.shape)
+        self.debug(df.head())
 
         #data = []
         #data1 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
@@ -109,7 +109,7 @@ class Service(SimpleService):
 
         #print(data)
 
-        for i in range(1, 10):
+        for i in range(1, 5):
             dimension_id = ''.join(['random', str(i)])
 
             if dimension_id not in self.charts['random']:
