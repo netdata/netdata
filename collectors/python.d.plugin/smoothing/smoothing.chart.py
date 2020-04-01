@@ -93,7 +93,7 @@ class Service(SimpleService):
 
         #print(data)
 
-        for i in range(1, 4):
+        for i in range(1, 10):
             dimension_id = ''.join(['random', str(i)])
 
             if dimension_id not in self.charts['random']:
