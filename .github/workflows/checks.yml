@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CFLAGS: >
-        -O1 -ggdb -Wall -Wextra -Wformat-signedness
+        -O1 -ggdb -Wall -Werror -Wextra -Wformat-signedness
         -fstack-protector-all
         -DNETDATA_INTERNAL_CHECKS=1
         -D_FORTIFY_SOURCE=2
