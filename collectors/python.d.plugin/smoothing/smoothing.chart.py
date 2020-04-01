@@ -5,22 +5,40 @@
 
 from random import SystemRandom
 
+import requests
+import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
 
-priority = 90000
+priority = 1
 
 ORDER = [
-    'random',
+    'smoothing',
 ]
 
 CHARTS = {
-    'random': {
-        'options': [None, 'A random number', 'random number', 'random', 'random', 'line'],
+    'smoothing': {
+        'options': [None, 'smoothing', 'smoothing', 'smoothing', 'smoothing', 'line'],
         'lines': [
-            ['random1']
         ]
     }
 }
+
+CHARTS_IN_SCOPE = ['system.cpu']
+N = 2
+
+
+def get_allmetrics(host: str = None, charts: list = None) -> list:
+    url = f'http://{host}/api/v1/allmetrics?format=json'
+    response = requests.get(url)
+    raw_data = response.json()
+    data = []
+    for k in raw_data:
+        if k in charts:
+            time = raw_data[k]['last_updated']
+            dimensions = raw_data[k]['dimensions']
+            for dimension in dimensions:
+                data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+    return data
 
 
 class Service(SimpleService):
@@ -29,6 +47,8 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
+        self.counter = 1
+        self.data = []
 
     @staticmethod
     def check():
