@@ -49,13 +49,10 @@ def get_allmetrics(host: str = None, charts: list = None) -> list:
     return data
 
 
-def data_to_df(data):
+def data_to_df(data, mode='wide'):
     df = pd.DataFrame([item for sublist in data for item in sublist], columns=['time', 'chart', 'variable', 'value'])
-    return df
-
-
-def df_long_to_wide(df):
-    df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
+    if mode == 'wide':
+        df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
     return df
 
 
@@ -80,7 +77,6 @@ class Service(SimpleService):
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
         df = data_to_df(self.data)
-        df = df_long_to_wide(df)
         df = df.mean().to_frame().transpose()
         self.debug(df.shape)
         self.debug(df.head())
