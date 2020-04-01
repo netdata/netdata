@@ -13,12 +13,18 @@ priority = 1
 
 ORDER = [
     'system.cpu',
+    'system.load',
     'random'
 ]
 
 CHARTS = {
     'system.cpu': {
         'options': [None, 'system.cpu', 'system.cpu', 'smoothing', 'system_cpu', 'line'],
+        'lines': [
+        ]
+    },
+    'system.load': {
+        'options': [None, 'system.load', 'system.load', 'smoothing', 'system_load', 'line'],
         'lines': [
         ]
     },
@@ -30,7 +36,7 @@ CHARTS = {
 }
 
 HOST_PORT = '127.0.0.1:19999'
-CHARTS_IN_SCOPE = ['system.cpu']
+CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
 N = 2
 
 
@@ -63,7 +69,6 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
-        self.counter = 1
         self.data = []
 
     @staticmethod
@@ -88,18 +93,20 @@ class Service(SimpleService):
 
         for col in df.columns:
             self.debug(f"col={col}")
-            chart = '.'.join(col.split('.')[0:2])
+            parts = col.split('.')
+            chart = '.'.join(parts[0:2])
+            name = parts[-1]
             self.debug(f"chart={chart}")
-            if col not in self.charts[chart]:
-                self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
-            data[col] = df[col].values[0] * 1000
+            if name not in self.charts[chart]:
+                self.charts[chart].add_dimension([name, name, 'absolute', 1, 1000])
+            data[name] = df[col].values[0] * 1000
 
         #print(data)
 
-        for i in range(1, 5):
-            dimension_id = ''.join(['random', str(i)])
-            if dimension_id not in self.charts['random']:
-                self.charts['random'].add_dimension([dimension_id])
-            data[dimension_id] = self.random.randint(0, 100)
+        #for i in range(1, 5):
+        #    dimension_id = ''.join(['random', str(i)])
+        #    if dimension_id not in self.charts['random']:
+        #        self.charts['random'].add_dimension([dimension_id])
+        #    data[dimension_id] = self.random.randint(0, 100)
 
         return data
