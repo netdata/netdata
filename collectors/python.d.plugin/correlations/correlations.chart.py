@@ -142,29 +142,3 @@ class Service(SimpleService):
 
         return data
 
-
-#%%
-
-#import time
-
-#data1 = get_allmetrics(host='london.my-netdata.io', charts=CHARTS_IN_SCOPE)
-#time.sleep(1)
-#data2 = get_allmetrics(host='london.my-netdata.io', charts=CHARTS_IN_SCOPE)
-#time.sleep(1)
-#data3 = get_allmetrics(host='london.my-netdata.io', charts=CHARTS_IN_SCOPE)
-
-#%%
-
-#data = list()
-#data.append(data1)
-#data.append(data2)
-#data.append(data3)
-#df = data_to_df(data)
-
-#%%
-
-#%%
-
-#%%
-
-#%%
