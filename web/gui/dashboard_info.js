@@ -219,6 +219,11 @@ netdataDashboard.menu = {
         info: 'Example charts, demonstrating the external plugin architecture.'
     },
 
+    'example2': {
+        title: 'Example Charts 2',
+        info: 'Example charts 2, demonstrating the external plugin architecture.'
+    },
+
     'cgroup': {
         title: '',
         icon: '<i class="fas fa-th"></i>',
