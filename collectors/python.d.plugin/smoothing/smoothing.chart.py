@@ -79,23 +79,10 @@ class Service(SimpleService):
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
         df = data_to_df(self.data)
+        df = df_long_to_wide(df)
+        df = df.mean().to_frame().transpose()
         self.debug(df.shape)
         self.debug(df.head())
-
-        #data = []
-        #data1 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        #data2 = get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        #data.append(data1)
-        #data.append(data2)
-        #df = data_to_df(data)
-        #print(df.shape)
-        #print(df.head())
-        #df = df_long_to_wide(df)
-        #print(df.shape)
-        #print(df.head())
-        #df = df.mean().to_frame().transpose()
-        #print(df.shape)
-        #print(df.head())
 
         data = dict()
 
