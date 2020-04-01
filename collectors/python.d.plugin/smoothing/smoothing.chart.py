@@ -13,7 +13,7 @@ priority = 1
 
 HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
-N = 2
+N = 5
 
 ORDER = [
     'system.cpu',
