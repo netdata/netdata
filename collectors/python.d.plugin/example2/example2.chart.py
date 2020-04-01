@@ -37,7 +37,7 @@ class Service(SimpleService):
     def get_data(self):
         data = dict()
 
-        print 'this will break it'
+        #print('this will break it')
 
         for i in range(1, 4):
             dimension_id = ''.join(['random', str(i)])
