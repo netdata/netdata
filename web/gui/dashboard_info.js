@@ -216,7 +216,6 @@ netdataDashboard.menu = {
     
     'smoothing': {
         title: 'smoothing',
-        icon: '<i class="fas fa-suitcase-rolling"></i>',
         info: 'smoothing'
     },
 

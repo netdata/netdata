@@ -12,12 +12,18 @@ from bases.FrameworkServices.SimpleService import SimpleService
 priority = 1
 
 ORDER = [
-    'smoothing',
+    'system.cpu',
+    'random'
 ]
 
 CHARTS = {
-    'smoothing': {
-        'options': [None, 'smoothing', 'smoothing', 'smoothing', 'smoothing', 'line'],
+    'system.cpu': {
+        'options': [None, 'system.cpu', 'system.cpu', 'smoothing', 'system_cpu', 'line'],
+        'lines': [
+        ]
+    },
+    'random': {
+        'options': [None, 'random', 'random', 'smoothing', 'random', 'line'],
         'lines': [
         ]
     }
@@ -68,17 +74,30 @@ class Service(SimpleService):
         self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
-        df = data_to_df(self.data)
-        print(df.shape)
-        print(df.head())
+        #df = data_to_df(self.data)
+        #print(df.shape)
+        #print(df.head())
+        #df = df.mean
+        #print(df.shape)
+        #print(df.head())
 
         data = dict()
+
+        #for col in df.columns:
+        #    print(col)
+        #    chart = col.split('.')[0:1]
+        #    print(chart)
+        #    if col not in self.charts[chart]:
+        #        self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
+        #    data[col] = df[col].values[0] * 1000
+
+        #print(data)
 
         for i in range(1, 4):
             dimension_id = ''.join(['random', str(i)])
 
-            if dimension_id not in self.charts['smoothing']:
-                self.charts['smoothing'].add_dimension([dimension_id])
+            if dimension_id not in self.charts['random']:
+                self.charts['random'].add_dimension([dimension_id])
 
             data[dimension_id] = self.random.randint(0, 100)
 
