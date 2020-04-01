@@ -32,7 +32,6 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
 ]
-#CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
 
 
 def get_allmetrics(host: str = None, charts: list = None):

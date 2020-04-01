@@ -213,6 +213,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-random"></i>',
         info: 'Cross correlations relating to key system metrics.'
     },
+    
+    'smoothing': {
+        title: 'smoothing',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'smoothing'
+    },
 
     'example': {
         title: 'Example Charts',
