@@ -174,11 +174,9 @@ AC_ARG_ENABLE(
 )
 
 aclk_required="${enable_cloud}"
-AC_MSG_CHECKING([if cloud functionality should be enabled])
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
-AC_MSG_RESULT([${enable_cloud}])
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -553,6 +551,8 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # ACLK
 
+AC_MSG_CHECKING([if cloud functionality should be enabled])
+AC_MSG_RESULT([${enable_cloud}])
 if test "$enable_cloud" != "no"; then
     # just to have all messages that can fail ACLK build in one place
     # so it is easier to see why it can't be built
