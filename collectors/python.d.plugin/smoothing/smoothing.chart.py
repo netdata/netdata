@@ -84,7 +84,7 @@ class Service(SimpleService):
         df = df_long_to_wide(df)
         print(df.shape)
         print(df.head())
-        df = df.mean()
+        df = df.mean().transpose()
         print(df.shape)
         print(df.head())
 
