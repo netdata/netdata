@@ -92,7 +92,7 @@ class Service(SimpleService):
 
         for col in df.columns:
             print(col)
-            chart = col.split('.')[0:1]
+            chart = '.'.join(col.split('.')[0:2])
             print(chart)
         #    if col not in self.charts[chart]:
         #        self.charts[chart].add_dimension([col, col, 'absolute', 1, 1000])
