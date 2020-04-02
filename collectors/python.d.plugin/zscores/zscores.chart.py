@@ -120,7 +120,7 @@ class Service(SimpleService):
                 z = 0
             else:
                 z = float((x - mu) / sigma)
-            z = np.clip(z, -10, 10)
+            z = np.clip(z, -10.0, 10.0)
             self.debug(f'z={z}')
             if metric not in self.charts['zscores']:
                 self.charts['zscores'].add_dimension([metric, metric, 'absolute', 1, 1000])
