@@ -109,7 +109,7 @@ RELOAD=1
 NETDATA_USER=netdata
 [ -z "$EUID" ] && EUID="$(id -u)"
 
-CONF_USER=$(grep '^[^#]*run as user[ \t]*=' "${NETDATA_USER_CONFIG_DIR}/netdata.conf" 2>/dev/null)
+CONF_USER=$(grep '^[ 	#]*run as user[ 	]*=' "${NETDATA_USER_CONFIG_DIR}/netdata.conf" 2>/dev/null)
 if [ -n "$CONF_USER" ]; then
     NETDATA_USER=$(echo "$CONF_USER" | sed 's/^[^=]*=[ \t]*//' | sed 's/[ \t]*$//')
 fi

@@ -170,17 +170,13 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--disable-cloud],
                     [Disables all cloud functionality])],
     [ enable_cloud="$enableval" ],
-    [ enable_cloud="yes" ]
+    [ enable_cloud="detect" ]
 )
 
-AC_MSG_CHECKING([if cloud functionality should be enabled])
+aclk_required="${enable_cloud}"
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
-    aclk_required="no"
-else
-    aclk_required="detect"
 fi
-AC_MSG_RESULT([${enable_cloud}])
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -555,17 +551,30 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # ACLK
 
-if test "$enable_cloud" = "yes"; then
+AC_MSG_CHECKING([if cloud functionality should be enabled])
+AC_MSG_RESULT([${enable_cloud}])
+if test "$enable_cloud" != "no"; then
+    # just to have all messages that can fail ACLK build in one place
+    # so it is easier to see why it can't be built
+    if test -n "${SSL_LIBS}"; then
+        OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+    else
+        AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+    fi
+
     AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        LIBS_SAVES="$LIBS"
-        LIBS="externaldeps/mosquitto/libmosquitto.a"
-        AC_LINK_IFELSE([AC_LANG_SOURCE([[int main (int argc, char **argv)) {
+        LIBS_BKP="${LIBS}"
+        LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS}"
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/mosquitto/mosquitto.h"
+                                         int main (int argc, char **argv) {
                                              int m,mm,r;
                                              mosquitto_lib_version(&m, &mm, &r);
-                                         }]]),
+                                         }]])],
                                         [HAVE_libmosquitto_a="yes"],
-                                        [HAVE_libmosquitto_a="no"]])
+                                        [HAVE_libmosquitto_a="no"])
+        LIBS="${LIBS_BKP}"
     else
         HAVE_libmosquitto_a="no"
         AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
@@ -584,7 +593,7 @@ if test "$enable_cloud" = "yes"; then
 
     if test "${build_target}" = "linux" -a "${aclk_required}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
-            AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-aclk or enable libcap])
+            AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
         fi
         if test "${with_libcap}" = "yes"; then
             LWS_LIBS+=" -lcap"
@@ -592,7 +601,7 @@ if test "$enable_cloud" = "yes"; then
     fi
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
