@@ -17,8 +17,8 @@ CHARTS_IN_SCOPE = [
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
 CHART_TYPES = {'stacked': ['system.cpu']}
-N = 100
-RECALC_EVERY = 50
+N = 50
+RECALC_EVERY = 5
 
 ORDER = [
     'zscores',
@@ -30,24 +30,6 @@ CHARTS = {
         'lines': []
     },
 }
-
-## define charts based on whats in scope
-#CHARTS = dict()
-#for CHART_IN_SCOPE in CHARTS_IN_SCOPE:
-#    if CHART_IN_SCOPE in CHART_TYPES['stacked']:
-#        chart_type = 'stacked'
-#    else:
-#        chart_type = 'line'
-#    # set chart options
-#    name = CHART_IN_SCOPE
-#    title = CHART_IN_SCOPE
-#    units = f'{CHART_IN_SCOPE} (ma{N})'
-#    family = CHART_IN_SCOPE.split('.')[-1]
-#    context = CHART_IN_SCOPE.replace('.', '_')
-#    CHARTS[CHART_IN_SCOPE] = {
-#        'options': [name, title, units, family, context, chart_type],
-#        'lines': []
-#    }
 
 
 class Service(SimpleService):
@@ -119,11 +101,11 @@ class Service(SimpleService):
             # pull data into a pandas df
             df = self.data_to_df(self.data)
             # do calculations
-            df_mean = df.mean().to_frame().transpose()
-            self.debug('df_mean')
+            df_mean = df.mean().to_dict()
+            self.debug('df_mean_dict')
             self.debug(df_mean)
-            df_sigma = df.std().to_frame().transpose()
-            self.debug('df_sigma')
+            df_sigma = df.std().to_dict()
+            self.debug('df_sigma_dict')
             self.debug(df_sigma)
 
         ## save results to data
