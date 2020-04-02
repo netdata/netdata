@@ -38,12 +38,16 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 // ----------------------------------------------------------------------
+FILE *developer_log = NULL;
+
 //Netdata eBPF library
 void *libnetdatanv = NULL;
 int (*load_bpf_file)(char *, int) = NULL;
 int *map_fd = NULL;
 //Libbpf (It is necessary to have at least kernel 4.10)
 int (*bpf_map_lookup_elem)(int, const void *, void *);
+int (*bpf_map_get_next_key)(int, const void *, void *);
+int (*bpf_map_delete_elem)(int, const void *);
 
 netdata_network_t *outgoing_table = NULL;
 netdata_network_t *ingoing_table = NULL;
@@ -54,6 +58,7 @@ netdata_control_connection_t connection_controller;
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 static char *plugin_dir = PLUGINS_DIR;
+static char *netdata_configured_log_dir = LOG_DIR;
 
 uint64_t *conn = NULL;
 uint64_t *ibytes = NULL;
@@ -61,13 +66,17 @@ uint64_t *ebytes = NULL;
 
 uint32_t *hash_values = NULL;
 netdata_network_stat_t *aggregated_data = NULL;
+static int use_json = 0;
 
 pthread_mutex_t lock;
+static int developer_mode = 0;
 
 static char *dimension_names[NETDATA_SOCKET_LENGTH] = { "send", "receive", "retransmit", "close"
+                                                        , "receive", "send", "send", "retransmit"
                                                         , "receive", "send" };
 static char *id_names[NETDATA_SOCKET_LENGTH] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_retransmit_skb", "tcp_close"
-                                                 , "udp_recvmsg", "udp_sendmsg"  };
+                                                 , "udp_recvmsg", "udp_sendmsg", "tcp_sendmsg", "tcp_retransmit_skb"
+                                                 , "udp_recvmsg", "udp_sendmsg"};
 
 //protocols used with this collector
 static char *protocols[] = { "tcp", "udp" };
@@ -105,6 +114,15 @@ static void clean_network(netdata_network_t *ptr) {
 
     free(ptr);
 }
+
+void open_developer_log() {
+    char filename[FILENAME_MAX+1];
+    int tot = sprintf(filename, "%s/%s",  netdata_configured_log_dir, NETDATA_DEVELOPER_LOG_FILE2);
+
+    if(tot > 0)
+        developer_log = fopen(filename, "a");
+}
+
 
 static void clean_networks() {
 
@@ -203,6 +221,11 @@ static void int_exit(int sig) {
         clean_port_lists();
     }
 
+    if (developer_log) {
+        fclose(developer_log);
+        developer_log = NULL;
+    }
+
     if (connection_controller.pti) {
         parse_text_input_t *r = connection_controller.pti;
         while (r) {
@@ -260,8 +283,16 @@ static void int_exit(int sig) {
             int sid = setsid();
             if(sid >= 0) {
                 sleep(1);
+                if(developer_mode) {
+                    open_developer_log();
+                }
                 debug(D_EXIT, "Wait for father %d die", event_pid);
-                clean_kprobe_events(NULL, event_pid, collector_events);
+                clean_kprobe_events(developer_log, event_pid, collector_events);
+
+                if (developer_log) {
+                    fclose(developer_log);
+                    developer_log = NULL;
+                }
             } else {
                 fprintf(stderr, "Cannot become session id leader, so I won't try to clean kprobe_events.\n");
             }
@@ -415,13 +446,32 @@ static void netdata_create_charts() {
                                , 4);
 
     netdata_create_global_chart(NETWORK_VIEWER_FAMILY
+                                , NETWORK_VIEWER_TCP_ERROR
+                                , "Number of errors during TCP calls"
+                                , "Calls"
+                                , NETWORK_VIEWER_TCP_GROUP
+                                , 985
+                                , &aggregated_data[6]
+                                , 2);
+
+    netdata_create_global_chart(NETWORK_VIEWER_FAMILY
                                 , NETWORK_VIEWER_UDP_FUNCTION_CALL
                                 , "Number of calls realized to UDP functions inside kernel."
                                 , "Calls"
                                 , NETWORK_VIEWER_UDP_GROUP
-                                , 986
+                                , 985
                                 , &aggregated_data[4]
                                 , 2);
+
+    netdata_create_global_chart(NETWORK_VIEWER_FAMILY
+                               , NETWORK_VIEWER_UDP_ERROR
+                               , "Number of calls realized to UDP functions inside kernel."
+                               , "Calls"
+                               , NETWORK_VIEWER_UDP_GROUP
+                               , 985
+                               , &aggregated_data[8]
+                               , 2);
+
 }
 
 static void write_connection(char *name, uint64_t *bytes, int istcp) {
@@ -544,7 +594,9 @@ void *network_viewer_publisher(void *ptr) {
         netdata_publish_data(connection_controller.ports_udp_ipv6, AF_INET6, 17);
         netdata_publish_data(connection_controller.ports_udp_ipv4, AF_INET, 17);
         write_global_chart(NETWORK_VIEWER_TCP_FUNCTION_CALL, aggregated_data, 4);
+        write_global_chart(NETWORK_VIEWER_TCP_ERROR, &aggregated_data[6], 2);
         write_global_chart(NETWORK_VIEWER_UDP_FUNCTION_CALL, &aggregated_data[4], 2);
+        write_global_chart(NETWORK_VIEWER_UDP_ERROR, &aggregated_data[8], 2);
         pthread_mutex_unlock(&lock);
 
         fflush(stdout);
@@ -711,6 +763,83 @@ void *network_viewer_collector(void *ptr) {
 
     return NULL;
 }
+
+static void collector_log_date(char *buffer, size_t len) {
+    if (unlikely(!buffer || !len))
+        return;
+
+    time_t t;
+    struct tm *tmp, tmbuf;
+
+    t = now_realtime_sec();
+    tmp = localtime_r(&t, &tmbuf);
+
+    if (tmp == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
+        buffer[0] = '\0';
+
+    buffer[len - 1] = '\0';
+}
+
+static int netdata_store_log() {
+    int counter = 0;
+    int limit = 200;
+    char *fields[] = {"Timestamp", "Task", "PID", "Function", "Error Number", "Error Message"};
+
+    netdata_error_report_t ner;
+    uint64_t key = 0, next_key = 0;
+    int fd = map_fd[2];
+    char ct[64];
+    while(!bpf_map_get_next_key(fd, &key, &next_key)) {
+        if (!bpf_map_lookup_elem(fd, &next_key, &ner)) {
+            collector_log_date(ct, 63);
+            int err = -ner.err;
+            fprintf(developer_log
+                    , (!use_json)?
+                      "%s:%s\t%s:%s\t%s:%u\t%s:%s\t%s:%d\t%s:%s\n":
+                      "{\"%s\":\"%s\",\"%s\":\"%s\",\"%s\":\"%u\",\"%s\":\"%s\",\"%s\":\"%d\",\"%s\":\"%s\"}\n"
+                    , fields[0], ct
+                    , fields[1], ner.comm
+                    , fields[2], ner.pid
+                    , fields[3], id_names[ner.type]
+                    , fields[4], err
+                    , fields[5], (err < 134)?strerror(err): ""
+            );
+
+            bpf_map_delete_elem(fd, &next_key);
+        }
+
+        counter++;
+        if (counter == limit) {
+            break;
+        }
+    }
+
+    return 0;
+}
+
+void *network_viewer_log(void *ptr)
+{
+    (void) ptr;
+
+    if (developer_mode == 1) {
+        usec_t step = 500000ULL;
+        heartbeat_t hb;
+        heartbeat_init(&hb);
+        while(!close_plugin) {
+            usec_t dt = heartbeat_next(&hb, step);
+            (void) dt;
+
+            netdata_store_log();
+        }
+    }
+
+    return NULL;
+}
 // ----------------------------------------------------------------------
 
 static void build_complete_path(char *out, size_t length, char *path, char *filename) {
@@ -739,14 +868,28 @@ int network_viewer_load_libraries() {
 
         map_fd =  dlsym(libnetdatanv, "map_fd");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
+            error("[NETWORK VIEWER] Cannot find map_fd: %s", err);
             return -1;
         }
 
         bpf_map_lookup_elem = dlsym(libnetdatanv, "bpf_map_lookup_elem");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+            error("[NETWORK VIEWER] Cannot find bpf_map_lookup_elem: %s", err);
             return -1;
+        }
+
+        if(developer_mode == 1) {
+            bpf_map_get_next_key = dlsym(libnetdatanv, "bpf_map_get_next_key");
+            if ((err = dlerror()) != NULL) {
+                error("[NETWORK VIEWER] Cannot find bpf_map_lookup_elem: %s", err);
+                return -1;
+            }
+
+            bpf_map_delete_elem = dlsym(libnetdatanv, "bpf_map_delete_elem");
+            if ((err = dlerror()) != NULL) {
+                error("[EBPF_PROCESS] Cannot find bpf_map_delete_elem: %s", err);
+                return -1;
+            }
         }
     }
 
@@ -756,7 +899,7 @@ int network_viewer_load_libraries() {
 int network_viewer_load_ebpf() {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, plugin_dir, "netdata_ebpf_network_viewer.o");
+    build_complete_path(lpath, 4096, plugin_dir, (developer_mode)?"dnetdata_ebpf_network_viewer.o":"netdata_ebpf_network_viewer.o");
     event_pid = getpid();
     if (load_bpf_file(lpath, event_pid) ) {
         return -1;
@@ -1031,6 +1174,37 @@ netdata_network_t *netdata_list_ips(char *ips, int outgoing) {
     return ret;
 }
 
+static inline void enable_develop_mode(char *ptr) {
+    if (!strcasecmp(ptr, "yes"))
+        developer_mode = 1;
+}
+
+static inline void set_log_format(char *ptr) {
+    if (!strcasecmp(ptr, "json"))
+        use_json = 1;
+    else if (!strcasecmp(ptr, "ltsv"))
+        use_json = 0;
+}
+
+
+static void change_collector_event() {
+    int i;
+    for (i = 0; i < 4 ; i++ ) {
+        if (i != 1)
+            collector_events[i].type = 'r';
+    }
+}
+
+
+static inline void adjust_to_developer() {
+    if (!developer_mode) {
+        return;
+    }
+
+    change_collector_event();
+    open_developer_log();
+}
+
 static int read_config_file(const char *path) {
     char filename[512];
 
@@ -1068,6 +1242,10 @@ static int read_config_file(const char *path) {
             udp_port_list = netdata_list_ports(value, 17);
         } else if (!strcasecmp(key, "ingoing")) {
             ingoing_table = netdata_list_ips(value, 0);
+        } else if(!strcasecmp(key, "developer mode")) {
+            enable_develop_mode(value);
+        } else if(!strcasecmp(key, "log format")) {
+                set_log_format(value);
         } else if (isdigit(key[0])) {
             parse_text_input_t *pti = callocz(1, sizeof(pti));
             if (pti) {
@@ -1089,6 +1267,7 @@ static int read_config_file(const char *path) {
     }
 
     fclose(fp);
+    adjust_to_developer();
     return 0;
 }
 
@@ -1189,6 +1368,11 @@ void parse_config() {
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
     if(!plugin_dir)
         plugin_dir = PLUGINS_DIR;
+
+    netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
+    if(!netdata_configured_log_dir)
+        netdata_configured_log_dir = LOG_DIR;
+
 
     memset(&connection_controller,0,sizeof(connection_controller));
     avl_init_lock(&(connection_controller.port_stat_tcp_ipv4), compare_port);
@@ -1316,12 +1500,14 @@ int main(int argc, char **argv) {
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_t thread[2];
+    pthread_t thread[3];
+
+    void * (*function_pointer[])(void *) = {network_viewer_publisher, network_viewer_collector, network_viewer_log };
 
     int i;
-    int end = 2;
+    int end = 3;
     for ( i = 0; i < end ; i++ ) {
-        if ( ( pthread_create(&thread[i], &attr, (!i)?network_viewer_publisher:network_viewer_collector, NULL) ) ) {
+        if ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) {
             error("[NETWORK VIEWER] Cannot create the necessaries threads.");
             thread_finished++;
             int_exit(8);
@@ -1329,7 +1515,7 @@ int main(int argc, char **argv) {
     }
 
     for ( i = 0; i < end ; i++ ) {
-        if ( (pthread_join(thread[i], NULL) ) ) {
+        if (pthread_join(thread[i], NULL)) {
             error("[NETWORK VIEWER] Cannot join the necessaries threads.");
             thread_finished++;
             int_exit(9);

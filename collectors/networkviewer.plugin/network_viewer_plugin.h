@@ -176,9 +176,18 @@ typedef struct netdata_network_stat {
     uint64_t rvalue;
 }netdata_network_stat_t;
 
+typedef struct netdata_error_report {
+    char comm[16];
+    __u32 pid;
+
+    int type;
+    int err;
+}netdata_error_report_t;
+
+# define NETDATA_DEVELOPER_LOG_FILE2 "network_viewer.log"
 # define NETDATA_MAX_PROCESSOR 512
 
-# define NETDATA_SOCKET_LENGTH 6
+# define NETDATA_SOCKET_LENGTH 10
 
 # define NETDATA_MAX_DIMENSION 50
 
@@ -205,6 +214,9 @@ typedef struct netdata_network_stat {
 
 # define NETWORK_VIEWER_TCP_FUNCTION_CALL "tcp_fcnt_count"
 # define NETWORK_VIEWER_UDP_FUNCTION_CALL "udp_fcnt_count"
+
+# define NETWORK_VIEWER_TCP_ERROR "tcp_fnct_error"
+# define NETWORK_VIEWER_UDP_ERROR "udp_fnct_error"
 
 # define NETWORK_VIEWER_TCP_GROUP "TCP Socket"
 # define NETWORK_VIEWER_UDP_GROUP "UDP Socket"
