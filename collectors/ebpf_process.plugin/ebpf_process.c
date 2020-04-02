@@ -165,19 +165,16 @@ static void int_exit(int sig)
             for ( i=getdtablesize(); i>=0; --i)
                 close(i);
 
-            char filename[FILENAME_MAX+1];
-            ret = sprintf(filename, "%s/%s",  netdata_configured_log_dir, "error.log");
-            if (ret < 0)
-                fprintf(stderr,"[EBPF PROCESS] Cannot fill filename with values %s/%s", netdata_configured_log_dir, "error.log" );
-
-            int fd = open(filename, O_RDWR, 0);
+            int fd = open("/dev/null", O_RDWR, 0);
             if (fd != -1) {
                 dup2 (fd, STDIN_FILENO);
                 dup2 (fd, STDOUT_FILENO);
                 dup2 (fd, STDERR_FILENO);
 
-                close(fd);
             }
+
+            if (fd > 2)
+                close(fd);
 
             int sid = setsid();
             if(sid >= 0) {
@@ -189,13 +186,19 @@ static void int_exit(int sig)
                 debug(D_EXIT, "Wait for father %d die", event_pid);
                 clean_kprobe_events(developer_log, event_pid, collector_events);
 
-                if (developer_log) {
-                    fclose(developer_log);
-                    developer_log = NULL;
-                }
             } else {
                 error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
             }
+
+            if (developer_log) {
+                fclose(developer_log);
+                developer_log = NULL;
+            }
+
+            for ( i=getdtablesize(); i>=0; --i)
+                close(i);
+
+            exit(0);
         } else { //parent
             exit(0);
         }
