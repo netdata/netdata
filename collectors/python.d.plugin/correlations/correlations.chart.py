@@ -119,10 +119,12 @@ class Service(SimpleService):
             dimension_id = f'({dimension_id})'
             value = df[col].values[0]
             # drop any low correlation values
+            if dimension_id not in self.charts['metric_correlations']:
+                self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
             if abs(value) >= CORRELATION_THOLD:
-                if dimension_id not in self.charts['metric_correlations']:
-                    self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
                 data[dimension_id] = value * 100
+            else:
+                data[dimension_id] = 0
 
         return data
 
