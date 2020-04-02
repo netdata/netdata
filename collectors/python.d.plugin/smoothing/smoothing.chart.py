@@ -12,26 +12,23 @@ from bases.FrameworkServices.SimpleService import SimpleService
 priority = 1
 
 HOST_PORT = '127.0.0.1:19999'
-CHARTS_IN_SCOPE = ['system.cpu', 'system.load']
+CHARTS_IN_SCOPE = ['system.cpu', 'system.load', 'system.io']
 N = 5
 
-ORDER = [
-    'system.cpu',
-    'system.load',
-]
+ORDER = CHARTS_IN_SCOPE
 
-CHARTS = {
-    'system.cpu': {
-        'options': [None, 'system.cpu', f'system.cpu (ma{N})', 'cpu', 'system_cpu', 'line'],
-        'lines': [
-        ]
-    },
-    'system.load': {
-        'options': [None, 'system.load', f'system.load (ma{N})', 'load', 'system_load', 'line'],
-        'lines': [
-        ]
-    },
-}
+CHARTS = dict()
+for CHART_IN_SCOPE in CHARTS_IN_SCOPE:
+    CHARTS[CHART_IN_SCOPE] = {
+        'options': [
+            None,
+            CHART_IN_SCOPE,
+            f'{CHART_IN_SCOPE} (ma{N})',
+            CHART_IN_SCOPE.split('.')[-1],
+            CHART_IN_SCOPE.replace('.', '_'), 'line'
+        ],
+        'lines': []
+    }
 
 
 class Service(SimpleService):
@@ -75,20 +72,15 @@ class Service(SimpleService):
 
         self.append_data(self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
-        self.debug(f"self.data={self.data}")
         df = self.data_to_df(self.data)
         df = df.mean().to_frame().transpose()
-        self.debug(df.shape)
-        self.debug(df.head())
 
         data = dict()
 
         for col in df.columns:
-            self.debug(f"col={col}")
             parts = col.split('.')
             chart = '.'.join(parts[0:2])
             name = parts[-1]
-            self.debug(f"chart={chart}")
             if name not in self.charts[chart]:
                 self.charts[chart].add_dimension([name, name, 'absolute', 1, 1000])
             data[name] = df[col].values[0] * 1000
