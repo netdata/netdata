@@ -51,5 +51,7 @@ extern int health_silencers_json_read_callback(JSON_ENTRY *e);
 extern void health_silencers_add(SILENCER *silencer);
 extern SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
 extern int health_initialize_global_silencers();
+extern int helth_is_silencer_linked(SILENCER *test);
+extern void health_free_sielencer_pointers(SILENCER *t);
 
 #endif
