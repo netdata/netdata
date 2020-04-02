@@ -123,8 +123,8 @@ class Service(SimpleService):
             z = np.clip(z, -10.0, 10.0)
             self.debug(f'z={z}')
             if metric not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([metric, metric, 'absolute', 1, 10000])
-            data[metric] = z * 10000
+                self.charts['zscores'].add_dimension([metric, metric, 'absolute', 1, 100])
+            data[metric] = z * 100
 
 
         ## save results to data
