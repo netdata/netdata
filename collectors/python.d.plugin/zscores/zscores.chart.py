@@ -17,18 +17,22 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio',
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
-CHART_TYPES = {'stacked': ['system.cpu']}
 N = 100
 RECALC_EVERY = 50
 ZSCORE_CLIP = 10
 
 ORDER = [
     'zscores',
+    'zscores_3sigma'
 ]
 
 CHARTS = {
     'zscores': {
         'options': [None, 'Z Scores', 'name.chart', 'zscores', 'zscores.zscores', 'line'],
+        'lines': []
+    },
+    'zscores_3sigma': {
+        'options': [None, 'Z Scores >3 Sigma', 'name.chart', 'zscores', 'zscores.zscores_3sigma', 'stacked'],
         'lines': []
     },
 }
@@ -111,6 +115,7 @@ class Service(SimpleService):
         # process each metric and add to data
         for metric in data_latest.keys():
             metric_rev = '.'.join(reversed(metric.split('.')))
+            metric_rev_3sigma = f'{metric_rev}_3sigma'
             x = data_latest.get(metric, 0)
             mu = self.mean.get(metric, 0)
             sigma = self.sigma.get(metric, 0)
@@ -125,7 +130,10 @@ class Service(SimpleService):
             self.debug(f'z={z}')
             if metric_rev not in self.charts['zscores']:
                 self.charts['zscores'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
+            if metric_rev not in self.charts['zscores_3sigma']:
+                self.charts['zscores_3sigma'].add_dimension([metric_rev_3sigma, metric_rev_3sigma, 'absolute', 1, 1])
             data[metric_rev] = z * 100
+            data[metric_rev_3sigma] = 1 if abs(z) > 3 else 0
 
         # append latest data
         self.append_data(latest_observations)
