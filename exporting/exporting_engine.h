@@ -103,14 +103,38 @@ struct stats {
     collected_number chart_lost_metrics;
     collected_number chart_sent_metrics;
     collected_number chart_buffered_bytes;
-    collected_number chart_received_bytes;
-    collected_number chart_sent_bytes;
-    collected_number chart_receptions;
-    collected_number chart_transmission_successes;
-    collected_number chart_transmission_failures;
-    collected_number chart_data_lost_events;
     collected_number chart_lost_bytes;
+    collected_number chart_sent_bytes;
+    collected_number chart_received_bytes;
+    collected_number chart_transmission_successes;
+    collected_number chart_data_lost_events;
     collected_number chart_reconnects;
+    collected_number chart_transmission_failures;
+    collected_number chart_receptions;
+
+    int initialized;
+
+    RRDSET *st_metrics;
+    RRDDIM *rd_buffered_metrics;
+    RRDDIM *rd_lost_metrics;
+    RRDDIM *rd_sent_metrics;
+
+    RRDSET *st_bytes;
+    RRDDIM *rd_buffered_bytes;
+    RRDDIM *rd_lost_bytes;
+    RRDDIM *rd_sent_bytes;
+    RRDDIM *rd_received_bytes;
+
+    RRDSET *st_ops;
+    RRDDIM *rd_transmission_successes;
+    RRDDIM *rd_data_lost_events;
+    RRDDIM *rd_reconnects;
+    RRDDIM *rd_transmission_failures;
+    RRDDIM *rd_receptions;
+
+    RRDSET *st_rusage;
+    RRDDIM *rd_user;
+    RRDDIM *rd_system;
 };
 
 struct instance {
@@ -199,7 +223,9 @@ void simple_connector_receive_response(int *sock, struct instance *instance);
 void simple_connector_send_buffer(int *sock, int *failures, struct instance *instance);
 void simple_connector_worker(void *instance_p);
 
-int send_internal_metrics(struct engine *engine);
+void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
+void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
+void send_internal_metrics(struct instance *instance);
 
 #include "exporting/prometheus/prometheus.h"
 
