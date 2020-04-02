@@ -15,20 +15,25 @@ HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
+CHART_TYPES = {'stacked': ['system.cpu']}
 N = 5
 
 ORDER = CHARTS_IN_SCOPE
 
 CHARTS = dict()
 for CHART_IN_SCOPE in CHARTS_IN_SCOPE:
+    if CHART_IN_SCOPE in CHART_TYPES['stacked']:
+        chart_type = 'stacked'
+    else:
+        chart_type = 'line'
+    # set chart options
+    name = CHART_IN_SCOPE
+    title = CHART_IN_SCOPE
+    units = f'{CHART_IN_SCOPE} (ma{N})'
+    family = CHART_IN_SCOPE.split('.')[-1]
+    context = CHART_IN_SCOPE.replace('.', '_')
     CHARTS[CHART_IN_SCOPE] = {
-        'options': [
-            None,
-            CHART_IN_SCOPE,
-            f'{CHART_IN_SCOPE} (ma{N})',
-            CHART_IN_SCOPE.split('.')[-1],
-            CHART_IN_SCOPE.replace('.', '_'), 'line'
-        ],
+        'options': [name, title, units, family, context, chart_type],
         'lines': []
     }
 
