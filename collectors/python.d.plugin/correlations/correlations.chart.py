@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: zscores netdata python.d module
+# Description: correlations netdata python.d module
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
