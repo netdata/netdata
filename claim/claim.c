@@ -52,15 +52,7 @@ void claim_agent(char *claiming_arguments)
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
     FILE *fp;
 
-    char *cloud_base_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
-    char *cloud_base_port = NULL;
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-    if( aclk_decode_base_url(cloud_base_url, &cloud_base_hostname, &cloud_base_port))
-    {
-        error("Configuration error - cannot decode \"cloud base url\"");
-        return;
-    }
-
     const char *proxy_str;
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
