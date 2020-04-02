@@ -17,7 +17,7 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio',
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
-N = 100
+N = 500
 RECALC_EVERY = 50
 ZSCORE_CLIP = 10
 
