@@ -1477,6 +1477,7 @@ char *read_by_filename(char *filename, long *file_size)
     }
     if (fseek(f, 0, SEEK_SET) < 0) {
         fclose(f);
+        freez(contents);
         return NULL;
     }
     size_t res = fread(contents, 1, size, f);
