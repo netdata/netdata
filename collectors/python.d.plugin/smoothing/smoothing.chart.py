@@ -8,7 +8,7 @@ from random import SystemRandom
 import requests
 import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
-from ndutils.utils import get_allmetrics
+from bases.utils import get_allmetrics
 
 priority = 1
 

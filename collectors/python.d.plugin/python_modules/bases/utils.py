@@ -13,4 +13,3 @@ def get_allmetrics(host: str = None, charts: list = None) -> list:
             for dimension in dimensions:
                 data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
     return data
-
