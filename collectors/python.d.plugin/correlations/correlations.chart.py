@@ -18,7 +18,6 @@ CHARTS_IN_SCOPE = [
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
 N = 100
-CORRELATION_THOLD = 0.6
 
 ORDER = [
     'metric_correlations'
@@ -121,10 +120,7 @@ class Service(SimpleService):
             # drop any low correlation values
             if dimension_id not in self.charts['metric_correlations']:
                 self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
-            if abs(value) >= CORRELATION_THOLD:
-                data[dimension_id] = value * 100
-            else:
-                data[dimension_id] = 0
+            data[dimension_id] = value * 100
 
         return data
 
