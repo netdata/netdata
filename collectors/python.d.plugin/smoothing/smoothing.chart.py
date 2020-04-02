@@ -12,7 +12,7 @@ from bases.FrameworkServices.SimpleService import SimpleService
 priority = 1
 
 HOST_PORT = '127.0.0.1:19999'
-CHARTS_IN_SCOPE = ['system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.net', 'system.ip']
+CHARTS_IN_SCOPE = ['system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6']
 N = 5
 
 ORDER = CHARTS_IN_SCOPE
