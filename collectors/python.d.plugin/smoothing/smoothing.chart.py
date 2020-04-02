@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: example netdata python.d module
-# Author: Put your name here (your github login)
+# Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from random import SystemRandom
@@ -8,7 +8,6 @@ from random import SystemRandom
 import requests
 import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
-from bases.utils import get_allmetrics
 
 priority = 1
 
@@ -19,7 +18,6 @@ N = 5
 ORDER = [
     'system.cpu',
     'system.load',
-    'random'
 ]
 
 CHARTS = {
@@ -36,13 +34,6 @@ CHARTS = {
 }
 
 
-def data_to_df(data, mode='wide'):
-    df = pd.DataFrame([item for sublist in data for item in sublist], columns=['time', 'chart', 'variable', 'value'])
-    if mode == 'wide':
-        df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
-    return df
-
-
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -54,6 +45,28 @@ class Service(SimpleService):
     @staticmethod
     def check():
         return True
+
+    def get_allmetrics(self, host: str = '127.0.0.1:19999', charts: list = None) -> list:
+        if charts is None:
+            charts = ['system.cpu']
+        url = f'http://{host}/api/v1/allmetrics?format=json'
+        response = requests.get(url)
+        raw_data = response.json()
+        data = []
+        for k in raw_data:
+            if k in charts:
+                time = raw_data[k]['last_updated']
+                dimensions = raw_data[k]['dimensions']
+                for dimension in dimensions:
+                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+        return data
+
+    def data_to_df(data, mode='wide'):
+        df = pd.DataFrame([item for sublist in data for item in sublist],
+                          columns=['time', 'chart', 'variable', 'value'])
+        if mode == 'wide':
+            df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
+        return df
 
     def append_data(self, data):
         self.data.append(data)
