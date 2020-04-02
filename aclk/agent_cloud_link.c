@@ -167,6 +167,7 @@ static int create_private_key()
     fclose(f);
     if (bytes_read == 0) {
         info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
+        freez(private_key);
         return 1;
     }
 
