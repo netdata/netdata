@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-# Description: example netdata python.d module
+# Description: smoothing netdata python.d module
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from random import SystemRandom
 
 import requests
 import pandas as pd
@@ -45,7 +44,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.random = SystemRandom()
         self.data = []
 
     @staticmethod
