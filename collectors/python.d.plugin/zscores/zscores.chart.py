@@ -18,8 +18,9 @@ CHARTS_IN_SCOPE = [
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
 CHART_TYPES = {'stacked': ['system.cpu']}
-N = 50
-RECALC_EVERY = 5
+N = 100
+RECALC_EVERY = 50
+ZSCORE_CLIP = 10
 
 ORDER = [
     'zscores',
@@ -92,43 +93,41 @@ class Service(SimpleService):
         # empty dict to collect data points into
         data = dict()
 
-        # get data from allmetrics and append to self
+        # get latest data from allmetrics
         latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        df_latest = self.data_to_df([latest_observations]).mean().to_dict()
-        self.debug('df_latest')
-        self.debug(df_latest)
+        data_latest = self.data_to_df([latest_observations]).mean().to_dict()
 
         # limit size of data maintained to last n
         self.data = self.data[-N:]
 
+        # recalc if needed
         if self.runs_counter % RECALC_EVERY == 0:
             # pull data into a pandas df
             df_data = self.data_to_df(self.data)
-            # do calculations
+            # update mean and sigma
             self.mean = df_data.mean().to_dict()
             self.sigma = df_data.std().to_dict()
 
-        for metric in df_latest.keys():
+        # process each metric and add to data
+        for metric in data_latest.keys():
             metric_rev = '.'.join(reversed(metric.split('.')))
-            self.debug(metric)
-            self.debug(metric_rev)
-            x = df_latest.get(metric, 0)
+            x = data_latest.get(metric, 0)
             mu = self.mean.get(metric, 0)
             sigma = self.sigma.get(metric, 0)
-            self.debug(f'x={x}')
-            self.debug(f'mu={mu}')
-            self.debug(f'sigma={sigma}')
+            self.debug(f'metric={metric}, x={x}, mu={mu}, sigma={sigma}')
+            # calculate z score
             if sigma == 0:
                 z = 0
             else:
-                z = float((x - mu) / sigma)
-            z = np.clip(z, -10.0, 10.0)
+                z = (x - mu) / sigma
+            # clip z score
+            z = np.clip(z, -ZSCORE_CLIP, ZSCORE_CLIP)
             self.debug(f'z={z}')
             if metric_rev not in self.charts['zscores']:
                 self.charts['zscores'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
             data[metric_rev] = z * 100
 
-        # append data
+        # append latest data
         self.append_data(latest_observations)
 
         return data
