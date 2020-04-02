@@ -174,7 +174,7 @@ int configured_as_master() {
         uuid_t uuid;
 
         if (uuid_parse(section->name, uuid) != -1 &&
-            appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
+                appconfig_get_boolean_by_section(section, "enabled", 0)) {
             is_master = 1;
             break;
         }
