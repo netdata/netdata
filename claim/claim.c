@@ -110,27 +110,18 @@ void load_claiming_state(void)
     }
 
     char filename[FILENAME_MAX + 1];
-    struct stat statbuf;
-
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
 
-    // check if the file exists
-    if (lstat(filename, &statbuf) != 0) {
-        info("lstat on File '%s' failed reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
+    long bytes_read;
+    claimed_id = read_by_filename(filename, &bytes_read);
+    if (!claimed_id) {
+        info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
     }
 
-    FILE *f = fopen(filename, "rt");
-    if (unlikely(f == NULL)) {
-        error("File '%s' cannot be opened. Setting state to AGENT_UNCLAIMED.", filename);
-        return;
-    }
-
-    claimed_id = callocz(1, statbuf.st_size + 1);
-    size_t bytes_read = fread(claimed_id, 1, statbuf.st_size, f);
-    claimed_id[bytes_read] = 0;
-    fclose(f);
     if (bytes_read == 0) {
+        freez(claimed_id);
+        claimed_id = NULL;
         info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
         return;
     }

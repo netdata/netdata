@@ -278,6 +278,7 @@ extern void recursive_config_double_dir_load(
         , void *data
         , size_t depth
 );
+extern char *read_by_filename(char *filename, long *file_size);
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
