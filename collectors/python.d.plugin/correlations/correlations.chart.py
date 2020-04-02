@@ -25,7 +25,7 @@ ORDER = [
 
 CHARTS = {
     'metric_correlations': {
-        'options': [None, 'Metric Correlations', '(var1,var2)', 'correlations', 'correlations.correlations', 'stacked'],
+        'options': [None, 'Metric Correlations', '(var1,var2)', 'correlations', 'correlations.correlations', 'lines'],
         'lines': []
     },
 }
