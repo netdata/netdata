@@ -3,15 +3,22 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from random import SystemRandom, randint
-
-from bases.FrameworkServices.SimpleService import SimpleService
+from random import SystemRandom
 
 import requests
 import pandas as pd
-
+from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 2
+
+HOST_PORT = '127.0.0.1:19999'
+CHARTS_IN_SCOPE = [
+    'system.cpu', 'system.load', 'system.io', 'system.pgpgio',
+    'system.net', 'system.ip', 'system.ipv6', 'system.intr'
+]
+CHART_TYPES = {'stacked': ['system.cpu']}
+N = 100
+RECALC_EVERY = 50
 
 ORDER = [
     'zscores',
@@ -20,92 +27,119 @@ ORDER = [
 CHARTS = {
     'zscores': {
         'options': [None, 'Z Scores', 'value', 'zscores', 'zscores.zscores', 'line'],
-        'lines': [
-        ]
+        'lines': []
     },
 }
 
-
-HOST_PORT = '127.0.0.1:19999'
-AFTER = 50
-CHARTS_IN_SCOPE = [
-    'system.cpu', 'system.load', 'system.ram', 'system.io', 'system.pgpgio', 'system.net', 'system.ip', 'system.ipv6',
-    'system.processes', 'system.intr', 'system.forks', 'system.softnet_stat'
-]
-
-
-def get_raw_data(host: str = None, after: int = 500, charts: list = None) -> pd.DataFrame:
-
-    df = pd.DataFrame(columns=['time'])
-
-    # get all relevant data
-    for chart in charts:
-
-        # get data
-        url = f'http://{host}/api/v1/data?chart={chart}&after=-{after}&format=json'
-        response = requests.get(url)
-        response_json = response.json()
-        raw_data = response_json['data']
-
-        # create df
-        df_chart = pd.DataFrame(raw_data, columns=response_json['labels'])
-        df_chart = df_chart.rename(
-            columns={col: f'{chart}.{col}' for col in df_chart.columns[df_chart.columns != 'time']}
-        )
-        df = df.merge(df_chart, on='time', how='outer')
-
-    df = df.set_index('time')
-    df = df.ffill()
-
-    return df
-
-
-def process_data(self=None, df: pd.DataFrame = None) -> dict:
-
-    data = dict()
-
-    m = df.mean()
-    s = df.std(ddof=0)
-    # get zscore
-    df = (df - m) / s
-    df = df.tail(1).dropna(axis=1, how='all').clip(-10, 10)
-
-    for col in df.columns:
-        if self:
-            if col not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([col, None, 'absolute', 1, 1000])
-        data[col] = df[col].values[0] * 1000
-
-    return data
+## define charts based on whats in scope
+#CHARTS = dict()
+#for CHART_IN_SCOPE in CHARTS_IN_SCOPE:
+#    if CHART_IN_SCOPE in CHART_TYPES['stacked']:
+#        chart_type = 'stacked'
+#    else:
+#        chart_type = 'line'
+#    # set chart options
+#    name = CHART_IN_SCOPE
+#    title = CHART_IN_SCOPE
+#    units = f'{CHART_IN_SCOPE} (ma{N})'
+#    family = CHART_IN_SCOPE.split('.')[-1]
+#    context = CHART_IN_SCOPE.replace('.', '_')
+#    CHARTS[CHART_IN_SCOPE] = {
+#        'options': [name, title, units, family, context, chart_type],
+#        'lines': []
+#    }
 
 
 class Service(SimpleService):
-
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
+        self.data = []
+        self.mean = dict()
+        self.sigma = dict()
+
 
     @staticmethod
     def check():
         return True
 
+    @staticmethod
+    def get_allmetrics(host: str = '127.0.0.1:19999', charts: list = None) -> list:
+        """
+        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
+        :param host: host to pull data from <str>
+        :param charts: charts to filter to <list>
+        :return: list of lists where each element is a metric from allmetrics <list>
+        """
+        if charts is None:
+            charts = ['system.cpu']
+        url = f'http://{host}/api/v1/allmetrics?format=json'
+        raw_data = requests.get(url).json()
+        data = []
+        for k in raw_data:
+            if k in charts:
+                time = raw_data[k]['last_updated']
+                dimensions = raw_data[k]['dimensions']
+                for dimension in dimensions:
+                    # [time, chart, name, value]
+                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+        return data
+
+    @staticmethod
+    def data_to_df(data, mode='wide'):
+        """
+        Parses data list of list's from allmetrics and formats it as a pandas dataframe.
+        :param data: list of lists where each element is a metric from allmetrics <list>
+        :param mode: used to determine if we want pandas df to be long (row per metric) or wide (col per metric) format <str>
+        :return: pandas dataframe of the data <pd.DataFrame>
+        """
+        df = pd.DataFrame([item for sublist in data for item in sublist],
+                          columns=['time', 'chart', 'variable', 'value'])
+        if mode == 'wide':
+            df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
+        return df
+
+    def append_data(self, data):
+        self.data.append(data)
+
     def get_data(self):
 
-        df = get_raw_data(host=HOST_PORT, after=AFTER, charts=CHARTS_IN_SCOPE)
-        data = process_data(self, df)
+        # empty dict to collect data points into
+        data = dict()
+
+        # get data from allmetrics and append to self
+        self.append_data(self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+
+        # limit size of data maintained to last n
+        self.data = self.data[-N:]
+
+        if self.runs_counter % RECALC_EVERY == 0:
+            # pull data into a pandas df
+            df = self.data_to_df(self.data)
+            # do calculations
+            df_mean = df.mean().to_frame().transpose()
+            self.debug('df_mean')
+            self.debug(df_mean)
+            df_sigma = df.std().to_frame().transpose()
+            self.debug('df_sigma')
+            self.debug(df_sigma)
+
+        ## save results to data
+        #for col in df.columns:
+        #    parts = col.split('.')
+        #    chart, name = ('.'.join(parts[0:2]), parts[-1])
+        #    if name not in self.charts[chart]:
+        #        self.charts[chart].add_dimension([name, name, 'absolute', 1, 1000])
+        #    data[name] = df[col].values[0] * 1000
+
+        for i in range(1, 4):
+            dimension_id = ''.join(['random', str(i)])
+            if dimension_id not in self.charts['zscores']:
+                self.charts['zscores'].add_dimension([dimension_id])
+            data[dimension_id] = self.random.randint(0, 100)
 
         return data
 
 
-#%%
-
-#df = get_raw_data(host='london.my-netdata.io', after=AFTER, charts=CHARTS_IN_SCOPE)
-#data = process_data(df=df)
-#print(df)
-#print(data)
-
-#%%
-
-#%%
