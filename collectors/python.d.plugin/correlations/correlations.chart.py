@@ -18,6 +18,7 @@ CHARTS_IN_SCOPE = [
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
 N = 100
+CORRELATION_THOLD = 0.8
 
 ORDER = [
     'metric_correlations'
@@ -118,9 +119,11 @@ class Service(SimpleService):
         for col in df.columns:
             dimension_id = col.replace('system.', '').replace('__', ' , ')
             dimension_id = f'({dimension_id})'
-            if dimension_id not in self.charts['metric_correlations']:
-                self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
-            data[dimension_id] = df[col].values[0] * 100
+            value = df[col].values[0]
+            if abs(value) >= CORRELATION_THOLD:
+                if dimension_id not in self.charts['metric_correlations']:
+                    self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
+                data[dimension_id] = value * 100
 
         return data
 
