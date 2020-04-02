@@ -135,6 +135,4 @@ void load_claiming_state(void)
         return;
     }
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 }
