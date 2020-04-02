@@ -119,7 +119,7 @@ class Service(SimpleService):
             if sigma == 0:
                 z = 0
             else:
-                z = (x - mu) / sigma
+                z = float((x - mu) / sigma)
             z = np.clip(z, -10, 10)
             self.debug(f'z={z}')
             if metric not in self.charts['zscores']:
