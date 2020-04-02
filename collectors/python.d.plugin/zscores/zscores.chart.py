@@ -92,21 +92,20 @@ class Service(SimpleService):
         data = dict()
 
         # get data from allmetrics and append to self
-        self.append_data(self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+        latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        df_latest = self.data_to_df(latest_observations)
+        self.debug('df_latest')
+        self.debug(df_latest)
 
         # limit size of data maintained to last n
         self.data = self.data[-N:]
 
         if self.runs_counter % RECALC_EVERY == 0:
             # pull data into a pandas df
-            df = self.data_to_df(self.data)
+            df_data = self.data_to_df(self.data)
             # do calculations
-            df_mean = df.mean().to_dict()
-            self.debug('df_mean_dict')
-            self.debug(df_mean)
-            df_sigma = df.std().to_dict()
-            self.debug('df_sigma_dict')
-            self.debug(df_sigma)
+            self.mean = df_data.mean().to_dict()
+            self.sigma = df_data.std().to_dict()
 
         ## save results to data
         #for col in df.columns:
@@ -121,6 +120,9 @@ class Service(SimpleService):
             if dimension_id not in self.charts['zscores']:
                 self.charts['zscores'].add_dimension([dimension_id])
             data[dimension_id] = self.random.randint(0, 100)
+
+        # append data
+        self.append_data(latest_observations)
 
         return data
 
