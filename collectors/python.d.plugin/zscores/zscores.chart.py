@@ -109,10 +109,12 @@ class Service(SimpleService):
             self.sigma = df_data.std().to_dict()
 
         for metric in df_latest.keys():
+            metric_rev = '.'.join(reversed(metric.split('.')))
             self.debug(metric)
-            x = df_latest.get(metric,0)
-            mu = self.mean.get(metric,0)
-            sigma = self.sigma.get(metric,0)
+            self.debug(metric_rev)
+            x = df_latest.get(metric, 0)
+            mu = self.mean.get(metric, 0)
+            sigma = self.sigma.get(metric, 0)
             self.debug(f'x={x}')
             self.debug(f'mu={mu}')
             self.debug(f'sigma={sigma}')
@@ -122,24 +124,9 @@ class Service(SimpleService):
                 z = float((x - mu) / sigma)
             z = np.clip(z, -10.0, 10.0)
             self.debug(f'z={z}')
-            if metric not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([metric, metric, 'absolute', 1, 100])
-            data[metric] = z * 100
-
-
-        ## save results to data
-        #for col in df.columns:
-        #    parts = col.split('.')
-        #    chart, name = ('.'.join(parts[0:2]), parts[-1])
-        #    if name not in self.charts[chart]:
-        #        self.charts[chart].add_dimension([name, name, 'absolute', 1, 1000])
-        #    data[name] = df[col].values[0] * 1000
-
-        #for i in range(1, 4):
-        #    dimension_id = ''.join(['random', str(i)])
-        #    if dimension_id not in self.charts['zscores']:
-        #        self.charts['zscores'].add_dimension([dimension_id])
-        #    data[dimension_id] = self.random.randint(0, 100)
+            if metric_rev not in self.charts['zscores']:
+                self.charts['zscores'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
+            data[metric_rev] = z * 100
 
         # append data
         self.append_data(latest_observations)
