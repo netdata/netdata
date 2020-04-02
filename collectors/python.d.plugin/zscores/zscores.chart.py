@@ -27,7 +27,7 @@ ORDER = [
 
 CHARTS = {
     'zscores': {
-        'options': [None, 'Z Scores', 'value', 'zscores', 'zscores.zscores', 'line'],
+        'options': [None, 'Z Scores', 'name.chart', 'zscores', 'zscores.zscores', 'line'],
         'lines': []
     },
 }
