@@ -18,7 +18,7 @@ CHARTS_IN_SCOPE = [
     'system.net', 'system.ip', 'system.ipv6', 'system.intr'
 ]
 N = 100
-CORRELATION_THOLD = 0.8
+CORRELATION_THOLD = 0.7
 
 ORDER = [
     'metric_correlations'
