@@ -52,7 +52,8 @@ jobs:
             pre: 'apt-get update'
           - distro: 'debian:jessie'
             pre: >
-              echo "deb http://archive.debian.org/debian/ jessie-backports main contrib non-free" >> /etc/apt/sources.list.d/99-archived.list &&
+              echo "deb http://archive.debian.org/debian/ jessie-backports main contrib non-free"
+              >> /etc/apt/sources.list.d/99-archived.list &&
               apt-get update -o Acquire::Check-Valid-Until=false
 
           - distro: 'ubuntu:20.04'
