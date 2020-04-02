@@ -25,7 +25,7 @@ ORDER = [
 
 CHARTS = {
     'metric_correlations': {
-        'options': [None, 'Metric Correlations', 'name.chart', 'correlations', 'correlations.correlations', 'line'],
+        'options': [None, 'Metric Correlations', '(var1,var2)', 'correlations', 'correlations.correlations', 'line'],
         'lines': []
     },
 }
@@ -116,9 +116,11 @@ class Service(SimpleService):
 
         # add to chart data
         for col in df.columns:
-            if col not in self.charts['metric_correlations']:
-                self.charts['metric_correlations'].add_dimension([col, col, 'absolute', 1, 100])
-            data[col] = df[col].values[0] * 100
+            dimension_id = col.replace('system.', '').replace('__', ' , ')
+            dimension_id = f'({dimension_id})'
+            if dimension_id not in self.charts['metric_correlations']:
+                self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
+            data[dimension_id] = df[col].values[0] * 100
 
         return data
 
