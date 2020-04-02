@@ -93,7 +93,7 @@ class Service(SimpleService):
 
         # get data from allmetrics and append to self
         latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        df_latest = self.data_to_df([latest_observations])
+        df_latest = self.data_to_df([latest_observations]).mean().to_dict()
         self.debug('df_latest')
         self.debug(df_latest)
 
