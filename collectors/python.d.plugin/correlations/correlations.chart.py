@@ -102,6 +102,7 @@ class Service(SimpleService):
         # pull data into a pandas df
         df = self.data_to_df(self.data)
 
+        # get correlation matrix
         df = df.corr()
         df = df.rename_axis("var1", axis="index")
         df = df.rename_axis("var2", axis="columns")
@@ -111,15 +112,13 @@ class Service(SimpleService):
         df = df[['variable', 'value']]
         df['idx'] = 1
         df = df.pivot(index='idx', columns='variable', values='value')
-        self.debug('df')
-        self.debug(df.shape)
-        self.debug(df.head())
 
         # add to chart data
         for col in df.columns:
             dimension_id = col.replace('system.', '').replace('__', ' , ')
             dimension_id = f'({dimension_id})'
             value = df[col].values[0]
+            # drop any low correlation values
             if abs(value) >= CORRELATION_THOLD:
                 if dimension_id not in self.charts['metric_correlations']:
                     self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
