@@ -107,6 +107,13 @@ class Service(SimpleService):
             self.mean = df_data.mean().to_dict()
             self.sigma = df_data.std().to_dict()
 
+        for metric in df_latest.keys():
+            self.debug(metric)
+            self.debug(f'x={df_latest[metric]}')
+            self.debug(f'mean={self.mean[metric]}')
+            self.debug(f'sigma={self.sigma[metric]}')
+
+
         ## save results to data
         #for col in df.columns:
         #    parts = col.split('.')
