@@ -114,35 +114,11 @@ class Service(SimpleService):
         self.debug(df.shape)
         self.debug(df.head())
 
-        for i in range(1, 4):
-            dimension_id = ''.join(['random', str(i)])
-            if dimension_id not in self.charts['metric_correlations']:
-                self.charts['metric_correlations'].add_dimension([dimension_id])
-            data[dimension_id] = self.random.randint(0, 100)
-
-        ## process each metric and add to data
-        #for metric in data_latest.keys():
-        #    metric_rev = '.'.join(reversed(metric.split('.')))
-        #    metric_rev_3sigma = f'{metric_rev}_3sigma'
-        #    x = data_latest.get(metric, 0)
-        #    mu = self.mean.get(metric, 0)
-        #    sigma = self.sigma.get(metric, 0)
-        #    self.debug(f'metric={metric}, x={x}, mu={mu}, sigma={sigma}')
-        #    # calculate z score
-        #    if sigma == 0:
-        #        z = 0
-        #    else:
-        #        z = (x - mu) / sigma
-        #    # clip z score
-        #    z = np.clip(z, -ZSCORE_CLIP, ZSCORE_CLIP)
-        #    self.debug(f'z={z}')
-        #    if metric_rev not in self.charts['zscores']:
-        #        self.charts['zscores'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
-        #    if metric_rev_3sigma not in self.charts['zscores_3sigma']:
-        #        self.charts['zscores_3sigma'].add_dimension([metric_rev_3sigma, metric_rev_3sigma, 'absolute', 1, 1])
-        #    data[metric_rev] = z * 100
-        #    data[metric_rev_3sigma] = 1 if abs(z) > 3 else 0
-
+        # add to chart data
+        for col in df.columns:
+            if col not in self.charts['metric_correlations']:
+                self.charts['metric_correlations'].add_dimension([col, col, 'absolute', 1, 100])
+            data[col] = df[col].values[0] * 100
 
         return data
 
