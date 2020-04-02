@@ -6,7 +6,7 @@
 from random import SystemRandom
 
 import requests
-impoer numpy as np
+import numpy as np
 import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
 
