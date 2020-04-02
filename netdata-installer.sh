@@ -193,7 +193,8 @@ USAGE: ${PROGRAM} [options]
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
-  --disable-cloud            Disable all cloud functionality.
+  --disable-cloud            Disable all Netdata Cloud functionality.
+  --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -280,8 +281,20 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
-      NETDATA_DISABLE_CLOUD=1
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+        echo "Cloud explicitly enabled, ignoring --disable-cloud."
+      else
+        NETDATA_DISABLE_CLOUD=1
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
+      fi
+      ;;
+    "--require-cloud")
+      if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+        echo "Cloud explicitly disabled, ignoring --require-cloud."
+      else
+        NETDATA_REQUIRE_CLOUD=1
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-cloud/} --enable-cloud"
+      fi
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
@@ -502,12 +515,20 @@ bundle_libmosquitto() {
     then
       run_ok "libmosquitto built and prepared."
     else
-      run_failed "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
-      defer_error_highlighted "Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+      run_failed "Failed to build libmosquitto."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+        exit 1
+      else
+        defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
+      fi
     fi
   else
-    run_failed "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
-    defer_error_highlighted "Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud."
+    run_failed "Unable to fetch sources for libmosquitto."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
+    fi
   fi
 }
 
@@ -562,12 +583,20 @@ bundle_libwebsockets() {
     then
       run_ok "libwebsockets built and prepared."
     else
-      run_failed "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-      defer_error_highlighted "Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+      run_failed "Failed to build libwebsockets."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
+      fi
     fi
   else
-    run_failed "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-    defer_error_highlighted "Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    run_failed "Unable to fetch sources for libwebsockets."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
+    fi
   fi
 }
 

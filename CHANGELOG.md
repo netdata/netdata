@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix regressions in cloud functionality \(build, CI, claiming\) [\#8568](https://github.com/netdata/netdata/pull/8568) ([underhood](https://github.com/underhood))
 - Added logic to bail early on LWS build if cmake is not present. [\#8559](https://github.com/netdata/netdata/pull/8559) ([Ferroin](https://github.com/Ferroin))
 - Fix broken pipe ignoring in apps plugin [\#8554](https://github.com/netdata/netdata/pull/8554) ([vlvkobal](https://github.com/vlvkobal))
 - dashboard v0.4.10 [\#8553](https://github.com/netdata/netdata/pull/8553) ([jacekkolasa](https://github.com/jacekkolasa))
+- Update README.md [\#8552](https://github.com/netdata/netdata/pull/8552) ([bceylan](https://github.com/bceylan))
+- github/workflow: remove duplicate key \(`line-length`\) from the yamlli… [\#8551](https://github.com/netdata/netdata/pull/8551) ([ilyam8](https://github.com/ilyam8))
 - apache: fix `bytespersec` chart context [\#8550](https://github.com/netdata/netdata/pull/8550) ([ilyam8](https://github.com/ilyam8))
 - Add missing override for Ubuntu eoan [\#8547](https://github.com/netdata/netdata/pull/8547) ([prologic](https://github.com/prologic))
 - Switching over to soft feature flag [\#8545](https://github.com/netdata/netdata/pull/8545) ([amoss](https://github.com/amoss))
@@ -130,12 +133,9 @@
 - Fix RHEL / CentOS 8.x dependencies for Judy-devel and others [\#8202](https://github.com/netdata/netdata/pull/8202) ([prologic](https://github.com/prologic))
 - Remvoed the use of clang-format that does not actually block PRs or surface anything to developers \#8188 [\#8196](https://github.com/netdata/netdata/pull/8196) ([prologic](https://github.com/prologic))
 - Add support to new kernels [\#8192](https://github.com/netdata/netdata/pull/8192) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add an AWS Kinesis connector to the exporting engine [\#8145](https://github.com/netdata/netdata/pull/8145) ([vlvkobal](https://github.com/vlvkobal))
-- Added libwebsockets bundling code to netdata-installer.sh [\#8144](https://github.com/netdata/netdata/pull/8144) ([Ferroin](https://github.com/Ferroin))
 - Added connections \(backend\) usage to postgres monitoring [\#8126](https://github.com/netdata/netdata/pull/8126) ([ManuelPombo](https://github.com/ManuelPombo))
 - Cleans up CODEOWNERS for the build system itself \(not to be confused with packaging\) [\#8098](https://github.com/netdata/netdata/pull/8098) ([prologic](https://github.com/prologic))
 - added requirements for exim. Issue \#8087 [\#8096](https://github.com/netdata/netdata/pull/8096) ([petarkozic](https://github.com/petarkozic))
-- Removed tmem stat collection from xenstat plugin for Xen 4.13 [\#7951](https://github.com/netdata/netdata/pull/7951) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
@@ -218,11 +218,6 @@
 - health\_doc\_name: Clarify the rules to create an alarm name [\#7911](https://github.com/netdata/netdata/pull/7911) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
 - ACLK agent 1 [\#7894](https://github.com/netdata/netdata/pull/7894) ([stelfrag](https://github.com/stelfrag))
-- Adds docs for how to build/install NetData on CentOS 8.x [\#7890](https://github.com/netdata/netdata/pull/7890) ([prologic](https://github.com/prologic))
-- Clarify editing health config files in health quickstart [\#7883](https://github.com/netdata/netdata/pull/7883) ([joelhans](https://github.com/joelhans))
-- installer: include go.d.plugin version v0.15.0 [\#7882](https://github.com/netdata/netdata/pull/7882) ([ilyam8](https://github.com/ilyam8))
-- Missing extern [\#7877](https://github.com/netdata/netdata/pull/7877) ([thiagoftsm](https://github.com/thiagoftsm))
-- collectors/python.d/phpfpm: fix readme and per process chart titles [\#7876](https://github.com/netdata/netdata/pull/7876) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

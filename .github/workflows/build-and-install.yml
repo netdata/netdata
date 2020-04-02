@@ -18,7 +18,6 @@ jobs:
           - 'archlinux:latest'
           - 'centos:8'
           - 'centos:7'
-          - 'centos:6'
           - 'debian:bullseye'
           - 'debian:buster'
           - 'debian:stretch'
@@ -75,10 +74,13 @@ jobs:
           PRE: ${{ matrix.pre }}
         run: |
           echo $PRE > ./prep-cmd.sh
-          docker build . -f .github/dockerfiles/Dockerfile.build_test -t build_test --build-arg BASE=${{ matrix.distro }}
+          docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
       - name: Regular build on ${{ matrix.distro }}
         run: |
-          docker run --rm -e PRE -w /netdata build_test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+          docker run -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}
         run: |
-          docker run --rm -e PRE -w /netdata build_test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it'
+          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+      - name: netdata-installer on ${{ matrix.distro }}
+        run: |
+          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
