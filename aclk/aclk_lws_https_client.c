@@ -176,6 +176,7 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
     context = lws_create_context(&info);
     if (!context) {
         error("Error creating LWS context");
+        freez(data);
         return 1;
     }
 

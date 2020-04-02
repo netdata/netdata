@@ -153,10 +153,6 @@ static int create_private_key()
         error("Claimed agent cannot establish ACLK - private key not found '%s' failed.", filename);
         return 1;
     }
-    if (unlikely(statbuf.st_size == 0)) {
-        info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
-        return 1;
-    }
 
     FILE *f = fopen(filename, "rt");
     if (unlikely(f == NULL)) {
@@ -169,6 +165,10 @@ static int create_private_key()
     private_key[bytes_read] = 0;
     debug(D_ACLK, "Claimed agent loaded private key len=%zu bytes", bytes_read);
     fclose(f);
+    if (bytes_read == 0) {
+        info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
+        return 1;
+    }
 
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {
