@@ -109,9 +109,9 @@ class Service(SimpleService):
 
         for metric in df_latest.keys():
             self.debug(metric)
-            self.debug(f'x={df_latest[metric]}')
-            self.debug(f'mean={self.mean[metric]}')
-            self.debug(f'sigma={self.sigma[metric]}')
+            self.debug(f'x={df_latest.get(metric,0)}')
+            self.debug(f'mean={self.mean.get(metric,0)}')
+            self.debug(f'sigma={self.sigma.get(metric,0)}')
 
 
         ## save results to data
