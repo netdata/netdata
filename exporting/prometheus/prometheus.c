@@ -655,9 +655,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     } else {
                         // we need average or sum of the data
 
-                        time_t first_t = instance->after;
-                        time_t last_t = instance->before;
-                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+                        time_t first_time = instance->after;
+                        time_t last_time = instance->before;
+                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_time);
 
                         if (!isnan(value) && !isinf(value)) {
                             if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
@@ -680,8 +680,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     suffix,
                                     (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
                                     st->units,
-                                    (unsigned long long)first_t,
-                                    (unsigned long long)last_t);
+                                    (unsigned long long)first_time,
+                                    (unsigned long long)last_time);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
@@ -700,7 +700,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     dimension,
                                     labels,
                                     value,
-                                    last_t * MSEC_PER_SEC);
+                                    last_time * MSEC_PER_SEC);
                             else
                                 buffer_sprintf(
                                     wb,
