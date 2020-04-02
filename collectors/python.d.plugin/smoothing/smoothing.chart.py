@@ -91,6 +91,8 @@ class Service(SimpleService):
 
     def get_data(self):
 
+        self.debug(f"runs_counter={self.runs_counter}")
+
         # empty dict to collect data points into
         data = dict()
 
