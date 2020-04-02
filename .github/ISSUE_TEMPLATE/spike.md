@@ -1,5 +1,8 @@
 ### Questions To Investigate
 
+Please explain the area that will be investigated during the spike with concrete
+questions that will answered.
+
 ### Expected Outcome
 
 - [ ] Implementation Issues
