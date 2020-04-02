@@ -61,7 +61,7 @@ class Service(SimpleService):
                     data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
         return data
 
-    def data_to_df(data, mode='wide'):
+    def data_to_df(self, data, mode='wide'):
         df = pd.DataFrame([item for sublist in data for item in sublist],
                           columns=['time', 'chart', 'variable', 'value'])
         if mode == 'wide':
@@ -73,10 +73,10 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        self.append_data(get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
+        self.append_data(self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE))
         self.data = self.data[-N:]
         self.debug(f"self.data={self.data}")
-        df = data_to_df(self.data)
+        df = self.data_to_df(self.data)
         df = df.mean().to_frame().transpose()
         self.debug(df.shape)
         self.debug(df.head())
