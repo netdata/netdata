@@ -130,7 +130,7 @@ class Service(SimpleService):
             self.debug(f'z={z}')
             if metric_rev not in self.charts['zscores']:
                 self.charts['zscores'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
-            if metric_rev not in self.charts['zscores_3sigma']:
+            if metric_rev_3sigma not in self.charts['zscores_3sigma']:
                 self.charts['zscores_3sigma'].add_dimension([metric_rev_3sigma, metric_rev_3sigma, 'absolute', 1, 1])
             data[metric_rev] = z * 100
             data[metric_rev_3sigma] = 1 if abs(z) > 3 else 0
