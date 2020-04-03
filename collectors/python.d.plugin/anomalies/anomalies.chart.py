@@ -124,7 +124,7 @@ class Service(SimpleService):
 
         if 'cpu_score' not in self.charts['anomaly_score']:
             self.charts['anomaly_score'].add_dimension(['cpu_score', 'cpu_score', 'absolute', 1, 100])
-        if 'cpu_flag' not in self.charts['anomaly_score']:
+        if 'cpu_flag' not in self.charts['anomaly_flag']:
             self.charts['anomaly_flag'].add_dimension(['cpu_flag', 'cpu_flag', 'absolute', 1, 100])
         data['cpu_score'] = anomaly_score
         data['cpu_flag'] = anomaly_flag
