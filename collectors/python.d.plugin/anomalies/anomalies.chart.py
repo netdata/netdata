@@ -114,15 +114,20 @@ class Service(SimpleService):
             # refit the model
             model.fit(df_data.values)
 
-        pred = model.predict(data_latest.values)
-        scores = model.decision_function(data_latest.values)
+        # get anomaly score and flag
+        if hasattr(model, "decision_scores_"):
+            anomaly_flag = model.predict(data_latest.values)[-1]
+            anomaly_score = model.decision_function(data_latest.values)[-1]
+        else:
+            anomaly_flag = 0
+            anomaly_score = 0
 
         if 'cpu_score' not in self.charts['anomaly_score']:
             self.charts['anomaly_score'].add_dimension(['cpu_score', 'cpu_score', 'absolute', 1, 100])
         if 'cpu_flag' not in self.charts['anomaly_score']:
             self.charts['anomaly_flag'].add_dimension(['cpu_flag', 'cpu_flag', 'absolute', 1, 100])
-        data['cpu_score'] = scores[-1]
-        data['cpu_flag'] = pred[-1]
+        data['cpu_score'] = anomaly_score
+        data['cpu_flag'] = anomaly_flag
 
         # append latest data
         self.append_data(latest_observations)
