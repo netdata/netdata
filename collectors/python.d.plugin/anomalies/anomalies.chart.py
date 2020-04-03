@@ -151,20 +151,21 @@ class Service(SimpleService):
 
             else:
                 anomaly_flag = 0
-                anomaly_prob = 0
                 anomaly_score = 0
+                if self.model_config['predict_proba']:
+                    anomaly_prob = 0
 
             if chart_score not in self.charts['anomaly_score']:
                 self.charts['anomaly_score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
-            if self.model_config['predict_proba']:
-                if chart_prob not in self.charts['anomaly_probability']:
-                    self.charts['anomaly_probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
             if chart_flag not in self.charts['anomaly_flag']:
                 self.charts['anomaly_flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
             data[chart_score] = anomaly_score * 100
-            if self.model_config['predict_proba']:
-                data[chart_prob] = anomaly_prob * 100
             data[chart_flag] = anomaly_flag
+
+            if self.model_config['predict_proba']:
+                if chart_prob not in self.charts['anomaly_probability']:
+                    self.charts['anomaly_probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
+                data[chart_prob] = anomaly_prob * 100
 
         # append latest data
         self.append_data(latest_observations)
