@@ -31,7 +31,7 @@ CHARTS = {
         'lines': []
     },
     'anomaly_flag': {
-        'options': [None, 'Anomaly Flag', 'name.chart', 'anomaly_flag', 'anomalies.anomalies', 'line'],
+        'options': [None, 'Anomaly Flag', 'name.chart', 'anomaly_flag', 'anomalies.anomalies', 'stacked'],
         'lines': []
     },
 }
