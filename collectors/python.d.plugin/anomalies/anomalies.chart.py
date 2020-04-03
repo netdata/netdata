@@ -11,13 +11,13 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
 
-HOST_PORT = '127.0.0.1:19999'
+HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-N = 60*30
-REFIT_EVERY = 60*5
+TRAIN_MAX_N = 100
+FIT_EVERY = 10
 MODEL_CONFIG = {'type': 'hbos', 'kwargs': {'contamination': 0.001}}
 
 ORDER = [
@@ -44,32 +44,16 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.data = []
         self.models = dict()
+        self.charts_in_scope = CHARTS_IN_SCOPE
+        self.model_config = MODEL_CONFIG
+        self.fit_every = FIT_EVERY
+        self.train_max_n = TRAIN_MAX_N
+        self.host = HOST
+
 
     @staticmethod
     def check():
         return True
-
-    @staticmethod
-    def get_allmetrics(host: str = '127.0.0.1:19999', charts: list = None) -> list:
-        """
-        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
-        :param host: host to pull data from <str>
-        :param charts: charts to filter to <list>
-        :return: list of lists where each element is a metric from allmetrics <list>
-        """
-        if charts is None:
-            charts = ['system.cpu']
-        url = f'http://{host}/api/v1/allmetrics?format=json'
-        raw_data = requests.get(url).json()
-        data = []
-        for k in raw_data:
-            if k in charts:
-                time = raw_data[k]['last_updated']
-                dimensions = raw_data[k]['dimensions']
-                for dimension in dimensions:
-                    # [time, chart, name, value]
-                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
-        return data
 
     @staticmethod
     def data_to_df(data: list, mode: str = 'wide', charts: list = None) -> pd.DataFrame:
@@ -89,6 +73,27 @@ class Service(SimpleService):
             df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
         return df
 
+    def get_allmetrics(self) -> list:
+        """
+        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
+        :param host: host to pull data from <str>
+        :param charts: charts to filter to <list>
+        :return: list of lists where each element is a metric from allmetrics <list>
+        """
+        if self.charts_in_scope is None:
+            self.charts_in_scope = ['system.cpu']
+        url = f'http://{self.host}/api/v1/allmetrics?format=json'
+        raw_data = requests.get(url).json()
+        data = []
+        for k in raw_data:
+            if k in self.charts_in_scope:
+                time = raw_data[k]['last_updated']
+                dimensions = raw_data[k]['dimensions']
+                for dimension in dimensions:
+                    # [time, chart, name, value]
+                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+        return data
+
     def append_data(self, data):
         self.data.append(data)
 
@@ -98,12 +103,9 @@ class Service(SimpleService):
         data = dict()
 
         # get latest data from allmetrics
-        latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        latest_observations = self.get_allmetrics()
 
-        # limit size of data maintained to last n
-        self.data = self.data[-N:]
-
-        for chart in CHARTS_IN_SCOPE:
+        for chart in self.charts_in_scope:
 
             self.debug(f"chart={chart}")
 
@@ -111,14 +113,14 @@ class Service(SimpleService):
             self.debug(f'data_latest={data_latest}')
 
             if chart not in self.models:
-                if MODEL_CONFIG['type'] == 'hbos':
-                    self.models[chart] = HBOS(**MODEL_CONFIG['kwargs'])
+                if self.model_config['type'] == 'hbos':
+                    self.models[chart] = HBOS(**self.model_config['kwargs'])
 
             chart_score = f"{chart.replace('system.','')}_score"
             chart_flag = f"{chart.replace('system.','')}_flag"
 
             # recalc if needed
-            if self.runs_counter % REFIT_EVERY == 0:
+            if self.runs_counter % self.fit_every == 0:
                 # pull data into a pandas df
                 df_data = self.data_to_df(self.data, charts=[chart])
                 # refit the model
@@ -145,6 +147,8 @@ class Service(SimpleService):
 
         # append latest data
         self.append_data(latest_observations)
+        # limit size of data maintained to last n
+        self.data = self.data[-self.train_max_n:]
 
         return data
 
