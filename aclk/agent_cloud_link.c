@@ -155,13 +155,7 @@ static int create_private_key()
         error("Claimed agent cannot establish ACLK - unable to load private key '%s' failed.", filename);
         return 1;
     }
-
     debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
-    if (bytes_read == 0) {
-        info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
-        freez(private_key);
-        return 1;
-    }
 
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {

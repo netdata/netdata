@@ -119,11 +119,5 @@ void load_claiming_state(void)
         return;
     }
 
-    if (bytes_read == 0) {
-        freez(claimed_id);
-        claimed_id = NULL;
-        info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
-        return;
-    }
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
 }
