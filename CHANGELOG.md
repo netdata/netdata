@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix broken Fedora 30/31 RPM builds [\#8572](https://github.com/netdata/netdata/pull/8572) ([prologic](https://github.com/prologic))
 - Fix regressions in cloud functionality \(build, CI, claiming\) [\#8568](https://github.com/netdata/netdata/pull/8568) ([underhood](https://github.com/underhood))
 - Added logic to bail early on LWS build if cmake is not present. [\#8559](https://github.com/netdata/netdata/pull/8559) ([Ferroin](https://github.com/Ferroin))
 - Fix broken pipe ignoring in apps plugin [\#8554](https://github.com/netdata/netdata/pull/8554) ([vlvkobal](https://github.com/vlvkobal))
@@ -128,11 +129,9 @@
 - packaging/installer: fix bundle\_libwebsockets [\#8219](https://github.com/netdata/netdata/pull/8219) ([ilyam8](https://github.com/ilyam8))
 - Enconde slave fields [\#8216](https://github.com/netdata/netdata/pull/8216) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove the confusion around the multiple Dockerfile\(s\) we have [\#8214](https://github.com/netdata/netdata/pull/8214) ([prologic](https://github.com/prologic))
-- fixed typo [\#8213](https://github.com/netdata/netdata/pull/8213) ([shortpatti](https://github.com/shortpatti))
 - Retry transient failures from our lifecycle tests on Travis CI [\#8203](https://github.com/netdata/netdata/pull/8203) ([prologic](https://github.com/prologic))
 - Fix RHEL / CentOS 8.x dependencies for Judy-devel and others [\#8202](https://github.com/netdata/netdata/pull/8202) ([prologic](https://github.com/prologic))
 - Remvoed the use of clang-format that does not actually block PRs or surface anything to developers \#8188 [\#8196](https://github.com/netdata/netdata/pull/8196) ([prologic](https://github.com/prologic))
-- Add support to new kernels [\#8192](https://github.com/netdata/netdata/pull/8192) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added connections \(backend\) usage to postgres monitoring [\#8126](https://github.com/netdata/netdata/pull/8126) ([ManuelPombo](https://github.com/ManuelPombo))
 - Cleans up CODEOWNERS for the build system itself \(not to be confused with packaging\) [\#8098](https://github.com/netdata/netdata/pull/8098) ([prologic](https://github.com/prologic))
 - added requirements for exim. Issue \#8087 [\#8096](https://github.com/netdata/netdata/pull/8096) ([petarkozic](https://github.com/petarkozic))
@@ -217,7 +216,6 @@
 - Add doc with post-install instructions for GCP [\#7912](https://github.com/netdata/netdata/pull/7912) ([joelhans](https://github.com/joelhans))
 - health\_doc\_name: Clarify the rules to create an alarm name [\#7911](https://github.com/netdata/netdata/pull/7911) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
-- ACLK agent 1 [\#7894](https://github.com/netdata/netdata/pull/7894) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
