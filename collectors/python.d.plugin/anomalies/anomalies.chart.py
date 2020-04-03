@@ -28,11 +28,11 @@ ORDER = [
 
 CHARTS = {
     'anomaly_score': {
-        'options': [None, 'Anomaly Scores', 'name.chart', 'anomaly_scores', 'anomalies.scores', 'line'],
+        'options': ['anomaly_score_testing', 'Anomaly Scores', 'Anomaly Score', 'anomaly_scores', 'anomalies.scores', 'line'],
         'lines': []
     },
     'anomaly_flag': {
-        'options': [None, 'Anomaly Flag', 'name.chart', 'anomaly_flag', 'anomalies.anomalies', 'stacked'],
+        'options': [None, 'Anomaly Flag', 'Anomaly Flag', 'anomaly_flag', 'anomalies.anomalies', 'stacked'],
         'lines': []
     },
 }
