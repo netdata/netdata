@@ -329,7 +329,6 @@ jobs:
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
       env:
-        - CFLAGS="-fPIC"
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
@@ -338,7 +337,6 @@ jobs:
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
       env:
-        - CFLAGS="-fPIC"
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="30" BUILD_STRING="fedora/30"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
