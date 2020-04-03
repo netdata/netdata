@@ -17,7 +17,7 @@ HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu'
 ]
-N = 500
+N = 100
 REFIT_EVERY = 50
 CONTAMINATION = 0.01
 
