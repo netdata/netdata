@@ -22,12 +22,17 @@ MODEL_CONFIG = {'type': 'hbos', 'kwargs': {'contamination': 0.001}}
 
 ORDER = [
     'anomaly_score',
+    'anomaly_prob',
     'anomaly_flag'
 ]
 
 CHARTS = {
     'anomaly_score': {
         'options': [None, 'Anomaly Scores', 'Anomaly Score', 'anomaly_scores', 'anomalies.scores', 'line'],
+        'lines': []
+    },
+    'anomaly_probabilities': {
+        'options': [None, 'Anomaly Probability', 'Anomaly Probability', 'anomaly_probabilities', 'anomalies.probabilities', 'line'],
         'lines': []
     },
     'anomaly_flag': {
@@ -117,6 +122,7 @@ class Service(SimpleService):
                     self.models[chart] = HBOS(**self.model_config['kwargs'])
 
             chart_score = f"{chart.replace('system.','')}_score"
+            chart_prob = f"{chart.replace('system.', '')}_prob"
             chart_flag = f"{chart.replace('system.','')}_flag"
 
             # refit if needed
@@ -131,18 +137,24 @@ class Service(SimpleService):
                 X = data_latest.values
                 anomaly_flag = self.models[chart].predict(X)[-1]
                 anomaly_score = self.models[chart].decision_function(X)[-1]
+                anomaly_prob = self.models[chart].predict_proba(X)[-1]
                 self.debug(f'X={X}')
                 self.debug(f'anomaly_score={anomaly_score}')
+                self.debug(f'anomaly_prob={anomaly_prob}')
                 self.debug(f'anomaly_flag={anomaly_flag}')
             else:
                 anomaly_flag = 0
+                anomaly_prob = 0
                 anomaly_score = 0
 
             if chart_score not in self.charts['anomaly_score']:
                 self.charts['anomaly_score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
+            if chart_prob not in self.charts['anomaly_probabilities']:
+                self.charts['anomaly_probabilities'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
             if chart_flag not in self.charts['anomaly_flag']:
                 self.charts['anomaly_flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
             data[chart_score] = anomaly_score * 100
+            data[chart_prob] = anomaly_prob * 100
             data[chart_flag] = anomaly_flag
 
         # append latest data
