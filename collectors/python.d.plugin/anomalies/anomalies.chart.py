@@ -96,7 +96,8 @@ class Service(SimpleService):
 
         # get latest data from allmetrics
         latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        data_latest = self.data_to_df([latest_observations]).mean().to_dict()
+        data_latest = self.data_to_df([latest_observations]).mean().to_frame().transpose()
+        self.debug(f'data_latest={data_latest}')
 
         # limit size of data maintained to last n
         self.data = self.data[-N:]
