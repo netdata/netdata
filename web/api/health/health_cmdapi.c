@@ -16,8 +16,17 @@ void free_silencers(SILENCER *t) {
     if (t->next) free_silencers(t->next);
     debug(D_HEALTH, "HEALTH command API: Freeing silencer %s:%s:%s:%s:%s", t->alarms,
           t->charts, t->contexts, t->hosts, t->families);
-
-    health_free_sielencer_pointers(t);
+    simple_pattern_free(t->alarms_pattern);
+    simple_pattern_free(t->charts_pattern);
+    simple_pattern_free(t->contexts_pattern);
+    simple_pattern_free(t->hosts_pattern);
+    simple_pattern_free(t->families_pattern);
+    freez(t->alarms);
+    freez(t->charts);
+    freez(t->contexts);
+    freez(t->hosts);
+    freez(t->families);
+    freez(t);
     return;
 }
 

@@ -100,44 +100,6 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
 }
 
 /**
- * Is SILENCER linked?
- *
- * Check whether the SILENCER is linked
- *
- * @param test is the silencer pointer
- *
- * @return It returns 1 case it is linked and 0 otherwise
- */
-int helth_is_silencer_linked(SILENCER *test) {
-    SILENCER *silencer;
-    for(silencer = silencers->silencers; silencer ; silencer = silencer->next) {
-        if (test == silencer)
-            return 1;
-    }
-
-    return 0;
-}
-
-/**
- * Free Silencer pointers
- *
- * This function cleans the silencer pointers and the SILENCER itself.
- */
-void health_free_sielencer_pointers(SILENCER *t) {
-    simple_pattern_free(t->alarms_pattern);
-    simple_pattern_free(t->charts_pattern);
-    simple_pattern_free(t->contexts_pattern);
-    simple_pattern_free(t->hosts_pattern);
-    simple_pattern_free(t->families_pattern);
-    freez(t->alarms);
-    freez(t->charts);
-    freez(t->contexts);
-    freez(t->hosts);
-    freez(t->families);
-    freez(t);
-}
-
-/**
  * JSON Read Callback
  *
  * Callback called by netdata to create the silencer.
@@ -176,13 +138,8 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
                 else if (!strcmp(e->data.string,"DISABLE")) silencers->stype = STYPE_DISABLE_ALARMS;
             } else {
                 debug(D_HEALTH, "JSON: Adding %s=%s", e->name, e->data.string);
-                SILENCER *silencer = health_silencers_addparam(e->callback_data, e->name, e->data.string);
-                if(silencer) {
-                   if (!helth_is_silencer_linked(silencer))
-                       health_silencers_add(silencer);
-                   else
-                       health_free_sielencer_pointers(silencer);
-                }
+                if (e->callback_data)
+                    (void)health_silencers_addparam(e->callback_data, e->name, e->data.string);
             }
             break;
 
