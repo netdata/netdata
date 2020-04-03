@@ -50,6 +50,6 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpmdev
 
 # Run the build process on the container
 print("Starting RPM build process")
-common.run_command(container, ["sudo", "-E", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
 
 print('Done!')
