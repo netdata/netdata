@@ -3,7 +3,6 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from random import SystemRandom
 
 import requests
 import numpy as np
@@ -43,10 +42,8 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.random = SystemRandom()
         self.data = []
-        self.mean = dict()
-        self.sigma = dict()
+        self.model = HBOS(contamination=CONTAMINATION)
 
 
     @staticmethod
@@ -97,9 +94,6 @@ class Service(SimpleService):
         # empty dict to collect data points into
         data = dict()
 
-        # define model
-        model = HBOS(contamination=CONTAMINATION)
-
         # get latest data from allmetrics
         latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
         data_latest = self.data_to_df([latest_observations]).mean().to_dict()
@@ -112,12 +106,16 @@ class Service(SimpleService):
             # pull data into a pandas df
             df_data = self.data_to_df(self.data)
             # refit the model
-            model.fit(df_data.values)
+            self.model.fit(df_data.values)
 
         # get anomaly score and flag
-        if hasattr(model, "decision_scores_"):
-            anomaly_flag = model.predict(data_latest.values)[-1]
-            anomaly_score = model.decision_function(data_latest.values)[-1]
+        if hasattr(self.model, "decision_scores_"):
+            X = data_latest.values
+            anomaly_flag = self.model.predict(X)
+            anomaly_score = self.model.decision_function(X)
+            self.debug(f'X={X}')
+            self.debug(f'anomaly_score={anomaly_score}')
+            self.debug(f'anomaly_flag={anomaly_flag}')
         else:
             anomaly_flag = 0
             anomaly_score = 0
