@@ -6,9 +6,19 @@
 
 **Merged pull requests:**
 
+- Change all https://app.netdata.cloud URLs to https://netdata.cloud [\#8598](https://github.com/netdata/netdata/pull/8598) ([mfundul](https://github.com/mfundul))
+- Fixes Ubuntu build with both libcap-dev and libcapng [\#8596](https://github.com/netdata/netdata/pull/8596) ([underhood](https://github.com/underhood))
+- Correctly fixed RPM package builds on Fedora. [\#8595](https://github.com/netdata/netdata/pull/8595) ([Ferroin](https://github.com/Ferroin))
+- Ensure we only enable jessie-backports for Debian 8 \(jessie\) once [\#8593](https://github.com/netdata/netdata/pull/8593) ([prologic](https://github.com/prologic))
+- Fix Debian 8 \(jessie\) support [\#8590](https://github.com/netdata/netdata/pull/8590) ([prologic](https://github.com/prologic))
+- Read configuration when section is open [\#8588](https://github.com/netdata/netdata/pull/8588) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix Coverity Defect CID-349684 [\#8586](https://github.com/netdata/netdata/pull/8586) ([thiagoftsm](https://github.com/thiagoftsm))
+- Coverity scan [\#8579](https://github.com/netdata/netdata/pull/8579) ([amoss](https://github.com/amoss))
 - Fix broken Fedora 30/31 RPM builds [\#8572](https://github.com/netdata/netdata/pull/8572) ([prologic](https://github.com/prologic))
 - Fix regressions in cloud functionality \(build, CI, claiming\) [\#8568](https://github.com/netdata/netdata/pull/8568) ([underhood](https://github.com/underhood))
+- Fix compiler warnings in the claiming code [\#8567](https://github.com/netdata/netdata/pull/8567) ([vlvkobal](https://github.com/vlvkobal))
 - Added logic to bail early on LWS build if cmake is not present. [\#8559](https://github.com/netdata/netdata/pull/8559) ([Ferroin](https://github.com/Ferroin))
+- Add netdata.service.\* to .gitignore [\#8556](https://github.com/netdata/netdata/pull/8556) ([vlvkobal](https://github.com/vlvkobal))
 - Fix broken pipe ignoring in apps plugin [\#8554](https://github.com/netdata/netdata/pull/8554) ([vlvkobal](https://github.com/vlvkobal))
 - dashboard v0.4.10 [\#8553](https://github.com/netdata/netdata/pull/8553) ([jacekkolasa](https://github.com/jacekkolasa))
 - Update README.md [\#8552](https://github.com/netdata/netdata/pull/8552) ([bceylan](https://github.com/bceylan))
@@ -120,21 +130,11 @@
 - Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
 - Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
 - python.d/ceph: fix get\_osd\_perf\(\) for 14.2+ [\#8248](https://github.com/netdata/netdata/pull/8248) ([ilyam8](https://github.com/ilyam8))
-- Adapt the claiming script to new API responses [\#8245](https://github.com/netdata/netdata/pull/8245) ([hmoragrega](https://github.com/hmoragrega))
-- vernemq alarms, dashboard info and godplugin new version [\#8236](https://github.com/netdata/netdata/pull/8236) ([ilyam8](https://github.com/ilyam8))
-- Fix misspelling of openSUSE and SUSE [\#8233](https://github.com/netdata/netdata/pull/8233) ([m-rey](https://github.com/m-rey))
-- Implement OpenGraph and basic Schema tags [\#8224](https://github.com/netdata/netdata/pull/8224) ([joelhans](https://github.com/joelhans))
-- Adding support for ACLK build-configuration [\#8223](https://github.com/netdata/netdata/pull/8223) ([amoss](https://github.com/amoss))
-- Fix claiming script to reflect API changes on netdata.cloud [\#8220](https://github.com/netdata/netdata/pull/8220) ([cosmix](https://github.com/cosmix))
-- packaging/installer: fix bundle\_libwebsockets [\#8219](https://github.com/netdata/netdata/pull/8219) ([ilyam8](https://github.com/ilyam8))
 - Enconde slave fields [\#8216](https://github.com/netdata/netdata/pull/8216) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove the confusion around the multiple Dockerfile\(s\) we have [\#8214](https://github.com/netdata/netdata/pull/8214) ([prologic](https://github.com/prologic))
-- Retry transient failures from our lifecycle tests on Travis CI [\#8203](https://github.com/netdata/netdata/pull/8203) ([prologic](https://github.com/prologic))
 - Fix RHEL / CentOS 8.x dependencies for Judy-devel and others [\#8202](https://github.com/netdata/netdata/pull/8202) ([prologic](https://github.com/prologic))
 - Remvoed the use of clang-format that does not actually block PRs or surface anything to developers \#8188 [\#8196](https://github.com/netdata/netdata/pull/8196) ([prologic](https://github.com/prologic))
-- Added connections \(backend\) usage to postgres monitoring [\#8126](https://github.com/netdata/netdata/pull/8126) ([ManuelPombo](https://github.com/ManuelPombo))
 - Cleans up CODEOWNERS for the build system itself \(not to be confused with packaging\) [\#8098](https://github.com/netdata/netdata/pull/8098) ([prologic](https://github.com/prologic))
-- added requirements for exim. Issue \#8087 [\#8096](https://github.com/netdata/netdata/pull/8096) ([petarkozic](https://github.com/petarkozic))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
@@ -211,11 +211,6 @@
 - Cleanup of macOS installation docs [\#7925](https://github.com/netdata/netdata/pull/7925) ([joelhans](https://github.com/joelhans))
 - Fix typo in PULL\_REQUEST\_TEMPLATE [\#7924](https://github.com/netdata/netdata/pull/7924) ([joelhans](https://github.com/joelhans))
 - Set ownership correctly for plugins in netdata-installer.sh [\#7923](https://github.com/netdata/netdata/pull/7923) ([Ferroin](https://github.com/Ferroin))
-- Reformats ./packaging/installer/install-required-packages.sh with: shfmt -w -i 2 -ci -sr [\#7915](https://github.com/netdata/netdata/pull/7915) ([prologic](https://github.com/prologic))
-- Adds new simpler \(Alpine based\) Dockerfile for quick dev and testing [\#7914](https://github.com/netdata/netdata/pull/7914) ([prologic](https://github.com/prologic))
-- Add doc with post-install instructions for GCP [\#7912](https://github.com/netdata/netdata/pull/7912) ([joelhans](https://github.com/joelhans))
-- health\_doc\_name: Clarify the rules to create an alarm name [\#7911](https://github.com/netdata/netdata/pull/7911) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add docs about using caching proxies with our package repos. [\#7909](https://github.com/netdata/netdata/pull/7909) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
