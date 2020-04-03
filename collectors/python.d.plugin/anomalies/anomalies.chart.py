@@ -5,7 +5,6 @@
 
 
 import requests
-import numpy as np
 import pandas as pd
 from pyod.models.hbos import HBOS
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -19,8 +18,7 @@ CHARTS_IN_SCOPE = [
 ]
 N = 60*30
 REFIT_EVERY = 60*5
-CONTAMINATION = 0.001
-MODEL_CONFIG = {'type': 'hbos', 'kwargs' : {'contamination': 0.001}}
+MODEL_CONFIG = {'type': 'hbos', 'kwargs': {'contamination': 0.001}}
 
 ORDER = [
     'anomaly_score',
@@ -113,7 +111,8 @@ class Service(SimpleService):
             self.debug(f'data_latest={data_latest}')
 
             if chart not in self.models:
-                self.models[chart] = HBOS(contamination=CONTAMINATION)
+                if MODEL_CONFIG['type'] == 'hbos':
+                    self.models[chart] = HBOS(**MODEL_CONFIG['kwargs'])
 
             chart_score = f"{chart.replace('system.','')}_score"
             chart_flag = f"{chart.replace('system.','')}_flag"
