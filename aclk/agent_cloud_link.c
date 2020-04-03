@@ -146,29 +146,16 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 static RSA *aclk_private_key = NULL;
 static int create_private_key()
 {
-    char filename[FILENAME_MAX + 1];    struct stat statbuf;
+    char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 
-    if (lstat(filename, &statbuf) != 0) {
-        error("Claimed agent cannot establish ACLK - private key not found '%s' failed.", filename);
+    long bytes_read;
+    char *private_key = read_by_filename(filename, &bytes_read);
+    if (!private_key) {
+        error("Claimed agent cannot establish ACLK - unable to load private key '%s' failed.", filename);
         return 1;
     }
-    if (unlikely(statbuf.st_size == 0)) {
-        info("Claimed agent cannot establish ACLK - private key '%s' is empty.", filename);
-        return 1;
-    }
-
-    FILE *f = fopen(filename, "rt");
-    if (unlikely(f == NULL)) {
-        error("Claimed agent cannot establish ACLK - unable to open private key '%s'.", filename);
-        return 1;
-    }
-
-    char *private_key = callocz(1, statbuf.st_size + 1);
-    size_t bytes_read = fread(private_key, 1, statbuf.st_size, f);
-    private_key[bytes_read] = 0;
-    debug(D_ACLK, "Claimed agent loaded private key len=%zu bytes", bytes_read);
-    fclose(f);
+    debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
 
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {

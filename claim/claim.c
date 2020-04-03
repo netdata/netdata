@@ -51,15 +51,7 @@ void claim_agent(char *claiming_arguments)
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
     FILE *fp;
 
-    char *cloud_base_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
-    char *cloud_base_port = NULL;
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-    if( aclk_decode_base_url(cloud_base_url, &cloud_base_hostname, &cloud_base_port))
-    {
-        error("Configuration error - cannot decode \"cloud base url\"");
-        return;
-    }
-
     const char *proxy_str;
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
@@ -120,31 +112,14 @@ void load_claiming_state(void)
     }
 
     char filename[FILENAME_MAX + 1];
-    struct stat statbuf;
-
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
 
-    // check if the file exists
-    if (lstat(filename, &statbuf) != 0) {
-        info("lstat on File '%s' failed reason=\"%s\". Setting state to AGENT_UNCLAIMED.", filename, strerror(errno));
-        return;
-    }
-    if (unlikely(statbuf.st_size == 0)) {
-        info("File '%s' has no contents. Setting state to AGENT_UNCLAIMED.", filename);
+    long bytes_read;
+    claimed_id = read_by_filename(filename, &bytes_read);
+    if (!claimed_id) {
+        info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
     }
 
-    FILE *f = fopen(filename, "rt");
-    if (unlikely(f == NULL)) {
-        error("File '%s' cannot be opened. Setting state to AGENT_UNCLAIMED.", filename);
-        return;
-    }
-
-    claimed_id = callocz(1, statbuf.st_size + 1);
-    size_t bytes_read = fread(claimed_id, 1, statbuf.st_size, f);
-    claimed_id[bytes_read] = 0;
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-    fclose(f);
-
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
 }
