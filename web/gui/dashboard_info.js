@@ -783,16 +783,6 @@ netdataDashboard.context = {
         valueRange: "[0, 100]"
     },
 
-    'anomalies.anomaly_score': {
-        info: 'This is the anomaly score.',
-        height: 0.7
-    },
-
-    'anomalies.anomaly_flag': {
-        info: 'This is the anomaly flag.',
-        height: 0.7
-    },
-
     'system.load': {
         info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>.',
         height: 0.7
