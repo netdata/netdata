@@ -25,7 +25,6 @@ static char *claiming_errors[] = {
         "Service Unavailable"                           // 15
 };
 
-
 static char *claimed_id = NULL;
 
 char *is_agent_claimed(void)
@@ -107,6 +106,9 @@ void claim_agent(char *claiming_arguments)
     }
     error("Agent failed to be claimed with the following error message:");
     error("\"%s\"", claiming_errors[exit_code]);
+#else
+    UNUSED(claiming_arguments);
+    UNUSED(claiming_errors);
 #endif
 }
 
