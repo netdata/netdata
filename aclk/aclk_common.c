@@ -42,7 +42,7 @@ ACLK_PROXY_TYPE aclk_verify_proxy(const char *string)
     if (!string)
         return PROXY_TYPE_UNKNOWN;
 
-    while (*string == 0x20)
+    while (*string == 0x20 && *string!=0)   // Help coverity (compiler will remove)
         string++;
 
     if (!*string)

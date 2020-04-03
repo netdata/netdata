@@ -26,7 +26,7 @@ following arguments:
 -rooms=ROOM1,ROOM2,...
     where ROOMX is the workspace war-room to join. This list is optional.
 -url=URL_BASE
-    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://app.netdata.cloud.
+    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://netdata.cloud.
 -id=AGENT_ID
     where AGENT_ID is the unique identifier of the agent. This is the agent's MACHINE_GUID by default.
 -hostname=HOSTNAME
