@@ -8,6 +8,7 @@ from random import SystemRandom
 import requests
 import numpy as np
 import pandas as pd
+from pyod.models.hbos import HBOS
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
@@ -17,8 +18,8 @@ CHARTS_IN_SCOPE = [
     'system.cpu'
 ]
 N = 500
-RECALC_EVERY = 50
-ZSCORE_CLIP = 10
+REFIT_EVERY = 50
+CONTAMINATION = 0.01
 
 ORDER = [
     'anomaly_score',
@@ -96,6 +97,9 @@ class Service(SimpleService):
         # empty dict to collect data points into
         data = dict()
 
+        # define model
+        model = HBOS(contamination=CONTAMINATION)
+
         # get latest data from allmetrics
         latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
         data_latest = self.data_to_df([latest_observations]).mean().to_dict()
@@ -104,35 +108,21 @@ class Service(SimpleService):
         self.data = self.data[-N:]
 
         # recalc if needed
-        if self.runs_counter % RECALC_EVERY == 0:
+        if self.runs_counter % REFIT_EVERY == 0:
             # pull data into a pandas df
             df_data = self.data_to_df(self.data)
-            # update mean and sigma
-            self.mean = df_data.mean().to_dict()
-            self.sigma = df_data.std().to_dict()
+            # refit the model
+            model.fit(df_data.values)
 
-        # process each metric and add to data
-        for metric in data_latest.keys():
-            metric_rev = '.'.join(reversed(metric.split('.')))
-            metric_rev_flag = f'{metric_rev}_flag'
-            x = data_latest.get(metric, 0)
-            mu = self.mean.get(metric, 0)
-            sigma = self.sigma.get(metric, 0)
-            self.debug(f'metric={metric}, x={x}, mu={mu}, sigma={sigma}')
-            # calculate z score
-            if sigma == 0:
-                z = 0
-            else:
-                z = (x - mu) / sigma
-            # clip z score
-            z = np.clip(z, -ZSCORE_CLIP, ZSCORE_CLIP)
-            self.debug(f'z={z}')
-            if metric_rev not in self.charts['anomaly_score']:
-                self.charts['anomaly_score'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
-            if metric_rev_flag not in self.charts['anomaly_flag']:
-                self.charts['anomaly_flag'].add_dimension([metric_rev_flag, metric_rev_flag, 'absolute', 1, 1])
-            data[metric_rev] = z * 100
-            data[metric_rev_flag] = 1 if abs(z) > 3 else 0
+        pred = model.predict(data_latest.values)
+        scores = model.decision_function(data_latest.values)
+
+        if 'cpu_score' not in self.charts['anomaly_score']:
+            self.charts['anomaly_score'].add_dimension(['cpu_score', 'cpu_score', 'absolute', 1, 100])
+        if 'cpu_flag' not in self.charts['anomaly_score']:
+            self.charts['anomaly_flag'].add_dimension(['cpu_flag', 'cpu_flag', 'absolute', 1, 100])
+        data['cpu_score'] = scores[-1]
+        data['cpu_flag'] = pred[-1]
 
         # append latest data
         self.append_data(latest_observations)
