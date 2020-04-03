@@ -17,8 +17,8 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-N = 500
-REFIT_EVERY = 50
+N = 60*30
+REFIT_EVERY = 60*5
 CONTAMINATION = 0.001
 
 ORDER = [
