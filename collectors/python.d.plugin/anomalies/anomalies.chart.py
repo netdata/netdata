@@ -20,6 +20,7 @@ CHARTS_IN_SCOPE = [
 N = 60*30
 REFIT_EVERY = 60*5
 CONTAMINATION = 0.001
+MODEL_CONFIG = {'type': 'hbos', 'kwargs' : {'contamination': 0.001}}
 
 ORDER = [
     'anomaly_score',
