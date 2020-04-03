@@ -110,7 +110,7 @@ class Service(SimpleService):
 
         # get anomaly score and flag
         if hasattr(self.model, "decision_scores_"):
-            X = data_latest.values
+            X = data_latest.values.reshape(1, -1)
             anomaly_flag = self.model.predict(X)
             anomaly_score = self.model.decision_function(X)
             self.debug(f'X={X}')
