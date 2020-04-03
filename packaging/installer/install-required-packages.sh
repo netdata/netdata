@@ -1280,12 +1280,12 @@ install_apt_get() {
   echo >&2 "NOTE: Running apt-get update and updating your APT caches ..."
   if [ "${version}" = 8 ]; then
     echo >&2 "WARNING: You seem to be on Debian 8 (jessie) which is old enough we have to disable Check-Valid-Until checks"
-    echo >&2 "We also have to enable the jessie-backports repository"
-    if prompt "Is this okay?"; then
-      echo "deb http://archive.debian.org/debian/ jessie-backports main contrib non-free" \
-        >> /etc/apt/sources.list.d/99-archived.list
+    if ! cat /etc/apt/sources.list /etc/apt/sources.list.d/* 2> /dev/null | grep -q jessie-backports; then
+      echo >&2 "We also have to enable the jessie-backports repository"
+      if prompt "Is this okay?"; then
+        ${sudo} /bin/sh -c 'echo "deb http://archive.debian.org/debian/ jessie-backports main contrib non-free" >> /etc/apt/sources.list.d/99-archived.list'
+      fi
     fi
-    apt-get update -o Acquire::Check-Valid-Until=false
     run ${sudo} apt-get "${apt_opts[@]}" -o Acquire::Check-Valid-Until=false update
   else
     run ${sudo} apt-get "${apt_opts[@]}" update
