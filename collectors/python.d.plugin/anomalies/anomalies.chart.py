@@ -22,21 +22,21 @@ MODEL_CONFIG = {'type': 'hbos', 'kwargs': {'contamination': 0.001}}
 
 ORDER = [
     'anomaly_score',
-    'anomaly_prob',
+    'anomaly_probability',
     'anomaly_flag'
 ]
 
 CHARTS = {
     'anomaly_score': {
-        'options': [None, 'Anomaly Scores', 'Anomaly Score', 'anomaly_scores', 'anomalies.scores', 'line'],
+        'options': [None, 'Anomaly Score', 'Anomaly Score', 'anomaly_score', 'anomalies.score', 'line'],
         'lines': []
     },
-    'anomaly_probabilities': {
-        'options': [None, 'Anomaly Probability', 'Anomaly Probability', 'anomaly_probabilities', 'anomalies.probabilities', 'line'],
+    'anomaly_probability': {
+        'options': [None, 'Anomaly Probability', 'Anomaly Probability', 'anomaly_probability', 'anomalies.probability', 'line'],
         'lines': []
     },
     'anomaly_flag': {
-        'options': [None, 'Anomaly Flag', 'Anomaly Flag', 'anomaly_flag', 'anomalies.anomalies', 'stacked'],
+        'options': [None, 'Anomaly Flag', 'Anomaly Flag', 'anomaly_flag', 'anomalies.flag', 'stacked'],
         'lines': []
     },
 }
@@ -149,8 +149,8 @@ class Service(SimpleService):
 
             if chart_score not in self.charts['anomaly_score']:
                 self.charts['anomaly_score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
-            if chart_prob not in self.charts['anomaly_probabilities']:
-                self.charts['anomaly_probabilities'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
+            if chart_prob not in self.charts['anomaly_probability']:
+                self.charts['anomaly_probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
             if chart_flag not in self.charts['anomaly_flag']:
                 self.charts['anomaly_flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
             data[chart_score] = anomaly_score * 100
