@@ -43,8 +43,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.data = []
-        self.model = HBOS(contamination=CONTAMINATION)
-
+        self.models = dict()
 
     @staticmethod
     def check():
@@ -102,31 +101,39 @@ class Service(SimpleService):
         # limit size of data maintained to last n
         self.data = self.data[-N:]
 
-        # recalc if needed
-        if self.runs_counter % REFIT_EVERY == 0:
-            # pull data into a pandas df
-            df_data = self.data_to_df(self.data)
-            # refit the model
-            self.model.fit(df_data.values)
+        for chart in CHARTS_IN_SCOPE:
 
-        # get anomaly score and flag
-        if hasattr(self.model, "decision_scores_"):
-            X = data_latest.values
-            anomaly_flag = self.model.predict(X)[-1]
-            anomaly_score = self.model.decision_function(X)[-1]
-            self.debug(f'X={X}')
-            self.debug(f'anomaly_score={anomaly_score}')
-            self.debug(f'anomaly_flag={anomaly_flag}')
-        else:
-            anomaly_flag = 0
-            anomaly_score = 0
+            if chart not in self.models:
+                self.models[chart] = HBOS(contamination=CONTAMINATION)
 
-        if 'cpu_score' not in self.charts['anomaly_score']:
-            self.charts['anomaly_score'].add_dimension(['cpu_score', 'cpu_score', 'absolute', 1, 100])
-        if 'cpu_flag' not in self.charts['anomaly_flag']:
-            self.charts['anomaly_flag'].add_dimension(['cpu_flag', 'cpu_flag', 'absolute', 1, 1])
-        data['cpu_score'] = anomaly_score * 100
-        data['cpu_flag'] = anomaly_flag
+            chart_score = f'{chart}_score'
+            chart_flag = f'{chart}_flag'
+
+            # recalc if needed
+            if self.runs_counter % REFIT_EVERY == 0:
+                # pull data into a pandas df
+                df_data = self.data_to_df(self.data)
+                # refit the model
+                self.models[chart].fit(df_data.values)
+
+            # get anomaly score and flag
+            if hasattr(self.models[chart], "decision_scores_"):
+                X = data_latest.values
+                anomaly_flag = self.models[chart].predict(X)[-1]
+                anomaly_score = self.models[chart].decision_function(X)[-1]
+                self.debug(f'X={X}')
+                self.debug(f'anomaly_score={anomaly_score}')
+                self.debug(f'anomaly_flag={anomaly_flag}')
+            else:
+                anomaly_flag = 0
+                anomaly_score = 0
+
+            if chart_score not in self.charts['anomaly_score']:
+                self.charts['anomaly_score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
+            if chart_flag not in self.charts['anomaly_flag']:
+                self.charts['anomaly_flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
+            data[chart_score] = anomaly_score * 100
+            data[chart_flag] = anomaly_flag
 
         # append latest data
         self.append_data(latest_observations)
