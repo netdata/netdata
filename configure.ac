@@ -583,7 +583,7 @@ if test "$enable_cloud" != "no"; then
 
     AC_MSG_CHECKING([if libwebsockets static lib is present])
     if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-        LWS_LIBS="-I externaldeps/libwebsockets/include"
+        LWS_CFLAGS="-I externaldeps/libwebsockets/include"
         HAVE_libwebsockets_a="yes"
     else
         HAVE_libwebsockets_a="no"
@@ -596,7 +596,7 @@ if test "$enable_cloud" != "no"; then
             AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
         fi
         if test "${with_libcap}" = "yes"; then
-            LWS_LIBS+=" -lcap"
+            LWS_CFLAGS+=" ${LIBCAP_CFLAGS}"
         fi
     fi
 
@@ -1230,7 +1230,7 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_LIBS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
