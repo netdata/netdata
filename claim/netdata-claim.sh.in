@@ -98,7 +98,7 @@ fi
 MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
 CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
 TOKEN="unknown"
-URL_BASE="https://app.netdata.cloud"
+URL_BASE="https://netdata.cloud"
 ID="unknown"
 ROOMS=""
 HOSTNAME=$(hostname)
