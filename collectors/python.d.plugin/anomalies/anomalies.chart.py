@@ -14,7 +14,7 @@ priority = 3
 
 HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
-    'system.cpu'
+    'system.cpu', 'system.load'
 ]
 N = 500
 REFIT_EVERY = 50
@@ -72,15 +72,19 @@ class Service(SimpleService):
         return data
 
     @staticmethod
-    def data_to_df(data, mode='wide'):
+    def data_to_df(data: list, mode: str = 'wide', charts: list = None) -> pd.DataFrame:
         """
         Parses data list of list's from allmetrics and formats it as a pandas dataframe.
         :param data: list of lists where each element is a metric from allmetrics <list>
         :param mode: used to determine if we want pandas df to be long (row per metric) or wide (col per metric) format <str>
+        :param charts: filter data just for charts of interest <list>
         :return: pandas dataframe of the data <pd.DataFrame>
         """
-        df = pd.DataFrame([item for sublist in data for item in sublist],
-                          columns=['time', 'chart', 'variable', 'value'])
+        if charts:
+            data = [item for sublist in data for item in sublist if item[1] in charts]
+        else:
+            data = [item for sublist in data for item in sublist]
+        df = pd.DataFrame(data, columns=['time', 'chart', 'variable', 'value'])
         if mode == 'wide':
             df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
         return df
@@ -95,24 +99,27 @@ class Service(SimpleService):
 
         # get latest data from allmetrics
         latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        data_latest = self.data_to_df([latest_observations]).mean().to_frame().transpose()
-        self.debug(f'data_latest={data_latest}')
 
         # limit size of data maintained to last n
         self.data = self.data[-N:]
 
         for chart in CHARTS_IN_SCOPE:
 
+            self.debug(f"chart={chart}")
+
+            data_latest = self.data_to_df([latest_observations], charts=[chart]).mean().to_frame().transpose()
+            self.debug(f'data_latest={data_latest}')
+
             if chart not in self.models:
                 self.models[chart] = HBOS(contamination=CONTAMINATION)
 
-            chart_score = f'{chart}_score'
-            chart_flag = f'{chart}_flag'
+            chart_score = f"{chart.replace('system.','')}_score"
+            chart_flag = f"{chart.replace('system.','')}_flag"
 
             # recalc if needed
             if self.runs_counter % REFIT_EVERY == 0:
                 # pull data into a pandas df
-                df_data = self.data_to_df(self.data)
+                df_data = self.data_to_df(self.data, charts=[chart])
                 # refit the model
                 self.models[chart].fit(df_data.values)
 
