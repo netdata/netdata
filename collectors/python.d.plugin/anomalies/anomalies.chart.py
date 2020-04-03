@@ -16,9 +16,9 @@ HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu'
 ]
-N = 100
+N = 500
 REFIT_EVERY = 50
-CONTAMINATION = 0.01
+CONTAMINATION = 0.001
 
 ORDER = [
     'anomaly_score',
@@ -124,8 +124,8 @@ class Service(SimpleService):
         if 'cpu_score' not in self.charts['anomaly_score']:
             self.charts['anomaly_score'].add_dimension(['cpu_score', 'cpu_score', 'absolute', 1, 100])
         if 'cpu_flag' not in self.charts['anomaly_flag']:
-            self.charts['anomaly_flag'].add_dimension(['cpu_flag', 'cpu_flag', 'absolute', 1, 100])
-        data['cpu_score'] = anomaly_score
+            self.charts['anomaly_flag'].add_dimension(['cpu_flag', 'cpu_flag', 'absolute', 1, 1])
+        data['cpu_score'] = anomaly_score * 100
         data['cpu_flag'] = anomaly_flag
 
         # append latest data
