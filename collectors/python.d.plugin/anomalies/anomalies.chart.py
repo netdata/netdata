@@ -16,8 +16,8 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-TRAIN_MAX_N = 100
-FIT_EVERY = 10
+TRAIN_MAX_N = 60*10
+FIT_EVERY = 60
 MODEL_CONFIG = {'type': 'hbos', 'kwargs': {'contamination': 0.001}}
 
 ORDER = [
@@ -119,7 +119,7 @@ class Service(SimpleService):
             chart_score = f"{chart.replace('system.','')}_score"
             chart_flag = f"{chart.replace('system.','')}_flag"
 
-            # recalc if needed
+            # refit if needed
             if self.runs_counter % self.fit_every == 0:
                 # pull data into a pandas df
                 df_data = self.data_to_df(self.data, charts=[chart])
