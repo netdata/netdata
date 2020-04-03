@@ -3,169 +3,38 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from random import SystemRandom, randint
-
-from bases.FrameworkServices.SimpleService import SimpleService
+from random import SystemRandom
 
 import requests
 import numpy as np
 import pandas as pd
+from bases.FrameworkServices.SimpleService import SimpleService
 
+priority = 3
 
-priority = 1
+HOST_PORT = '127.0.0.1:19999'
+CHARTS_IN_SCOPE = [
+    'system.cpu'
+]
+N = 500
+RECALC_EVERY = 50
+ZSCORE_CLIP = 10
 
 ORDER = [
-    'cpu',
-    'load',
-    'ram',
-    'io',
-    'net',
-    'ip',
-    'ipv6',
-    'processes',
-    'intr',
-    'scores',
-    'anomalies',
+    'anomaly_score',
+    'anomaly_flag'
 ]
 
 CHARTS = {
-    'cpu': {
-        'options': [None, 'CPU Anomaly Scores', 'value', 'cpu', 'anomalies.cpu', 'line'],
-        'lines': [
-            ['cpu_actual', 'cpu', 'absolute', 1, 1000],
-            ['cpu_error', 'error', 'absolute', 1, 1000],
-            ['cpu_expected', 'expected', 'absolute', 1, 1000],
-        ]
+    'anomaly_score': {
+        'options': [None, 'Anomaly Scores', 'name.chart', 'anomaly_scores', 'anomalies.scores', 'line'],
+        'lines': []
     },
-    'load': {
-        'options': [None, 'Load Anomaly Scores', 'value', 'load', 'anomalies.load', 'line'],
-        'lines': [
-            ['load_actual', 'load', 'absolute', 1, 1000],
-            ['load_error', 'error', 'absolute', 1, 1000],
-            ['load_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'ram': {
-        'options': [None, 'RAM Anomaly Scores', 'value', 'ram', 'anomalies.ram', 'line'],
-        'lines': [
-            ['ram_actual', 'ram', 'absolute', 1, 1000],
-            ['ram_error', 'error', 'absolute', 1, 1000],
-            ['ram_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'io': {
-        'options': [None, 'IO Anomaly Scores', 'value', 'io', 'anomalies.io', 'line'],
-        'lines': [
-            ['io_actual', 'io', 'absolute', 1, 1000],
-            ['io_error', 'error', 'absolute', 1, 1000],
-            ['io_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'net': {
-        'options': [None, 'Network Anomaly Scores', 'value', 'net', 'anomalies.net', 'line'],
-        'lines': [
-            ['net_actual', 'net', 'absolute', 1, 1000],
-            ['net_error', 'error', 'absolute', 1, 1000],
-            ['net_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'ip': {
-        'options': [None, 'Network IP Anomaly Scores', 'value', 'ip', 'anomalies.ip', 'line'],
-        'lines': [
-            ['ip_actual', 'ip', 'absolute', 1, 1000],
-            ['ip_error', 'error', 'absolute', 1, 1000],
-            ['ip_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'ipv6': {
-        'options': [None, 'Network IPv6 Anomaly Scores', 'value', 'ipv6', 'anomalies.ipv6', 'line'],
-        'lines': [
-            ['ipv6_actual', 'ipv6', 'absolute', 1, 1000],
-            ['ipv6_error', 'error', 'absolute', 1, 1000],
-            ['ipv6_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'processes': {
-        'options': [None, 'Processes Anomaly Scores', 'value', 'processes', 'anomalies.processes', 'line'],
-        'lines': [
-            ['processes_actual', 'processes', 'absolute', 1, 1000],
-            ['processes_error', 'error', 'absolute', 1, 1000],
-            ['processes_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'intr': {
-        'options': [None, 'Interrupts Anomaly Scores', 'value', 'intr', 'anomalies.intr', 'line'],
-        'lines': [
-            ['intr_actual', 'intr', 'absolute', 1, 1000],
-            ['intr_error', 'error', 'absolute', 1, 1000],
-            ['intr_expected', 'expected', 'absolute', 1, 1000],
-        ]
-    },
-    'scores': {
-        'options': [None, 'All Anomaly Scores', 'value', 'scores', 'anomalies.scores', 'line'],
-        'lines': [
-            ['cpu_score', 'cpu', 'absolute', 1, 1000],
-            ['load_score', 'load', 'absolute', 1, 1000],
-            ['ram_score', 'ram', 'absolute', 1, 1000],
-            ['io_score', 'io', 'absolute', 1, 1000],
-            ['net_score', 'net', 'absolute', 1, 1000],
-            ['ip_score', 'ip', 'absolute', 1, 1000],
-            ['ipv6_score', 'ipv6', 'absolute', 1, 1000],
-            ['processes_score', 'processes', 'absolute', 1, 1000],
-            ['intr_score', 'intr', 'absolute', 1, 1000],
-        ]
-    },
-    'anomalies': {
-        'options': [None, 'All Anomaly Events', 'is_anomaly', 'anomalies', 'anomalies.anomalies', 'stacked'],
-        'lines': [
-            ['cpu_anomaly', 'cpu', 'absolute', 1, 1],
-            ['load_anomaly', 'load', 'absolute', 1, 1],
-            ['ram_anomaly', 'ram', 'absolute', 1, 1],
-            ['io_anomaly', 'io', 'absolute', 1, 1],
-            ['net_anomaly', 'net', 'absolute', 1, 1],
-            ['ip_anomaly', 'ip', 'absolute', 1, 1],
-            ['ipv6_anomaly', 'ipv6', 'absolute', 1, 1],
-            ['processes_anomaly', 'processes', 'absolute', 1, 1],
-            ['intr_anomaly', 'intr', 'absolute', 1, 1],
-        ]
+    'anomaly_flag': {
+        'options': [None, 'Anomaly Flag', 'name.chart', 'anomaly_flag', 'anomalies.anomalies', 'line'],
+        'lines': []
     },
 }
-
-HOST_PORT = '127.0.0.1:19999'
-N = 20
-
-def get_raw_data(host=None):
-
-    if host is None:
-        host = HOST_PORT
-
-    data = dict()
-
-    for chart in list(set(CHARTS.keys()) - set(['scores', 'anomalies'])):
-
-        # get data
-        url = f'http://{host}/api/v1/data?chart=system.{chart}&after=-{N}&format=json'
-        response = requests.get(url)
-        response_json = response.json()
-        raw_data = response_json['data']
-        df = pd.DataFrame(raw_data, columns=response_json['labels'])
-        df = df.set_index('time').dropna()
-
-        # create data for lines
-        actual = np.mean(abs(df.values[0]))
-        expected = np.mean(abs(df.values[1:]))
-        error_abs = abs(actual - expected)
-        error_pct = error_abs / expected
-        anomalies = 1.0 if error_pct >= 0.9 else 0.0
-
-        # add data
-        data[f'{chart}_expected'] = expected * 1000
-        data[f'{chart}_actual'] = actual * 1000
-        data[f'{chart}_error'] = error_abs * 1000
-        data[f'{chart}_score'] = np.sqrt(error_pct) * 1000
-        data[f'{chart}_anomaly'] = anomalies
-
-    return data
 
 
 class Service(SimpleService):
@@ -174,23 +43,100 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
+        self.data = []
+        self.mean = dict()
+        self.sigma = dict()
+
 
     @staticmethod
     def check():
         return True
 
+    @staticmethod
+    def get_allmetrics(host: str = '127.0.0.1:19999', charts: list = None) -> list:
+        """
+        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
+        :param host: host to pull data from <str>
+        :param charts: charts to filter to <list>
+        :return: list of lists where each element is a metric from allmetrics <list>
+        """
+        if charts is None:
+            charts = ['system.cpu']
+        url = f'http://{host}/api/v1/allmetrics?format=json'
+        raw_data = requests.get(url).json()
+        data = []
+        for k in raw_data:
+            if k in charts:
+                time = raw_data[k]['last_updated']
+                dimensions = raw_data[k]['dimensions']
+                for dimension in dimensions:
+                    # [time, chart, name, value]
+                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+        return data
+
+    @staticmethod
+    def data_to_df(data, mode='wide'):
+        """
+        Parses data list of list's from allmetrics and formats it as a pandas dataframe.
+        :param data: list of lists where each element is a metric from allmetrics <list>
+        :param mode: used to determine if we want pandas df to be long (row per metric) or wide (col per metric) format <str>
+        :return: pandas dataframe of the data <pd.DataFrame>
+        """
+        df = pd.DataFrame([item for sublist in data for item in sublist],
+                          columns=['time', 'chart', 'variable', 'value'])
+        if mode == 'wide':
+            df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
+        return df
+
+    def append_data(self, data):
+        self.data.append(data)
+
     def get_data(self):
 
-        data = get_raw_data()
+        # empty dict to collect data points into
+        data = dict()
+
+        # get latest data from allmetrics
+        latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        data_latest = self.data_to_df([latest_observations]).mean().to_dict()
+
+        # limit size of data maintained to last n
+        self.data = self.data[-N:]
+
+        # recalc if needed
+        if self.runs_counter % RECALC_EVERY == 0:
+            # pull data into a pandas df
+            df_data = self.data_to_df(self.data)
+            # update mean and sigma
+            self.mean = df_data.mean().to_dict()
+            self.sigma = df_data.std().to_dict()
+
+        # process each metric and add to data
+        for metric in data_latest.keys():
+            metric_rev = '.'.join(reversed(metric.split('.')))
+            metric_rev_flag = f'{metric_rev}_flag'
+            x = data_latest.get(metric, 0)
+            mu = self.mean.get(metric, 0)
+            sigma = self.sigma.get(metric, 0)
+            self.debug(f'metric={metric}, x={x}, mu={mu}, sigma={sigma}')
+            # calculate z score
+            if sigma == 0:
+                z = 0
+            else:
+                z = (x - mu) / sigma
+            # clip z score
+            z = np.clip(z, -ZSCORE_CLIP, ZSCORE_CLIP)
+            self.debug(f'z={z}')
+            if metric_rev not in self.charts['anomaly_score']:
+                self.charts['anomaly_score'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
+            if metric_rev_flag not in self.charts['anomaly_flag']:
+                self.charts['anomaly_flag'].add_dimension([metric_rev_flag, metric_rev_flag, 'absolute', 1, 1])
+            data[metric_rev] = z * 100
+            data[metric_rev_flag] = 1 if abs(z) > 3 else 0
+
+        # append latest data
+        self.append_data(latest_observations)
 
         return data
 
 
-#%%
-
-#data = get_raw_data('london.my-netdata.io')
-#print(data)
-
-#%%
-
-#%%
