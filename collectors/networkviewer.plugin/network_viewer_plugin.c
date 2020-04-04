@@ -441,7 +441,7 @@ static void netdata_create_charts() {
                                , "Number of calls realized to TCP functions inside kernel."
                                , "Calls"
                                , NETWORK_VIEWER_TCP_GROUP
-                               , 986
+                               , 985
                                , aggregated_data
                                , 4);
 
@@ -450,7 +450,7 @@ static void netdata_create_charts() {
                                 , "Number of errors during TCP calls"
                                 , "Calls"
                                 , NETWORK_VIEWER_TCP_GROUP
-                                , 985
+                                , 986
                                 , &aggregated_data[6]
                                 , 2);
 
@@ -468,7 +468,7 @@ static void netdata_create_charts() {
                                , "Number of calls realized to UDP functions inside kernel."
                                , "Calls"
                                , NETWORK_VIEWER_UDP_GROUP
-                               , 985
+                               , 986
                                , &aggregated_data[8]
                                , 2);
 
@@ -792,7 +792,7 @@ static int netdata_store_log() {
 
     netdata_error_report_t ner;
     uint64_t key = 0, next_key = 0;
-    int fd = map_fd[2];
+    int fd = map_fd[5];
     char ct[64];
     while(!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (!bpf_map_lookup_elem(fd, &next_key, &ner)) {
@@ -1174,7 +1174,7 @@ netdata_network_t *netdata_list_ips(char *ips, int outgoing) {
     return ret;
 }
 
-static inline void enable_develop_mode(char *ptr) {
+static inline void enable_developer_mode(char *ptr) {
     if (!strcasecmp(ptr, "yes"))
         developer_mode = 1;
 }
@@ -1189,9 +1189,18 @@ static inline void set_log_format(char *ptr) {
 
 static void change_collector_event() {
     int i;
-    for (i = 0; i < 4 ; i++ ) {
-        if (i != 1)
-            collector_events[i].type = 'r';
+    for (i = 0; collector_events[i].name ; i++ ) {
+        switch (i) {
+            case 0:
+            case 2:
+            case 6: {
+                collector_events[i].type = 'r';
+            }
+            default: {
+                break;
+
+            }
+        }
     }
 }
 
@@ -1243,7 +1252,7 @@ static int read_config_file(const char *path) {
         } else if (!strcasecmp(key, "ingoing")) {
             ingoing_table = netdata_list_ips(value, 0);
         } else if(!strcasecmp(key, "developer mode")) {
-            enable_develop_mode(value);
+            enable_developer_mode(value);
         } else if(!strcasecmp(key, "log format")) {
                 set_log_format(value);
         } else if (isdigit(key[0])) {
