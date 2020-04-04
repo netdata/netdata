@@ -123,13 +123,10 @@
 - Add a Prometheus Remote Write connector to the exporting engine [\#8292](https://github.com/netdata/netdata/pull/8292) ([vlvkobal](https://github.com/vlvkobal))
 - Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 - ACLK  cmake fixes [\#8280](https://github.com/netdata/netdata/pull/8280) ([underhood](https://github.com/underhood))
-- Added ability to change ID used to connect to ceph. [\#8276](https://github.com/netdata/netdata/pull/8276) ([paulmezz](https://github.com/paulmezz))
 - Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
 - Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
-- python.d/ceph: fix get\_osd\_perf\(\) for 14.2+ [\#8248](https://github.com/netdata/netdata/pull/8248) ([ilyam8](https://github.com/ilyam8))
 - Enconde slave fields [\#8216](https://github.com/netdata/netdata/pull/8216) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove the confusion around the multiple Dockerfile\(s\) we have [\#8214](https://github.com/netdata/netdata/pull/8214) ([prologic](https://github.com/prologic))
-- Fix RHEL / CentOS 8.x dependencies for Judy-devel and others [\#8202](https://github.com/netdata/netdata/pull/8202) ([prologic](https://github.com/prologic))
 - Remvoed the use of clang-format that does not actually block PRs or surface anything to developers \#8188 [\#8196](https://github.com/netdata/netdata/pull/8196) ([prologic](https://github.com/prologic))
 - Cleans up CODEOWNERS for the build system itself \(not to be confused with packaging\) [\#8098](https://github.com/netdata/netdata/pull/8098) ([prologic](https://github.com/prologic))
 
@@ -205,8 +202,6 @@
 - Fixes a bug in DO\_NOT\_TRACK expression [\#7929](https://github.com/netdata/netdata/pull/7929) ([prologic](https://github.com/prologic))
 - Assorted cleanup items in the RPM spec file. [\#7927](https://github.com/netdata/netdata/pull/7927) ([Ferroin](https://github.com/Ferroin))
 - /collectors/python.d/varnish: collect smf metrics [\#7926](https://github.com/netdata/netdata/pull/7926) ([ilyam8](https://github.com/ilyam8))
-- Cleanup of macOS installation docs [\#7925](https://github.com/netdata/netdata/pull/7925) ([joelhans](https://github.com/joelhans))
-- Fix typo in PULL\_REQUEST\_TEMPLATE [\#7924](https://github.com/netdata/netdata/pull/7924) ([joelhans](https://github.com/joelhans))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
