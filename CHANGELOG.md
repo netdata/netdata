@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- dashboard v0.4.12: [\#8599](https://github.com/netdata/netdata/pull/8599) ([jacekkolasa](https://github.com/jacekkolasa))
 - Change all https://app.netdata.cloud URLs to https://netdata.cloud [\#8598](https://github.com/netdata/netdata/pull/8598) ([mfundul](https://github.com/mfundul))
 - Fixes Ubuntu build with both libcap-dev and libcapng [\#8596](https://github.com/netdata/netdata/pull/8596) ([underhood](https://github.com/underhood))
 - Correctly fixed RPM package builds on Fedora. [\#8595](https://github.com/netdata/netdata/pull/8595) ([Ferroin](https://github.com/Ferroin))
@@ -123,10 +124,6 @@
 - Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 - ACLK  cmake fixes [\#8280](https://github.com/netdata/netdata/pull/8280) ([underhood](https://github.com/underhood))
 - Added ability to change ID used to connect to ceph. [\#8276](https://github.com/netdata/netdata/pull/8276) ([paulmezz](https://github.com/paulmezz))
-- Added libwebsockets files to `make dist`. [\#8275](https://github.com/netdata/netdata/pull/8275) ([Ferroin](https://github.com/Ferroin))
-- Fixed misplaced commas in help disable strings [\#8266](https://github.com/netdata/netdata/pull/8266) ([FlyingSixtySix](https://github.com/FlyingSixtySix))
-- Disable Schema tag in documentation [\#8264](https://github.com/netdata/netdata/pull/8264) ([joelhans](https://github.com/joelhans))
-- Tweak eBPF documentation and add performance data [\#8261](https://github.com/netdata/netdata/pull/8261) ([joelhans](https://github.com/joelhans))
 - Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
 - Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
 - python.d/ceph: fix get\_osd\_perf\(\) for 14.2+ [\#8248](https://github.com/netdata/netdata/pull/8248) ([ilyam8](https://github.com/ilyam8))
@@ -210,7 +207,6 @@
 - /collectors/python.d/varnish: collect smf metrics [\#7926](https://github.com/netdata/netdata/pull/7926) ([ilyam8](https://github.com/ilyam8))
 - Cleanup of macOS installation docs [\#7925](https://github.com/netdata/netdata/pull/7925) ([joelhans](https://github.com/joelhans))
 - Fix typo in PULL\_REQUEST\_TEMPLATE [\#7924](https://github.com/netdata/netdata/pull/7924) ([joelhans](https://github.com/joelhans))
-- Set ownership correctly for plugins in netdata-installer.sh [\#7923](https://github.com/netdata/netdata/pull/7923) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
