@@ -73,16 +73,12 @@ void *aclk_main(void *ptr);
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 
-//int     aclk_init();
-//char    *get_base_topic();
-
 extern char *is_agent_claimed(void);
 extern void aclk_lws_wss_mqtt_layer_disconect_notif();
 char *create_uuid();
 
 // callbacks for agent cloud link
 int aclk_subscribe(char *topic, int qos);
-void aclk_shutdown();
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
