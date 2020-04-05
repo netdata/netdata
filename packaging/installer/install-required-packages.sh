@@ -1047,7 +1047,9 @@ declare -A pkg_zip=(
 )
 
 validate_package_trees() {
-  validate_tree_${tree}
+  if type -t validate_tree_${tree} > /dev/null; then
+    validate_tree_${tree}
+  fi
 }
 
 validate_installed_package() {
