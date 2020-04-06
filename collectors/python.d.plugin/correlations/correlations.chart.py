@@ -32,7 +32,7 @@ CHARTS = {
     'metric_correlation_changes': {
         'options': [
             None, 'Metric Correlation Changes', '(var1,var2)', 'metric correlation changes', 'correlations.changes',
-            'stacked'],
+            'lines'],
         'lines': []
     },
 }
@@ -141,12 +141,11 @@ class Service(SimpleService):
                 if dimension_id not in self.charts['metric_correlations']:
                     self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
                 data[dimension_id] = correlation * 100
-                if abs(correlation_diff) > self.corr_diff_thold:
-                    if dimension_id_flag not in self.charts['metric_correlation_changes']:
-                        self.charts['metric_correlation_changes'].add_dimension(
-                            [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
-                        )
-                    data[dimension_id_flag] = 1
+                if dimension_id_flag not in self.charts['metric_correlation_changes']:
+                    self.charts['metric_correlation_changes'].add_dimension(
+                        [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
+                    )
+                data[dimension_id_flag] = 1 if abs(correlation_diff) > self.corr_diff_thold else 0
 
         return data
 
