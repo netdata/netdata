@@ -15,7 +15,7 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-TRAIN_MAX_N = 60*2
+TRAIN_MAX_N = 60*5
 
 ORDER = [
     'metric_correlations'
