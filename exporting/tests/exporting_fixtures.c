@@ -127,3 +127,35 @@ int teardown_initialized_engine(void **state)
 
     return 0;
 }
+
+int setup_prometheus(void **state)
+{
+    (void)state;
+
+    prometheus_exporter_instance = calloc(1, sizeof(struct instance));
+
+    setup_rrdhost();
+
+    prometheus_exporter_instance->config.update_every = 10;
+
+    prometheus_exporter_instance->config.options |=
+        EXPORTING_OPTION_SEND_NAMES | EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    prometheus_exporter_instance->config.charts_pattern = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT);
+    prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT);
+
+    return 0;
+}
+
+int teardown_prometheus(void **state)
+{
+    (void)state;
+
+    teardown_rrdhost();
+
+    simple_pattern_free(prometheus_exporter_instance->config.charts_pattern);
+    simple_pattern_free(prometheus_exporter_instance->config.hosts_pattern);
+    free(prometheus_exporter_instance);
+
+    return 0;
+}

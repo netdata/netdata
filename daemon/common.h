@@ -50,6 +50,8 @@
 
 // backends for archiving the metrics
 #include "backends/backends.h"
+// the new exporting engine for archiving the metrics
+#include "exporting/exporting_engine.h"
 
 // the netdata API
 #include "web/api/web_api_v1.h"

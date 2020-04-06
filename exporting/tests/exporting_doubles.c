@@ -20,7 +20,7 @@ struct engine *__mock_read_exporting_config()
     engine->instance_root = calloc(1, sizeof(struct instance));
     struct instance *instance = engine->instance_root;
     instance->engine = engine;
-    instance->config.type = BACKEND_TYPE_GRAPHITE;
+    instance->config.type = EXPORTING_CONNECTOR_TYPE_GRAPHITE;
     instance->config.name = strdupz("instance_name");
     instance->config.destination = strdupz("localhost");
     instance->config.update_every = 1;
