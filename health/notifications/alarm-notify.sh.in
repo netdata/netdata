@@ -35,6 +35,7 @@
 #  - Microsoft Team notification by @tioumen
 #  - RocketChat notifications by @Hermsi1337 #3777
 #  - Google Hangouts Chat notifications by @EnzoAkira and @hendrikhofstadt
+#  - Dynatrace Event by @illumine
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -170,6 +171,7 @@ awssns
 rocketchat
 sms
 hangouts
+dynatrace
 "
 
 # -----------------------------------------------------------------------------
@@ -366,6 +368,16 @@ IRC_NETWORK=
 # hangouts configs
 declare -A HANGOUTS_WEBHOOK_URI
 
+# dynatrace configs
+DYNATRACE_SPACE=
+DYNATRACE_SERVER=
+DYNATRACE_TOKEN=
+DYNATRACE_TAG_VALUE=
+DYNATRACE_ANNOTATION_TYPE=
+DYNATRACE_EVENT=
+SEND_DYNATRACE=
+
+
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -503,6 +515,14 @@ filter_recipient_by_criticality() {
 #shellcheck disable=SC2153
 { [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
 
+# check dynatrace
+{ [ -z "${DYNATRACE_SPACE}" ] ||
+  [ -z "${DYNATRACE_SERVER}" ] ||
+  [ -z "${DYNATRACE_TOKEN}" ] ||
+  [ -z "${DYNATRACE_TAG_VALUE}" ] ||
+  [ -z "${DYNATRACE_EVENT}" ]; } && SEND_DYNATRACE="NO"
+
+
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_SLACK}" = "YES" ] ||
 	[ "${SEND_ROCKETCHAT}" = "YES" ] ||
@@ -521,7 +541,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_PROWL}" = "YES" ] ||
 	[ "${SEND_HANGOUTS}" = "YES" ] ||
 	[ "${SEND_CUSTOM}" = "YES" ] ||
-	[ "${SEND_MSTEAM}" = "YES" ]; then
+	[ "${SEND_MSTEAM}" = "YES" ] ||
+	[ "${SEND_DYNATRACE}" = "YES" ]; then
 	# if we need curl, check for the curl command
 	if [ -z "${curl}" ]; then
 		curl="$(command -v curl 2>/dev/null)"
@@ -547,6 +568,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_PROWL="NO"
 		SEND_HANGOUTS="NO"
 		SEND_CUSTOM="NO"
+		SEND_DYNATRACE="NO"
 	fi
 fi
 
@@ -673,7 +695,9 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_AWSSNS}" \
 	"${SEND_SYSLOG}" \
 	"${SEND_SMS}" \
-	"${SEND_MSTEAM}"; do
+	"${SEND_MSTEAM}" \
+    "${SEND_DYNATRACE}"; do
+	
 	if [ "${method}" == "YES" ]; then
 		proceed=1
 		break
@@ -1887,6 +1911,51 @@ EOF
 
 	return 1
 }
+# -----------------------------------------------------------------------------
+# Dynatrace sender
+send_dynatrace() {
+  local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
+  local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
+  local payload=""
+  
+  payload=$(cat <<EOF
+{
+  "title": "NetData Alarm from ${host}",
+  "source" : "${DYNATRACE_ANNOTATION_TYPE}",
+  "description" : "${description}",
+  "eventType": "${DYNATRACE_EVENT}",
+   "attachRules":{
+     "tagRule":[{
+        "meTypes":["HOST"],
+        "tags":["${DYNATRACE_TAG_VALUE}"]
+     }]
+  },
+  "customProperties":{
+    "description": "${description}"
+  }
+}
+EOF
+)
+
+  # echo ${payload}
+
+  httpcode=$(docurl -X POST  -H "Authorization: Api-token ${DYNATRACE_TOKEN}"  -H "Content-Type: application/json" -d "${payload}"    ${dynatrace_url})
+  ret=$?
+
+
+  if [ ${ret} -eq 0 ]; then
+     if [ "${httpcode}" = "200" ]; then
+        info "sent ${DYNATRACE_EVENT} to ${DYNATRACE_SERVER}"
+        return 0
+     else
+        warning "Dynatrace ${DYNATRACE_SERVER} responded ${httpcode} notification for: ${host} ${chart}.${name} is ${status} was not sent!"
+        return 1
+     fi
+  else
+     error  "failed to sent ${DYNATRACE_EVENT} notification for: ${host} ${chart}.${name} is ${status} to  ${DYNATRACE_SERVER} with error code ${ret}."
+     return 1
+  fi
+}
 
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
@@ -2392,6 +2461,12 @@ fi
 SENT_EMAIL=$?
 
 # -----------------------------------------------------------------------------
+# send the EVENT to Dynatrace
+send_dynatrace "${host}" "${chart}" "${name}"  "${status}"
+SENT_DYNATRACE=$?
+
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
 	"${SENT_PUSHOVER}" \
@@ -2416,7 +2491,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_AWSSNS}" \
 	"${SENT_SYSLOG}" \
 	"${SENT_SMS}" \
-	"${SENT_MSTEAM}"; do
+	"${SENT_MSTEAM}" \
+    "${SENT_DYNATRACE}"; do	
 	if [ "${state}" -eq 0 ]; then
 		# we sent something
 		exit 0
