@@ -67,7 +67,7 @@ operating systems.
 
 [![Install with .deb or .rpm
 packages](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png) Install
-with .deb or .rpm packages](methods/packages.md)
+with .deb or .rpm packages](/packaging/installer/methods/packages.md)
 
 [![Install with a pre-built static binary for 64-bit
 systems](https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png) Install
