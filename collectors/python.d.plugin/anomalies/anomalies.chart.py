@@ -27,21 +27,21 @@ MODEL_CONFIG = {
 }
 
 ORDER = [
-    'anomaly_score',
-    'anomaly_probability',
+    'score',
+    'probability',
     'anomaly_flag'
 ]
 
 CHARTS = {
-    'anomaly_score': {
+    'score': {
         'options': [None, 'Anomaly Score', 'Anomaly Score', 'score', 'anomalies.score', 'line'],
         'lines': []
     },
-    'anomaly_probability': {
+    'probability': {
         'options': [None, 'Anomaly Probability', 'Anomaly Probability', 'probability', 'anomalies.probability', 'line'],
         'lines': []
     },
-    'anomaly_flag': {
+    'flag': {
         'options': [None, 'Anomaly Flag', 'Anomaly Flag', 'flag', 'anomalies.flag', 'stacked'],
         'lines': []
     },
