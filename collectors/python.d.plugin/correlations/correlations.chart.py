@@ -66,7 +66,9 @@ class Service(SimpleService):
                 dimensions = raw_data[k]['dimensions']
                 for dimension in dimensions:
                     # [time, chart, name, value]
-                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+                    data.append(
+                        [time, k, "{}.{}".format(k, dimensions[dimension]['name']), dimensions[dimension]['value']]
+                    )
         return data
 
     @staticmethod
@@ -116,7 +118,7 @@ class Service(SimpleService):
         # add to chart data
         for col in df.columns:
             dimension_id = col.replace('system.', '').replace('__', ' , ')
-            dimension_id = f'({dimension_id})'
+            dimension_id = '({})'.format(dimension_id)
             value = df[col].values[0]
             # drop any low correlation values
             if dimension_id not in self.charts['metric_correlations']:
