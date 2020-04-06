@@ -135,7 +135,7 @@ class Service(SimpleService):
             # update charts if needed
             if dimension_id not in self.charts['metric_correlations']:
                 self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
-            if dimension_id not in self.charts['metric_correlation_changes']:
+            if dimension_id_flag not in self.charts['metric_correlation_changes']:
                 self.charts['metric_correlation_changes'].add_dimension(
                     [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
                 )
