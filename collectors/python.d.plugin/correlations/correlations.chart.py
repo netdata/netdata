@@ -124,24 +124,29 @@ class Service(SimpleService):
             correlation = df[col].values[0]
             dimension_id = col.replace('system.', '').replace('__', ' , ')
             dimension_id = '({})'.format(dimension_id)
-            dimension_id_flag = '{} flag'.format(dimension_id)
-            if dimension_id in self.correlations:
-                correlation_diff = correlation - self.correlations[dimension_id]
+            dimension_id_reversed = dimension_id.replace(' ', '').replace('(', '').replace(')', '').split(',')
+            dimension_id_reversed = "({} , {})".format(dimension_id_reversed[1], dimension_id_reversed[0])
+            if dimension_id_reversed in data:
+                self.debug('skipping {} as {} already in data'.format(dimension_id, dimension_id_reversed))
             else:
-                correlation_diff = 0
-            self.debug('dimension_id={}, correlation={}, correlation_diff={}'.format(
-                dimension_id, correlation, correlation_diff))
-            # update correlation in self
-            self.correlations[dimension_id] = correlation
-            if dimension_id not in self.charts['metric_correlations']:
-                self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
-            data[dimension_id] = correlation * 100
-            if abs(correlation_diff) > self.corr_diff_thold:
-                if dimension_id_flag not in self.charts['metric_correlation_changes']:
-                    self.charts['metric_correlation_changes'].add_dimension(
-                        [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
-                    )
-                data[dimension_id_flag] = 1
+                dimension_id_flag = '{} flag'.format(dimension_id)
+                if dimension_id in self.correlations:
+                    correlation_diff = correlation - self.correlations[dimension_id]
+                else:
+                    correlation_diff = 0
+                self.debug('dimension_id={}, correlation={}, correlation_diff={}'.format(
+                    dimension_id, correlation, correlation_diff))
+                # update correlation in self
+                self.correlations[dimension_id] = correlation
+                if dimension_id not in self.charts['metric_correlations']:
+                    self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
+                data[dimension_id] = correlation * 100
+                if abs(correlation_diff) > self.corr_diff_thold:
+                    if dimension_id_flag not in self.charts['metric_correlation_changes']:
+                        self.charts['metric_correlation_changes'].add_dimension(
+                            [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
+                        )
+                    data[dimension_id_flag] = 1
 
         return data
 
