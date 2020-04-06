@@ -221,7 +221,7 @@ Our experimental exporting engine received significant updates with new connecto
 
 We upgraded our **TLS compatibility to include 1.3**, which applies to HTTPS for both Netdata's web server and streaming connections. TLS 1.3 is the most up-to-date version of the TLS protocol, and contains important fixes and improvements to ensure strong encryption. If you enabled TLS in the web server or streaming, Netdata attempts to use 1.3 by default, but you can also set the version and ciphers explicitly. Learn more in the [documentation](https://docs.netdata.cloud/web/server/#select-tls-version).
 
-The Netdata dashboard has been **completely re-written in React**. While the look and behavior hasn't changed, these under-the-hood changes will enable a suite of new features, UX improvements, and design overhauls. With React, we'll be able to work faster and better resource our talented engineers.
+The Netdata dashboard has been **completely re-written in React**. While the look and behavior hasn't changed, these under-the-hood changes enables a suite of new features, UX improvements, and design overhauls. With React, we'll be able to work faster and better resource our talented engineers.
 
 As part of the ongoing work to polish our **eBPF collector tech preview**, we've now proven the collector's performance is very good, and have vastly expanded the number of operating system versions the collector works on. Learn how to [enable it](https://docs.netdata.cloud/collectors/ebpf_process.plugin/) in our documentation. We've also extensively stress-tested the eBPF collector and found that it's impressively fast given the depth of metrics it collects! Read up on our benchmarking analysis [on GitHub](https://github.com/netdata/netdata/issues/8195).
 
