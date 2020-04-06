@@ -32,7 +32,7 @@ CHARTS = {
     'metric_correlation_changes': {
         'options': [
             None, 'Metric Correlation Changes', '(var1,var2)', 'metric correlation changes', 'correlations.changes',
-            'lines'],
+            'stacked'],
         'lines': []
     },
 }
