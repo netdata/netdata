@@ -25,7 +25,7 @@ FIT_EVERY = 30
 MODEL_CONFIG = {
     'type': 'hbos',
     'kwargs': {'contamination': 0.001},
-    'predict_proba': False
+    'predict_proba': True
 }
 
 ORDER = [
