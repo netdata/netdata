@@ -32,7 +32,7 @@ MODEL_CONFIG = {
 ORDER = [
     'score',
     'probability',
-    'anomaly_flag'
+    'flag'
 ]
 
 CHARTS = {
