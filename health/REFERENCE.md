@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Health configuration reference"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
 ---
 -->
@@ -136,7 +137,7 @@ If you create a template using the `disk.io` context, it will apply an alarm to 
 The alarm or template will be used only if the operating system of the host matches this list specified in `os`. The
 value is a space-separated list.
 
-The following example enables the entity on Linux, FreeBSD, and MacOS, but no other operating systems.
+The following example enables the entity on Linux, FreeBSD, and macOS, but no other operating systems.
 
 ```yaml
 os: linux freebsd macos

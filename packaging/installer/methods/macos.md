@@ -75,7 +75,7 @@ sudo ./netdata-installer.sh --install /usr/local
 > Your Netdata configuration directory will be at `/usr/local/netdata/`, and your stock configuration directory will
 > be at **`/usr/local/lib/netdata/conf.d/`.**
 >
-> The installer will also install a startup plist to start Netdata when your Mac boots.
+> The installer will also install a startup plist to start Netdata when your macOS system boots.
 
 ## What's next?
 

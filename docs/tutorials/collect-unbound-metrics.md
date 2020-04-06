@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Monitor Unbound DNS servers with Netdata"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/collect-unbound-metrics.md
 ---
 -->
@@ -11,7 +12,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/c
 Labs. In v1.19 of Netdata, we release a completely refactored collector for collecting real-time metrics from Unbound
 servers and displaying them in Netdata dashboards.
 
-Unbound runs on FreeBSD, OpenBSD, NetBSD, MacOS, Linux, and Windows, and supports DNS-over-TLS, which ensures that DNS
+Unbound runs on FreeBSD, OpenBSD, NetBSD, macOS, Linux, and Windows, and supports DNS-over-TLS, which ensures that DNS
 queries and answers are all encrypted with TLS. In theory, that should reduce the risk of eavesdropping or
 man-in-the-middle attacks when communicating to DNS servers.
 

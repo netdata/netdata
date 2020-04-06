@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Package Maintainers"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md
 ---
 -->
@@ -36,11 +37,11 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 ---
 
-## MacOS
+## macOS
 
 | System | URL | Core Developer | Package Maintainer
 |:-:|:-:|:-:|:-:|
-| MacOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
+| macOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
 
 ---
 

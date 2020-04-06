@@ -81,7 +81,7 @@ You can bind Netdata to multiple IPs and ports. If you use hostnames, Netdata wi
 
 For cloud based installations, if your cloud provider does not provide such a private LAN (or if you use multiple providers), you can create a virtual management and administration LAN with tools like `tincd` or `gvpe`. These tools create a mesh VPN allowing all servers to communicate securely and privately. Your administration stations join this mesh VPN to get access to management and administration tasks on all your cloud servers.
 
-For `gvpe` we have developed a [simple provisioning tool](https://github.com/netdata/netdata-demo-site/tree/master/gvpe) you may find handy (it includes statically compiled `gvpe` binaries for Linux and FreeBSD, and also a script to compile `gvpe` on your Mac). We use this to create a management and administration LAN for all Netdata demo sites (spread all over the internet using multiple hosting providers).
+For `gvpe` we have developed a [simple provisioning tool](https://github.com/netdata/netdata-demo-site/tree/master/gvpe) you may find handy (it includes statically compiled `gvpe` binaries for Linux and FreeBSD, and also a script to compile `gvpe` on your macOS system). We use this to create a management and administration LAN for all Netdata demo sites (spread all over the internet using multiple hosting providers).
 
 ---
 
