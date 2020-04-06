@@ -55,7 +55,7 @@ void send_internal_metrics(struct instance *instance)
 
         buffer_sprintf(family, "exporting_%s", instance->config.name);
 
-        sprintf("exporting_%s_metrics", instance->config.name);
+        snprintf(id, RRD_ID_LENGTH_MAX, "exporting_%s_metrics", instance->config.name);
         netdata_fix_chart_id(id);
 
         stats->st_metrics = rrdset_create_localhost(
@@ -68,7 +68,7 @@ void send_internal_metrics(struct instance *instance)
 
         // ------------------------------------------------------------------------
 
-        sprintf("exporting_%s_bytes", instance->config.name);
+        snprintf(id, RRD_ID_LENGTH_MAX, "exporting_%s_bytes", instance->config.name);
         netdata_fix_chart_id(id);
 
         stats->st_bytes = rrdset_create_localhost(
@@ -82,7 +82,7 @@ void send_internal_metrics(struct instance *instance)
 
         // ------------------------------------------------------------------------
 
-        sprintf("exporting_%s_ops", instance->config.name);
+        snprintf(id, RRD_ID_LENGTH_MAX, "exporting_%s_ops", instance->config.name);
         netdata_fix_chart_id(id);
 
         stats->st_ops = rrdset_create_localhost(
@@ -97,7 +97,7 @@ void send_internal_metrics(struct instance *instance)
 
         // ------------------------------------------------------------------------
 
-        sprintf("exporting_%s_thread_cpu", instance->config.name);
+        snprintf(id, RRD_ID_LENGTH_MAX, "exporting_%s_thread_cpu", instance->config.name);
         netdata_fix_chart_id(id);
 
         stats->st_rusage = rrdset_create_localhost(

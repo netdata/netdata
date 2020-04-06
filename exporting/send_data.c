@@ -200,6 +200,8 @@ void simple_connector_worker(void *instance_p)
             failures++;
         }
 
+        send_internal_metrics(instance);
+
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
