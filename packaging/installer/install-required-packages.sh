@@ -192,7 +192,7 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      alpine | arch | centos | debian | fedora | gentoo | sabayon | rhel | ubuntu | suse | opensuse-leap | sles | clear-linux-os)
+      alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | rhel | sabayon | sles | suse | ubuntu)
         distribution="${x}"
         version="${VERSION_ID}"
         codename="${VERSION}"
@@ -1047,7 +1047,9 @@ declare -A pkg_zip=(
 )
 
 validate_package_trees() {
-  validate_tree_${tree}
+  if type -t validate_tree_${tree} > /dev/null; then
+    validate_tree_${tree}
+  fi
 }
 
 validate_installed_package() {
