@@ -154,7 +154,7 @@ class Service(SimpleService):
                 self.debug('anomaly_flag={}'.format(anomaly_flag))
 
                 if self.model_config['predict_proba']:
-                    anomaly_prob = self.models[chart].predict_proba(X)[-1][0]
+                    anomaly_prob = self.models[chart].predict_proba(X)[-1][1]
                     self.debug('anomaly_prob={}'.format(anomaly_prob))
 
             else:
