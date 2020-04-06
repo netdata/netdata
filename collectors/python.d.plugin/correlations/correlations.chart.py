@@ -45,30 +45,6 @@ class Service(SimpleService):
         return True
 
     @staticmethod
-    def get_allmetrics(host: str = '127.0.0.1:19999', charts: list = None) -> list:
-        """
-        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
-        :param host: host to pull data from <str>
-        :param charts: charts to filter to <list>
-        :return: list of lists where each element is a metric from allmetrics <list>
-        """
-        if charts is None:
-            charts = ['system.cpu']
-        url = 'http://{}/api/v1/allmetrics?format=json'.format(host)
-        raw_data = requests.get(url).json()
-        data = []
-        for k in raw_data:
-            if k in charts:
-                time = raw_data[k]['last_updated']
-                dimensions = raw_data[k]['dimensions']
-                for dimension in dimensions:
-                    # [time, chart, name, value]
-                    data.append(
-                        [time, k, "{}.{}".format(k, dimensions[dimension]['name']), dimensions[dimension]['value']]
-                    )
-        return data
-
-    @staticmethod
     def data_to_df(data, mode='wide'):
         """
         Parses data list of list's from allmetrics and formats it as a pandas dataframe.
@@ -82,6 +58,27 @@ class Service(SimpleService):
             df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
         return df
 
+    def get_allmetrics(self) -> list:
+        """
+        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
+        :param host: host to pull data from <str>
+        :param charts: charts to filter to <list>
+        :return: list of lists where each element is a metric from allmetrics <list>
+        """
+        url = 'http://{}/api/v1/allmetrics?format=json'.format(self.host)
+        raw_data = requests.get(url).json()
+        data = []
+        for k in raw_data:
+            if k in self.charts_in_scope:
+                time = raw_data[k]['last_updated']
+                dimensions = raw_data[k]['dimensions']
+                for dimension in dimensions:
+                    # [time, chart, name, value]
+                    data.append(
+                        [time, k, "{}.{}".format(k, dimensions[dimension]['name']), dimensions[dimension]['value']]
+                    )
+        return data
+
     def append_data(self, data):
         self.data.append(data)
 
@@ -91,11 +88,11 @@ class Service(SimpleService):
         data = dict()
 
         # get latest data from allmetrics
-        latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
+        latest_observations = self.get_allmetrics()
         self.append_data(latest_observations)
 
         # limit size of data maintained to last n
-        self.data = self.data[-N:]
+        self.data = self.data[-self.train_max_n:]
 
         # pull data into a pandas df
         df = self.data_to_df(self.data)
