@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.20.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.20.0...v1.21.0)
 
 **Merged pull requests:**
 
@@ -200,8 +200,6 @@
 - Fixes support for editing configuration when NetData is installed to a symlinked /opt [\#7933](https://github.com/netdata/netdata/pull/7933) ([prologic](https://github.com/prologic))
 - Re-formats ./system/edit-config.in with shfmt -w -i 2 -ci -sr [\#7932](https://github.com/netdata/netdata/pull/7932) ([prologic](https://github.com/prologic))
 - Fixes a bug in DO\_NOT\_TRACK expression [\#7929](https://github.com/netdata/netdata/pull/7929) ([prologic](https://github.com/prologic))
-- Assorted cleanup items in the RPM spec file. [\#7927](https://github.com/netdata/netdata/pull/7927) ([Ferroin](https://github.com/Ferroin))
-- /collectors/python.d/varnish: collect smf metrics [\#7926](https://github.com/netdata/netdata/pull/7926) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
