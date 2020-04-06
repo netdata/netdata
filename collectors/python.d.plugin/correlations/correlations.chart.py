@@ -16,14 +16,22 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 TRAIN_MAX_N = 60*5
+CORR_DIFF_THOLD = 0.2
 
 ORDER = [
-    'metric_correlations'
+    'metric_correlations',
+    'metric_correlation_changes'
 ]
 
 CHARTS = {
     'metric_correlations': {
         'options': [None, 'Metric Correlations', '(var1,var2)', 'metric correlations', 'correlations.correlations', 'lines'],
+        'lines': []
+    },
+    'metric_correlation_changes': {
+        'options': [
+            None, 'Metric Correlation Changes', '(var1,var2)', 'metric correlation changes', 'correlations.changes',
+            'stacked'],
         'lines': []
     },
 }
@@ -38,6 +46,8 @@ class Service(SimpleService):
         self.charts_in_scope = CHARTS_IN_SCOPE
         self.train_max_n = TRAIN_MAX_N
         self.host = HOST
+        self.correlations = dict()
+        self.corr_diff_thold = CORR_DIFF_THOLD
 
 
     @staticmethod
@@ -110,13 +120,28 @@ class Service(SimpleService):
 
         # add to chart data
         for col in df.columns:
+            correlation = df[col].values[0]
             dimension_id = col.replace('system.', '').replace('__', ' , ')
             dimension_id = '({})'.format(dimension_id)
-            value = df[col].values[0]
-            # drop any low correlation values
+            dimension_id_flag = '({} flag)'.format(dimension_id)
+            if dimension_id in self.correlations:
+                correlation_diff = correlation - self.correlations[dimension_id]
+            else:
+                correlation_diff = 0
+            self.debug('dimension_id={}, correlation={}, correlation_diff={}'.format(
+                dimension_id, correlation, correlation_diff))
+            # update correlation in self
+            self.correlations[dimension_id] = correlation
+            # update charts if needed
             if dimension_id not in self.charts['metric_correlations']:
                 self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
-            data[dimension_id] = value * 100
+            if dimension_id not in self.charts['metric_correlation_changes']:
+                self.charts['metric_correlation_changes'].add_dimension(
+                    [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
+                )
+            # update data
+            data[dimension_id] = correlation * 100
+            data[dimension_id_flag] = 1 if abs(correlation_diff) > self.corr_diff_thold else 0
 
         return data
 
