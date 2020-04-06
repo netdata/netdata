@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 from pyod.models.knn import KNN
 from pyod.models.hbos import HBOS
+from pyod.models.auto_encoder import AutoEncoder
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
@@ -20,7 +21,7 @@ CHARTS_IN_SCOPE = [
 TRAIN_MAX_N = 60*10
 FIT_EVERY = 60
 MODEL_CONFIG = {
-    'type': 'knn',
+    'type': 'auto_encoder',
     'kwargs': {'contamination': 0.001},
     'predict_proba': False
 }
@@ -127,6 +128,8 @@ class Service(SimpleService):
                     self.models[chart] = HBOS(**self.model_config['kwargs'])
                 elif self.model_config['type'] == 'knn':
                     self.models[chart] = KNN(**self.model_config['kwargs'])
+                elif self.model_config['type'] == 'auto_encoder':
+                    self.models[chart] = AutoEncoder(**self.model_config['kwargs'])
 
             chart_score = f"{chart.replace('system.','')}_score"
             chart_prob = f"{chart.replace('system.', '')}_prob"
