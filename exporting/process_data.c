@@ -390,6 +390,19 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 }
 
 /**
+ * Update stats for buffered bytes
+ *
+ * @param instance an instance data structure.
+ * @return Always returns 0.
+ */
+int simple_connector_update_buffered_bytes(struct instance *instance)
+{
+    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)instance->buffer);
+
+    return 0;
+}
+
+/**
  * Notify workers
  *
  * Notify exporting connector instance working threads that data is ready to send.

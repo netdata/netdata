@@ -160,6 +160,19 @@ void simple_connector_worker(void *instance_p)
     int failures = 0;
 
     while(!netdata_exit) {
+
+        // reset the monitoring chart counters
+        stats->received_bytes =
+        stats->sent_bytes =
+        stats->sent_metrics =
+        stats->lost_metrics =
+        stats->receptions =
+        stats->transmission_successes =
+        stats->transmission_failures =
+        stats->data_lost_events =
+        stats->lost_bytes =
+        stats->reconnects = 0;
+
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
 
@@ -201,6 +214,9 @@ void simple_connector_worker(void *instance_p)
         }
 
         send_internal_metrics(instance);
+
+        if(likely(buffer_strlen((BUFFER *)instance->buffer) == 0))
+            stats->buffered_metrics = 0;
 
         uv_mutex_unlock(&instance->mutex);
 
