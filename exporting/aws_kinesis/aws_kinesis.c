@@ -75,8 +75,22 @@ void aws_kinesis_connector_worker(void *instance_p)
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
 
+        // reset the monitoring chart counters
+        stats->received_bytes =
+        stats->sent_bytes =
+        stats->sent_metrics =
+        stats->lost_metrics =
+        stats->receptions =
+        stats->transmission_successes =
+        stats->transmission_failures =
+        stats->data_lost_events =
+        stats->lost_bytes =
+        stats->reconnects = 0;
+
         BUFFER *buffer = (BUFFER *)instance->buffer;
         size_t buffer_len = buffer_strlen(buffer);
+
+        stats->buffered_bytes = buffer_len;
 
         size_t sent = 0;
 
@@ -150,6 +164,10 @@ void aws_kinesis_connector_worker(void *instance_p)
             stats->sent_metrics = stats->buffered_metrics;
 
         buffer_flush(buffer);
+
+        send_internal_metrics(instance);
+
+        stats->buffered_metrics = 0;
 
         uv_mutex_unlock(&instance->mutex);
 
