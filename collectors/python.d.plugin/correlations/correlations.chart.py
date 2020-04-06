@@ -4,21 +4,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from random import SystemRandom
-
 import requests
-import numpy as np
 import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 2
 
-HOST_PORT = '127.0.0.1:19999'
+HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-N = 100
+TRAIN_MAX_N = 100
 
 ORDER = [
     'metric_correlations'
@@ -37,10 +34,10 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.random = SystemRandom()
         self.data = []
-        self.mean = dict()
-        self.sigma = dict()
+        self.charts_in_scope = CHARTS_IN_SCOPE
+        self.train_max_n = TRAIN_MAX_N
+        self.host = HOST
 
 
     @staticmethod
@@ -99,7 +96,6 @@ class Service(SimpleService):
 
         # limit size of data maintained to last n
         self.data = self.data[-N:]
-
 
         # pull data into a pandas df
         df = self.data_to_df(self.data)
