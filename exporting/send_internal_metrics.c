@@ -118,9 +118,9 @@ void send_internal_metrics(struct instance *instance)
     if (likely(stats->st_metrics->counter_done))
         rrdset_next(stats->st_metrics);
 
-    rrddim_set_by_pointer(stats->st_metrics, stats->rd_buffered_metrics, stats->chart_buffered_metrics);
-    rrddim_set_by_pointer(stats->st_metrics, stats->rd_lost_metrics,     stats->chart_lost_metrics);
-    rrddim_set_by_pointer(stats->st_metrics, stats->rd_sent_metrics,     stats->chart_sent_metrics);
+    rrddim_set_by_pointer(stats->st_metrics, stats->rd_buffered_metrics, stats->buffered_metrics);
+    rrddim_set_by_pointer(stats->st_metrics, stats->rd_lost_metrics,     stats->lost_metrics);
+    rrddim_set_by_pointer(stats->st_metrics, stats->rd_sent_metrics,     stats->sent_metrics);
 
     rrdset_done(stats->st_metrics);
 
@@ -129,10 +129,10 @@ void send_internal_metrics(struct instance *instance)
     if (likely(stats->st_bytes->counter_done))
         rrdset_next(stats->st_bytes);
 
-    rrddim_set_by_pointer(stats->st_bytes, stats->rd_buffered_bytes, stats->chart_buffered_bytes);
-    rrddim_set_by_pointer(stats->st_bytes, stats->rd_lost_bytes,     stats->chart_lost_bytes);
-    rrddim_set_by_pointer(stats->st_bytes, stats->rd_sent_bytes,     stats->chart_sent_bytes);
-    rrddim_set_by_pointer(stats->st_bytes, stats->rd_received_bytes, stats->chart_received_bytes);
+    rrddim_set_by_pointer(stats->st_bytes, stats->rd_buffered_bytes, stats->buffered_bytes);
+    rrddim_set_by_pointer(stats->st_bytes, stats->rd_lost_bytes,     stats->lost_bytes);
+    rrddim_set_by_pointer(stats->st_bytes, stats->rd_sent_bytes,     stats->sent_bytes);
+    rrddim_set_by_pointer(stats->st_bytes, stats->rd_received_bytes, stats->received_bytes);
 
     rrdset_done(stats->st_bytes);
 
@@ -141,11 +141,11 @@ void send_internal_metrics(struct instance *instance)
     if (likely(stats->st_ops->counter_done))
         rrdset_next(stats->st_ops);
 
-    rrddim_set_by_pointer(stats->st_ops, stats->rd_transmission_successes, stats->chart_transmission_successes);
-    rrddim_set_by_pointer(stats->st_ops, stats->rd_data_lost_events,       stats->chart_data_lost_events);
-    rrddim_set_by_pointer(stats->st_ops, stats->rd_reconnects,             stats->chart_reconnects);
-    rrddim_set_by_pointer(stats->st_ops, stats->rd_transmission_failures,  stats->chart_transmission_failures);
-    rrddim_set_by_pointer(stats->st_ops, stats->rd_receptions,             stats->chart_receptions);
+    rrddim_set_by_pointer(stats->st_ops, stats->rd_transmission_successes, stats->transmission_successes);
+    rrddim_set_by_pointer(stats->st_ops, stats->rd_data_lost_events,       stats->data_lost_events);
+    rrddim_set_by_pointer(stats->st_ops, stats->rd_reconnects,             stats->reconnects);
+    rrddim_set_by_pointer(stats->st_ops, stats->rd_transmission_failures,  stats->transmission_failures);
+    rrddim_set_by_pointer(stats->st_ops, stats->rd_receptions,             stats->receptions);
 
     rrdset_done(stats->st_ops);
 

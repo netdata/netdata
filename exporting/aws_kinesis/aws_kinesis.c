@@ -115,7 +115,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                 connector_specific_data, connector_specific_config->stream_name, partition_key, first_char, record_len);
 
             sent += record_len;
-            stats->chart_transmission_successes++;
+            stats->transmission_successes++;
 
             size_t sent_bytes = 0, lost_bytes = 0;
 
@@ -127,27 +127,27 @@ void aws_kinesis_connector_worker(void *instance_p)
                     "EXPORTING: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
                     instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
 
-                stats->chart_transmission_failures++;
-                stats->chart_data_lost_events++;
-                stats->chart_lost_bytes += lost_bytes;
+                stats->transmission_failures++;
+                stats->data_lost_events++;
+                stats->lost_bytes += lost_bytes;
 
                 // estimate the number of lost metrics
-                stats->chart_lost_metrics += (collected_number)(
-                    stats->chart_buffered_metrics *
+                stats->lost_metrics += (collected_number)(
+                    stats->buffered_metrics *
                     (buffer_len && (lost_bytes > buffer_len) ? (double)lost_bytes / buffer_len : 1));
 
                 break;
             } else {
-                stats->chart_receptions++;
+                stats->receptions++;
             }
 
             if (unlikely(netdata_exit))
                 break;
         }
 
-        stats->chart_sent_bytes += sent;
+        stats->sent_bytes += sent;
         if (likely(sent == buffer_len))
-            stats->chart_sent_metrics = stats->chart_buffered_metrics;
+            stats->sent_metrics = stats->buffered_metrics;
 
         buffer_flush(buffer);
 

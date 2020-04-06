@@ -184,7 +184,7 @@ int format_batch_mongodb(struct instance *instance)
         connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
         free_bson(insert, connector_specific_data->last_buffer->documents_inserted);
     }
-    insert = callocz((size_t)stats->chart_buffered_metrics, sizeof(bson_t *));
+    insert = callocz((size_t)stats->buffered_metrics, sizeof(bson_t *));
     connector_specific_data->last_buffer->insert = insert;
 
     BUFFER *buffer = (BUFFER *)instance->buffer;
@@ -193,7 +193,7 @@ int format_batch_mongodb(struct instance *instance)
 
     size_t documents_inserted = 0;
 
-    while (*end && documents_inserted <= (size_t)stats->chart_buffered_metrics) {
+    while (*end && documents_inserted <= (size_t)stats->buffered_metrics) {
         while (*end && *end != '\n')
             end++;
 
@@ -279,9 +279,9 @@ void mongodb_connector_worker(void *instance_p)
                 NULL,
                 NULL,
                 &bson_error))) {
-            stats->chart_sent_bytes += data_size;
-            stats->chart_transmission_successes++;
-            stats->chart_receptions++;
+            stats->sent_bytes += data_size;
+            stats->transmission_successes++;
+            stats->receptions++;
         } else {
             // oops! we couldn't send (all or some of the) data
             error("EXPORTING: %s", bson_error.message);
@@ -290,10 +290,10 @@ void mongodb_connector_worker(void *instance_p)
                 "Willing to write %zu bytes, wrote %zu bytes.",
                 instance->config.destination, data_size, 0UL);
 
-            stats->chart_transmission_failures++;
-            stats->chart_data_lost_events++;
-            stats->chart_lost_bytes += data_size;
-            stats->chart_lost_metrics += stats->chart_buffered_metrics;
+            stats->transmission_failures++;
+            stats->data_lost_events++;
+            stats->lost_bytes += data_size;
+            stats->lost_metrics += stats->buffered_metrics;
         }
 
         free_bson(insert, documents_inserted);
@@ -301,8 +301,8 @@ void mongodb_connector_worker(void *instance_p)
         if (unlikely(netdata_exit))
             break;
 
-        stats->chart_sent_bytes += data_size;
-        stats->chart_sent_metrics = stats->chart_buffered_metrics;
+        stats->sent_bytes += data_size;
+        stats->sent_metrics = stats->buffered_metrics;
 
 #ifdef UNIT_TESTING
         break;

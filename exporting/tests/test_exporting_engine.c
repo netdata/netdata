@@ -384,7 +384,7 @@ static void test_prepare_buffers(void **state)
 
     assert_int_equal(__real_prepare_buffers(engine), 0);
 
-    assert_int_equal(instance->stats.chart_buffered_metrics, 1);
+    assert_int_equal(instance->stats.buffered_metrics, 1);
 
     // check with NULL functions
     instance->start_batch_formatting = NULL;
@@ -573,8 +573,8 @@ static void test_simple_connector_receive_response(void **state)
         log_line,
         "EXPORTING: received 9 bytes from instance_name connector instance. Ignoring them. Sample: 'Test recv'");
 
-    assert_int_equal(stats->chart_received_bytes, 9);
-    assert_int_equal(stats->chart_receptions, 1);
+    assert_int_equal(stats->received_bytes, 9);
+    assert_int_equal(stats->receptions, 1);
     assert_int_equal(sock, 1);
 }
 
@@ -614,10 +614,10 @@ static void test_simple_connector_send_buffer(void **state)
     simple_connector_send_buffer(&sock, &failures, instance);
 
     assert_int_equal(failures, 0);
-    assert_int_equal(stats->chart_transmission_successes, 1);
-    assert_int_equal(stats->chart_sent_bytes, 84);
-    assert_int_equal(stats->chart_sent_metrics, 1);
-    assert_int_equal(stats->chart_transmission_failures, 0);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_metrics, 1);
+    assert_int_equal(stats->transmission_failures, 0);
 
     assert_int_equal(buffer_strlen(buffer), 0);
 
@@ -1304,7 +1304,7 @@ static void test_format_batch_mongodb(void **state)
     BUFFER *buffer = buffer_create(0);
     buffer_sprintf(buffer, "{ \"metric\": \"test_metric\" }\n");
     instance->buffer = buffer;
-    stats->chart_buffered_metrics = 1;
+    stats->buffered_metrics = 1;
 
     assert_int_equal(format_batch_mongodb(instance), 0);
 
@@ -1362,11 +1362,11 @@ static void test_mongodb_connector_worker(void **state)
     assert_ptr_equal(connector_specific_data->first_buffer, connector_specific_data->first_buffer->next);
 
     struct stats *stats = &instance->stats;
-    assert_int_equal(stats->chart_sent_bytes, 60);
-    assert_int_equal(stats->chart_transmission_successes, 1);
-    assert_int_equal(stats->chart_receptions, 1);
-    assert_int_equal(stats->chart_sent_bytes, 60);
-    assert_int_equal(stats->chart_sent_metrics, 0);
+    assert_int_equal(stats->sent_bytes, 60);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->receptions, 1);
+    assert_int_equal(stats->sent_bytes, 60);
+    assert_int_equal(stats->sent_metrics, 0);
 
     free(connector_specific_config->database);
     free(connector_specific_config->collection);

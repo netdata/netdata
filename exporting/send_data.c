@@ -57,8 +57,8 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         if (likely(r > 0)) {
             // we received some data
             response->len += r;
-            stats->chart_received_bytes += r;
-            stats->chart_receptions++;
+            stats->received_bytes += r;
+            stats->receptions++;
         } else if (r == 0) {
             error("EXPORTING: '%s' closed the socket", instance->config.destination);
             close(*sock);
@@ -109,9 +109,9 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     if(written != -1 && (size_t)written == len) {
         // we sent the data successfully
-        stats->chart_transmission_successes++;
-        stats->chart_sent_bytes += written;
-        stats->chart_sent_metrics = stats->chart_buffered_metrics;
+        stats->transmission_successes++;
+        stats->sent_bytes += written;
+        stats->sent_metrics = stats->buffered_metrics;
 
         // reset the failures count
         *failures = 0;
@@ -126,10 +126,10 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
             instance->config.destination,
             len,
             written);
-        stats->chart_transmission_failures++;
+        stats->transmission_failures++;
 
         if(written != -1)
-            stats->chart_sent_bytes += written;
+            stats->sent_bytes += written;
 
         // increment the counter we check for data loss
         (*failures)++;
@@ -179,7 +179,7 @@ void simple_connector_worker(void *instance_p)
                 &reconnects,
                 NULL,
                 0);
-            stats->chart_reconnects += reconnects;
+            stats->reconnects += reconnects;
         }
 
         if(unlikely(netdata_exit)) break;
@@ -194,7 +194,7 @@ void simple_connector_worker(void *instance_p)
             simple_connector_send_buffer(&sock, &failures, instance);
         } else {
             error("EXPORTING: failed to update '%s'", instance->config.destination);
-            stats->chart_transmission_failures++;
+            stats->transmission_failures++;
 
             // increment the counter we check for data loss
             failures++;

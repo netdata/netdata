@@ -99,18 +99,18 @@ struct engine_config {
 };
 
 struct stats {
-    collected_number chart_buffered_metrics;
-    collected_number chart_lost_metrics;
-    collected_number chart_sent_metrics;
-    collected_number chart_buffered_bytes;
-    collected_number chart_lost_bytes;
-    collected_number chart_sent_bytes;
-    collected_number chart_received_bytes;
-    collected_number chart_transmission_successes;
-    collected_number chart_data_lost_events;
-    collected_number chart_reconnects;
-    collected_number chart_transmission_failures;
-    collected_number chart_receptions;
+    collected_number buffered_metrics;
+    collected_number lost_metrics;
+    collected_number sent_metrics;
+    collected_number buffered_bytes;
+    collected_number lost_bytes;
+    collected_number sent_bytes;
+    collected_number received_bytes;
+    collected_number transmission_successes;
+    collected_number data_lost_events;
+    collected_number reconnects;
+    collected_number transmission_failures;
+    collected_number receptions;
 
     int initialized;
 
