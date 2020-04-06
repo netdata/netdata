@@ -133,16 +133,14 @@ class Service(SimpleService):
                 dimension_id, correlation, correlation_diff))
             # update correlation in self
             self.correlations[dimension_id] = correlation
-            # update charts if needed
             if dimension_id not in self.charts['metric_correlations']:
                 self.charts['metric_correlations'].add_dimension([dimension_id, dimension_id, 'absolute', 1, 100])
-            if dimension_id_flag not in self.charts['metric_correlation_changes']:
-                self.charts['metric_correlation_changes'].add_dimension(
-                    [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
-                )
-            # update data
             data[dimension_id] = correlation * 100
             if abs(correlation_diff) > self.corr_diff_thold:
+                if dimension_id_flag not in self.charts['metric_correlation_changes']:
+                    self.charts['metric_correlation_changes'].add_dimension(
+                        [dimension_id_flag, dimension_id_flag, 'absolute', 1, 1]
+                    )
                 data[dimension_id_flag] = 1
 
         return data
