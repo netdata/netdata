@@ -121,6 +121,7 @@ class Service(SimpleService):
         # get latest data from allmetrics
         latest_observations = self.get_allmetrics()
 
+        # get scores and models for each chart
         for chart in self.charts_in_scope:
 
             self.debug("chart={}".format(chart))
@@ -149,36 +150,44 @@ class Service(SimpleService):
                 # refit the model
                 self.models[chart].fit(df_data.values)
 
-            # get anomaly score and flag
+            # get anomaly score, prob and flag
             if hasattr(self.models[chart], "decision_scores_"):
+
                 X = data_latest.values
-                anomaly_flag = self.models[chart].predict(X)[-1]
-                anomaly_score = self.models[chart].decision_function(X)[-1]
                 self.debug('X={}'.format(X))
-                self.debug('anomaly_score={}'.format(anomaly_score))
-                self.debug('anomaly_flag={}'.format(anomaly_flag))
+
+                if self.model_config['score']:
+                    anomaly_score = self.models[chart].decision_function(X)[-1]
+                    self.debug('anomaly_score={}'.format(anomaly_score))
 
                 if self.model_config['prob']:
                     anomaly_prob = self.models[chart].predict_proba(X)[-1][1]
                     self.debug('anomaly_prob={}'.format(anomaly_prob))
 
+                if self.model_config['flag']:
+                    anomaly_flag = self.models[chart].predict(X)[-1]
+                    self.debug('anomaly_flag={}'.format(anomaly_flag))
+
             else:
                 anomaly_flag = 0
                 anomaly_score = 0
-                if self.model_config['prob']:
-                    anomaly_prob = 0
+                anomaly_prob = 0
 
-            if chart_score not in self.charts['score']:
-                self.charts['score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
-            if chart_flag not in self.charts['flag']:
-                self.charts['flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
-            data[chart_score] = anomaly_score * 100
-            data[chart_flag] = anomaly_flag
+            # insert data
+            if self.model_config['score']:
+                if chart_score not in self.charts['score']:
+                    self.charts['score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
+                data[chart_score] = anomaly_score * 100
 
             if self.model_config['prob']:
                 if chart_prob not in self.charts['probability']:
                     self.charts['probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
                 data[chart_prob] = anomaly_prob * 100
+
+            if self.model_config['flag']:
+                if chart_flag not in self.charts['flag']:
+                    self.charts['flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
+                data[chart_flag] = anomaly_flag
 
         # append latest data
         self.append_data(latest_observations)
