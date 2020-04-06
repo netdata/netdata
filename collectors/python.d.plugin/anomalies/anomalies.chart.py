@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 from pyod.models.knn import KNN
 from pyod.models.hbos import HBOS
+from pyod.models.cblof import CBLOF
 #from pyod.models.auto_encoder import AutoEncoder
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -21,9 +22,11 @@ CHARTS_IN_SCOPE = [
 TRAIN_MAX_N = 60*10
 FIT_EVERY = 60
 MODEL_CONFIG = {
-    'type': 'hbos',
+    'type': 'cblof',
     'kwargs': {'contamination': 0.001},
-    'predict_proba': True
+    'score': True,
+    'prob': True,
+    'flag': True,
 }
 
 ORDER = [
@@ -130,6 +133,8 @@ class Service(SimpleService):
                     self.models[chart] = HBOS(**self.model_config['kwargs'])
                 elif self.model_config['type'] == 'knn':
                     self.models[chart] = KNN(**self.model_config['kwargs'])
+                elif self.model_config['type'] == 'cblof':
+                    self.models[chart] = CBLOF(**self.model_config['kwargs'])
                 #elif self.model_config['type'] == 'auto_encoder':
                 #    self.models[chart] = AutoEncoder(**self.model_config['kwargs'])
 
@@ -153,26 +158,26 @@ class Service(SimpleService):
                 self.debug('anomaly_score={}'.format(anomaly_score))
                 self.debug('anomaly_flag={}'.format(anomaly_flag))
 
-                if self.model_config['predict_proba']:
+                if self.model_config['prob']:
                     anomaly_prob = self.models[chart].predict_proba(X)[-1][1]
                     self.debug('anomaly_prob={}'.format(anomaly_prob))
 
             else:
                 anomaly_flag = 0
                 anomaly_score = 0
-                if self.model_config['predict_proba']:
+                if self.model_config['prob']:
                     anomaly_prob = 0
 
-            if chart_score not in self.charts['anomaly_score']:
-                self.charts['anomaly_score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
-            if chart_flag not in self.charts['anomaly_flag']:
-                self.charts['anomaly_flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
+            if chart_score not in self.charts['score']:
+                self.charts['score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
+            if chart_flag not in self.charts['flag']:
+                self.charts['flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
             data[chart_score] = anomaly_score * 100
             data[chart_flag] = anomaly_flag
 
-            if self.model_config['predict_proba']:
-                if chart_prob not in self.charts['anomaly_probability']:
-                    self.charts['anomaly_probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
+            if self.model_config['prob']:
+                if chart_prob not in self.charts['probability']:
+                    self.charts['probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
                 data[chart_prob] = anomaly_prob * 100
 
         # append latest data
