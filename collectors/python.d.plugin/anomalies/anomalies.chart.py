@@ -8,7 +8,7 @@ import requests
 import pandas as pd
 from pyod.models.knn import KNN
 from pyod.models.hbos import HBOS
-from pyod.models.auto_encoder import AutoEncoder
+#from pyod.models.auto_encoder import AutoEncoder
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
@@ -21,7 +21,7 @@ CHARTS_IN_SCOPE = [
 TRAIN_MAX_N = 60*10
 FIT_EVERY = 60
 MODEL_CONFIG = {
-    'type': 'auto_encoder',
+    'type': 'hbos',
     'kwargs': {'contamination': 0.001},
     'predict_proba': False
 }
@@ -93,7 +93,7 @@ class Service(SimpleService):
         """
         if self.charts_in_scope is None:
             self.charts_in_scope = ['system.cpu']
-        url = f'http://{self.host}/api/v1/allmetrics?format=json'
+        url = 'http://{}/api/v1/allmetrics?format=json'.format(self.host)
         raw_data = requests.get(url).json()
         data = []
         for k in raw_data:
@@ -102,7 +102,9 @@ class Service(SimpleService):
                 dimensions = raw_data[k]['dimensions']
                 for dimension in dimensions:
                     # [time, chart, name, value]
-                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
+                    data.append(
+                        [time, k, "{}.{}".format(k, dimensions[dimension]['name']), dimensions[dimension]['value']]
+                    )
         return data
 
     def append_data(self, data):
@@ -118,22 +120,22 @@ class Service(SimpleService):
 
         for chart in self.charts_in_scope:
 
-            self.debug(f"chart={chart}")
+            self.debug("chart={}".format(chart))
 
             data_latest = self.data_to_df([latest_observations], charts=[chart]).mean().to_frame().transpose()
-            self.debug(f'data_latest={data_latest}')
+            self.debug('data_latest={}'.format(data_latest))
 
             if chart not in self.models:
                 if self.model_config['type'] == 'hbos':
                     self.models[chart] = HBOS(**self.model_config['kwargs'])
                 elif self.model_config['type'] == 'knn':
                     self.models[chart] = KNN(**self.model_config['kwargs'])
-                elif self.model_config['type'] == 'auto_encoder':
-                    self.models[chart] = AutoEncoder(**self.model_config['kwargs'])
+                #elif self.model_config['type'] == 'auto_encoder':
+                #    self.models[chart] = AutoEncoder(**self.model_config['kwargs'])
 
-            chart_score = f"{chart.replace('system.','')}_score"
-            chart_prob = f"{chart.replace('system.', '')}_prob"
-            chart_flag = f"{chart.replace('system.','')}_flag"
+            chart_score = "{}_score".format(chart.replace('system.', ''))
+            chart_prob = "{}_prob".format(chart.replace('system.', ''))
+            chart_flag = "{}_flag".format(chart.replace('system.', ''))
 
             # refit if needed
             if self.runs_counter % self.fit_every == 0:
@@ -147,13 +149,13 @@ class Service(SimpleService):
                 X = data_latest.values
                 anomaly_flag = self.models[chart].predict(X)[-1]
                 anomaly_score = self.models[chart].decision_function(X)[-1]
-                self.debug(f'X={X}')
-                self.debug(f'anomaly_score={anomaly_score}')
-                self.debug(f'anomaly_flag={anomaly_flag}')
+                self.debug('X={}'.format(X))
+                self.debug('anomaly_score={}'.format(anomaly_score))
+                self.debug('anomaly_flag={}'.format(anomaly_flag))
 
                 if self.model_config['predict_proba']:
                     anomaly_prob = self.models[chart].predict_proba(X)[-1]
-                    self.debug(f'anomaly_prob={anomaly_prob}')
+                    self.debug('anomaly_prob={}'.format(anomaly_prob))
 
             else:
                 anomaly_flag = 0
