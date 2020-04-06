@@ -32,7 +32,7 @@ CHARTS = {
     'metric_correlation_changes': {
         'options': [
             None, 'Metric Correlation Changes', '(var1,var2)', 'metric correlation changes', 'correlations.changes',
-            'lines'],
+            'stacked'],
         'lines': []
     },
 }
@@ -142,7 +142,8 @@ class Service(SimpleService):
                 )
             # update data
             data[dimension_id] = correlation * 100
-            data[dimension_id_flag] = 1 if abs(correlation_diff) > self.corr_diff_thold else 0
+            if abs(correlation_diff) > self.corr_diff_thold:
+                data[dimension_id_flag] = 1
 
         return data
 
