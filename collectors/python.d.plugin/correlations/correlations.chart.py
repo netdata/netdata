@@ -16,7 +16,7 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 TRAIN_MAX_N = 60*5
-CORR_DIFF_THOLD = 0.5
+CORR_DIFF_THOLD = 0.25
 
 ORDER = [
     'metric_correlations',
