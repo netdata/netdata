@@ -213,9 +213,23 @@ void simple_connector_worker(void *instance_p)
             failures++;
         }
 
+        BUFFER *buffer = instance->buffer;
+
+        if (failures > instance->config.buffer_on_failures) {
+            stats->lost_bytes += buffer_strlen(buffer);
+            error(
+                "EXPORTING: connector instance %s reached %d exporting failures. "
+                "Flushing buffers to protect this host - this results in data loss on server '%s'",
+                instance->config.name, failures, instance->config.destination);
+            buffer_flush(buffer);
+            failures = 0;
+            stats->data_lost_events++;
+            stats->lost_metrics = stats->buffered_metrics;
+        }
+
         send_internal_metrics(instance);
 
-        if(likely(buffer_strlen((BUFFER *)instance->buffer) == 0))
+        if(likely(buffer_strlen(buffer) == 0))
             stats->buffered_metrics = 0;
 
         uv_mutex_unlock(&instance->mutex);

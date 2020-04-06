@@ -397,7 +397,7 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
  */
 int simple_connector_update_buffered_bytes(struct instance *instance)
 {
-    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)instance->buffer);
+    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)(instance->buffer));
 
     return 0;
 }
