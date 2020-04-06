@@ -16,7 +16,7 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 TRAIN_MAX_N = 60*5
-CORR_DIFF_THOLD = 0.2
+CORR_DIFF_THOLD = 0.5
 
 ORDER = [
     'metric_correlations',
@@ -25,7 +25,8 @@ ORDER = [
 
 CHARTS = {
     'metric_correlations': {
-        'options': [None, 'Metric Correlations', '(var1,var2)', 'metric correlations', 'correlations.correlations', 'lines'],
+        'options': [None, 'Metric Correlations', '(var1,var2)', 'metric correlations', 'correlations.correlations',
+                    'lines'],
         'lines': []
     },
     'metric_correlation_changes': {
@@ -123,7 +124,7 @@ class Service(SimpleService):
             correlation = df[col].values[0]
             dimension_id = col.replace('system.', '').replace('__', ' , ')
             dimension_id = '({})'.format(dimension_id)
-            dimension_id_flag = '({} flag)'.format(dimension_id)
+            dimension_id_flag = '{} flag'.format(dimension_id)
             if dimension_id in self.correlations:
                 correlation_diff = correlation - self.correlations[dimension_id]
             else:
