@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Supported collectors list"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md
 ---
 -->
@@ -37,7 +38,7 @@ collector—we may be looking for contributions from users such as yourself!
 | [diskspace.plugin](diskspace.plugin/README.md)   | Linux   | Collects disk space usage metrics on Linux mount points.                                   |
 | [freebsd.plugin](freebsd.plugin/README.md)       | FreeBSD | Collects resource usage and performance data on FreeBSD systems.                           |
 | [idlejitter.plugin](idlejitter.plugin/README.md) | any     | Measures CPU latency and jitter on all operating systems.                                  |
-| [macos.plugin](macos.plugin/README.md)           | macos   | Collects resource usage and performance data on MacOS systems.                             |
+| [macos.plugin](macos.plugin/README.md)           | macos   | Collects resource usage and performance data on macOS systems.                             |
 | [proc.plugin](proc.plugin/README.md)             | Linux   | Collects resource usage and performance data on Linux systems.                             |
 | [slabinfo.plugin](slabinfo.plugin/README.md)     | Linux   | Collects kernel SLAB details on Linux systems.                                             |
 | [statsd.plugin](statsd.plugin/README.md)         | any     | Implements a high performance `statsd` server for Netdata.                                 |
