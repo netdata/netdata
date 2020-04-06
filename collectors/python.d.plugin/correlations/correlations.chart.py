@@ -57,7 +57,7 @@ class Service(SimpleService):
         """
         if charts is None:
             charts = ['system.cpu']
-        url = f'http://{host}/api/v1/allmetrics?format=json'
+        url = 'http://{}/api/v1/allmetrics?format=json'.format(host)
         raw_data = requests.get(url).json()
         data = []
         for k in raw_data:
