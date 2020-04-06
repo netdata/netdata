@@ -17,8 +17,8 @@ configuration, but there are some valuable things to know to get the most out of
 We'll skip right into some technical details, so if you're brand-new to monitoring the health and performance of systems
 and applications, our [**step-by-step tutorial**](/docs/step-by-step/step-00.md) might be a better fit.
 
-> If you haven't installed Netdata yet, visit the [installation instructions](/packaging/installer) for details,
-> including our one-liner script, which automatically installs Netdata on almost all Linux distributions.
+> If you haven't installed Netdata yet, visit the [installation instructions](/packaging/installer/README.md) for
+> details, including our one-liner script, which automatically installs Netdata on almost all Linux distributions.
 
 ## Access the dashboard
 
