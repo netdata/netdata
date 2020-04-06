@@ -80,9 +80,7 @@ struct netdata_static_thread static_threads[] = {
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
-#ifdef ENABLE_EXPORTING
     {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
-#endif
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
 

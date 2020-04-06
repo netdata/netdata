@@ -206,7 +206,7 @@ int start_host_formatting(struct engine *engine, RRDHOST *host)
  * Start chart formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
- * @param a chart.
+ * @param st a chart.
  * @return Returns 0 on success, 1 on failure.
  */
 int start_chart_formatting(struct engine *engine, RRDSET *st)

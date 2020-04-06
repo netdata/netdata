@@ -87,7 +87,7 @@ static void test_read_exporting_config(void **state)
     assert_ptr_not_equal(instance, NULL);
     assert_ptr_equal(instance->next, NULL);
     assert_ptr_equal(instance->engine, engine);
-    assert_int_equal(instance->config.type, BACKEND_TYPE_GRAPHITE);
+    assert_int_equal(instance->config.type, EXPORTING_CONNECTOR_TYPE_GRAPHITE);
     assert_string_equal(instance->config.destination, "localhost");
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);
@@ -761,6 +761,140 @@ static void test_flush_host_labels(void **state)
     assert_int_equal(buffer_strlen(instance->labels), 0);
 }
 
+static void test_can_send_rrdset(void **state)
+{
+    (void)*state;
+
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 1);
+
+    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+
+    // TODO: test with a denying simple pattern
+
+    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
+
+    localhost->rrdset_root->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
+    prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+}
+
+static void test_prometheus_name_copy(void **state)
+{
+    (void)*state;
+
+    char destination_name[PROMETHEUS_ELEMENT_MAX + 1];
+    assert_int_equal(prometheus_name_copy(destination_name, "test-name", PROMETHEUS_ELEMENT_MAX), 9);
+
+    assert_string_equal(destination_name, "test_name");
+}
+
+static void test_prometheus_label_copy(void **state)
+{
+    (void)*state;
+
+    char destination_name[PROMETHEUS_ELEMENT_MAX + 1];
+    assert_int_equal(prometheus_label_copy(destination_name, "test\"\\\nlabel", PROMETHEUS_ELEMENT_MAX), 15);
+
+    assert_string_equal(destination_name, "test\\\"\\\\\\\nlabel");
+}
+
+static void test_prometheus_units_copy(void **state)
+{
+    (void)*state;
+
+    char destination_name[PROMETHEUS_ELEMENT_MAX + 1];
+    assert_string_equal(prometheus_units_copy(destination_name, "test-units", PROMETHEUS_ELEMENT_MAX, 0), "_test_units");
+    assert_string_equal(destination_name, "_test_units");
+
+    assert_string_equal(prometheus_units_copy(destination_name, "%", PROMETHEUS_ELEMENT_MAX, 0), "_percent");
+    assert_string_equal(prometheus_units_copy(destination_name, "test-units/s", PROMETHEUS_ELEMENT_MAX, 0), "_test_units_persec");
+
+    assert_string_equal(prometheus_units_copy(destination_name, "KiB", PROMETHEUS_ELEMENT_MAX, 1), "_KB");
+}
+
+static void test_format_host_labels_prometheus(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    format_host_labels_prometheus(instance, localhost);
+    assert_string_equal(buffer_tostring(instance->labels), "key1=\"netdata\",key2=\"value2\"");
+}
+
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
+{
+    (void)state;
+
+    BUFFER *buffer = buffer_create(0);
+
+    localhost->hostname = strdupz("test_hostname");
+    localhost->rrdset_root->family = strdupz("test_family");
+    localhost->rrdset_root->context = strdupz("test_context");
+
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(localhost, buffer, "test_server", "test_prefix", 0, 0);
+
+    assert_string_equal(
+        buffer_tostring(buffer),
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
+        "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
+        "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\"} 690565856.0000000\n");
+
+    buffer_flush(buffer);
+
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+        localhost, buffer, "test_server", "test_prefix", 0, PROMETHEUS_OUTPUT_NAMES | PROMETHEUS_OUTPUT_TYPES);
+
+    assert_string_equal(
+        buffer_tostring(buffer),
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
+        "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
+        "# COMMENT TYPE test_prefix_test_context gauge\n"
+        "test_prefix_test_context{chart=\"chart_name\",family=\"test_family\",dimension=\"dimension_name\"} 690565856.0000000\n");
+
+    buffer_flush(buffer);
+
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(localhost, buffer, "test_server", "test_prefix", 0, 0);
+
+    assert_string_equal(
+        buffer_tostring(buffer),
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
+        "netdata_host_tags_info{instance=\"test_hostname\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_host_tags{instance=\"test_hostname\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\",instance=\"test_hostname\"} 690565856.0000000\n");
+
+    free(localhost->rrdset_root->context);
+    free(localhost->rrdset_root->family);
+    free(localhost->hostname);
+    buffer_free(buffer);
+}
+
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
 static void test_init_prometheus_remote_write_instance(void **state)
 {
@@ -1310,6 +1444,19 @@ int main(void)
 
     int test_res = cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
                    cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
+
+    const struct CMUnitTest prometheus_web_api_tests[] = {
+        cmocka_unit_test_setup_teardown(test_can_send_rrdset, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(test_prometheus_name_copy, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(test_prometheus_label_copy, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(test_prometheus_units_copy, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_labels_prometheus, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            rrd_stats_api_v1_charts_allmetrics_prometheus, setup_prometheus, teardown_prometheus),
+    };
+
+    test_res += cmocka_run_group_tests_name("prometheus_web_api", prometheus_web_api_tests, NULL, NULL);
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     const struct CMUnitTest prometheus_remote_write_tests[] = {
