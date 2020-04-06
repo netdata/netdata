@@ -34,15 +34,15 @@ ORDER = [
 
 CHARTS = {
     'anomaly_score': {
-        'options': [None, 'Anomaly Score', 'Anomaly Score', 'anomaly_score', 'anomalies.score', 'line'],
+        'options': [None, 'Anomaly Score', 'Anomaly Score', 'score', 'anomalies.score', 'line'],
         'lines': []
     },
     'anomaly_probability': {
-        'options': [None, 'Anomaly Probability', 'Anomaly Probability', 'anomaly_probability', 'anomalies.probability', 'line'],
+        'options': [None, 'Anomaly Probability', 'Anomaly Probability', 'probability', 'anomalies.probability', 'line'],
         'lines': []
     },
     'anomaly_flag': {
-        'options': [None, 'Anomaly Flag', 'Anomaly Flag', 'anomaly_flag', 'anomalies.flag', 'stacked'],
+        'options': [None, 'Anomaly Flag', 'Anomaly Flag', 'flag', 'anomalies.flag', 'stacked'],
         'lines': []
     },
 }
