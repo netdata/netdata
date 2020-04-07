@@ -111,7 +111,7 @@ cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /et
 ```
 
 For more information about editing the defaults or writing new alarm entities, see our health monitoring [quickstart
-guide](../../health/QUICKSTART.md).
+guide](/health/QUICKSTART.md).
 
 ## What's next?
 

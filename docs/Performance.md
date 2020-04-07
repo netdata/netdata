@@ -32,7 +32,7 @@ For most server systems, with a few hundred charts and a few thousand dimensions
 
 To prove Netdata scalability, check issue [#1323](https://github.com/netdata/netdata/issues/1323#issuecomment-265501668) where Netdata collects 95.000 metrics per second, with 12% CPU utilization of a single core!
 
-In embedded systems, if the Netdata daemon is using a lot of CPU without any web clients accessing it, you should lower the data collection frequency. To set the data collection frequency, edit `/etc/netdata/netdata.conf` and set `update_every` to a higher number (this is the frequency in seconds data are collected for all charts: higher number of seconds = lower frequency, the default is 1 for per second data collection). You can also set this frequency per module or chart. Check the [daemon configuration](../daemon/config) for plugins and charts. For specific modules, the configuration needs to be changed in:
+In embedded systems, if the Netdata daemon is using a lot of CPU without any web clients accessing it, you should lower the data collection frequency. To set the data collection frequency, edit `/etc/netdata/netdata.conf` and set `update_every` to a higher number (this is the frequency in seconds data are collected for all charts: higher number of seconds = lower frequency, the default is 1 for per second data collection). You can also set this frequency per module or chart. Check the [daemon configuration](/daemon/config/README.md) for plugins and charts. For specific modules, the configuration needs to be changed in:
 
 -   `python.d.conf` for [python](/collectors/python.d.plugin/README.md)
 -   `node.d.conf` for [nodejs](/collectors/node.d.plugin/README.md)

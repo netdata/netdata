@@ -7,14 +7,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-clo
 
 # Registration and signing in
 
-To use the features of [Netdata Cloud](README.md), you must first register an account with Netdata Cloud and associate your first Netdata node with the Netdata Cloud [registry](../../registry/README.md). **Netdata Cloud is entirely free for all Netdata users**, and does not store any metrics created by your machines. You keep your data—Netdata Cloud just connects it all together.
+To use the features of [Netdata Cloud](README.md), you must first register an account with Netdata Cloud and associate
+your first Netdata node with the Netdata Cloud [registry](/registry/README.md). **Netdata Cloud is entirely free for all
+Netdata users**, and does not store any metrics created by your machines. You keep your data—Netdata Cloud just connects
+it all together.
 
-!!! attention "Opting-in to Netdata Cloud"
-    By [signing in](signing-in.md) to Netdata Cloud, you opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store). We never store the metrics collected by Netdata agents, just machine GUIDs, person GUID, URLs, and account information.
+> By [signing in](/docs/netdata-cloud/signing-in.md) to Netdata Cloud, you opt-in to let Netdata Cloud receive and store
+> the information described [here](/registry/README.md#what-data-does-the-registry-store). We never store the metrics
+> collected by Netdata agents, just machine GUIDs, person GUID, URLs, and account information.
 
 ## Registering a Netdata Cloud account
 
-There is only one prerequisite to using Netdata Cloud: A working Netdata agent. If you don't have a running Netdata agent yet, check out the [installation guides](../../packaging/installer/) for more information.
+There is only one prerequisite to using Netdata Cloud: A working Netdata agent. If you don't have a running Netdata
+agent yet, check out the [installation guides](/packaging/installer/README.md) for more information.
 
 To begin, visit the web dashboard of your Netdata agent by navigating your browser of choice to `http://SERVER-IP:19999`. You’ll see a dashboard much like this:
 
