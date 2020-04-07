@@ -23,6 +23,8 @@ static char *aclk_password = NULL;
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
 int aclk_connected = 0;             // Exposed in the web-api
+usec_t aclk_session_us = 0;         // Used by the mqtt layer
+time_t aclk_session_sec = 0;        // User ny the mqtt layer
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -750,7 +752,7 @@ int aclk_execute_query(struct aclk_query *this_query)
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
 
-        aclk_create_header(local_buffer, "http", this_query->msg_id);
+        aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0);
 
         char *encoded_response = aclk_encode_response(w->response.data);
 
@@ -819,11 +821,6 @@ int aclk_process_query()
         case ACLK_CMD_ALARM:
             debug(D_ACLK, "EXECUTING an alarm update command");
             aclk_send_message(this_query->topic, this_query->query, this_query->msg_id);
-            break;
-
-        case ACLK_CMD_ALARMS:
-            debug(D_ACLK, "EXECUTING an alarms update command");
-            aclk_send_alarm_metadata();
             break;
 
         case ACLK_CMD_CLOUD:
@@ -1514,7 +1511,7 @@ void aclk_shutdown()
     info("Shutdown complete");
 }
 
-inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
+inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us)
 {
     uuid_t uuid;
     char uuid_str[36 + 1];
@@ -1525,9 +1522,11 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         msg_id = uuid_str;
     }
 
-    usec_t time_created_offset_usec = now_realtime_usec();
-    time_t time_created = time_created_offset_usec / USEC_PER_SEC;
-    time_created_offset_usec = time_created_offset_usec % USEC_PER_SEC;
+    if (ts_secs == 0) {
+        ts_us = now_realtime_usec();
+        ts_secs = ts_us / USEC_PER_SEC;
+        ts_us = ts_us % USEC_PER_SEC;
+    }
 
     buffer_sprintf(
         dest,
@@ -1535,9 +1534,11 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         "\t\"msg-id\": \"%s\",\n"
         "\t\"timestamp\": %ld,\n"
         "\t\"timestamp-offset-usec\": %llu,\n"
+        "\t\"connect\": %ld,\n"
+        "\t\"connect-offset-usec\": %llu,\n"
         "\t\"version\": %d,\n"
         "\t\"payload\": ",
-        type, msg_id, time_created, time_created_offset_usec, ACLK_VERSION);
+        type, msg_id, ts_secs, ts_us, aclk_session_sec, aclk_session_us, ACLK_VERSION);
 
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
 }
@@ -1599,7 +1600,8 @@ void aclk_send_alarm_metadata()
 
     debug(D_ACLK, "Metadata alarms start");
 
-    aclk_create_header(local_buffer, "connect_alarms", msg_id);
+    // Time is the session start by definition
+    aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
 
     buffer_sprintf(local_buffer, "{\n\t \"configured-alarms\" : ");
     health_alarms2json(localhost, local_buffer, 1);
@@ -1635,7 +1637,8 @@ int aclk_send_info_metadata()
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    aclk_create_header(local_buffer, "connect", msg_id);
+    // Time is the session start by definition
+    aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
     web_client_api_request_v1_info_fill_buffer(localhost, local_buffer);
     debug(D_ACLK, "Metadata %s with info has %zu bytes", msg_id, local_buffer->len);
@@ -1728,7 +1731,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    aclk_create_header(local_buffer, "chart", msg_id);
+    aclk_create_header(local_buffer, "chart", msg_id, 0, 0);
     rrdset2json(st, local_buffer, NULL, NULL, 1);
     buffer_sprintf(local_buffer, "\t\n}");
 
@@ -1793,7 +1796,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     char *msg_id = create_uuid();
 
     buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "status-change", msg_id);
+    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0);
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     health_alarm_entry2json_nolock(local_buffer, ae, host);
