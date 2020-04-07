@@ -9,10 +9,10 @@ import pandas as pd
 from pyod.models.knn import KNN
 from pyod.models.hbos import HBOS
 from pyod.models.cblof import CBLOF
-#from pyod.models.auto_encoder import AutoEncoder
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
+update_every = 1
 
 HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
@@ -136,8 +136,6 @@ class Service(SimpleService):
                     self.models[chart] = KNN(**self.model_config['kwargs'])
                 elif self.model_config['type'] == 'cblof':
                     self.models[chart] = CBLOF(**self.model_config['kwargs'])
-                #elif self.model_config['type'] == 'auto_encoder':
-                #    self.models[chart] = AutoEncoder(**self.model_config['kwargs'])
 
             chart_score = "{}_score".format(chart.replace('system.', ''))
             chart_prob = "{}_prob".format(chart.replace('system.', ''))
