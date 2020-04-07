@@ -24,7 +24,7 @@ There are two primary ways to view Netdata's dashboards:
 
 2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
    [customize the standard dashboards](/web/gui/README.md#customizing-the-standard-dashboard)
-   using JavaScript, or create entirely new [custom dashboards](/web/gui/README.md#custom/) or
+   using JavaScript, or create entirely new [custom dashboards](/web/gui/custom/README.md) or
    [Atlassian Confluence dashboards](/web/gui/confluence/README.md).
 
 You can also view all the data Netdata collects through the [REST API v1](/web/api/).
