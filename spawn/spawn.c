@@ -231,7 +231,7 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
 
 #define CONCURRENT_SPAWNS 16
 #define SPAWN_ITERATIONS  10000
-#define CONCURRENT_STRESS_TEST
+#undef CONCURRENT_STRESS_TEST
 
 void spawn_init(void)
 {

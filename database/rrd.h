@@ -576,7 +576,7 @@ struct alarm_entry {
     char *recipient;
     time_t exec_run_timestamp;
     int exec_code;
-    pid_t exec_pid;
+    uint64_t exec_spawn_serial;
 
     char *source;
     char *units;

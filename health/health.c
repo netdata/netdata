@@ -360,14 +360,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
-    ae->exec_run_timestamp = now_realtime_sec();
+    ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
     debug(D_HEALTH, "executing command '%s'", command_to_run);
-    if (netdata_spawn(command_to_run, &ae->exec_pid)) {
-        error("HEALTH: Cannot spawn(\"%s\", \"r\").", command_to_run);
-        goto done;
-    }
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+    ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     enqueue_alarm_notify_in_progress(ae);
 
     return; //health_alarm_wait_for_execution
@@ -379,7 +376,7 @@ static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
         return;
 
-    ae->exec_code = netdata_spawn_waitpid(ae->exec_pid);
+    spawn_wait_cmd(ae->exec_spawn_serial, &ae->exec_code, &ae->exec_run_timestamp);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
     ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
 
