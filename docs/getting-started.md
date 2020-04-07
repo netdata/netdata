@@ -198,7 +198,7 @@ If you have Netdata installed on multiple systems, you can have them all appear 
 corner of the dashboard.
 
 To show all your servers in that menu, you need to [register for or sign in](/docs/netdata-cloud/signing-in.md) to
-[Netdata Cloud](/docs/netdata-cloud/) from each system. Each system will then appear in the **My nodes** menu, which you
+[Netdata Cloud](/docs/netdata-cloud/README.md) from each system. Each system will then appear in the **My nodes** menu, which you
 can use to navigate between your systems quickly.
 
 ![Animated GIF of the My Nodes menu in
@@ -240,10 +240,10 @@ added all your systems to the **My nodes** menu, you've just gotten started with
 Take a look at some more advanced features and configurations:
 
 -   Centralize Netdata metrics from many systems with [streaming](/streaming/README.md)
--   Enable long-term archiving of Netdata metrics via [backends](/backends/) to time-series databases.
+-   Enable long-term archiving of Netdata metrics via [backends](/backends/README.md) to time-series databases.
 -   Improve security by putting Netdata behind an [Nginx proxy with SSL](/docs/Running-behind-nginx.md).
 
 Or, learn more about how you can contribute to [Netdata core](/CONTRIBUTING.md) or our
-[documentation](../docs/contributing/contributing-documentation.md)!
+[documentation](/docs/contributing/contributing-documentation.md)!
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fgetting-started&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

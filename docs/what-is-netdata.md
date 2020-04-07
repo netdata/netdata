@@ -55,17 +55,16 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 2.  [Our userbase](#user-base) - Enterprises we help monitor and our userbase
 3.  [Quickstart](#quickstart) - How to try it now on your systems
 4.  [Why Netdata](#why-netdata) - Why people love Netdata and how it compares with other solutions
-5.  [News](#news) - The latest news about Netdata
-6.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
-7.  [Infographic](#infographic) - Everything about Netdata in a single graphic
-8.  [Features](#features) - How you'll use Netdata on your systems
-9.  [Visualization](#visualization) - Learn about visual anomaly detection
-10. [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
-11. [Documentation](#documentation) - Read the documentation
-12. [Community](#community) - Discuss Netdata with others and get support
-13. [License](#license) - Check Netdata's licencing
-14. [Is it any good?](#is-it-any-good) - Yes.
-15. [Is it awesome?](#is-it-awesome) - Yes.
+5.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
+6.  [Infographic](#infographic) - Everything about Netdata in a single graphic
+7.  [Features](#features) - How you'll use Netdata on your systems
+8.  [Visualization](#visualization) - Learn about visual anomaly detection
+9. [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
+10. [Documentation](#documentation) - Read the documentation
+11. [Community](#community) - Discuss Netdata with others and get support
+12. [License](#license) - Check Netdata's licencing
+13. [Is it any good?](#is-it-any-good) - Yes.
+14. [Is it awesome?](#is-it-awesome) - Yes.
 
 ## What does it look like?
 
@@ -172,7 +171,7 @@ For more information about running Netdata in Docker, check the [docker installa
 
 From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
-page](docs/anonymous-statistics.md).
+page](/docs/anonymous-statistics.md).
 
 ## Why Netdata
 
@@ -265,17 +264,18 @@ This is what you should expect from Netdata:
 
 -   **Sophisticated alerting** - Netdata comes with hundreds of alarms **out of the box**! It supports dynamic
     thresholds, hysteresis, alarm templates, multiple role-based notification methods, and more.
--   **Notifications**: [alerta.io](/health/notifications/alerta/), [amazon sns](/health/notifications/awssns/),
-    [discordapp.com](/health/notifications/discord/), [email](/health/notifications/email/),
-    [flock.com](/health/notifications/flock/), [hangouts](/health/notifications/hangouts/),
-    [irc](/health/notifications/irc/), [kavenegar.com](/health/notifications/kavenegar/),
-    [messagebird.com](/health/notifications/messagebird/), [pagerduty.com](/health/notifications/pagerduty/),
-    [prowl](health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
-    [pushover.net](health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
-    [slack.com](/health/notifications/slack/), [smstools3](/health/notifications/smstools3/),
-    [syslog](/health/notifications/syslog/), [telegram.org](/health/notifications/telegram/),
-    [twilio.com](/health/notifications/twilio/), [web](/health/notifications/web/) and [custom
-    notifications](/health/notifications/custom/).
+-   **Notifications**: [alerta.io](/health/notifications/alerta/README.md), [amazon
+    sns](/health/notifications/awssns/README.md), [discordapp.com](/health/notifications/discord/README.md),
+    [email](/health/notifications/email/README.md), [flock.com](/health/notifications/flock/README.md),
+    [hangouts](/health/notifications/hangouts/README.md), [irc](/health/notifications/irc/README.md),
+    [kavenegar.com](/health/notifications/kavenegar/README.md), [messagebird.com](/health/notifications/messagebird/),
+    [pagerduty.com](/health/notifications/pagerduty/README.md), [prowl](/health/notifications/prowl/README.md),
+    [pushbullet.com](/health/notifications/pushbullet/README.md),
+    [pushover.net](/health/notifications/pushover/README.md), [rocket.chat](/health/notifications/rocketchat/README.md),
+    [slack.com](/health/notifications/slack/README.md), [smstools3](/health/notifications/smstools3/README.md),
+    [syslog](/health/notifications/syslog/README.md), [telegram.org](/health/notifications/telegram/README.md),
+    [twilio.com](/health/notifications/twilio/README.md), [web](/health/notifications/web/README.md) and [custom
+    notifications](/health/notifications/custom/README.md).
 
 ### Integrations
 

@@ -10,7 +10,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md
 Netdata copyright info:
  Copyright 2016-2018, Costa Tsaousis.
  Copyright 2018, Netdata Inc.
- Released under [GPL v3 or later](LICENSE).
+ Released under [GPL v3 or later](/LICENSE).
 
 Netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).

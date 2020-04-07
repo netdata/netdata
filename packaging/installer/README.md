@@ -12,7 +12,8 @@ IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and
 
 The best way to install Netdata is with our [**automatic one-line installation
 script**](#automatic-one-line-installation-script), which works with all Linux distributions, or our [**.deb/rpm
-packages**](methods/packages.md), which seamlessly install with your distribution's package manager.
+packages**](/packaging/installer/methods/packages.md), which seamlessly install with your distribution's package
+manager.
 
 If you want to install Netdata with Docker, on a Kubernetes cluster, or a different operating system, see [Have a
 different operating system, or want to try another
@@ -23,7 +24,7 @@ packages. We recommend you install Netdata using one of the methods listed below
 checksum-verified packages.
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
+about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
@@ -52,7 +53,7 @@ When you finish installing Netdata, be sure to visit our [step-by-step tutorial]
 for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](../../docs/getting-started.md) for a quick overview.
+guide](/docs/getting-started.md) for a quick overview.
 
 ## Have a different operating system, or want to try another method?
 

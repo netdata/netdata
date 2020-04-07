@@ -40,9 +40,9 @@ content.
 
 ### Health entities
 
-[Stopping notifications for individual alarms](/docs/tutorials/stop-notifications-alarms.md)
+[Stopping notifications for individual alarms](/health/tutorials/stop-notifications-alarms.md)
 
-[Use dimension templates to create dynamic alarms](/docs/tutorials/dimension-templates.md)
+[Use dimension templates to create dynamic alarms](/health/tutorials/dimension-templates.md)
 
 </div>
 </DocsTutorials>

@@ -63,7 +63,7 @@ it there.
 #### Increase the long-term metrics retention period
 
 Increase the values for the `page cache size` and `dbengine disk space` settings in the [`[global]`
-section](../daemon/config/README.md#global-section-options) of `netdata.conf`. Read our tutorial on [increasing
+section](/daemon/config/README.md#global-section-options) of `netdata.conf`. Read our tutorial on [increasing
 long-term metrics storage](/docs/tutorials/longer-metrics-storage.md) and the [memory requirements for the database
 engine](/database/engine/README.md#memory-requirements).
 
@@ -151,7 +151,7 @@ documentation](/web/server/README.md#binding-netdata-to-multiple-ports) for more
 
 #### Reduce the resources Netdata uses
 
-The page on [Netdata performance](/docs/erformance.md) has an excellent guide on how to reduce the Netdata cpu/disk/RAM
+The page on [Netdata performance](/docs/Performance.md) has an excellent guide on how to reduce the Netdata cpu/disk/RAM
 utilization to levels suitable even for the weakest [IoT devices](/docs/netdata-for-IoT.md).
 
 #### Change when Netdata saves metrics to disk
