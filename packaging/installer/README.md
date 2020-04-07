@@ -42,12 +42,13 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
-stable releases, or disable anonymous statistics, see the [`kickstart.sh` method page](methods/kickstart.md). 
+stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
+page](/packaging/installer/methods/kickstart.md). 
 
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../docs/step-by-step/step-00.md)
+When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md)
 for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
@@ -56,7 +57,8 @@ guide](../../docs/getting-started.md) for a quick overview.
 ## Have a different operating system, or want to try another method?
 
 Netdata works on many different operating systems, each with a few possible installation methods. To see the full list
-of approved methods for each operating system/version we support, see our [distribution matrix](../DISTRIBUTIONS.md).
+of approved methods for each operating system/version we support, see our [distribution
+matrix](/packaging/DISTRIBUTIONS.md).
 
 Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
 operating systems.
@@ -88,35 +90,35 @@ Install Netdata on cloud providers (GCP/AWS/Azure)](/packaging/installer/methods
 
 [![Install Netdata on
 macOS](https://user-images.githubusercontent.com/1153921/76029616-1673b600-5ef2-11ea-888a-4a1375a42246.png) Install
-Netdata on macOS](methods/macos.md)
+Netdata on macOS](/packaging/installer/methods/macos.md)
 
 [![Install Netdata on
 FreeBSD](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png) Install
-Netdata on FreeBSD](methods/freebsd.md)
+Netdata on FreeBSD](/packaging/installer/methods/freebsd.md)
 
 [![Install manually from
 source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
-manually from source](methods/manual.md)
+manually from source](/packaging/installer/methods/manual.md)
 
 [![Install on offline/air-gapped
 systems](https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png) Install on
-offline/air-gapped systems](methods/offline.md)
+offline/air-gapped systems](/packaging/installer/methods/offline.md)
 
 [![Installation on
 PFSense](https://user-images.githubusercontent.com/1153921/76030071-cb0dd780-5ef2-11ea-87cd-607d943dc521.png)
-Installation on PFSense](methods/pfsense.md)
+Installation on PFSense](/packaging/installer/methods/pfsense.md)
 
 [![Install Netdata on
 Synology](https://user-images.githubusercontent.com/1153921/76029789-5fc40580-5ef2-11ea-9d35-c022f682da77.png) Install
-Netdata on Synology](methods/synology.md)
+Netdata on Synology](/packaging/installer/methods/synology.md)
 
 [![Manual installation on
 FreeNAS](https://user-images.githubusercontent.com/1153921/76030537-1c1dcb80-5ef3-11ea-9cf9-f130e7d41712.png) Manual
-installation on FreeNAS](methods/freenas.md)
+installation on FreeNAS](/packaging/installer/methods/freenas.md)
 
 [![Manual installation on
 Alpine](https://user-images.githubusercontent.com/1153921/76029682-37d4a200-5ef2-11ea-9a2c-a8ffeb1d13c3.png) Manual
-installation on Alpine](methods/alpine.md)
+installation on Alpine](/packaging/installer/methods/alpine.md)
 
 </div>
 
@@ -132,7 +134,8 @@ script](#automatic-one-line-installation-script).
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
 ```
 
-With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).
+With automatic updates disabled, you can choose exactly when and how you [update
+Netdata](/packaging/installer/UPDATE.md).
 
 ## Nightly vs. stable releases
 
