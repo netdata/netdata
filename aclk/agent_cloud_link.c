@@ -1585,8 +1585,14 @@ void aclk_send_alarm_metadata()
 
     debug(D_ACLK, "Metadata alarms start");
 
-    // Time is the session start by definition
-    aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
+    // on_connect messages are sent on a health reload, if the on_connect message is real then we
+    // use the session time as the fake timestamp to indicate that it starts the session. If it is
+    // a fake on_connect message then use the real timestamp to indicate it is within the existing
+    // session.
+    if (aclk_metadata_submitted == ACLK_METADATA_SENT)
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0);
+    else
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     buffer_sprintf(local_buffer, "{\n\t \"configured-alarms\" : ");
@@ -1623,8 +1629,14 @@ int aclk_send_info_metadata()
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    // Time is the session start by definition
-    aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
+    // on_connect messages are sent on a health reload, if the on_connect message is real then we
+    // use the session time as the fake timestamp to indicate that it starts the session. If it is
+    // a fake on_connect message then use the real timestamp to indicate it is within the existing
+    // session.
+    if (aclk_metadata_submitted == ACLK_METADATA_SENT)
+        aclk_create_header(local_buffer, "connect", msg_id, 0, 0);
+    else
+        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
