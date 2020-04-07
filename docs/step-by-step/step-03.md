@@ -21,7 +21,7 @@ together for a seamless experience when monitoring multiple systems.
 All without remembering IPs or making a bunch of bookmarks.
 
 > If you're interested in streaming the metrics from one Netdata agent to another, that's unfortunately not part of this
-> tutorial. You'll want to reference our [streaming documentation](../../streaming/README.md) when you're finished with
+> tutorial. You'll want to reference our [streaming documentation](/streaming/README.md) when you're finished with
 > these steps.
 
 Even if you don't have multiple systems right now, keep reading. The instructions to follow will show you how to test
