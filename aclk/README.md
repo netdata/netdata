@@ -37,6 +37,10 @@ With running Netdata agent visit this URL http://127.0.0.1/api/v1/info. JSON ret
 
 - In case `cloud-available` is `false` after you verified Cloud is enabled in the previous step, something has caused the build of the Cloud features to fail during the installation. For user convenience, we install Netdata agent without Cloud functionality in such cases as opposed to failing installation. In case you are not able to spot the error causing Cloud functionality to not be built, try running the installer with the option `--require-cloud` which will cause the installation to fail. This should make the error more obvious.
 
+- In case `agent-claimed` is `false` please claim your agent with cloud.
+
+- In case all above flags are `true` and `aclk-available` is `false` there are issues with connection of agent to the Cloud. Please check your firewall and Netdata proxy settings. If you are sure firewall and proxy are not issue best way to procees is to consult `error.log` and contact us by filing issue in our `github.com` repository. Thank you in advance for you willingness to help us.
+
 A common cause of failure to build Cloud features is lack of one of the following dependencies in the system:
 - `cmake`
 - OpenSSL incl. devel package
