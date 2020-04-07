@@ -11,14 +11,15 @@ import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 2
+update_every = 5
 
 HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
-    'system.cpu', 'system.load', 'system.io', 'system.pgpgio',
-    'system.net', 'system.ip', 'system.ipv6', 'system.intr'
+    'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
+    'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-N = 500
-RECALC_EVERY = 50
+N = 60*5
+RECALC_EVERY = 60
 ZSCORE_CLIP = 10
 
 ORDER = [
