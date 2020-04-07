@@ -4,6 +4,10 @@
 
 /**
  * Create a chart for the main exporting thread CPU usage
+ *
+ * @param st_rusage the thead CPU usage chart
+ * @param rd_user a dimension for user CPU usage
+ * @param rd_system a dimension for system CPU usage
  */
 void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system)
 {
@@ -12,7 +16,7 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
 
     *st_rusage = rrdset_create_localhost(
         "netdata", "exporting_main_thread_cpu", NULL, "exporting", NULL, "Netdata Main Exporting Thread CPU Usage",
-        "milliseconds/s", "exporting", NULL, 130630, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+        "milliseconds/s", "exporting", NULL, 130600, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
     *rd_user = rrddim_add(*st_rusage, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     *rd_system = rrddim_add(*st_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -20,6 +24,10 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
 
 /**
  * Send the main exporting thread CPU usage
+ *
+ * @param st_rusage a thead CPU usage chart
+ * @param rd_user a dimension for user CPU usage
+ * @param rd_system a dimension for system CPU usage
  */
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
 {
@@ -60,7 +68,7 @@ void send_internal_metrics(struct instance *instance)
 
         stats->st_metrics = rrdset_create_localhost(
             "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Buffered Metrics", "metrics", "exporting", NULL,
-            130600, instance->config.update_every, RRDSET_TYPE_LINE);
+            130610, instance->config.update_every, RRDSET_TYPE_LINE);
 
         stats->rd_buffered_metrics = rrddim_add(stats->st_metrics, "buffered", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         stats->rd_lost_metrics     = rrddim_add(stats->st_metrics, "lost", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -73,7 +81,7 @@ void send_internal_metrics(struct instance *instance)
 
         stats->st_bytes = rrdset_create_localhost(
             "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Exporting Data Size", "KiB", "exporting", NULL,
-            130610, instance->config.update_every, RRDSET_TYPE_AREA);
+            130620, instance->config.update_every, RRDSET_TYPE_AREA);
 
         stats->rd_buffered_bytes = rrddim_add(stats->st_bytes, "buffered", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         stats->rd_lost_bytes     = rrddim_add(stats->st_bytes, "lost", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -102,7 +110,7 @@ void send_internal_metrics(struct instance *instance)
 
         stats->st_rusage = rrdset_create_localhost(
             "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Exporting Instance Thread CPU Usage",
-            "milliseconds/s", "exporting", NULL, 130630, instance->config.update_every, RRDSET_TYPE_STACKED);
+            "milliseconds/s", "exporting", NULL, 130640, instance->config.update_every, RRDSET_TYPE_STACKED);
 
         stats->rd_user   = rrddim_add(stats->st_rusage, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         stats->rd_system = rrddim_add(stats->st_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);

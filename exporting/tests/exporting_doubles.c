@@ -82,10 +82,26 @@ int __wrap_notify_workers(struct engine *engine)
     return mock_type(int);
 }
 
-int __wrap_send_internal_metrics(struct engine *engine)
+void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(st_rusage);
+    check_expected_ptr(rd_user);
+    check_expected_ptr(rd_system);
+}
+
+void __wrap_send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
+{
+    function_called();
+    check_expected_ptr(st_rusage);
+    check_expected_ptr(rd_user);
+    check_expected_ptr(rd_system);
+}
+
+int __wrap_send_internal_metrics(struct instance *instance)
+{
+    function_called();
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
