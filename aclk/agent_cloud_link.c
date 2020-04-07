@@ -915,7 +915,7 @@ void *aclk_query_main_thread(void *ptr)
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
-                aclk_metadata_submitted = 0;
+                aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
             }
         }
 
