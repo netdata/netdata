@@ -67,11 +67,9 @@ If you would prefer to disable the ACLK and not use Netdata Cloud, you have two 
 2.  Change a runtime setting in your `netdata.conf` file. This setting only stops the agent from attempting any
     connection via the ACLK, but does not prevent the installer from downloading and compiling the ACLK's dependencies.
 
-> 🎆 Needed: Configuration flag for disabling ACLK.
-
 ```conf
 [global]
-    ???
+    netdata cloud = disable
 ```
 
 ## Troubleshooting
