@@ -71,11 +71,11 @@ with .deb or .rpm packages](/packaging/installer/methods/packages.md)
 
 [![Install with a pre-built static binary for 64-bit
 systems](https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png) Install
-with a pre-built static binary for 64-bit systems](methods/kickstart-64.md)
+with a pre-built static binary for 64-bit systems](/packaging/installer/methods/kickstart-64.md)
 
 [![Install Netdata on
 Docker](https://user-images.githubusercontent.com/1153921/76029355-85044400-5ef1-11ea-96f4-79edc58f9b5c.png) Install
-Netdata on Docker](../docker/README.md)
+Netdata on Docker](/packaging/docker/README.md)
 
 [![Install Netdata on
 Kubernetes](https://user-images.githubusercontent.com/1153921/76029478-cc8ad000-5ef1-11ea-8981-dd04744b00da.png) Install
@@ -84,7 +84,7 @@ chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-de
 
 [![Install Netdata on cloud providers
 (GCP/AWS/Azure)](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png)
-Install Netdata on cloud providers (GCP/AWS/Azure)](methods/cloud-providers.md)
+Install Netdata on cloud providers (GCP/AWS/Azure)](/packaging/installer/methods/cloud-providers.md)
 
 [![Install Netdata on
 macOS](https://user-images.githubusercontent.com/1153921/76029616-1673b600-5ef2-11ea-888a-4a1375a42246.png) Install
