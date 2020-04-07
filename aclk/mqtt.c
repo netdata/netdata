@@ -279,6 +279,9 @@ int _link_set_lwt(char *sub_topic, int qos)
     usec_t lwt_time = aclk_session_sec * USEC_PER_SEC + aclk_session_us + 1;
     BUFFER *b = buffer_create(512);
     aclk_create_header(b, "disconnect", NULL, lwt_time / USEC_PER_SEC, lwt_time % USEC_PER_SEC);
+    buffer_sprintf(b, "}\n");
+    buffer_free(b);
+
 
     rc = mosquitto_will_set(mosq, topic, buffer_strlen(b), buffer_tostring(b), qos, 0);
     return rc;
