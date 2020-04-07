@@ -188,7 +188,7 @@ Netdata supports access lists in `netdata.conf`:
 -   `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
      The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
--   `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/api/health/README.md#health-management-api)
+-   `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/web/api/health/README.md#health-management-api)
 
 In order to check the FQDN of the connection without opening the Netdata agent to DNS-spoofing, a reverse-dns record
 must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
@@ -214,8 +214,8 @@ present that may match DNS FQDNs.
 
 |setting|default|info|
 |:-----:|:-----:|:---|
-|ses max window|`15`|See [single exponential smoothing](/api/queries/des/README.md)|
-|des max window|`15`|See [double exponential smoothing](/api/queries/des/README.md)|
+|ses max window|`15`|See [single exponential smoothing](/web/api/queries/des/README.md)|
+|des max window|`15`|See [double exponential smoothing](/web/api/queries/des/README.md)|
 |listen backlog|`4096`|The port backlog. Check `man 2 listen`.|
 |web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, Netdata will only serve files owned by user given in `run as user`.|
 |web files group|`netdata`|If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.|
