@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README
 
 Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected
 metrics, in real-time to it. This is quite different to [data archiving to third party time-series
-databases](../backends).
+databases](/backends/README.md).
 
 When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is capable of:
 

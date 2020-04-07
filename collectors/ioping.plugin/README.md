@@ -44,7 +44,7 @@ ioping_opts="-T 1000000 -R"
 ## alarms
 
 Netdata will automatically attach a few alarms for each host.
-Check the [latest versions of the ioping alarms](../../health/health.d/ioping.conf)
+Check the [latest versions of the ioping alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf)
 
 ## Multiple ioping Plugins With Different Settings
 
