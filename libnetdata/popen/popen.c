@@ -103,11 +103,13 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
         }
     }
 
-    // Mark all files to be closed by the exec() stage of posix_spawn()
-    int i;
-    for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
-        if (i != STDIN_FILENO && i != STDERR_FILENO && !(NO_PIPE_NULL_STDOUT == use_pipe && i == STDOUT_FILENO))
-            (void) fcntl(i, F_SETFD, FD_CLOEXEC);
+    if (USE_PIPE == use_pipe) { //TODO: remove me
+        // Mark all files to be closed by the exec() stage of posix_spawn()
+        int i;
+        for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
+            if (i != STDIN_FILENO && i != STDERR_FILENO && !(NO_PIPE_NULL_STDOUT == use_pipe && i == STDOUT_FILENO))
+                (void) fcntl(i, F_SETFD, FD_CLOEXEC);
+        }
     }
 
     if (!posix_spawn_file_actions_init(&fa)) {
@@ -118,7 +120,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
                 goto error_after_posix_spawn_file_actions_init;
             }
         } else { // NO_PIPE_NULL_STDOUT == use_pipe
-            if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", 0, O_WRONLY)) {
+            if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
                 error("posix_spawn_file_actions_addopen() failed");
                 // this is not a fatal error
             }

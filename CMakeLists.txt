@@ -624,6 +624,13 @@ set(ACLK_PLUGIN_FILES
         aclk/mqtt.h
         )
 
+set(SPAWN_PLUGIN_FILES
+        spawn/spawn.c
+        spawn/spawn_server.c
+        spawn/spawn_client.c
+        spawn/spawn.h
+        )
+
 set(ACLK_STATIC_LIBS
         ${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a
         ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a
@@ -717,6 +724,7 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
+        ${SPAWN_PLUGIN_FILES}
 )
 
 set(NETDATACLI_FILES

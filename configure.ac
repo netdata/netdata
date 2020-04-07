@@ -1431,6 +1431,7 @@ AC_CONFIG_FILES([
     web/server/static/Makefile
     claim/Makefile
     aclk/Makefile
+    spawn/Makefile
 ])
 AC_OUTPUT
 

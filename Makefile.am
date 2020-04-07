@@ -110,6 +110,7 @@ SUBDIRS += \
     web \
     claim \
     aclk \
+    spawn \
     $(NULL)
 
 
@@ -495,6 +496,13 @@ endif
 
 
 
+SPAWN_PLUGIN_FILES = \
+    spawn/spawn.c \
+    spawn/spawn_server.c \
+    spawn/spawn_client.c \
+    spawn/spawn.h \
+    $(NULL)
+
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
     exporting/exporting_engine.h \
@@ -586,6 +594,7 @@ NETDATA_FILES = \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
     $(ACLK_FILES) \
+    $(SPAWN_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
