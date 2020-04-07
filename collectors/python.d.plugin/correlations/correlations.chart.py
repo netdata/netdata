@@ -9,7 +9,7 @@ import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 2
-update_every = 10
+update_every = 5
 
 HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
