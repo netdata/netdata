@@ -115,6 +115,13 @@ class Service(SimpleService):
     def append_data(self, data):
         self.data.append(data)
 
+    def make_x(self, df):
+        if self.lags_n > 0:
+            X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
+        else:
+            X = df.values
+        return X
+
     def get_data(self):
 
         # empty dict to collect data points into
@@ -148,20 +155,18 @@ class Service(SimpleService):
                 # pull data into a pandas df
                 df_data = self.data_to_df(self.data, charts=[chart])
                 # refit the model
-                X_train = pd.concat([df_data.shift(n) for n in range(self.lags_n+1)], axis=1).dropna().values
+                X_train = self.make_x(df_data)
                 self.debug('X_train={}'.format(X_train))
                 self.models[chart].fit(X_train)
 
             # get anomaly score, prob and flag
             if hasattr(self.models[chart], "decision_scores_"):
 
-                X_predict = self.data_to_df(self.data[-self.lags_n:], charts=[chart])
-                self.debug('X_predict={}'.format(X_predict))
-                X_predict = X_predict.append(data_latest)
-                self.debug('X_predict={}'.format(X_predict))
-                X_predict = pd.concat([X_predict.shift(n) for n in range(self.lags_n + 1)], axis=1)
-                self.debug('X_predict={}'.format(X_predict))
-                X_predict = X_predict.dropna().values
+                if self.lags_n > 0:
+                    df_predict = self.data_to_df(self.data[-self.lags_n:], charts=[chart]).append(data_latest)
+                else:
+                    df_predict = data_latest
+                X_predict = self.make_x(df_predict)
                 self.debug('X_predict={}'.format(X_predict))
 
                 if self.model_config['score']:
