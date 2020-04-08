@@ -20,8 +20,8 @@ CHARTS_IN_SCOPE = [
     'system.ram', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.ctxt', 'system.idlejitter',
     'system.intr', 'system.softirqs', 'system.softnet_stat', 'system.memory_some_pressure'
 ]
-TRAIN_MAX_N = 60*15
-FIT_EVERY = 60*5
+TRAIN_MAX_N = 60*5
+FIT_EVERY = 60*1
 LAGS_N = 1
 MODEL_CONFIG = {
     'type': 'cblof',
