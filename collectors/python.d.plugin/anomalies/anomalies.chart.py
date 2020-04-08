@@ -155,8 +155,9 @@ class Service(SimpleService):
             # get anomaly score, prob and flag
             if hasattr(self.models[chart], "decision_scores_"):
 
-                X = pd.concat([data_latest.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
-                self.debug('X={}'.format(X))
+                X_predict = self.data_to_df(self.data[-self.lags_n], charts=[chart])
+                X_predict = pd.concat([X_predict.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
+                self.debug('X={}'.format(X_predict))
 
                 if self.model_config['score']:
                     anomaly_score = self.models[chart].decision_function(X)[-1]
