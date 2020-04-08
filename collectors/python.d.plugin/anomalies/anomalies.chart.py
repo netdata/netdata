@@ -23,6 +23,7 @@ CHARTS_IN_SCOPE = [
 TRAIN_MAX_N = 60*5
 FIT_EVERY = 60*1
 LAGS_N = 1
+SMOOTHING_N = 2
 MODEL_CONFIG = {
     'type': 'cblof',
     'kwargs': {'contamination': 0.001},
@@ -66,6 +67,7 @@ class Service(SimpleService):
         self.train_max_n = TRAIN_MAX_N
         self.host = HOST
         self.lags_n = LAGS_N
+        self.smoothing_n = SMOOTHING_N
 
     @staticmethod
     def check():
@@ -116,6 +118,8 @@ class Service(SimpleService):
         self.data.append(data)
 
     def make_x(self, df):
+        if self.smoothing_n >= 2:
+            df = df.rolling(self.smoothing_n).mean()
         if self.lags_n > 0:
             X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
         else:
@@ -162,8 +166,10 @@ class Service(SimpleService):
             # get anomaly score, prob and flag
             if hasattr(self.models[chart], "decision_scores_"):
 
-                if self.lags_n > 0:
-                    df_predict = self.data_to_df(self.data[-self.lags_n:], charts=[chart]).append(data_latest)
+                # if any lags of smoothing then need some previous observations
+                if (self.lags_n > 0) or (self.smoothing_n >= 2):
+                    # pull in any historic data needed for features
+                    df_predict = self.data_to_df(self.data[-(self.lags_n + self.smoothing_n):], charts=[chart]).append(data_latest)
                 else:
                     df_predict = data_latest
                 X_predict = self.make_x(df_predict)
