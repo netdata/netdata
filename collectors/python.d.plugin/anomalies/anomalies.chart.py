@@ -21,7 +21,7 @@ CHARTS_IN_SCOPE = [
     'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 TRAIN_MAX_N = 60*5
-FIT_EVERY = 60*1
+FIT_EVERY = 30
 LAGS_N = 0
 SMOOTHING_N = 0
 MODEL_CONFIG = {
