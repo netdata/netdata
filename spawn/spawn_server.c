@@ -143,6 +143,9 @@ static void wait_children(void *arg)
             assert(0 == uv_async_send(&child_waited_async));
         }
     }
+    /* close event loop handles to trigger shutdown */
+    uv_close((uv_handle_t *)&server_pipe, NULL);
+    uv_close((uv_handle_t *)&child_waited_async, NULL);
 }
 
 void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t command_length)
@@ -244,9 +247,7 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
     }
 
-    if (nread < 0) { /* stop stream due to EOF or error */
-        (void)uv_read_stop((uv_stream_t *)pipe);
-    } else if (nread) {
+    if (nread) {
 #ifdef SPAWN_DEBUG
         fprintf(stderr, "SERVER %s nread %u\n", __func__, (unsigned)nread);
 #endif
@@ -256,8 +257,12 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         freez(buf->base);
     }
 
-    if (nread < 0 && UV_EOF != nread) {
-        uv_close((uv_handle_t *)pipe, NULL);
+    if (nread < 0) {
+        uv_mutex_lock(&wait_children_mutex);
+        server_shutdown = 1;
+        spawned_processes = 1;
+        uv_cond_signal(&wait_children_cond);
+        uv_mutex_unlock(&wait_children_mutex);
     }
 }
 
@@ -273,10 +278,6 @@ static void on_read_alloc(uv_handle_t *handle,
 void spawn_server(void)
 {
     int error;
-
-    /* block signals, closing the pipe should suffice to kill the server */
-    signals_reset();
-    signals_block();
 
     test_clock_boottime();
     test_clock_monotonic_coarse();
@@ -334,7 +335,10 @@ void spawn_server(void)
     }
     /* cleanup operations of the event loop */
     fprintf(stderr, "Shutting down spawn server event loop.\n");
-    uv_close((uv_handle_t *)&server_pipe, NULL);
+    error = uv_thread_join(&thread);
+    if (error) {
+        fprintf(stderr, "uv_thread_create(): %s", uv_strerror(error));
+    }
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
     fprintf(stderr, "Shutting down spawn server loop complete.\n");
