@@ -247,7 +247,9 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
     }
 
-    if (nread) {
+    if (nread < 0) { /* stop stream due to EOF or error */
+        (void)uv_read_stop((uv_stream_t *) pipe);
+    } else if (nread) {
 #ifdef SPAWN_DEBUG
         fprintf(stderr, "SERVER %s nread %u\n", __func__, (unsigned)nread);
 #endif

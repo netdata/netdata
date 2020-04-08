@@ -115,7 +115,7 @@ static void on_pipe_read(uv_stream_t* pipe, ssize_t nread, const uv_buf_t* buf)
         freez(buf->base);
     }
 
-    if (nread < 0 && UV_EOF != nread) {
+    if (nread < 0) {
         uv_close((uv_handle_t *)pipe, NULL);
     }
 }
