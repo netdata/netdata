@@ -7,8 +7,17 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on FreeBSD
 
-You can install Netdata from either the `ports` or `packages` collections.
+## Install from ports/packages
+You can install Netdata from either the `ports` or `packages` collections. To install from packages:
+```sh
+# pkg install netdata
+```
+You also need to enable the netdata service in `/etc/rc.conf` (add `netdata_enable="YES"`) and start the service:
+```sh
+# service netdata start
+```
 
+## Install latest version
 This is how to install the latest Netdata version from source on FreeBSD:
 
 ```sh
