@@ -194,7 +194,7 @@ class Service(SimpleService):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])
-            self.definitions['osd_size']['lines'].append([osd['name'],
+            self.definitions['osd_size']['lines'].append(['size_{0}'.format(osd['name']),
                                                            osd['name'],
                                                            'absolute'])
             self.definitions['osd_apply_latency']['lines'].append(['apply_latency_{0}'.format(osd['name']),
@@ -310,7 +310,7 @@ class Service(SimpleService):
         Process raw data into osd dict information to get osd size (kb)
         :return: A osd dict with osd name's key and size bytes' value
         """
-        return {osd['name']: float(osd['kb'])}
+        return {'size_{0}'.format(osd['name']): float(osd['kb'])}
 
     @staticmethod
     def _get_osd_latency(osd):
