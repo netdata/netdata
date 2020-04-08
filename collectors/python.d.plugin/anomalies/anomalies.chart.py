@@ -22,6 +22,7 @@ CHARTS_IN_SCOPE = [
 ]
 TRAIN_MAX_N = 60*15
 FIT_EVERY = 60*5
+LAGS_N = 1
 MODEL_CONFIG = {
     'type': 'cblof',
     'kwargs': {'contamination': 0.001},
@@ -64,6 +65,7 @@ class Service(SimpleService):
         self.fit_every = FIT_EVERY
         self.train_max_n = TRAIN_MAX_N
         self.host = HOST
+        self.lags_n = LAGS_N
 
     @staticmethod
     def check():
@@ -146,12 +148,13 @@ class Service(SimpleService):
                 # pull data into a pandas df
                 df_data = self.data_to_df(self.data, charts=[chart])
                 # refit the model
-                self.models[chart].fit(df_data.values)
+                X_train = pd.concat([df_data.shift(n) for n in range(self.lags_n+1)], axis=1).values
+                self.models[chart].fit(X_train)
 
             # get anomaly score, prob and flag
             if hasattr(self.models[chart], "decision_scores_"):
 
-                X = data_latest.values
+                X = pd.concat([data_latest.shift(n) for n in range(self.lags_n + 1)], axis=1).values
                 self.debug('X={}'.format(X))
 
                 if self.model_config['score']:
