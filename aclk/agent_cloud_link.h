@@ -44,7 +44,6 @@ typedef enum aclk_cmd {
     ACLK_CMD_CHART,
     ACLK_CMD_CHARTDEL,
     ACLK_CMD_ALARM,
-    ACLK_CMD_ALARMS,
     ACLK_CMD_MAX
 } ACLK_CMD;
 
@@ -98,7 +97,7 @@ struct aclk_query *
 aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
-void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
+void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us);
 int aclk_handle_cloud_request(char *payload);
 int aclk_submit_request(struct aclk_request *);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
