@@ -119,7 +119,7 @@ class Service(SimpleService):
 
     def make_x(self, df):
         if self.smoothing_n >= 2:
-            df = df.rolling(self.smoothing_n).mean()
+            df = df.rolling(self.smoothing_n).mean().dropna()
         if self.lags_n > 0:
             X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
         else:
