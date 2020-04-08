@@ -114,7 +114,7 @@ static void wait_children(void *arg)
         spawned_processes = 0;
         uv_mutex_unlock(&wait_children_mutex);
 
-        while (1) {
+        while (!server_shutdown) {
             i.si_pid = 0;
             if (waitid(P_ALL, (id_t) 0, &i, WEXITED) == -1) {
                 if (errno != ECHILD)
@@ -294,6 +294,7 @@ void spawn_server(void)
     // Have the libuv IPC pipe be closed when forking child processes
     (void) fcntl(0, F_SETFD, FD_CLOEXEC);
     fprintf(stderr, "Spawn server is up.\n");
+    signals_unblock();
 
     loop = uv_default_loop();
     loop->data = NULL;
