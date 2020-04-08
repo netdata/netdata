@@ -38,6 +38,8 @@ union { /* TODO: remove me */
     struct spawn_prot_cmd_exit_status exit;
 } payload;
 
+#undef SPAWN_DEBUG /* define to enable debug prints */
+
 #define SPAWN_MAX_OUTSTANDING (32768)
 
 #define SPAWN_CMD_PROCESSED         0x00000001

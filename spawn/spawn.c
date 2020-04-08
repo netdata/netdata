@@ -95,7 +95,6 @@ uint64_t spawn_enq_cmd(char *command_to_run)
  */
 void spawn_wait_cmd(uint64_t serial, int *exit_status, time_t *exec_run_timestamp)
 {
-    unsigned queue_size;
     avl *avl_ret;
     struct spawn_cmd_info tmp, *cmdinfo;
 

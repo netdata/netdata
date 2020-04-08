@@ -3,7 +3,6 @@
 #include "spawn.h"
 
 static uv_loop_t *loop;
-static struct completion completion;
 static uv_pipe_t server_pipe;
 
 static int server_shutdown = 0;
@@ -63,20 +62,13 @@ static inline void enqueue_child_waited_list(struct spawn_execution_info *exec_i
     uv_mutex_unlock(&wait_children_mutex);
 }
 
-static void pipe_close_cb(uv_handle_t *handle)
-{
-    ;
-}
-
 static void after_pipe_write(uv_write_t *req, int status)
 {
+    (void)status;
+#ifdef SPAWN_DEBUG
     fprintf(stderr, "SERVER %s called status=%d\n", __func__, status);
+#endif
     freez(req->data);
-}
-
-void child_waited_async_close_cb(uv_handle_t *handle)
-{
-    freez(handle);
 }
 
 static void child_waited_async_cb(uv_async_t *async_handle)
@@ -86,6 +78,7 @@ static void child_waited_async_cb(uv_async_t *async_handle)
     struct spawn_execution_info *exec_info;
     struct write_context *write_ctx;
 
+    (void)async_handle;
     while (NULL != (exec_info = dequeue_child_waited_list())) {
         write_ctx = mallocz(sizeof(*write_ctx));
         write_ctx->write_req.data = write_ctx;
@@ -96,14 +89,14 @@ static void child_waited_async_cb(uv_async_t *async_handle)
         write_ctx->exit_status.exec_exit_status = exec_info->exit_status;
         writebuf[0] = uv_buf_init((char *) &write_ctx->header, sizeof(write_ctx->header));
         writebuf[1] = uv_buf_init((char *) &write_ctx->exit_status, sizeof(write_ctx->exit_status));
+#ifdef SPAWN_DEBUG
         fprintf(stderr, "SERVER %s SPAWN_PROT_CMD_EXIT_STATUS\n", __func__);
+#endif
         ret = uv_write(&write_ctx->write_req, (uv_stream_t *) &server_pipe, writebuf, 2, after_pipe_write);
         assert(ret == 0);
 
         freez(exec_info);
     }
-//    uv_close((uv_handle_t *)async_handle, child_waited_async_close_cb);
-//    uv_stop(async_handle->loop);
 }
 
 static void wait_children(void *arg)
@@ -164,7 +157,9 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
     write_ctx->write_req.data = write_ctx;
 
     command_to_run[command_length] = '\0';
+#ifdef SPAWN_DEBUG
     fprintf(stderr, "SPAWN: executing command '%s'\n", command_to_run);
+#endif
     if (netdata_spawn(command_to_run, &write_ctx->spawn_result.exec_pid)) {
         fprintf(stderr, "SPAWN: Cannot spawn(\"%s\", \"r\").\n", command_to_run);
         write_ctx->spawn_result.exec_pid = 0;
@@ -189,7 +184,9 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
     write_ctx->header.handle = handle;
     writebuf[0] = uv_buf_init((char *)&write_ctx->header, sizeof(write_ctx->header));
     writebuf[1] = uv_buf_init((char *)&write_ctx->spawn_result, sizeof(write_ctx->spawn_result));
+#ifdef SPAWN_DEBUG
     fprintf(stderr, "SERVER %s SPAWN_PROT_SPAWN_RESULT\n", __func__);
+#endif
     ret = uv_write(&write_ctx->write_req, (uv_stream_t *)&server_pipe, writebuf, 2, after_pipe_write);
     assert(ret == 0);
 }
@@ -250,15 +247,17 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     if (nread < 0) { /* stop stream due to EOF or error */
         (void)uv_read_stop((uv_stream_t *)pipe);
     } else if (nread) {
+#ifdef SPAWN_DEBUG
         fprintf(stderr, "SERVER %s nread %u\n", __func__, (unsigned)nread);
+#endif
         server_parse_spawn_protocol(nread, buf->base);
     }
     if (buf && buf->len) {
         freez(buf->base);
     }
 
-    if (nread < 0 && UV_EOF != nread) { /* postpone until we write or something? */
-//        uv_close((uv_handle_t *)pipe, pipe_close_cb);
+    if (nread < 0 && UV_EOF != nread) {
+        uv_close((uv_handle_t *)pipe, NULL);
     }
 }
 
@@ -266,13 +265,18 @@ static void on_read_alloc(uv_handle_t *handle,
                           size_t suggested_size,
                           uv_buf_t* buf)
 {
+    (void)handle;
     buf->base = mallocz(suggested_size);
     buf->len = suggested_size;
 }
 
 void spawn_server(void)
 {
-    int ret, error;
+    int error;
+
+    /* block signals, closing the pipe should suffice to kill the server */
+    signals_reset();
+    signals_block();
 
     test_clock_boottime();
     test_clock_monotonic_coarse();
@@ -286,24 +290,22 @@ void spawn_server(void)
 
     // Have the libuv IPC pipe be closed when forking child processes
     (void) fcntl(0, F_SETFD, FD_CLOEXEC);
-    fprintf(stderr, "SPAWN SERVER IS UP!\n");
+    fprintf(stderr, "Spawn server is up.\n");
 
     loop = uv_default_loop();
     loop->data = NULL;
 
-    ret = uv_pipe_init(loop, &server_pipe, 1);
-    if (ret) {
-        fprintf(stderr, "uv_pipe_init(): %s\n", uv_strerror(ret));
-        error = ret;
-        goto error_after_pipe_init;
+    error = uv_pipe_init(loop, &server_pipe, 1);
+    if (error) {
+        fprintf(stderr, "uv_pipe_init(): %s\n", uv_strerror(error));
+        exit(error);
     }
     assert(server_pipe.ipc);
 
-    ret = uv_pipe_open(&server_pipe, 0 /* UV_STDIN_FD */);
-    if (ret) {
-        fprintf(stderr, "uv_pipe_open(): %s\n", uv_strerror(ret));
-        error = ret;
-        goto error_after_pipe_open;
+    error = uv_pipe_open(&server_pipe, 0 /* UV_STDIN_FD */);
+    if (error) {
+        fprintf(stderr, "uv_pipe_open(): %s\n", uv_strerror(error));
+        exit(error);
     }
     avl_init_lock(&spawn_outstanding_exec_tree, spawn_exec_compare);
 
@@ -311,17 +313,21 @@ void spawn_server(void)
     assert(0 == uv_cond_init(&wait_children_cond));
     assert(0 == uv_mutex_init(&wait_children_mutex));
     child_waited_list = NULL;
-    assert(0 == uv_async_init(loop, &child_waited_async, child_waited_async_cb));
+    error = uv_async_init(loop, &child_waited_async, child_waited_async_cb);
+    if (error) {
+        fprintf(stderr, "uv_async_init(): %s\n", uv_strerror(error));
+        exit(error);
+    }
 
     error = uv_thread_create(&thread, wait_children, NULL);
     if (error) {
         fprintf(stderr, "uv_thread_create(): %s\n", uv_strerror(error));
-        exit(1);
+        exit(error);
     }
 
     prot_buffer_len = 0;
-    ret = uv_read_start((uv_stream_t *)&server_pipe, on_read_alloc, on_pipe_read);
-    assert(ret == 0);
+    error = uv_read_start((uv_stream_t *)&server_pipe, on_read_alloc, on_pipe_read);
+    assert(error == 0);
 
     while (!server_shutdown) {
         uv_run(loop, UV_RUN_DEFAULT);
@@ -335,12 +341,4 @@ void spawn_server(void)
     assert(0 == uv_loop_close(loop));
 
     exit(0);
-
-error_after_pipe_open:
-    uv_close((uv_handle_t*)&server_pipe, NULL);
-error_after_pipe_init:
-    uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
-    assert(0 == uv_loop_close(loop));
-
-    exit(error);
 }

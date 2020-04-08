@@ -1005,8 +1005,14 @@ void *health_main(void *ptr) {
             // and cleanup
             health_alarm_log_process(host);
 
-            if (unlikely(netdata_exit))
+            if (unlikely(netdata_exit)) {
+                // wait for all notifications to finish before allowing health to be cleaned up
+                ALARM_ENTRY *ae;
+                while (NULL != (ae = alarm_notifications_in_progress.head)) {
+                    health_alarm_wait_for_execution(ae);
+                }
                 break;
+            }
 
         } /* rrdhost_foreach */
 

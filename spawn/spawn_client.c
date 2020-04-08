@@ -14,7 +14,10 @@ static void async_cb(uv_async_t *handle)
 
 static void after_pipe_write(uv_write_t* req, int status)
 {
+    (void)status;
+#ifdef SPAWN_DEBUG
     info("CLIENT %s called status=%d", __func__, status);
+#endif
     freez(req->data);
 }
 
@@ -49,13 +52,17 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
             uv_mutex_lock(&cmdinfo->mutex);
             cmdinfo->pid = spawn_result->exec_pid;
             if (0 == cmdinfo->pid) { /* Failed to spawn */
+#ifdef SPAWN_DEBUG
                 info("CLIENT %s SPAWN_PROT_SPAWN_RESULT failed to spawn.", __func__);
+#endif
                 cmdinfo->flags |= SPAWN_CMD_FAILED_TO_SPAWN | SPAWN_CMD_DONE;
                 uv_cond_signal(&cmdinfo->cond);
             } else {
                 cmdinfo->exec_run_timestamp = spawn_result->exec_run_timestamp;
                 cmdinfo->flags |= SPAWN_CMD_IN_PROGRESS;
+#ifdef SPAWN_DEBUG
                 info("CLIENT %s SPAWN_PROT_SPAWN_RESULT in progress.", __func__);
+#endif
             }
             uv_mutex_unlock(&cmdinfo->mutex);
             prot_buffer_len = 0;
@@ -70,7 +77,9 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
             exit_status = (struct spawn_prot_cmd_exit_status *)(header + 1);
             uv_mutex_lock(&cmdinfo->mutex);
             cmdinfo->exit_status = exit_status->exec_exit_status;
+#ifdef SPAWN_DEBUG
             info("CLIENT %s SPAWN_PROT_CMD_EXIT_STATUS %d.", __func__, exit_status->exec_exit_status);
+#endif
             cmdinfo->flags |= SPAWN_CMD_DONE;
             uv_cond_signal(&cmdinfo->cond);
             uv_mutex_unlock(&cmdinfo->mutex);
@@ -97,15 +106,17 @@ static void on_pipe_read(uv_stream_t* pipe, ssize_t nread, const uv_buf_t* buf)
     if (nread < 0) { /* stop stream due to EOF or error */
         (void)uv_read_stop((uv_stream_t *)pipe);
     } else if (nread) {
+#ifdef SPAWN_DEBUG
         info("CLIENT %s read %u", __func__, (unsigned)nread);
+#endif
         client_parse_spawn_protocol(nread, buf->base);
     }
     if (buf && buf->len) {
         freez(buf->base);
     }
 
-    if (nread < 0 && UV_EOF != nread) { /* postpone until we write or something? */
-//    uv_close((uv_handle_t *)pipe, close_cb);
+    if (nread < 0 && UV_EOF != nread) {
+        uv_close((uv_handle_t *)pipe, NULL);
     }
 }
 
@@ -113,6 +124,7 @@ static void on_read_alloc(uv_handle_t* handle,
                           size_t suggested_size,
                           uv_buf_t* buf)
 {
+    (void)handle;
     buf->base = mallocz(suggested_size);
     buf->len = suggested_size;
 }
@@ -138,7 +150,9 @@ static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
     writebuf[1] = uv_buf_init((char *)&write_ctx->payload, sizeof(write_ctx->payload));
     writebuf[2] = uv_buf_init((char *)cmdinfo->command_to_run, write_ctx->payload.command_length);
 
+#ifdef SPAWN_DEBUG
     info("CLIENT %s SPAWN_PROT_EXEC_CMD %u", __func__, (unsigned)cmdinfo->serial);
+#endif
     ret = uv_write(&write_ctx->write_req, (uv_stream_t *)&spawn_channel, writebuf, 3, after_pipe_write);
     assert(ret == 0);
 }
