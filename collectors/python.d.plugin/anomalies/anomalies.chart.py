@@ -19,12 +19,12 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-TRAIN_MAX_N = 60*10
-FIT_EVERY = 60
+TRAIN_MAX_N = 60*15
+FIT_EVERY = 60*5
 MODEL_CONFIG = {
     'type': 'cblof',
     'kwargs': {'contamination': 0.001},
-    'score': True,
+    'score': False,
     'prob': True,
     'flag': True,
 }
