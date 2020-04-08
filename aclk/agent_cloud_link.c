@@ -1525,7 +1525,7 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
         "\t\"version\": %d",
         type, msg_id, ts_secs, ts_us, aclk_session_sec, aclk_session_us, ACLK_VERSION);
 
-    debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, time_created);
+    debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, ts_secs);
 }
 
 /*
