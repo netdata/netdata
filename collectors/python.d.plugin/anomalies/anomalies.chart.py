@@ -148,14 +148,14 @@ class Service(SimpleService):
                 # pull data into a pandas df
                 df_data = self.data_to_df(self.data, charts=[chart])
                 # refit the model
-                X_train = pd.concat([df_data.shift(n) for n in range(self.lags_n+1)], axis=1).values
+                X_train = pd.concat([df_data.shift(n) for n in range(self.lags_n+1)], axis=1).dropna().values
                 self.debug('X_train={}'.format(X_train))
                 self.models[chart].fit(X_train)
 
             # get anomaly score, prob and flag
             if hasattr(self.models[chart], "decision_scores_"):
 
-                X = pd.concat([data_latest.shift(n) for n in range(self.lags_n + 1)], axis=1).values
+                X = pd.concat([data_latest.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
                 self.debug('X={}'.format(X))
 
                 if self.model_config['score']:
