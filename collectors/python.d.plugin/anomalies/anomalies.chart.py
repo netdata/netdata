@@ -16,9 +16,9 @@ update_every = 1
 
 HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
-    'system.cpu', 'system.load', 'system.io', 'system.io_some_pressure', 'system.pgpgio',
+    'system.cpu', 'system.cpu_pressue', 'system.load', 'system.io', 'system.io_some_pressure', 'system.pgpgio',
     'system.ram', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.ctxt', 'system.idlejitter',
-    'system.intr', 'system.softirqs', 'system.softnet_stat'
+    'system.intr', 'system.softirqs', 'system.softnet_stat', 'system.memory_some_pressure'
 ]
 TRAIN_MAX_N = 60*5
 FIT_EVERY = 30
