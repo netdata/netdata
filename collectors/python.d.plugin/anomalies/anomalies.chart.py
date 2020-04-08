@@ -22,11 +22,11 @@ CHARTS_IN_SCOPE = [
 ]
 TRAIN_MAX_N = 60*5
 FIT_EVERY = 30
-LAGS_N = 0
+LAGS_N = 1
 SMOOTHING_N = 2
 MODEL_CONFIG = {
     'type': 'cblof',
-    'kwargs': {'contamination': 0.001},
+    'kwargs': {'contamination': 0.001, 'n_clusters': 4},
     'score': False,
     'prob': True,
     'flag': True,
