@@ -874,7 +874,7 @@
               "type": "boolean"
             }
           }
-          ],
+        ],
         "responses": {
           "200": {
             "description": "An object containing general info and a linked list of alarms.",
