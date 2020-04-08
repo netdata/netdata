@@ -35,7 +35,7 @@ settings](../server/#other-netdataconf-web-section-options) in the
 
 We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
 
-The new dashboard is added to the codebase, but the old version is still here. If you want to use it, run `/usr/libexec/netdata/netdata-switch-dashboard.sh  classic`. To switch back, do `netdata-switch-dashboard.sh  react`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
+The new dashboard is added to the codebase, but the old version is still here. If you want to switch back to the old version, run `/usr/libexec/netdata/netdata-switch-dashboard.sh  classic`. To switch back to the React version, run `/usr/libexec/netdata/netdata-switch-dashboard.sh  react`. Currently, the React dashboard doesn't include any noticeable changes in user interface (UI) or features.
 
 ## Navigating the standard dashboard
 
