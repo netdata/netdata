@@ -160,15 +160,15 @@ class Service(SimpleService):
                 self.debug('X={}'.format(X_predict))
 
                 if self.model_config['score']:
-                    anomaly_score = self.models[chart].decision_function(X)[-1]
+                    anomaly_score = self.models[chart].decision_function(X_predict)[-1]
                     self.debug('anomaly_score={}'.format(anomaly_score))
 
                 if self.model_config['prob']:
-                    anomaly_prob = self.models[chart].predict_proba(X)[-1][1]
+                    anomaly_prob = self.models[chart].predict_proba(X_predict)[-1][1]
                     self.debug('anomaly_prob={}'.format(anomaly_prob))
 
                 if self.model_config['flag']:
-                    anomaly_flag = self.models[chart].predict(X)[-1]
+                    anomaly_flag = self.models[chart].predict(X_predict)[-1]
                     self.debug('anomaly_flag={}'.format(anomaly_flag))
 
             else:
