@@ -156,8 +156,13 @@ class Service(SimpleService):
             if hasattr(self.models[chart], "decision_scores_"):
 
                 X_predict = self.data_to_df(self.data[-self.lags_n:], charts=[chart])
-                X_predict = pd.concat([X_predict.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
-                self.debug('X={}'.format(X_predict))
+                self.debug('X_predict={}'.format(X_predict))
+                X_predict = X_predict.append(data_latest)
+                self.debug('X_predict={}'.format(X_predict))
+                X_predict = pd.concat([X_predict.shift(n) for n in range(self.lags_n + 1)], axis=1)
+                self.debug('X_predict={}'.format(X_predict))
+                X_predict = X_predict.dropna().values
+                self.debug('X_predict={}'.format(X_predict))
 
                 if self.model_config['score']:
                     anomaly_score = self.models[chart].decision_function(X_predict)[-1]
