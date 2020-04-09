@@ -141,8 +141,6 @@ class Service(SimpleService):
             X = df.values
         return X
 
-    self.models = {chart: HBOS(**self.model_config['kwargs']) for chart in self.charts_in_scope
-
     #def model_init(self, chart):
     #    if chart not in self.models:
     #        if self.model_config['type'] == 'hbos':
