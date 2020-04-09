@@ -90,7 +90,9 @@ class Service(SimpleService):
             data = [item for sublist in data for item in sublist if item[1] in charts]
         else:
             data = [item for sublist in data for item in sublist]
-        df = pd.DataFrame(data, columns=['time', 'chart', 'variable', 'value'])
+        df = pd.DataFrame(
+            data, columns=['time', 'chart', 'variable', 'value']
+        ).groupby(['time', 'chart', 'variable']).mean().reset_index()
         if mode == 'wide':
             df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
         return df
