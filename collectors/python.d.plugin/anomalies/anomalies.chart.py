@@ -148,7 +148,7 @@ class Service(SimpleService):
 
     def model_predict(self, chart):
         prediction = dict()
-        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*4))))
+        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))))
         if self.model_config['score']:
             prediction['score'] = self.models[chart].decision_function(X_predict)[-1]
         if self.model_config['prob']:
