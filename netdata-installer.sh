@@ -279,7 +279,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
@@ -1338,8 +1338,8 @@ get_compatible_kernel_for_ebpf() {
 }
 
 should_install_ebpf() {
-  if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
-    run_failed "ebpf not enabled. --enable-ebpf to enable"
+  if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
+    run_failed "eBPF explicitly disabled."
     return 1
   fi
 
@@ -1422,30 +1422,25 @@ install_ebpf() {
   # Detect libc
   libc="$(detect_libc)"
 
-  PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
-
-  echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
-
-  PACKAGE_TARBALL_URL=
-  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | grep -o -E "\"browser_download_url\": \".*${PACKAGE_TARBALL}\"" | sed -e 's/"browser_download_url": "\(.*\)"/\1/')"
-
-  if [ -z "${PACKAGE_TARBALL_URL}" ]; then
-    run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
-    return 1
-  fi
+  EBPF_VERSION="$(cat packaging/ebpf.version)"
+  EBPF_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
 
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
-  echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
-  if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
-    run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
+  if ! fetch_and_verify "ebpf" \
+                        "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
+                        "${EBPF_TARBALL}" \
+                        "${tmp}" \
+                        "${NETDATA_LOCAL_TARBALL_OVERRIDE_EBPF}"
+  then
+    run_failed "Failed to download eBPF collector package"
     echo 2>&" Removing temporary directory ${tmp} ..."
     rm -rf "${tmp}"
     return 1
   fi
 
-  echo >&2 " Extracting ${PACKAGE_TARBALL} ..."
-  tar -xf "${tmp}/${PACKAGE_TARBALL}" -C "${tmp}"
+  echo >&2 " Extracting ${EBPF_TARBALL} ..."
+  tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
   echo >&2 " Finding suitable lib directory ..."
   libdir=
