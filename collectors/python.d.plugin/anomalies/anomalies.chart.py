@@ -20,13 +20,13 @@ CHARTS_IN_SCOPE = [
     'system.ram', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.ctxt', 'system.idlejitter',
     'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-TRAIN_MAX_N = 60*15
-FIT_EVERY = 60*5
+TRAIN_MAX_N = 60*5
+FIT_EVERY = 30
 LAGS_N = 0
-SMOOTHING_N = 2
+SMOOTHING_N = 0
 MODEL_CONFIG = {
     'type': 'cblof',
-    'kwargs': {'contamination': 0.001, 'n_clusters': 4},
+    'kwargs': {'contamination': 0.001},
     'score': False,
     'prob': True,
     'flag': True,
@@ -68,6 +68,7 @@ class Service(SimpleService):
         self.host = HOST
         self.lags_n = LAGS_N
         self.smoothing_n = SMOOTHING_N
+        self.prediction = dict()
 
     @staticmethod
     def check():
@@ -116,6 +117,8 @@ class Service(SimpleService):
 
     def append_data(self, data):
         self.data.append(data)
+        # limit size of data maintained
+        self.data = self.data[-self.train_max_n:]
 
     def make_x(self, df):
         if self.smoothing_n >= 2:
@@ -126,6 +129,46 @@ class Service(SimpleService):
             X = df.values
         return X
 
+    def model_init(self, chart):
+        if chart not in self.models:
+            if self.model_config['type'] == 'hbos':
+                self.models[chart] = HBOS(**self.model_config['kwargs'])
+            elif self.model_config['type'] == 'knn':
+                self.models[chart] = KNN(**self.model_config['kwargs'])
+            elif self.model_config['type'] == 'cblof':
+                self.models[chart] = CBLOF(**self.model_config['kwargs'])
+
+    def model_fit(self, chart):
+        # get train data
+        X_train = self.make_x(self.data_to_df(self.data, charts=[chart]))
+        # self.debug('X_train={}'.format(X_train))
+        self.debug('X_train.shape={}'.format(X_train.shape))
+        # fit model
+        self.models[chart].fit(X_train)
+
+    def can_predict(self, chart):
+        return True if hasattr(self.models[chart], "decision_scores_") else False
+
+    def model_predict(self, chart):
+        prediction = dict()
+        # get predict data
+        X_predict = self.make_x(self.data_to_df(self.data[-(self.lags_n + self.smoothing_n + 1):], charts=[chart]))
+        self.debug('X_predict.shape={}'.format(X_predict.shape))
+        self.debug('X_predict={}'.format(X_predict))
+        if self.model_config['score']:
+            prediction['score'] = self.models[chart].decision_function(X_predict)[-1]
+        if self.model_config['prob']:
+            prediction['prob'] = self.models[chart].predict_proba(X_predict)[-1][1]
+        if self.model_config['flag']:
+            prediction['flag'] = self.models[chart].predict(X_predict)[-1]
+        self.debug('prediction={}'.format(prediction))
+        self.prediction = prediction
+
+    def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
+        if dimension_id not in self.charts[chart]:
+            self.charts[chart].add_dimension([dimension_id, title, algorithm, multiplier, divisor])
+        return True
+
     def get_data(self):
 
         # empty dict to collect data points into
@@ -134,84 +177,40 @@ class Service(SimpleService):
         # get latest data from allmetrics
         latest_observations = self.get_allmetrics()
 
+        # append latest data
+        self.append_data(latest_observations)
+
         # get scores and models for each chart
         for chart in self.charts_in_scope:
 
             self.debug("chart={}".format(chart))
 
-            data_latest = self.data_to_df([latest_observations], charts=[chart]).mean().to_frame().transpose()
-            self.debug('data_latest={}'.format(data_latest))
+            self.model_init(chart)
 
-            if chart not in self.models:
-                if self.model_config['type'] == 'hbos':
-                    self.models[chart] = HBOS(**self.model_config['kwargs'])
-                elif self.model_config['type'] == 'knn':
-                    self.models[chart] = KNN(**self.model_config['kwargs'])
-                elif self.model_config['type'] == 'cblof':
-                    self.models[chart] = CBLOF(**self.model_config['kwargs'])
-
-            chart_score = "{}_score".format(chart.replace('system.', ''))
-            chart_prob = "{}_prob".format(chart.replace('system.', ''))
-            chart_flag = "{}_flag".format(chart.replace('system.', ''))
+            # get prediction
+            if self.can_predict(chart):
+                self.model_predict(chart)
 
             # refit if needed
             if self.runs_counter % self.fit_every == 0:
-                # pull data into a pandas df
-                df_data = self.data_to_df(self.data, charts=[chart])
-                # refit the model
-                X_train = self.make_x(df_data)
-                self.debug('X_train={}'.format(X_train))
-                self.models[chart].fit(X_train)
+                self.model_fit(chart)
 
-            # get anomaly score, prob and flag
-            if hasattr(self.models[chart], "decision_scores_"):
+            # insert charts and data
 
-                # if any lags of smoothing then need some previous observations
-                if (self.lags_n > 0) or (self.smoothing_n >= 2):
-                    # pull in any historic data needed for features
-                    df_predict = self.data_to_df(self.data[-(self.lags_n + self.smoothing_n):], charts=[chart]).append(data_latest)
-                else:
-                    df_predict = data_latest
-                X_predict = self.make_x(df_predict)
-                self.debug('X_predict={}'.format(X_predict))
-
-                if self.model_config['score']:
-                    anomaly_score = self.models[chart].decision_function(X_predict)[-1]
-                    self.debug('anomaly_score={}'.format(anomaly_score))
-
-                if self.model_config['prob']:
-                    anomaly_prob = self.models[chart].predict_proba(X_predict)[-1][1]
-                    self.debug('anomaly_prob={}'.format(anomaly_prob))
-
-                if self.model_config['flag']:
-                    anomaly_flag = self.models[chart].predict(X_predict)[-1]
-                    self.debug('anomaly_flag={}'.format(anomaly_flag))
-
-            else:
-                anomaly_flag = 0
-                anomaly_score = 0
-                anomaly_prob = 0
-
-            # insert data
             if self.model_config['score']:
-                if chart_score not in self.charts['score']:
-                    self.charts['score'].add_dimension([chart_score, chart_score, 'absolute', 1, 100])
-                data[chart_score] = anomaly_score * 100
+                score = "{}_score".format(chart.replace('system.', ''))
+                self.update_chart_dim('score', score, divisor=100)
+                data[score] = self.prediction['score'] * 100
 
             if self.model_config['prob']:
-                if chart_prob not in self.charts['probability']:
-                    self.charts['probability'].add_dimension([chart_prob, chart_prob, 'absolute', 1, 100])
-                data[chart_prob] = anomaly_prob * 100
+                prob = "{}_prob".format(chart.replace('system.', ''))
+                self.update_chart_dim('prob', prob, divisor=100)
+                data[prob] = self.prediction['prob'] * 100
 
             if self.model_config['flag']:
-                if chart_flag not in self.charts['flag']:
-                    self.charts['flag'].add_dimension([chart_flag, chart_flag, 'absolute', 1, 1])
-                data[chart_flag] = anomaly_flag
-
-        # append latest data
-        self.append_data(latest_observations)
-        # limit size of data maintained to last n
-        self.data = self.data[-self.train_max_n:]
+                flag = "{}_flag".format(chart.replace('system.', ''))
+                self.update_chart_dim('flag', flag)
+                data[flag] = self.prediction['flag']
 
         return data
 
