@@ -22,7 +22,7 @@ CHARTS_IN_SCOPE = [
 TRAIN_MAX_N = 60*60
 FIT_EVERY = 30
 LAGS_N = 0
-SMOOTHING_N = 0
+SMOOTHING_N = 2
 MODEL_CONFIG = {
     'kwargs': {'contamination': 0.001},
     'score': False,
