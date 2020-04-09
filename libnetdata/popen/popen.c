@@ -78,11 +78,11 @@ static void myp_del(pid_t pid) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-/* use_pipe flag definitions */
-#define NO_PIPE_NULL_STDOUT 0 // Don't create a pipe, set stdout to /dev/null
-#define USE_PIPE 1  // Create a pipe like popen()
+/* custom_popene flag definitions */
+#define FLAG_CREATE_PIPE    1 // Create a pipe like popen() when set, otherwise set stdout to /dev/null
+#define FLAG_CLOSE_FD       2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
 
-static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t use_pipe) {
+static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t flags) {
     FILE *fp = (FILE *)1; // set to 1 to differentiate from NULL when running NO_PIPE_NULL_STDOUT
     int pipefd[2], error;
     pid_t pid;
@@ -95,7 +95,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    if (USE_PIPE == use_pipe) {
+    if (flags & FLAG_CREATE_PIPE) {
         if (pipe(pipefd) == -1)
             return NULL;
         if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
@@ -103,23 +103,24 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
         }
     }
 
-    if (USE_PIPE == use_pipe) { //TODO: remove me
+    if (flags & FLAG_CLOSE_FD) {
         // Mark all files to be closed by the exec() stage of posix_spawn()
         int i;
         for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
-            if (i != STDIN_FILENO && i != STDERR_FILENO && !(NO_PIPE_NULL_STDOUT == use_pipe && i == STDOUT_FILENO))
+            if (i != STDIN_FILENO && i != STDERR_FILENO)
                 (void) fcntl(i, F_SETFD, FD_CLOEXEC);
         }
     }
 
     if (!posix_spawn_file_actions_init(&fa)) {
-        if (USE_PIPE == use_pipe) {
+        if (flags & FLAG_CREATE_PIPE) {
             // move the pipe to stdout in the child
             if (posix_spawn_file_actions_adddup2(&fa, pipefd[PIPE_WRITE], STDOUT_FILENO)) {
                 error("posix_spawn_file_actions_adddup2() failed");
                 goto error_after_posix_spawn_file_actions_init;
             }
-        } else { // NO_PIPE_NULL_STDOUT == use_pipe
+        } else {
+            // set stdout to /dev/null
             if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
                 error("posix_spawn_file_actions_addopen() failed");
                 // this is not a fatal error
@@ -152,12 +153,12 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     } else {
         myp_add_unlock();
         error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
-        if (USE_PIPE == use_pipe) {
+        if (flags & FLAG_CREATE_PIPE) {
             fclose(fp);
             fp = NULL;
         }
     }
-    if (USE_PIPE == use_pipe) {
+    if (flags & FLAG_CREATE_PIPE) {
         close(pipefd[PIPE_WRITE]);
     }
 
@@ -175,7 +176,7 @@ error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
 error_after_pipe:
-    if (USE_PIPE == use_pipe) {
+    if (flags & FLAG_CREATE_PIPE) {
         if (fp)
             fclose(fp);
         else
@@ -244,16 +245,16 @@ int myp_reap(pid_t pid) {
 }
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
-    return custom_popene(command, pidptr, environ, USE_PIPE);
+    return custom_popene(command, pidptr, environ, FLAG_CREATE_PIPE | FLAG_CLOSE_FD);
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
-    return custom_popene(command, pidptr, env, USE_PIPE);
+    return custom_popene(command, pidptr, env, FLAG_CREATE_PIPE | FLAG_CLOSE_FD);
 }
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    FILE *fp = custom_popene(command, pidptr, environ, NO_PIPE_NULL_STDOUT);
+    FILE *fp = custom_popene(command, pidptr, environ, 0);
     return (fp != NULL) ? 0 : -1;
 }
 
