@@ -21,8 +21,8 @@ CHARTS_IN_SCOPE = [
 ]
 TRAIN_MAX_N = 60*5
 FIT_EVERY = 30
-LAGS_N = 0
-SMOOTHING_N = 0
+LAGS_N = 2
+SMOOTHING_N = 3
 MODEL_CONFIG = {
     'type': 'cblof',
     'kwargs': {'contamination': 0.001},
@@ -121,9 +121,16 @@ class Service(SimpleService):
 
     def make_x(self, df):
         if self.smoothing_n >= 2:
+            self.debug('df.shape before smoothing = {}'.format(df.shape))
             df = df.rolling(self.smoothing_n).mean().dropna()
+            self.debug('df.shape after smoothing = {}'.format(df.shape))
         if self.lags_n > 0:
-            X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna().values
+            self.debug('X.shape before lags = {}'.format(df.shape))
+            X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1)\
+            self.debug('X.shape after lags = {}'.format(df.shape))
+            self.debug('X.shape before dropna = {}'.format(df.shape))
+            X = X.dropna().values
+            self.debug('X.shape after dropna = {}'.format(df.shape))
         else:
             X = df.values
         return X
