@@ -295,7 +295,7 @@ done
 # slack configs
 SLACK_WEBHOOK_URL=
 
-# Microsoft Team configs
+# Microsoft Teams configs
 MSTEAMS_WEBHOOK_URL=
 
 # rocketchat configs
