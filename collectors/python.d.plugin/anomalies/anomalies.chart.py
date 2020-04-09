@@ -6,8 +6,8 @@
 
 import requests
 import pandas as pd
-from pyod.models.knn import KNN
-from pyod.models.hbos import HBOS
+#from pyod.models.knn import KNN
+#from pyod.models.hbos import HBOS
 from pyod.models.cblof import CBLOF
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -21,8 +21,8 @@ CHARTS_IN_SCOPE = [
 ]
 TRAIN_MAX_N = 60*5
 FIT_EVERY = 30
-LAGS_N = 2
-SMOOTHING_N = 3
+LAGS_N = 0
+SMOOTHING_N = 0
 MODEL_CONFIG = {
     'type': 'cblof',
     'kwargs': {'contamination': 0.001},
@@ -59,7 +59,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.data = []
-        self.models = dict()
+        self.models = {chart: CBLOF(**MODEL_CONFIG['kwargs']) for chart in CHARTS_IN_SCOPE}
         self.charts_in_scope = CHARTS_IN_SCOPE
         self.model_config = MODEL_CONFIG
         self.fit_every = FIT_EVERY
@@ -141,14 +141,16 @@ class Service(SimpleService):
             X = df.values
         return X
 
-    def model_init(self, chart):
-        if chart not in self.models:
-            if self.model_config['type'] == 'hbos':
-                self.models[chart] = HBOS(**self.model_config['kwargs'])
-            elif self.model_config['type'] == 'knn':
-                self.models[chart] = KNN(**self.model_config['kwargs'])
-            elif self.model_config['type'] == 'cblof':
-                self.models[chart] = CBLOF(**self.model_config['kwargs'])
+    self.models = {chart: HBOS(**self.model_config['kwargs']) for chart in self.charts_in_scope
+
+    #def model_init(self, chart):
+    #    if chart not in self.models:
+    #        if self.model_config['type'] == 'hbos':
+    #            self.models[chart] = HBOS(**self.model_config['kwargs'])
+    #        elif self.model_config['type'] == 'knn':
+    #            self.models[chart] = KNN(**self.model_config['kwargs'])
+    #        elif self.model_config['type'] == 'cblof':
+    #            self.models[chart] = CBLOF(**self.model_config['kwargs'])
 
     def model_fit(self, chart):
         # get train data
@@ -197,7 +199,7 @@ class Service(SimpleService):
 
             self.debug("chart={}".format(chart))
 
-            self.model_init(chart)
+            #self.model_init(chart)
 
             # get prediction
             if self.can_predict(chart):
