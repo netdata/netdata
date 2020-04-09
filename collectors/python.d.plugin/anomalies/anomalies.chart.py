@@ -180,8 +180,6 @@ class Service(SimpleService):
 
             self.debug("chart={}".format(chart))
 
-            #self.model_init(chart)
-
             # get prediction
             if self.can_predict(chart):
                 self.model_predict(chart)
