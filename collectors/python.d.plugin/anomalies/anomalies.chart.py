@@ -25,7 +25,7 @@ LAGS_N = 0
 SMOOTHING_N = 0
 MODEL_CONFIG = {
     'type': 'cblof',
-    'kwargs': {'contamination': 0.001},
+    'kwargs': {'contamination': 0.001, 'n_clusters': 4},
     'score': False,
     'prob': True,
     'flag': True,
