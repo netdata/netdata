@@ -32,12 +32,6 @@ struct spawn_prot_header {
     void *handle;
 };
 
-union { /* TODO: remove me */
-    struct spawn_prot_exec_cmd cmd;
-    struct spawn_prot_spawn_result res;
-    struct spawn_prot_cmd_exit_status exit;
-} payload;
-
 #undef SPAWN_DEBUG /* define to enable debug prints */
 
 #define SPAWN_MAX_OUTSTANDING (32768)
