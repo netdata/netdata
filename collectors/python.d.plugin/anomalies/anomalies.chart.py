@@ -23,7 +23,7 @@ TRAIN_MAX_N = 60*60
 TRAIN_SAMPLE_PCT = 1
 FIT_EVERY = 30
 LAGS_N = 2
-SMOOTHING_N = 2
+SMOOTHING_N = 3
 MODEL_CONFIG = {
     'kwargs': {'contamination': 0.001},
     'score': False,
@@ -148,18 +148,13 @@ class Service(SimpleService):
 
     def model_predict(self, chart):
         prediction = dict()
-        # get predict data
-        #X_predict = self.make_x(self.data_to_df(self.data[-((self.lags_n + self.smoothing_n)*2):], charts=[chart]))
-        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=20))
-        self.debug('X_predict.shape={}'.format(X_predict.shape))
-        self.debug('X_predict={}'.format(X_predict))
+        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*4))))
         if self.model_config['score']:
             prediction['score'] = self.models[chart].decision_function(X_predict)[-1]
         if self.model_config['prob']:
             prediction['prob'] = self.models[chart].predict_proba(X_predict)[-1][1]
         if self.model_config['flag']:
             prediction['flag'] = self.models[chart].predict(X_predict)[-1]
-        self.debug('prediction={}'.format(prediction))
         self.prediction[chart] = prediction
 
     def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
