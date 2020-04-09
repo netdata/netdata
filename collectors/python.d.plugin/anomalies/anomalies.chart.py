@@ -119,15 +119,12 @@ class Service(SimpleService):
         self.data = self.data[-self.train_max_n:]
 
     def make_x(self, df):
-        self.debug('df.shape begin make_x() = {}'.format(df.shape))
-        self.debug(df)
         # do smoothing
         if self.smoothing_n >= 2:
             df = df.rolling(self.smoothing_n).mean().dropna()
         # add lags
         if self.lags_n >= 1:
             df = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna()
-
         return df.values
 
     def model_fit(self, chart):
