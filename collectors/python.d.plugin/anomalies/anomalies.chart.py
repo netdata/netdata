@@ -154,7 +154,8 @@ class Service(SimpleService):
     def model_predict(self, chart):
         prediction = dict()
         # get predict data
-        X_predict = self.make_x(self.data_to_df(self.data[-((self.lags_n + self.smoothing_n)*2):], charts=[chart]))
+        #X_predict = self.make_x(self.data_to_df(self.data[-((self.lags_n + self.smoothing_n)*2):], charts=[chart]))
+        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart]))[-1]
         self.debug('X_predict.shape={}'.format(X_predict.shape))
         self.debug('X_predict={}'.format(X_predict))
         if self.model_config['score']:
