@@ -120,6 +120,7 @@ class Service(SimpleService):
         self.data = self.data[-self.train_max_n:]
 
     def make_x(self, df):
+        self.debug('df.shape begin make_x() = {}'.format(df.shape))
         if self.smoothing_n >= 2:
             self.debug('df.shape before smoothing = {}'.format(df.shape))
             df = df.rolling(self.smoothing_n).mean().dropna()
