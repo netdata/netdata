@@ -126,8 +126,8 @@ class Service(SimpleService):
             self.debug('df.shape after smoothing = {}'.format(df.shape))
         if self.lags_n > 0:
             self.debug('X.shape before lags = {}'.format(df.shape))
-            X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1)\
-            self.debug('X.shape after lags = {}'.format(df.shape))
+            X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1)
+            self.debug('X.shape after lags = {}'.format(X.shape))
             self.debug('X.shape before dropna = {}'.format(df.shape))
             X = X.dropna().values
             self.debug('X.shape after dropna = {}'.format(df.shape))
