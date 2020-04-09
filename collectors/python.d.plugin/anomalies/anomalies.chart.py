@@ -67,7 +67,7 @@ class Service(SimpleService):
         self.host = HOST
         self.lags_n = LAGS_N
         self.smoothing_n = SMOOTHING_N
-        self.prediction = dict()
+        self.prediction = {chart: {} for chart in CHARTS_IN_SCOPE}
 
     @staticmethod
     def check():
