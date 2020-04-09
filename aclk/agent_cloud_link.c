@@ -1283,7 +1283,6 @@ void *aclk_main(void *ptr)
         info("Killing ACLK thread -> cloud functionality has been disabled");
         return NULL;
     }
-    netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
@@ -1387,7 +1386,7 @@ exited:
     if (aclk_private_key != NULL)
         RSA_free(aclk_private_key);
 
-    netdata_thread_cleanup_pop(1);
+    aclk_main_cleanup(ptr);
     return NULL;
 }
 
