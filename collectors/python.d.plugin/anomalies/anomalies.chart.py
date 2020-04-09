@@ -121,16 +121,21 @@ class Service(SimpleService):
 
     def make_x(self, df):
         self.debug('df.shape begin make_x() = {}'.format(df.shape))
+        self.debug(df)
         if self.smoothing_n >= 2:
+            self.debug(df)
             self.debug('df.shape before smoothing = {}'.format(df.shape))
             df = df.rolling(self.smoothing_n).mean().dropna()
+            self.debug(df)
             self.debug('df.shape after smoothing = {}'.format(df.shape))
         if self.lags_n > 0:
             self.debug('X.shape before lags = {}'.format(df.shape))
             X = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1)
+            self.debug(X)
             self.debug('X.shape after lags = {}'.format(X.shape))
             self.debug('X.shape before dropna = {}'.format(X.shape))
             X = X.dropna().values
+            self.debug(X)
             self.debug('X.shape after dropna = {}'.format(X.shape))
         else:
             X = df.values
