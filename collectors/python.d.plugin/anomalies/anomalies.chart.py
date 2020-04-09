@@ -200,17 +200,17 @@ class Service(SimpleService):
             if self.model_config['score']:
                 score = "{}_score".format(chart.replace('system.', ''))
                 self.update_chart_dim('score', score, divisor=100)
-                data[score] = self.prediction['score'] * 100
+                data[score] = self.prediction.get('score', 0) * 100
 
             if self.model_config['prob']:
                 prob = "{}_prob".format(chart.replace('system.', ''))
                 self.update_chart_dim('prob', prob, divisor=100)
-                data[prob] = self.prediction['prob'] * 100
+                data[prob] = self.prediction.get('prob', 0) * 100
 
             if self.model_config['flag']:
                 flag = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag)
-                data[flag] = self.prediction['flag']
+                data[flag] = self.prediction.get('flag', 0)
 
         return data
 
