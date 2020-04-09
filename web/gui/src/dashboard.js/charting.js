@@ -437,6 +437,48 @@ NETDATA.chartLibraries = {
             return 'netdata-container-gauge';
         }
     },
+    "statusimage": {
+        autoresize: function (state) {
+            void(state);
+            return false;
+        },
+        container_class: function (state) {
+            void(state);
+            return 'netdata-container';
+        },
+        create: NETDATA.statusImageCreate,
+        enabled: true,
+        format: function (state) {
+            void(state);
+            return 'array';
+        },
+        initialized: true,
+        initialize: function (callback) {
+            callback();
+        },
+        legend: function (state) {
+            void(state);
+            return null;
+        },
+        max_updates_to_recreate: function (state) {
+            void(state);
+            return 5000;
+        },
+        options: function (state) {
+            void(state);
+            return 'absolute';
+        },
+        pixels_per_point: function (state) {
+            void(state);
+            return 3;
+        },
+        track_colors: function (state) {
+            void(state);
+            return false;
+        },
+        update: NETDATA.statusImageUpdate,
+        xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
+    },
     "textonly": {
         autoresize: function (state) {
             void(state);

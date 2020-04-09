@@ -4303,6 +4303,23 @@ NETDATA.peityChartCreate = function (state, data) {
 };
 
 // ----------------------------------------------------------------------------------------------------------------
+// "Status Image" chart - Displays binary status images in the DOM
+
+NETDATA.statusImageCreate = function(state, data) {
+    var trueImage = NETDATA.dataAttribute(state.element, 'statusimage-true-image', '');
+    var falseImage = NETDATA.dataAttribute(state.element, 'statusimage-false-image', '');
+
+    var imageUrl = trueImage;
+    if (data.result[0] == 0) imageUrl = falseImage;
+
+    state.element.innerHTML = "<img src=" + imageUrl + "></img>";
+    return true;
+}
+
+NETDATA.statusImageUpdate = NETDATA.statusImageCreate;
+
+
+// ----------------------------------------------------------------------------------------------------------------
 // "Text-only" chart - Just renders the raw value to the DOM
 
 NETDATA.textOnlyCreate = function(state, data) {
@@ -4756,6 +4773,48 @@ NETDATA.chartLibraries = {
             void(state);
             return 'netdata-container-gauge';
         }
+    },
+    "statusimage": {
+        autoresize: function (state) {
+            void(state);
+            return false;
+        },
+        container_class: function (state) {
+            void(state);
+            return 'netdata-container';
+        },
+        create: NETDATA.statusImageCreate,
+        enabled: true,
+        format: function (state) {
+            void(state);
+            return 'array';
+        },
+        initialized: true,
+        initialize: function (callback) {
+            callback();
+        },
+        legend: function (state) {
+            void(state);
+            return null;
+        },
+        max_updates_to_recreate: function (state) {
+            void(state);
+            return 5000;
+        },
+        options: function (state) {
+            void(state);
+            return 'absolute';
+        },
+        pixels_per_point: function (state) {
+            void(state);
+            return 3;
+        },
+        track_colors: function (state) {
+            void(state);
+            return false;
+        },
+        update: NETDATA.statusImageUpdate,
+        xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
     },
     "textonly": {
         autoresize: function (state) {
