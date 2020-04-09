@@ -143,9 +143,6 @@ static void wait_children(void *arg)
             assert(0 == uv_async_send(&child_waited_async));
         }
     }
-    /* close event loop handles to trigger shutdown */
-    uv_close((uv_handle_t *)&server_pipe, NULL);
-    uv_close((uv_handle_t *)&child_waited_async, NULL);
 }
 
 void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t command_length)
@@ -247,8 +244,26 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
         fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
     }
 
-    if (nread < 0) { /* stop stream due to EOF or error */
+    if (nread < 0) { /* stop spawn server due to EOF or error */
+        int error;
+
+        uv_mutex_lock(&wait_children_mutex);
+        server_shutdown = 1;
+        spawned_processes = 1;
+        uv_cond_signal(&wait_children_cond);
+        uv_mutex_unlock(&wait_children_mutex);
+
+        fprintf(stderr, "Shutting down spawn server event loop.\n");
+        /* cleanup operations of the event loop */
         (void)uv_read_stop((uv_stream_t *) pipe);
+        uv_close((uv_handle_t *)&server_pipe, NULL);
+
+        error = uv_thread_join(&thread);
+        if (error) {
+            fprintf(stderr, "uv_thread_create(): %s", uv_strerror(error));
+        }
+        /* After joining it is safe to destroy child_waited_async */
+        uv_close((uv_handle_t *)&child_waited_async, NULL);
     } else if (nread) {
 #ifdef SPAWN_DEBUG
         fprintf(stderr, "SERVER %s nread %u\n", __func__, (unsigned)nread);
@@ -257,14 +272,6 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
     }
     if (buf && buf->len) {
         freez(buf->base);
-    }
-
-    if (nread < 0) {
-        uv_mutex_lock(&wait_children_mutex);
-        server_shutdown = 1;
-        spawned_processes = 1;
-        uv_cond_signal(&wait_children_cond);
-        uv_mutex_unlock(&wait_children_mutex);
     }
 }
 
@@ -336,14 +343,6 @@ void spawn_server(void)
     while (!server_shutdown) {
         uv_run(loop, UV_RUN_DEFAULT);
     }
-    /* cleanup operations of the event loop */
-    fprintf(stderr, "Shutting down spawn server event loop.\n");
-    error = uv_thread_join(&thread);
-    if (error) {
-        fprintf(stderr, "uv_thread_create(): %s", uv_strerror(error));
-    }
-    uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
-
     fprintf(stderr, "Shutting down spawn server loop complete.\n");
     assert(0 == uv_loop_close(loop));
 
