@@ -174,7 +174,7 @@ class Service(SimpleService):
         if self.model_config['flag']:
             prediction['flag'] = self.models[chart].predict(X_predict)[-1]
         self.debug('prediction={}'.format(prediction))
-        self.prediction = prediction
+        self.prediction[chart] = prediction
 
     def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
         if dimension_id not in self.charts[chart]:
@@ -212,17 +212,17 @@ class Service(SimpleService):
             if self.model_config['score']:
                 score = "{}_score".format(chart.replace('system.', ''))
                 self.update_chart_dim('score', score, divisor=100)
-                data[score] = self.prediction.get('score', 0) * 100
+                data[score] = self.prediction[chart].get('score', 0) * 100
 
             if self.model_config['prob']:
                 prob = "{}_prob".format(chart.replace('system.', ''))
                 self.update_chart_dim('prob', prob, divisor=100)
-                data[prob] = self.prediction.get('prob', 0) * 100
+                data[prob] = self.prediction[chart].get('prob', 0) * 100
 
             if self.model_config['flag']:
                 flag = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag)
-                data[flag] = self.prediction.get('flag', 0)
+                data[flag] = self.prediction[chart].get('flag', 0)
 
         return data
 
