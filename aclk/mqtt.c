@@ -52,7 +52,12 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(obj);
     UNUSED(rc);
 
-    info("Connection to cloud failed");
+    if (netdata_exit)
+        info("Connection to cloud terminated due to agent shutdown");
+    else {
+        errno = 0;
+        error("Connection to cloud failed");
+    }
     aclk_disconnect();
 
     aclk_lws_wss_mqtt_layer_disconect_notif();

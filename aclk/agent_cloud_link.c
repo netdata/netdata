@@ -187,7 +187,7 @@ biofailed:
  * should be called with
  *
  * mode 0 to reset the delay
- * mode 1 to sleep for the calculated amount of time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
+ * mode 1 to calculate sleep time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
  *
  */
 unsigned long int aclk_reconnect_delay(int mode)
@@ -209,8 +209,6 @@ unsigned long int aclk_reconnect_delay(int mode)
         fail++;
         delay = (delay * 1000) + (random() % 1000);
     }
-
-    //    sleep_usec(USEC_PER_MS * delay);
 
     return delay;
 }
@@ -308,7 +306,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         if (tmp_query->run_after == run_after) {
             QUERY_UNLOCK;
             QUERY_THREAD_WAKEUP;
-            return 1;
+            return 0;
         }
 
         if (last_query)
@@ -865,18 +863,22 @@ int aclk_process_queries()
 static void aclk_query_thread_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
-
-    COLLECTOR_LOCK;
 
     _reset_collector_list();
     freez(collector_list);
 
-    COLLECTOR_UNLOCK;
+    // Clean memory for pending queries if any
+    struct aclk_query *this_query;
 
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    do {
+        this_query = aclk_queue_pop();
+        aclk_query_free(this_query);
+    } while (this_query);
+
+    freez(static_thread->thread);
+    freez(static_thread);
 }
 
 /**
@@ -913,7 +915,7 @@ void *aclk_query_main_thread(void *ptr)
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
-                aclk_metadata_submitted = 0;
+                aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
             }
         }
 
@@ -973,7 +975,6 @@ static void aclk_main_cleanup(void *ptr)
         }
     }
 
-    info("Disconnected");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -1278,7 +1279,6 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *query_thread;
 
-    netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
     if (!netdata_cloud_setting) {
         info("Killing ACLK thread -> cloud functionality has been disabled");
         return NULL;
@@ -1318,9 +1318,10 @@ void *aclk_main(void *ptr)
         sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
-    create_private_key();
 
     usec_t reconnect_expiry = 0; // In usecs
+
+    netdata_thread_disable_cancelability();
 
     while (!netdata_exit) {
         static int first_init = 0;
@@ -1375,7 +1376,8 @@ void *aclk_main(void *ptr)
         }
     } // forever
 exited:
-    aclk_shutdown();
+    // Wakeup query thread to cleanup
+    QUERY_THREAD_WAKEUP;
 
     freez(aclk_username);
     freez(aclk_password);
@@ -1384,7 +1386,7 @@ exited:
     if (aclk_private_key != NULL)
         RSA_free(aclk_private_key);
 
-    netdata_thread_cleanup_pop(1);
+    aclk_main_cleanup(ptr);
     return NULL;
 }
 
@@ -1867,6 +1869,12 @@ int aclk_handle_cloud_request(char *payload)
             freez(cloud_to_agent.callback_topic);
 
         return 1;
+    }
+
+    // Checked to be "http", not needed anymore
+    if (likely(cloud_to_agent.type_id)) {
+        freez(cloud_to_agent.type_id);
+        cloud_to_agent.type_id = NULL;
     }
 
     if (unlikely(aclk_submit_request(&cloud_to_agent)))
