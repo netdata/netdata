@@ -73,14 +73,17 @@ class Service(SimpleService):
         return True
 
     @staticmethod
-    def data_to_df(data: list, mode: str = 'wide', charts: list = None) -> pd.DataFrame:
+    def data_to_df(data: list, mode: str = 'wide', charts: list = None, n: int = None) -> pd.DataFrame:
         """
         Parses data list of list's from allmetrics and formats it as a pandas dataframe.
         :param data: list of lists where each element is a metric from allmetrics <list>
         :param mode: used to determine if we want pandas df to be long (row per metric) or wide (col per metric) format <str>
         :param charts: filter data just for charts of interest <list>
+        :param n: filter data just for n last rows <list>
         :return: pandas dataframe of the data <pd.DataFrame>
         """
+        if n:
+            data = data[-n:]
         if charts:
             data = [item for sublist in data for item in sublist if item[1] in charts]
         else:
@@ -142,7 +145,7 @@ class Service(SimpleService):
         prediction = dict()
         # get predict data
         #X_predict = self.make_x(self.data_to_df(self.data[-((self.lags_n + self.smoothing_n)*2):], charts=[chart]))
-        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart]))
+        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=20))
         self.debug('X_predict.shape={}'.format(X_predict.shape))
         self.debug('X_predict={}'.format(X_predict))
         if self.model_config['score']:
