@@ -20,6 +20,7 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 TRAIN_MAX_N = 60*60
+TRAIN_SAMPLE_PCT = 1
 FIT_EVERY = 30
 LAGS_N = 2
 SMOOTHING_N = 2
@@ -67,6 +68,7 @@ class Service(SimpleService):
         self.lags_n = LAGS_N
         self.smoothing_n = SMOOTHING_N
         self.prediction = {chart: {} for chart in CHARTS_IN_SCOPE}
+        self.train_sample_pct = TRAIN_SAMPLE_PCT
 
     @staticmethod
     def check():
@@ -128,12 +130,15 @@ class Service(SimpleService):
         # add lags
         if self.lags_n >= 1:
             df = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna()
+        # sample if specified
+        if 0 < self.train_sample_pct < 1:
+            df = df.sample(frac=self.train_sample_pct)
         return df.values
 
     def model_fit(self, chart):
         # get train data
-        X_train = self.make_x(self.data_to_df(self.data, charts=[chart]))
-        # self.debug('X_train={}'.format(X_train))
+        df = self.data_to_df(self.data, charts=[chart])
+        X_train = self.make_x(df)
         self.debug('X_train.shape={}'.format(X_train.shape))
         # fit model
         self.models[chart].fit(X_train)
