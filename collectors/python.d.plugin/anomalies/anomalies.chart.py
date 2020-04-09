@@ -16,14 +16,13 @@ update_every = 1
 
 HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
-    'system.cpu', 'system.load', 'system.io', 'system.pgpgio',
-    'system.ram', 'system.net', 'system.ip', 'system.ipv6', 'system.processes', 'system.ctxt', 'system.idlejitter',
-    'system.intr', 'system.softirqs', 'system.softnet_stat'
+    'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
+    'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 TRAIN_MAX_N = 60*5
 FIT_EVERY = 30
-LAGS_N = 0
-SMOOTHING_N = 0
+LAGS_N = 2
+SMOOTHING_N = 2
 MODEL_CONFIG = {
     'type': 'cblof',
     'kwargs': {'contamination': 0.001},
