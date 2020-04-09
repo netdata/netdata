@@ -1279,11 +1279,11 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *query_thread;
 
-    netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
     if (!netdata_cloud_setting) {
         info("Killing ACLK thread -> cloud functionality has been disabled");
         return NULL;
     }
+    netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
@@ -1319,7 +1319,6 @@ void *aclk_main(void *ptr)
         sleep_usec(USEC_PER_SEC * 60);
     }
     create_publish_base_topic();
-    create_private_key();
 
     usec_t reconnect_expiry = 0; // In usecs
 
