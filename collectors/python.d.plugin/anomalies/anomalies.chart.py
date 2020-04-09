@@ -7,8 +7,8 @@
 import requests
 import pandas as pd
 #from pyod.models.knn import KNN
-#from pyod.models.hbos import HBOS
-from pyod.models.cblof import CBLOF
+from pyod.models.hbos import HBOS
+#from pyod.models.cblof import CBLOF
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
@@ -19,13 +19,12 @@ CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-TRAIN_MAX_N = 60*5
-FIT_EVERY = 60
+TRAIN_MAX_N = 60*60
+FIT_EVERY = 60*5
 LAGS_N = 0
 SMOOTHING_N = 0
 MODEL_CONFIG = {
-    'type': 'cblof',
-    'kwargs': {'contamination': 0.001, 'n_clusters': 4},
+    'kwargs': {'contamination': 0.001},
     'score': False,
     'prob': True,
     'flag': True,
@@ -59,7 +58,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.data = []
-        self.models = {chart: CBLOF(**MODEL_CONFIG['kwargs']) for chart in CHARTS_IN_SCOPE}
+        self.models = {chart: HBOS(**MODEL_CONFIG['kwargs']) for chart in CHARTS_IN_SCOPE}
         self.charts_in_scope = CHARTS_IN_SCOPE
         self.model_config = MODEL_CONFIG
         self.fit_every = FIT_EVERY
@@ -140,15 +139,6 @@ class Service(SimpleService):
         else:
             X = df.values
         return X
-
-    #def model_init(self, chart):
-    #    if chart not in self.models:
-    #        if self.model_config['type'] == 'hbos':
-    #            self.models[chart] = HBOS(**self.model_config['kwargs'])
-    #        elif self.model_config['type'] == 'knn':
-    #            self.models[chart] = KNN(**self.model_config['kwargs'])
-    #        elif self.model_config['type'] == 'cblof':
-    #            self.models[chart] = CBLOF(**self.model_config['kwargs'])
 
     def model_fit(self, chart):
         # get train data
