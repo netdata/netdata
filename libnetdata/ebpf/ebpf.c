@@ -91,7 +91,7 @@ int get_kernel_version() {
     return ((int)(str2l(major)*65536) + (int)(str2l(minor)*256) + (int)str2l(patch));
 }
 
-static int has_redhat_release()
+int get_redhat_release()
 {
     char buffer[256];
     int major,minor;
@@ -132,7 +132,7 @@ static int has_redhat_release()
 
 static int has_ebpf_kernel_version(int version) {
             //Kernel 4.11.0 or RH > 7.5
-    return (version >= NETDATA_MINIMUM_EBPF_KERNEL ||  has_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
+    return (version >= NETDATA_MINIMUM_EBPF_KERNEL ||  get_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
 }
 
 int has_condition_to_run(int version) {

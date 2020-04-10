@@ -21,6 +21,11 @@
  */
 # define NETDATA_MINIMUM_RH_VERSION 1797
 
+/**
+ * 2048 = 8*256 + 0
+ */
+# define NETDATA_RH_8 2048
+
 
 typedef struct netdata_ebpf_events {
     char type;
@@ -30,6 +35,7 @@ typedef struct netdata_ebpf_events {
 
 extern int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr);
 extern int get_kernel_version();
+extern int get_redhat_release();
 extern int has_condition_to_run(int version);
 
 #endif

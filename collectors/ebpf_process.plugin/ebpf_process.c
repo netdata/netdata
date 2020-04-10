@@ -72,6 +72,7 @@ static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
 static int nprocs;
+static int isrh;
 uint32_t *hash_values;
 
 pthread_mutex_t lock;
@@ -775,6 +776,8 @@ void set_global_variables() {
     if (nprocs > NETDATA_MAX_PROCESSOR) {
         nprocs = NETDATA_MAX_PROCESSOR;
     }
+
+    isrh = get_redhat_release();
 }
 
 static void change_collector_event() {
@@ -787,6 +790,14 @@ static void change_collector_event() {
         collector_events[i].name = NULL;
 }
 
+static void change_syscalls() {
+    static char *lfork = { "do_fork" };
+    static char *lclone = { "sys_clone" };
+    id_names[7] = lfork;
+    collector_events[8].name = lfork;
+    collector_events[10].name = lclone;
+}
+
 static inline void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
         mode = 0;
@@ -796,6 +807,9 @@ static inline void what_to_load(char *ptr) {
         */
     else
         change_collector_event();
+
+    if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+        change_syscalls();
 }
 
 static inline void enable_debug(char *ptr) {
