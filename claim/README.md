@@ -9,10 +9,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 # Agent claiming
 
 Agent claiming is part of the onboarding process when creating a Space in Netdata Cloud. Each Space gets its own
-common invitation mechanism, which begins with the administrators of the Scape creating a **claiming token**. They,
-or other users is their organization, can then use the claiming token to add an node to their Space.
+common invitation mechanism, which begins with the administrators of the Space creating a **claiming token**. They,
+or other users in their organization, can then use the claiming token to add a node to their Space.
 
-To claim a node, you first send a claiming request to Netdata Cloud (from the agent node). Once the Netdata Cloud
+To claim a node, you first send a claiming request to Netdata Cloud (from the agent node). Once Netdata Cloud
 validates the claiming request of the agent (based on the claiming token), and returns a successful result, the node is
 considered claimed.
 
@@ -61,6 +61,8 @@ command line parameters:
 ```sh
 -W "claim -token=TOKEN -rooms=ROOM1,ROOM2"
 ```
+
+> This method only works if the Agent is already running.
 
 For example:
 
