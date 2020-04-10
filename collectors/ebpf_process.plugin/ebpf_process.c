@@ -888,6 +888,9 @@ int main(int argc, char **argv)
 
     if (load_collector_file(user_config_dir)) {
         info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
+        change_collector_event();
+        if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+            change_syscalls();
     }
 
     if(ebpf_load_libraries()) {
