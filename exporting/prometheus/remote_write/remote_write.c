@@ -314,7 +314,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
         return 1;
     }
     buffer->len = data_size;
-    instance->stats.chart_buffered_bytes = (collected_number)buffer_strlen(buffer);
+    instance->stats.buffered_bytes = (collected_number)buffer_strlen(buffer);
 
     return 0;
 }

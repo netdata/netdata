@@ -85,6 +85,92 @@ void __rrd_check_rdlock(const char *file, const char *function, const unsigned l
     (void)line;
 }
 
+RRDSET *rrdset_create_custom(
+    RRDHOST *host,
+    const char *type,
+    const char *id,
+    const char *name,
+    const char *family,
+    const char *context,
+    const char *title,
+    const char *units,
+    const char *plugin,
+    const char *module,
+    long priority,
+    int update_every,
+    RRDSET_TYPE chart_type,
+    RRD_MEMORY_MODE memory_mode,
+    long history_entries)
+{
+    check_expected_ptr(host);
+    check_expected_ptr(type);
+    check_expected_ptr(id);
+    check_expected_ptr(name);
+    check_expected_ptr(family);
+    check_expected_ptr(context);
+    UNUSED(title);
+    check_expected_ptr(units);
+    check_expected_ptr(plugin);
+    check_expected_ptr(module);
+    check_expected(priority);
+    check_expected(update_every);
+    check_expected(chart_type);
+    UNUSED(memory_mode);
+    UNUSED(history_entries);
+
+    function_called();
+
+    return mock_ptr_type(RRDSET *);
+}
+
+void rrdset_next_usec(RRDSET *st, usec_t microseconds)
+{
+    check_expected_ptr(st);
+    UNUSED(microseconds);
+
+    function_called();
+}
+
+void rrdset_done(RRDSET *st)
+{
+    check_expected_ptr(st);
+
+    function_called();
+}
+
+RRDDIM *rrddim_add_custom(
+    RRDSET *st,
+    const char *id,
+    const char *name,
+    collected_number multiplier,
+    collected_number divisor,
+    RRD_ALGORITHM algorithm,
+    RRD_MEMORY_MODE memory_mode)
+{
+    check_expected_ptr(st);
+    UNUSED(id);
+    check_expected_ptr(name);
+    check_expected(multiplier);
+    check_expected(divisor);
+    check_expected(algorithm);
+    UNUSED(memory_mode);
+
+    function_called();
+
+    return NULL;
+}
+
+collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
+{
+    check_expected_ptr(st);
+    UNUSED(rd);
+    UNUSED(value);
+
+    function_called();
+
+    return 0;
+}
+
 const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
 {
     (void)id;
