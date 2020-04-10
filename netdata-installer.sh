@@ -1335,13 +1335,13 @@ get_compatible_kernel_for_ebpf() {
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
     run_failed "eBPF explicitly disabled."
-    deferred error "eBPF explicitly disabled."
+    defer_error "eBPF explicitly disabled."
     return 1
   fi
 
   if [ "$(uname)" != "Linux" ]; then
     run_failed "Running on an unsupported system type ($(uname)), not installing eBPF."
-    deferred_error "Running on an unsupported system type ($(uname)), not installing eBPF."
+    defer_error "Running on an unsupported system type ($(uname)), not installing eBPF."
     return 1
   fi
 
@@ -1355,7 +1355,7 @@ should_install_ebpf() {
   # Check Kernel Compatibility
   if ! get_compatible_kernel_for_ebpf "${kver}" "${rhver}" > /dev/null; then
     run_failed "Incompatible kernel detected (${kver}), not installing eBPF"
-    deferred_error "Incompatible kernel detected (${kver}), not installing eBPF"
+    defer_error "Incompatible kernel detected (${kver}), not installing eBPF"
     return 1
   fi
 
