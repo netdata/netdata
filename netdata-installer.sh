@@ -1209,6 +1209,19 @@ function get_kernel_version() {
   printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
 }
 
+function get_rh_version() {
+  if [ ! -f /etc/redhat-release ] ; then
+     printf "000000000"
+     return
+  fi
+
+  r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
 detect_libc() {
   libc=
   if ldd --version 2>&1 | grep -q -i glibc; then
@@ -1230,6 +1243,7 @@ detect_libc() {
 
 get_compatible_kernel_for_ebpf() {
   kver="${1}"
+  rhver="${2}"
 
   # XXX: Logic taken from Slack discussion in #ebpf
   # everything that has a version <= 4.14 can use the code built to 4.14
@@ -1241,19 +1255,72 @@ get_compatible_kernel_for_ebpf() {
 
   kpkg=
 
-  if [ "${kver}" -ge 005000000 ]; then
+  # Kernel variables
+  rhver8="0080000000"
+  rhver7="0070061810"
+  kernel_5_0_0="005000000"
+  kernel_4_20_17="004020017"
+  kernel_4_20_0="004020000"
+  kernel_4_19_108="004019108"
+  kernel_4_19_105="004019105"
+  kernel_4_19_104="004019104"
+  kernel_4_19_102="004019102"
+  kernel_4_19_101="004019101"
+  kernel_4_19_98="004019098"
+  kernel_4_19_97="004019097"
+  kernel_4_19_6="004019006"
+  kernel_4_18_20="004018020"
+  kernel_4_18_17="004018017"
+  kernel_4_18_16="004018016"
+  kernel_4_18_0="004018000"
+  kernel_4_16_18="004016018"
+  kernel_4_16_4="004016004"
+  kernel_4_16_3="004016003"
+  kernel_4_16_0="004016000"
+  kernel_4_15_18="004015018"
+  kernel_4_15_0="004015000"
+  kernel_4_14_999="004014999"
+
+  if [ "${rhver}" -ge "${rhver8}" ] ; then
+    echo >&2 " Using eBPF Kernel Package built against RH Linux 4.18.0"
+    kpkg="4_18_0"
+  elif [ "${rhver}" -ge "${rhver7}" ] ; then
+    echo >&2 " Using eBPF Kernel Package built against RH Linux 3.10.0"
+    kpkg="3_10_0"
+  elif [ "${kver}" -ge "${kernel_5_0_0}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
     kpkg="5_4_20"
-  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
+  elif [ "${kver}" -ge "${kernel_4_20_0}" ] && [ "${kver}" -le "${kernel_4_20_17}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.20.17"
+    kpkg="4_20_17"
+  elif [ "${kver}" -ge "${kernel_4_19_105}" ] && [ "${kver}" -le "${kernel_4_19_108}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.105"
+    kpkg="4_19_105"
+  elif [ "${kver}" -ge "${kernel_4_19_102}" ] && [ "${kver}" -le "${kernel_4_19_104}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
     kpkg="4_19_104"
-  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
+  elif [ "${kver}" -ge "${kernel_4_19_98}" ] && [ "${kver}" -le "${kernel_4_19_101}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
     kpkg="4_19_98"
-  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
+  elif [ "${kver}" -ge "${kernel_4_19_6}" ] && [ "${kver}" -le "${kernel_4_19_97}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.6"
+    kpkg="4_19_6"
+  elif [ "${kver}" -ge "${kernel_4_18_17}" ] && [ "${kver}" -le "${kernel_4_18_20}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.18.20"
+    kpkg="4_18_20"
+  elif [ "${kver}" -ge "${kernel_4_18_0}" ] && [ "${kver}" -le "${kernel_4_18_16}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.18.16"
+    kpkg="4_18_16"
+  elif [ "${kver}" -ge "${kernel_4_16_4}" ] && [ "${kver}" -le "${kernel_4_16_18}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.16.18"
+    kpkg="4_16_18"
+  elif [ "${kver}" -ge "${kernel_4_16_0}" ] && [ "${kver}" -le "${kernel_4_16_3}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.16.3"
+    kpkg="4_16_3"
+  elif [ "${kver}" -ge "${kernel_4_15_0}" ] && [ "${kver}" -le "${kernel_4_15_18}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
     kpkg="4_15_18"
-  elif [ "${kver}" -le 004014999 ]; then
+  elif [ "${kver}" -le "${kernel_4_14_999}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
     kpkg="4_14_171"
   else
@@ -1281,8 +1348,11 @@ should_install_ebpf() {
   kver="$(get_kernel_version)"
   kver="${kver:-0}"
 
+  #Get RH Version
+  rhver=$(get_rh_version)
+
   # Check Kernel Compatibility
-  if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
+  if ! get_compatible_kernel_for_ebpf "${kver}" "${rhver}" > /dev/null; then
     echo >&2 " Detected Kernel: ${kver}"
     run_failed "Kernel incompatible. Please contact NetData support!"
     return 1
@@ -1325,8 +1395,11 @@ install_ebpf() {
   kver="$(get_kernel_version)"
   kver="${kver:-0}"
 
+  #Get RH Version
+  rhver=$(get_rh_version)
+
   # Get Compatible eBPF Kernel Package
-  kpkg="$(get_compatible_kernel_for_ebpf "${kver}")"
+  kpkg="$(get_compatible_kernel_for_ebpf "${kver}" "${rhver}")"
 
   # Detect libc
   libc="$(detect_libc)"
