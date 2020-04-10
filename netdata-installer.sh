@@ -1335,12 +1335,13 @@ get_compatible_kernel_for_ebpf() {
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
     run_failed "eBPF explicitly disabled."
+    deferred error "eBPF explicitly disabled."
     return 1
   fi
 
   if [ "$(uname)" != "Linux" ]; then
-    echo >&2 " Sorry eBPF Collector is currently unsupproted on $(uname) Systems at this time."
-    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
+    run_failed "Running on an unsupported system type ($(uname)), not installing eBPF."
+    deferred_error "Running on an unsupported system type ($(uname)), not installing eBPF."
     return 1
   fi
 
@@ -1353,8 +1354,8 @@ should_install_ebpf() {
 
   # Check Kernel Compatibility
   if ! get_compatible_kernel_for_ebpf "${kver}" "${rhver}" > /dev/null; then
-    echo >&2 " Detected Kernel: ${kver}"
-    run_failed "Kernel incompatible. Please contact NetData support!"
+    run_failed "Incompatible kernel detected (${kver}), not installing eBPF"
+    deferred_error "Incompatible kernel detected (${kver}), not installing eBPF"
     return 1
   fi
 
@@ -1374,6 +1375,7 @@ should_install_ebpf() {
 
   if ! run "${tmp}"/check-kernel-config.sh; then
     run_failed "Kernel unsupported or missing required config"
+    defer_error "Kernel unsupported or missing required config, not installing eBPF collector"
     return 1
   fi
 
@@ -1433,6 +1435,7 @@ install_ebpf() {
 
   if [ -z "${libdir}" ]; then
     run_failed "Could not find a suitable lib directory"
+    rm -rf "${tmp}"
     return 1
   fi
 
@@ -1443,13 +1446,12 @@ install_ebpf() {
   run ln -v -f -s "${libdir}"/libbpf_kernel.so "${libdir}"/libbpf_kernel.so.0
   run ldconfig
 
-  echo >&2 "ePBF installation all done!"
   rm -rf "${tmp}"
 
   return 0
 }
 
-progress "eBPF Kernel Collector (opt-in)"
+progress "eBPF Kernel Collector"
 install_ebpf
 
 # -----------------------------------------------------------------------------
