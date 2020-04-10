@@ -891,6 +891,7 @@ int main(int argc, char **argv)
         change_collector_event();
         if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
             change_syscalls();
+        
     }
 
     if(ebpf_load_libraries()) {
