@@ -861,8 +861,10 @@ int main(int argc, char **argv)
     (void)argv;
 
     mykernel =  get_kernel_version();
-    if(!has_condition_to_run(mykernel))
+    if(!has_condition_to_run(mykernel)) {
+        error("[EBPF PROCESS] The current collector cannot run on this kernel.");
         return 1;
+    }
 
     //set name
     program_name = "ebpf_process.plugin";
@@ -891,7 +893,6 @@ int main(int argc, char **argv)
         change_collector_event();
         if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
             change_syscalls();
-        
     }
 
     if(ebpf_load_libraries()) {
@@ -930,6 +931,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
+        error("[EBPF PROCESS] Cannot start the mutex.");
         int_exit(7);
     }
 
