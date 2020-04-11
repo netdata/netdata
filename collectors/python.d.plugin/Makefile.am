@@ -47,6 +47,7 @@ include bind_rndc/Makefile.inc
 include boinc/Makefile.inc
 include ceph/Makefile.inc
 include chrony/Makefile.inc
+include clickhouse/Makefile.inc
 include couchdb/Makefile.inc
 include dnsdist/Makefile.inc
 include dns_query_time/Makefile.inc
