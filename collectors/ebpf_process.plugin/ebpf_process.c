@@ -792,10 +792,8 @@ static void change_collector_event() {
 
 static void change_syscalls() {
     static char *lfork = { "do_fork" };
-    static char *lclone = { "sys_clone" };
     id_names[7] = lfork;
     collector_events[8].name = lfork;
-    collector_events[10].name = lclone;
 }
 
 static inline void what_to_load(char *ptr) {
