@@ -100,7 +100,9 @@ int get_redhat_release()
     if (fp) {
         major = 0;
         minor = -1;
-        if (fread(buffer, sizeof(char), 255, fp) > 4 ) {
+        size_t length = fread(buffer, sizeof(char), 255, fp);
+        if (length > 4 ) {
+            buffer[length] = '\0';
             char *end = strchr(buffer, '.');
             char *start;
             if (end) {
