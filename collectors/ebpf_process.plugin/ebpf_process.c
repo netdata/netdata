@@ -782,12 +782,12 @@ void set_global_variables() {
 
 static void change_collector_event() {
     int i;
+    if (mykernel < NETDATA_KERNEL_V5_3)
+        collector_events[10].name = NULL;
+
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
-
-    if (mykernel < 328448)
-        collector_events[i].name = NULL;
 }
 
 static void change_syscalls() {
