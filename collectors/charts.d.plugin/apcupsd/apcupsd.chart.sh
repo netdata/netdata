@@ -26,6 +26,13 @@ apcupsd_get() {
   run -t $apcupsd_timeout apcaccess status "$1"
 }
 
+is_ups_status_ok() {
+  case "$1" in
+    "ONLINE"* | "ONBATT"* | "TRIM ONLINE") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 apcupsd_check() {
 
   # this should return:
@@ -47,8 +54,8 @@ apcupsd_check() {
       error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
       failed=$((failed + 1))
     else
-      apcupsd_status="$(apcupsd_get ${apcupsd_sources[${host}]} | awk '/^STATUS.*/{ print $3 }')"
-      if [ "${apcupsd_status}" != "ONLINE" ] && [ "${apcupsd_status}" != "ONBATT" ]; then
+      apcupsd_status="$(apcupsd_get ${apcupsd_sources[${host}]} | sed -e 's/STATUS.*: //' -e 't' -e 'd')"
+      if ! is_ups_status_ok "$apcupsd_status"; then
         error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
         failed=$((failed + 1))
       else
