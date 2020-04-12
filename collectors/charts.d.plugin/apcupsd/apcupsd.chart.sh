@@ -28,7 +28,7 @@ apcupsd_get() {
 
 is_ups_status_ok() {
   case "$1" in
-    "ONLINE"* | "ONBATT"* | "TRIM ONLINE" | "CAL ONBATT") return 0 ;;
+    "ONLINE" | "ONBATT" | "TRIM ONLINE" | "CAL ONBATT") return 0 ;;
     *) return 1 ;;
   esac
 }
