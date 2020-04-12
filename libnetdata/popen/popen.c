@@ -296,8 +296,14 @@ int custom_pclose(FILE *fp, pid_t pid) {
                 return(info.si_status);
 
             case CLD_KILLED:
-                error("child pid %d killed by signal %d.", info.si_pid, info.si_status);
-                return(-1);
+                if(info.si_status == 15) {
+                    info("child pid %d killed by signal %d.", info.si_pid, info.si_status);
+                    return(0);
+                }
+                else {
+                    error("child pid %d killed by signal %d.", info.si_pid, info.si_status);
+                    return(-1);
+                }
 
             case CLD_DUMPED:
                 error("child pid %d core dumped by signal %d.", info.si_pid, info.si_status);
