@@ -247,42 +247,6 @@ Caddyfile.
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our Travis CI infrastructure.
 
-### Using tools manually from the command line
-
-The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your
-choosing. 
-
-```bash
-Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PWD> [-s]
-	-s skip build, just push the image
-Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
-```
-
-This is especially useful when testing a Pull Request for Kubernetes, since you can set `image` to an immutable
-repository and tag, set the `imagePullPolicy` to `Always` and just keep uploading new images.
-
-Example:
-
-We get a local copy of the Helm chart at <https://github.com/netdata/helmchart>. We modify `values.yaml` to have the
-following:
-
-```yaml
-image:
-  repository: cakrit/netdata-prs
-  tag: PR5576
-  pullPolicy: Always
-```
-
-We check out PR5576 and run the following:
-
-```bash
-./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
-```
-
-Then we can run `helm install [path to our helmchart clone]`.
-
-If we make changes to the code, we execute the same `build-test.sh` command, followed by `helm upgrade [name] [path to our helmchart clone]`
-
 ### Inside Netdata organization, using Travis CI
 
 To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata
