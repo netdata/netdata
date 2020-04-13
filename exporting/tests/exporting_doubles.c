@@ -20,7 +20,7 @@ struct engine *__mock_read_exporting_config()
     engine->instance_root = calloc(1, sizeof(struct instance));
     struct instance *instance = engine->instance_root;
     instance->engine = engine;
-    instance->config.type = BACKEND_TYPE_GRAPHITE;
+    instance->config.type = EXPORTING_CONNECTOR_TYPE_GRAPHITE;
     instance->config.name = strdupz("instance_name");
     instance->config.destination = strdupz("localhost");
     instance->config.update_every = 1;
@@ -82,10 +82,26 @@ int __wrap_notify_workers(struct engine *engine)
     return mock_type(int);
 }
 
-int __wrap_send_internal_metrics(struct engine *engine)
+void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(st_rusage);
+    check_expected_ptr(rd_user);
+    check_expected_ptr(rd_system);
+}
+
+void __wrap_send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
+{
+    function_called();
+    check_expected_ptr(st_rusage);
+    check_expected_ptr(rd_user);
+    check_expected_ptr(rd_system);
+}
+
+int __wrap_send_internal_metrics(struct instance *instance)
+{
+    function_called();
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 

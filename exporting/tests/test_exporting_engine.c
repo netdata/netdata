@@ -44,6 +44,11 @@ static void test_exporting_engine(void **state)
     expect_memory(__wrap_init_connectors, engine, engine, sizeof(struct engine));
     will_return(__wrap_init_connectors, 0);
 
+    expect_function_call(__wrap_create_main_rusage_chart);
+    expect_not_value(__wrap_create_main_rusage_chart, st_rusage, NULL);
+    expect_not_value(__wrap_create_main_rusage_chart, rd_user, NULL);
+    expect_not_value(__wrap_create_main_rusage_chart, rd_system, NULL);
+
     expect_function_call(__wrap_now_realtime_sec);
     will_return(__wrap_now_realtime_sec, 2);
 
@@ -59,9 +64,10 @@ static void test_exporting_engine(void **state)
     expect_memory(__wrap_notify_workers, engine, engine, sizeof(struct engine));
     will_return(__wrap_notify_workers, 0);
 
-    expect_function_call(__wrap_send_internal_metrics);
-    expect_memory(__wrap_send_internal_metrics, engine, engine, sizeof(struct engine));
-    will_return(__wrap_send_internal_metrics, 0);
+    expect_function_call(__wrap_send_main_rusage);
+    expect_value(__wrap_send_main_rusage, st_rusage, NULL);
+    expect_value(__wrap_send_main_rusage, rd_user, NULL);
+    expect_value(__wrap_send_main_rusage, rd_system, NULL);
 
     expect_function_call(__wrap_info_int);
 
@@ -87,7 +93,7 @@ static void test_read_exporting_config(void **state)
     assert_ptr_not_equal(instance, NULL);
     assert_ptr_equal(instance->next, NULL);
     assert_ptr_equal(instance->engine, engine);
-    assert_int_equal(instance->config.type, BACKEND_TYPE_GRAPHITE);
+    assert_int_equal(instance->config.type, EXPORTING_CONNECTOR_TYPE_GRAPHITE);
     assert_string_equal(instance->config.destination, "localhost");
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);
@@ -122,7 +128,7 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(instance->metric_formatting, format_dimension_collected_graphite_plaintext);
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
-    assert_ptr_equal(instance->end_batch_formatting, NULL);
+    assert_ptr_equal(instance->end_batch_formatting, simple_connector_update_buffered_bytes);
 
     BUFFER *buffer = instance->buffer;
     assert_ptr_not_equal(buffer, NULL);
@@ -384,7 +390,7 @@ static void test_prepare_buffers(void **state)
 
     assert_int_equal(__real_prepare_buffers(engine), 0);
 
-    assert_int_equal(instance->stats.chart_buffered_metrics, 1);
+    assert_int_equal(instance->stats.buffered_metrics, 1);
 
     // check with NULL functions
     instance->start_batch_formatting = NULL;
@@ -573,8 +579,8 @@ static void test_simple_connector_receive_response(void **state)
         log_line,
         "EXPORTING: received 9 bytes from instance_name connector instance. Ignoring them. Sample: 'Test recv'");
 
-    assert_int_equal(stats->chart_received_bytes, 9);
-    assert_int_equal(stats->chart_receptions, 1);
+    assert_int_equal(stats->received_bytes, 9);
+    assert_int_equal(stats->receptions, 1);
     assert_int_equal(sock, 1);
 }
 
@@ -614,10 +620,10 @@ static void test_simple_connector_send_buffer(void **state)
     simple_connector_send_buffer(&sock, &failures, instance);
 
     assert_int_equal(failures, 0);
-    assert_int_equal(stats->chart_transmission_successes, 1);
-    assert_int_equal(stats->chart_sent_bytes, 84);
-    assert_int_equal(stats->chart_sent_metrics, 1);
-    assert_int_equal(stats->chart_transmission_failures, 0);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_metrics, 1);
+    assert_int_equal(stats->transmission_failures, 0);
 
     assert_int_equal(buffer_strlen(buffer), 0);
 
@@ -628,6 +634,7 @@ static void test_simple_connector_worker(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
+    struct stats *stats = &instance->stats;
     BUFFER *buffer = instance->buffer;
 
     __real_mark_scheduled_instances(engine);
@@ -661,7 +668,24 @@ static void test_simple_connector_worker(void **state)
     expect_value(__wrap_send, len, 84);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
+    expect_function_call(__wrap_send_internal_metrics);
+    expect_value(__wrap_send_internal_metrics, instance, instance);
+    will_return(__wrap_send_internal_metrics, 0);
+
     simple_connector_worker(instance);
+
+    assert_int_equal(stats->buffered_metrics, 0);
+    assert_int_equal(stats->buffered_bytes, 84);
+    assert_int_equal(stats->received_bytes, 0);
+    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_metrics, 1);
+    assert_int_equal(stats->lost_metrics, 0);
+    assert_int_equal(stats->receptions, 0);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->transmission_failures, 0);
+    assert_int_equal(stats->data_lost_events, 0);
+    assert_int_equal(stats->lost_bytes, 0);
+    assert_int_equal(stats->reconnects, 0);
 }
 
 static void test_sanitize_json_string(void **state)
@@ -759,6 +783,367 @@ static void test_flush_host_labels(void **state)
 
     assert_int_equal(flush_host_labels(instance, localhost), 0);
     assert_int_equal(buffer_strlen(instance->labels), 0);
+}
+
+static void test_create_main_rusage_chart(void **state)
+{
+    UNUSED(state);
+
+    RRDSET *st_rusage = calloc(1, sizeof(RRDSET));
+    RRDDIM *rd_user = NULL;
+    RRDDIM *rd_system = NULL;
+
+    expect_function_call(rrdset_create_custom);
+    expect_value(rrdset_create_custom, host, localhost);
+    expect_string(rrdset_create_custom, type, "netdata");
+    expect_string(rrdset_create_custom, id, "exporting_main_thread_cpu");
+    expect_value(rrdset_create_custom, name, NULL);
+    expect_string(rrdset_create_custom, family, "exporting");
+    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, units, "milliseconds/s");
+    expect_string(rrdset_create_custom, plugin, "exporting");
+    expect_value(rrdset_create_custom, module, NULL);
+    expect_value(rrdset_create_custom, priority, 130600);
+    expect_value(rrdset_create_custom, update_every, localhost->rrd_update_every);
+    expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_STACKED);
+    will_return(rrdset_create_custom, st_rusage);
+
+    expect_function_calls(rrddim_add_custom, 2);
+    expect_value_count(rrddim_add_custom, st, st_rusage, 2);
+    expect_value_count(rrddim_add_custom, name, NULL, 2);
+    expect_value_count(rrddim_add_custom, multiplier, 1, 2);
+    expect_value_count(rrddim_add_custom, divisor, 1000, 2);
+    expect_value_count(rrddim_add_custom, algorithm, RRD_ALGORITHM_INCREMENTAL, 2);
+
+    __real_create_main_rusage_chart(&st_rusage, &rd_user, &rd_system);
+
+    free(st_rusage);
+}
+
+static void test_send_main_rusage(void **state)
+{
+    UNUSED(state);
+
+    RRDSET *st_rusage = calloc(1, sizeof(RRDSET));
+    st_rusage->counter_done = 1;
+
+    expect_function_call(rrdset_next_usec);
+    expect_value(rrdset_next_usec, st, st_rusage);
+
+    expect_function_calls(rrddim_set_by_pointer, 2);
+    expect_value_count(rrddim_set_by_pointer, st, st_rusage, 2);
+
+    expect_function_call(rrdset_done);
+    expect_value(rrdset_done, st, st_rusage);
+
+    __real_send_main_rusage(st_rusage, NULL, NULL);
+
+    free(st_rusage);
+}
+
+static void test_send_internal_metrics(void **state)
+{
+    UNUSED(state);
+
+    struct instance *instance = calloc(1, sizeof(struct instance));
+    instance->config.name = (const char *)strdupz("test_instance");
+    instance->config.update_every = 2;
+
+    struct stats *stats = &instance->stats;
+
+    stats->st_metrics = calloc(1, sizeof(RRDSET));
+    stats->st_metrics->counter_done = 1;
+    stats->st_bytes = calloc(1, sizeof(RRDSET));
+    stats->st_bytes->counter_done = 1;
+    stats->st_ops = calloc(1, sizeof(RRDSET));
+    stats->st_ops->counter_done = 1;
+    stats->st_rusage = calloc(1, sizeof(RRDSET));
+    stats->st_rusage->counter_done = 1;
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_create_custom);
+    expect_value(rrdset_create_custom, host, localhost);
+    expect_string(rrdset_create_custom, type, "netdata");
+    expect_string(rrdset_create_custom, id, "exporting_test_instance_metrics");
+    expect_value(rrdset_create_custom, name, NULL);
+    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, units, "metrics");
+    expect_string(rrdset_create_custom, plugin, "exporting");
+    expect_value(rrdset_create_custom, module, NULL);
+    expect_value(rrdset_create_custom, priority, 130610);
+    expect_value(rrdset_create_custom, update_every, 2);
+    expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_LINE);
+    will_return(rrdset_create_custom, stats->st_metrics);
+
+    expect_function_calls(rrddim_add_custom, 3);
+    expect_value_count(rrddim_add_custom, st, stats->st_metrics, 3);
+    expect_value_count(rrddim_add_custom, name, NULL, 3);
+    expect_value_count(rrddim_add_custom, multiplier, 1, 3);
+    expect_value_count(rrddim_add_custom, divisor, 1, 3);
+    expect_value_count(rrddim_add_custom, algorithm, RRD_ALGORITHM_ABSOLUTE, 3);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_create_custom);
+    expect_value(rrdset_create_custom, host, localhost);
+    expect_string(rrdset_create_custom, type, "netdata");
+    expect_string(rrdset_create_custom, id, "exporting_test_instance_bytes");
+    expect_value(rrdset_create_custom, name, NULL);
+    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, units, "KiB");
+    expect_string(rrdset_create_custom, plugin, "exporting");
+    expect_value(rrdset_create_custom, module, NULL);
+    expect_value(rrdset_create_custom, priority, 130620);
+    expect_value(rrdset_create_custom, update_every, 2);
+    expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_AREA);
+    will_return(rrdset_create_custom, stats->st_bytes);
+
+    expect_function_calls(rrddim_add_custom, 4);
+    expect_value_count(rrddim_add_custom, st, stats->st_bytes, 4);
+    expect_value_count(rrddim_add_custom, name, NULL, 4);
+    expect_value_count(rrddim_add_custom, multiplier, 1, 4);
+    expect_value_count(rrddim_add_custom, divisor, 1024, 4);
+    expect_value_count(rrddim_add_custom, algorithm, RRD_ALGORITHM_ABSOLUTE, 4);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_create_custom);
+    expect_value(rrdset_create_custom, host, localhost);
+    expect_string(rrdset_create_custom, type, "netdata");
+    expect_string(rrdset_create_custom, id, "exporting_test_instance_ops");
+    expect_value(rrdset_create_custom, name, NULL);
+    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, units, "operations");
+    expect_string(rrdset_create_custom, plugin, "exporting");
+    expect_value(rrdset_create_custom, module, NULL);
+    expect_value(rrdset_create_custom, priority, 130630);
+    expect_value(rrdset_create_custom, update_every, 2);
+    expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_LINE);
+    will_return(rrdset_create_custom, stats->st_ops);
+
+    expect_function_calls(rrddim_add_custom, 5);
+    expect_value_count(rrddim_add_custom, st, stats->st_ops, 5);
+    expect_value_count(rrddim_add_custom, name, NULL, 5);
+    expect_value_count(rrddim_add_custom, multiplier, 1, 5);
+    expect_value_count(rrddim_add_custom, divisor, 1, 5);
+    expect_value_count(rrddim_add_custom, algorithm, RRD_ALGORITHM_ABSOLUTE, 5);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_create_custom);
+    expect_value(rrdset_create_custom, host, localhost);
+    expect_string(rrdset_create_custom, type, "netdata");
+    expect_string(rrdset_create_custom, id, "exporting_test_instance_thread_cpu");
+    expect_value(rrdset_create_custom, name, NULL);
+    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, units, "milliseconds/s");
+    expect_string(rrdset_create_custom, plugin, "exporting");
+    expect_value(rrdset_create_custom, module, NULL);
+    expect_value(rrdset_create_custom, priority, 130640);
+    expect_value(rrdset_create_custom, update_every, 2);
+    expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_STACKED);
+    will_return(rrdset_create_custom, stats->st_rusage);
+
+    expect_function_calls(rrddim_add_custom, 2);
+    expect_value_count(rrddim_add_custom, st, stats->st_rusage, 2);
+    expect_value_count(rrddim_add_custom, name, NULL, 2);
+    expect_value_count(rrddim_add_custom, multiplier, 1, 2);
+    expect_value_count(rrddim_add_custom, divisor, 1000, 2);
+    expect_value_count(rrddim_add_custom, algorithm, RRD_ALGORITHM_INCREMENTAL, 2);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_next_usec);
+    expect_value(rrdset_next_usec, st, stats->st_metrics);
+
+    expect_function_calls(rrddim_set_by_pointer, 3);
+    expect_value_count(rrddim_set_by_pointer, st, stats->st_metrics, 3);
+
+    expect_function_call(rrdset_done);
+    expect_value(rrdset_done, st, stats->st_metrics);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_next_usec);
+    expect_value(rrdset_next_usec, st, stats->st_bytes);
+
+    expect_function_calls(rrddim_set_by_pointer, 4);
+    expect_value_count(rrddim_set_by_pointer, st, stats->st_bytes, 4);
+
+    expect_function_call(rrdset_done);
+    expect_value(rrdset_done, st, stats->st_bytes);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_next_usec);
+    expect_value(rrdset_next_usec, st, stats->st_ops);
+
+    expect_function_calls(rrddim_set_by_pointer, 5);
+    expect_value_count(rrddim_set_by_pointer, st, stats->st_ops, 5);
+
+    expect_function_call(rrdset_done);
+    expect_value(rrdset_done, st, stats->st_ops);
+
+    // ------------------------------------------------------------------------
+
+    expect_function_call(rrdset_next_usec);
+    expect_value(rrdset_next_usec, st, stats->st_rusage);
+
+    expect_function_calls(rrddim_set_by_pointer, 2);
+    expect_value_count(rrddim_set_by_pointer, st, stats->st_rusage, 2);
+
+    expect_function_call(rrdset_done);
+    expect_value(rrdset_done, st, stats->st_rusage);
+
+    // ------------------------------------------------------------------------
+
+    __real_send_internal_metrics(instance);
+
+    free(stats->st_metrics);
+    free(stats->st_bytes);
+    free(stats->st_ops);
+    free(stats->st_rusage);
+    free((void *)instance->config.name);
+    free(instance);
+}
+
+static void test_can_send_rrdset(void **state)
+{
+    (void)*state;
+
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 1);
+
+    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+
+    // TODO: test with a denying simple pattern
+
+    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_OBSOLETE);
+
+    localhost->rrdset_root->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
+    prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
+    assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
+}
+
+static void test_prometheus_name_copy(void **state)
+{
+    (void)*state;
+
+    char destination_name[PROMETHEUS_ELEMENT_MAX + 1];
+    assert_int_equal(prometheus_name_copy(destination_name, "test-name", PROMETHEUS_ELEMENT_MAX), 9);
+
+    assert_string_equal(destination_name, "test_name");
+}
+
+static void test_prometheus_label_copy(void **state)
+{
+    (void)*state;
+
+    char destination_name[PROMETHEUS_ELEMENT_MAX + 1];
+    assert_int_equal(prometheus_label_copy(destination_name, "test\"\\\nlabel", PROMETHEUS_ELEMENT_MAX), 15);
+
+    assert_string_equal(destination_name, "test\\\"\\\\\\\nlabel");
+}
+
+static void test_prometheus_units_copy(void **state)
+{
+    (void)*state;
+
+    char destination_name[PROMETHEUS_ELEMENT_MAX + 1];
+    assert_string_equal(prometheus_units_copy(destination_name, "test-units", PROMETHEUS_ELEMENT_MAX, 0), "_test_units");
+    assert_string_equal(destination_name, "_test_units");
+
+    assert_string_equal(prometheus_units_copy(destination_name, "%", PROMETHEUS_ELEMENT_MAX, 0), "_percent");
+    assert_string_equal(prometheus_units_copy(destination_name, "test-units/s", PROMETHEUS_ELEMENT_MAX, 0), "_test_units_persec");
+
+    assert_string_equal(prometheus_units_copy(destination_name, "KiB", PROMETHEUS_ELEMENT_MAX, 1), "_KB");
+}
+
+static void test_format_host_labels_prometheus(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    format_host_labels_prometheus(instance, localhost);
+    assert_string_equal(buffer_tostring(instance->labels), "key1=\"netdata\",key2=\"value2\"");
+}
+
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
+{
+    (void)state;
+
+    BUFFER *buffer = buffer_create(0);
+
+    localhost->hostname = strdupz("test_hostname");
+    localhost->rrdset_root->family = strdupz("test_family");
+    localhost->rrdset_root->context = strdupz("test_context");
+
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(localhost, buffer, "test_server", "test_prefix", 0, 0);
+
+    assert_string_equal(
+        buffer_tostring(buffer),
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
+        "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
+        "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\"} 690565856.0000000\n");
+
+    buffer_flush(buffer);
+
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+        localhost, buffer, "test_server", "test_prefix", 0, PROMETHEUS_OUTPUT_NAMES | PROMETHEUS_OUTPUT_TYPES);
+
+    assert_string_equal(
+        buffer_tostring(buffer),
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
+        "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
+        "# COMMENT TYPE test_prefix_test_context gauge\n"
+        "test_prefix_test_context{chart=\"chart_name\",family=\"test_family\",dimension=\"dimension_name\"} 690565856.0000000\n");
+
+    buffer_flush(buffer);
+
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(localhost, buffer, "test_server", "test_prefix", 0, 0);
+
+    assert_string_equal(
+        buffer_tostring(buffer),
+        "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
+        "netdata_host_tags_info{instance=\"test_hostname\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "netdata_host_tags{instance=\"test_hostname\",key1=\"value1\",key2=\"value2\"} 1\n"
+        "test_prefix_test_context{chart=\"chart_id\",family=\"test_family\",dimension=\"dimension_id\",instance=\"test_hostname\"} 690565856.0000000\n");
+
+    free(localhost->rrdset_root->context);
+    free(localhost->rrdset_root->family);
+    free(localhost->hostname);
+    buffer_free(buffer);
 }
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
@@ -1014,6 +1399,7 @@ static void test_aws_kinesis_connector_worker(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
+    struct stats *stats = &instance->stats;
     BUFFER *buffer = instance->buffer;
 
     __real_mark_scheduled_instances(engine);
@@ -1059,7 +1445,24 @@ static void test_aws_kinesis_connector_worker(void **state)
     expect_not_value(__wrap_kinesis_get_result, lost_bytes, NULL);
     will_return(__wrap_kinesis_get_result, 0);
 
+    expect_function_call(__wrap_send_internal_metrics);
+    expect_value(__wrap_send_internal_metrics, instance, instance);
+    will_return(__wrap_send_internal_metrics, 0);
+
     aws_kinesis_connector_worker(instance);
+
+    assert_int_equal(stats->buffered_metrics, 0);
+    assert_int_equal(stats->buffered_bytes, 84);
+    assert_int_equal(stats->received_bytes, 0);
+    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_metrics, 1);
+    assert_int_equal(stats->lost_metrics, 0);
+    assert_int_equal(stats->receptions, 1);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->transmission_failures, 0);
+    assert_int_equal(stats->data_lost_events, 0);
+    assert_int_equal(stats->lost_bytes, 0);
+    assert_int_equal(stats->reconnects, 0);
 
     free(connector_specific_config->stream_name);
     free(connector_specific_config->auth_key_id);
@@ -1170,7 +1573,7 @@ static void test_format_batch_mongodb(void **state)
     BUFFER *buffer = buffer_create(0);
     buffer_sprintf(buffer, "{ \"metric\": \"test_metric\" }\n");
     instance->buffer = buffer;
-    stats->chart_buffered_metrics = 1;
+    stats->buffered_metrics = 1;
 
     assert_int_equal(format_batch_mongodb(instance), 0);
 
@@ -1221,6 +1624,10 @@ static void test_mongodb_connector_worker(void **state)
     expect_not_value(__wrap_mongoc_collection_insert_many, error, NULL);
     will_return(__wrap_mongoc_collection_insert_many, true);
 
+    expect_function_call(__wrap_send_internal_metrics);
+    expect_value(__wrap_send_internal_metrics, instance, instance);
+    will_return(__wrap_send_internal_metrics, 0);
+
     mongodb_connector_worker(instance);
 
     assert_ptr_equal(connector_specific_data->first_buffer->insert, NULL);
@@ -1228,11 +1635,18 @@ static void test_mongodb_connector_worker(void **state)
     assert_ptr_equal(connector_specific_data->first_buffer, connector_specific_data->first_buffer->next);
 
     struct stats *stats = &instance->stats;
-    assert_int_equal(stats->chart_sent_bytes, 60);
-    assert_int_equal(stats->chart_transmission_successes, 1);
-    assert_int_equal(stats->chart_receptions, 1);
-    assert_int_equal(stats->chart_sent_bytes, 60);
-    assert_int_equal(stats->chart_sent_metrics, 0);
+    assert_int_equal(stats->buffered_metrics, 0);
+    assert_int_equal(stats->buffered_bytes, 0);
+    assert_int_equal(stats->received_bytes, 0);
+    assert_int_equal(stats->sent_bytes, 30);
+    assert_int_equal(stats->sent_metrics, 1);
+    assert_int_equal(stats->lost_metrics, 0);
+    assert_int_equal(stats->receptions, 1);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->transmission_failures, 0);
+    assert_int_equal(stats->data_lost_events, 0);
+    assert_int_equal(stats->lost_bytes, 0);
+    assert_int_equal(stats->reconnects, 0);
 
     free(connector_specific_config->database);
     free(connector_specific_config->collection);
@@ -1310,6 +1724,27 @@ int main(void)
 
     int test_res = cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
                    cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
+
+    const struct CMUnitTest internal_metrics_tests[] = {
+        cmocka_unit_test(test_create_main_rusage_chart),
+        cmocka_unit_test(test_send_main_rusage),
+        cmocka_unit_test(test_send_internal_metrics),
+    };
+
+    test_res += cmocka_run_group_tests_name("internal_metrics", internal_metrics_tests, NULL, NULL);
+
+    const struct CMUnitTest prometheus_web_api_tests[] = {
+        cmocka_unit_test_setup_teardown(test_can_send_rrdset, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(test_prometheus_name_copy, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(test_prometheus_label_copy, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(test_prometheus_units_copy, setup_prometheus, teardown_prometheus),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_labels_prometheus, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            rrd_stats_api_v1_charts_allmetrics_prometheus, setup_prometheus, teardown_prometheus),
+    };
+
+    test_res += cmocka_run_group_tests_name("prometheus_web_api", prometheus_web_api_tests, NULL, NULL);
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     const struct CMUnitTest prometheus_remote_write_tests[] = {

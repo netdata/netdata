@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Step 4. The basics of configuring Netdata"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-04.md
 ---
 -->
@@ -61,7 +62,7 @@ an example file to your Netdata config directory and then allow you to edit it b
 > change permanent](https://stackoverflow.com/questions/13046624/how-to-permanently-export-a-variable-in-linux).
 
 Let's give it a shot. Navigate to your Netdata config directory. To use `edit-config` on `netdata.conf`, you need to
-have permissions to edit the file. On Linux/MacOS systems, you can usually use `sudo` to elevate your permissions.
+have permissions to edit the file. On Linux/macOS systems, you can usually use `sudo` to elevate your permissions.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different as found in the steps above

@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Netdata"
+date: 2020-04-06
 custom_edit_url: https://github.com/netdata/netdata/edit/master/README.md
 ---
 -->
@@ -33,7 +34,7 @@ granularity. Run this long-term storage autonomously, or integrate Netdata with 
 Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** and **virtual** servers,
 **containers**, **IoT** devices), without disrupting their core function.
 
-Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**, along with
+Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **macOS**, along with
 other systems derived from them, such as **Kubernetes** and **Docker**.
 
 Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing

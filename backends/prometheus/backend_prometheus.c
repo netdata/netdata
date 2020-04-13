@@ -44,7 +44,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     return 0;
 }
 
-static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable) {
+static inline size_t backends_prometheus_name_copy(char *d, const char *s, size_t usable) {
     size_t n;
 
     for(n = 0; *s && n < usable ; d++, s++, n++) {
@@ -58,7 +58,7 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
     return n;
 }
 
-static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable) {
+static inline size_t backends_prometheus_label_copy(char *d, const char *s, size_t usable) {
     size_t n;
 
     // make sure we can escape one character without overflowing the buffer
@@ -78,7 +78,7 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
     return n;
 }
 
-static inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
+static inline char *backends_prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
     const char *sorig = s;
     char *ret = d;
     size_t n;
@@ -194,7 +194,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
             label_post = "}";
         }
 
-        prometheus_name_copy(opts->name, rv->name, sizeof(opts->name));
+        backends_prometheus_name_copy(opts->name, rv->name, sizeof(opts->name));
 
         if(opts->output_options & BACKENDS_PROMETHEUS_OUTPUT_TIMESTAMPS)
             buffer_sprintf(opts->wb
@@ -227,7 +227,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
+    backends_prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if(allhosts) {
@@ -299,9 +299,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         char family[PROMETHEUS_ELEMENT_MAX + 1];
         char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
-        prometheus_label_copy(chart, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
-        prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
-        prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
+        backends_prometheus_label_copy(chart, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+        backends_prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+        backends_prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
         if(likely(backends_can_send_rrdset(backend_options, st))) {
             rrdset_rdlock(st);
@@ -317,7 +317,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             }
             else {
                 if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE && !(output_options & BACKENDS_PROMETHEUS_OUTPUT_HIDEUNITS))
-                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & BACKENDS_PROMETHEUS_OUTPUT_OLDUNITS);
+                    backends_prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & BACKENDS_PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
@@ -354,7 +354,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                             // we add all dimensions as labels
 
-                            prometheus_label_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            backends_prometheus_label_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(wb
@@ -411,7 +411,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
 
-                            prometheus_name_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            backends_prometheus_name_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(wb
@@ -480,7 +480,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
                                 suffix = "_sum";
 
-                            prometheus_label_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            backends_prometheus_label_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(wb, "# COMMENT %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
@@ -593,7 +593,7 @@ void backends_rrd_stats_remote_write_allmetrics_prometheus(
         , size_t *count_dims_skipped
 ) {
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
+    backends_prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
 
     backends_add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
@@ -620,9 +620,9 @@ void backends_rrd_stats_remote_write_allmetrics_prometheus(
         char family[PROMETHEUS_ELEMENT_MAX + 1];
         char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
-        prometheus_label_copy(chart, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
-        prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
-        prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
+        backends_prometheus_label_copy(chart, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+        backends_prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+        backends_prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
         if(likely(backends_can_send_rrdset(backend_options, st))) {
             rrdset_rdlock(st);
@@ -640,7 +640,7 @@ void backends_rrd_stats_remote_write_allmetrics_prometheus(
             }
             else {
                 if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
-                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
+                    backends_prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
             }
 
             // for each dimension
@@ -664,7 +664,7 @@ void backends_rrd_stats_remote_write_allmetrics_prometheus(
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                             // we add all dimensions as labels
 
-                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            backends_prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
 
                             backends_add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
@@ -674,7 +674,7 @@ void backends_rrd_stats_remote_write_allmetrics_prometheus(
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
 
-                            prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            backends_prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
 
                             backends_add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
@@ -694,7 +694,7 @@ void backends_rrd_stats_remote_write_allmetrics_prometheus(
                             else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
                                 suffix = "_sum";
 
-                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            backends_prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
                             backends_add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);

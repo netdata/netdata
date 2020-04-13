@@ -37,6 +37,16 @@ declare -A libreswan_established_add_time=()
 # we need this to avoid converting tunnel names to chart IDs on every iteration
 declare -A libreswan_tunnel_charts=()
 
+is_able_sudo_ipsec() {
+  if ! sudo -n -l "${IPSEC_CMD}" whack --status > /dev/null 2>&1; then
+    return 1
+  fi
+  if ! sudo -n -l "${IPSEC_CMD}" whack --trafficstatus > /dev/null 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
 # run the ipsec command
 libreswan_ipsec() {
   if [ ${libreswan_sudo} -ne 0 ]; then
@@ -89,6 +99,11 @@ libreswan_check() {
   # shellcheck disable=SC2143
   if [ -z "$(ipsec --version | grep -i libreswan)" ]; then
     error "ipsec command is not Libreswan. Disabling Libreswan plugin."
+    return 1
+  fi
+
+  if [ ${libreswan_sudo} -ne 0 ] && ! is_able_sudo_ipsec; then
+    error "not enough permissions to execute ipsec with sudo. Disabling Libreswan plugin."
     return 1
   fi
 

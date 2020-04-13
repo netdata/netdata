@@ -206,7 +206,7 @@ int start_host_formatting(struct engine *engine, RRDHOST *host)
  * Start chart formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
- * @param a chart.
+ * @param st a chart.
  * @return Returns 0 on success, 1 on failure.
  */
 int start_chart_formatting(struct engine *engine, RRDSET *st)
@@ -242,7 +242,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
                 error("EXPORTING: cannot format metric for %s", instance->config.name);
                 return 1;
             }
-            instance->stats.chart_buffered_metrics++;
+            instance->stats.buffered_metrics++;
         }
     }
 
@@ -385,6 +385,19 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 
     if (instance->labels)
         buffer_flush(instance->labels);
+
+    return 0;
+}
+
+/**
+ * Update stats for buffered bytes
+ *
+ * @param instance an instance data structure.
+ * @return Always returns 0.
+ */
+int simple_connector_update_buffered_bytes(struct instance *instance)
+{
+    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)(instance->buffer));
 
     return 0;
 }

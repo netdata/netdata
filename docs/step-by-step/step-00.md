@@ -1,6 +1,7 @@
 <!--
 ---
 title: "The step-by-step Netdata tutorial"
+date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-00.md
 ---
 -->
@@ -21,7 +22,7 @@ If you have monitoring experience, or would rather get straight into configuring
 straight into code and configurations with our [getting started guide](../getting-started.md).
 
 > This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
-> other supported operating systems, like FreeBSD and MacOS, but we can't make any guarantees.
+> other supported operating systems, like FreeBSD and macOS, but we can't make any guarantees.
 
 ## Where to go if you need help
 

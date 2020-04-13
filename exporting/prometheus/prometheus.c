@@ -7,10 +7,16 @@
 // PROMETHEUS
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
+/**
+ * Check if a chart can be sent to an external databese
+ *
+ * @param instance an instance data structure.
+ * @param st a chart.
+ * @return Returns 1 if the chart can be sent, 0 otherwise.
+ */
 inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 {
     RRDHOST *host = st->rrdhost;
-    (void)host;
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
@@ -24,7 +30,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
             rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
             debug(
                 D_BACKEND,
-                "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.",
+                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
                 st->id,
                 host->hostname);
             return 0;
@@ -34,7 +40,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
     if (unlikely(!rrdset_is_available_for_backends(st))) {
         debug(
             D_BACKEND,
-            "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.",
+            "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
             st->id,
             host->hostname);
         return 0;
@@ -42,10 +48,10 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 
     if (unlikely(
             st->rrd_memory_mode == RRD_MEMORY_MODE_NONE &&
-            !(BACKEND_OPTIONS_DATA_SOURCE(instance->config.options) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
+            !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
         debug(
             D_BACKEND,
-            "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.",
+            "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
             st->id,
             host->hostname,
             rrd_memory_mode_name(host->rrd_memory_mode));
@@ -63,8 +69,19 @@ static struct prometheus_server {
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
+/**
+ * Get the last time when a Prometheus server scraped the Netdata Prometheus exporter.
+ *
+ * @param server the name of the Prometheus server.
+ * @param host a data collecting host.
+ * @param now actual time.
+ * @return Returns the last time when the server accessed Netdata, or 0 if it is the first occurrence.
+ */
 static inline time_t prometheus_server_last_access(const char *server, RRDHOST *host, time_t now)
 {
+#ifdef UNIT_TESTING
+    return 0;
+#endif
     static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
 
     uint32_t hash = simple_hash(server);
@@ -93,6 +110,14 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     return 0;
 }
 
+/**
+ * Copy and sanitize name.
+ *
+ * @param d a destination string.
+ * @param s a source sting.
+ * @param usable the number of characters to copy.
+ * @return Returns the length of the copied string.
+ */
 inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 {
     size_t n;
@@ -110,6 +135,14 @@ inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
     return n;
 }
 
+/**
+ * Copy and sanitize label.
+ *
+ * @param d a destination string.
+ * @param s a source sting.
+ * @param usable the number of characters to copy.
+ * @return Returns the length of the copied string.
+ */
 inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
 {
     size_t n;
@@ -131,6 +164,15 @@ inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
     return n;
 }
 
+/**
+ * Copy and sanitize units.
+ *
+ * @param d a destination string.
+ * @param s a source sting.
+ * @param usable the number of characters to copy.
+ * @param showoldunits set this flag to 1 to show old (before v1.12) units.
+ * @return Returns the destination string.
+ */
 inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits)
 {
     const char *sorig = s;
@@ -203,6 +245,43 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
     return ret;
 }
 
+/**
+ * Format host labels for the Prometheus exporter
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ */
+void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
+{
+    if (unlikely(!sending_labels_configured(instance)))
+        return;
+
+    if (!instance->labels)
+        instance->labels = buffer_create(1024);
+
+    int count = 0;
+    rrdhost_check_rdlock(host);
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if (!should_send_label(instance, label))
+            continue;
+
+        char key[PROMETHEUS_ELEMENT_MAX + 1];
+        char value[PROMETHEUS_ELEMENT_MAX + 1];
+
+        prometheus_name_copy(key, label->key, PROMETHEUS_ELEMENT_MAX);
+        prometheus_label_copy(value, label->value, PROMETHEUS_ELEMENT_MAX);
+
+        if (*key && *value) {
+            if (count > 0)
+                buffer_strcat(instance->labels, ",");
+            buffer_sprintf(instance->labels, "%s=\"%s\"", key, value);
+            count++;
+        }
+    }
+    netdata_rwlock_unlock(&host->labels_rwlock);
+}
+
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
@@ -215,6 +294,13 @@ struct host_variables_callback_options {
     char name[PROMETHEUS_VARIABLE_MAX + 1];
 };
 
+/**
+ * Print host variables.
+ *
+ * @param rv a variable.
+ * @param data callback options.
+ * @return Returns 1 if the chart can be sent, 0 otherwise.
+ */
 static int print_host_variables(RRDVAR *rv, void *data)
 {
     struct host_variables_callback_options *opts = data;
@@ -274,14 +360,23 @@ static int print_host_variables(RRDVAR *rv, void *data)
     return 0;
 }
 
+/**
+ * Write metrics in Prometheus format to a buffer.
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @param wb the buffer to fill with metrics.
+ * @param prefix a prefix for every metric.
+ * @param exporting_options options to configure what data is exported.
+ * @param allhosts set to 1 if host instance should be in the output for tags.
+ * @param output_options options to configure the format of the output.
+ */
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     struct instance *instance,
     RRDHOST *host,
     BUFFER *wb,
     const char *prefix,
     EXPORTING_OPTIONS exporting_options,
-    time_t after,
-    time_t before,
     int allhosts,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
@@ -290,31 +385,33 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
+    format_host_labels_prometheus(instance, host);
+
+    if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(
+            wb,
+            "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n",
+            hostname,
+            host->program_name,
+            host->program_version,
+            now_realtime_usec() / USEC_PER_MS);
+    else
+        buffer_sprintf(
+            wb,
+            "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n",
+            hostname,
+            host->program_name,
+            host->program_version);
+
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if (allhosts) {
-        if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n",
-                hostname,
-                host->program_name,
-                host->program_version,
-                now_realtime_usec() / USEC_PER_MS);
-        else
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n",
-                hostname,
-                host->program_name,
-                host->program_version);
-
-        if (host->tags && *(host->tags)) {
+        if (instance->labels && buffer_tostring(instance->labels)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
                     wb,
                     "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n",
                     hostname,
-                    host->tags,
+                    buffer_tostring(instance->labels),
                     now_realtime_usec() / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
@@ -322,49 +419,45 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     wb,
                     "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n",
                     hostname,
-                    host->tags,
+                    buffer_tostring(instance->labels),
                     now_realtime_usec() / USEC_PER_MS);
             } else {
-                buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, host->tags);
+                buffer_sprintf(
+                    wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1\n", hostname, host->tags);
+                buffer_sprintf(
+                    wb, "netdata_host_tags{instance=\"%s\",%s} 1\n", hostname, buffer_tostring(instance->labels));
             }
         }
 
         snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
     } else {
-        if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n",
-                hostname,
-                host->program_name,
-                host->program_version,
-                now_realtime_usec() / USEC_PER_MS);
-        else
-            buffer_sprintf(
-                wb,
-                "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n",
-                hostname,
-                host->program_name,
-                host->program_version);
-
-        if (host->tags && *(host->tags)) {
+        if (instance->labels && buffer_tostring(instance->labels)) {
             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
                 buffer_sprintf(
-                    wb, "netdata_host_tags_info{%s} 1 %llu\n", host->tags, now_realtime_usec() / USEC_PER_MS);
+                    wb,
+                    "netdata_host_tags_info{%s} 1 %llu\n",
+                    buffer_tostring(instance->labels),
+                    now_realtime_usec() / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{%s} 1 %llu\n", host->tags, now_realtime_usec() / USEC_PER_MS);
+                buffer_sprintf(
+                    wb,
+                    "netdata_host_tags{%s} 1 %llu\n",
+                    buffer_tostring(instance->labels),
+                    now_realtime_usec() / USEC_PER_MS);
             } else {
-                buffer_sprintf(wb, "netdata_host_tags_info{%s} 1\n", host->tags);
+                buffer_sprintf(wb, "netdata_host_tags_info{%s} 1\n", buffer_tostring(instance->labels));
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{%s} 1\n", host->tags);
+                buffer_sprintf(wb, "netdata_host_tags{%s} 1\n", buffer_tostring(instance->labels));
             }
         }
     }
+
+    if (instance->labels)
+        buffer_flush(instance->labels);
 
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {
@@ -383,19 +476,19 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     RRDSET *st;
     rrdset_foreach_read(st, host)
     {
-        char chart[PROMETHEUS_ELEMENT_MAX + 1];
-        char context[PROMETHEUS_ELEMENT_MAX + 1];
-        char family[PROMETHEUS_ELEMENT_MAX + 1];
-
-        prometheus_label_copy(
-            chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id, PROMETHEUS_ELEMENT_MAX);
-        prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
-        prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
         if (likely(can_send_rrdset(instance, st))) {
             rrdset_rdlock(st);
 
+            char chart[PROMETHEUS_ELEMENT_MAX + 1];
+            char context[PROMETHEUS_ELEMENT_MAX + 1];
+            char family[PROMETHEUS_ELEMENT_MAX + 1];
             char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
+
+            prometheus_label_copy(
+                chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id, PROMETHEUS_ELEMENT_MAX);
+            prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+            prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
@@ -433,7 +526,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     if (as_collected) {
                         // we need as-collected / raw data
 
-                        if (unlikely(rd->last_collected_time.tv_sec < after))
+                        if (unlikely(rd->last_collected_time.tv_sec < instance->after))
                             continue;
 
                         const char *t = "gauge", *h = "gives";
@@ -562,8 +655,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     } else {
                         // we need average or sum of the data
 
-                        time_t first_t = after, last_t = before;
-                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
+                        time_t first_time = instance->after;
+                        time_t last_time = instance->before;
+                        calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_time);
 
                         if (!isnan(value) && !isinf(value)) {
                             if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
@@ -586,8 +680,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     suffix,
                                     (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
                                     st->units,
-                                    (unsigned long long)first_t,
-                                    (unsigned long long)last_t);
+                                    (unsigned long long)first_time,
+                                    (unsigned long long)last_time);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
@@ -606,7 +700,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     dimension,
                                     labels,
                                     value,
-                                    last_t * MSEC_PER_SEC);
+                                    last_time * MSEC_PER_SEC);
                             else
                                 buffer_sprintf(
                                     wb,
@@ -633,6 +727,18 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdhost_unlock(host);
 }
 
+/**
+ * Get the last time time when a server accessed Netdata. Write information about an API request to a buffer.
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @param wb the buffer to write to.
+ * @param exporting_options options to configure what data is exported.
+ * @param server the name of a Prometheus server..
+ * @param now actual time.
+ * @param output_options options to configure the format of the output.
+ * @return Returns the last time when the server accessed Netdata.
+ */
 static inline time_t prometheus_preparation(
     struct instance *instance,
     RRDHOST *host,
@@ -649,13 +755,13 @@ static inline time_t prometheus_preparation(
 
     int first_seen = 0;
     if (!after) {
-        after = now - instance->engine->config.update_every;
+        after = now - instance->config.update_every;
         first_seen = 1;
     }
 
     if (after > now) {
         // oops! this should never happen
-        after = now - instance->engine->config.update_every;
+        after = now - instance->config.update_every;
     }
 
     if (output_options & PROMETHEUS_OUTPUT_HELP) {
@@ -685,8 +791,17 @@ static inline time_t prometheus_preparation(
     return after;
 }
 
+/**
+ * Write metrics and auxiliary information for one host to a buffer.
+ *
+ * @param host a data collecting host.
+ * @param wb the buffer to write to.
+ * @param server the name of a Prometheus server.
+ * @param prefix a prefix for every metric.
+ * @param exporting_options options to configure what data is exported.
+ * @param output_options options to configure the format of the output.
+ */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
-    struct instance *instance,
     RRDHOST *host,
     BUFFER *wb,
     const char *server,
@@ -694,17 +809,36 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     EXPORTING_OPTIONS exporting_options,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    time_t before = now_realtime_sec();
+    if (unlikely(!prometheus_exporter_instance))
+        return;
+
+    prometheus_exporter_instance->before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(instance, host, wb, exporting_options, server, before, output_options);
+    prometheus_exporter_instance->after = prometheus_preparation(
+        prometheus_exporter_instance,
+        host,
+        wb,
+        exporting_options,
+        server,
+        prometheus_exporter_instance->before,
+        output_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        instance, host, wb, prefix, exporting_options, after, before, 0, output_options);
+        prometheus_exporter_instance, host, wb, prefix, exporting_options, 0, output_options);
 }
 
+/**
+ * Write metrics and auxiliary information for all hosts to a buffer.
+ *
+ * @param host a data collecting host.
+ * @param wb the buffer to write to.
+ * @param server the name of a Prometheus server.
+ * @param prefix a prefix for every metric.
+ * @param exporting_options options to configure what data is exported.
+ * @param output_options options to configure the format of the output.
+ */
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
-    struct instance *instance,
     RRDHOST *host,
     BUFFER *wb,
     const char *server,
@@ -712,16 +846,26 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     EXPORTING_OPTIONS exporting_options,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    time_t before = now_realtime_sec();
+    if (unlikely(!prometheus_exporter_instance))
+        return;
+
+    prometheus_exporter_instance->before = now_realtime_sec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(instance, host, wb, exporting_options, server, before, output_options);
+    prometheus_exporter_instance->after = prometheus_preparation(
+        prometheus_exporter_instance,
+        host,
+        wb,
+        exporting_options,
+        server,
+        prometheus_exporter_instance->before,
+        output_options);
 
     rrd_rdlock();
     rrdhost_foreach_read(host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            instance, host, wb, prefix, exporting_options, after, before, 1, output_options);
+            prometheus_exporter_instance, host, wb, prefix, exporting_options, 1, output_options);
     }
     rrd_unlock();
 }

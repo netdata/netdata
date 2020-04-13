@@ -91,7 +91,14 @@ int __wrap_prepare_buffers(struct engine *engine);
 
 int __wrap_notify_workers(struct engine *engine);
 
-int __wrap_send_internal_metrics(struct engine *engine);
+void __real_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
+void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
+
+void __real_send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
+void __wrap_send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
+
+int __real_send_internal_metrics(struct instance *instance);
+int __wrap_send_internal_metrics(struct instance *instance);
 
 int __real_rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int __wrap_rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
@@ -166,6 +173,8 @@ int setup_rrdhost();
 int teardown_rrdhost();
 int setup_initialized_engine(void **state);
 int teardown_initialized_engine(void **state);
+int setup_prometheus(void **state);
+int teardown_prometheus(void **state);
 
 void init_connectors_in_tests(struct engine *engine);
 
