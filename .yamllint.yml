@@ -32,3 +32,4 @@ rules:
   trailing-spaces: enable
   truthy:
     check-keys: false
+    allowed-values: ["true", "false", "yes", "no"]
