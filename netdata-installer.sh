@@ -1260,26 +1260,19 @@ get_compatible_kernel_for_ebpf() {
   rhver7="0070061810"
   kernel_5_0_0="005000000"
   kernel_4_20_17="004020017"
-  kernel_4_20_0="004020000"
-  kernel_4_19_108="004019108"
   kernel_4_19_105="004019105"
   kernel_4_19_104="004019104"
-  kernel_4_19_102="004019102"
-  kernel_4_19_101="004019101"
   kernel_4_19_98="004019098"
-  kernel_4_19_97="004019097"
+  kernel_4_19_67="004019067"
+  kernel_4_19_37="004019037"
+  kernel_4_19_28="004019028"
   kernel_4_19_6="004019006"
   kernel_4_18_20="004018020"
-  kernel_4_18_17="004018017"
   kernel_4_18_16="004018016"
-  kernel_4_18_0="004018000"
   kernel_4_16_18="004016018"
-  kernel_4_16_4="004016004"
   kernel_4_16_3="004016003"
-  kernel_4_16_0="004016000"
-  kernel_4_15_18="004015018"
   kernel_4_15_0="004015000"
-  kernel_4_14_999="004014999"
+  kernel_4_14_171="004014171"
 
   if [ "${rhver}" -ge "${rhver8}" ] ; then
     echo >&2 " Using eBPF Kernel Package built against RH Linux 4.18.0"
@@ -1290,37 +1283,46 @@ get_compatible_kernel_for_ebpf() {
   elif [ "${kver}" -ge "${kernel_5_0_0}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
     kpkg="5_4_20"
-  elif [ "${kver}" -ge "${kernel_4_20_0}" ] && [ "${kver}" -le "${kernel_4_20_17}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_20_17}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.20.17"
     kpkg="4_20_17"
-  elif [ "${kver}" -ge "${kernel_4_19_105}" ] && [ "${kver}" -le "${kernel_4_19_108}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_19_105}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.105"
     kpkg="4_19_105"
-  elif [ "${kver}" -ge "${kernel_4_19_102}" ] && [ "${kver}" -le "${kernel_4_19_104}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_19_104}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
     kpkg="4_19_104"
-  elif [ "${kver}" -ge "${kernel_4_19_98}" ] && [ "${kver}" -le "${kernel_4_19_101}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_19_98}" ] ; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
     kpkg="4_19_98"
-  elif [ "${kver}" -ge "${kernel_4_19_6}" ] && [ "${kver}" -le "${kernel_4_19_97}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_19_67}" ] ; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.67"
+    kpkg="4_19_67"
+  elif [ "${kver}" -eq "${kernel_4_19_37}" ] ; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.37"
+    kpkg="4_19_37"
+  elif [ "${kver}" -eq "${kernel_4_19_28}" ] ; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.28"
+    kpkg="4_19_28"
+  elif [ "${kver}" -eq "${kernel_4_19_6}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.19.6"
     kpkg="4_19_6"
-  elif [ "${kver}" -ge "${kernel_4_18_17}" ] && [ "${kver}" -le "${kernel_4_18_20}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_18_20}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.18.20"
     kpkg="4_18_20"
-  elif [ "${kver}" -ge "${kernel_4_18_0}" ] && [ "${kver}" -le "${kernel_4_18_16}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_18_16}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.18.16"
     kpkg="4_18_16"
-  elif [ "${kver}" -ge "${kernel_4_16_4}" ] && [ "${kver}" -le "${kernel_4_16_18}" ]; then
+  elif [ "${kver}" -eq "${kernel_4_16_18}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.16.18"
     kpkg="4_16_18"
-  elif [ "${kver}" -ge "${kernel_4_16_0}" ] && [ "${kver}" -le "${kernel_4_16_3}" ]; then
+  elif [ "${kver}" -le "${kernel_4_16_3}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.16.3"
     kpkg="4_16_3"
-  elif [ "${kver}" -ge "${kernel_4_15_0}" ] && [ "${kver}" -le "${kernel_4_15_18}" ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
-    kpkg="4_15_18"
-  elif [ "${kver}" -le "${kernel_4_14_999}" ]; then
+  elif [ "${kver}" -ge "${kernel_4_15_0}" ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.15.0"
+    kpkg="4_15"
+  elif [ "${kver}" -le "${kernel_4_14_171}" ]; then
     echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
     kpkg="4_14_171"
   else
