@@ -5,9 +5,6 @@
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
 
-extern usec_t aclk_session_us;
-extern time_t aclk_session_sec;
-
 inline const char *_link_strerror(int rc)
 {
     return mosquitto_strerror(rc);
@@ -52,12 +49,7 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(obj);
     UNUSED(rc);
 
-    if (netdata_exit)
-        info("Connection to cloud terminated due to agent shutdown");
-    else {
-        errno = 0;
-        error("Connection to cloud failed");
-    }
+    info("Connection to cloud failed");
     aclk_disconnect();
 
     aclk_lws_wss_mqtt_layer_disconect_notif();
@@ -138,11 +130,6 @@ static int _mqtt_create_connection(char *username, char *password)
         error("MQTT new structure  -- %s", mosquitto_strerror(errno));
         return MOSQ_ERR_UNKNOWN;
     }
-
-    // Record the session start time to allow a nominal LWT timestamp
-    usec_t now = now_realtime_usec();
-    aclk_session_sec = now / USEC_PER_SEC;
-    aclk_session_us = now % USEC_PER_SEC;  
 
     _link_set_lwt("outbound/meta", 2);
 
@@ -272,6 +259,7 @@ int _link_set_lwt(char *sub_topic, int qos)
 {
     int rc;
     char topic[ACLK_MAX_TOPIC + 1];
+    char payload[512];
     char *final_topic;
 
     final_topic = get_topic(sub_topic, topic, ACLK_MAX_TOPIC);
@@ -281,13 +269,25 @@ int _link_set_lwt(char *sub_topic, int qos)
         return 1;
     }
 
-    usec_t lwt_time = aclk_session_sec * USEC_PER_SEC + aclk_session_us + 1;
-    BUFFER *b = buffer_create(512);
-    aclk_create_header(b, "disconnect", NULL, lwt_time / USEC_PER_SEC, lwt_time % USEC_PER_SEC);
-    buffer_strcat(b, ", \"payload\": \"unexpected\" }");
-    rc = mosquitto_will_set(mosq, topic, buffer_strlen(b), buffer_tostring(b), qos, 0);
-    buffer_free(b);
+    usec_t time_created_offset_usec = now_realtime_usec();
+    time_t time_created = time_created_offset_usec / USEC_PER_SEC;
+    time_created_offset_usec = time_created_offset_usec % USEC_PER_SEC;
 
+    char *msg_id = create_uuid();
+
+    snprintfz(
+        payload, 511,
+        "{ \"type\": \"disconnect\","
+        " \"msg-id\": \"%s\","
+        " \"timestamp\": %ld,"
+        " \"timestamp-offset-usec\": %llu,"
+        " \"version\": %d,"
+        " \"payload\": \"unexpected\" }",
+        msg_id, time_created, time_created_offset_usec, ACLK_VERSION);
+
+    freez(msg_id);
+
+    rc = mosquitto_will_set(mosq, topic, strlen(payload), (const void *) payload, qos, 0);
     return rc;
 }
 

@@ -4110,6 +4110,8 @@ int main(int argc, char **argv) {
 
     procfile_adaptive_initial_allocation = 1;
 
+    time_t started_t = now_monotonic_sec();
+
     get_system_HZ();
 #ifdef __FreeBSD__
     time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
@@ -4210,5 +4212,8 @@ int main(int argc, char **argv) {
         show_guest_time_old = show_guest_time;
 
         debug_log("done Loop No %zu", global_iterations_counter);
+
+        // restart check (14400 seconds)
+        if(now_monotonic_sec() - started_t > 14400) exit(0);
     }
 }

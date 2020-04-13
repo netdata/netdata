@@ -35,11 +35,6 @@ void *exporting_main(void *ptr)
         goto cleanup;
     }
 
-    RRDSET *st_main_rusage = NULL;
-    RRDDIM *rd_main_user = NULL;
-    RRDDIM *rd_main_system = NULL;
-    create_main_rusage_chart(&st_main_rusage, &rd_main_user, &rd_main_system);
-
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -60,7 +55,10 @@ void *exporting_main(void *ptr)
             break;
         }
 
-        send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
+        if (send_internal_metrics(engine) != 0) {
+            error("EXPORTING: cannot send metrics for the operation of exporting engine");
+            break;
+        }
 
 #ifdef UNIT_TESTING
         break;

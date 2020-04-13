@@ -44,6 +44,7 @@ typedef enum aclk_cmd {
     ACLK_CMD_CHART,
     ACLK_CMD_CHARTDEL,
     ACLK_CMD_ALARM,
+    ACLK_CMD_ALARMS,
     ACLK_CMD_MAX
 } ACLK_CMD;
 
@@ -73,12 +74,16 @@ void *aclk_main(void *ptr);
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 
+//int     aclk_init();
+//char    *get_base_topic();
+
 extern char *is_agent_claimed(void);
 extern void aclk_lws_wss_mqtt_layer_disconect_notif();
 char *create_uuid();
 
 // callbacks for agent cloud link
 int aclk_subscribe(char *topic, int qos);
+void aclk_shutdown();
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
@@ -93,7 +98,7 @@ struct aclk_query *
 aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
-void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us);
+void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);
 int aclk_submit_request(struct aclk_request *);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);

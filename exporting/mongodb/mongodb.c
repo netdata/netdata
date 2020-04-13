@@ -183,10 +183,8 @@ int format_batch_mongodb(struct instance *instance)
         // ring buffer is full, reuse the oldest element
         connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
         free_bson(insert, connector_specific_data->last_buffer->documents_inserted);
-        connector_specific_data->total_documents_inserted -= connector_specific_data->last_buffer->documents_inserted;
-        stats->buffered_bytes -= connector_specific_data->last_buffer->buffered_bytes;
     }
-    insert = callocz((size_t)stats->buffered_metrics, sizeof(bson_t *));
+    insert = callocz((size_t)stats->chart_buffered_metrics, sizeof(bson_t *));
     connector_specific_data->last_buffer->insert = insert;
 
     BUFFER *buffer = (BUFFER *)instance->buffer;
@@ -195,7 +193,7 @@ int format_batch_mongodb(struct instance *instance)
 
     size_t documents_inserted = 0;
 
-    while (*end && documents_inserted <= (size_t)stats->buffered_metrics) {
+    while (*end && documents_inserted <= (size_t)stats->chart_buffered_metrics) {
         while (*end && *end != '\n')
             end++;
 
@@ -210,8 +208,7 @@ int format_batch_mongodb(struct instance *instance)
         insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &bson_error);
 
         if (unlikely(!insert[documents_inserted])) {
-            error(
-                "EXPORTING: Failed creating a BSON document from a JSON string \"%s\" : %s", start, bson_error.message);
+            error("EXPORTING: %s", bson_error.message);
             free_bson(insert, documents_inserted);
             return 1;
         }
@@ -221,15 +218,7 @@ int format_batch_mongodb(struct instance *instance)
         documents_inserted++;
     }
 
-    stats->buffered_bytes += connector_specific_data->last_buffer->buffered_bytes = buffer_strlen(buffer);
-
     buffer_flush(buffer);
-
-    // The stats->buffered_metrics is used in the MongoDB batch formatting as a variable for the number
-    // of metrics, added in the current iteration, so we are clearing it here. We will use the
-    // connector_specific_data->total_documents_inserted in the worker to show the statistics.
-    stats->buffered_metrics = 0;
-    connector_specific_data->total_documents_inserted += documents_inserted;
 
     connector_specific_data->last_buffer->documents_inserted = documents_inserted;
     connector_specific_data->last_buffer = connector_specific_data->last_buffer->next;
@@ -257,25 +246,11 @@ void mongodb_connector_worker(void *instance_p)
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
 
-        // reset the monitoring chart counters
-        stats->received_bytes =
-        stats->sent_bytes =
-        stats->sent_metrics =
-        stats->lost_metrics =
-        stats->receptions =
-        stats->transmission_successes =
-        stats->transmission_failures =
-        stats->data_lost_events =
-        stats->lost_bytes =
-        stats->reconnects = 0;
-
         bson_t **insert = connector_specific_data->first_buffer->insert;
         size_t documents_inserted = connector_specific_data->first_buffer->documents_inserted;
-        size_t buffered_bytes = connector_specific_data->first_buffer->buffered_bytes;
 
         connector_specific_data->first_buffer->insert = NULL;
         connector_specific_data->first_buffer->documents_inserted = 0;
-        connector_specific_data->first_buffer->buffered_bytes = 0;
         connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
 
         uv_mutex_unlock(&instance->mutex);
@@ -304,10 +279,9 @@ void mongodb_connector_worker(void *instance_p)
                 NULL,
                 NULL,
                 &bson_error))) {
-            stats->sent_metrics = documents_inserted;
-            stats->sent_bytes += data_size;
-            stats->transmission_successes++;
-            stats->receptions++;
+            stats->chart_sent_bytes += data_size;
+            stats->chart_transmission_successes++;
+            stats->chart_receptions++;
         } else {
             // oops! we couldn't send (all or some of the) data
             error("EXPORTING: %s", bson_error.message);
@@ -316,10 +290,10 @@ void mongodb_connector_worker(void *instance_p)
                 "Willing to write %zu bytes, wrote %zu bytes.",
                 instance->config.destination, data_size, 0UL);
 
-            stats->transmission_failures++;
-            stats->data_lost_events++;
-            stats->lost_bytes += buffered_bytes;
-            stats->lost_metrics += documents_inserted;
+            stats->chart_transmission_failures++;
+            stats->chart_data_lost_events++;
+            stats->chart_lost_bytes += data_size;
+            stats->chart_lost_metrics += stats->chart_buffered_metrics;
         }
 
         free_bson(insert, documents_inserted);
@@ -327,18 +301,8 @@ void mongodb_connector_worker(void *instance_p)
         if (unlikely(netdata_exit))
             break;
 
-        uv_mutex_lock(&instance->mutex);
-
-        stats->buffered_metrics = connector_specific_data->total_documents_inserted;
-
-        send_internal_metrics(instance);
-
-        connector_specific_data->total_documents_inserted -= documents_inserted;
-
-        stats->buffered_metrics = 0;
-        stats->buffered_bytes -= buffered_bytes;
-
-        uv_mutex_unlock(&instance->mutex);
+        stats->chart_sent_bytes += data_size;
+        stats->chart_sent_metrics = stats->chart_buffered_metrics;
 
 #ifdef UNIT_TESTING
         break;

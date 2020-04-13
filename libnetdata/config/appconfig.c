@@ -547,8 +547,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             s++;
 
             if (is_exporter_config) {
-                global_exporting_section =
-                    !(strcmp(s, CONFIG_SECTION_EXPORTING)) || !(strcmp(s, CONFIG_SECTION_PROMETHEUS));
+                global_exporting_section = !(strcmp(s, CONFIG_SECTION_EXPORTING));
                 if (unlikely(!global_exporting_section)) {
                     int rc;
                     rc = is_valid_connector(s, 0);

@@ -10,7 +10,6 @@
 struct bson_buffer {
     bson_t **insert;
     size_t documents_inserted;
-    size_t buffered_bytes;
 
     struct bson_buffer *next;
 };
@@ -18,8 +17,6 @@ struct bson_buffer {
 struct mongodb_specific_data {
     mongoc_client_t *client;
     mongoc_collection_t *collection;
-
-    size_t total_documents_inserted;
 
     bson_t **current_insert;
     struct bson_buffer *first_buffer;

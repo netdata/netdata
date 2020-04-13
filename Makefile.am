@@ -573,7 +573,6 @@ NETDATA_FILES = \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(BACKENDS_PLUGIN_FILES) \
-    $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
@@ -607,6 +606,12 @@ if LINUX
         $(TC_PLUGIN_FILES) \
         $(NULL)
 
+endif
+
+if ENABLE_EXPORTING
+    NETDATA_FILES += \
+        $(EXPORTING_ENGINE_FILES) \
+        $(NULL)
 endif
 
 NETDATA_COMMON_LIBS = \
@@ -740,13 +745,23 @@ if ENABLE_PLUGIN_SLABINFO
         $(NULL)
 endif
 
+if ENABLE_EXPORTING
 if ENABLE_BACKEND_KINESIS
-    netdata_SOURCES += $(KINESIS_BACKEND_FILES) $(KINESIS_EXPORTING_FILES)
+    netdata_SOURCES += $(KINESIS_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
+endif
+
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
-    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+if ENABLE_EXPORTING
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+endif
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
     BUILT_SOURCES = \
         exporting/prometheus/remote_write/remote_write.pb.cc \
@@ -760,8 +775,15 @@ exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote
 
 endif
 
+if ENABLE_EXPORTING
 if ENABLE_BACKEND_MONGODB
-    netdata_SOURCES += $(MONGODB_BACKEND_FILES) $(MONGODB_EXPORTING_FILES)
+    netdata_SOURCES += $(MONGODB_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
+endif
+endif
+
+if ENABLE_BACKEND_MONGODB
+    netdata_SOURCES += $(MONGODB_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif
 
@@ -873,8 +895,6 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=recv \
         -Wl,--wrap=send \
         -Wl,--wrap=connect_to_one_of \
-        -Wl,--wrap=create_main_rusage_chart \
-        -Wl,--wrap=send_main_rusage \
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)

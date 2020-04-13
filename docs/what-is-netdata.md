@@ -1,7 +1,6 @@
 <!--
 ---
 title: "What is Netdata?"
-date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/what-is-netdata.md
 ---
 -->
@@ -20,7 +19,7 @@ Netdata provides **unparalleled insights**, **in real-time**, of everything happ
 
 _Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
 
-Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **macOS**.
+Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ---
 
