@@ -31,6 +31,12 @@ settings](../server/#other-netdataconf-web-section-options) in the
 <iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </details>
 
+## New React Dashboard
+
+We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
+
+The new dashboard is added to the codebase, but the old version is still here. If you want to use it, run `/usr/libexec/netdata/netdata-switch-dashboard.sh  classic`. To switch back, do `netdata-switch-dashboard.sh  react`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
+
 ## Navigating the standard dashboard
 
 Beyond charts, the standard dashboard can be broken down into three key areas:
