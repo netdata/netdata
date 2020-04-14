@@ -21,8 +21,7 @@ HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat',
-    'system.cpu_pressure', 'system.io_some_pressure', 'system.memory_some_pressure', 'system.active_processes',
-    'system.entropy'
+    'system.cpu_pressure', 'system.io_some_pressure', 'system.active_processes', 'system.entropy'
 ]
 
 MODEL_CONFIG = {
