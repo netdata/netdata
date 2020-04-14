@@ -16,7 +16,7 @@ Below you can find instructions for configuring an apache server to:
 
 Make sure your apache has `mod_proxy` and `mod_proxy_http` installed and enabled.
 
-On Debian/Ubuntu systems, install apache, which already includes the 2 modules, using:
+On Debian/Ubuntu systems, install apache, which already includes the two modules, using:
 
 ```sh
 sudo apt-get install apache2
