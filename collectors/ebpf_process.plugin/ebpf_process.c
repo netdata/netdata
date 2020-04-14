@@ -72,6 +72,7 @@ static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
 static int nprocs;
+static int isrh;
 uint32_t *hash_values;
 
 pthread_mutex_t lock;
@@ -775,16 +776,24 @@ void set_global_variables() {
     if (nprocs > NETDATA_MAX_PROCESSOR) {
         nprocs = NETDATA_MAX_PROCESSOR;
     }
+
+    isrh = get_redhat_release();
 }
 
 static void change_collector_event() {
     int i;
+    if (mykernel < NETDATA_KERNEL_V5_3)
+        collector_events[10].name = NULL;
+
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
+}
 
-    if (mykernel < 328448)
-        collector_events[i].name = NULL;
+static void change_syscalls() {
+    static char *lfork = { "do_fork" };
+    id_names[7] = lfork;
+    collector_events[8].name = lfork;
 }
 
 static inline void what_to_load(char *ptr) {
@@ -796,6 +805,9 @@ static inline void what_to_load(char *ptr) {
         */
     else
         change_collector_event();
+
+    if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+        change_syscalls();
 }
 
 static inline void enable_debug(char *ptr) {
@@ -847,8 +859,10 @@ int main(int argc, char **argv)
     (void)argv;
 
     mykernel =  get_kernel_version();
-    if(!has_condition_to_run(mykernel))
+    if(!has_condition_to_run(mykernel)) {
+        error("[EBPF PROCESS] The current collector cannot run on this kernel.");
         return 1;
+    }
 
     //set name
     program_name = "ebpf_process.plugin";
@@ -874,6 +888,9 @@ int main(int argc, char **argv)
 
     if (load_collector_file(user_config_dir)) {
         info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
+        change_collector_event();
+        if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+            change_syscalls();
     }
 
     if(ebpf_load_libraries()) {
@@ -912,6 +929,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
+        error("[EBPF PROCESS] Cannot start the mutex.");
         int_exit(7);
     }
 

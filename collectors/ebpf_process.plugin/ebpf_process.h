@@ -100,4 +100,6 @@ typedef struct netdata_error_report {
 
 # define NETDATA_MAX_PROCESSOR 512
 
+# define NETDATA_KERNEL_V5_3 328448
+
 #endif
