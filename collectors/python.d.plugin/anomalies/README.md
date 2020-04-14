@@ -21,4 +21,6 @@ Then at each timestep the most recent feature vector "X" is used to generate eac
 - An ["Awesome" list](https://github.com/rob-med/awesome-TS-anomaly-detection) of useful anomaly detection tools and software.
 - [Anomaly Detection YouTube Playlist](https://www.youtube.com/playlist?list=PL6Zhl9mK2r0KxA6rB87oi4kWzoqGd5vp0) - Playlist of useful and interesting anomaly detection related videos and talks.
 
-If you have any feedback or want to chat more about wider ML features in Netdata please feel free to reach out to us at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) 
+# Feedback
+
+If you have any feedback or want to chat more about anomaly detection or potential other ML features in Netdata please feel free to reach out to us at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) 
