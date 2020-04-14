@@ -26,7 +26,7 @@ CHARTS_IN_SCOPE = [
 ]
 
 MODEL_CONFIG = {
-    'models': {chart: PCA(**{'n_components ': 1, 'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'models': {chart: PCA(**{'n_components': 1, 'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
     'do_score': False,
     'do_prob': True,
     'do_flag': True,
