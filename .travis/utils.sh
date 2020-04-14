@@ -12,6 +12,7 @@ tick() {
 	kill $PID
 	return $RET
 }
+export -f tick
 
 retry() {
 	local tries=$1
@@ -25,3 +26,4 @@ retry() {
 
 	return 1
 }
+export -f retry
