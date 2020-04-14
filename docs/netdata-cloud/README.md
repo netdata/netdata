@@ -9,20 +9,22 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-clo
 
 Netdata Cloud is core to our ongoing mission to provide real-time, distributed health monitoring and performance troubleshooting. It's the foundation of an ecosystem of tools that will help you build more extraordinary infrastructures.
 
-Netdata Cloud is also the next iteration of our global Netdata registry. For technical information about how our registries work, what information they store, and how your web browser "talks" to both, visit our [registry documentation](../../registry).
+Netdata Cloud is also the next iteration of our global Netdata registry. For technical information about how our registries work, what information they store, and how your web browser "talks" to both, visit our [registry documentation](/registry/README.md).
 
 Learn more about the future of Netdata Cloud on our [announcement post](https://blog.netdata.cloud/posts/netdata-cloud-announcement/).
 
 ## Registering for or signing in to Netdata Cloud
 
-**If you're ready to register for a new Netdata Cloud account, or sign in to your existing Netdata Cloud account, visit our [signing in guide](signing-in.md) for details.**
+**If you're ready to register for a new Netdata Cloud account, or sign in to your existing Netdata Cloud account, visit our [signing in guide](/docs/netdata-cloud/signing-in.md) for details.**
 
-!!! attention "Private registries and Netdata Cloud"
-    If you're running a private registry and are interested in trying out Netdata Cloud as a replacement for your private registry, read [our notice](signing-in.md#private-registries-and-netdata-cloud) about transitioning from a private registry to our Netdata Cloud registry.
+> If you're running a private registry and are interested in trying out Netdata Cloud as a replacement for your private
+> registry, read [our notice](/docs/netdata-cloud/signing-in.md#private-registries-and-netdata-cloud) about
+> transitioning from a private registry to our Netdata Cloud registry.
 
 ## Netdata Cloud features
 
-Netdata Cloud currently enables two features: the **My nodes** in the top-left corner of the Netdata dashboard, and the [**Nodes View**](nodes-view.md).
+Netdata Cloud currently enables two features: the **My nodes** in the top-left corner of the Netdata dashboard, and the
+[**Nodes View**](/docs/netdata-cloud/nodes-view.md).
 
 We have an aggressive roadmap of new features, such as Workspaces for different parts of your infrastructure, Rooms to collaborate with colleagues, and the ability to receive alarms from any number of distributed Netdata agents in a single place. Read more about our proposed features [here](https://blog.netdata.cloud/posts/netdata-cloud-announcement/#what-features-will-netdata-cloud-offer).
 
@@ -44,7 +46,7 @@ Again, we expect that the vast majority of Netdata's users won't need these feat
 
 ## Running Netdata without Netdata Cloud
 
-Netdata Cloud is entirely optional. The application will never force you to create a Netdata Cloud account or associate nodes with the public registries. But, if you choose not to use Netdata Cloud, you will be missing out on the [Nodes View](nodes-view.md) and other upcoming features.
+Netdata Cloud is entirely optional. The application will never force you to create a Netdata Cloud account or associate nodes with the public registries. But, if you choose not to use Netdata Cloud, you will be missing out on the [Nodes View](/docs/netdata-cloud/nodes-view.md) and other upcoming features.
 
 ## Running Netdata Cloud on-premises or as a hosted instance
 

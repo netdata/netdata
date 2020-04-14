@@ -103,7 +103,8 @@ jobs:
 
     - name: Docker container build process (alpine installation)
       script: packaging/docker/build.sh
-      env: DEVEL="true"
+      env:
+        - ARCH=amd64
       after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
     - name: Build/Install for ubuntu 18.04 (not containerized)

@@ -7,14 +7,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-clo
 
 # Registration and signing in
 
-To use the features of [Netdata Cloud](README.md), you must first register an account with Netdata Cloud and associate your first Netdata node with the Netdata Cloud [registry](../../registry/README.md). **Netdata Cloud is entirely free for all Netdata users**, and does not store any metrics created by your machines. You keep your data—Netdata Cloud just connects it all together.
+To use the features of [Netdata Cloud](/docs/netdata-cloud/README.md), you must first register an account with Netdata
+Cloud and associate your first Netdata node with the Netdata Cloud [registry](/registry/README.md). **Netdata Cloud is
+entirely free for all Netdata users**, and does not store any metrics created by your machines. You keep your
+data—Netdata Cloud just connects it all together.
 
-!!! attention "Opting-in to Netdata Cloud"
-    By [signing in](signing-in.md) to Netdata Cloud, you opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store). We never store the metrics collected by Netdata agents, just machine GUIDs, person GUID, URLs, and account information.
+> By [signing in](/docs/netdata-cloud/signing-in.md) to Netdata Cloud, you opt-in to let Netdata Cloud receive and store
+> the information described [here](/registry/README.md#what-data-does-the-registry-store). We never store the metrics
+> collected by Netdata agents, just machine GUIDs, person GUID, URLs, and account information.
 
 ## Registering a Netdata Cloud account
 
-There is only one prerequisite to using Netdata Cloud: A working Netdata agent. If you don't have a running Netdata agent yet, check out the [installation guides](../../packaging/installer/) for more information.
+There is only one prerequisite to using Netdata Cloud: A working Netdata agent. If you don't have a running Netdata
+agent yet, check out the [installation guides](/packaging/installer/README.md) for more information.
 
 To begin, visit the web dashboard of your Netdata agent by navigating your browser of choice to `http://SERVER-IP:19999`. You’ll see a dashboard much like this:
 
@@ -49,7 +54,7 @@ A second route can be found in the Nodes List—the drop-down menu in the top-le
 
 ![A screenshot of the private registry warning modal](https://user-images.githubusercontent.com/1153921/59782901-ca091d00-9273-11e9-9f9a-0cb18f78ca26.png)
 
-If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again. If not, click the **Cancel** button to continue using your private registry.
+If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](/registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again. If not, click the **Cancel** button to continue using your private registry.
 
 
 ### Choosing your registration or sign in method
@@ -112,15 +117,21 @@ Please view [this comment on issue #6318](https://github.com/netdata/netdata/iss
 
 ## Private registries and Netdata Cloud
 
-If you use a [private registry](../../registry/README.md#run-your-own-registry), and sign in to Netdata Cloud, you'll be using the Netdata Cloud registry in addition to your private registry.
+If you use a [private registry](/registry/README.md#run-your-own-registry), and sign in to Netdata Cloud, you'll be using the Netdata Cloud registry in addition to your private registry.
 
 Clicking the **Sign in** button on the Netdata dashboard will display a modal window warning you about the synchronization of your private registry's entries to the Netdata Cloud's registry.
 
 ![A screenshot of the private registry warning modal](https://user-images.githubusercontent.com/1153921/59807493-fd1bd280-92ac-11e9-8017-98efb2cbbed8.png)
 
-If your company's data policies don't allow storing information about your nodes on the Netdata Cloud registry, you should click the **Cancel** button and continue using your private registry. You'll be able to access the Nodes List in the top-left corner of a Netdata dashboard, but you won't be able to use the [Nodes View](nodes-view.md) feature within Netdata Cloud, or any of the [additional features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/#what-features-will-netdata-cloud-offer) on our roadmap. You can also sign up for the waiting list for the [hosted and/or on-premises versions of Netdata Cloud](README.md#running-netdata-cloud-on-premises-or-as-a-hosted-instance) that we're working on.
+If your company's data policies don't allow storing information about your nodes on the Netdata Cloud registry, you
+should click the **Cancel** button and continue using your private registry. You'll be able to access the Nodes List in
+the top-left corner of a Netdata dashboard, but you won't be able to use the [Nodes View](nodes-view.md) feature within
+Netdata Cloud, or any of the [additional
+features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/#what-features-will-netdata-cloud-offer) on our
+roadmap. You can also sign up for the waiting list for the [hosted and/or on-premises versions of Netdata
+Cloud](/docs/netdata-cloud/README.md#running-netdata-cloud-on-premises-or-as-a-hosted-instance) that we're working on.
 
-If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again to continue the registration/sign in process.
+If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](/registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again to continue the registration/sign in process.
 
 ### Returning to your private registry
 
@@ -131,7 +142,7 @@ You can sign out in two ways:
 1.  **From a node's dashboard**: In the top-right corner you will find a dropdown menu with your email address. Click that and then click the **Sign Out** button.
 2.  **From Netdata Cloud**: Click on your profile picture in the top-right corner and then click on the **Sign Out** button.
 
-Signing out from Netdata Cloud and returning to your private registry *does not remove* the [information stored](../../registry/README.md#what-data-does-the-registry-store) about your nodes or account details.
+Signing out from Netdata Cloud and returning to your private registry *does not remove* the [information stored](/registry/README.md#what-data-does-the-registry-store) about your nodes or account details.
 
 But, upon signout, your Nodes List on all dashboards will once more be populated by your private registry and not Netdata Cloud.
 

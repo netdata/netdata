@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatte
 
 # SSV formatter
 
-The SSV formatter sums all dimensions in [results of database queries](../../queries)
+The SSV formatter sums all dimensions in [results of database queries](/web/api/queries/README.md)
 to a single value and returns a list of such values showing how it changes through time.
 
 It supports the following formats:

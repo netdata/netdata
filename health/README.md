@@ -21,9 +21,9 @@ and the needs of your infrastructure, are your only limits.
 
 <DocsSteps>
 
-[<FiPlay /> Quickstart](QUICKSTART.md)
+[<FiPlay /> Quickstart](/health/QUICKSTART.md)
 
-[<FiCode /> Configuration reference](REFERENCE.md)
+[<FiCode /> Configuration reference](/health/REFERENCE.md)
 
 [<FiBook /> Tutorials](#tutorials)
 
@@ -40,15 +40,16 @@ content.
 
 ### Health entities
 
-[Stopping notifications for individual alarms](tutorials/stop-notifications-alarms.md)
+[Stopping notifications for individual alarms](/health/tutorials/stop-notifications-alarms.md)
 
-[Use dimension templates to create dynamic alarms](tutorials/dimension-templates.md)
+[Use dimension templates to create dynamic alarms](/health/tutorials/dimension-templates.md)
 
 </div>
 </DocsTutorials>
 
 ## Related features
 
-**[Health notifications](notifications/README.md)**: Get notified about Netdata's alarms via your favorite platform(s).
+**[Health notifications](/health/notifications/README.md)**: Get notified about Netdata's alarms via your favorite
+platform(s).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

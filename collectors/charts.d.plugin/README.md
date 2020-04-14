@@ -62,11 +62,11 @@ For a module called `X`, the following criteria must be met:
          the collector cannot be used).
 
     -   `X_create()` - creates the Netdata charts, following the standard Netdata plugin guides as described in
-         **[External Plugins](../plugins.d/)** (commands `CHART` and `DIMENSION`).
+         **[External Plugins](/collectors/plugins.d/README.md)** (commands `CHART` and `DIMENSION`).
          The return value does matter: 0 = OK, 1 = FAILED.
 
     -   `X_update()` - collects the values for the defined charts, following the standard Netdata plugin guides
-         as described in **[External Plugins](../plugins.d/)** (commands `BEGIN`, `SET`, `END`).
+         as described in **[External Plugins](/collectors/plugins.d/README.md)** (commands `BEGIN`, `SET`, `END`).
          The return value also matters: 0 = OK, 1 = FAILED.
 
 5.  The following global variables are available to be set:
@@ -74,7 +74,7 @@ For a module called `X`, the following criteria must be met:
 
 The module script may use more functions or variables. But all of them must begin with `X_`.
 
-The standard Netdata plugin variables are also available (check **[External Plugins](../plugins.d/)**). 
+The standard Netdata plugin variables are also available (check **[External Plugins](/collectors/plugins.d/README.md)**). 
 
 ### X_check()
 
@@ -88,7 +88,7 @@ connect to a local mysql database to find out if it can read the values it needs
 ### X_create()
 
 The purpose of the BASH function `X_create()` is to create the charts and dimensions using the standard Netdata
-plugin guides (**[External Plugins](../plugins.d/)**).
+plugin guides (**[External Plugins](/collectors/plugins.d/README.md)**).
 
 `X_create()` will be called just once and only after `X_check()` was successful.
 You can however call it yourself when there is need for it (for example to add a new dimension to an existing chart).
@@ -98,7 +98,7 @@ A non-zero return value will disable the collector.
 ### X_update()
 
 `X_update()` will be called repeatedly every `X_update_every` seconds, to collect new values and send them to Netdata,
-following the Netdata plugin guides (**[External Plugins](../plugins.d/)**).
+following the Netdata plugin guides (**[External Plugins](/collectors/plugins.d/README.md)**).
 
 The function will be called with one parameter: microseconds since the last time it was run. This value should be
 appended to the `BEGIN` statement of every chart updated by the collector script.

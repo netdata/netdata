@@ -73,7 +73,7 @@ You can access the API via GET requests, by adding the bearer token to an `Autho
 curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
-By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in `netdata.conf` within the [web] section. See [web server access lists](../../server/#access-lists) for more information.
+By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in `netdata.conf` within the [web] section. See [web server access lists](/web/server/README.md#access-lists) for more information.
 
 The command `RESET` just returns Netdata to the default operation, with all health checks and notifications enabled.
 If you've configured and entered your token correclty, you should see the plain text response `All health checks and notifications are enabled`.
@@ -127,7 +127,7 @@ curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-
 
 #### Selection criteria
 
-The `selection criteria` are key/value pairs, in the format `key : value`, where value is a Netdata [simple pattern](../../../libnetdata/simple_pattern/). This means that you can create very powerful selectors (you will rarely need more than one or two).
+The `selection criteria` are key/value pairs, in the format `key : value`, where value is a Netdata [simple pattern](/libnetdata/simple_pattern/README.md). This means that you can create very powerful selectors (you will rarely need more than one or two).
 
 The accepted keys for the `selection criteria` are the following:
 
@@ -221,6 +221,6 @@ The file's location is configurable in `netdata.conf`. The default is shown belo
 
 ### Further reading
 
-The test script under [tests/health_mgmtapi](../../../tests/health_mgmtapi) contains a series of tests that you can either run or read through to understand the various calls and responses better.
+The test script under [tests/health_mgmtapi](/tests/health_mgmtapi/README.md) contains a series of tests that you can either run or read through to understand the various calls and responses better.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
