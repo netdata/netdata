@@ -17,18 +17,22 @@ update_every = 1
 HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
-    'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
+    'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat',
+    'system.cpu_pressure', 'system.io_some_pressure', 'system.memory_some_pressure', 'system.active_processes',
+    'system.entropy'
 ]
-TRAIN_MAX_N = 60*60
-TRAIN_SAMPLE_PCT = 1
-FIT_EVERY = 60*5
-LAGS_N = 2
-SMOOTHING_N = 3
+
 MODEL_CONFIG = {
-    'kwargs': {'contamination': 0.001},
-    'score': False,
-    'prob': True,
-    'flag': True,
+    'models': {chart: HBOS(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'do_score': False,
+    'do_prob': True,
+    'do_flag': True,
+    'diffs_n': 0,
+    'lags_n': 0,
+    'smoothing_n': 0,
+    'train_max_n': 60*60,
+    'train_sample_pct': 1,
+    'fit_every_n': 60*5
 }
 
 ORDER = [
@@ -59,16 +63,19 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.data = []
-        self.models = {chart: HBOS(**MODEL_CONFIG['kwargs']) for chart in CHARTS_IN_SCOPE}
+        self.models = MODEL_CONFIG['models']
         self.charts_in_scope = CHARTS_IN_SCOPE
-        self.model_config = MODEL_CONFIG
-        self.fit_every = FIT_EVERY
-        self.train_max_n = TRAIN_MAX_N
         self.host = HOST
-        self.lags_n = LAGS_N
-        self.smoothing_n = SMOOTHING_N
         self.prediction = {chart: {} for chart in CHARTS_IN_SCOPE}
-        self.train_sample_pct = TRAIN_SAMPLE_PCT
+        self.do_score = MODEL_CONFIG.get('do_score', False)
+        self.do_prob = MODEL_CONFIG.get('do_prob', True)
+        self.do_flag = MODEL_CONFIG.get('do_flag', True)
+        self.diffs_n = MODEL_CONFIG.get('diffs_n', 0)
+        self.lags_n = MODEL_CONFIG.get('lags_n', 0)
+        self.smoothing_n = MODEL_CONFIG.get('smoothing_n', 0)
+        self.train_max_n = MODEL_CONFIG.get('train_max_n', 60*10)
+        self.train_sample_pct = MODEL_CONFIG.get('train_sample_pct', 1)
+        self.fit_every_n = MODEL_CONFIG.get('fit_every_n', 60*5)
 
     @staticmethod
     def check():
@@ -151,11 +158,11 @@ class Service(SimpleService):
     def model_predict(self, chart):
         prediction = dict()
         X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))))
-        if self.model_config['score']:
+        if self.do_score:
             prediction['score'] = self.models[chart].decision_function(X_predict)[-1]
-        if self.model_config['prob']:
+        if self.do_prob:
             prediction['prob'] = self.models[chart].predict_proba(X_predict)[-1][1]
-        if self.model_config['flag']:
+        if self.do_flag:
             prediction['flag'] = self.models[chart].predict(X_predict)[-1]
         self.prediction[chart] = prediction
 
@@ -185,22 +192,22 @@ class Service(SimpleService):
                 self.model_predict(chart)
 
             # refit if needed
-            if self.runs_counter % self.fit_every == 0:
+            if self.runs_counter % self.fit_every_n == 0:
                 self.model_fit(chart)
 
             # insert charts and data
 
-            if self.model_config['score']:
+            if self.do_score:
                 score = "{}_score".format(chart.replace('system.', ''))
                 self.update_chart_dim('score', score, divisor=100)
                 data[score] = self.prediction[chart].get('score', 0) * 100
 
-            if self.model_config['prob']:
+            if self.do_prob:
                 prob = "{}_prob".format(chart.replace('system.', ''))
                 self.update_chart_dim('prob', prob, divisor=100)
                 data[prob] = self.prediction[chart].get('prob', 0) * 100
 
-            if self.model_config['flag']:
+            if self.do_flag:
                 flag = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag)
                 data[flag] = self.prediction[chart].get('flag', 0)
