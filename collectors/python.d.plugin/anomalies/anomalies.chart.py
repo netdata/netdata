@@ -6,9 +6,9 @@
 
 import requests
 import pandas as pd
-#from pyod.models.knn import KNN
+from pyod.models.knn import KNN
 from pyod.models.hbos import HBOS
-#from pyod.models.cblof import CBLOF
+from pyod.models.cblof import CBLOF
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
@@ -23,7 +23,7 @@ CHARTS_IN_SCOPE = [
 ]
 
 MODEL_CONFIG = {
-    'models': {chart: HBOS(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'models': {chart: CBLOF(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
     'do_score': False,
     'do_prob': True,
     'do_flag': True,
