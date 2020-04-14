@@ -1261,7 +1261,8 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
-    aclk_connecting = 1;
+    // The event loop will be called 200 times (100ms delay) before resetting
+    aclk_connecting = 200;
 }
 
 
@@ -1350,6 +1351,7 @@ void *aclk_main(void *ptr)
             if (aclk_connecting) {
                 _link_event_loop();
                 sleep_usec(USEC_PER_MS * 100);
+                aclk_connecting--;
             }
             continue;
         }
@@ -1363,7 +1365,7 @@ void *aclk_main(void *ptr)
         }*/
 
         // TODO: Move to on-connect
-        if (unlikely(!aclk_subscribed)) {
+        if (unlikely(!aclk_subscribed && aclk_connected)) {
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 1);
         }
 
