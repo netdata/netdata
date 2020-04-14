@@ -26,7 +26,7 @@ update_every = 1
 
 HOST = '127.0.0.1:19999'
 
-# for each chart a
+# charts to generate anomaly scores for
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat',
@@ -39,8 +39,8 @@ MODEL_CONFIG = {
     'do_prob': True,
     'do_flag': True,
     'diffs_n': 0,
-    'lags_n': 0,
-    'smoothing_n': 0,
+    'lags_n': 2,
+    'smoothing_n': 2,
     'train_max_n': 60*5,
     'train_sample_pct': 1,
     'fit_every_n': 30
