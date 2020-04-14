@@ -43,6 +43,7 @@ MODEL_CONFIG = {
     'lags_n': 2,
     'smoothing_n': 2,
     'train_max_n': 60*60,
+    'train_min_n': 60,
     'train_sample_pct': 1,
     'fit_every_n': 60*5
 }
@@ -86,6 +87,7 @@ class Service(SimpleService):
         self.lags_n = MODEL_CONFIG.get('lags_n', 0)
         self.smoothing_n = MODEL_CONFIG.get('smoothing_n', 0)
         self.train_max_n = MODEL_CONFIG.get('train_max_n', 60*10)
+        self.train_min_n = MODEL_CONFIG.get('train_min_n', 60)
         self.train_sample_pct = MODEL_CONFIG.get('train_sample_pct', 1)
         self.fit_every_n = MODEL_CONFIG.get('fit_every_n', 60*5)
 
@@ -239,7 +241,13 @@ class Service(SimpleService):
                 self.model_predict(chart)
 
             # refit if needed
-            if self.runs_counter % self.fit_every_n == 0:
+            if (
+                    # fit an initial model
+                    not self.can_predict(chart) and self.runs_counter >= self.train_min_n
+            ) or (
+                    # refit model
+                    self.runs_counter % self.fit_every_n == 0
+            ):
                 self.model_fit(chart)
 
             # insert charts and data
