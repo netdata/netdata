@@ -42,9 +42,9 @@ MODEL_CONFIG = {
     'diffs_n': 1,
     'lags_n': 2,
     'smoothing_n': 2,
-    'train_max_n': 60*5,
+    'train_max_n': 60*60,
     'train_sample_pct': 1,
-    'fit_every_n': 30
+    'fit_every_n': 60*5
 }
 
 ORDER = [
