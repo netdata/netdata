@@ -1,0 +1,28 @@
+---
+style: Github
+template: CHANGELOG.tpl.md
+info:
+  title: CHANGELOG
+  repository_url: https://github.com/netdata/netdata
+options:
+  commits:
+    filters:
+      Type:
+        - Add
+        - Fix
+        - Update
+        - Document
+  commit_groups:
+    title_maps:
+      Add: Features
+      Update: Updates
+      Fix: Bug Fixes
+      Document: Documentation
+  header:
+    pattern: "^((\\w+)\\s.*)$"
+    pattern_maps:
+      - Subject
+      - Type
+  notes:
+    keywords:
+      - BREAKING CHANGE
