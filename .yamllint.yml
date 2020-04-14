@@ -30,4 +30,6 @@ rules:
   octal-values: enable
   quoted-strings: disable
   trailing-spaces: enable
-  truthy: disable
+  truthy:
+    check-keys: false
+    allowed-values: ["true", "false", "yes", "no"]

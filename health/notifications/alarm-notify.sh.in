@@ -1914,6 +1914,8 @@ EOF
 # -----------------------------------------------------------------------------
 # Dynatrace sender
 send_dynatrace() {
+  [ "${SEND_DYNATRACE}" != "YES" ] && return 1
+
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
   local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""

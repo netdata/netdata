@@ -1112,6 +1112,8 @@ endif()
         -Wl,--wrap=recv
         -Wl,--wrap=send
         -Wl,--wrap=connect_to_one_of
+        -Wl,--wrap=create_main_rusage_chart
+        -Wl,--wrap=send_main_rusage
         ${PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS}
         ${KINESIS_LINK_OPTIONS}
         ${MONGODB_LINK_OPTIONS}

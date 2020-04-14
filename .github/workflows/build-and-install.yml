@@ -42,7 +42,7 @@ jobs:
             pre: 'apk add -U bash'
 
           - distro: 'archlinux:latest'
-            pre: 'pacman --noconfirm -Sy grep'
+            pre: 'pacman --noconfirm -Sy grep libffi'
 
           - distro: 'debian:bullseye'
             pre: 'apt-get update'

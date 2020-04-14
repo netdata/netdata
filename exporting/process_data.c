@@ -242,7 +242,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
                 error("EXPORTING: cannot format metric for %s", instance->config.name);
                 return 1;
             }
-            instance->stats.chart_buffered_metrics++;
+            instance->stats.buffered_metrics++;
         }
     }
 
@@ -385,6 +385,19 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 
     if (instance->labels)
         buffer_flush(instance->labels);
+
+    return 0;
+}
+
+/**
+ * Update stats for buffered bytes
+ *
+ * @param instance an instance data structure.
+ * @return Always returns 0.
+ */
+int simple_connector_update_buffered_bytes(struct instance *instance)
+{
+    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)(instance->buffer));
 
     return 0;
 }

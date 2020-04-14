@@ -52,7 +52,7 @@ case "${running_os}" in
 	;;
 "arch")
 	pacman -Sy
-	pacman --noconfirm --needed -S bash-bats curl
+	pacman --noconfirm --needed -S bash-bats curl libffi
 	;;
 "alpine")
 	apk update
