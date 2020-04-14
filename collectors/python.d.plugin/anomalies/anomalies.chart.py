@@ -241,13 +241,7 @@ class Service(SimpleService):
                 self.model_predict(chart)
 
             # refit if needed
-            if (
-                    # fit an initial model
-                    not self.can_predict(chart) and self.runs_counter >= self.train_min_n
-            ) or (
-                    # refit model
-                    self.runs_counter % self.fit_every_n == 0
-            ):
+            if (self.runs_counter % self.fit_every_n == 0) or (self.runs_counter == self.train_min_n):
                 self.model_fit(chart)
 
             # insert charts and data
