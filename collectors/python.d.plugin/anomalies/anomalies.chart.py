@@ -26,14 +26,14 @@ CHARTS_IN_SCOPE = [
 ]
 
 MODEL_CONFIG = {
-    'models': {chart: PCA(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'models': {chart: PCA(**{'n_components ': 1, 'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
     'do_score': False,
     'do_prob': True,
     'do_flag': True,
     'diffs_n': 0,
     'lags_n': 0,
     'smoothing_n': 0,
-    'train_max_n': 60,
+    'train_max_n': 60*5,
     'train_sample_pct': 1,
     'fit_every_n': 30
 }
