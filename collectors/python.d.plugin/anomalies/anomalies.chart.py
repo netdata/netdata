@@ -121,10 +121,8 @@ class Service(SimpleService):
 
     def get_allmetrics(self) -> list:
         """
-        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
-        :param host: host to pull data from <str>
-        :param charts: charts to filter to <list>
-        :return: list of lists where each element is a metric from allmetrics <list>
+        Hits the allmetrics endpoint on and saves data into a list
+        :return: list of lists where each element is a metric from allmetrics e.g. [[time, chart, name, value]] <list>
         """
         if self.charts_in_scope is None:
             self.charts_in_scope = ['system.cpu']
@@ -226,11 +224,8 @@ class Service(SimpleService):
         # empty dict to collect data points into
         data = dict()
 
-        # get latest data from allmetrics
-        latest_observations = self.get_allmetrics()
-
-        # append latest data
-        self.append_data(latest_observations)
+        # get and append latest data
+        self.append_data(self.get_allmetrics())
 
         # get scores and models for each chart
         for chart in self.charts_in_scope:
