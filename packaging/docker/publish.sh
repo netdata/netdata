@@ -79,12 +79,9 @@ echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 for ARCH in ${ARCHS[@]}; do
     TAG="${MANIFEST_LIST}-${ARCH}"
     echo "Publishing image ${TAG}.."
-    $DOCKER_CMD push "${TAG}" &
+    $DOCKER_CMD push "${TAG}"
     echo "Image ${TAG} published succesfully!"
 done
-
-echo "Waiting for images publishing to complete"
-wait
 
 # Recreate docker manifest list
 echo "Getting tag list for version '${VERSION}'.."
