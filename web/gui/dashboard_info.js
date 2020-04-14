@@ -786,19 +786,19 @@ netdataDashboard.context = {
     'anomalies.score': {
         info: 'This is the raw anomaly score from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model. ' +
             'It can be on different scales depending on the type of model used ' +
-            '(more info <a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.decision_function">in the PyOD docs</a>).'
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.decision_function">PyOD docs</a>).'
     },
 
     'anomalies.prob': {
         info: 'This is the anomaly probability from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model. ' +
             'This represents a post processing of the raw scores into a [0,1] range so as to behave more like a probability ' +
-            '(more info <a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba">in the PyOD docs</a>).'
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba">PyOD docs</a>).'
     },
 
     'anomalies.flag': {
         info: 'This is the anomaly flag from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model,' +
             'it predicts a 1 if the model judges a particular observation to be an outlier ' +
-            '(more info <a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict">in the PyOD docs</a>).'
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict">PyOD docs</a>).'
     },
 
     'system.load': {
