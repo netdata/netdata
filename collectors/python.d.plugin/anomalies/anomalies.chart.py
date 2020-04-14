@@ -11,6 +11,7 @@ from pyod.models.hbos import HBOS
 from pyod.models.cblof import CBLOF
 from pyod.models.iforest import IForest
 from pyod.models.pca import PCA
+from pyod.models.loda import LODA
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
@@ -25,7 +26,7 @@ CHARTS_IN_SCOPE = [
 ]
 
 MODEL_CONFIG = {
-    'models': {chart: KNN(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'models': {chart: PCA(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
     'do_score': False,
     'do_prob': True,
     'do_flag': True,
