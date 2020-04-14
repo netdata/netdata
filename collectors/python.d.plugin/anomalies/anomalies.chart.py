@@ -33,6 +33,7 @@ CHARTS_IN_SCOPE = [
     'system.cpu_pressure', 'system.io_some_pressure', 'system.active_processes', 'system.entropy'
 ]
 
+# model configuration
 MODEL_CONFIG = {
     'models': {chart: CBLOF(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
     'do_score': False,
@@ -139,11 +140,18 @@ class Service(SimpleService):
         return data
 
     def append_data(self, data):
+        # append data to self
         self.data.append(data)
         # limit size of data maintained
         self.data = self.data[-self.train_max_n:]
 
-    def make_x(self, df):
+    def make_x(self, df: pd.DataFrame):
+        """
+        Given the input dataframe apply model relevant pre-processing to
+        get X feature vector for the model to train or score on.
+        :param df: host to pull data from <pd.DataFrame>
+        :return: Numpy array that represents X feature vector to feed into the model.
+        """
         # take diffs
         if self.diffs_n >= 1:
             df = df.diff(self.diffs_n).dropna()
@@ -156,9 +164,14 @@ class Service(SimpleService):
         # sample if specified
         if 0 < self.train_sample_pct < 1:
             df = df.sample(frac=self.train_sample_pct)
-        return df.values
+        X = df.values
+        return X
 
     def model_fit(self, chart):
+        """
+        Fit (or refit) the model for a specified chart, using the available data.
+        :param chart: the chart for which to fit the model on.
+        """
         # get train data
         df = self.data_to_df(self.data, charts=[chart])
         X_train = self.make_x(df)
@@ -167,20 +180,40 @@ class Service(SimpleService):
         self.models[chart].fit(X_train)
 
     def can_predict(self, chart):
+        """
+        Check if the model has been fitted and so is able to predict.
+        :param chart: the chart for which to check for.
+        """
         return True if hasattr(self.models[chart], "decision_scores_") else False
 
     def model_predict(self, chart):
+        """
+        Generate a prediction for a model and store it.
+        :param chart: the chart for which to generate a prediction for.
+        """
         prediction = dict()
+        # create feature vector on recent data to make predictions on
         X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))))
+        # make score, prob, flag as specified and keep most recent as current prediction
         if self.do_score:
             prediction['score'] = self.models[chart].decision_function(X_predict)[-1]
         if self.do_prob:
             prediction['prob'] = self.models[chart].predict_proba(X_predict)[-1][1]
         if self.do_flag:
             prediction['flag'] = self.models[chart].predict(X_predict)[-1]
+        # update prediction for the chart
         self.prediction[chart] = prediction
 
     def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
+        """
+        Check if the chart has a specific dimension and if not then add it.
+        :param chart: the chart for which to check for.
+        :param dimension_id:
+        :param title:
+        :param algorithm:
+        :param multiplier:
+        :param divisor:
+        """
         if dimension_id not in self.charts[chart]:
             self.charts[chart].add_dimension([dimension_id, title, algorithm, multiplier, divisor])
         return True
