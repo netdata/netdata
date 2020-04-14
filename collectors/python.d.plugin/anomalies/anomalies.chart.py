@@ -22,7 +22,7 @@ from pyod.models.auto_encoder import AutoEncoder
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
-update_every = 1
+update_every = 5
 
 HOST = '127.0.0.1:19999'
 
