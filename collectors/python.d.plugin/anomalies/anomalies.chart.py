@@ -38,7 +38,7 @@ MODEL_CONFIG = {
     'do_score': False,
     'do_prob': True,
     'do_flag': True,
-    'diffs_n': 0,
+    'diffs_n': 1,
     'lags_n': 2,
     'smoothing_n': 2,
     'train_max_n': 60*5,
@@ -144,6 +144,9 @@ class Service(SimpleService):
         self.data = self.data[-self.train_max_n:]
 
     def make_x(self, df):
+        # take diffs
+        if self.diffs_n >= 1:
+            df = df.diff(self.diffs_n).dropna()
         # do smoothing
         if self.smoothing_n >= 2:
             df = df.rolling(self.smoothing_n).mean().dropna()
