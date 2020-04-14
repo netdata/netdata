@@ -17,5 +17,6 @@ Then at each timestep the most recent feature vector "X" is used to generate eac
 - **Anomaly Flag** - A `1` if the trained PyOD model considered the observation an outlier `0` otherwise (see PyOD docs [`pyod.models.base.BaseDetector.predict`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict)).   
 
 # Useful Links
-- [PyOD Examples](https://pyod.readthedocs.io/en/latest/example.html)
-- [Anomaly Detection YouTube Playlist](https://www.youtube.com/playlist?list=PL6Zhl9mK2r0KxA6rB87oi4kWzoqGd5vp0)
+- [PyOD Examples](https://pyod.readthedocs.io/en/latest/example.html).
+- An ["Awesome" list](https://github.com/rob-med/awesome-TS-anomaly-detection) of useful anomaly detection tools and software.
+- [Anomaly Detection YouTube Playlist](https://www.youtube.com/playlist?list=PL6Zhl9mK2r0KxA6rB87oi4kWzoqGd5vp0) - Playlist of useful and interesting anomaly detection related videos and talks.
