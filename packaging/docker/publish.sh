@@ -76,7 +76,7 @@ for ARCH in ${ARCHS[@]}; do
     $DOCKER_CMD push "${TAG}"
 
     published() {
-        curl -s https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags | jq -e -r '.results[] | select(.name == "'${VERSION}-${ARCH}'")' > /dev/null
+        curl -s "https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/taga"s | jq -e -r '.results[] | select(.name == "'"${VERSION}-${ARCH}"'")' > /dev/null
     }
     retry 5 published
 
