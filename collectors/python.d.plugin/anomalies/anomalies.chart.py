@@ -6,20 +6,27 @@
 
 import requests
 import pandas as pd
+
+# basic/traditional models
 from pyod.models.knn import KNN
 from pyod.models.hbos import HBOS
 from pyod.models.cblof import CBLOF
-from pyod.models.iforest import IForest
 from pyod.models.pca import PCA
 from pyod.models.loda import LODA
 from pyod.models.abod import ABOD
+# more fancy models
+from pyod.models.iforest import IForest
 from pyod.models.vae import VAE
+from pyod.models.auto_encoder import AutoEncoder
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 3
 update_every = 1
 
 HOST = '127.0.0.1:19999'
+
+# for each chart a
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat',
@@ -27,7 +34,7 @@ CHARTS_IN_SCOPE = [
 ]
 
 MODEL_CONFIG = {
-    'models': {chart: VAE(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'models': {chart: AutoEncoder(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
     'do_score': False,
     'do_prob': True,
     'do_flag': True,
