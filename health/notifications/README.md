@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 # Netdata alarm notifications
 
 The `exec` line in health configuration defines an external script that will be called once
-the alarm is triggered. The default script is **[alarm-notify.sh](alarm-notify.sh.in)**.
+the alarm is triggered. The default script is `alarm-notify.sh`.
 
 You can change the default script globally by editing `/etc/netdata/netdata.conf`.
 
@@ -20,11 +20,10 @@ You can change the default script globally by editing `/etc/netdata/netdata.conf
 
 It uses **roles**. For example `sysadmin`, `webmaster`, `dba`, etc.
 
-Each alarm is assigned to one or more roles, using the `to` line of the alarm configuration.
-Then `alarm-notify.sh` uses its own configuration file `/etc/netdata/health_alarm_notify.conf`
-the default is [here](health_alarm_notify.conf)
-(to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`)
-to find the destination address of the notification for each method.
+Each alarm is assigned to one or more roles, using the `to` line of the alarm configuration. Then `alarm-notify.sh` uses
+its own configuration file `/etc/netdata/health_alarm_notify.conf`. To edit it on your system, run
+`/etc/netdata/edit-config health_alarm_notify.conf` and find the destination address of the notification for each
+method.
 
 Each role may have one or more destinations.
 
@@ -38,8 +37,7 @@ So, for example the `sysadmin` role may send:
 
 ## Configuration
 
-Edit [`/etc/netdata/health_alarm_notify.conf`](health_alarm_notify.conf)
-by running `/etc/netdata/edit-config health_alarm_notify.conf`:
+Edit `/etc/netdata/health_alarm_notify.conf` by running `/etc/netdata/edit-config health_alarm_notify.conf`:
 
 -   settings per notification method:
 

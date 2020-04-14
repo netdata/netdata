@@ -102,7 +102,7 @@ We provide Docker images for the most common architectures. These are statistics
 ### Registry
 
 When you install multiple Netdata, they are integrated into **one distributed application**, via a [Netdata
-registry](registry/README.md). This is a web browser feature and it allows us to count the number of unique users and
+registry](/registry/README.md). This is a web browser feature and it allows us to count the number of unique users and
 unique Netdata servers installed. The following information comes from the global public Netdata registry we run:
 
 [![User
@@ -136,19 +136,20 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](docs/anonymous-statistics.md) page.
+about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md) page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
 
-To learn more about the pros and cons of using _nightly_ vs. _stable_ releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
+To learn more about the pros and cons of using _nightly_ vs. _stable_ releases, see our [notice about the two options](/packaging/installer/README.md#nightly-vs-stable-releases).
 
 The above command will:
 
 -   Install any required packages on your system (it will ask you to confirm before doing so)
 -   Compile it, install it, and start it.
 
-More installation methods and additional options can be found at the [installation page](packaging/installer/).
+More installation methods and additional options can be found at the [installation
+page](/packaging/installer/README.md).
 
 To try Netdata in a Docker container, run this:
 
@@ -165,7 +166,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running Netdata in Docker, check the [docker installation page](packaging/docker/).
+For more information about running Netdata in Docker, check the [docker installation page](/packaging/docker/README.md).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -242,12 +243,12 @@ This is how it works:
 
 | Function    | Description                                                                                                                                                                                                                                                    | Documentation                                       |
 | :---------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------- |
-| **Collect** | Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. | [`collectors`](collectors/README.md)                |
-| **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](database/README.md)                    |
-| **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](health/README.md)                        |
-| **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](streaming/README.md)                  |
-| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`backends`](backends/README.md)                    |
-| **Query**   | Multiple independent workers are attached to the [internal web server](web/server/README.md), servicing API requests, including [data queries](web/api/queries/README.md).                                                                                     | [`web/api`](web/api/README.md)                      |
+| **Collect** | Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. | [`collectors`](/collectors/README.md)                |
+| **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](/database/README.md)                    |
+| **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](/health/README.md)                        |
+| **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](/streaming/README.md)                  |
+| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`backends`](/backends/README.md)                    |
+| **Query**   | Multiple independent workers are attached to the [internal web server](/web/server/README.md), servicing API requests, including [data queries](/web/api/queries/README.md).                                                                                     | [`web/api`](/web/api/README.md)                      |
 
 The result is a highly efficient, low-latency system, supporting multiple readers and one writer on each metric.
 
@@ -287,17 +288,17 @@ This is what you should expect from Netdata:
 
 -   **Sophisticated alerting** - Netdata comes with hundreds of alarms **out of the box**! It supports dynamic
     thresholds, hysteresis, alarm templates, multiple role-based notification methods, and more.
--   **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/),
-    [discordapp.com](health/notifications/discord/), [email](health/notifications/email/),
-    [flock.com](health/notifications/flock/), [hangouts](health/notifications/hangouts/),
-    [irc](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/),
-    [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/),
-    [prowl](health/notifications/prowl/), [pushbullet.com](health/notifications/pushbullet/),
-    [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/),
-    [slack.com](health/notifications/slack/), [smstools3](health/notifications/smstools3/),
-    [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/),
-    [twilio.com](health/notifications/twilio/), [web](health/notifications/web/) and [custom
-    notifications](health/notifications/custom/).
+-   **Notifications**: [alerta.io](/health/notifications/alerta/), [amazon sns](/health/notifications/awssns/),
+    [discordapp.com](/health/notifications/discord/), [email](/health/notifications/email/),
+    [flock.com](/health/notifications/flock/), [hangouts](/health/notifications/hangouts/),
+    [irc](/health/notifications/irc/), [kavenegar.com](/health/notifications/kavenegar/),
+    [messagebird.com](/health/notifications/messagebird/), [pagerduty.com](/health/notifications/pagerduty/),
+    [prowl](health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
+    [pushover.net](health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
+    [slack.com](/health/notifications/slack/), [smstools3](/health/notifications/smstools3/),
+    [syslog](/health/notifications/syslog/), [telegram.org](/health/notifications/telegram/),
+    [twilio.com](/health/notifications/twilio/), [web](/health/notifications/web/) and [custom
+    notifications](/health/notifications/custom/).
 
 ### Integrations
 
@@ -317,7 +318,7 @@ This is what you should expect from Netdata:
 -   **Visual anomaly detection** - Our UI/UX emphasizes the relationships between charts so you can better detect
     anomalies visually.
 -   **Embeddable** - Charts can be embedded on your web pages, wikis and blogs. You can even use [Atlassian's Confluence
-    as a monitoring dashboard](web/gui/confluence/).
+    as a monitoring dashboard](/web/gui/confluence/README.md).
 -   **Customizable** - You can build custom dashboards using simple HTML. No JavaScript needed!
 
 ### Positive and negative values
@@ -350,7 +351,7 @@ _Charts are panned by dragging them with the mouse. Charts can be zoomed in/out 
 mouse pointer is over a chart._
 
 > The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server when navigating via the
-> [My nodes menu](registry/README.md).
+> [My nodes menu](/registry/README.md).
 
 ### Highlighted time-frame
 
@@ -363,21 +364,22 @@ _A highlighted time-frame can be given by pressing `Alt` + `mouse selection` on 
 same range on all charts._
 
 > Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [My nodes
-> menu](registry/README.md).
+> menu](/registry/README.md).
 
 ## What Netdata monitors
 
 Netdata can collect metrics from 200+ popular services and applications, on top of dozens of system-related metrics
 jocs, such as CPU, memory, disks, filesystems, networking, and more. We call these **collectors**, and they're managed
-by [**plugins**](collectors/plugins.d/), which support a variety of programming languages, including Go and Python.
+by [**plugins**](/collectors/plugins.d/README.md), which support a variety of programming languages, including Go and
+Python.
 
 Popular collectors include **Nginx**, **Apache**, **MySQL**, **statsd**, **cgroups** (containers, Docker, Kubernetes,
 LXC, and more), **Traefik**, **web server `access.log` files**, and much more. 
 
-See the **full list of [supported collectors](collectors/COLLECTORS.md)**.
+See the **full list of [supported collectors](/collectors/COLLECTORS.md)**.
 
 Netdata's data collection is **extensible**, which means you can monitor anything you can get a metric for. You can even
-write a collector for your custom application using our [plugin API](collectors/plugins.d/README.md).
+write a collector for your custom application using our [plugin API](/collectors/plugins.d/README.md).
 
 ## Documentation
 
@@ -386,25 +388,25 @@ repository itself in Markdown (`.md`) files. You can find all our documentation 
 
 Here is a quick list of notable documents:
 
-| Directory                                   | Description                                                                                                           |
-| :------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------- |
-| [`installer`](packaging/installer/)         | Instructions to install Netdata on your systems.                                                                      |
-| [`docker`](packaging/docker/)               | Instructions to install Netdata using docker.                                                                         |
-| [`daemon`](daemon/)                         | Information about the Netdata daemon and its configuration.                                                           |
-| [`collectors`](collectors/)                 | Information about data collection plugins.                                                                            |
-| [`health`](health/)                         | How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods. |
-| [`streaming`](streaming/)                   | How to build hierarchies of Netdata servers, by streaming metrics between them.                                       |
-| [`backends`](backends/)                     | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
-| [`web/api`](web/api/)                       | Learn how to query the Netdata API and the queries it supports.                                                       |
-| [`web/api/badges`](web/api/badges/)         | Learn how to generate badges (SVG images) from live data.                                                             |
-| [`web/gui/custom`](web/gui/custom/)         | Learn how to create custom Netdata dashboards.                                                                        |
-| [`web/gui/confluence`](web/gui/confluence/) | Learn how to create Netdata dashboards on Atlassian's Confluence.                                                     |
+| Directory                                             | Description                                                                                                           |
+| :---------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| [`installer`](/packaging/installer/README.md)         | Instructions to install Netdata on your systems.                                                                      |
+| [`docker`](/packaging/docker/README.md)               | Instructions to install Netdata using docker.                                                                         |
+| [`daemon`](/daemon/README.md)                         | Information about the Netdata daemon and its configuration.                                                           |
+| [`collectors`](/collectors/README.md)                 | Information about data collection plugins.                                                                            |
+| [`health`](/health/README.md)                         | How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods. |
+| [`streaming`](/streaming/README.md)                   | How to build hierarchies of Netdata servers, by streaming metrics between them.                                       |
+| [`backends`](/backends/README.md)                     | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
+| [`web/api`](/web/api/README.md)                       | Learn how to query the Netdata API and the queries it supports.                                                       |
+| [`web/api/badges`](/web/api/badges/README.md)         | Learn how to generate badges (SVG images) from live data.                                                             |
+| [`web/gui/custom`](/web/gui/custom/README.md)         | Learn how to create custom Netdata dashboards.                                                                        |
+| [`web/gui/confluence`](/web/gui/confluence/README.md) | Learn how to create Netdata dashboards on Atlassian's Confluence.                                                     |
 
 You can also check all the other directories. Most of them have plenty of documentation.
 
 ## Community
 
-We welcome [contributions](CONTRIBUTING.md). Feel free to join the team!
+We welcome [contributions](/CONTRIBUTING.md). Feel free to join the team!
 
 To report bugs or get help, use [GitHub's issues](https://github.com/netdata/netdata/issues).
 
@@ -413,15 +415,14 @@ You can also find Netdata on:
 -   [Facebook](https://www.facebook.com/linuxnetdata/)
 -   [Twitter](https://twitter.com/linuxnetdata)
 -   [StackShare](https://stackshare.io/netdata)
--   [LinkedIn](https://www.linkedin.com/company/my-netdata.io/)
 -   [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
 -   [Repology](https://repology.org/metapackage/netdata/versions)
 
 ## License
 
-Netdata is [GPLv3+](LICENSE).
+Netdata is [GPLv3+](/LICENSE).
 
-Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](REDISTRIBUTED.md).
+Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](/REDISTRIBUTED.md).
 
 ## Is it any good?
 

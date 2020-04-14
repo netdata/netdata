@@ -14,18 +14,18 @@ The following formats are supported:
 
 | format|module|content type|description|
 |:----:|:----:|:----------:|:----------|
-| `array`|[ssv](ssv)|application/json|a JSON array|
-| `csv`|[csv](csv)|text/plain|a text table, comma separated, with a header line (dimension names) and `\r\n` at the end of the lines|
-| `csvjsonarray`|[csv](csv)|application/json|a JSON array, with each row as another array (the first row has the dimension names)|
-| `datasource`|[json](json)|application/json|a Google Visualization Provider `datasource` javascript callback|
-| `datatable`|[json](json)|application/json|a Google `datatable`|
-| `html`|[csv](csv)|text/html|an html table|
-| `json`|[json](json)|application/json|a JSON object|
-| `jsonp`|[json](json)|application/json|a JSONP javascript callback|
-| `markdown`|[csv](csv)|text/plain|a markdown table|
-| `ssv`|[ssv](ssv)|text/plain|a space separated list of values|
-| `ssvcomma`|[ssv](ssv)|text/plain|a comma separated list of values|
-| `tsv`|[csv](csv)|text/plain|a TAB delimited `csv` (MS Excel flavor)|
+| `array`|[ssv](/web/api/formatters/ssv/README.md)|application/json|a JSON array|
+| `csv`|[csv](/web/api/formatters/csv/README.md)|text/plain|a text table, comma separated, with a header line (dimension names) and `\r\n` at the end of the lines|
+| `csvjsonarray`|[csv](/web/api/formatters/csv/README.md)|application/json|a JSON array, with each row as another array (the first row has the dimension names)|
+| `datasource`|[json](/web/api/formatters/json/README.md)|application/json|a Google Visualization Provider `datasource` javascript callback|
+| `datatable`|[json](/web/api/formatters/json/README.md)|application/json|a Google `datatable`|
+| `html`|[csv](/web/api/formatters/csv/README.md)|text/html|an html table|
+| `json`|[json](/web/api/formatters/json/README.md)|application/json|a JSON object|
+| `jsonp`|[json](/web/api/formatters/json/README.md)|application/json|a JSONP javascript callback|
+| `markdown`|[csv](/web/api/formatters/csv/README.md)|text/plain|a markdown table|
+| `ssv`|[ssv](/web/api/formatters/ssv/README.md)|text/plain|a space separated list of values|
+| `ssvcomma`|[ssv](/web/api/formatters/ssv/README.md)|text/plain|a comma separated list of values|
+| `tsv`|[csv](/web/api/formatters/csv/README.md)|text/plain|a TAB delimited `csv` (MS Excel flavor)|
 
 For examples of each format, check the relative module documentation.
 

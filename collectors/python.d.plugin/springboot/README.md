@@ -102,7 +102,7 @@ Please refer [Spring Boot Actuator: Production-ready Features](https://docs.spri
 ## Usage
 
 Edit the `python.d/springboot.conf` configuration file using `edit-config` from the your agent's [config
-directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -139,6 +139,8 @@ You can disable the default charts by set `defaults.<chart-id>: false`.
 
 The dimension name of extras charts should replace `.` to `_`.
 
-Please check [springboot.conf](springboot.conf) for more examples.
+Please check
+[springboot.conf](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/springboot/springboot.conf)
+for more examples.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fspringboot%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

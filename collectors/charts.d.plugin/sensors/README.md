@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/chart
 # Linux machine sensors monitoring with Netdata
 
 > THIS MODULE IS OBSOLETE.
-> USE [THE PYTHON ONE](../../python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
+> USE [THE PYTHON ONE](/collectors/python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
 >
 > Unlike the python one, this module can collect temperature on RPi.
 
@@ -34,7 +34,7 @@ One chart for every sensor chip found and each of the above will be created.
 ## Configuration
 
 Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the your agent's [config
-directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

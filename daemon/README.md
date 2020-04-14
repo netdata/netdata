@@ -12,7 +12,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
 -   You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
 -   You can stop Netdata by killing it with `killall netdata`. You can stop and start Netdata at any point. When
-    exiting, the [database engine](../database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
+    exiting, the [database engine](/database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
     it can continue when started again.
 
 Access to the web site, for all graphs, is by default on port `19999`, so go to:
@@ -192,7 +192,7 @@ The command line options of the Netdata 1.10.0 version are the following:
   - USR2                   Reload health configuration.
 ```
 
-You can send commands during runtime via [netdatacli](../cli).
+You can send commands during runtime via [netdatacli](/cli/README.md).
 
 ## Log files
 
@@ -485,8 +485,8 @@ When you compile Netdata with debugging:
 2.  a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is
     printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated
     via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find
-    the options supported at [log.h](../libnetdata/log/log.h). They are the `D_*` defines. The value
-    `0xffffffffffffffff` will enable all possible debug flags.
+    the options supported at [log.h](https://raw.githubusercontent.com/netdata/netdata/master/libnetdata/log/log.h).
+    They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
 
 Once Netdata is compiled with debugging and tracing is enabled for a few sections, the file `/var/log/netdata/debug.log`
 will contain the messages.

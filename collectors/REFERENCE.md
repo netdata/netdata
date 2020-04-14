@@ -35,8 +35,8 @@ independent processes in a variety of programming languages based on their purpo
 MySQL database, among many others.
 
 For most users, enabling individual collectors for the application/service you're interested in is far more important
-than knowing which plugin it uses. See our [collectors list](COLLECTORS.md) to see whether your favorite app/service has
-a collector, and then read the [collectors quickstart](QUICKSTART.md) and the documentation for that specific collector
+than knowing which plugin it uses. See our [collectors list](/collectors/COLLECTORS.md) to see whether your favorite app/service has
+a collector, and then read the [collectors quickstart](/collectors/QUICKSTART.md) and the documentation for that specific collector
 to figure out how to enable it.
 
 There are three types of plugins:
@@ -48,7 +48,7 @@ There are three types of plugins:
     independent processes. They communicate with the daemon via pipes.
 -   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
     type of collector. We have a few plugin orchestrators available for those who want to develop their own collectors,
-    but focus most of our efforts on the [Go plugin](go.d.plugin/README.md).
+    but focus most of our efforts on the [Go plugin](/collectors/go.d.plugin/README.md).
 
 ## Enable, configure, and disable modules
 
@@ -59,7 +59,7 @@ However, there are cases that auto-detection fails. Usually, the reason is that 
 allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
 metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
 
-View our [collectors quickstart](QUICKSTART.md) for explict details on enabling and configuring collector modules.
+View our [collectors quickstart](/collectors/QUICKSTART.md) for explict details on enabling and configuring collector modules.
 
 ## Troubleshoot a collector
 

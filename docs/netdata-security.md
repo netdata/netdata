@@ -196,12 +196,12 @@ Of course, there are many more methods you could use to protect Netdata:
 
 ### Registry or how to not send any information to a third party server
 
-The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
+The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](/registry/README.md) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
 
 -   The url where you open the web-ui in the browser (via http request referrer)
 -   The hostnames of the Netdata servers
 
-If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).
+If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](/registry/README.md#run-your-own-registry).
 
 ### Opt-out of anonymous statistics
 

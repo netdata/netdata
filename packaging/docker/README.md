@@ -91,7 +91,7 @@ VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
+about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
@@ -105,7 +105,7 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access
+[HAProxy](/docs/running-behind-haproxy/) so that it restricts connections to read-only access
 to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
@@ -181,7 +181,7 @@ Netdata will be running on, using the [command instruction](https://docs.docker.
 ## Install Netdata using docker-compose with SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you should [secure the Netdata
-instance](../../docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
+instance](/docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
 reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and

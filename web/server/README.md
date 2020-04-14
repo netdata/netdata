@@ -48,7 +48,7 @@ Using the above, Netdata will bind to:
 -   IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
 -   IPv4 10.1.1.1 at port 19998. The management API and `netdata.conf` will be accessible on this port.
 -   All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
--   All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. slaves also need to be [configured for TLS](../../streaming).
+-   All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. slaves also need to be [configured for TLS](/streaming/README.md).
 -   All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
 -   All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port. 
 -   Unix domain socket `/run/netdata/netdata.sock`. All requests are serviceable on this socket. Note that in some OSs like Fedora, every service sees a different `/tmp`, so don't create a Unix socket under `/tmp`. `/run` or `/var/run` is suggested.
@@ -132,7 +132,7 @@ Example:
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 ```
 
-For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-streaming-communications) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
+For information how to configure the slaves to use TLS, check [securing the communication](/streaming/README.md#securing-streaming-communications) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
 When we define the use of SSL in a Netdata agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
@@ -182,13 +182,13 @@ Netdata supports access lists in `netdata.conf`:
 -   `allow badges from` checks if the API request is for a badge. Badges are not matched by `allow dashboard from`.
 
 -   `allow streaming from` checks if the slave willing to stream metrics to this Netdata is allowed.
-     This can be controlled per API KEY and MACHINE GUID in [stream.conf](../../streaming/stream.conf).
-     The setting in `netdata.conf` is checked before the ones in [stream.conf](../../streaming/stream.conf).
+     This can be controlled per API KEY and MACHINE GUID in `stream.conf`.
+     The setting in `netdata.conf` is checked before the ones in `stream.conf`.
 
 -   `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
      The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
--   `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](../api/health/#health-management-api)
+-   `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/web/api/health/README.md#health-management-api)
 
 In order to check the FQDN of the connection without opening the Netdata agent to DNS-spoofing, a reverse-dns record
 must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
@@ -214,14 +214,14 @@ present that may match DNS FQDNs.
 
 |setting|default|info|
 |:-----:|:-----:|:---|
-|ses max window|`15`|See [single exponential smoothing](../api/queries/des/)|
-|des max window|`15`|See [double exponential smoothing](../api/queries/des/)|
+|ses max window|`15`|See [single exponential smoothing](/web/api/queries/des/README.md)|
+|des max window|`15`|See [double exponential smoothing](/web/api/queries/des/README.md)|
 |listen backlog|`4096`|The port backlog. Check `man 2 listen`.|
 |web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, Netdata will only serve files owned by user given in `run as user`.|
 |web files group|`netdata`|If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.|
 |disconnect idle clients after seconds|`60`|The time in seconds to disconnect web clients after being totally idle.|
 |timeout for first request|`60`|How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.|
-|accept a streaming request every seconds|`0`|Can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves in a [streaming and replication setup](../../streaming)|
+|accept a streaming request every seconds|`0`|Can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves in a [streaming and replication setup](/streaming/README.md)|
 |respect do not track policy|`no`|If set to `yes`, will respect the client's browser preferences on storing cookies.|
 |x-frame-options response header||[Avoid clickjacking attacks, by ensuring that the content is not embedded into other sites](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options).|
 |enable gzip compression|`yes`|When set to `yes`, Netdata web responses will be GZIP compressed, if the web client accepts such responses.|

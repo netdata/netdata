@@ -71,9 +71,9 @@ commands. You can also configure your system's `/etc/fstab` configuration to mou
 
 eBPF collection is only enabled if you install Netdata with the `--enable-ebpf` option. 
 
-If you installed via the [one-line installation script](../../packaging/installer/README.md), [64-bit
-binary](../../packaging/installer/methods/kickstart-64.md), or [manually](../../packaging/installer/methods/manual.md),
-you can append the `--enable-ebpf` option when you reinstall.
+If you installed via the [one-line installation script](/packaging/installer/README.md), [64-bit
+binary](/packaging/installer/methods/kickstart-64.md), or [manually](/packaging/installer/methods/manual.md), you can
+append the `--enable-ebpf` option when you reinstall.
 
 For example, if you used the one-line installation script, you can reinstall Netdata with the following:
 
@@ -214,6 +214,6 @@ Because eBPF monitoring is complex, we are evaluating the performance of this ne
 conditions, across various system loads, and when monitoring complex applications.
 
 Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
-nearly identical to our [apps.plugin collector](../apps.plugin/), despite collecting and displaying much more
-sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of your
-complex applications at any load.
+nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.md), despite collecting and displaying
+much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
+your complex applications at any load.

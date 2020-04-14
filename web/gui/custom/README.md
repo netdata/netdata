@@ -17,16 +17,16 @@ You can:
 
 You can also add Netdata charts to existing web pages.
 
-Check this **[very simple working example of a custom
-dashboard](http://netdata.firehol.org/demo.html)**, and its **[html
-source](../demo.html)**.
+Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its
+**[html source](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](../dashboard.html).
+supported charts. The code is [here](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard.html).
 
-If you plan to put the dashboard on TV, check out [tv.html](../tv.html). Here's
-is a screenshot of it, monitoring two servers on the same page:
+If you plan to put the dashboard on TV, check out
+[tv.html](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/tv.html). Here's is a screenshot of it,
+monitoring two servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
 
@@ -301,9 +301,8 @@ Each chart can get data from a different Netdata server. You can specify the Net
  ></div>
 ```
 
-If you have ephemeral monitoring setup ([More info
-here](../../../streaming/#monitoring-ephemeral-nodes)) and have no direct access
-to the nodes dashboards, you can use the following:
+If you have ephemeral monitoring setup ([More info here](/streaming/README.md#monitoring-ephemeral-nodes)) and have no
+direct access to the nodes dashboards, you can use the following:
 
 ```html
 <div data-netdata="unique.id"
@@ -426,7 +425,7 @@ select specific dimensions using this:
 ```
 
 Netdata supports coma (`,`) or pipe (`|`) separated [simple
-patterns](../../../libnetdata/simple_pattern/) for dimensions. By default it
+patterns](/libnetdata/simple_pattern/README.md) for dimensions. By default it
 searches for both dimension IDs and dimension NAMEs. You can control the target
 of the match with: `data-append-options="match-ids"` or
 `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched
@@ -494,7 +493,7 @@ it, using this:
 
 ### API options
 
-You can append Netdata **[REST API v1](../../api)** data options, using this:
+You can append Netdata **[REST API v1](/web/api/README.md)** data options, using this:
 
 ```html
 <div data-netdata="unique.id"

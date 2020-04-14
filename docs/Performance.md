@@ -32,15 +32,15 @@ For most server systems, with a few hundred charts and a few thousand dimensions
 
 To prove Netdata scalability, check issue [#1323](https://github.com/netdata/netdata/issues/1323#issuecomment-265501668) where Netdata collects 95.000 metrics per second, with 12% CPU utilization of a single core!
 
-In embedded systems, if the Netdata daemon is using a lot of CPU without any web clients accessing it, you should lower the data collection frequency. To set the data collection frequency, edit `/etc/netdata/netdata.conf` and set `update_every` to a higher number (this is the frequency in seconds data are collected for all charts: higher number of seconds = lower frequency, the default is 1 for per second data collection). You can also set this frequency per module or chart. Check the [daemon configuration](../daemon/config) for plugins and charts. For specific modules, the configuration needs to be changed in:
+In embedded systems, if the Netdata daemon is using a lot of CPU without any web clients accessing it, you should lower the data collection frequency. To set the data collection frequency, edit `/etc/netdata/netdata.conf` and set `update_every` to a higher number (this is the frequency in seconds data are collected for all charts: higher number of seconds = lower frequency, the default is 1 for per second data collection). You can also set this frequency per module or chart. Check the [daemon configuration](/daemon/config/README.md) for plugins and charts. For specific modules, the configuration needs to be changed in:
 
--   `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin)
--   `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
--   `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
+-   `python.d.conf` for [python](/collectors/python.d.plugin/README.md)
+-   `node.d.conf` for [nodejs](/collectors/node.d.plugin/README.md)
+-   `charts.d.conf` for [bash](/collectors/charts.d.plugin/README.md)
 
 ## Plugins
 
-If a plugin is using a lot of CPU, you should lower its update frequency, or if you wrote it, re-factor it to be more CPU efficient. Check [External Plugins](../collectors/plugins.d/) for more details on writing plugins.
+If a plugin is using a lot of CPU, you should lower its update frequency, or if you wrote it, re-factor it to be more CPU efficient. Check [External Plugins](/collectors/plugins.d/README.md) for more details on writing plugins.
 
 ## CPU consumption when web clients are accessing dashboards
 
@@ -55,7 +55,7 @@ To lower the CPU utilization of Netdata when clients are accessing the dashboard
 ## Monitoring a heavily-loaded system
 
 While running, Netdata does not depend much on disk I/O aside from writing to log files and the [database
-engine](../database/engine/README.md) "spilling" historical metrics to disk when it uses all its available RAM.
+engine](/database/engine/README.md) "spilling" historical metrics to disk when it uses all its available RAM.
 
 Under a heavy system load, plugins that need disk may stop and show gaps during heavy system load, but the Netdata
 daemon itself should be able to work and collect values from `/proc` and `/sys` and serve web clients accessing it.
@@ -159,7 +159,7 @@ In this section you can select which modules of the `proc` plugin you need. All 
 ...
 ```
 
-Refer to the [proc.plugins documentation](../collectors/proc.plugin/) for the list and description of all the proc plugin modules.
+Refer to the [proc.plugins documentation](/collectors/proc.plugin/README.md) for the list and description of all the proc plugin modules.
 
 ### 3. Lower internal plugin update frequency
 
@@ -196,7 +196,7 @@ following settings in the `[global]` section of `netdata.conf`:
 	# dbengine disk space = 256
 ```
 
-See the [database engine documentation](../database/engine/README.md) or our [tutorial on metrics
+See the [database engine documentation](/database/engine/README.md) or our [tutorial on metrics
 retention](tutorials/longer-metrics-storage.md) for more details on lowering the database engine's memory requirements.
 
 ### 6. Disable gzip compression of responses

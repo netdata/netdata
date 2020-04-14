@@ -141,7 +141,7 @@ easy!
 We'll cover this quickly, as you're probably eager to get on with using Netdata itself.
 
 We don't want to lock you in to using Netdata by itself, and forever. By supporting [archiving to
-backends](../../backends/README.md) like Graphite, Prometheus, OpenTSDB, MongoDB, and others, you can use Netdata _in
+backends](/backends/README.md) like Graphite, Prometheus, OpenTSDB, MongoDB, and others, you can use Netdata _in
 conjunction_ with software that might seem like our competitors.
 
 We don't want to "wage war" with another monitoring solution, whether it's commercial, open-source, or anything in
