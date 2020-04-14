@@ -5,6 +5,7 @@
 
 
 import requests
+import numpy as np
 import pandas as pd
 
 # basic/traditional models
@@ -260,6 +261,18 @@ class Service(SimpleService):
                 flag = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag)
                 data[flag] = self.prediction[chart].get('flag', 0)
+
+        # add averages
+
+        if self.do_score:
+            score = 'mean_score'
+            self.update_chart_dim('score', score, divisor=100)
+            data[score] = np.mean([data[k] for k in data if 'score' in k])
+
+        if self.do_prob:
+            prob = 'mean_prob'
+            self.update_chart_dim('prob', prob, divisor=100)
+            data[prob] = np.mean([data[k] for k in data if 'prob' in k])
 
         return data
 
