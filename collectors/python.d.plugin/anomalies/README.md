@@ -45,7 +45,7 @@ MODEL_CONFIG = {
 - `do_flag` - A True/False used to tell the plugin if it needs to compute and display the anomaly flag, that is, if the PyOD model considered the latest observation to be an outlier or not. 
 - `diffs_n` - An integer used if you want to preprocess the data to just train on difference's of values as opposed to the raw values from the chart. For example if you set `diffs_n=0` then models will be trained on the raw values from that charts, whereas if you set `diffs_n=1` then the data will be preprocessed and the changes in values is what the model will be trained on. For further information on differencing see [this Wikipedia page](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) and [this blog post](https://machinelearningmastery.com/remove-trends-seasonality-difference-transform-python/) for some examples.  
 - `lags_n` - An integer used to define if we want to include lagged values of the data in our feature vector "X". You might want to do this if you are not only interested in point anomalies (see [blog post here](https://www.anodot.com/blog/quick-guide-different-types-outliers/) for overview of different types of anomalies) but also is anomalous sub patterns in your data which you might only capture by looking across a lagged history of data points when training your model.
-- `xxx` - xxx
+- `smoothing_n` - An integer used to define the extend to which we want to smooth our feature vector "X". For example if we set `smoothing_n=2` then we will train on a rolling average of 2 so as to smooth the data somewhat in the idea that this may make out trained model a little less trigger happy in response to transient spikes and jumps. 
 - `xxx` - xxx
 - `xxx` - xxx
 - `xxx` - xxx
