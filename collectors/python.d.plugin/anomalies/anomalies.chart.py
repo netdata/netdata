@@ -32,9 +32,6 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat',
     'system.cpu_pressure', 'system.io_some_pressure', 'system.active_processes', 'system.entropy'
 ]
-CHARTS_IN_SCOPE = [
-    'system.cpu'
-]
 
 # model configuration
 MODEL_CONFIG = {
