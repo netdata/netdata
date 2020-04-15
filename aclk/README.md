@@ -14,7 +14,7 @@ The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdat
 end-to-end, and enable the features found in Netdata Cloud. _No data is exchanged with Netdata Cloud until you claim a
 node._
 
-Read our [claiming documentation](../claim/README.md) for a guide for claiming a node using the ACLK and additional
+Read our [claiming documentation](/claim/README.md) for a guide for claiming a node using the ACLK and additional
 troubleshooting and reference information.
 
 ## Enable and configure the ACLK
@@ -28,7 +28,7 @@ in the `[cloud]` section of `netdata.conf`.
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-claiming](../claim/README.md#claiming-through-a-proxy).
+claiming](/claim/README.md#claiming-through-a-proxy).
 
 ## Disable the ACLK
 

@@ -10,7 +10,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 # Agent claiming
 
 Agent claiming is part of the onboarding process when creating a Space in Netdata Cloud. A Space's administrator creates
-a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link (ACLK)](../aclk/README.md).
+a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link (ACLK)](/aclk/README.md).
 
 Claiming nodes is a security feature in Netdata Cloud. Through the process of claiming, you demonstrate in a few ways
 that you have administrative access to that node and the configuration settings for its Agent. By logging into the node,
@@ -119,7 +119,7 @@ Additionally, check that the `netdata cloud` setting in `netdata.conf` is set to
     netadata cloud = enable
 ```
 
-To fix this issue, reinstall Netdata using your [preferred method](../packaging/installer/README.md) and do not add the
+To fix this issue, reinstall Netdata using your [preferred method](/packaging/installer/README.md) and do not add the
 `--disable-cloud` option.
 
 #### cloud-available is false
