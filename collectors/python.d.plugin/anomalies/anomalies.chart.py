@@ -48,7 +48,9 @@ MODEL_CONFIG = {
     'train_max_n': 60*60,
     'train_min_n': 60,
     'train_sample_pct': 1,
-    'fit_every_n': 30
+    'fit_every_n': 30,
+    'flags_min_n': 1,
+    'flags_window_n': 5
 }
 
 ORDER = [
@@ -94,6 +96,8 @@ class Service(SimpleService):
         self.train_sample_pct = MODEL_CONFIG.get('train_sample_pct', 1)
         self.fit_every_n = MODEL_CONFIG.get('fit_every_n', 60*5)
         self.predictions_keep_n = MODEL_CONFIG.get('predictions_keep_n', 5)
+        self.flags_min_n = MODEL_CONFIG.get('flags_min_n', 1)
+        self.flags_window_n = MODEL_CONFIG.get('flags_window_n', 2)
 
     @staticmethod
     def check():
@@ -199,7 +203,7 @@ class Service(SimpleService):
         # create feature vector on recent data to make predictions on
         X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))))
         self.debug('X_predict.shape={}'.format(X_predict.shape))
-        self.debug('X_predict={}'.format(X_predict))
+        #self.debug('X_predict={}'.format(X_predict))
         # make score, prob, flag as specified and keep most recent as current prediction
         if self.do_score:
             prediction.append(self.models[chart].decision_function(X_predict)[-1])
@@ -276,7 +280,12 @@ class Service(SimpleService):
             if self.do_flag:
                 flag_label = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag_label)
-                flag_value = self.predictions[chart][-1][2]
+                if self.flags_min_n > 1:
+                    # work out if should flag or not
+                    flag_value = self.predictions[chart][-1][2]
+                else:
+                    # just get most recent value
+                    flag_value = self.predictions[chart][-1][2]
                 self.debug("{}={}".format(flag_label, flag_value))
                 data[flag_label] = flag_value
 
