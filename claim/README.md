@@ -63,7 +63,7 @@ will also be used to tunnel the ACLK. The default `proxy` setting is `none`.
 
 The `proxy` setting can take one of the following values:
 
--   `none`: Do not use any proxy (even if system configured otherwise)
+-   `none`: Do not use a proxy, even if the system configured otherwise.
 -   `env`: Try to read proxy settings from set environment variables `http_proxy`/`socks_proxy`.
 -   `socks5[h]://[user:pass@]host:ip`: The ACLK and claiming will use the specified SOCKS5 proxy.
 -   `http://[user:pass@]host:ip`: The ACLK and claiming will use the specified HTTP(S) proxy.
