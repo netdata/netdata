@@ -93,6 +93,7 @@ class Service(SimpleService):
         self.train_min_n = MODEL_CONFIG.get('train_min_n', 60)
         self.train_sample_pct = MODEL_CONFIG.get('train_sample_pct', 1)
         self.fit_every_n = MODEL_CONFIG.get('fit_every_n', 60*5)
+        self.predictions_keep_n = MODEL_CONFIG.get('predictions_keep_n', 5)
 
     @staticmethod
     def check():
@@ -214,7 +215,8 @@ class Service(SimpleService):
             prediction.append(0)
         # update prediction for the chart
         self.predictions[chart].append(prediction)
-        self.predictions[chart] = self.predictions[chart][-5:]
+        # keep most recent n
+        self.predictions[chart] = self.predictions[chart][-self.predictions_keep_n:]
         self.debug('len(self.predictions[{}])={}'.format(chart, len(self.predictions[chart])))
         self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
 
