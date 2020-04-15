@@ -16,6 +16,42 @@ Then at each timestep the most recent feature vector "X" is used to generate eac
 - **Anomaly Probability** - the anomaly score from above but transformed to by on a `[0,1]` scale and behave more like a probability (see PyOD docs [`pyod.models.base.BaseDetector.decision_function`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba)).
 - **Anomaly Flag** - A `1` if the trained PyOD model considered the observation an outlier `0` otherwise (see PyOD docs [`pyod.models.base.BaseDetector.predict`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict)).   
 
+### MODEL_CONFIG
+
+One of the main inputs is the `MODEL_CONFIG` object that defines the various parameters and settings used to initialize and train the model.
+
+```
+# an example model configuration
+MODEL_CONFIG = {
+    'models': {chart: CBLOF(**{'contamination': 0.001}) for chart in CHARTS_IN_SCOPE},
+    'do_score': False,
+    'do_prob': True,
+    'do_flag': True,
+    'diffs_n': 1,
+    'lags_n': 2,
+    'smoothing_n': 2,
+    'train_max_n': 60*60,
+    'train_min_n': 60,
+    'train_sample_pct': 1,
+    'fit_every_n': 30,
+    'flags_min_n': 2,
+    'flags_window_n': 3
+}
+```
+
+- `models` - A dictionary defining a [PyOD model](https://pyod.readthedocs.io/en/latest/pyod.html) for each chart in scope.
+- `do_score` - A True/False used to tell the plugin if it needs to compute and display the raw anomaly score (sometimes you may just want the probability, although it may depend on the type of model used from PyOD). 
+- `do_prob` - A True/False used to tell the plugin if it needs to compute and display the anomaly probability (which is derived from the anomaly score - see PyOD docs [here](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba)).
+- `do_flag` - A True/False used to tell the plugin if it needs to compute and display the anomaly flag, that is, if the PyOD model considered the latest observation to be an outlier or not. 
+- `diffs_n` - An integer used if you want to preprocess the data to just train on difference's of values as opposed to the raw values from the chart. For example if you set `diffs_n=0` then models will be trained on the raw values from that charts, whereas if you set `diffs_n=1` then the data will be preprocessed and the changes in values is what the model will be trained on. For further information on differencing see [this Wikipedia page](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) and [this blog post](https://machinelearningmastery.com/remove-trends-seasonality-difference-transform-python/) for some examples.  
+- `lags_n` - An integer used to define if we want to include lagged values of the data in our feature vector "X". You might want to do this if you are not only interested in point anomalies (see [blog post here](https://www.anodot.com/blog/quick-guide-different-types-outliers/) for overview of different types of anomalies) but also is anomalous sub patterns in your data which you might only capture by looking across a lagged history of data points when training your model.
+- `xxx` - xxx
+- `xxx` - xxx
+- `xxx` - xxx
+- `xxx` - xxx
+- `xxx` - xxx
+- `xxx` - xxx 
+
 # Useful Links
 - [PyOD Examples](https://pyod.readthedocs.io/en/latest/example.html).
 - An ["Awesome" list](https://github.com/rob-med/awesome-TS-anomaly-detection) of useful anomaly detection tools and software.
