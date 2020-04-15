@@ -15,7 +15,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/SECURITY.md
 
 ## Reporting a Vulnerability
 
-We’re extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
+We're extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
 
 To make a report, please create a post [here](https://groups.google.com/a/netdata.cloud/forum/#!newtopic/security) with
 the vulnerability details and the details expected for [all Netdata bug
