@@ -9,16 +9,15 @@ import numpy as np
 import pandas as pd
 
 # basic/traditional models
-from pyod.models.knn import KNN
-from pyod.models.hbos import HBOS
+#from pyod.models.hbos import HBOS
 from pyod.models.cblof import CBLOF
-from pyod.models.pca import PCA
-from pyod.models.loda import LODA
-from pyod.models.abod import ABOD
+#from pyod.models.pca import PCA
+#from pyod.models.loda import LODA
+#from pyod.models.abod import ABOD
 # more fancy models
-from pyod.models.iforest import IForest
-from pyod.models.vae import VAE
-from pyod.models.auto_encoder import AutoEncoder
+#from pyod.models.iforest import IForest
+#from pyod.models.vae import VAE
+#from pyod.models.auto_encoder import AutoEncoder
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -214,14 +213,14 @@ class Service(SimpleService):
         else:
             prediction.append(0)
         # update prediction for the chart
-        self.debug('len(self.predictions)={}'.format(len(self.predictions)))
-        self.debug('self.predictions[{}]={}'.format(chart, self.predictions))
+        self.debug('len(self.predictions[{}])={}'.format(chart, len(self.predictions[chart])))
+        self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
         self.predictions[chart].append(prediction)
-        self.debug('len(self.predictions)={}'.format(len(self.predictions)))
-        self.debug('self.predictions[{}]={}'.format(chart, self.predictions))
+        self.debug('len(self.predictions[{}])={}'.format(chart, len(self.predictions[chart])))
+        self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
         self.predictions[chart] = self.predictions[chart][-5:]
-        self.debug('len(self.predictions)={}'.format(len(self.predictions)))
-        self.debug('self.predictions[{}]={}'.format(chart, self.predictions))
+        self.debug('len(self.predictions)={}'.format(len(self.predictions[chart])))
+        self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
 
     def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
         """
