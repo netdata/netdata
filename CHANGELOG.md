@@ -1,5 +1,16 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.21.1...HEAD)
+
+**Merged pull requests:**
+
+- Fixed Arch Linux Ci checks. [\#8699](https://github.com/netdata/netdata/pull/8699) ([Ferroin](https://github.com/Ferroin))
+- yamllint: enable truthy rule [\#8698](https://github.com/netdata/netdata/pull/8698) ([ilyam8](https://github.com/ilyam8))
+- Fixes compatibility with RH 7.x family [\#8694](https://github.com/netdata/netdata/pull/8694) ([thiagoftsm](https://github.com/thiagoftsm))
+- Docs: Standardize links between documentation [\#8638](https://github.com/netdata/netdata/pull/8638) ([joelhans](https://github.com/joelhans))
+
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.21.0...v1.21.1)
@@ -192,10 +203,6 @@
 - /docs/generator: build docs only for go.d itself and its modules [\#8005](https://github.com/netdata/netdata/pull/8005) ([ilyam8](https://github.com/ilyam8))
 - Update database servers group in apps\_groups.conf [\#8004](https://github.com/netdata/netdata/pull/8004) ([DefauIt](https://github.com/DefauIt))
 - /collectors/charts.d.plugin: fix `os\_id` detection in `run` [\#8002](https://github.com/netdata/netdata/pull/8002) ([ilyam8](https://github.com/ilyam8))
-- /docs/generator: add an option to use last dir name for page name  [\#7997](https://github.com/netdata/netdata/pull/7997) ([ilyam8](https://github.com/ilyam8))
-- Refactor collectors documentation [\#7996](https://github.com/netdata/netdata/pull/7996) ([joelhans](https://github.com/joelhans))
-- Docs: Change sed to allow parentheses in heading links [\#7995](https://github.com/netdata/netdata/pull/7995) ([joelhans](https://github.com/joelhans))
-- Fix CentOS 7 RPM build failures. [\#7993](https://github.com/netdata/netdata/pull/7993) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
