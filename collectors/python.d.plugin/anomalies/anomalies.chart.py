@@ -33,6 +33,9 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat',
     'system.cpu_pressure', 'system.io_some_pressure', 'system.active_processes', 'system.entropy'
 ]
+CHARTS_IN_SCOPE = [
+    'system.cpu'
+]
 
 # model configuration
 MODEL_CONFIG = {
@@ -80,7 +83,7 @@ class Service(SimpleService):
         self.models = MODEL_CONFIG['models']
         self.charts_in_scope = CHARTS_IN_SCOPE
         self.host = HOST
-        self.prediction = {chart: {} for chart in CHARTS_IN_SCOPE}
+        self.predictions = {chart: [] for chart in CHARTS_IN_SCOPE}
         self.do_score = MODEL_CONFIG.get('do_score', False)
         self.do_prob = MODEL_CONFIG.get('do_prob', True)
         self.do_flag = MODEL_CONFIG.get('do_flag', True)
@@ -192,18 +195,33 @@ class Service(SimpleService):
         Generate a prediction for a model and store it.
         :param chart: the chart for which to generate a prediction for.
         """
-        prediction = dict()
+        prediction = []
         # create feature vector on recent data to make predictions on
         X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))))
+        self.debug('X_predict.shape={}'.format(X_predict.shape))
+        self.debug('X_predict={}'.format(X_predict))
         # make score, prob, flag as specified and keep most recent as current prediction
         if self.do_score:
-            prediction['score'] = self.models[chart].decision_function(X_predict)[-1]
+            prediction.append(self.models[chart].decision_function(X_predict)[-1])
+        else:
+            prediction.append(0)
         if self.do_prob:
-            prediction['prob'] = self.models[chart].predict_proba(X_predict)[-1][1]
+            prediction.append(self.models[chart].predict_proba(X_predict)[-1][1])
+        else:
+            prediction.append(0)
         if self.do_flag:
-            prediction['flag'] = self.models[chart].predict(X_predict)[-1]
+            prediction.append(self.models[chart].predict(X_predict)[-1])
+        else:
+            prediction.append(0)
         # update prediction for the chart
-        self.prediction[chart] = prediction
+        self.debug('len(self.predictions)={}'.format(len(self.predictions)))
+        self.debug('self.predictions[{}]={}'.format(chart, self.predictions))
+        self.predictions[chart].append(prediction)
+        self.debug('len(self.predictions)={}'.format(len(self.predictions)))
+        self.debug('self.predictions[{}]={}'.format(chart, self.predictions))
+        self.predictions[chart] = self.predictions[chart][-5:]
+        self.debug('len(self.predictions)={}'.format(len(self.predictions)))
+        self.debug('self.predictions[{}]={}'.format(chart, self.predictions))
 
     def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
         """
@@ -245,17 +263,17 @@ class Service(SimpleService):
             if self.do_score:
                 score = "{}_score".format(chart.replace('system.', ''))
                 self.update_chart_dim('score', score, divisor=100)
-                data[score] = self.prediction[chart].get('score', 0) * 100
+                data[score] = self.predictions[chart][-1][0] * 100
 
             if self.do_prob:
                 prob = "{}_prob".format(chart.replace('system.', ''))
                 self.update_chart_dim('prob', prob, divisor=100)
-                data[prob] = self.prediction[chart].get('prob', 0) * 100
+                data[prob] = self.predictions[chart][-1][1] * 100
 
             if self.do_flag:
                 flag = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag)
-                data[flag] = self.prediction[chart].get('flag', 0)
+                data[flag] = self.predictions[chart][-1][2]
 
         # add averages
 
