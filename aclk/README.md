@@ -19,8 +19,8 @@ troubleshooting and reference information.
 
 ## Enable and configure the ACLK
 
-The ACLK is enabled by default if its prerequisites installed correctly, and the correct configuration is already set in
-your Agent's `netdata.conf` file.
+The ACLK is enabled by default and automatically configured if the prerequisites installed correctly. You can see this
+in the `[cloud]` section of `netdata.conf`.
 
 ```conf
 [cloud]
