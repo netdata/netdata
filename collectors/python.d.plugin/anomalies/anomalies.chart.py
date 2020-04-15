@@ -49,8 +49,8 @@ MODEL_CONFIG = {
     'train_min_n': 60,
     'train_sample_pct': 1,
     'fit_every_n': 30,
-    'flags_min_n': 1,
-    'flags_window_n': 5
+    'flags_min_n': 2,
+    'flags_window_n': 3
 }
 
 ORDER = [
@@ -280,14 +280,15 @@ class Service(SimpleService):
             if self.do_flag:
                 flag_label = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag_label)
+                # work out if to flag based on recent flags history
                 if self.flags_min_n > 1:
-                    #flags = [prediction[2] for prediction in self.predictions[chart][-self.flags_window_n]]
-                    #self.debug('flags={}'.format(flags))
-                    # work out if should flag or not
-                    flag_value = self.predictions[chart][-1][2]
+                    # check if self.flags_min_n or more flags in last self.flags_window_n flags from predictions
+                    flag_count = np.sum([prediction[2] for prediction in self.predictions[chart][-self.flags_window_n:]])
+                    if flag_count >= self.flags_min_n:
+                        flag_value = 1
+                    else:
+                        flag_value = 0
                 else:
-                    flags = [prediction[2] for prediction in self.predictions[chart][-self.flags_window_n:]]
-                    self.debug('flagsx={}'.format(flags))
                     # just get most recent value
                     flag_value = self.predictions[chart][-1][2]
                 self.debug("{}={}".format(flag_label, flag_value))
