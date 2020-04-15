@@ -33,7 +33,7 @@ MODEL_CONFIG = {
     'train_max_n': 60*60,
     'train_min_n': 60,
     'train_sample_pct': 1,
-    'fit_every_n': 30,
+    'fit_every_n': 60*5,
     'flags_min_n': 2,
     'flags_window_n': 3
 }
@@ -46,11 +46,12 @@ MODEL_CONFIG = {
 - `diffs_n` - An integer used if you want to preprocess the data to just train on difference's of values as opposed to the raw values from the chart. For example if you set `diffs_n=0` then models will be trained on the raw values from that charts, whereas if you set `diffs_n=1` then the data will be preprocessed and the changes in values is what the model will be trained on. For further information on differencing see [this Wikipedia page](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) and [this blog post](https://machinelearningmastery.com/remove-trends-seasonality-difference-transform-python/) for some examples.  
 - `lags_n` - An integer used to define if we want to include lagged values of the data in our feature vector "X". You might want to do this if you are not only interested in point anomalies (see [blog post here](https://www.anodot.com/blog/quick-guide-different-types-outliers/) for overview of different types of anomalies) but also is anomalous sub patterns in your data which you might only capture by looking across a lagged history of data points when training your model.
 - `smoothing_n` - An integer used to define the extend to which we want to smooth our feature vector "X". For example if we set `smoothing_n=2` then we will train on a rolling average of 2 so as to smooth the data somewhat in the idea that this may make out trained model a little less trigger happy in response to transient spikes and jumps. 
-- `xxx` - xxx
-- `xxx` - xxx
-- `xxx` - xxx
-- `xxx` - xxx
-- `xxx` - xxx 
+- `train_max_n` - This is the maximum number of data points the model will keep in `self.data` for training on.
+- `train_min_n` - This is the minimum number of data points required to train an initial model on.
+- `train_sample_pct` - We can sample from `self.data` if we want to train on a bigger `train_max_n` but not have to train a big expensive model on all that data each time.
+- `fit_every_n` - The schedule on which to refit the model for each chart (calls [`fit()`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.fit) method for the PyOD model).
+- `flags_min_n` - Used to post process the anomaly flags from the PyOD model to smooth them out or have more control on when to raise a flag in the anomaly flag chart. For example if we set `flags_min_n=2` and `flags_window_n=4` then we will only raise a flag in the netdata anomaly flags chart if we have seen 2 or more flags from the PyOD model in the last 4 predictions. 
+- `flags_window_n` - Used to determine over how many recent predictions to look when using `flags_min_n`. 
 
 # Useful Links
 - [PyOD Examples](https://pyod.readthedocs.io/en/latest/example.html).
