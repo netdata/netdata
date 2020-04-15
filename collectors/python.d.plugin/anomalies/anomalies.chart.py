@@ -83,7 +83,7 @@ class Service(SimpleService):
         self.models = MODEL_CONFIG['models']
         self.charts_in_scope = CHARTS_IN_SCOPE
         self.host = HOST
-        self.predictions = {chart: [] for chart in CHARTS_IN_SCOPE}
+        self.predictions = {chart: [[0, 0, 0]] for chart in CHARTS_IN_SCOPE}
         self.do_score = MODEL_CONFIG.get('do_score', False)
         self.do_prob = MODEL_CONFIG.get('do_prob', True)
         self.do_flag = MODEL_CONFIG.get('do_flag', True)
