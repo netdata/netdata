@@ -53,6 +53,10 @@ MODEL_CONFIG = {
 - `flags_min_n` - Used to post process the anomaly flags from the PyOD model to smooth them out or have more control on when to raise a flag in the anomaly flag chart. For example if we set `flags_min_n=2` and `flags_window_n=4` then we will only raise a flag in the netdata anomaly flags chart if we have seen 2 or more flags from the PyOD model in the last 4 predictions. 
 - `flags_window_n` - Used to determine over how many recent predictions to look when using `flags_min_n`. 
 
+# Notes
+- There will be a 'burn in' period at the start whereby the model will be a bit noisy until it gets the opportunity to train on more data.
+- We'd love to hear and feedback or ideas on the feature so please reach out to us at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) if you'd like to chat. 
+
 # Useful Links
 - [PyOD Examples](https://pyod.readthedocs.io/en/latest/example.html).
 - An ["Awesome" list](https://github.com/rob-med/awesome-TS-anomaly-detection) of useful anomaly detection tools and software.
