@@ -424,6 +424,12 @@ void rrdset_delete(RRDSET *st) {
     }
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        aclk_del_collector(st->rrdhost->hostname, st->plugin_name, st->module_name);
+        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
+    }
+#endif
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -546,18 +552,20 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
-    long rentries = config_get_number(config_section, "history", history_entries);
-    long entries = align_entries_to_pagesize(memory_mode, rentries);
-    if(entries != rentries) entries = config_set_number(config_section, "history", entries);
+    long entries;
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        // only sets it the first time
+        entries = config_get_number(config_section, "history", 5);
+    } else {
+        long rentries = config_get_number(config_section, "history", history_entries);
+        entries = align_entries_to_pagesize(memory_mode, rentries);
+        if (entries != rentries) entries = config_set_number(config_section, "history", entries);
 
-    if(memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
-        entries = config_set_number(config_section, "history", 10);
-
+        if (memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
+            entries = config_set_number(config_section, "history", 10);
+    }
     int enabled = config_get_boolean(config_section, "enabled", 1);
     if(!enabled) entries = 5;
-
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        entries = config_set_number(config_section, "history", 5);
 
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
@@ -761,7 +769,12 @@ RRDSET *rrdset_create_custom(
     rrdhost_cleanup_obsolete_charts(host);
 
     rrdhost_unlock(host);
-
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting) {
+        aclk_add_collector(host->hostname, plugin, module);
+        aclk_update_chart(host, st->id, ACLK_CMD_CHART);
+    }
+#endif
     return(st);
 }
 

@@ -1,8 +1,15 @@
-# ovpn_status_log
+<!--
+---
+title: "OpenVPN monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ovpn_status_log/README.md
+---
+-->
 
-Module monitor openvpn-status log file.
+# OpenVPN monitoring with Netdata
 
-**Requirements:**
+Parses server log files and provides summary (client, traffic) metrics.
+
+## Requirements
 
 -   If you are running multiple OpenVPN instances out of the same directory, MAKE SURE TO EDIT DIRECTIVES which create output files
     so that multiple instances do not overwrite each other's output files.
@@ -22,7 +29,15 @@ It produces:
     -   in
     -   out
 
-## configuration
+## Configuration
+
+Edit the `python.d/ovpn_status_log.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/ovpn_status_log.conf
+```
 
 Sample:
 

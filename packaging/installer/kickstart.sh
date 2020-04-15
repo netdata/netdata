@@ -109,7 +109,7 @@ run() {
 
 	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
 	escaped_print >&2 "${@}"
-	printf >&2 "${TPUT_RESET}\n"
+	printf >&2 "${TPUT_RESET}"
 
 	"${@}"
 

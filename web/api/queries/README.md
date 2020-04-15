@@ -1,3 +1,10 @@
+<!--
+---
+title: "Database Queries"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/README.md
+---
+-->
+
 # Database Queries
 
 Netdata database can be queried with `/api/v1/data` and `/api/v1/badge.svg` REST API methods.
@@ -83,7 +90,7 @@ To disable alignment, pass `&options=unaligned` to the query.
 
 To execute the query, the engine evaluates all dimensions of the chart, one after another.
 
-The engine does not evaluate dimensions that do not match the [simple pattern](../../../libnetdata/simple_pattern)
+The engine does not evaluate dimensions that do not match the [simple pattern](/libnetdata/simple_pattern/README.md)
 given at the `dimensions` parameter, except when `options=percentage` is given (this option
 requires all the dimensions to be evaluated to find the percentage of each dimension vs to chart
 total).

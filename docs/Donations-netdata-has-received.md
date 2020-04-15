@@ -1,3 +1,10 @@
+<!--
+---
+title: "Donations"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Donations-netdata-has-received.md
+---
+-->
+
 # Donations
 
 This is a list of the donations we have received for Netdata (sorted alphabetically on their name):

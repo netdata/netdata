@@ -295,7 +295,7 @@ void backend_set_prometheus_variables(int *default_port,
 #endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-    *brc = process_prometheus_remote_write_response;
+    *brc = backends_process_prometheus_remote_write_response;
 #endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 }
 
@@ -439,7 +439,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
         return BACKEND_TYPE_JSON;
     }
     else if (!strcmp(type, "prometheus_remote_write")) {
-        return  BACKEND_TYPE_PROMETHEUS;
+        return  BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE;
     }
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
@@ -557,12 +557,12 @@ void *backends_main(void *ptr) {
             backend_set_opentsdb_http_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
-        case BACKEND_TYPE_PROMETHEUS: {
+        case BACKEND_TYPE_PROMETHEUS_REMOTE_WRITE: {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             do_prometheus_remote_write = 1;
 
             http_request_header = buffer_create(1);
-            init_write_request();
+            backends_init_write_request();
 #else
             error("BACKEND: Prometheus remote write support isn't compiled");
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
@@ -578,7 +578,7 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
+            backends_kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
 #else
             error("BACKEND: AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
@@ -596,7 +596,7 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
+            if(likely(!backends_mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
                 backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
                 do_mongodb = 1;
             }
@@ -724,7 +724,7 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
         if(do_prometheus_remote_write)
-            clear_write_request();
+            backends_clear_write_request();
 #endif
         rrd_rdlock();
         RRDHOST *host;
@@ -755,7 +755,7 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             if(do_prometheus_remote_write) {
-                rrd_stats_remote_write_allmetrics_prometheus(
+                backends_rrd_stats_remote_write_allmetrics_prometheus(
                     host
                     , __hostname
                     , global_backend_prefix
@@ -860,18 +860,18 @@ void *backends_main(void *ptr) {
 
                 char error_message[ERROR_LINE_MAX + 1] = "";
 
-                debug(D_BACKEND, "BACKEND: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
+                debug(D_BACKEND, "BACKEND: backends_kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
                       buffer = %zu, record = %zu", destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name,
                       partition_key, buffer_len, record_len);
 
-                kinesis_put_record(kinesis_stream_name, partition_key, first_char, record_len);
+                backends_kinesis_put_record(kinesis_stream_name, partition_key, first_char, record_len);
 
                 sent += record_len;
                 chart_transmission_successes++;
 
                 size_t sent_bytes = 0, lost_bytes = 0;
 
-                if(unlikely(kinesis_get_result(error_message, &sent_bytes, &lost_bytes))) {
+                if(unlikely(backends_kinesis_get_result(error_message, &sent_bytes, &lost_bytes))) {
                     // oops! we couldn't send (all or some of the) data
                     error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
@@ -910,10 +910,10 @@ void *backends_main(void *ptr) {
             while(sent < buffer_len) {
                 const char *first_char = buffer_tostring(b);
 
-                debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
+                debug(D_BACKEND, "BACKEND: backends_mongodb_insert(): uri = %s, database = %s, collection = %s, \
                       buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
-                if(likely(!mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics))) {
+                if(likely(!backends_mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics))) {
                     sent += buffer_len;
                     chart_transmission_successes++;
                     chart_receptions++;
@@ -1048,7 +1048,7 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
                 if(do_prometheus_remote_write) {
-                    size_t data_size = get_write_request_size();
+                    size_t data_size = backends_get_write_request_size();
 
                     if(unlikely(!data_size)) {
                         error("BACKEND: write request size is out of range");
@@ -1057,7 +1057,7 @@ void *backends_main(void *ptr) {
 
                     buffer_flush(b);
                     buffer_need_bytes(b, data_size);
-                    if(unlikely(pack_write_request(b->buffer, &data_size))) {
+                    if(unlikely(backends_pack_write_request(b->buffer, &data_size))) {
                         error("BACKEND: cannot pack write request");
                         continue;
                     }
@@ -1137,7 +1137,7 @@ void *backends_main(void *ptr) {
         if(do_prometheus_remote_write && failures) {
             (void) buffer_on_failures;
             failures = 0;
-            chart_lost_bytes = chart_buffered_bytes = get_write_request_size(); // estimated write request size
+            chart_lost_bytes = chart_buffered_bytes = backends_get_write_request_size(); // estimated write request size
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         } else
@@ -1199,7 +1199,7 @@ void *backends_main(void *ptr) {
 cleanup:
 #if HAVE_KINESIS
     if(do_kinesis) {
-        kinesis_shutdown();
+        backends_kinesis_shutdown();
         freez(kinesis_auth_key_id);
         freez(kinesis_secure_key);
         freez(kinesis_stream_name);
@@ -1209,12 +1209,12 @@ cleanup:
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     buffer_free(http_request_header);
     if(do_prometheus_remote_write)
-        protocol_buffers_shutdown();
+        backends_protocol_buffers_shutdown();
 #endif
 
 #if HAVE_MONGOC
     if(do_mongodb) {
-        mongodb_cleanup();
+        backends_mongodb_cleanup();
         freez(mongodb_uri);
         freez(mongodb_database);
         freez(mongodb_collection);

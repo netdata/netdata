@@ -163,7 +163,8 @@ extern void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
 extern void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 extern void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
                             struct rrdeng_page_descr *descr);
-extern void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty);
+extern void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty,
+                                uint8_t is_exclusive_holder);
 extern usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
                                             usec_t start_time, usec_t end_time);
 extern void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
@@ -185,6 +186,7 @@ extern void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index,
 extern void pg_cache_update_metric_times(struct pg_cache_page_index *page_index);
 extern unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx);
 extern unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx);
+extern unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx);
 
 static inline void
     pg_cache_atomic_get_pg_info(struct rrdeng_page_descr *descr, usec_t *end_timep, uint32_t *page_lengthp)

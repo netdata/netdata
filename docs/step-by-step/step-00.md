@@ -1,3 +1,11 @@
+<!--
+---
+title: "The step-by-step Netdata tutorial"
+date: 2020-03-31
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-00.md
+---
+-->
+
 # The step-by-step Netdata tutorial
 
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.
@@ -11,10 +19,10 @@ completely new to Netdata, or have never tried health monitoring/performance tro
 tutorial is perfect for you.
 
 If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can jump
-straight into code and configurations with our [getting started guide](../getting-started.md).
+straight into code and configurations with our [getting started guide](/docs/getting-started.md).
 
 > This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
-> other supported operating systems, like FreeBSD and MacOS, but we can't make any guarantees.
+> other supported operating systems, like FreeBSD and macOS, but we can't make any guarantees.
 
 ## Where to go if you need help
 
@@ -38,7 +46,7 @@ The easiest way to install Netdata on a Linux system is our `kickstart.sh` one-l
 and let it take care of the rest. 
 
 This script will install Netdata from source, keep it up to date with nightly releases, connects to the Netdata
-[registry](../../registry/README.md), and sends [_anonymous statistics_](../anonymous-statistics.md) about how you use
+[registry](/registry/README.md), and sends [_anonymous statistics_](/docs/anonymous-statistics.md) about how you use
 Netdata. We use this information to better understand how we can improve the Netdata experience for all our users.
 
 ```bash
@@ -49,7 +57,7 @@ Once finished, you'll have Netdata installed, and you'll be set up to get _night
 improvements, and bugfixes.
 
 If this method doesn't work for you, or you want to use a different process, visit our [installation
-documentation](../../packaging/installer/README.md) for details.
+documentation](/packaging/installer/README.md) for details.
 
 ## Netdata fundamentals
 
@@ -98,8 +106,9 @@ you choose. You can even monitor many systems from a single HTML file.
 
 [Step 9. Long-term metrics storage](step-09.md)
 
-Want to store lots of real-time metrics from Netdata? Tweak our custom database to your heart's content. Want to take
-your Netdata metrics elsewhere? We're happy to help you archive data to Prometheus, MongoDB, TimescaleDB, and others.
+By default, Netdata can store lots of real-time metrics, but you can also tweak our custom database engine to your
+heart's content. Want to take your Netdata metrics elsewhere? We're happy to help you archive data to Prometheus,
+MongoDB, TimescaleDB, and others.
 
 [Step 10. Set up a proxy](step-10.md)
 

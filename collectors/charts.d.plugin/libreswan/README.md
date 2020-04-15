@@ -1,6 +1,13 @@
-# libreswan
+<!--
+---
+title: "Libreswan IPSec tunnel monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/libreswan/README.md
+---
+-->
 
-The plugin will collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.
+# Libreswan IPSec tunnel monitoring with Netdata
+
+Collects bytes-in, bytes-out and uptime for all established libreswan IPSEC tunnels.
 
 The following charts are created, **per tunnel**:
 
@@ -13,9 +20,15 @@ The following charts are created, **per tunnel**:
 -   bytes in
 -   bytes out
 
-## configuration
+## Configuration
 
-Its config file is `/etc/netdata/charts.d/libreswan.conf`.
+Edit the `charts.d/libreswan.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d/libreswan.conf
+```
 
 The plugin executes 2 commands to collect all the information it needs:
 

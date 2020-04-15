@@ -8,6 +8,9 @@ SUBDIRS = \
     graphite \
     json \
     opentsdb \
+    prometheus \
+    aws_kinesis \
+    mongodb \
     $(NULL)
 
 dist_noinst_DATA = \

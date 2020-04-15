@@ -1,3 +1,10 @@
+<!--
+---
+title: "Using Netdata with Prometheus"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/prometheus/README.md
+---
+-->
+
 # Using Netdata with Prometheus
 
 > IMPORTANT: the format Netdata sends metrics to prometheus has changed since Netdata v1.7. The new prometheus backend
@@ -12,7 +19,7 @@ are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM
 
 ### Installing Netdata
 
-There are number of ways to install Netdata according to [Installation](../../packaging/installer/). The suggested way
+There are number of ways to install Netdata according to [Installation](/packaging/installer/README.md). The suggested way
 of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
 
 ```sh

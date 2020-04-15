@@ -11,7 +11,7 @@ uniquepath() {
       [ -n "${path}" ] && path="${path}:"
       path="${path}${REPLY}"
     fi
-  done < <(echo "${PATH}" | tr ":" "\\n")
+  done < <(echo "${PATH}" | tr ":" "\n")
 
   [ -n "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
 }
@@ -26,6 +26,12 @@ if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" ] && [ "${INSTALLER_DIR}" != 
 fi
 
 # -----------------------------------------------------------------------------
+# Pull in OpenSSL properly if on macOS
+if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
+  export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+fi
+
+# -----------------------------------------------------------------------------
 # reload the user profile
 
 # shellcheck source=/dev/null
@@ -33,6 +39,28 @@ fi
 
 # make sure /etc/profile does not change our current directory
 cd "${NETDATA_SOURCE_DIR}" || exit 1
+
+# -----------------------------------------------------------------------------
+# set up handling for deferred error messages
+NETDATA_DEFERRED_ERRORS=""
+
+defer_error() {
+  NETDATA_DEFERRED_ERRORS="${NETDATA_DEFERRED_ERRORS}\n* ${1}"
+}
+
+defer_error_highlighted() {
+  NETDATA_DEFERRED_ERRORS="${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_DEFERRED_ERRORS}\n* ${1}${TPUT_RESET}"
+}
+
+print_deferred_errors() {
+  if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
+    echo >&2
+    echo >&2 "The following non-fatal errors were encountered during the installation process:"
+    # shellcheck disable=SC2059
+    printf >&2 "${NETDATA_DEFERRED_ERRORS}"
+    echo >&2
+  fi
+}
 
 # -----------------------------------------------------------------------------
 # load the required functions
@@ -45,9 +73,11 @@ else
   source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
-download_go() {
+download_tarball() {
   url="${1}"
   dest="${2}"
+  name="${3}"
+  opt="${4}"
 
   if command -v curl > /dev/null 2>&1; then
     run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
@@ -55,12 +85,16 @@ download_go() {
     run wget -T 15 -O - "${url}" > "${dest}"
   else
     echo >&2
-    echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
-    echo >&2 "Either add packages or disable it by issuing '--disable-go' in the installer"
+    echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
+    echo >&2 "Either add packages or disable it by issuing '--disable-${opt}' in the installer"
     echo >&2
 
     run_failed "I need curl or wget to proceed, but neither is available on this system."
   fi
+}
+
+download_go() {
+  download_tarball "${1}" "${2}" "go.d plugin" "go"
 }
 
 # make sure we save all commands we run
@@ -84,19 +118,20 @@ renice 19 $$ > /dev/null 2> /dev/null
 LDFLAGS="${LDFLAGS}"
 CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
+ACLK="${ACLK}"
 
 # keep a log of this command
 # shellcheck disable=SC2129
-printf "\\n# " >> netdata-installer.log
+printf "\n# " >> netdata-installer.log
 date >> netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >> netdata-installer.log
 printf 'LDFLAGS="%s" ' "${LDFLAGS}" >> netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >> netdata-installer.log
-printf "\\n" >> netdata-installer.log
+printf "\n" >> netdata-installer.log
 
 REINSTALL_OPTIONS="$(
   printf "%s" "${*}"
-  printf "\\n"
+  printf "\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' | sed 's/--dont-start-it//g')"
@@ -157,6 +192,9 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
+  --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
+  --disable-cloud            Disable all Netdata Cloud functionality.
+  --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -241,6 +279,23 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
+    "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
+    "--disable-cloud")
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+        echo "Cloud explicitly enabled, ignoring --disable-cloud."
+      else
+        NETDATA_DISABLE_CLOUD=1
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
+      fi
+      ;;
+    "--require-cloud")
+      if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+        echo "Cloud explicitly disabled, ignoring --require-cloud."
+      else
+        NETDATA_REQUIRE_CLOUD=1
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-cloud/} --enable-cloud"
+      fi
+      ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
       shift 1
@@ -412,6 +467,147 @@ if [ ${LIBS_ARE_HERE} -eq 1 ]; then
 fi
 
 trap build_error EXIT
+
+# -----------------------------------------------------------------------------
+
+build_libmosquitto() {
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+}
+
+copy_libmosquitto() {
+  target_dir="${PWD}/externaldeps/mosquitto"
+
+  run mkdir -p "${target_dir}"
+
+  run cp "${1}/lib/libmosquitto.a" "${target_dir}"
+  run cp "${1}/lib/mosquitto.h" "${target_dir}"
+}
+
+bundle_libmosquitto() {
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+    echo "Skipping cloud"
+    return 0
+  fi
+
+  if [ "$(uname)" != "Linux" ]; then
+    echo >&2 " Sorry NetData with custom libmosquitto is unsupported on $(uname) at this time!"
+    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
+    return 0
+  fi
+
+  progress "Prepare custom libmosquitto version"
+
+  MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
+
+  tmp="$(mktemp -d -t netdata-mosquitto-XXXXXX)"
+  MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "mosquitto" \
+                     "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" \
+                     "${MOSQUITTO_PACKAGE_BASENAME}" \
+                     "${tmp}" \
+                     "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"
+  then
+    if run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}" && \
+       build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && \
+       copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "libmosquitto built and prepared."
+    else
+      run_failed "Failed to build libmosquitto."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+        exit 1
+      else
+        defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libmosquitto."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
+    fi
+  fi
+}
+
+bundle_libmosquitto
+
+# -----------------------------------------------------------------------------
+
+build_libwebsockets() {
+  pushd "${1}" > /dev/null || exit 1
+  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make
+  popd > /dev/null || exit 1
+}
+
+copy_libwebsockets() {
+  target_dir="${PWD}/externaldeps/libwebsockets"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/lib/libwebsockets.a" "${target_dir}/libwebsockets.a" || return 1
+  run cp -r "${1}/include" "${target_dir}" || return 1
+}
+
+bundle_libwebsockets() {
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ] ; then
+    run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
+    return 0
+  fi
+
+  progress "Prepare libwebsockets"
+
+  LIBWEBSOCKETS_PACKAGE_VERSION="$(cat packaging/libwebsockets.version)"
+
+  tmp="$(mktemp -d -t netdata-libwebsockets-XXXXXX)"
+  LIBWEBSOCKETS_PACKAGE_BASENAME="v${LIBWEBSOCKETS_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "libwebsockets" \
+                      "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+                      "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"
+  then
+    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" && \
+       build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
+       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
+       rm -rf "${tmp}"
+    then
+      run_ok "libwebsockets built and prepared."
+    else
+      run_failed "Failed to build libwebsockets."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libwebsockets."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
+    fi
+  fi
+}
+
+bundle_libwebsockets
+
+# -----------------------------------------------------------------------------
+# If we have the dashboard switching logic, make sure we're on the classic
+# dashboard during the install (updates don't work correctly otherwise).
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ] ; then
+  "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
+fi
 
 # -----------------------------------------------------------------------------
 echo >&2
@@ -782,6 +978,11 @@ if [ "${UID}" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+  fi
+
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
@@ -791,7 +992,6 @@ if [ "${UID}" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
   fi
-
 else
   # non-privileged user installation
   run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_LOG_DIR}"
@@ -802,7 +1002,122 @@ fi
 
 # -----------------------------------------------------------------------------
 
+copy_react_dashboard() {
+  run rm -rf "${NETDATA_WEB_DIR}-react"
+  run rm -rf "${NETDATA_WEB_DIR}-classic"
+  run cp -a "${1}/" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/dashboard_info.js" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/dashboard.slate.css" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/dashboard.css" "${NETDATA_WEB_DIR}-react"
+  run cp -a "${NETDATA_WEB_DIR}/main.css" "${NETDATA_WEB_DIR}-react"
+  run echo "$(cd ${NETDATA_WEB_DIR}-react && find . -type f | sed -e 's/\.\///')" > "${NETDATA_WEB_DIR}-react/.files"
+  run cp -a "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
+  run echo "$(find web/gui -type f | sed -e "s/web\/gui\///")" > "${NETDATA_WEB_DIR}-classic/.files"
+  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
+}
+
+install_react_dashboard() {
+  progress "Fetching and installing dashboard"
+
+  DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
+
+  tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
+  DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
+
+  if fetch_and_verify "dashboard" \
+                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${DASHBOARD_PACKAGE_BASENAME}" \
+                      "${tmp}" \
+                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
+  then
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
+       copy_react_dashboard "${tmp}/build" && \
+       rm -rf "${tmp}"
+    then
+      if run "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-switch-dashboard.sh" "${NETDATA_SELECTED_DASHBOARD:-react}" ; then
+        run_ok "React dashboard installed."
+      else
+        run_failed "Failed to switch to React dashboard."
+        run rm -rf "${NETDATA_WEB_DIR}"
+        run cp -a "${NETDATA_WEB_DIR}-classic" "${NETDATA_WEB_DIR}"
+      fi
+    else
+      run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+    fi
+  else
+    run_failed "Unable to fetch React dashboard. The install process will continue, but you will not be able to use the new dashboard."
+  fi
+}
+
+install_react_dashboard
+
+# -----------------------------------------------------------------------------
+
+# govercomp compares go.d.plugin versions. Exit codes:
+# 0 - version1 == version2
+# 1 - version1 > version2
+# 2 - version2 > version1
+# 3 - error
+govercomp() {
+  # version in file:
+  # - v0.14.0
+  #
+  # 'go.d.plugin -v' output variants:
+  # - go.d.plugin, version: unknown
+  # - go.d.plugin, version: v0.14.1
+  # - go.d.plugin, version: v0.14.1-dirty
+  # - go.d.plugin, version: v0.14.1-1-g4c5f98c
+  # - go.d.plugin, version: v0.14.1-1-g4c5f98c-dirty
+
+  # we need to compare only MAJOR.MINOR.PATCH part
+  local ver1 ver2
+  ver1=$(echo "$1" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
+  ver2=$(echo "$2" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
+
+  local IFS=.
+  read -ra ver1 <<< "$ver1"
+  read -ra ver2 <<< "$ver2"
+
+  if [ ${#ver1[@]} -eq 0 ] || [ ${#ver2[@]} -eq 0 ]; then
+    return 3
+  fi
+
+  local i
+  for ((i = 0; i < ${#ver1[@]}; i++)); do
+    if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
+      return 1
+    elif [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
+      return 2
+    fi
+  done
+
+  return 0
+}
+
+should_install_go() {
+  if [ -n "${NETDATA_DISABLE_GO+x}" ]; then
+    return 1
+  fi
+
+  local version_in_file
+  local binary_version
+
+  version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
+  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
+
+  govercomp "$version_in_file" "$binary_version"
+  case $? in
+    0) return 1 ;; # =
+    2) return 1 ;; # <
+    *) return 0 ;; # >, error
+  esac
+}
+
 install_go() {
+  if ! should_install_go; then
+    return 0
+  fi
+
   # When updating this value, ensure correct checksums in packaging/go.d.checksums
   GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
   ARCH_MAP=(
@@ -816,74 +1131,258 @@ install_go() {
     'armv5tel::arm'
   )
 
-  if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
-    progress "Install go.d.plugin"
-    ARCH=$(uname -m)
-    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+  progress "Install go.d.plugin"
+  ARCH=$(uname -m)
+  OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-    for index in "${ARCH_MAP[@]}"; do
-      KEY="${index%%::*}"
-      VALUE="${index##*::}"
-      if [ "$KEY" = "$ARCH" ]; then
-        ARCH="${VALUE}"
-        break
-      fi
-    done
-    tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-    GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
-
-    if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" ]; then
-      download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
-    else
-      progress "Using provided go.d tarball ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}"
-      run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" "${tmp}/${GO_PACKAGE_BASENAME}"
+  for index in "${ARCH_MAP[@]}"; do
+    KEY="${index%%::*}"
+    VALUE="${index##*::}"
+    if [ "$KEY" = "$ARCH" ]; then
+      ARCH="${VALUE}"
+      break
     fi
+  done
+  tmp="$(mktemp -d -t netdata-go-XXXXXX)"
+  GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
-    if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" ]; then
-      download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
-    else
-      progress "Using provided config file for go.d ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}"
-      run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" "${tmp}/config.tar.gz"
-    fi
-
-    if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
-      run_failed "go.d plugin download failed, go.d plugin will not be available"
-      echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
-      echo >&2
-      return 0
-    fi
-
-    grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
-    grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2> /dev/null
-
-    # Checksum validation
-    if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
-
-      echo >&2 "go.d plugin checksum validation failure."
-      echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
-      echo >&2
-
-      run_failed "go.d.plugin package files checksum validation failed."
-      return 0
-    fi
-
-    # Install new files
-    run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
-    run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
-    run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
-    run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
-
-    run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-    run mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-    if [ "${UID}" -eq 0 ]; then
-      run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-    fi
-    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-    rm -rf "${tmp}"
+  if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" ]; then
+    download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
+  else
+    progress "Using provided go.d tarball ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}"
+    run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" "${tmp}/${GO_PACKAGE_BASENAME}"
   fi
+
+  if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" ]; then
+    download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+  else
+    progress "Using provided config file for go.d ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}"
+    run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" "${tmp}/config.tar.gz"
+  fi
+
+  if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
+    run_failed "go.d plugin download failed, go.d plugin will not be available"
+    defer_error "go.d plugin download failed, go.d plugin will not be available"
+    echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+    echo >&2
+    return 0
+  fi
+
+  grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
+  grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2> /dev/null
+
+  # Checksum validation
+  if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+
+    echo >&2 "go.d plugin checksum validation failure."
+    echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+    echo >&2
+
+    run_failed "go.d.plugin package files checksum validation failed."
+    defer_error "go.d.plugin package files checksum validation failed, go.d.plugin will not be available"
+    return 0
+  fi
+
+  # Install new files
+  run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
+  run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
+  run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
+  run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
+
+  run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
+  run mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  if [ "${UID}" -eq 0 ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  fi
+  run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  rm -rf "${tmp}"
   return 0
 }
+
 install_go
+
+function get_kernel_version() {
+  r="$(uname -r | cut -f 1 -d '-')"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+    echo >&2 " ERROR: Cannot detect a supported libc on your system!"
+    return 1
+  fi
+  echo "${libc}"
+  return 0
+}
+
+get_compatible_kernel_for_ebpf() {
+  kver="${1}"
+
+  # XXX: Logic taken from Slack discussion in #ebpf
+  # everything that has a version <= 4.14 can use the code built to 4.14
+  # also all distributions that has a version <= 4.15.256 can use the code built to 4.15
+  # Continue the logic, everything that has a version < 4.19.102 and >= 4.15 can use the code built to 4.19
+  # Kernel 4.19 had a feature added in the version 4.19.102 that force us to break it in two, so version >= 4.19.102
+  # and smaller than < 5.0 runs with code built to 4.19.102
+  # Finally,  everybody that is using 5.X can use what is compiled with 5.4
+
+  kpkg=
+
+  if [ "${kver}" -ge 005000000 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
+    kpkg="5_4_20"
+  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
+    kpkg="4_19_104"
+  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
+    kpkg="4_19_98"
+  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
+    kpkg="4_15_18"
+  elif [ "${kver}" -le 004014999 ]; then
+    echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
+    kpkg="4_14_171"
+  else
+    echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
+    return 1
+  fi
+
+  echo "${kpkg}"
+  return 0
+}
+
+should_install_ebpf() {
+  if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
+    run_failed "ebpf not enabled. --enable-ebpf to enable"
+    return 1
+  fi
+
+  if [ "$(uname)" != "Linux" ]; then
+    echo >&2 " Sorry eBPF Collector is currently unsupproted on $(uname) Systems at this time."
+    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
+    return 1
+  fi
+
+  # Get and Parse Kernel Version
+  kver="$(get_kernel_version)"
+  kver="${kver:-0}"
+
+  # Check Kernel Compatibility
+  if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
+    echo >&2 " Detected Kernel: ${kver}"
+    run_failed "Kernel incompatible. Please contact NetData support!"
+    return 1
+  fi
+
+  # Check Kernel Config
+
+  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
+
+  echo >&2 " Downloading check-kernel-config.sh ..."
+  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
+    run_failed "Failed to download check-kernel-config.sh"
+    echo 2>&" Removing temporary directory ${tmp} ..."
+    rm -rf "${tmp}"
+    return 1
+  fi
+
+  run chmod +x "${tmp}"/check-kernel-config.sh
+
+  if ! run "${tmp}"/check-kernel-config.sh; then
+    run_failed "Kernel unsupported or missing required config"
+    return 1
+  fi
+
+  rm -rf "${tmp}"
+
+  # TODO: Check for current vs. latest version
+
+  return 0
+}
+
+install_ebpf() {
+  if ! should_install_ebpf; then
+    return 0
+  fi
+
+  progress "Installing eBPF plugin"
+
+  # Get and Parse Kernel Version
+  kver="$(get_kernel_version)"
+  kver="${kver:-0}"
+
+  # Get Compatible eBPF Kernel Package
+  kpkg="$(get_compatible_kernel_for_ebpf "${kver}")"
+
+  # Detect libc
+  libc="$(detect_libc)"
+
+  PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
+
+  echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
+
+  PACKAGE_TARBALL_URL=
+  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | grep -o -E "\"browser_download_url\": \".*${PACKAGE_TARBALL}\"" | sed -e 's/"browser_download_url": "\(.*\)"/\1/')"
+
+  if [ -z "${PACKAGE_TARBALL_URL}" ]; then
+    run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
+    return 1
+  fi
+
+  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
+
+  echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
+  if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
+    run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
+    echo 2>&" Removing temporary directory ${tmp} ..."
+    rm -rf "${tmp}"
+    return 1
+  fi
+
+  echo >&2 " Extracting ${PACKAGE_TARBALL} ..."
+  tar -xf "${tmp}/${PACKAGE_TARBALL}" -C "${tmp}"
+
+  echo >&2 " Finding suitable lib directory ..."
+  libdir=
+  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
+  if [ -z "${libdir}" ]; then
+    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
+  fi
+
+  if [ -z "${libdir}" ]; then
+    run_failed "Could not find a suitable lib directory"
+    return 1
+  fi
+
+  run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
+  run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
+  run ln -v -f -s "${libdir}"/libbpf_kernel.so "${libdir}"/libbpf_kernel.so.0
+  run ldconfig
+
+  echo >&2 "ePBF installation all done!"
+  rm -rf "${tmp}"
+
+  return 0
+}
+
+progress "eBPF Kernel Collector (opt-in)"
+install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
@@ -1102,6 +1601,7 @@ REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
+NETDATA_SELECTED_DASHBOARD="${NETDATA_SELECTED_DASHBOARD:-react}"
 EOF
 run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 
@@ -1109,6 +1609,8 @@ echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
 cat << EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
 new_installation
 EOF
+
+print_deferred_errors
 
 # -----------------------------------------------------------------------------
 echo >&2

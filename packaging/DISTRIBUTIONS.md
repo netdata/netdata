@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata distribution support matrix"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/DISTRIBUTIONS.md
+---
+-->
+
 # Netdata distribution support matrix
 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
@@ -29,7 +36,6 @@ have complete visibility over the range of support.
 | 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10007; | &#63; | &#10007; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 18.04.2 LTS (Bionic Beaver) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| 19.04 (Disco Dingo) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 19.10 (Eoan Ermine) Latest | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | Debian 8 (Jessie) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | Debian 9 (Stretch) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
@@ -37,15 +43,13 @@ have complete visibility over the range of support.
 | Versions 6.x | RHEL |  &#10007; | &#63; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | Versions 7.x | RHEL | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | Versions 8.x | RHEL |  &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| Fedora 29 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | Fedora 30 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | Fedora 31 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | CentOS 6.x | Cent OS | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
 | CentOS 7.x | Cent OS | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | CentOS 8.x | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| OpenSuSE Leap 15.0 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| OpenSuSE Leap 15.1 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| OpenSuSE Tumbleweed | Open SuSE | &#10004; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10004; | &#63;
+| openSUSE Leap 15.1 | openSUSE | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
+| openSUSE Tumbleweed | openSUSE | &#10004; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10004; | &#63;
 | SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | SLES 12 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
@@ -60,7 +64,6 @@ have complete visibility over the range of support.
 | 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10007; | &#63; | &#10007; | &#10007; | N/A | &#10004; | &#10004; | &#10007; | &#63;
 | 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10007; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10007; | &#63;
 | 18.04.2 LTS (Bionic Beaver) | Ubuntu | &#10007; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10007; | &#63;
-| 19.04 (Disco Dingo) | Ubuntu | &#10007; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10007; | &#63;
 | 19.10 (Enoan Ermine) Latest | Ubuntu | &#10007; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10007; | &#10004; | &#63;
 | Debian 8 (Jessie) | Debian | &#10007; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10007; | &#63;
 | Debian 9 (Stretch) | Debian | &#10007; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10007; | &#63;
@@ -68,15 +71,13 @@ have complete visibility over the range of support.
 | Versions 6.x | RHEL |  &#10007; | &#63; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#10007; | &#63;
 | Versions 7.x | RHEL | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | Versions 8.x | RHEL |  &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| Fedora 29 | Fedora | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | Fedora 30 | Fedora | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | Fedora 31 | Fedora | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10007; | &#10007; | &#10007; | &#63;
 | CentOS 6.x | Cent OS | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | CentOS 7.x | Cent OS | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | CentOS 8.x | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| OpenSuSE Leap 15.0 | Open SuSE | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
-| OpenSuSE Leap 15.1 | Open SuSE | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
-| OpenSuSE Tumbleweed | Open SuSE | &#10007; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10007; | &#63;
+| openSUSE Leap 15.1 | openSUSE | &#10007; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
+| openSUSE Tumbleweed | openSUSE | &#10007; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10007; | &#63;
 | SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10007; | &#63;
 | SLES 12 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10007; | &#63;
 | SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10007; | &#63;
@@ -162,7 +163,7 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 
 |make/make install|netdata-installer.sh|kickstart.sh|kickstart-static64.sh|Docker image|RPM packaging|DEB packaging|
 |:---------------:|:------------------:|:----------:|:-------------------:|:----------:|:-----------:|:-----------:|
-|Auto-detect|Auto-detect|Auto-detect|Auto-detect|No|YES|YES|
+|Auto-detect|Auto-detect|Auto-detect|Auto-detect|YES|YES|YES|
 
 -   **Flags/instructions to enable**: None
 -   **Flags to disable from source**: --disable-plugin-freeipmi

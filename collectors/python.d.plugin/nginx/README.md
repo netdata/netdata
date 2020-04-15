@@ -1,8 +1,15 @@
-# nginx
+<!--
+---
+title: "NGINX monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nginx/README.md
+---
+-->
 
-This module will monitor one or more nginx servers depending on configuration. Servers can be either local or remote.
+# NGINX monitoring with Netdata
 
-**Requirements:**
+Monitors one or more NGINX servers depending on configuration. Servers can be either local or remote.
+
+## Requirements
 
 -   nginx with configured 'ngx_http_stub_status_module'
 -   'location /stub_status'
@@ -30,9 +37,17 @@ It produces following charts:
     -   accepts
     -   handled
 
-## configuration
+## Configuration
 
-Needs only `url` to server's `stub_status`
+Edit the `python.d/nginx.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/nginx.conf
+```
+
+Needs only `url` to server's `stub_status`.
 
 Here is an example for local server:
 

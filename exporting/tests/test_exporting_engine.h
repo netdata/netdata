@@ -10,6 +10,18 @@
 #include "exporting/json/json.h"
 #include "exporting/opentsdb/opentsdb.h"
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+#include "exporting/prometheus/remote_write/remote_write.h"
+#endif
+
+#if HAVE_KINESIS
+#include "exporting/aws_kinesis/aws_kinesis.h"
+#endif
+
+#if HAVE_MONGOC
+#include "exporting/mongodb/mongodb.h"
+#endif
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -79,7 +91,14 @@ int __wrap_prepare_buffers(struct engine *engine);
 
 int __wrap_notify_workers(struct engine *engine);
 
-int __wrap_send_internal_metrics(struct engine *engine);
+void __real_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
+void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
+
+void __real_send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
+void __wrap_send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
+
+int __real_send_internal_metrics(struct instance *instance);
+int __wrap_send_internal_metrics(struct instance *instance);
 
 int __real_rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int __wrap_rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
@@ -95,6 +114,56 @@ int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
 
+void *__real_init_write_request();
+void *__wrap_init_write_request();
+
+void __real_add_host_info(
+    void *write_request_p,
+    const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp);
+void __wrap_add_host_info(
+    void *write_request_p,
+    const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp);
+
+void __real_add_label(void *write_request_p, char *key, char *value);
+void __wrap_add_label(void *write_request_p, char *key, char *value);
+
+void __real_add_metric(
+    void *write_request_p,
+    const char *name, const char *chart, const char *family, const char *dimension,
+    const char *instance, const double value, const int64_t timestamp);
+void __wrap_add_metric(
+    void *write_request_p,
+    const char *name, const char *chart, const char *family, const char *dimension,
+    const char *instance, const double value, const int64_t timestamp);
+
+void __wrap_aws_sdk_init();
+void __wrap_kinesis_init(
+    void *kinesis_specific_data_p, const char *region, const char *access_key_id, const char *secret_key,
+    const long timeout);
+void __wrap_kinesis_put_record(
+    void *kinesis_specific_data_p, const char *stream_name, const char *partition_key, const char *data,
+    size_t data_len);
+int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes);
+
+void __wrap_mongoc_init();
+mongoc_uri_t *__wrap_mongoc_uri_new_with_error(const char *uri_string, bson_error_t *error);
+int32_t __wrap_mongoc_uri_get_option_as_int32(const mongoc_uri_t *uri, const char *option, int32_t fallback);
+bool __wrap_mongoc_uri_set_option_as_int32(const mongoc_uri_t *uri, const char *option, int32_t value);
+mongoc_client_t *__wrap_mongoc_client_new_from_uri(const mongoc_uri_t *uri);
+bool __wrap_mongoc_client_set_appname(mongoc_client_t *client, const char *appname);
+mongoc_collection_t *
+__wrap_mongoc_client_get_collection(mongoc_client_t *client, const char *db, const char *collection);
+mongoc_collection_t *
+__real_mongoc_client_get_collection(mongoc_client_t *client, const char *db, const char *collection);
+void __wrap_mongoc_uri_destroy(mongoc_uri_t *uri);
+bool __wrap_mongoc_collection_insert_many(
+    mongoc_collection_t *collection,
+    const bson_t **documents,
+    size_t n_documents,
+    const bson_t *opts,
+    bson_t *reply,
+    bson_error_t *error);
+
 // -----------------------------------------------------------------------
 // fixtures
 
@@ -104,6 +173,8 @@ int setup_rrdhost();
 int teardown_rrdhost();
 int setup_initialized_engine(void **state);
 int teardown_initialized_engine(void **state);
+int setup_prometheus(void **state);
+int teardown_prometheus(void **state);
 
 void init_connectors_in_tests(struct engine *engine);
 

@@ -3,23 +3,6 @@
 #include "opentsdb.h"
 
 /**
- * Initialize OpenTSDB connector
- *
- * @param instance a connector data structure.
- * @return Always returns 0.
- */
-int init_opentsdb_connector(struct connector *connector)
-{
-    connector->worker = simple_connector_worker;
-
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
-    connector->config.connector_specific_config = (void *)connector_specific_config;
-    connector_specific_config->default_port = 4242;
-
-    return 0;
-}
-
-/**
  * Initialize OpenTSDB telnet connector instance
  *
  * @param instance an instance data structure.
@@ -27,6 +10,12 @@ int init_opentsdb_connector(struct connector *connector)
  */
 int init_opentsdb_telnet_instance(struct instance *instance)
 {
+    instance->worker = simple_connector_worker;
+
+    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    instance->config.connector_specific_config = (void *)connector_specific_config;
+    connector_specific_config->default_port = 4242;
+
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_telnet;
     instance->start_chart_formatting = NULL;
@@ -38,7 +27,10 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = NULL;
+    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+
+    instance->send_header = NULL;
+    instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {
@@ -59,6 +51,12 @@ int init_opentsdb_telnet_instance(struct instance *instance)
  */
 int init_opentsdb_http_instance(struct instance *instance)
 {
+    instance->worker = simple_connector_worker;
+
+    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    instance->config.connector_specific_config = (void *)connector_specific_config;
+    connector_specific_config->default_port = 4242;
+
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
     instance->start_chart_formatting = NULL;
@@ -70,7 +68,10 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = NULL;
+    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+
+    instance->send_header = NULL;
+    instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {
@@ -145,7 +146,7 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->connector->engine;
+    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -186,7 +187,7 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
  */
 int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->connector->engine;
+    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -293,7 +294,7 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->connector->engine;
+    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -347,7 +348,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
  */
 int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->connector->engine;
+    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 

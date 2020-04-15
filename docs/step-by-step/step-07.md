@@ -1,9 +1,16 @@
+<!--
+---
+title: "Step 7. Netdata's dashboard in depth"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-07.md
+---
+-->
+
 # Step 7. Netdata's dashboard in depth
 
 Welcome to the seventh step of the Netdata guide!
 
 This step of the guide aims to get you more familiar with the features of the dashboard not previously mentioned in
-[step 2](step-02.md).
+[step 2](/docs/step-by-step/step-02.md).
 
 ## What you'll learn in this step
 
@@ -53,9 +60,9 @@ modal](https://user-images.githubusercontent.com/12263278/64876743-be957a00-d647
 
 If an update is available, you'll see a modal similar to the one above.
 
-When you use the [automatic one-line installer script](../../packaging/installer/README.md) attempt to update every day.
-If you choose to update it manually, there are [several well-documented methods](../../packaging/installer/UPDATE.md) to
-achieve that. However, it is best practice for you to first go over the [changelog](../../CHANGELOG.md).
+When you use the [automatic one-line installer script](/packaging/installer/README.md) attempt to update every day. If
+you choose to update it manually, there are [several well-documented methods](/packaging/installer/UPDATE.md) to achieve
+that. However, it is best practice for you to first go over the [changelog](/CHANGELOG.md).
 
 ## Export and import a snapshot
 

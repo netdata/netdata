@@ -1,8 +1,15 @@
-# smartd_log
+<!--
+---
+title: "Storage devices monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/smartd_log/README.md
+---
+-->
 
-Module monitor `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
+# Storage devices monitoring with Netdata
 
-**Requirements:**
+Monitors `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
+
+## Requirements
 
 -   `smartmontools`
 
@@ -97,7 +104,15 @@ Otherwise, all the smartd `.csv` files may get written to `/var/lib/smartmontool
 
 `smartd` appends logs at every run. It's strongly recommended to use `logrotate` for smartd files.
 
-## configuration
+## Configuration
+
+Edit the `python.d/smartd_log.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/smartd_log.conf
+```
 
 ```yaml
 local:

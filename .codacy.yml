@@ -13,3 +13,4 @@ exclude_paths:
   - web/gui/src/**
   - web/gui/main.js
   - tests/**
+  - aclk/tests/**

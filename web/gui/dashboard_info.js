@@ -190,6 +190,11 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
+    'aclk_test': {
+        title: 'ACLK Test Generator',
+        info: 'For internal use to perform integration testing.'
+    },
+
     'example': {
         title: 'Example Charts',
         info: 'Example charts, demonstrating the external plugin architecture.'
@@ -540,8 +545,25 @@ netdataDashboard.menu = {
         title: 'CockroachDB',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance and health statistics for various <code>CockroachDB</code> components.'
-    }
+    },
 
+    'ebpf': {
+        title: 'eBPF',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Monitor system calls, internal functions, bytes read, bytes written and errors using <code>eBPF</code>.'
+    },
+
+    'vernemq': {
+        title: 'VerneMQ',
+        icon: '<i class="fas fa-comments"></i>',
+        info: 'Performance data for the <b><a href="https://vernemq.com/">VerneMQ</a></b> open-source MQTT broker.'
+    },
+
+    'pulsar': {
+        title: 'Pulsar',
+        icon: '<i class="fas fa-comments"></i>',
+        info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
+    },
 };
 
 
@@ -1396,6 +1418,14 @@ netdataDashboard.context = {
             '<li><strong>pg_replslot_files:</strong> files present in pg_replslot.</li>' +
             '</ul>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.'
+    },
+    'postgres.backend_usage': {
+        info: 'Connections usage against maximum connections allowed, as defined in the <i>max_connections</i> setting.<ul>' +
+            '<li><strong>available:</strong> maximum new connections allowed.</li>' +
+            '<li><strong>used:</strong> connections currently in use.</li>' +
+            '</ul>' +
+            'Assuming non-superuser accounts are being used to connect to Postgres (so <i>superuser_reserved_connections</i> are subtracted from <i>max_connections</i>).<br/>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/runtime-config-connection.html" target="_blank">Connections and Authentication</a>.'
     },
 
 
@@ -3012,4 +3042,369 @@ netdataDashboard.context = {
         info: 'Size of metric samples written to disk.'
     },
 
+    // ------------------------------------------------------------------------
+    // eBPF
+
+    'ebpf.file_descriptor': {
+        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function \'do_sys_open\', that is the common function called from open(2) and openat(2). The close dimension is attached to the function \'__close_fd\', that is called from system call close(2).'
+    },
+
+    'ebpf.file_error': {
+        info: 'File error shows the number of calls that returned an error when called per period.'
+    },
+
+    'ebpf.deleted_objects': {
+        info: 'Deleted objects monitors calls to the function \'vfs_unlink\'. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
+    },
+
+    'ebpf.io': {
+        info: 'IO shows the number of calls for functions \'vfs_read\' and \'vfs_write\' independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
+    },
+
+    'ebpf.io_bytes': {
+        info: 'IO bytes shows the total of bytes read or written with success using the functions  \'vfs_read\' and \'vfs_write\'.'
+    },
+
+    'ebpf.io_error': {
+        info: 'IO error shows the number of calls for \'vfs_read\' and \'vfs_write\' that did not have success.'
+    },
+
+    'ebpf.process_thread': {
+        info: 'Process thread counts the number of times that the function \'do_fork\' was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for \'sys_clone\' that has the flag \'CLONE_THREAD\' set.'
+    },
+
+    'ebpf.exit': {
+        info: 'Exit count the number of calls for the functions responsible to close (\'do_exit\') and release(\'release_task\') tasks.'
+    },
+
+    'ebpf.task_error': {
+        info: 'Task error count the number of errors to create a new process or thread.'
+    },
+
+    'ebpf.process_status': {
+        info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
+    },
+
+    // ------------------------------------------------------------------------
+    // VerneMQ
+
+    'vernemq.sockets': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="open_sockets"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Connected Clients"'
+                    + ' data-units="clients"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'vernemq.queue_processes': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_processes"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Queues Processes"'
+                    + ' data-units="processes"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'vernemq.queue_messages_in_queues': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_messages_current"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Messages in the Queues"'
+                    + ' data-units="messages"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'vernemq.queue_messages': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_message_in"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="MQTT Recieve Rate"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="queue_message_out"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="MQTT Send Rate"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ]
+    },
+    'vernemq.average_scheduler_utilization': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="system_utilization"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Average Scheduler Utilization"'
+                    + ' data-units="percentage"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="16%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    // ------------------------------------------------------------------------
+    // Apache Pulsar
+    'pulsar.messages_rate': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_rate_in"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Publish"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_rate_out"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Dispatch"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ]
+    },
+    'pulsar.subscription_msg_rate_redeliver': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_subscription_msg_rate_redeliver"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Redelivered"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.subscription_blocked_on_unacked_messages': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_subscription_blocked_on_unacked_messages"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Blocked On Unacked"'
+                    + ' data-units="subscriptions"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.msg_backlog': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="pulsar_msg_backlog"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Messages Backlog"'
+                    + ' data-units="messages"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'pulsar.namespace_messages_rate': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="publish"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Publish"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="dispatch"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Dispatch"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ]
+    },
+    'pulsar.namespace_subscription_msg_rate_redeliver': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="redelivered"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Redelivered"'
+                    + ' data-units="messages/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.namespace_subscription_blocked_on_unacked_messages': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="blocked"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Blocked On Unacked"'
+                    + ' data-units="subscriptions"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'pulsar.namespace_msg_backlog': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="backlog"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-title="Messages Backlog"'
+                    + ' data-units="messages"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="14%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            },
+        ],
+    },
 };

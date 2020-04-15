@@ -17,6 +17,9 @@
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+# Redefine centos_ver to standardize on a single macro
+%{?rhel:%global centos_ver %rhel}
+
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
@@ -87,7 +90,7 @@ Version:	%{version}
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/netdata/%{name}/releases/download/v%{version}/%{name}-v%{version}.tar.gz
+Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
 
 # #####################################################################
@@ -99,13 +102,14 @@ URL:		http://my-netdata.io
 BuildRequires: gcc
 BuildRequires: gcc-c++
 BuildRequires: make
-BuildRequires: git
+BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
 BuildRequires: autogen
 %endif
 BuildRequires: automake
+BuildRequires: cmake
 BuildRequires: pkgconfig
 BuildRequires: curl
 BuildRequires: findutils
@@ -116,12 +120,10 @@ BuildRequires: openssl-devel
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
-BuildRequires: netcat-openbsd
 BuildRequires: json-glib-devel
 %else
 BuildRequires: Judy-devel
 BuildRequires: lz4-devel
-BuildRequires: nc
 BuildRequires: json-c-devel
 %endif
 
@@ -231,6 +233,8 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-%{version}
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 
 %build
 # Conf step
@@ -275,6 +279,10 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
+# Install ebpf_process.plugin
+install -m 4750 -p ebpf_process.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf_process.plugin"
+
+# ###########################################################
 # Install cups.plugin
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
@@ -283,6 +291,11 @@ install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 # ###########################################################
 # Install slabinfo.plugin
 install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/slabinfo.plugin"
+
+# ###########################################################
+# Install cache and log directories
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/cache/%{name}"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/log/%{name}"
 
 # ###########################################################
 # Install registry directory
@@ -392,7 +405,7 @@ install_go() {
 	return 0
 }
 install_go
-install -m 0750 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
 %pre
 
@@ -514,6 +527,11 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Thu Feb 13 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-13
+- Add handling for custom libmosquitto fork
+* Wed Jan 01 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-12
+- Add explicit installation of log and cache directories
+- Clean up build dependencies.
 * Thu Dec 19 2019 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-11
 - Fix remaining ownership and permissions issues.
 * Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10

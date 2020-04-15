@@ -1,3 +1,10 @@
+<!--
+---
+title: "double exponential smoothing"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/des/README.md
+---
+-->
+
 # double exponential smoothing
 
 Exponential smoothing is one of many window functions commonly applied to smooth data in signal

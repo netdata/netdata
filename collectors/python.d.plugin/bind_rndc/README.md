@@ -1,8 +1,15 @@
-# bind_rndc
+<!--
+---
+title: "ISC Bind monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/bind_rndc/README.md
+---
+-->
 
-Module parses bind dump file to collect real-time performance metrics
+# ISC Bind monitoring with Netdata
 
-**Requirements:**
+Collects Name server summary performance statistics using `rndc` tool.
+
+## Requirements
 
 -   Version of bind must be 9.6 +
 -   Netdata must have permissions to run `rndc stats`
@@ -49,7 +56,15 @@ It produces:
 
 -   Same as Incoming queries
 
-## configuration
+## Configuration
+
+Edit the `python.d/bind_rndc.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/bind_rndc.conf
+```
 
 Sample:
 

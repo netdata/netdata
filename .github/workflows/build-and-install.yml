@@ -1,0 +1,79 @@
+---
+name: Builder
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  build:
+    name: Build & Install
+    strategy:
+      matrix:
+        distro:
+          - 'alpine:edge'
+          - 'alpine:3.11'
+          - 'alpine:3.10'
+          - 'alpine:3.9'
+          - 'archlinux:latest'
+          - 'centos:8'
+          - 'centos:7'
+          - 'debian:bullseye'
+          - 'debian:buster'
+          - 'debian:stretch'
+          - 'debian:jessie'
+          - 'fedora:31'
+          - 'fedora:30'
+          - 'opensuse/leap:15.2'
+          - 'opensuse/leap:15.1'
+          - 'opensuse/tumbleweed:latest'
+          - 'ubuntu:20.04'
+          - 'ubuntu:19.10'
+          - 'ubuntu:18.04'
+          - 'ubuntu:16.04'
+        include:
+          - distro: 'alpine:edge'
+            pre: 'apk add -U bash'
+          - distro: 'alpine:3.11'
+            pre: 'apk add -U bash'
+          - distro: 'alpine:3.10'
+            pre: 'apk add -U bash'
+          - distro: 'alpine:3.9'
+            pre: 'apk add -U bash'
+
+          - distro: 'archlinux:latest'
+            pre: 'pacman --noconfirm -Sy grep libffi'
+
+          - distro: 'debian:bullseye'
+            pre: 'apt-get update'
+          - distro: 'debian:buster'
+            pre: 'apt-get update'
+          - distro: 'debian:stretch'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:20.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:19.10'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:18.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:16.04'
+            pre: 'apt-get update'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: install-required-packages.sh on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
+        run: |
+          echo $PRE > ./prep-cmd.sh
+          docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
+      - name: Regular build on ${{ matrix.distro }}
+        run: |
+          docker run -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+      - name: netdata-installer on ${{ matrix.distro }}
+        run: |
+          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+      - name: netdata-installer on ${{ matrix.distro }}
+        run: |
+          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'

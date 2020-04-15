@@ -1,6 +1,13 @@
-# powerdns
+<!--
+---
+title: "PowerDNS monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/powerdns/README.md
+---
+-->
 
-Module monitor powerdns performance and health metrics.
+# PowerDNS monitoring with Netdata
+
+Monitors authoritative server and recursor statistics.
 
 Powerdns charts:
 
@@ -75,7 +82,15 @@ Powerdns charts:
     -   packetcache-entries
     -   negcache-entries
 
-## configuration
+## Configuration
+
+Edit the `python.d/powerdns.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/powerdns.conf
+```
 
 ```yaml
 local:

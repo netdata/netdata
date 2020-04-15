@@ -199,7 +199,7 @@ class Service(SimpleService):
 
             try:
                 if result_type == 101:
-                    val = int(result_data[0][1].values()[0][0])
+                    val = int(list(result_data[0][1].values())[0][0])
             except (ValueError, IndexError) as error:
                 self.debug(error)
                 continue

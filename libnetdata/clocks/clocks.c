@@ -3,6 +3,7 @@
 #include "../libnetdata.h"
 
 static int clock_boottime_valid = 1;
+static int clock_monotonic_coarse_valid = 1;
 
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
@@ -21,6 +22,12 @@ void test_clock_boottime(void) {
     struct timespec ts;
     if(clock_gettime(CLOCK_BOOTTIME, &ts) == -1 && errno == EINVAL)
         clock_boottime_valid = 0;
+}
+
+void test_clock_monotonic_coarse(void) {
+    struct timespec ts;
+    if(clock_gettime(CLOCK_MONOTONIC_COARSE, &ts) == -1 && errno == EINVAL)
+        clock_monotonic_coarse_valid = 0;
 }
 
 static inline time_t now_sec(clockid_t clk_id) {
@@ -69,27 +76,43 @@ inline int now_realtime_timeval(struct timeval *tv) {
 }
 
 inline time_t now_monotonic_sec(void) {
-    return now_sec(CLOCK_MONOTONIC);
+    return now_sec(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
 }
 
 inline usec_t now_monotonic_usec(void) {
-    return now_usec(CLOCK_MONOTONIC);
+    return now_usec(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
 }
 
 inline int now_monotonic_timeval(struct timeval *tv) {
+    return now_timeval(likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC, tv);
+}
+
+inline time_t now_monotonic_high_precision_sec(void) {
+    return now_sec(CLOCK_MONOTONIC);
+}
+
+inline usec_t now_monotonic_high_precision_usec(void) {
+    return now_usec(CLOCK_MONOTONIC);
+}
+
+inline int now_monotonic_high_precision_timeval(struct timeval *tv) {
     return now_timeval(CLOCK_MONOTONIC, tv);
 }
 
 inline time_t now_boottime_sec(void) {
-    return now_sec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME : CLOCK_MONOTONIC);
+    return now_sec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
+                   likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
 }
 
 inline usec_t now_boottime_usec(void) {
-    return now_usec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME : CLOCK_MONOTONIC);
+    return now_usec(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
+                    likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC);
 }
 
 inline int now_boottime_timeval(struct timeval *tv) {
-    return now_timeval(likely(clock_boottime_valid) ? CLOCK_BOOTTIME : CLOCK_MONOTONIC, tv);
+    return now_timeval(likely(clock_boottime_valid) ? CLOCK_BOOTTIME :
+                       likely(clock_monotonic_coarse_valid) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC,
+                       tv);
 }
 
 inline usec_t timeval_usec(struct timeval *tv) {

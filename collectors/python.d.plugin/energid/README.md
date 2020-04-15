@@ -1,9 +1,16 @@
-# energid
+<!--
+---
+title: "Energi Core node monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/energid/README.md
+---
+-->
 
-A collector for [Energi Core](https://github.com/energicryptocurrency/energi)
-node instance monitoring.
+# Energi Core node monitoring with Netdata
 
-As Energi Core Gen 1 & 2 are based on the original Bitcoin code and
+Monitors blockchain, memory, network and unspent transactions statistics.
+
+
+As [Energi Core](https://github.com/energicryptocurrency/energi) Gen 1 & 2 are based on the original Bitcoin code and
 supports very similar JSON RPC, there is quite high chance the module works
 with many others forks including bitcoind itself.
 
@@ -41,6 +48,14 @@ It may be desired to increase retry count for production use due to possibly
 long daemon startup.
 
 ## Configuration
+
+Edit the `python.d/energid.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different, if different
+sudo ./edit-config python.d/energid.conf
+```
 
 Sample:
 

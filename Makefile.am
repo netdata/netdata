@@ -60,8 +60,16 @@ dist_noinst_DATA = \
     package.json \
     docs \
     packaging/version \
+    packaging/dashboard.version \
+    packaging/dashboard.checksums \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/libwebsockets.version \
+    packaging/libwebsockets.checksums \
+    packaging/mosquitto.version \
+    packaging/mosquitto.checksums \
+    packaging/bundle-mosquitto.sh \
+    packaging/bundle-lws.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
@@ -100,6 +108,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+    aclk \
     $(NULL)
 
 
@@ -108,6 +117,7 @@ AM_CFLAGS = \
     $(OPTIONAL_NFACCT_CFLAGS) \
     $(OPTIONAL_ZLIB_CFLAGS) \
     $(OPTIONAL_UUID_CFLAGS) \
+    $(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
@@ -130,6 +140,8 @@ LIBNETDATA_FILES = \
     libnetdata/clocks/clocks.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
+    libnetdata/ebpf/ebpf.c \
+    libnetdata/ebpf/ebpf.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
@@ -247,6 +259,12 @@ XENSTAT_PLUGIN_FILES = \
 
 PERF_PLUGIN_FILES = \
     collectors/perf.plugin/perf_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+EBPF_PROCESS_PLUGIN_FILES = \
+    collectors/ebpf_process.plugin/ebpf_process.c \
+    collectors/ebpf_process.plugin/ebpf_process.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -451,10 +469,30 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
-CLAIM_PLUGIN_FILES = \
+CLAIM_FILES = \
     claim/claim.c \
     claim/claim.h \
     $(NULL)
+
+ACLK_FILES = \
+    aclk/aclk_common.c \
+    aclk/aclk_common.h \
+    $(NULL)
+
+if ENABLE_ACLK
+ACLK_FILES += \
+    aclk/agent_cloud_link.c \
+    aclk/agent_cloud_link.h \
+    aclk/mqtt.c \
+    aclk/mqtt.h \
+    aclk/aclk_lws_wss_client.c \
+    aclk/aclk_lws_wss_client.h \
+    aclk/aclk_lws_https_client.c \
+    aclk/aclk_lws_https_client.h \
+    $(NULL)
+endif
+
+
 
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
@@ -465,12 +503,34 @@ EXPORTING_ENGINE_FILES = \
     exporting/json/json.h \
     exporting/opentsdb/opentsdb.c \
     exporting/opentsdb/opentsdb.h \
+    exporting/prometheus/prometheus.c \
+    exporting/prometheus/prometheus.h \
     exporting/read_config.c \
     exporting/init_connectors.c \
     exporting/process_data.c \
     exporting/check_filters.c \
     exporting/send_data.c \
     exporting/send_internal_metrics.c \
+    $(NULL)
+
+PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES = \
+    exporting/prometheus/remote_write/remote_write.c \
+    exporting/prometheus/remote_write/remote_write.h \
+    exporting/prometheus/remote_write/remote_write_request.cc \
+    exporting/prometheus/remote_write/remote_write_request.h \
+    exporting/prometheus/remote_write/remote_write.proto \
+    $(NULL)
+
+KINESIS_EXPORTING_FILES = \
+    exporting/aws_kinesis/aws_kinesis.c \
+    exporting/aws_kinesis/aws_kinesis.h \
+    exporting/aws_kinesis/aws_kinesis_put_record.cc \
+    exporting/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
+MONGODB_EXPORTING_FILES = \
+    exporting/mongodb/mongodb.c \
+    exporting/mongodb/mongodb.h \
     $(NULL)
 
 KINESIS_BACKEND_FILES = \
@@ -483,7 +543,6 @@ KINESIS_BACKEND_FILES = \
 PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     backends/prometheus/remote_write/remote_write.cc \
     backends/prometheus/remote_write/remote_write.h \
-    backends/prometheus/remote_write/remote_write.proto \
     $(NULL)
 
 MONGODB_BACKEND_FILES = \
@@ -514,6 +573,7 @@ NETDATA_FILES = \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(BACKENDS_PLUGIN_FILES) \
+    $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
@@ -523,7 +583,8 @@ NETDATA_FILES = \
     $(STREAMING_PLUGIN_FILES) \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
-    $(CLAIM_PLUGIN_FILES) \
+    $(CLAIM_FILES) \
+    $(ACLK_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -548,22 +609,18 @@ if LINUX
 
 endif
 
-if ENABLE_EXPORTING
-    NETDATA_FILES += \
-        $(EXPORTING_ENGINE_FILES) \
-        $(NULL)
-endif
-
 NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MATH_LIBS) \
     $(OPTIONAL_ZLIB_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_UUID_LIBS) \
+    $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
 
 NETDATACLI_FILES = \
@@ -575,9 +632,20 @@ NETDATACLI_FILES = \
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
+
+if ENABLE_ACLK
+netdata_LDADD = \
+    externaldeps/mosquitto/libmosquitto.a \
+    externaldeps/libwebsockets/libwebsockets.a \
+    $(OPTIONAL_LIBCAP_LIBS) \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+else
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
+endif
+
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
@@ -618,6 +686,14 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_EBPF
+    plugins_PROGRAMS += ebpf_process.plugin
+    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
+    ebpf_process_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 
@@ -665,27 +741,27 @@ if ENABLE_PLUGIN_SLABINFO
 endif
 
 if ENABLE_BACKEND_KINESIS
-    netdata_SOURCES += $(KINESIS_BACKEND_FILES)
+    netdata_SOURCES += $(KINESIS_BACKEND_FILES) $(KINESIS_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
-    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
     BUILT_SOURCES = \
-        backends/prometheus/remote_write/remote_write.pb.cc \
-        backends/prometheus/remote_write/remote_write.pb.h \
+        exporting/prometheus/remote_write/remote_write.pb.cc \
+        exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
     nodist_netdata_SOURCES = $(BUILT_SOURCES)
 
-backends/prometheus/remote_write/remote_write.pb.cc \
-backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
+exporting/prometheus/remote_write/remote_write.pb.cc \
+exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
 	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
 
 endif
 
 if ENABLE_BACKEND_MONGODB
-    netdata_SOURCES += $(MONGODB_BACKEND_FILES)
+    netdata_SOURCES += $(MONGODB_BACKEND_FILES) $(MONGODB_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif
 
@@ -797,7 +873,45 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=recv \
         -Wl,--wrap=send \
         -Wl,--wrap=connect_to_one_of \
+        -Wl,--wrap=create_main_rusage_chart \
+        -Wl,--wrap=send_main_rusage \
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=init_write_request \
+        -Wl,--wrap=add_host_info \
+        -Wl,--wrap=add_label \
+        -Wl,--wrap=add_metric \
+        $(NULL)
+    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
+endif
+if ENABLE_BACKEND_KINESIS
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=aws_sdk_init \
+        -Wl,--wrap=kinesis_init \
+        -Wl,--wrap=kinesis_put_record \
+        -Wl,--wrap=kinesis_get_result \
+        $(NULL)
+endif
+if ENABLE_BACKEND_MONGODB
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(MONGODB_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_MONGOC_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=mongoc_init \
+        -Wl,--wrap=mongoc_uri_new_with_error \
+        -Wl,--wrap=mongoc_uri_get_option_as_int32 \
+        -Wl,--wrap=mongoc_uri_set_option_as_int32 \
+        -Wl,--wrap=mongoc_client_new_from_uri \
+        -Wl,--wrap=mongoc_client_set_appname \
+        -Wl,--wrap=mongoc_client_get_collection \
+        -Wl,--wrap=mongoc_uri_destroy \
+        -Wl,--wrap=mongoc_collection_insert_many \
+        $(NULL)
+endif
 endif

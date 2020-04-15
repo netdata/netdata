@@ -13,38 +13,11 @@
 
 extern struct config exporting_config;
 
-#define EXPORTER_DATA_SOURCE                    "data source"
-#define EXPORTER_DATA_SOURCE_DEFAULT            "average"
-
-#define EXPORTER_DESTINATION                    "destination"
-#define EXPORTER_DESTINATION_DEFAULT            "localhost"
-
-#define EXPORTER_UPDATE_EVERY                   "update every"
-#define EXPORTER_UPDATE_EVERY_DEFAULT           10
-
-#define EXPORTER_BUF_ONFAIL                     "buffer on failures"
-#define EXPORTER_BUF_ONFAIL_DEFAULT             10
-
-#define EXPORTER_TIMEOUT_MS                     "timeout ms"
-#define EXPORTER_TIMEOUT_MS_DEFAULT             10000
-
-#define EXPORTER_SEND_CHART_MATCH               "send charts matching"
-#define EXPORTER_SEND_CHART_MATCH_DEFAULT       "*"
-
-#define EXPORTER_SEND_HOST_MATCH                "send hosts matching"
-#define EXPORTER_SEND_HOST_MATCH_DEFAULT        "localhost *"
-
-#define EXPORTER_SEND_CONFIGURED_LABELS         "send configured labels"
-#define EXPORTER_SEND_CONFIGURED_LABELS_DEFAULT CONFIG_BOOLEAN_YES
-
-#define EXPORTER_SEND_AUTOMATIC_LABELS          "send automatic labels"
-#define EXPORTER_SEND_AUTOMATIC_LABELS_DEFAULT  CONFIG_BOOLEAN_NO
-
-#define EXPORTER_SEND_NAMES                     "send names instead of ids"
-#define EXPORTER_SEND_NAMES_DEFAULT             CONFIG_BOOLEAN_YES
+#define EXPORTING_UPDATE_EVERY_OPTION_NAME "update every"
+#define EXPORTING_UPDATE_EVERY_DEFAULT 10
 
 typedef enum exporting_options {
-    EXPORTING_OPTION_NONE                   = 0,
+    EXPORTING_OPTION_NON                    = 0,
 
     EXPORTING_SOURCE_DATA_AS_COLLECTED      = (1 << 0),
     EXPORTING_SOURCE_DATA_AVERAGE           = (1 << 1),
@@ -69,9 +42,23 @@ typedef enum exporting_options {
      (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
       label->label_source != LABEL_SOURCE_NETDATA_CONF))
 
+typedef enum exporting_connector_types {
+    EXPORTING_CONNECTOR_TYPE_UNKNOWN,                 // Invalid type
+    EXPORTING_CONNECTOR_TYPE_GRAPHITE,                // Send plain text to Graphite
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET,   // Send data to OpenTSDB using telnet API
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP,     // Send data to OpenTSDB using HTTP API
+    EXPORTING_CONNECTOR_TYPE_JSON,                    // Stores the data using JSON.
+    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // The user selected to use Prometheus backend
+    EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
+    EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
+    EXPORTING_CONNECTOR_TYPE_NUM                      // Number of backend types
+} EXPORTING_CONNECTOR_TYPE;
+
 struct engine;
 
 struct instance_config {
+    EXPORTING_CONNECTOR_TYPE type;
+
     const char *name;
     const char *destination;
 
@@ -90,9 +77,19 @@ struct simple_connector_config {
     int default_port;
 };
 
-struct connector_config {
-    BACKEND_TYPE type;
-    void *connector_specific_config;
+struct prometheus_remote_write_specific_config {
+    char *remote_write_path;
+};
+
+struct aws_kinesis_specific_config {
+    char *stream_name;
+    char *auth_key_id;
+    char *secure_key;
+};
+
+struct mongodb_specific_config {
+    char *database;
+    char *collection;
 };
 
 struct engine_config {
@@ -102,23 +99,48 @@ struct engine_config {
 };
 
 struct stats {
-    collected_number chart_buffered_metrics;
-    collected_number chart_lost_metrics;
-    collected_number chart_sent_metrics;
-    collected_number chart_buffered_bytes;
-    collected_number chart_received_bytes;
-    collected_number chart_sent_bytes;
-    collected_number chart_receptions;
-    collected_number chart_transmission_successes;
-    collected_number chart_transmission_failures;
-    collected_number chart_data_lost_events;
-    collected_number chart_lost_bytes;
-    collected_number chart_reconnects;
+    collected_number buffered_metrics;
+    collected_number lost_metrics;
+    collected_number sent_metrics;
+    collected_number buffered_bytes;
+    collected_number lost_bytes;
+    collected_number sent_bytes;
+    collected_number received_bytes;
+    collected_number transmission_successes;
+    collected_number data_lost_events;
+    collected_number reconnects;
+    collected_number transmission_failures;
+    collected_number receptions;
+
+    int initialized;
+
+    RRDSET *st_metrics;
+    RRDDIM *rd_buffered_metrics;
+    RRDDIM *rd_lost_metrics;
+    RRDDIM *rd_sent_metrics;
+
+    RRDSET *st_bytes;
+    RRDDIM *rd_buffered_bytes;
+    RRDDIM *rd_lost_bytes;
+    RRDDIM *rd_sent_bytes;
+    RRDDIM *rd_received_bytes;
+
+    RRDSET *st_ops;
+    RRDDIM *rd_transmission_successes;
+    RRDDIM *rd_data_lost_events;
+    RRDDIM *rd_reconnects;
+    RRDDIM *rd_transmission_failures;
+    RRDDIM *rd_receptions;
+
+    RRDSET *st_rusage;
+    RRDDIM *rd_user;
+    RRDDIM *rd_system;
 };
 
 struct instance {
     struct instance_config config;
     void *buffer;
+    void (*worker)(void *instance_p);
     struct stats stats;
 
     int scheduled;
@@ -142,18 +164,13 @@ struct instance {
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
 
+    int (*send_header)(int *sock, struct instance *instance);
+    int (*check_response)(BUFFER *buffer, struct instance *instance);
+
+    void *connector_specific_data;
+
     size_t index;
     struct instance *next;
-    struct connector *connector;
-};
-
-struct connector {
-    struct connector_config config;
-
-    void (*worker)(void *instance_p);
-
-    struct instance *instance_root;
-    struct connector *next;
     struct engine *engine;
 };
 
@@ -163,13 +180,18 @@ struct engine {
     size_t instance_num;
     time_t now;
 
-    struct connector *connector_root;
+    int aws_sdk_initialized;
+    int mongoc_initialized;
+
+    struct instance *instance_root;
 };
+
+extern struct instance *prometheus_exporter_instance;
 
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
-BACKEND_TYPE exporting_select_type(const char *type);
+EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
 
 int init_connectors(struct engine *engine);
 
@@ -195,12 +217,17 @@ int end_chart_formatting(struct engine *engine, RRDSET *st);
 int end_host_formatting(struct engine *engine, RRDHOST *host);
 int end_batch_formatting(struct engine *engine);
 int flush_host_labels(struct instance *instance, RRDHOST *host);
+int simple_connector_update_buffered_bytes(struct instance *instance);
 
 int exporting_discard_response(BUFFER *buffer, struct instance *instance);
 void simple_connector_receive_response(int *sock, struct instance *instance);
 void simple_connector_send_buffer(int *sock, int *failures, struct instance *instance);
 void simple_connector_worker(void *instance_p);
 
-int send_internal_metrics(struct engine *engine);
+void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
+void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
+void send_internal_metrics(struct instance *instance);
+
+#include "exporting/prometheus/prometheus.h"
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */

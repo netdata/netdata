@@ -1,3 +1,10 @@
+<!--
+---
+title: "Install Netdata on Linux manually"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
+---
+-->
+
 # Install Netdata on Linux manually
 
 To install the latest git version of Netdata, please follow these 2 steps:
@@ -12,9 +19,9 @@ To install the latest git version of Netdata, please follow these 2 steps:
 
 ## Prepare your system
 
-Try our experimental automatic requirements installer (no need to be root). This will try to find the packages that
-should be installed on your system to build and run Netdata. It supports most major Linux distributions released after
-2010:
+Use our automatic requirements installer (_no need to be `root`_), which attempts to find the packages that
+should be installed on your system to build and run Netdata. It supports a large variety of major Linux distributions
+and other operating systems and is regularly tested. You can find this tool [here](https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) or run it directly with `bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)`. Otherwise read on for how to get requires packages manually:
 
 -   **Alpine** Linux and its derivatives
     -   You have to install `bash` yourself, before using the installer.
@@ -31,22 +38,23 @@ should be installed on your system to build and run Netdata. It supports most ma
         [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
         In addition, RHEL/CentOS version 6 also need
         [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
+    -   CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
--   **SuSe** Linux and its derivatives (including **openSuSe**)
+-   **SUSE** Linux and its derivatives (including **openSUSE**)
 
--   **SLE12** Must have your system registered with Suse Customer Center or have the DVD. See
+-   **SLE12** Must have your system registered with SUSE Customer Center or have the DVD. See
     [#1162](https://github.com/netdata/netdata/issues/1162)
 
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
 ```
 
 Install all the required packages for **monitoring everything Netdata can monitor**:
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
 ```
 
 If the above do not work for you, please [open a github
@@ -60,16 +68,16 @@ This is how to do it by hand:
 
 ```sh
 # Debian / Ubuntu
-apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python
+apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
 
 # Fedora
-dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python
+dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 
 # CentOS / Red Hat Enterprise Linux
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel
+yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel cmake
 
 # openSUSE
-zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python
+zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 ```
 
 Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
@@ -113,6 +121,61 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 | `openssl`| Cryptography and SSL/TLS toolkit|
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
+
+Netdata Cloud support may require the following packages to be installed:
+
+| package  | description
+|:--------:| -----------------------
+| `cmake` | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux
+
+*Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
+
+### CentOS / RHEL 6.x
+
+On CentOS / RHEL 6.x, many of the dependencies for Netdata are only
+available with versions older than what we need, so special setup is
+required if manually installing packages.
+
+CentOS 6.x:
+
+- Enable the EPEL repo
+- Enable the additional repo from [okay.network](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
+
+And install the minimum required dependencies.
+
+### CentOS / RHEL 8.x
+
+For CentOS / RHEL 8.x a lot of development packages have moved out into their
+own separate repositories. Some other dependeicies are either missing completely
+or have to be sourced by 3rd-parties.
+
+CentOS 8.x:
+
+- Enable the PowerTools repo
+- Enable the EPEL repo
+- Enable the Extra repo from [extra.getpagespeed.com](https://extras.getpagespeed.com/release-el8-latest.rpm)
+
+And install the minimum required dependencies:
+
+```sh
+# Enable config-manager
+yum install -y 'dnf-command(config-manager)'
+
+# Enable PowerTools
+yum config-manager --set-enabled PowerTools
+
+# Enable EPEL
+yum install -y epel-release
+
+# Install Repo for libuv-devl (NEW)
+yum install -y https://extras.getpagespeed.com/release-el8-latest.rpm
+
+# Install Devel Packages
+yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
+
+# Install Judy-Devel directly
+yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
+```
 
 ---
 

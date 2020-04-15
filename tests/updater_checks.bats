@@ -35,10 +35,7 @@ setup() {
 }
 
 @test "install stable netdata using kickstart" {
-	kickstart_file="/tmp/kickstart.$$"
-	curl -Ss -o ${kickstart_file} https://my-netdata.io/kickstart.sh
-	chmod +x ${kickstart_file}
-	${kickstart_file} --dont-wait --dont-start-it --auto-update --install ${INSTALLATION}
+	./packaging/installer/kickstart.sh --dont-wait --dont-start-it --auto-update --install ${INSTALLATION}
 
 	# Validate particular files
 	for file in $FILES; do

@@ -1,3 +1,10 @@
+<!--
+---
+title: "shell exporter"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/exporters/shell/README.md
+---
+-->
+
 # shell exporter
 
 Shell scripts can now query Netdata:

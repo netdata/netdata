@@ -55,7 +55,7 @@ testinternal () {
 	ilnk=${3}
 	header=${ilnk//-/}
 	dbg "   - Searching for \"$header\" in $ifile"
-	tr -d '[],_.:? `'< "$ifile" | sed -e 's/-//g' -e "s/'//g" | grep -i "^\\#*$header\$" >/dev/null
+	tr -d '[],_.:? `'< "$ifile" | sed -e 's/-//g' -e "s/'//g" -e "s/(//g" -e "s/)//g" | grep -i "^\\#*$header\$" >/dev/null
 	if [ $? -eq 0 ] ; then
 		dbg "   - $ilnk found in $ifile"
 		return 0
@@ -112,6 +112,33 @@ ck_netdata_relative () {
 			dbg "   - # (#somelink)"
 			testinternal "$f" "$f" "$rlnk"
 			;;
+    /* )
+      # Handle links in Markdown files that begin with `/`.
+      dbg "   - # (/path/filename.md) -> htmldoc (/path/filename/)"
+      # For links that end in `.md`.
+      if [[ $rlnk =~ ^(.*)/(.*).md$ ]] ; then
+        testf "$f" ".$rlnk"
+
+        if [ "${BASH_REMATCH[2]}" = "README" ] ; then
+          s="${BASH_REMATCH[1]}/"
+        else
+          s="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/"
+        fi
+      fi
+      # For links that end in `.md#...`.
+      if [[ $lnk =~ ^(.*)/(.*).md#(.*)$ ]] ; then
+        TRGT=".${BASH_REMATCH[1]}/${BASH_REMATCH[2]}.md"
+				LNK="#${BASH_REMATCH[3]}"
+				testf "$f" "$TRGT"
+        testinternal "$f" "$TRGT" "$LNK"
+
+        if [ "${BASH_REMATCH[2]}" = "README" ] ; then
+          s="${BASH_REMATCH[1]}/#${BASH_REMATCH[3]}"
+        else
+          s="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/#${BASH_REMATCH[3]}"
+        fi
+      fi
+      ;;
 		*/ ) 
 			dbg "   - # (path/)"
 			TRGT="$fpath/${rlnk}README.md"

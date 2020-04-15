@@ -169,12 +169,13 @@ static inline struct section *appconfig_section_create(struct config *root, cons
         error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
 
     appconfig_wrlock(root);
-    struct section *co2 = root->sections;
+    struct section *co2 = root->last_section;
     if(co2) {
-        while (co2->next) co2 = co2->next;
         co2->next = co;
+    } else {
+        root->first_section = co;
     }
-    else root->sections = co;
+    root->last_section = co;
     appconfig_unlock(root);
 
     return co;
@@ -284,15 +285,9 @@ cleanup:
     return ret;
 }
 
-
-char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
+char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value)
 {
     struct config_option *cv;
-
-    debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
-
-    struct section *co = appconfig_section_find(root, section);
-    if(!co) co = appconfig_section_create(root, section);
 
     cv = appconfig_option_index_find(co, name, 0);
     if(!cv) {
@@ -311,6 +306,16 @@ char *appconfig_get(struct config *root, const char *section, const char *name, 
     }
 
     return(cv->value);
+}
+
+char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
+{
+    debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
+
+    struct section *co = appconfig_section_find(root, section);
+    if(!co) co = appconfig_section_create(root, section);
+
+    return appconfig_get_by_section(co, name, default_value);
 }
 
 long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value)
@@ -335,6 +340,23 @@ LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const 
     return str2ld(s, NULL);
 }
 
+static inline int appconfig_test_boolean_value(char *s) {
+    if(!strcasecmp(s, "yes") || !strcasecmp(s, "true") || !strcasecmp(s, "on")
+       || !strcasecmp(s, "auto") || !strcasecmp(s, "on demand"))
+        return 1;
+
+    return 0;
+}
+
+int appconfig_get_boolean_by_section(struct section *co, const char *name, int value) {
+    char *s;
+
+    s = appconfig_get_by_section(co, name, (!value)?"no":"yes");
+    if(!s) return value;
+
+    return appconfig_test_boolean_value(s);
+}
+
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value)
 {
     char *s;
@@ -344,8 +366,7 @@ int appconfig_get_boolean(struct config *root, const char *section, const char *
     s = appconfig_get(root, section, name, s);
     if(!s) return value;
 
-    if(!strcasecmp(s, "yes") || !strcasecmp(s, "true") || !strcasecmp(s, "on") || !strcasecmp(s, "auto") || !strcasecmp(s, "on demand")) return 1;
-    return 0;
+    return appconfig_test_boolean_value(s);
 }
 
 int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value)
@@ -526,7 +547,8 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             s++;
 
             if (is_exporter_config) {
-                global_exporting_section = !(strcmp(s, CONFIG_SECTION_EXPORTING));
+                global_exporting_section =
+                    !(strcmp(s, CONFIG_SECTION_EXPORTING)) || !(strcmp(s, CONFIG_SECTION_PROMETHEUS));
                 if (unlikely(!global_exporting_section)) {
                     int rc;
                     rc = is_valid_connector(s, 0);
@@ -678,7 +700,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
         }
 
         appconfig_wrlock(root);
-        for(co = root->sections; co ; co = co->next) {
+        for(co = root->first_section; co ; co = co->next) {
             if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
                || !strcmp(co->name, CONFIG_SECTION_WEB)
                || !strcmp(co->name, CONFIG_SECTION_STATSD)

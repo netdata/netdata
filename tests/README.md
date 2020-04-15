@@ -1,3 +1,10 @@
+<!--
+---
+title: "Testing"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/tests/README.md
+---
+-->
+
 # Testing
 
 This readme is a manual on how to get started with unit testing on javascript and nodejs

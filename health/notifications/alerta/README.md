@@ -1,3 +1,10 @@
+<!--
+---
+title: "alerta.io"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/alerta/README.md
+---
+-->
+
 # alerta.io
 
 The [Alerta](https://alerta.io) monitoring system is a tool used to

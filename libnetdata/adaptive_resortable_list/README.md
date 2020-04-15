@@ -1,3 +1,10 @@
+<!--
+---
+title: "Adaptive Re-sortable List (ARL)"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/adaptive_resortable_list/README.md
+---
+-->
+
 # Adaptive Re-sortable List (ARL)
 
 This library allows Netdata to read a series of `name - value` pairs
@@ -84,7 +91,7 @@ Compared to unoptimized code (test No 1: 4.6sec):
 -   before ARL Netdata was using test No **7** with hashing and a custom `str2ull()` to achieve 602ms.
 -   the current ARL implementation is test No **9** that needs only 157ms (29 times faster vs unoptimized code, about 4 times faster vs optimized code).
 
-[Check the source code of this test](../../tests/profile/benchmark-value-pairs.c).
+[Check the source code of this test](https://raw.githubusercontent.com/netdata/netdata/master/tests/profile/benchmark-value-pairs.c).
 
 ## Limitations
 

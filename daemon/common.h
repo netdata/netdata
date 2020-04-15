@@ -50,6 +50,8 @@
 
 // backends for archiving the metrics
 #include "backends/backends.h"
+// the new exporting engine for archiving the metrics
+#include "exporting/exporting_engine.h"
 
 // the netdata API
 #include "web/api/web_api_v1.h"
@@ -62,6 +64,9 @@
 
 // netdata agent claiming
 #include "claim/claim.h"
+
+// netdata agent cloud link
+#include "aclk/agent_cloud_link.h"
 
 // the netdata deamon
 #include "daemon.h"
@@ -85,5 +90,6 @@ extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
 extern int netdata_ready;
+extern int netdata_cloud_setting;
 
 #endif /* NETDATA_COMMON_H */

@@ -57,8 +57,8 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         if (likely(r > 0)) {
             // we received some data
             response->len += r;
-            stats->chart_received_bytes += r;
-            stats->chart_receptions++;
+            stats->received_bytes += r;
+            stats->receptions++;
         } else if (r == 0) {
             error("EXPORTING: '%s' closed the socket", instance->config.destination);
             close(*sock);
@@ -76,7 +76,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 
     // if we received data, process them
     if (buffer_strlen(response))
-        exporting_discard_response(response, instance);
+        instance->check_response(response, instance);
 }
 
 /**
@@ -98,14 +98,20 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     struct stats *stats = &instance->stats;
 
-    ssize_t written;
-    written = send(*sock, buffer_tostring(buffer), len, flags);
+    int ret = 0;
+    if (instance->send_header)
+        ret = instance->send_header(sock, instance);
+
+    ssize_t written = -1;
+
+    if (!ret)
+        written = send(*sock, buffer_tostring(buffer), len, flags);
 
     if(written != -1 && (size_t)written == len) {
         // we sent the data successfully
-        stats->chart_transmission_successes++;
-        stats->chart_sent_bytes += written;
-        stats->chart_sent_metrics = stats->chart_buffered_metrics;
+        stats->transmission_successes++;
+        stats->sent_bytes += written;
+        stats->sent_metrics = stats->buffered_metrics;
 
         // reset the failures count
         *failures = 0;
@@ -120,10 +126,10 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
             instance->config.destination,
             len,
             written);
-        stats->chart_transmission_failures++;
+        stats->transmission_failures++;
 
         if(written != -1)
-            stats->chart_sent_bytes += written;
+            stats->sent_bytes += written;
 
         // increment the counter we check for data loss
         (*failures)++;
@@ -145,7 +151,7 @@ void simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
 
-    struct simple_connector_config *connector_specific_config = instance->connector->config.connector_specific_config;
+    struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
     struct stats *stats = &instance->stats;
 
     int sock = -1;
@@ -154,6 +160,19 @@ void simple_connector_worker(void *instance_p)
     int failures = 0;
 
     while(!netdata_exit) {
+
+        // reset the monitoring chart counters
+        stats->received_bytes =
+        stats->sent_bytes =
+        stats->sent_metrics =
+        stats->lost_metrics =
+        stats->receptions =
+        stats->transmission_successes =
+        stats->transmission_failures =
+        stats->data_lost_events =
+        stats->lost_bytes =
+        stats->reconnects = 0;
+
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
 
@@ -173,7 +192,7 @@ void simple_connector_worker(void *instance_p)
                 &reconnects,
                 NULL,
                 0);
-            stats->chart_reconnects += reconnects;
+            stats->reconnects += reconnects;
         }
 
         if(unlikely(netdata_exit)) break;
@@ -188,11 +207,30 @@ void simple_connector_worker(void *instance_p)
             simple_connector_send_buffer(&sock, &failures, instance);
         } else {
             error("EXPORTING: failed to update '%s'", instance->config.destination);
-            stats->chart_transmission_failures++;
+            stats->transmission_failures++;
 
             // increment the counter we check for data loss
             failures++;
         }
+
+        BUFFER *buffer = instance->buffer;
+
+        if (failures > instance->config.buffer_on_failures) {
+            stats->lost_bytes += buffer_strlen(buffer);
+            error(
+                "EXPORTING: connector instance %s reached %d exporting failures. "
+                "Flushing buffers to protect this host - this results in data loss on server '%s'",
+                instance->config.name, failures, instance->config.destination);
+            buffer_flush(buffer);
+            failures = 0;
+            stats->data_lost_events++;
+            stats->lost_metrics = stats->buffered_metrics;
+        }
+
+        send_internal_metrics(instance);
+
+        if(likely(buffer_strlen(buffer) == 0))
+            stats->buffered_metrics = 0;
 
         uv_mutex_unlock(&instance->mutex);
 

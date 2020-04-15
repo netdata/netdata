@@ -1,3 +1,10 @@
+<!--
+---
+title: "Slack"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/slack/README.md
+---
+-->
+
 # Slack
 
 This is what you will get:

@@ -1,6 +1,13 @@
+<!--
+---
+title: "JSON formatter"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/json/README.md
+---
+-->
+
 # JSON formatter
 
-The CSV formatter presents [results of database queries](../../queries) in the following formats:
+The CSV formatter presents [results of database queries](/web/api/queries/README.md) in the following formats:
 
 | format       | content type     | description|
 |:----:|:----------:|:----------|

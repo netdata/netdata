@@ -1,3 +1,10 @@
+<!--
+---
+title: "Health quickstart"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/QUICKSTART.md
+---
+-->
+
 # Health quickstart
 
 In this getting started guide, you'll learn the basics of editing health configuration files. With this knowledge, you
@@ -94,7 +101,10 @@ lookup: average -1m percentage of used
 
 Let's look into each of the lines to see how they create a working health entity.
 
--   `alarm`: The name for your new entity. The name can be anything, but the only symbols allowed are `.` and `_`.
+-   `alarm`: The name for your new entity. The name needs to follow these requirements:
+     -   Any alphabet letter or number.
+     -   The symbols `.` and `_`.
+     -   Cannot be `chart name`, `dimension name`, `family name`, or `chart variable names`.  
 -   `on`: Which chart the entity listens to.
 -   `lookup`: Which metrics the alarm monitors, the duration of time to monitor, and how to process the metrics into a
     usable format.
@@ -128,11 +138,11 @@ killall -USR2 netdata
 
 ## What's next?
 
-To learn about all of Netdata's health configuration options, view the [reference guide](REFERENCE.md).
+To learn about all of Netdata's health configuration options, view the [reference guide](/health/REFERENCE.md).
 
-Or, get guided insights into specific health configurations with our [health tutorials](README.md#tutorials).
+Or, get guided insights into specific health configurations with our [health tutorials](/health/README.md#tutorials).
 
-Finally, move on to Netdata's [notification system](notifications/README.md) to learn more about how Netdata can let you
-know when the health of your systems or apps goes awry.
+Finally, move on to Netdata's [notification system](/health/notifications/README.md) to learn more about how Netdata can
+let you know when the health of your systems or apps goes awry.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fquickstart%2F&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

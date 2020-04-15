@@ -1,3 +1,10 @@
+<!--
+---
+title: "ioping.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ioping.plugin/README.md
+---
+-->
+
 # ioping.plugin
 
 The ioping plugin supports monitoring latency for any number of directories/files/devices,
@@ -37,7 +44,7 @@ ioping_opts="-T 1000000 -R"
 ## alarms
 
 Netdata will automatically attach a few alarms for each host.
-Check the [latest versions of the ioping alarms](../../health/health.d/ioping.conf)
+Check the [latest versions of the ioping alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf)
 
 ## Multiple ioping Plugins With Different Settings
 

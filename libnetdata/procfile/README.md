@@ -1,3 +1,10 @@
+<!--
+---
+title: "PROCFILE"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/procfile/README.md
+---
+-->
+
 # PROCFILE
 
 procfile is a library for reading text data files (i.e `/proc` files) in the fastest possible way.
@@ -23,9 +30,9 @@ For each iteration, the caller:
 -   calls `procfile_readall()` to read updated contents.
      This call also rewinds (`lseek()` to 0) before reading it.
 
-     For every file, a [BUFFER](../buffer/) is used that is automatically adjusted to fit
-     the entire file contents of the file. So the file is read with a single `read()` call
-     (providing atomicity / consistency when the data are read from the kernel).
+     For every file, a [BUFFER](/libnetdata/buffer/README.md) is used that is automatically adjusted to fit the entire
+     file contents of the file. So the file is read with a single `read()` call (providing atomicity / consistency when
+     the data are read from the kernel).
 
      Once the data are read, 2 arrays of pointers are updated:
 

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Contributing"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/CONTRIBUTING.md
+---
+-->
+
 # Contributing
 
 Thank you for considering contributing to Netdata.
@@ -180,6 +187,23 @@ There are several guides for pull requests, such as the following:
 However, it's not always that simple. Our [PR approval process](#pr-approval-process) and the several merges we do every day may cause your fork to get behind the Netdata master. If you worked on something that has changed in the meantime, you will be required to do a git rebase, to bring your fork to the correct state. A very easy to follow guide on how to do it without learning all the intricacies of GitHub can be found [here](https://medium.com/@ruthmpardee/git-fork-workflow-using-rebase-587a144be470)
 
 One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
+
+#### PR title guidelines
+
+All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds", "Fixed" instead of "Fixes".
+
+Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
+
+Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+
+New collectors must have the title "[New collector] : [Name of collector]".
+
+#### Commit messages when PRs are merged
+
+When a PR gets squashed and merged into master, the title of the commit message (first line) must be the PR title
+followed by the PR number.
+
+The body of the commit message should be a short description of the work, preferably taken from the connected issue.
 
 ### PR approval process
 

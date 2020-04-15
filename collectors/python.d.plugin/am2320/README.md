@@ -1,7 +1,15 @@
-# AM2320
-This module will display a graph of the temperature and humity from a AM2320 sensor.
+<!--
+---
+title: "AM2320 sensor monitoring with netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/am2320/README.md
+---
+-->
 
-**Requirements:**
+# AM2320 sensor monitoring with netdata
+
+Displays a graph of the temperature and humity from a AM2320 sensor.
+
+## Requirements
  - Adafruit Circuit Python AM2320 library
  - Adafruit AM2320 I2C sensor
  - Python 3 (Adafruit libraries are not Python 2.x compatible)
@@ -11,7 +19,15 @@ It produces the following charts:
 1. **Temperature** 
 2. **Humidity**
 
-## configuration
+## Configuration
+
+Edit the `python.d/am2320.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/am2320.conf
+```
 
 Raspbery Pi Instructions:
 

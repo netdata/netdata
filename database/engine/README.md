@@ -1,3 +1,10 @@
+<!--
+---
+title: "Database engine"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/README.md
+---
+-->
+
 # Database engine
 
 The Database Engine works like a traditional database. There is some amount of RAM dedicated to data caching and
@@ -39,7 +46,7 @@ can select the memory mode for localhost by editing netdata.conf and setting:
 ```
 
 For setting the memory mode for the rest of the nodes you should look at
-[streaming](../../streaming/).
+[streaming](/streaming/README.md).
 
 The `history` configuration option is meaningless for `memory mode = dbengine` and is ignored for any metrics being
 stored in the DB engine.
@@ -170,10 +177,10 @@ so as to avoid all disk bottlenecks.
 The reported numbers are the following:
 
 | device | page cache | dataset | reads/sec | writes/sec |
-| :---: | :---: | ---: | ---: | ---: |
-| HDD | 64 MiB | 4.1 GiB | 813K | 18.0M |
-| SSD | 64 MiB | 9.8 GiB | 1.7M | 43.0M |
-| N/A | 16 GiB | 6.8 GiB |118.2M | 30.2M |
+| :----: | :--------: | ------: | --------: | ---------: |
+| HDD    | 64 MiB     | 4.1 GiB | 813K      | 18.0M      |
+| SSD    | 64 MiB     | 9.8 GiB | 1.7M      | 43.0M      |
+| N/A    | 16 GiB     | 6.8 GiB | 118.2M    | 30.2M      |
 
 where "reads/sec" is the number of metric data points being read from the database via its API per second and
 "writes/sec" is the number of metric data points being written to the database per second. 

@@ -1,3 +1,10 @@
+<!--
+---
+title: "Using Netdata with AWS Kinesis Data Streams"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/aws_kinesis/README.md
+---
+-->
+
 # Using Netdata with AWS Kinesis Data Streams
 
 ## Prerequisites

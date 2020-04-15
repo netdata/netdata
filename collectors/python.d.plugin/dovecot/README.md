@@ -1,6 +1,13 @@
-# dovecot
+<!--
+---
+title: "Dovecot monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dovecot/README.md
+---
+-->
 
-This module provides statistics information from Dovecot server.
+# Dovecot monitoring with Netdata
+
+Provides statistics information from Dovecot server.
 
 Statistics are taken from dovecot socket by executing `EXPORT global` command.
 More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
@@ -69,7 +76,15 @@ Module gives information with following charts:
     -   hit
     -   miss
 
-## configuration
+## Configuration
+
+Edit the `python.d/dovecot.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different, if different
+sudo ./edit-config python.d/dovecot.conf
+```
 
 Sample:
 

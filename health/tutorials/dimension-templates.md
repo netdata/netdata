@@ -1,3 +1,10 @@
+<!--
+---
+title: "Use dimension templates to create dynamic alarms"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/tutorials/dimension-templates.md
+---
+-->
+
 # Use dimension templates to create dynamic alarms
 
 Your ability to monitor the health of your systems and applications relies on your ability to create and maintain

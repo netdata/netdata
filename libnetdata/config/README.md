@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata ini config files"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/config/README.md
+---
+-->
+
 # Netdata ini config files
 
 Configuration files `netdata.conf` and `stream.conf` are Netdata ini files.

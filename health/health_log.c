@@ -101,7 +101,6 @@ inline void health_label_log_save(RRDHOST *host) {
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
-
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp
                             , "%c\t%s"
@@ -153,6 +152,10 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
             host->health_log_entries_written++;
         }
     }
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting)
+        aclk_update_alarm(host, ae);
+#endif
 }
 
 inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {

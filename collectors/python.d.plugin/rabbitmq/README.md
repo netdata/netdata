@@ -1,6 +1,14 @@
-# rabbitmq
+<!--
+---
+title: "RabbitMQ monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/rabbitmq/README.md
+---
+-->
 
-This module monitors [RabbitMQ](https://www.rabbitmq.com/) performance and health metrics.
+# RabbitMQ monitoring with Netdata
+
+Collects message broker global and per virtual host metrics.
+
 
 Following charts are drawn:
 
@@ -62,7 +70,17 @@ Per Vhost charts:
     -   redeliver
     -   return_unroutable
 
-## configuration
+## Configuration
+
+Edit the `python.d/rabbitmq.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/rabbitmq.conf
+```
+
+When no configuration file is found, module tries to connect to: `localhost:15672`.
 
 ```yaml
 socket:
@@ -72,8 +90,6 @@ socket:
   user     : 'guest'
   pass     : 'guest'
 ```
-
-When no configuration file is found, module tries to connect to: `localhost:15672`.
 
 ---
 

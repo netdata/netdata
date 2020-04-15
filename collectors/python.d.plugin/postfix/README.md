@@ -1,6 +1,15 @@
-# postfix
+<!--
+---
+title: "Postfix monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/postfix/README.md
+---
+-->
 
-Simple module executing `postfix -p` to grab postfix queue.
+# Postfix monitoring with Netdata
+
+Monitors MTA email queue statistics using postqueue tool.  
+
+Execute `postfix -p` to grab postfix queue.
 
 It produces only two charts:
 

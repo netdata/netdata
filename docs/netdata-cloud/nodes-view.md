@@ -1,3 +1,10 @@
+<!--
+---
+title: "Using the Nodes View"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/nodes-view.md
+---
+-->
+
 # Using the Nodes View
 
 ## Introduction
@@ -149,7 +156,7 @@ Please view [this comment on issue #6318](https://github.com/netdata/netdata/iss
 
 ## Services available in the Nodes View
 
-The following tables elaborate on which services will appear in the Nodes View. Alerts from [other collectors](../../collectors/README.md), when entered an alarm status, will show up in the _Alarms_ tab despite not appearing 
+The following tables elaborate on which services will appear in the Nodes View. Alerts from [other collectors](/collectors/README.md), when entered an alarm status, will show up in the _Alarms_ tab despite not appearing in the
 
 ### Databases
 

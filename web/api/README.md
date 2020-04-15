@@ -1,3 +1,10 @@
+<!--
+---
+title: "API"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/README.md
+---
+-->
+
 # API
 
 ## Netdata REST API

@@ -1,3 +1,11 @@
+<!--
+---
+title: "Health configuration reference"
+date: 2020-03-31
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
+---
+-->
+
 # Health configuration reference
 
 Welcome to the health configuration reference.
@@ -88,7 +96,8 @@ alarm: NAME
 template: NAME
 ```
 
-`NAME` can be anything, with `.` (period) and `_` (underscore) as the only allowed symbols.
+`NAME` can be any alpha character, with `.` (period) and `_` (underscore) as the only allowed symbols, but the names 
+cannot be `chart name`, `dimension name`, `family name`, or `chart variables names`.
 
 #### Alarm line `on`
 
@@ -128,7 +137,7 @@ If you create a template using the `disk.io` context, it will apply an alarm to 
 The alarm or template will be used only if the operating system of the host matches this list specified in `os`. The
 value is a space-separated list.
 
-The following example enables the entity on Linux, FreeBSD, and MacOS, but no other operating systems.
+The following example enables the entity on Linux, FreeBSD, and macOS, but no other operating systems.
 
 ```yaml
 os: linux freebsd macos
@@ -373,8 +382,10 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `host labels`
 
-Defines the list of labels present on a host. For example, let's suppose that `netdata.conf` is configured with the
-following labels:
+Defines the list of labels present on a host. See our [host labels tutorial](../docs/tutorials/using-host-labels.md) for
+an explanation of host labels and how to implement them.
+
+For example, let's suppose that `netdata.conf` is configured with the following labels:
 
 ```yaml
 [host labels]
@@ -390,7 +401,7 @@ And more labels in `netdata.conf` for workstations:
     room = workstation
 ```
 
-By defining labels inside of `netdata.conf`, you can now apply labels to alarms. For example, you can add the following 
+By defining labels inside of `netdata.conf`, you can now apply labels to alarms. For example, you can add the following
 line to any alarms you'd like to apply to hosts that have the label `room = server`.
 
 ```yaml

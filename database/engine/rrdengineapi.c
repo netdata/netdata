@@ -6,6 +6,8 @@ static struct rrdengine_instance default_global_ctx;
 
 int default_rrdeng_page_cache_mb = 32;
 int default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+/* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
+uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
 /*
  * Gets a handle for storing metrics to the database.
@@ -107,7 +109,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr);
             pg_cache_put(ctx, descr);
-            pg_cache_punch_hole(ctx, descr, 1);
+            pg_cache_punch_hole(ctx, descr, 1, 0);
             handle->prev_descr = NULL;
         } else {
             /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
@@ -173,9 +175,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
         handle->descr = descr;
 
-        uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
-        handle->page_correlation_id = pg_cache->committed_page_index.latest_corr_id++;
-        uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
+        handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
         if (0 == rd->rrdset->rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
@@ -189,9 +189,21 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;
     if (unlikely(INVALID_TIME == descr->start_time)) {
+        unsigned long new_metric_API_producers, old_metric_API_max_producers, ret_metric_API_max_producers;
         descr->start_time = point_in_time;
 
-        rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
+        new_metric_API_producers = rrd_atomic_add_fetch(&ctx->stats.metric_API_producers, 1);
+        while (unlikely(new_metric_API_producers > (old_metric_API_max_producers = ctx->metric_API_max_producers))) {
+            /* Increase ctx->metric_API_max_producers */
+            ret_metric_API_max_producers = ulong_compare_and_swap(&ctx->metric_API_max_producers,
+                                                                  old_metric_API_max_producers,
+                                                                  new_metric_API_producers);
+            if (old_metric_API_max_producers == ret_metric_API_max_producers) {
+                /* success */
+                break;
+            }
+        }
+
         pg_cache_insert(ctx, handle->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(handle->page_index, descr);
@@ -629,16 +641,27 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     nr_committed_pages = ++pg_cache->committed_page_index.nr_committed_pages;
     uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
-    if (nr_committed_pages >= (ctx->max_cache_pages) / 2 + (unsigned long)ctx->stats.metric_API_producers) {
-        /* 50% of pages have not been committed yet */
-        if (0 == (unsigned long)ctx->stats.flushing_errors) {
-            /* only print the first time */
-            error("Failed to flush dirty buffers quickly enough in dbengine instance \"%s\"."
-                  "Metric data at risk of not being stored in the database, "
-                  "please reduce disk load or use a faster disk.", ctx->dbfiles_path);
+    if (nr_committed_pages >= pg_cache_hard_limit(ctx) / 2) {
+        /* over 50% of pages have not been committed yet */
+
+        if (ctx->drop_metrics_under_page_cache_pressure &&
+            nr_committed_pages >= pg_cache_committed_hard_limit(ctx)) {
+            /* 100% of pages are dirty */
+            struct rrdeng_cmd cmd;
+
+            cmd.opcode = RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE;
+            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+        } else {
+            if (0 == (unsigned long) ctx->stats.pg_cache_over_half_dirty_events) {
+                /* only print the first time */
+                errno = 0;
+                error("Failed to flush dirty buffers quickly enough in dbengine instance \"%s\". "
+                      "Metric data at risk of not being stored in the database, "
+                      "please reduce disk load or use a faster disk.", ctx->dbfiles_path);
+            }
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_over_half_dirty_events, 1);
+            rrd_stat_atomic_add(&global_pg_cache_over_half_dirty_events, 1);
         }
-        rrd_stat_atomic_add(&ctx->stats.flushing_errors, 1);
-        rrd_stat_atomic_add(&global_flushing_errors, 1);
     }
 
     pg_cache_put(ctx, descr);
@@ -688,7 +711,7 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
  * You must not change the indices of the statistics or user code will break.
  * You must not exceed RRDENG_NR_STATS or it will crash.
  */
-void rrdeng_get_35_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
+void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
@@ -725,9 +748,11 @@ void rrdeng_get_35_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[30] = (uint64_t)global_io_errors;
     array[31] = (uint64_t)global_fs_errors;
     array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
-    array[33] = (uint64_t)ctx->stats.flushing_errors;
-    array[34] = (uint64_t)global_flushing_errors;
-    assert(RRDENG_NR_STATS == 35);
+    array[33] = (uint64_t)ctx->stats.pg_cache_over_half_dirty_events;
+    array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
+    array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
+    array[36] = (uint64_t)global_flushing_pressure_page_deletions;
+    assert(RRDENG_NR_STATS == 37);
 }
 
 /* Releases reference to page */
@@ -777,6 +802,8 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     ctx->max_disk_space = disk_space_mb * 1048576LLU;
     strncpyz(ctx->dbfiles_path, dbfiles_path, sizeof(ctx->dbfiles_path) - 1);
     ctx->dbfiles_path[sizeof(ctx->dbfiles_path) - 1] = '\0';
+    ctx->drop_metrics_under_page_cache_pressure = rrdeng_drop_metrics_under_page_cache_pressure;
+    ctx->metric_API_max_producers = 0;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->worker_config.ctx = ctx;

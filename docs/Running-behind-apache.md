@@ -1,3 +1,10 @@
+<!--
+---
+title: "Netdata via apache's mod_proxy"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md
+---
+-->
+
 # Netdata via apache's mod_proxy
 
 Below you can find instructions for configuring an apache server to:
@@ -14,7 +21,7 @@ Make sure your apache has installed `mod_proxy` and `mod_proxy_http`.
 On debian/ubuntu systems, install them with this: 
 
 ```sh
-sudo apt-get install apache2-bin
+sudo apt-get install apache2
 ```
 
 Also make sure they are enabled:
@@ -347,7 +354,7 @@ If your apache server is not on localhost, you can set:
 
 *note: Netdata v1.9+ support `allow connections from`*
 
-`allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
+`allow connections from` accepts [Netdata simple patterns](/libnetdata/simple_pattern/README.md) to match against the connection IP address.
 
 ## prevent the double access.log
 

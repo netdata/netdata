@@ -66,6 +66,9 @@ slabinfo.plugin
 cgroup-network
 !cgroup-network/
 
+ebpf_process.plugin
+!ebpf_process.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h
@@ -108,6 +111,9 @@ system/netdata-openrc
 system/netdata-init-d
 system/netdata.logrotate
 system/netdata.service
+system/netdata.service.*
+!system/netdata.service.in
+!system/netdata.service.*.in
 system/netdata.plist
 system/netdata-freebsd
 system/edit-config
@@ -125,6 +131,7 @@ collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
 collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
+web/netdata-switch-dashboard.sh
 
 # installer generated files
 /netdata-uninstaller.sh
@@ -174,6 +181,7 @@ tests/acls/acl.sh
 tests/urls/request.sh
 tests/alarm_repetition/alarm.sh
 tests/template_dimension/template_dim.sh
+aclk/tests/install-fake-charts.d.sh
 
 # tests and temp files
 test-driver
@@ -192,3 +200,6 @@ docs/generator/mkdocs.yml
 
 #CLion files
 netdata.cbp
+
+# External dependencies
+externaldeps/

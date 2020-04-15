@@ -159,8 +159,10 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               "global_io_errors: %ld\n"
               "global_fs_errors: %ld\n"
               "rrdeng_reserved_file_descriptors: %ld\n"
-              "flushing_errors: %ld\n"
-              "global_flushing_errors: %ld\n",
+              "pg_cache_over_half_dirty_events: %ld\n"
+              "global_pg_cache_over_half_dirty_events: %ld\n"
+              "flushing_pressure_page_deletions: %ld\n"
+              "global_flushing_pressure_page_deletions: %ld\n",
               (long)ctx->stats.metric_API_producers,
               (long)ctx->stats.metric_API_consumers,
               (long)pg_cache->page_descriptors,
@@ -194,8 +196,10 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               (long)global_io_errors,
               (long)global_fs_errors,
               (long)rrdeng_reserved_file_descriptors,
-              (long)ctx->stats.flushing_errors,
-              (long)global_flushing_errors
+              (long)ctx->stats.pg_cache_over_half_dirty_events,
+              (long)global_pg_cache_over_half_dirty_events,
+              (long)ctx->stats.flushing_pressure_page_deletions,
+              (long)global_flushing_pressure_page_deletions
     );
     return str;
 }

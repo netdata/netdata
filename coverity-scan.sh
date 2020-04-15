@@ -48,37 +48,35 @@ source packaging/installer/functions.sh || echo "Failed to fully load the functi
 cpus=$(find_processors)
 [ -z "${cpus}" ] && cpus=1
 
-if [ -f ".coverity-scan.conf" ]
-then
-	source ".coverity-scan.conf"
+if [ -f ".coverity-scan.conf" ]; then
+  source ".coverity-scan.conf"
 fi
 
 repo="${REPOSITORY}"
 if [ -z "${repo}" ]; then
-	fatal "export variable REPOSITORY or set it in .coverity-scan.conf"
+  fatal "export variable REPOSITORY or set it in .coverity-scan.conf"
 fi
 repo="${repo//\//%2F}"
 
 email="${COVERITY_SCAN_SUBMIT_MAIL}"
 if [ -z "${email}" ]; then
-	fatal "export variable COVERITY_SCAN_SUBMIT_MAIL or set it in .coverity-scan.conf"
+  fatal "export variable COVERITY_SCAN_SUBMIT_MAIL or set it in .coverity-scan.conf"
 fi
 
 token="${COVERITY_SCAN_TOKEN}"
 if [ -z "${token}" ]; then
-	fatal "export variable COVERITY_SCAN_TOKEN or set it in .coverity-scan.conf"
+  fatal "export variable COVERITY_SCAN_TOKEN or set it in .coverity-scan.conf"
 fi
 
-if ! command -v curl >/dev/null 2>&1; then
-	fatal "CURL is required for coverity scan to work"
+if ! command -v curl > /dev/null 2>&1; then
+  fatal "CURL is required for coverity scan to work"
 fi
 
 # only print the output of a command
 # when debugging is enabled
 # used to hide the token when debugging is not enabled
 debugrun() {
-  if [ "${COVERITY_SUBMIT_DEBUG}" = "1" ]
-  then
+  if [ "${COVERITY_SUBMIT_DEBUG}" = "1" ]; then
     run "${@}"
     return $?
   else
@@ -91,7 +89,7 @@ scanit() {
   progress "Scanning using coverity"
   export PATH="${PATH}:${INSTALL_DIR}/${COVERITY_BUILD_VERSION}/bin/"
   covbuild="${COVERITY_BUILD_PATH}"
-  [ -z "${covbuild}" ] && covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
+  [ -z "${covbuild}" ] && covbuild="$(which cov-build 2> /dev/null || command -v cov-build 2> /dev/null)"
 
   if [ -z "${covbuild}" ]; then
     fatal "Cannot find 'cov-build' binary in \$PATH. Export variable COVERITY_BUILD_PATH or set it in .coverity-scan.conf"
@@ -146,7 +144,7 @@ installit() {
     progress "Installing coverity..."
     cd "${INSTALL_DIR}"
 
-    run sudo tar -z -x -f  "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
+    run sudo tar -z -x -f "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
     rm "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
     export PATH=${PATH}:${INSTALL_DIR}/${COVERITY_BUILD_VERSION}/bin/
   else
@@ -154,7 +152,7 @@ installit() {
   fi
 
   # Validate the installation
-  covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
+  covbuild="$(which cov-build 2> /dev/null || command -v cov-build 2> /dev/null)"
   if [ -z "$covbuild" ]; then
     fatal "Failed to install coverity."
   fi
@@ -183,23 +181,23 @@ OTHER_OPTIONS+=" --enable-backend-prometheus-remote-write"
 
 FOUND_OPTS="NO"
 while [ -n "${1}" ]; do
-	if [ "${1}" = "--with-install" ]; then
-		progress "Running coverity install"
-		installit
-		shift 1
-	elif [ -n "${1}" ]; then
-		# Clear the default arguments, once you bump into the first argument
-		if [ "${FOUND_OPTS}" = "NO" ]; then
-			OTHER_OPTIONS="${1}"
-			FOUND_OPTS="YES"
-		else
-			OTHER_OPTIONS+=" ${1}"
-		fi
+  if [ "${1}" = "--with-install" ]; then
+    progress "Running coverity install"
+    installit
+    shift 1
+  elif [ -n "${1}" ]; then
+    # Clear the default arguments, once you bump into the first argument
+    if [ "${FOUND_OPTS}" = "NO" ]; then
+      OTHER_OPTIONS="${1}"
+      FOUND_OPTS="YES"
+    else
+      OTHER_OPTIONS+=" ${1}"
+    fi
 
-		shift 1
-	else
-		break
-	fi
+    shift 1
+  else
+    break
+  fi
 done
 
 echo "Running coverity scan with extra options ${OTHER_OPTIONS}"

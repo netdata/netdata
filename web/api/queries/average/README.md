@@ -1,3 +1,10 @@
+<!--
+---
+title: "Average or Mean"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/average/README.md
+---
+-->
+
 # Average or Mean
 
 > This query is available as `average` and `mean`.

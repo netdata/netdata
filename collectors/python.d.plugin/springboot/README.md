@@ -1,6 +1,13 @@
-# springboot
+<!--
+---
+title: "Spring Boot2 monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/springboot/README.md
+---
+-->
 
-This module will monitor one or more Java Spring-boot applications depending on configuration.
+# Spring Boot2 monitoring with Netdata
+
+Monitors one or more Java Spring-boot applications depending on configuration.
 Netdata can be used to monitor running Java [Spring Boot](https://spring.io/) applications that expose their metrics with the use of the **Spring Boot Actuator** included in Spring Boot library.
 
 ## Configuration
@@ -94,7 +101,13 @@ Please refer [Spring Boot Actuator: Production-ready Features](https://docs.spri
 
 ## Usage
 
-The springboot module is enabled by default. It looks up `http://localhost:8080/metrics` and `http://127.0.0.1:8080/metrics` to detect Spring Boot application by default. You can change it by editing `/etc/netdata/python.d/springboot.conf` (to edit it on your system run `/etc/netdata/edit-config python.d/springboot.conf`).
+Edit the `python.d/springboot.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/springboot.conf
+```
 
 This module defines some common charts, and you can add custom charts by change the configurations.
 
@@ -126,6 +139,8 @@ You can disable the default charts by set `defaults.<chart-id>: false`.
 
 The dimension name of extras charts should replace `.` to `_`.
 
-Please check [springboot.conf](springboot.conf) for more examples.
+Please check
+[springboot.conf](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/springboot/springboot.conf)
+for more examples.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fspringboot%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

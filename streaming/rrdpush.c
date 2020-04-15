@@ -28,14 +28,24 @@
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
+#define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
 typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
+typedef struct {
+    char *os_name;
+    char *os_id;
+    char *os_version;
+    char *kernel_name;
+    char *kernel_version;
+} stream_encoded_t;
+
 static struct config stream_config = {
-        .sections = NULL,
+        .first_section = NULL,
+        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
@@ -99,6 +109,7 @@ int rrdpush_init() {
     }
 
     char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
+
     if ( !strcmp(invalid_certificate,"yes")){
         if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
             info("Netdata is configured to accept invalid SSL certificate.");
@@ -159,11 +170,11 @@ int configured_as_master() {
     int is_master = 0;
 
     appconfig_wrlock(&stream_config);
-    for (section = stream_config.sections; section; section = section->next) {
+    for (section = stream_config.first_section; section; section = section->next) {
         uuid_t uuid;
 
         if (uuid_parse(section->name, uuid) != -1 &&
-            appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
+                appconfig_get_boolean_by_section(section, "enabled", 0)) {
             is_master = 1;
             break;
         }
@@ -496,6 +507,38 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
+static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
+    host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+    host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+}
+
+void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
+{
+    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
+    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):"";
+    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):"";
+    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):"";
+    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):"";
+}
+
+void rrdpush_clean_encoded(stream_encoded_t *se)
+{
+    if (se->os_name)
+        freez(se->os_name);
+
+    if (se->os_id)
+        freez(se->os_id);
+
+    if (se->os_version)
+        freez(se->os_version);
+
+    if (se->kernel_name)
+        freez(se->kernel_name);
+
+    if (se->kernel_version)
+        freez(se->kernel_version);
+}
+
 //called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
@@ -557,53 +600,78 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
     */
+    stream_encoded_t se;
+    rrdpush_encode_variable(&se, host);
+
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
-                    "&NETDATA_SYSTEM_OS_NAME=%s"
-                    "&NETDATA_SYSTEM_OS_ID=%s"
-                    "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
-                    "&NETDATA_SYSTEM_OS_VERSION=%s"
-                    "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
-                    "&NETDATA_SYSTEM_OS_DETECTION=%s"
-                    "&NETDATA_SYSTEM_KERNEL_NAME=%s"
-                    "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
-                    "&NETDATA_SYSTEM_ARCHITECTURE=%s"
-                    "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
-                    "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
-                    "&NETDATA_SYSTEM_CONTAINER=%s"
-                    "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
-                    "&NETDATA_PROTOCOL_VERSION=%s"
-                    " HTTP/1.1\r\n"
-                    "User-Agent: %s/%s\r\n"
-                    "Accept: */*\r\n\r\n"
-              , host->rrdpush_send_api_key
-              , host->hostname
-              , host->registry_hostname
-              , host->machine_guid
-              , default_rrd_update_every
-              , host->os
-              , host->timezone
-              , (host->tags) ? host->tags : ""
-              , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
-              , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
-              , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
-              , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
-              , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
-              , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
-              , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
-              , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
-              , (host->system_info->architecture) ? host->system_info->architecture : ""
-              , (host->system_info->virtualization) ? host->system_info->virtualization : ""
-              , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
-              , (host->system_info->container) ? host->system_info->container : ""
-              , (host->system_info->container_detection) ? host->system_info->container_detection : ""
-              , STREAMING_PROTOCOL_VERSION
-              , host->program_name
-              , host->program_version
-    );
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s&ver=%u"
+                 "&NETDATA_SYSTEM_OS_NAME=%s"
+                 "&NETDATA_SYSTEM_OS_ID=%s"
+                 "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
+                 "&NETDATA_SYSTEM_OS_VERSION=%s"
+                 "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
+                 "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_KERNEL_NAME=%s"
+                 "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
+                 "&NETDATA_SYSTEM_ARCHITECTURE=%s"
+                 "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
+                 "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CONTAINER=%s"
+                 "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                 "&NETDATA_CONTAINER_OS_NAME=%s"
+                 "&NETDATA_CONTAINER_OS_ID=%s"
+                 "&NETDATA_CONTAINER_OS_ID_LIKE=%s"
+                 "&NETDATA_CONTAINER_OS_VERSION=%s"
+                 "&NETDATA_CONTAINER_OS_VERSION_ID=%s"
+                 "&NETDATA_CONTAINER_OS_DETECTION=%s"
+                 "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=%s"
+                 "&NETDATA_SYSTEM_CPU_FREQ=%s"
+                 "&NETDATA_SYSTEM_TOTAL_RAM=%s"
+                 "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
+                 "&NETDATA_PROTOCOL_VERSION=%s"
+                 " HTTP/1.1\r\n"
+                 "User-Agent: %s/%s\r\n"
+                 "Accept: */*\r\n\r\n"
+                 , host->rrdpush_send_api_key
+                 , host->hostname
+                 , host->registry_hostname
+                 , host->machine_guid
+                 , default_rrd_update_every
+                 , host->os
+                 , host->timezone
+                 , (host->tags) ? host->tags : ""
+                 , STREAMING_PROTOCOL_CURRENT_VERSION
+                 , se.os_name
+                 , se.os_id
+                 , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
+                 , se.os_version
+                 , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
+                 , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
+                 , se.kernel_name
+                 , se.kernel_version
+                 , (host->system_info->architecture) ? host->system_info->architecture : ""
+                 , (host->system_info->virtualization) ? host->system_info->virtualization : ""
+                 , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
+                 , (host->system_info->container) ? host->system_info->container : ""
+                 , (host->system_info->container_detection) ? host->system_info->container_detection : ""
+                 , (host->system_info->container_os_name) ? host->system_info->container_os_name : ""
+                 , (host->system_info->container_os_id) ? host->system_info->container_os_id : ""
+                 , (host->system_info->container_os_id_like) ? host->system_info->container_os_id_like : ""
+                 , (host->system_info->container_os_version) ? host->system_info->container_os_version : ""
+                 , (host->system_info->container_os_version_id) ? host->system_info->container_os_version_id : ""
+                 , (host->system_info->container_os_detection) ? host->system_info->container_os_detection : ""
+                 , (host->system_info->host_cores) ? host->system_info->host_cores : ""
+                 , (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : ""
+                 , (host->system_info->host_ram_total) ? host->system_info->host_ram_total : ""
+                 , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
+                 , STREAMING_PROTOCOL_VERSION
+                 , host->program_name
+                 , host->program_version
+                 );
     http[eol] = 0x00;
+    rrdpush_clean_encoded(&se);
 
 #ifdef ENABLE_HTTPS
     if (!host->ssl.flags) {
@@ -643,26 +711,44 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
+    ssize_t received;
 #ifdef ENABLE_HTTPS
-    if(recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    received = recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
 #else
-    if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    received = recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
 #endif
         error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
 
-    int answer = strncmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-    if(!answer) {
-        host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-        host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
-    } else {
-        answer = strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+    http[received] = '\0';
+    int answer = -1;
+    char *version_start = strchr(http, '=');
+    uint32_t version;
+    if(version_start) {
+        version_start++;
+        version = (uint32_t)strtol(version_start, NULL, 10);
+        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
-            host->labels_flag |= LABEL_FLAG_STOP_STREAM;
-            host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-            info("STREAM %s [send to %s]: is using an old Netdata.", host->hostname,  connected_to);
+            rrdpush_set_flags_to_newest_stream(host);
+            host->stream_version = version;
+        }
+    } else {
+        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+        if(!answer) {
+            version = 1;
+            rrdpush_set_flags_to_newest_stream(host);
+        }
+        else {
+            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+            if(!answer) {
+                version = 0;
+                host->labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+            }
         }
     }
 
@@ -672,7 +758,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         return 0;
     }
 
-    info("STREAM %s [send to %s]: established communication - ready to send metrics...", host->hostname, connected_to);
+    info("STREAM %s [send to %s]: established communication with a master using protocol version %u - ready to send metrics..."
+         , host->hostname
+         , connected_to
+         , version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
@@ -993,35 +1082,6 @@ static void log_stream_connection(const char *client_ip, const char *client_port
     log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
 
-static RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY get_multiple_connections_strategy(struct config *c, const char *section, const char *name, RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY def) {
-    char *value;
-    switch(def) {
-        default:
-        case RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW:
-            value = "allow";
-            break;
-
-        case RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW:
-            value = "deny";
-            break;
-    }
-
-    value = appconfig_get(c, section, name, value);
-
-    RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY ret = def;
-
-    if(strcasecmp(value, "allow") == 0 || strcasecmp(value, "permit") == 0 || strcasecmp(value, "accept") == 0)
-        ret = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
-
-    else if(strcasecmp(value, "deny") == 0 || strcasecmp(value, "reject") == 0 || strcasecmp(value, "block") == 0)
-        ret = RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW;
-
-    else
-        error("Invalid stream config value at section [%s], setting '%s', value '%s'", section, name, value);
-
-    return ret;
-}
-
 static int rrdpush_receive(int fd
                            , const char *key
                            , const char *hostname
@@ -1036,7 +1096,7 @@ static int rrdpush_receive(int fd
                            , int update_every
                            , char *client_ip
                            , char *client_port
-                           , int stream_flags
+                           , uint32_t stream_version
 #ifdef ENABLE_HTTPS
                            , struct netdata_ssl *ssl
 #endif
@@ -1050,7 +1110,6 @@ static int rrdpush_receive(int fd
     char *rrdpush_api_key = default_rrdpush_api_key;
     char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
     time_t alarms_delay = 60;
-    RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY rrdpush_multiple_connections_strategy = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
 
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
@@ -1077,9 +1136,6 @@ static int rrdpush_receive(int fd
     rrdpush_api_key = appconfig_get(&stream_config, key, "default proxy api key", rrdpush_api_key);
     rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
 
-    rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, key, "multiple connections", rrdpush_multiple_connections_strategy);
-    rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, machine_guid, "multiple connections", rrdpush_multiple_connections_strategy);
-
     rrdpush_send_charts_matching = appconfig_get(&stream_config, key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
@@ -1092,26 +1148,40 @@ static int rrdpush_receive(int fd
         close(fd);
         return 1;
     }
-    else
-        host = rrdhost_find_or_create(
-                hostname
-                , registry_hostname
-                , machine_guid
-                , os
-                , timezone
-                , tags
-                , program_name
-                , program_version
-                , update_every
-                , history
-                , mode
-                , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
-                , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
-                , rrdpush_destination
-                , rrdpush_api_key
-                , rrdpush_send_charts_matching
-                , system_info
-        );
+
+    /*
+     * Quick path for rejecting multiple connections. Don't take any locks so that progress is made. The same
+     * condition will be checked again below, while holding the global and host writer locks. Any potential false
+     * positives will not cause harm. Data hazards with host deconstruction will be handled when reference counting
+     * is implemented.
+     */
+    host = rrdhost_find_by_guid(machine_guid, 0);
+    if(host && host->connected_senders > 0) {
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
+        close(fd);
+        return 0;
+    }
+
+    host = rrdhost_find_or_create(
+            hostname
+            , registry_hostname
+            , machine_guid
+            , os
+            , timezone
+            , tags
+            , program_name
+            , program_version
+            , update_every
+            , history
+            , mode
+            , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
+            , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
+            , rrdpush_destination
+            , rrdpush_api_key
+            , rrdpush_send_charts_matching
+            , system_info
+    );
 
     if(!host) {
         close(fd);
@@ -1153,15 +1223,18 @@ static int rrdpush_receive(int fd
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
-    char *initial_response;
-    if (stream_flags & LABEL_FLAG_UPDATE_STREAM) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the newest stream protocol.", host->hostname, client_ip, client_port);
-        initial_response = START_STREAMING_PROMPT_V2;
+    char initial_response[HTTP_HEADER_SIZE];
+    if (stream_version > 1) {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_version);
+    } else if (stream_version == 1) {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
     } else {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using an old protocol.", host->hostname, client_ip, client_port);
-        initial_response = START_STREAMING_PROMPT;
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", host->hostname, client_ip, client_port);
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
-#ifdef ENABLE_HTTPS
+    #ifdef ENABLE_HTTPS
     host->stream_ssl.conn = ssl->conn;
     host->stream_ssl.flags = ssl->flags;
     if(send_timeout(ssl, fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
@@ -1189,24 +1262,17 @@ static int rrdpush_receive(int fd
 
     rrdhost_wrlock(host);
     if(host->connected_senders > 0) {
-        switch(rrdpush_multiple_connections_strategy) {
-            case RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW:
-                info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. If multiple netdata are pushing metrics for the same charts, at the same time, the result is unexpected.", host->hostname, client_ip, client_port);
-                break;
-
-            case RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW:
-                rrdhost_unlock(host);
-                log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
-                info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
-                fclose(fp);
-                return 0;
-        }
+        rrdhost_unlock(host);
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
+        fclose(fp);
+        return 0;
     }
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     host->connected_senders++;
     host->senders_disconnected_time = 0;
-    host->labels_flag = stream_flags;
+    host->labels_flag = (stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
@@ -1262,7 +1328,7 @@ struct rrdpush_thread {
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
-    int stream_flags;
+    uint32_t stream_version;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -1318,7 +1384,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
-	    , rpt->stream_flags
+	    , rpt->stream_version
 #ifdef ENABLE_HTTPS
 	    , &rpt->ssl
 #endif
@@ -1367,8 +1433,8 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
+    uint32_t stream_version = UINT_MAX;
     char buf[GUID_LEN + 1];
-    int stream_flags = LABEL_FLAG_STOP_STREAM;
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
 
@@ -1396,30 +1462,35 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             timezone = value;
         else if(!strcmp(name, "tags"))
             tags = value;
+        else if(!strcmp(name, "ver"))
+            stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
         else {
-            if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
-                stream_flags = LABEL_FLAG_UPDATE_STREAM;
-            else {
-                // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
-                if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
-                    name = "NETDATA_HOST_OS_NAME";
-                else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID"))
-                    name = "NETDATA_HOST_OS_ID";
-                else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE"))
-                    name = "NETDATA_HOST_OS_ID_LIKE";
-                else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION"))
-                    name = "NETDATA_HOST_OS_VERSION";
-                else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID"))
-                    name = "NETDATA_HOST_OS_VERSION_ID";
-                else if (!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION"))
-                    name = "NETDATA_HOST_OS_DETECTION";
-                if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
-                    info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
-                     w->client_ip, w->client_port, key, value);
-                }
+            // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
+            if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
+                name = "NETDATA_HOST_OS_NAME";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID"))
+                name = "NETDATA_HOST_OS_ID";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE"))
+                name = "NETDATA_HOST_OS_ID_LIKE";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION"))
+                name = "NETDATA_HOST_OS_VERSION";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID"))
+                name = "NETDATA_HOST_OS_VERSION_ID";
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION"))
+                name = "NETDATA_HOST_OS_DETECTION";
+            else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && stream_version == UINT_MAX) {
+                stream_version = 1;
+            }
+
+            if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
+                     w->client_ip, w->client_port, name, value);
             }
         }
     }
+
+    if (stream_version == UINT_MAX)
+        stream_version = 0;
 
     if(!key || !*key) {
         rrdhost_system_info_free(system_info);
@@ -1532,7 +1603,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
-    rpt->stream_flags      = stream_flags;
+    rpt->stream_version    = stream_version;
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.flags         = w->ssl.flags;

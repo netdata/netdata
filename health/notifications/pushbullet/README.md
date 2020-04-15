@@ -1,3 +1,10 @@
+<!--
+---
+title: "PushBullet"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/pushbullet/README.md
+---
+-->
+
 # PushBullet
 
 Will look like this on your browser:

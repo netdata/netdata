@@ -1,4 +1,11 @@
-# monit
+<!--
+---
+title: "Monit monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/monit/README.md
+---
+-->
+
+# Monit monitoring with Netdata
 
 Monit monitoring module. Data is grabbed from stats XML interface (exists for a long time, but not mentioned in official documentation). Mostly this plugin shows statuses of monit targets, i.e. [statuses of specified checks](https://mmonit.com/monit/documentation/monit.html#Service-checks).
 
@@ -19,7 +26,15 @@ Monit monitoring module. Data is grabbed from stats XML interface (exists for a 
     -   Hosts (+latency)
     -   Network interfaces
 
-## configuration
+## Configuration
+
+Edit the `python.d/monit.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/monit.conf
+```
 
 Sample:
 

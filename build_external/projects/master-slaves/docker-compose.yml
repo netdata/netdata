@@ -1,0 +1,23 @@
+version: '3.3'
+services:
+  agent_master:
+    image: debian_10_dev
+    command: /usr/sbin/netdata -D
+    ports:
+    - 20000:19999
+    volumes:
+    - ./master_stream.conf:/etc/netdata/stream.conf:ro
+  agent_slave1:
+    image: debian_9_dev
+    command: /usr/sbin/netdata -D
+    #ports:               Removed to allow scaling
+    #- 20001:19999
+    volumes:
+      - ./slave_stream.conf:/etc/netdata/stream.conf:ro
+  agent_slave2:
+    image: fedora_30_dev
+    command: /usr/sbin/netdata -D
+    #ports:              Removed to allow scaling
+    #- 20002:19999
+    volumes:
+      - ./slave_stream.conf:/etc/netdata/stream.conf:ro

@@ -196,10 +196,8 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
     return DATASOURCE_JSON;
 }
 
-
-inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_alarms_select (char *url) {
     int all = 0;
-
     while(url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
@@ -208,9 +206,25 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
         else if(!strcmp(value, "active")) all = 0;
     }
 
+    return all;
+}
+
+inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
+    int all = web_client_api_request_v1_alarms_select(url);
+
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     health_alarms2json(host, w->response.data, all);
+    buffer_no_cacheable(w->response.data);
+    return HTTP_RESP_OK;
+}
+
+inline int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url) {
+    int all = web_client_api_request_v1_alarms_select(url);
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarms_values2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
     return HTTP_RESP_OK;
 }
@@ -335,7 +349,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data);
+    charts2json(host, w->response.data, 0);
     return HTTP_RESP_OK;
 }
 
@@ -475,7 +489,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     st->last_accessed_time = now_realtime_sec();
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
-    long long after  = (after_str  && *after_str) ?str2l(after_str):0;
+    long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
     int       points = (points_str && *points_str)?str2i(points_str):0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 
@@ -793,13 +807,9 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     rrdhost_unlock(host);
 }
 
-inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
-
+extern int aclk_connected;
+inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
+{
     buffer_strcat(wb, "{\n");
     buffer_sprintf(wb, "\t\"version\": \"%s\",\n", host->program_version);
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
@@ -818,6 +828,10 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->host_os_version) ? host->system_info->host_os_version : "");
     buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : "");
     buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->host_os_detection) ? host->system_info->host_os_detection : "");
+    buffer_sprintf(wb, "\t\"cores_total\": \"%s\",\n", (host->system_info->host_cores) ? host->system_info->host_cores : "");
+    buffer_sprintf(wb, "\t\"total_disk_space\": \"%s\",\n", (host->system_info->host_disk_space) ? host->system_info->host_disk_space : "");
+    buffer_sprintf(wb, "\t\"cpu_freq\": \"%s\",\n", (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : "");
+    buffer_sprintf(wb, "\t\"ram_total\": \"%s\",\n", (host->system_info->host_ram_total) ? host->system_info->host_ram_total : "");
 
     if (host->system_info->container_os_name)
         buffer_sprintf(wb, "\t\"container_os_name\": \"%s\",\n", host->system_info->container_os_name);
@@ -846,9 +860,45 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);
-    buffer_strcat(wb, "\n\t]\n");
+    buffer_strcat(wb, "\n\t],\n");
+
+#ifdef DISABLE_CLOUD
+    buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
+#else
+    if (netdata_cloud_setting)
+        buffer_strcat(wb, "\t\"cloud-enabled\": true,\n");
+    else
+        buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
+#endif
+#ifdef ENABLE_ACLK
+    buffer_strcat(wb, "\t\"cloud-available\": true,\n");
+#else
+    buffer_strcat(wb, "\t\"cloud-available\": false,\n");
+#endif
+    if (is_agent_claimed() == NULL)
+        buffer_strcat(wb, "\t\"agent-claimed\": false,\n");
+    else
+        buffer_strcat(wb, "\t\"agent-claimed\": true,\n");
+#ifdef ENABLE_ACLK
+    if (aclk_connected)
+        buffer_strcat(wb, "\t\"aclk-available\": true\n");
+    else
+#endif
+        buffer_strcat(wb, "\t\"aclk-available\": false\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "}");
+    return 0;
+}
+
+inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
+    (void)url;
+    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+
+    web_client_api_request_v1_info_fill_buffer(host, wb);
+
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
@@ -871,6 +921,7 @@ static struct api_command {
         { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
 
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms_values   },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },

@@ -1,6 +1,14 @@
-# nvidia_smi
+<!--
+---
+title: "NVIDIA GPU monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nvidia_smi/README.md
+---
+-->
 
-This module monitors the `nvidia-smi` cli tool.
+# NVIDIA GPU monitoring with Netdata
+
+Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
+
 
 **Requirements and Notes:**
 
@@ -33,7 +41,15 @@ It produces:
     -   clock speed
     -   PCI bandwidth
 
-## configuration
+## Configuration
+
+Edit the `python.d/nvidia_smi.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/nvidia_smi.conf
+```
 
 Sample:
 

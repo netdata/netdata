@@ -1,3 +1,10 @@
+<!--
+---
+title: "Immediate results"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/immediate-results.md
+---
+-->
+
 # Immediate results
 
 Most of our infrastructure is based on standardized systems and applications. 

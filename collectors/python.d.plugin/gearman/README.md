@@ -1,8 +1,13 @@
-# Gearman
+<!--
+---
+title: "Gearman monitoring with Netdata"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/gearman/README.md
+---
+-->
 
-Module monitors Gearman worker statistics. A chart
-is shown for each job as well as one showing a summary
-of all workers.
+# Gearman monitoring with Netdata
+
+Monitors Gearman worker statistics. A chart is shown for each job as well as one showing a summary of all workers.
 
 Note: Charts may show as a line graph rather than an area 
 graph if you load Netdata with no jobs running. To change 
@@ -20,7 +25,15 @@ It produces:
  * Workers idle
  * Workers running
 
-### configuration
+## Configuration
+
+Edit the `python.d/gearman.conf` configuration file using `edit-config` from the your agent's [config
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d/gearman.conf
+```
 
 ```yaml
 localhost:

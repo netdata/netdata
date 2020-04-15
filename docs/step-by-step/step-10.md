@@ -1,3 +1,10 @@
+<!--
+---
+title: "Step 10. Set up a proxy"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-10.md
+---
+-->
+
 # Step 10. Set up a proxy
 
 You're almost through! At this point, you should be pretty familiar with now Netdata works and how to configure it to
@@ -202,9 +209,9 @@ You're a real sysadmin now!
 
 If you want to configure your Nginx proxy further, check out the following:
 
--   [Running Netdata behind Nginx](../Running-behind-nginx.md)
--   [High-performance Netdata](../high-performance-netdata.md)
--   [Enabling TLS on Netdata's dashboard](../../web/server/README.md#enabling-tls-support)
+-   [Running Netdata behind Nginx](/docs/Running-behind-nginx.md)
+-   [High-performance Netdata](/docs/high-performance-netdata.md)
+-   [Enabling TLS on Netdata's dashboard](/web/server/README.md#enabling-tls-support)
 
 And... you're _almost_ done with the Netdata tutorial.
 

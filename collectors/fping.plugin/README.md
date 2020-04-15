@@ -1,3 +1,10 @@
+<!--
+---
+title: "fping.plugin"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/fping.plugin/README.md
+---
+-->
+
 # fping.plugin
 
 The fping plugin supports monitoring latency, packet loss and uptime of any number of network end points,
@@ -37,7 +44,7 @@ fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 ## alarms
 
 Netdata will automatically attach a few alarms for each host.
-Check the [latest versions of the fping alarms](../../health/health.d/fping.conf)
+Check the [latest versions of the fping alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/fping.conf)
 
 ## Additional Tips
 
