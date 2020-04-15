@@ -281,12 +281,12 @@ class Service(SimpleService):
                 flag_label = "{}_flag".format(chart.replace('system.', ''))
                 self.update_chart_dim('flag', flag_label)
                 if self.flags_min_n > 1:
-                    flags = [prediction[2] for prediction in self.predictions[chart][-self.flags_window_n]]
-                    self.debug('flags={}'.format(flags))
+                    #flags = [prediction[2] for prediction in self.predictions[chart][-self.flags_window_n]]
+                    #self.debug('flags={}'.format(flags))
                     # work out if should flag or not
                     flag_value = self.predictions[chart][-1][2]
                 else:
-                    flags = [prediction[2] for prediction in self.predictions[chart][-self.flags_window_n]]
+                    flags = [prediction for prediction in self.predictions[chart][-self.flags_window_n]]
                     self.debug('flagsx={}'.format(flags))
                     # just get most recent value
                     flag_value = self.predictions[chart][-1][2]
