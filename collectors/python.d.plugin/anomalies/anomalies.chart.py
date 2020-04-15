@@ -45,7 +45,7 @@ MODEL_CONFIG = {
     'train_max_n': 60*60,
     'train_min_n': 60,
     'train_sample_pct': 1,
-    'fit_every_n': 30,
+    'fit_every_n': 60*5,
     'flags_min_n': 2,
     'flags_window_n': 3
 }
