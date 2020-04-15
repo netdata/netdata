@@ -213,13 +213,9 @@ class Service(SimpleService):
         else:
             prediction.append(0)
         # update prediction for the chart
-        self.debug('len(self.predictions[{}])={}'.format(chart, len(self.predictions[chart])))
-        self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
         self.predictions[chart].append(prediction)
-        self.debug('len(self.predictions[{}])={}'.format(chart, len(self.predictions[chart])))
-        self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
         self.predictions[chart] = self.predictions[chart][-5:]
-        self.debug('len(self.predictions)={}'.format(len(self.predictions[chart])))
+        self.debug('len(self.predictions[{}])={}'.format(chart, len(self.predictions[chart])))
         self.debug('self.predictions[{}]={}'.format(chart, self.predictions[chart]))
 
     def update_chart_dim(self, chart, dimension_id, title=None, algorithm='absolute', multiplier=1, divisor=1):
@@ -251,40 +247,48 @@ class Service(SimpleService):
 
             # get prediction
             if self.can_predict(chart):
+                self.debug("self.can_predict({})={}".format(chart, self.can_predict(chart)))
                 self.model_predict(chart)
 
             # refit if needed
             if (self.runs_counter % self.fit_every_n == 0) or (self.runs_counter == self.train_min_n):
+                self.debug("fitting model")
                 self.model_fit(chart)
 
             # insert charts and data
 
             if self.do_score:
-                score = "{}_score".format(chart.replace('system.', ''))
-                self.update_chart_dim('score', score, divisor=100)
-                data[score] = self.predictions[chart][-1][0] * 100
+                score_label = "{}_score".format(chart.replace('system.', ''))
+                self.update_chart_dim('score', score_label, divisor=100)
+                score_value = self.predictions[chart][-1][0]
+                self.debug("{}={}".format(score_label, score_value))
+                data[score_label] = score_value * 100
 
             if self.do_prob:
-                prob = "{}_prob".format(chart.replace('system.', ''))
-                self.update_chart_dim('prob', prob, divisor=100)
-                data[prob] = self.predictions[chart][-1][1] * 100
+                prob_label = "{}_prob".format(chart.replace('system.', ''))
+                self.update_chart_dim('prob', prob_label, divisor=100)
+                prob_value = self.predictions[chart][-1][1]
+                self.debug("{}={}".format(prob_label, prob_value))
+                data[prob_label] = prob_value * 100
 
             if self.do_flag:
-                flag = "{}_flag".format(chart.replace('system.', ''))
-                self.update_chart_dim('flag', flag)
-                data[flag] = self.predictions[chart][-1][2]
+                flag_label = "{}_flag".format(chart.replace('system.', ''))
+                self.update_chart_dim('flag', flag_label)
+                flag_value = self.predictions[chart][-1][2]
+                self.debug("{}={}".format(flag_label, flag_value))
+                data[flag_label] = flag_value
 
         # add averages
 
         if self.do_score:
-            score = 'mean_score'
-            self.update_chart_dim('score', score, divisor=100)
-            data[score] = np.mean([data[k] for k in data if 'score' in k])
+            score_label = 'mean_score'
+            self.update_chart_dim('score', score_label, divisor=100)
+            data[score_label] = np.mean([data[k] for k in data if 'score' in k])
 
         if self.do_prob:
-            prob = 'mean_prob'
-            self.update_chart_dim('prob', prob, divisor=100)
-            data[prob] = np.mean([data[k] for k in data if 'prob' in k])
+            prob_label = 'mean_prob'
+            self.update_chart_dim('prob', prob_label, divisor=100)
+            data[prob_label] = np.mean([data[k] for k in data if 'prob' in k])
 
         return data
 
