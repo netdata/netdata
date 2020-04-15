@@ -1257,11 +1257,11 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
     if (aclk_password == NULL)
         return;
     int rc;
-    aclk_connecting = 1;
     rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
+    aclk_connecting = 1;
 }
 
 
@@ -1355,8 +1355,6 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        if (unlikely(!aclk_connected))
-            continue;
         /*static int stress_counter = 0;
         if (write_q_bytes==0 && stress_counter ++ >5)
         {
