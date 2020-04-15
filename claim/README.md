@@ -1,16 +1,17 @@
 <!--
 ---
 title: "Agent claiming"
-description: "Agent claiming is part of the onboarding process when creating a workspace in Netdata Cloud."
-date: 2020-04-14
+description: "Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud. A Space's administrator creates a claiming token, which is used to add an Agent to their Space via the Agent-Cloud link."
+date: 2020-04-15
 custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 ---
 -->
 
 # Agent claiming
 
-Agent claiming is part of the onboarding process when creating a Space in Netdata Cloud. A Space's administrator creates
-a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link (ACLK)](/aclk/README.md).
+Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud. A Space's
+administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
+(ACLK)](/aclk/README.md).
 
 Claiming nodes is a security feature in Netdata Cloud. Through the process of claiming, you demonstrate in a few ways
 that you have administrative access to that node and the configuration settings for its Agent. By logging into the node,
@@ -24,8 +25,9 @@ Netdata Cloud.
 > Space, or War Room that you did not authorize.
 
 By claiming a node, you opt-in to sending data from your Agent to Netdata Cloud via the ACLK. This data is encrypted by
-the RSA keypair created during claiming, sent to Cloud, and then redirected your browser with TLS encryption. While the
-data does flow through Netdata Cloud servers on its way from Agents to the browser, we do not store or log it.
+TLS while it is in transit. We use the the RSA keypair created during claiming to authenticate the identity of the agent
+when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way from Agents to the
+browser, we do not store or log it.
 
 ## How to claim a node
 
@@ -39,7 +41,7 @@ To claim a Node, copy the script given by Cloud and paste it into your node's te
 following:
 
 ```bash
-netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2
+netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`.
@@ -51,7 +53,7 @@ If the claiming script returns errors, see the [troubleshooting information](#tr
 
 ### Claiming through a proxy
 
-A Space's administrator can claim a node through a SOCKS5 (preferred) or HTTP(S) proxy.
+A Space's administrator can claim a node through a SOCKS5 or HTTP(S) proxy.
 
 You should first configure the proxy in the `[cloud]` section of `netdata.conf`. The proxy settings you specify here
 will also be used to tunnel the ACLK. The default `proxy` setting is `none`.
