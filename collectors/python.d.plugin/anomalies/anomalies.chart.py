@@ -3,6 +3,7 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# TODO: add param for data_max_n to work alongside train_max_n and so remove train_sample_pct
 
 import requests
 import numpy as np
