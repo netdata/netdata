@@ -42,9 +42,8 @@ MODEL_CONFIG = {
     'lags_n': 2,
     'smoothing_n': 2,
     'data_max_n': 60*60,
-    'train_max_n': 60*60,
+    'train_max_n': 60*30,
     'train_min_n': 60,
-    'train_sample_pct': 1,
     'fit_every_n': 60*5,
     'flags_min_n': 2,
     'flags_window_n': 3
@@ -168,7 +167,8 @@ class Service(SimpleService):
         if self.lags_n >= 1:
             df = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna()
         # sample if specified
-        if self.train_max_n < self.data_max_n:
+        if (self.train_max_n < self.data_max_n) and (len(self.data) > self.train_max_n):
+            self.debug("training on a sample of {} out of {} observations".format(self.train_max_n, self.data_max_n))
             df = df.sample(n=self.train_max_n)
         X = df.values
         return X
