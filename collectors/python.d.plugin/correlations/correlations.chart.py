@@ -9,14 +9,14 @@ import pandas as pd
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 2
-update_every = 5
+update_every = 10
 
 HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
-TRAIN_MAX_N = 60*5
+TRAIN_MAX_N = 60
 CORR_DIFF_THOLD = 0.25
 
 ORDER = [
