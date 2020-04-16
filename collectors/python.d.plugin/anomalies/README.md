@@ -59,6 +59,10 @@ So an example of how things might look when all is normal might look like below,
 
 ![](images/anomalies_normal.jpg)
 
+And here is an example where some charts have consistent anomaly flags against them.
+
+![](images/anomalies_abnormal.jpg)
+
 # Notes
 - There will be a 'burn in' period at the start whereby the model will be a bit noisy until it gets the opportunity to train on more data.
 - We'd love to hear and feedback or ideas on the feature so please reach out to us at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) if you'd like to chat. 
