@@ -10,9 +10,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 # Agent-cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata Agent to Netdata Cloud. The ACLK uses
-[MQTT](https://en.wikipedia.org/wiki/MQTT) over secure websockets to create, persist, and encrypt the connection from
-end-to-end, and enable the features found in Netdata Cloud. _No data is exchanged with Netdata Cloud until you claim a
-node._
+[MQTT](https://en.wikipedia.org/wiki/MQTT) over secure websockets to first create, persist, encrypt the connection, and
+then enable the features found in Netdata Cloud. _No data is exchanged with Netdata Cloud until you claim a node._
 
 Read our [claiming documentation](/claim/README.md) for a guide for claiming a node using the ACLK and additional
 troubleshooting and reference information.
