@@ -169,7 +169,7 @@ class Service(SimpleService):
             df = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna()
         # sample if specified
         if train_or_predict == 'train':
-            if (self.train_max_n < self.data_max_n) and (len(self.data) > self.train_max_n):
+            if (self.train_max_n < self.data_max_n) and (len(df) > self.train_max_n):
                 self.debug("training on a sample of {} out of {} observations".format(self.train_max_n, self.data_max_n))
                 df = df.sample(n=self.train_max_n)
         X = df.values
