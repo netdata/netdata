@@ -57,7 +57,7 @@ MODEL_CONFIG = {
 
 So an example of how things might look when all is normal might look like below:
 
-![](https://drive.google.com/file/d/1cIRAysz9xNho_sCVqrbfb6b3VOAHsd9-/view?usp=sharing)
+![](images/anomalies_normal.jpg)
 
 # Notes
 - There will be a 'burn in' period at the start whereby the model will be a bit noisy until it gets the opportunity to train on more data.
