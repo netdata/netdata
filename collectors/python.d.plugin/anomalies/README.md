@@ -65,6 +65,7 @@ And here is an example where some charts have consistent anomaly flags against t
 
 # Notes
 - There will be a 'burn in' period at the start whereby the model will be a bit noisy until it gets the opportunity to train on more data.
+- As this is still an experimental feature and involves training ML models on the same host as the agent there will be some overhead cost of this plugin in terms of cpu's usage. So it might be best to initially turn this on in a setting where you can benchmark and get comfortable with the impact the plugin itself may have on the system. Probably the nicest way to use this plugin would be on a master agent where you are comfortable spending some additional resources.  
 - We'd love to hear and feedback or ideas on the feature so please reach out to us at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) if you'd like to chat. 
 
 # Useful Links
