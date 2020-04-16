@@ -150,11 +150,12 @@ class Service(SimpleService):
         # limit size of data maintained
         self.data = self.data[-self.data_max_n:]
 
-    def make_x(self, df: pd.DataFrame):
+    def make_x(self, df: pd.DataFrame, train_or_predict: str = 'train'):
         """
         Given the input dataframe apply model relevant pre-processing to
         get X feature vector for the model to train or score on.
         :param df: host to pull data from <pd.DataFrame>
+        :param train_or_predict: if we are making x to train a model or make a prediction <str>
         :return: Numpy array that represents X feature vector to feed into the model.
         """
         # take diffs
@@ -167,9 +168,10 @@ class Service(SimpleService):
         if self.lags_n >= 1:
             df = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna()
         # sample if specified
-        if (self.train_max_n < self.data_max_n) and (len(self.data) > self.train_max_n):
-            self.debug("training on a sample of {} out of {} observations".format(self.train_max_n, self.data_max_n))
-            df = df.sample(n=self.train_max_n)
+        if train_or_predict == 'train':
+            if (self.train_max_n < self.data_max_n) and (len(self.data) > self.train_max_n):
+                self.debug("training on a sample of {} out of {} observations".format(self.train_max_n, self.data_max_n))
+                df = df.sample(n=self.train_max_n)
         X = df.values
         return X
 
@@ -199,7 +201,9 @@ class Service(SimpleService):
         """
         prediction = []
         # create feature vector on recent data to make predictions on
-        X_predict = self.make_x(self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))))
+        X_predict = self.make_x(
+            df=self.data_to_df(self.data, charts=[chart], n=(1+((self.lags_n + self.smoothing_n)*5))),
+            train_or_predict='predict')
         self.debug('X_predict.shape={}'.format(X_predict.shape))
         #self.debug('X_predict={}'.format(X_predict))
         # make score, prob, flag as specified and keep most recent as current prediction
