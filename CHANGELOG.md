@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- Revert "Improved ACLK reconnection sequence " [\#8728](https://github.com/netdata/netdata/pull/8728) ([cosmix](https://github.com/cosmix))
+- Fixed the build matrix in the build & install checks. [\#8715](https://github.com/netdata/netdata/pull/8715) ([Ferroin](https://github.com/Ferroin))
+- Improved ACLK reconnection sequence  [\#8708](https://github.com/netdata/netdata/pull/8708) ([stelfrag](https://github.com/stelfrag))
 - Fixed Arch Linux Ci checks. [\#8699](https://github.com/netdata/netdata/pull/8699) ([Ferroin](https://github.com/Ferroin))
 - yamllint: enable truthy rule [\#8698](https://github.com/netdata/netdata/pull/8698) ([ilyam8](https://github.com/ilyam8))
 - Fixes compatibility with RH 7.x family [\#8694](https://github.com/netdata/netdata/pull/8694) ([thiagoftsm](https://github.com/thiagoftsm))
+- added certificate revocation alert [\#8684](https://github.com/netdata/netdata/pull/8684) ([yasharne](https://github.com/yasharne))
 - Docs: Standardize links between documentation [\#8638](https://github.com/netdata/netdata/pull/8638) ([joelhans](https://github.com/joelhans))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
@@ -197,12 +201,6 @@
 - Fixes conditional for NetData Updater when checking for new updates [\#8028](https://github.com/netdata/netdata/pull/8028) ([gmeszaros](https://github.com/gmeszaros))
 - Add support for libmosquitto to netdata-installer.sh for ACLK support. [\#8025](https://github.com/netdata/netdata/pull/8025) ([Ferroin](https://github.com/Ferroin))
 - Fix: Documentation states in one place default is dbengine and in another save is default [\#8017](https://github.com/netdata/netdata/pull/8017) ([underhood](https://github.com/underhood))
-- invalid literal for float\(\): NN.NNt [\#8013](https://github.com/netdata/netdata/pull/8013) ([blaines](https://github.com/blaines))
-- Fix missing variables on stream [\#8011](https://github.com/netdata/netdata/pull/8011) ([thiagoftsm](https://github.com/thiagoftsm))
-- /docs/generator: use h1 heading as page title for collectors pages [\#8009](https://github.com/netdata/netdata/pull/8009) ([ilyam8](https://github.com/ilyam8))
-- /docs/generator: build docs only for go.d itself and its modules [\#8005](https://github.com/netdata/netdata/pull/8005) ([ilyam8](https://github.com/ilyam8))
-- Update database servers group in apps\_groups.conf [\#8004](https://github.com/netdata/netdata/pull/8004) ([DefauIt](https://github.com/DefauIt))
-- /collectors/charts.d.plugin: fix `os\_id` detection in `run` [\#8002](https://github.com/netdata/netdata/pull/8002) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
