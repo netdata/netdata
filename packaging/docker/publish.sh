@@ -74,6 +74,12 @@ for ARCH in ${ARCHS[@]}; do
     TAG="${MANIFEST_LIST}-${ARCH}"
     echo "Publishing image ${TAG}.."
     $DOCKER_CMD push "${TAG}"
+
+    published() {
+        curl -s "https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags" | jq -e -r '.results[] | select(.name == "'"${VERSION}-${ARCH}"'")' > /dev/null
+    }
+    retry 5 published
+
     echo "Image ${TAG} published succesfully!"
 done
 
