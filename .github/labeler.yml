@@ -1,3 +1,4 @@
+---
 # This configures label matching for PR's.
 #
 # The keys are labels, and the values are lists of minimatch patterns

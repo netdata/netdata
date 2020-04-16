@@ -1,3 +1,4 @@
+---
 version: "2"
 checks:
   argument-count:
@@ -43,9 +44,9 @@ plugins:
     enabled: false
     config:
       languages:
-      - javascript:
+        - javascript:
           mass_threshold: 100
-      - python:
+        - python:
           python_version: 3
           mass_threshold: 100
     checks:
@@ -96,4 +97,3 @@ exclude_patterns:
   - "collectors/node.d.plugin/node_modules/extend.js"
   - "collectors/node.d.plugin/node_modules/pixl-xml.js"
   - "collectors/node.d.plugin/node_modules/net-snmp.js"
-

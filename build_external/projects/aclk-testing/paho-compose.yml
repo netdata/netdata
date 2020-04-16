@@ -1,3 +1,4 @@
+---
 version: '3.3'
 services:
   paho_inspect:

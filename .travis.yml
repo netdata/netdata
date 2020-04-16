@@ -17,7 +17,9 @@ before_install:
 # Install dependencies for all, once
 #
 install:
-  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
+  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin \
+    zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev \
+    libnetfilter-acct-dev gnupg python-pip
   - sudo pip install git-semver==0.2.4 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
   - source tests/installer/slack.sh
   - export NOTIF_CHANNEL="automation-beta"
@@ -25,7 +27,11 @@ install:
   - export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
   - export LATEST_RELEASE_VERSION="$(cat packaging/version | cut -d'-' -f1)"
   - export LATEST_RELEASE_DATE="$(git log -1 --format=%aD "${LATEST_RELEASE_VERSION}" | cat)"
-  - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
+  - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then \
+      export BUILD_VERSION="$(cat packaging/version \
+        | cut -d'-' -f1,2 \
+        | sed -e 's/-/./g').latest"; \
+    fi;
   - export DEPLOY_REPO="netdata"  # Default production packaging repository
   - export PACKAGING_USER="netdata" # Standard package cloud account
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
@@ -97,9 +103,15 @@ jobs:
     - stage: Build process
 
       name: Standard netdata build
-      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
-      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
+      script: >
+        fakeroot ./netdata-installer.sh
+        --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct
+        --enable-plugin-freeipmi --disable-lto
+      env: >
+        CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all
+        -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2
+        -DNETDATA_VERIFY_LOCKS=1'
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing"
 
     - name: Docker container build process (alpine installation)
       script: packaging/docker/build.sh
@@ -112,61 +124,113 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
 
     - name: Build/install for CentOS 7 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+      script: >
+        docker run -it -v "${PWD}:/netdata:rw" -w /netdata
+        "netdata/os-test:centos7"
+        ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
 
       # Ubuntu runs
     - name: Run netdata lifecycle on Ubuntu 16.04
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:16.04" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:16.04" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 16.04"
 
     - name: Run netdata lifecycle, on Ubuntu 18.04
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:18.04" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:18.04" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 18.04"
 
     - name: Run netdata lifecycle, on Ubuntu 19.10
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.10" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.10" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.10"
 
       # Centos runs
     - name: Run netdata lifecycle on CentOS 7
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh && break; done '
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
 
     - name: Run netdata lifecycle, on Debian 9
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:stretch" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:stretch" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 9 (stretch)"
 
     - name: Run netdata lifecycle, on Debian 10
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:buster" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:buster" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 10 (buster)"
 
       # openSUSE runs
     - name: Run netdata lifecycle, on openSUSE 15.1
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.1" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.1" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.1"
 
     - name: Run netdata lifecycle, on openSUSE Tumbleweed
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/tumbleweed:latest" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/tumbleweed:latest" tests/updater_checks.sh \
+          && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/tumbleweed:latest"
 
       # Alpine runs
     - name: Run netdata lifecycle, on Alpine linux
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Alpine"
 
       # Arch linux runs
     - name: Run netdata lifecycle, on ArchLinux
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "archlinux/base:latest" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "archlinux/base:latest" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
 
       # Fedora runs
     - name: Run netdata lifecycle, on Fedora 30
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
 
     - name: Run netdata lifecycle, on Fedora 31
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh && break; done'
+      script: >
+        for i in $(seq 0 4); do
+          printf "[XXX: Run #%s]\n" "$i";
+          docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh && break;
+        done
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
@@ -183,8 +247,10 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Changelog generation and tag of release, failed"
       git:
         depth: false
-      if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
-
+      if: >
+        commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/
+        AND tag !~ /(-rc)/
+        OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
 
     # ###### Packaging workflow section ######
     # References:
@@ -197,10 +263,13 @@ jobs:
         git:
           depth: false
         before_install:
-          - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
+          - sudo apt-get install -y wget lxc python3-lxc python-lxc \
+            lxc-templates dh-make git-buildpackage build-essential \
+            libdistro-info-perl
           - source tests/installer/slack.sh
         before_script:
-          - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+          - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" \
+            && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
         script:
           - echo "GIT Branch:" && git branch
           - echo "Last commit:" && git log -1
@@ -213,7 +282,8 @@ jobs:
           - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
         after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
         before_deploy:
-          - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
+          - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" \
+            || echo "No stale DEB found"
         deploy:
           - provider: packagecloud
             repository: "${DEPLOY_REPO}"
@@ -228,7 +298,11 @@ jobs:
               branch: "master"
               condition: -d "${PACKAGES_DIRECTORY}"
         after_deploy:
-          - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
+          - if [ -n "${BUILDER_NAME}" ]; then \
+              rm -rf /home/${BUILDER_NAME}/* \
+              && echo "Cleared /home/${BUILDER_NAME} directory" \
+              || echo "Failed to clean /home/${BUILDER_NAME} directory"; \
+            fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
       name: "Build & Publish DEB package for ubuntu/eoan"
@@ -288,7 +362,8 @@ jobs:
           - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
           - source tests/installer/slack.sh
         before_script:
-          - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+          - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" \
+            && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
         script:
           - echo "GIT Branch:" && git branch
           - echo "Last commit:" && git log -1
@@ -300,7 +375,8 @@ jobs:
           - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
         after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
         before_deploy:
-          - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
+          - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" \
+            || echo "No stale RPM found"
         deploy:
           - provider: packagecloud
             repository: "${DEPLOY_REPO}"
@@ -315,7 +391,11 @@ jobs:
               branch: "master"
               condition: -d "${PACKAGES_DIRECTORY}"
         after_deploy:
-          - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
+          - if [ -n "${BUILDER_NAME}" ]; then \
+              rm -rf /home/${BUILDER_NAME}/* \
+              && echo "Cleared /home/${BUILDER_NAME} directory" \
+              || echo "Failed to clean /home/${BUILDER_NAME} directory"; \
+            fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
       name: "Build & Publish RPM package for Enterprise Linux 7"
@@ -406,16 +486,19 @@ jobs:
         - echo "Last commit:" && git log -1
         - echo "GIT Describe:" && git describe
         - echo "packaging/version:" && cat packaging/version
-        - echo "Generating release artifacts" && .travis/create_artifacts.sh  # Could/should be a common storage to put this and share between jobs
+        - echo "Generating release artifacts" \
+          && .travis/create_artifacts.sh  # Could/should be a common storage to put this and share between jobs
         - .travis/draft_release.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
-
 
     - stage: Trigger deb and rpm package build (release)
       name: Trigger deb and rpm package build
       script: .travis/trigger_package_generation.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during release" "${NOTIF_CHANNEL}"
-
+      after_failure: >
+        post_message
+        "TRAVIS_MESSAGE"
+        "<!here> Failed to trigger deb and rpm package build during release"
+        "${NOTIF_CHANNEL}"
 
     # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
     - stage: Nightly operations
@@ -486,13 +569,21 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly artifacts generation failed"
       git:
         depth: false
-      before_deploy:
+      before_deploy: |
         echo "Preparing creds under ${TRAVIS_REPO_SLUG}";
         if [ "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
-           openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
+           openssl aes-256-cbc \
+             -K $encrypted_8daf19481253_key \
+             -iv $encrypted_8daf19481253_iv \
+             -in .travis/gcs-credentials.json.enc \
+             -out .travis/gcs-credentials.json -d;
         else
            echo "Beta deployment stage in progress";
-           openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
+           openssl aes-256-cbc \
+             -K $encrypted_8daf19481253_key \
+             -iv $encrypted_8daf19481253_iv \
+             -in .travis/gcs-credentials.json.enc \
+             -out .travis/gcs-credentials.json -d;
         fi;
       deploy:
         # Beta storage, used for testing purposes
@@ -529,4 +620,7 @@ jobs:
     - stage: Trigger deb and rpm package build (nightly release)
       name: Trigger deb and rpm package build
       script: .travis/trigger_package_generation.sh "[Build latest]"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during nightly release" "${NOTIF_CHANNEL}"
+      after_failure: >
+        post_message "TRAVIS_MESSAGE"
+        "<!here> Failed to trigger deb and rpm package build during nightly release"
+        "${NOTIF_CHANNEL}"
