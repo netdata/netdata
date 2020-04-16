@@ -3498,7 +3498,7 @@ NETDATA.gaugeChartCreate = function (state, data) {
         colorStart: startColor,     // Colors
         colorStop: stopColor,       // just experiment with them
         strokeColor: strokeColor,   // to see which ones work best for you
-        generateGradient: (generateGradient === true), // gmosx:
+        generateGradient: (generateGradient === true), // gmosx: 
         gradientType: 0,
         highDpiSupport: true        // High resolution support
     };
@@ -10006,7 +10006,7 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);
-                });
+                });    
             }
         });
     },
@@ -10057,7 +10057,7 @@ NETDATA.registry = {
             // data.
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
-        }
+        } 
 
         console.log("ACCESS", name, url);
 
