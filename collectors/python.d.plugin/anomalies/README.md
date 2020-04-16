@@ -59,7 +59,7 @@ So an example of how things might look when all is normal might look like below,
 
 ![](images/anomalies_normal.jpg)
 
-And here is an example where some charts have consistent anomaly flags against them.
+And here is an example where some charts have consistent anomaly flags against them that might be worth exploring in more detail by navigating to the charts in question.
 
 ![](images/anomalies_abnormal.jpg)
 
