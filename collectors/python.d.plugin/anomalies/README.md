@@ -55,7 +55,7 @@ MODEL_CONFIG = {
 
 ### Screenshots
 
-So an example of how things might look when all is normal might look like below:
+So an example of how things might look when all is normal might look like below, where the anomaly probabilities are jumping around but none are really high enough to trigger an anomaly flag. 
 
 ![](images/anomalies_normal.jpg)
 
