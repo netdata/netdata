@@ -3,8 +3,6 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# TODO: add param for data_max_n to work alongside train_max_n and so remove train_sample_pct
-
 import requests
 import numpy as np
 import pandas as pd
@@ -43,6 +41,7 @@ MODEL_CONFIG = {
     'diffs_n': 1,
     'lags_n': 2,
     'smoothing_n': 2,
+    'data_max_n': 60*60,
     'train_max_n': 60*60,
     'train_min_n': 60,
     'train_sample_pct': 1,
@@ -89,7 +88,8 @@ class Service(SimpleService):
         self.diffs_n = MODEL_CONFIG.get('diffs_n', 0)
         self.lags_n = MODEL_CONFIG.get('lags_n', 0)
         self.smoothing_n = MODEL_CONFIG.get('smoothing_n', 0)
-        self.train_max_n = MODEL_CONFIG.get('train_max_n', 60*10)
+        self.data_max_n = MODEL_CONFIG.get('data_max_n', 60*10)
+        self.train_max_n = MODEL_CONFIG.get('train_max_n', 60 * 10)
         self.train_min_n = MODEL_CONFIG.get('train_min_n', 60)
         self.train_sample_pct = MODEL_CONFIG.get('train_sample_pct', 1)
         self.fit_every_n = MODEL_CONFIG.get('fit_every_n', 60*5)
@@ -149,7 +149,7 @@ class Service(SimpleService):
         # append data to self
         self.data.append(data)
         # limit size of data maintained
-        self.data = self.data[-self.train_max_n:]
+        self.data = self.data[-self.data_max_n:]
 
     def make_x(self, df: pd.DataFrame):
         """
@@ -168,8 +168,8 @@ class Service(SimpleService):
         if self.lags_n >= 1:
             df = pd.concat([df.shift(n) for n in range(self.lags_n + 1)], axis=1).dropna()
         # sample if specified
-        if 0 < self.train_sample_pct < 1:
-            df = df.sample(frac=self.train_sample_pct)
+        if self.train_max_n < self.data_max_n:
+            df = df.sample(n=self.train_max_n)
         X = df.values
         return X
 
