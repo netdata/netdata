@@ -221,7 +221,7 @@ void spawn_client(void *arg)
     info("Shutting down spawn client loop complete.");
     assert(0 == uv_loop_close(loop));
 
-    exit(0);
+    return;
 
 error_after_spawn_server:
     uv_close((uv_handle_t *)&spawn_channel, NULL);
