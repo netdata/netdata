@@ -17,14 +17,39 @@
   force = true
 
 [[redirects]]
-  from  = "/*"
+  from  = "/aclk/*"
+  to    = "https://learn.netdata.cloud/docs/agent/aclk/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/build_external/*"
+  to    = "https://learn.netdata.cloud/docs/agent/build_external/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/claim/*"
+  to    = "https://learn.netdata.cloud/docs/agent/claim/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/cli/*"
+  to    = "https://learn.netdata.cloud/docs/agent/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/collectors/*"
+  to    = "https://learn.netdata.cloud/docs/agent/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/packaging/*"
   to    = "https://learn.netdata.cloud/docs/agent/:splat"
   force = true
 
 [[redirects]]
   from = "/docs/GettingStarted/"
-  to = "/docs/getting-started"
+  to = "https://learn.netdata.cloud/docs/agent/getting-started"
 
 [[redirects]]
   from = "/docs/tutorials/dimension-templates/"
-  to = "/health/tutorials/dimension-templates/"
+  to = "https://learn.netdata.cloud/docs/agent/health/tutorials/dimension-templates/"
