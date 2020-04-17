@@ -22,6 +22,11 @@
   force = true
 
 [[redirects]]
+  from  = "/backends/*"
+  to    = "https://learn.netdata.cloud/docs/agent/backends/:splat"
+  force = true
+
+[[redirects]]
   from  = "/build_external/*"
   to    = "https://learn.netdata.cloud/docs/agent/build_external/:splat"
   force = true
@@ -49,6 +54,11 @@
 [[redirects]]
   from  = "/database/*"
   to    = "https://learn.netdata.cloud/docs/agent/database/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/diagrams/*"
+  to    = "https://learn.netdata.cloud/docs/agent/diagrams/:splat"
   force = true
 
 [[redirects]]
@@ -104,6 +114,16 @@
 [[redirects]]
   from  = "/code_of_conduct/"
   to    = "https://learn.netdata.cloud/docs/agent/code_of_conduct/"
+  force = true
+
+[[redirects]]
+  from  = "/contributing/"
+  to    = "https://learn.netdata.cloud/docs/agent/contributing/"
+  force = true
+
+[[redirects]]
+  from  = "/contributors/"
+  to    = "https://learn.netdata.cloud/docs/agent/contributors/"
   force = true
 
 [[redirects]]
