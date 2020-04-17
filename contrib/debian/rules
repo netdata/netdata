@@ -72,6 +72,7 @@ override_dh_install: debian/netdata.postinst
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
+	packaging/bundle-dashboard.sh . ${TOP}/var/lib/netdata/www
 	mkdir -p "$(TOP)/usr/share/netdata/www"
 	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
 		echo Relocating $$D; \

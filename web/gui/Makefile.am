@@ -45,7 +45,8 @@ dist_noinst_DATA = \
     $(DASHBOARD_JS_FILES) \
     $(NULL)
 
-dist_web_DATA = \
+webolddir=$(webdir)/old
+dist_webold_DATA = \
     demo.html \
     demo2.html \
     demosites.html \
@@ -71,12 +72,12 @@ dist_web_DATA = \
     version.txt \
     $(NULL)
 
-webstaticdir=$(webdir)/static/img
+webstaticdir=$(webolddirg)/static/img
 dist_webstatic_DATA = \
     static/img/netdata-logomark.svg \
     $(NULL)
 
-weblibdir=$(webdir)/lib
+weblibdir=$(webolddirg)/lib
 dist_weblib_DATA = \
     lib/bootstrap-3.3.7.min.js \
     lib/bootstrap-slider-10.0.0.min.js \
@@ -100,7 +101,7 @@ dist_weblib_DATA = \
     lib/tableExport-1.6.0.min.js \
     $(NULL)
 
-webcssdir=$(webdir)/css
+webcssdir=$(webolddirg)/css
 dist_webcss_DATA = \
     css/morris-0.5.1.css \
     css/bootstrap-3.3.7.css \
@@ -111,7 +112,7 @@ dist_webcss_DATA = \
     css/c3-0.4.18.min.css \
     $(NULL)
 
-webfontsdir=$(webdir)/fonts
+webfontsdir=$(webolddirg)/fonts
 dist_webfonts_DATA = \
     fonts/glyphicons-halflings-regular.eot \
     fonts/glyphicons-halflings-regular.svg \
@@ -120,7 +121,7 @@ dist_webfonts_DATA = \
     fonts/glyphicons-halflings-regular.woff2 \
     $(NULL)
 
-webimagesdir=$(webdir)/images
+webimagesdir=$(webolddirg)/images
 dist_webimages_DATA = \
     images/netdata-logomark.svg \
     images/alert-128-orange.png \
@@ -164,11 +165,11 @@ dashboard.js: $(DASHBOARD_JS_FILES)
 	if test -f $@; then rm -f $@; fi
 	cat $(DASHBOARD_JS_FILES) > $@.tmp && mv $@.tmp $@
 
-webwellknowndir=$(webdir)/.well-known
+webwellknowndir=$(webolddirg)/.well-known
 dist_webwellknown_DATA = \
     $(NULL)
 
-webdntdir=$(webdir)/.well-known/dnt
+webdntdir=$(webolddirg)/.well-known/dnt
 dist_webdnt_DATA = \
     .well-known/dnt/cookies \
     $(NULL)
