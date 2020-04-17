@@ -512,7 +512,7 @@ void *process_publisher(void *ptr)
 
 static void move_from_kernel2user_global() {
     uint64_t idx;
-    uint64_t res[NETDATA_GLOBAL_VECTOR];
+    netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
 
     netdata_idx_t *val = hash_values;
     for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
