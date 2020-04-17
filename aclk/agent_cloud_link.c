@@ -791,7 +791,7 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
         w->response.code = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
-        web_client_send_http_header(w);
+        web_client_build_http_header(w);
         BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
