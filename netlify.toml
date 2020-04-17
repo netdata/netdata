@@ -33,17 +33,87 @@
 
 [[redirects]]
   from  = "/cli/*"
-  to    = "https://learn.netdata.cloud/docs/agent/:splat"
+  to    = "https://learn.netdata.cloud/docs/agent/cli/:splat"
   force = true
 
 [[redirects]]
   from  = "/collectors/*"
-  to    = "https://learn.netdata.cloud/docs/agent/:splat"
+  to    = "https://learn.netdata.cloud/docs/agent/collectors/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/daemon/*"
+  to    = "https://learn.netdata.cloud/docs/agent/daemon/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/database/*"
+  to    = "https://learn.netdata.cloud/docs/agent/database/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/exporting/*"
+  to    = "https://learn.netdata.cloud/docs/agent/exporting/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/health/*"
+  to    = "https://learn.netdata.cloud/docs/agent/health/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/libnetdata/*"
+  to    = "https://learn.netdata.cloud/docs/agent/libnetdata/:splat"
   force = true
 
 [[redirects]]
   from  = "/packaging/*"
-  to    = "https://learn.netdata.cloud/docs/agent/:splat"
+  to    = "https://learn.netdata.cloud/docs/agent/packaging/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/registry/*"
+  to    = "https://learn.netdata.cloud/docs/agent/registry/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/streaming/*"
+  to    = "https://learn.netdata.cloud/docs/agent/streaming/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/tests/*"
+  to    = "https://learn.netdata.cloud/docs/agent/tests/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/web/*"
+  to    = "https://learn.netdata.cloud/docs/agent/web/:splat"
+  force = true
+
+[[redirects]]
+  from  = "/breaking_changes/"
+  to    = "https://learn.netdata.cloud/docs/agent/breaking_changes/"
+  force = true
+
+[[redirects]]
+  from  = "/changelog/"
+  to    = "https://learn.netdata.cloud/docs/agent/changelog/"
+  force = true
+
+[[redirects]]
+  from  = "/code_of_conduct/"
+  to    = "https://learn.netdata.cloud/docs/agent/code_of_conduct/"
+  force = true
+
+[[redirects]]
+  from  = "/redistributed/"
+  to    = "https://learn.netdata.cloud/docs/agent/redistributed/"
+  force = true
+
+[[redirects]]
+  from  = "/security/"
+  to    = "https://learn.netdata.cloud/docs/agent/security/"
   force = true
 
 [[redirects]]
