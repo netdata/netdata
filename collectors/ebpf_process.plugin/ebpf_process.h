@@ -48,6 +48,8 @@ typedef struct netdata_syscall_stat {
     struct netdata_syscall_stat  *next; //Link list
 }netdata_syscall_stat_t;
 
+typedef uint64_t netdata_idx_t;
+
 typedef struct netdata_publish_syscall {
     char *dimension;
     char *name;
