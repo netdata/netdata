@@ -9,9 +9,6 @@ int spawn_thread_shutdown;
 
 struct spawn_queue spawn_cmd_queue;
 
-char prot_buffer[MAX_COMMAND_LENGTH];
-unsigned prot_buffer_len = 0;
-
 static struct spawn_cmd_info *create_spawn_cmd(char *command_to_run)
 {
     struct spawn_cmd_info *cmdinfo;

@@ -8,6 +8,9 @@ static uv_pipe_t spawn_channel;
 static uv_loop_t *loop;
 uv_async_t spawn_async;
 
+static char prot_buffer[MAX_COMMAND_LENGTH];
+static unsigned prot_buffer_len = 0;
+
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -33,7 +36,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
     while (source_len) {
         required_len = sizeof(*header);
         if (prot_buffer_len < required_len)
-            copy_to_prot_buffer(required_len - prot_buffer_len, &source, &source_len);
+            copy_to_prot_buffer(prot_buffer, &prot_buffer_len, required_len - prot_buffer_len, &source, &source_len);
         if (prot_buffer_len < required_len)
             return; /* Source buffer ran out */
 
@@ -45,7 +48,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
         case SPAWN_PROT_SPAWN_RESULT:
             required_len += sizeof(*spawn_result);
             if (prot_buffer_len < required_len)
-                copy_to_prot_buffer(required_len - prot_buffer_len, &source, &source_len);
+                copy_to_prot_buffer(prot_buffer, &prot_buffer_len, required_len - prot_buffer_len, &source, &source_len);
             if (prot_buffer_len < required_len)
                 return; /* Source buffer ran out */
 
@@ -71,7 +74,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
         case SPAWN_PROT_CMD_EXIT_STATUS:
             required_len += sizeof(*exit_status);
             if (prot_buffer_len < required_len)
-                copy_to_prot_buffer(required_len - prot_buffer_len, &source, &source_len);
+                copy_to_prot_buffer(prot_buffer, &prot_buffer_len, required_len - prot_buffer_len, &source, &source_len);
             if (prot_buffer_len < required_len)
                 return; /* Source buffer ran out */
 

@@ -79,8 +79,6 @@ struct write_context {
 extern int spawn_thread_error;
 extern int spawn_thread_shutdown;
 extern uv_async_t spawn_async;
-extern char prot_buffer[];
-extern unsigned prot_buffer_len;
 
 void spawn_init(void);
 void spawn_server(void);
@@ -96,13 +94,14 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
  * Copies from the source buffer to the protocol buffer. It advances the source buffer by the amount copied. It
  * subtracts the amount copied from the source length.
  */
-static inline void copy_to_prot_buffer(unsigned max_to_copy, char **source, unsigned *source_len)
+static inline void copy_to_prot_buffer(char *prot_buffer, unsigned *prot_buffer_len, unsigned max_to_copy,
+                                       char **source, unsigned *source_len)
 {
     unsigned to_copy;
 
     to_copy = MIN(max_to_copy, *source_len);
-    memcpy(prot_buffer + prot_buffer_len, *source, to_copy);
-    prot_buffer_len += to_copy;
+    memcpy(prot_buffer + *prot_buffer_len, *source, to_copy);
+    *prot_buffer_len += to_copy;
     *source += to_copy;
     *source_len -= to_copy;
 }

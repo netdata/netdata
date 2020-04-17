@@ -12,6 +12,9 @@ static uv_thread_t thread;
 /* spawn outstanding execution structure */
 static avl_tree_lock spawn_outstanding_exec_tree;
 
+static char prot_buffer[MAX_COMMAND_LENGTH];
+static unsigned prot_buffer_len = 0;
+
 struct spawn_execution_info {
     avl avl;
 
@@ -201,7 +204,7 @@ static void server_parse_spawn_protocol(unsigned source_len, char *source)
     while (source_len) {
         required_len = sizeof(*header);
         if (prot_buffer_len < required_len)
-            copy_to_prot_buffer(required_len - prot_buffer_len, &source, &source_len);
+            copy_to_prot_buffer(prot_buffer, &prot_buffer_len, required_len - prot_buffer_len, &source, &source_len);
         if (prot_buffer_len < required_len)
             return; /* Source buffer ran out */
 
@@ -211,7 +214,7 @@ static void server_parse_spawn_protocol(unsigned source_len, char *source)
 
         required_len += sizeof(*payload);
         if (prot_buffer_len < required_len)
-            copy_to_prot_buffer(required_len - prot_buffer_len, &source, &source_len);
+            copy_to_prot_buffer(prot_buffer, &prot_buffer_len, required_len - prot_buffer_len, &source, &source_len);
         if (prot_buffer_len < required_len)
             return; /* Source buffer ran out */
 
@@ -225,7 +228,7 @@ static void server_parse_spawn_protocol(unsigned source_len, char *source)
             required_len = MAX_COMMAND_LENGTH - 1;
         }
         if (prot_buffer_len < required_len)
-            copy_to_prot_buffer(required_len - prot_buffer_len, &source, &source_len);
+            copy_to_prot_buffer(prot_buffer, &prot_buffer_len, required_len - prot_buffer_len, &source, &source_len);
         if (prot_buffer_len < required_len)
             return; /* Source buffer ran out */
 
