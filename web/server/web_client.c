@@ -1118,7 +1118,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     return bytes;
 }
 
-static inline void web_client_send_http_header(struct web_client *w) {
+void web_client_send_http_header(struct web_client *w) {
     if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 

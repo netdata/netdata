@@ -774,6 +774,7 @@ int aclk_execute_query(struct aclk_query *this_query)
         struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
         w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+        w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
         strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
         w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
         w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
@@ -789,7 +790,8 @@ int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        int rc = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        w->response.code = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        web_client_send_http_header(w);
         BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
@@ -797,19 +799,21 @@ int aclk_execute_query(struct aclk_query *this_query)
         aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0);
         buffer_strcat(local_buffer, ",\n\t\"payload\": ");
         char *encoded_response = aclk_encode_response(w->response.data->buffer, w->response.data->len, 0);
-        char *encoded_header = aclk_encode_response(w->response.header->buffer, w->response.header->len, 1);
+        char *encoded_header = aclk_encode_response(w->response.header_output->buffer, w->response.header_output->len, 1);
 
         buffer_sprintf(
-            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\", \"headers\": \"%s\"\n}", 
-            rc, encoded_response, encoded_header);
+            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\",\n\"headers\": \"%s\"\n}", 
+            w->response.code, encoded_response, encoded_header);
 
         buffer_sprintf(local_buffer, "\n}");
 
-        info("Response:%s",local_buffer->buffer);
+        info("Response:%s", encoded_header);
 
         aclk_send_message(this_query->topic, local_buffer->buffer, this_query->msg_id);
 
         buffer_free(w->response.data);
+        buffer_free(w->response.header);
+        buffer_free(w->response.header_output);
         freez(w);
         buffer_free(local_buffer);
         freez(encoded_response);
