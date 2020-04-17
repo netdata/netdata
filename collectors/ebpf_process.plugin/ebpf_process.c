@@ -529,26 +529,26 @@ static void move_from_kernel2user_global() {
         }
     }
 
-    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN]; //open
-    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD]; //close
-    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK]; //unlink
-    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV]; //read + readv
-    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV]; //write + writev
-    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT]; //exit
-    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK]; //release
-    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK]; //fork
-    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE]; //thread
+    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
+    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
+    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
+    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
+    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
+    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
+    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
+    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
+    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
 
-    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN]; //open
-    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD]; //close
-    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK]; //unlink
-    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];  //read + readv
-    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV]; //write + writev
-    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK]; //fork
-    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE]; //thread
+    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
+    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
+    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
+    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
+    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
+    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
+    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
 
-    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV]; //write + writev
-    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];//read + readv
+    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
+    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
 static void move_from_kernel2user()
