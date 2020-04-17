@@ -54,61 +54,22 @@ With `sudo`:
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`.
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
 
 > Your node may need up to 60 seconds to connect to Netdata Cloud after finishing the claiming process. Please be
 > patient!
 
-If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
-
 ### Claim an Agent running in Docker
 
-First, stop the container, replacing `netdata` with the name of your Agent container.
+You can execute the claiming script on a running agent by appending the script offered by Cloud to a `docker exec -it`
+command:
 
 ```bash
-docker stop netdata
+docker exec -it netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-Then, start the container again with the `docker run` command, passing 
-
-```bash
-docker run -it netdata/netdata /usr/sbin/netdata -D -W "claim -token=BSH_u2gRGweLVttLOL4k00zhgedGWXdBObc_X1-7G9iBKJJUFFVq0MWwCg-gFIbm_d8_eMKmoY-HXsDVj0vh2qQZZ6gJ6T9jc60nU9QVO2fgPPfwNh-p3TeemCdPMtEQk6ZiKps -rooms=a380abef-2244-40e7-a193-ff880c4604ed -url=https://staging.netdata.cloud"
-```
-
-
-
-docker run -it netdata/netdata --entry-point '/usr/sbin/netdata -D -W "claim -token=BSH_u2gRGweLVttLOL4k00zhgedGWXdBObc_X1-7G9iBKJJUFFVq0MWwCg-gFIbm_d8_eMKmoY-HXsDVj0vh2qQZZ6gJ6T9jc60nU9QVO2fgPPfwNh-p3TeemCdPMtEQk6ZiKps -rooms=a380abef-2244-40e7-a193-ff880c4604ed -url=https://staging.netdata.cloud"'
-
-
-
-
-
-
-
-
-
-
-
-
-
-```bash
-docker run -d -it --name=netdata \
-  -p 20000:19999 \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  netdata/netdata \
-  /usr/sbin/netdata -D -W "claim -token=BSH_u2gRGweLVttLOL4k00zhgedGWXdBObc_X1-7G9iBKJJUFFVq0MWwCg-gFIbm_d8_eMKmoY-HXsDVj0vh2qQZZ6gJ6T9jc60nU9QVO2fgPPfwNh-p3TeemCdPMtEQk6ZiKps -rooms=a380abef-2244-40e7-a193-ff880c4604ed -url=https://staging.netdata.cloud"
-```
-
-```bash
-docker exec -it netdata netdata-claim.sh -token=DK3XktBOvJ_CiWXlHtGlPWBdcwc-aLajq_1TuytQv8ATOv1ycpmKXXruFJhFZoUMCsJcjRchb1zxUBAFyropTpNF38Tz4QCb8TEITndfL-2aDtMrHFCK9j_TfcWG8XEX9s-BFkk -rooms=8a796d97-7901-47c6-9e46-9eae56bd6942 -url=https://app.netdata.cloud
-```
-
+The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the
+[troubleshooting information](#troubleshooting).
 
 ### Claim through a proxy
 
@@ -146,12 +107,7 @@ added to `netdata.conf`.
 netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -url=https://app.netdata.cloud -proxy=socks5h://203.0.113.0:1080
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`.
-
-> Your node may need up to 60 seconds to connect to Netdata Cloud after finishing the claiming process. Please be
-> patient!
-
-If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
 
 ### Troubleshooting
 
