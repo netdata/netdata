@@ -73,7 +73,7 @@ struct config collector_config;
 static int mykernel = 0;
 static int nprocs;
 static int isrh;
-uint32_t *hash_values;
+uint64_t *hash_values;
 
 pthread_mutex_t lock;
 
@@ -511,13 +511,13 @@ void *process_publisher(void *ptr)
 }
 
 static void move_from_kernel2user_global() {
-    uint32_t idx;
-    uint32_t res[NETDATA_GLOBAL_VECTOR];
+    uint64_t idx;
+    uint64_t res[NETDATA_GLOBAL_VECTOR];
 
-    uint32_t *val = hash_values;
+    uint64_t *val = hash_values;
     for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
         if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
-            uint32_t total = 0;
+            uint64_t total = 0;
             int i;
             int end = (mykernel < 265984)?1:nprocs;
             for (i = 0; i < end; i++)
@@ -638,7 +638,7 @@ int allocate_global_vectors() {
         return -1;
     }
 
-    hash_values = callocz(nprocs, sizeof(uint32_t));
+    hash_values = callocz(nprocs, sizeof(uint64_t));
     if(!hash_values) {
         return -1;
     }
