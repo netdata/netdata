@@ -54,7 +54,8 @@ With `sudo`:
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see
+the [troubleshooting information](#troubleshooting).
 
 > Your node may need up to 60 seconds to connect to Netdata Cloud after finishing the claiming process. Please be
 > patient!
