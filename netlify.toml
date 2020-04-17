@@ -12,12 +12,12 @@
   command = "./buildhtml.sh"
 
 [[redirects]]
-  from = /docs/*
-  to   = https://learn.netdata.cloud/docs/agent/:splat
+  from = "/docs/*"
+  to   = "https://learn.netdata.cloud/docs/agent/:splat"
 
 [[redirects]]
-  from = /*
-  to   = https://learn.netdata.cloud/docs/agent/:splat
+  from = "/*"
+  to   = "https://learn.netdata.cloud/docs/agent/:splat"
 
 [[redirects]]
   from = "/docs/GettingStarted/"
