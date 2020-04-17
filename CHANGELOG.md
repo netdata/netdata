@@ -6,12 +6,15 @@
 
 **Merged pull requests:**
 
+- Improved ACLK reconnection sequence [\#8729](https://github.com/netdata/netdata/pull/8729) ([stelfrag](https://github.com/stelfrag))
 - Revert "Improved ACLK reconnection sequence " [\#8728](https://github.com/netdata/netdata/pull/8728) ([cosmix](https://github.com/cosmix))
+- Docs: Combined claiming+ACLK documentation [\#8724](https://github.com/netdata/netdata/pull/8724) ([joelhans](https://github.com/joelhans))
 - Fixed the build matrix in the build & install checks. [\#8715](https://github.com/netdata/netdata/pull/8715) ([Ferroin](https://github.com/Ferroin))
 - Improved ACLK reconnection sequence  [\#8708](https://github.com/netdata/netdata/pull/8708) ([stelfrag](https://github.com/stelfrag))
 - Fixed Arch Linux Ci checks. [\#8699](https://github.com/netdata/netdata/pull/8699) ([Ferroin](https://github.com/Ferroin))
 - yamllint: enable truthy rule [\#8698](https://github.com/netdata/netdata/pull/8698) ([ilyam8](https://github.com/ilyam8))
 - Fixes compatibility with RH 7.x family [\#8694](https://github.com/netdata/netdata/pull/8694) ([thiagoftsm](https://github.com/thiagoftsm))
+- charts.d/apcupsd: fix ups status check [\#8688](https://github.com/netdata/netdata/pull/8688) ([ilyam8](https://github.com/ilyam8))
 - added certificate revocation alert [\#8684](https://github.com/netdata/netdata/pull/8684) ([yasharne](https://github.com/yasharne))
 - Docs: Standardize links between documentation [\#8638](https://github.com/netdata/netdata/pull/8638) ([joelhans](https://github.com/joelhans))
 
@@ -195,12 +198,6 @@
 - Added hack to sha256sums.txt to force users of NetData on v1.19.0-483 with a broken updater to update to latest [\#8057](https://github.com/netdata/netdata/pull/8057) ([prologic](https://github.com/prologic))
 - Add config instructions to each collector module README  [\#8052](https://github.com/netdata/netdata/pull/8052) ([joelhans](https://github.com/joelhans))
 - Add required build dep for ACLK dependencies to Dockerfile. [\#8047](https://github.com/netdata/netdata/pull/8047) ([Ferroin](https://github.com/Ferroin))
-- github/workflow: change labeler [\#8032](https://github.com/netdata/netdata/pull/8032) ([ilyam8](https://github.com/ilyam8))
-- Docs: Promote DB engine/long-term metrics storage more heavily [\#8031](https://github.com/netdata/netdata/pull/8031) ([joelhans](https://github.com/joelhans))
-- Check if ACLK can be built [\#8030](https://github.com/netdata/netdata/pull/8030) ([underhood](https://github.com/underhood))
-- Fixes conditional for NetData Updater when checking for new updates [\#8028](https://github.com/netdata/netdata/pull/8028) ([gmeszaros](https://github.com/gmeszaros))
-- Add support for libmosquitto to netdata-installer.sh for ACLK support. [\#8025](https://github.com/netdata/netdata/pull/8025) ([Ferroin](https://github.com/Ferroin))
-- Fix: Documentation states in one place default is dbengine and in another save is default [\#8017](https://github.com/netdata/netdata/pull/8017) ([underhood](https://github.com/underhood))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
