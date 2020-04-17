@@ -62,7 +62,7 @@ the [troubleshooting information](#troubleshooting).
 
 ### Claim an Agent running in Docker
 
-You can execute the claiming script on a running agent by appending the script offered by Cloud to a `docker exec -it`
+You can execute the claiming script on a running agent by appending the script offered by Cloud to a `docker exec ...`
 command:
 
 ```bash
@@ -71,6 +71,29 @@ docker exec -it netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://ap
 
 The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the
 [troubleshooting information](#troubleshooting).
+
+You can also claim a newly-created container with `docker run ...`, using our recommended [Docker
+installation](/packaging/docker/README.md#run-netdata-with-the-docker-command).
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata \
+  /usr/sbin/netdata -D -W set global "netdata cloud" enable -W set cloud "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
+```
+
+The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run the following to find any error output and use that to guide your [troubleshooting](#troubleshooting):
+
+```bash
+docker logs netdata 2>&1 | grep -E 'ACLK|claim|cloud'
+```
 
 ### Claim through a proxy
 
@@ -116,7 +139,7 @@ the [troubleshooting information](#troubleshooting).
 
 If you're having trouble claiming a node, this may be because the ACLK cannot connect to Cloud.
 
-With the Netdata Agent running, visit `http://127.0.0.1/api/v1/info` in your browser. The returned JSON contains four
+With the Netdata Agent running, visit `http://localhost:19999/api/v1/info` in your browser. The returned JSON contains four
 keys that will be helpful to diagnose any issues you might be having with the ACLK or claiming process.
 
 ```json
