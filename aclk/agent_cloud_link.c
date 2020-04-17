@@ -1281,6 +1281,8 @@ void *aclk_main(void *ptr)
 
     if (!netdata_cloud_setting) {
         info("Killing ACLK thread -> cloud functionality has been disabled");
+        struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
         return NULL;
     }
 
