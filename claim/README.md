@@ -99,7 +99,8 @@ For example, a SOCKS5 proxy setting may look like the following:
     proxy = socks5h://proxy.example.com:1080 # With a URL
 ```
 
-You can now move on to claiming. Be sure to switch to the `netdata` user or use `sudo` as explained in the [step above](#how-to-claim-a-node).
+You can now move on to claiming. Be sure to switch to the `netdata` user or use `sudo` as explained in the [step
+above](#how-to-claim-a-node).
 
 When you claim with the `netdata-claim.sh` script, add the `-proxy=` parameter and append the same proxy setting you
 added to `netdata.conf`.
@@ -108,7 +109,8 @@ added to `netdata.conf`.
 netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -url=https://app.netdata.cloud -proxy=socks5h://203.0.113.0:1080
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see
+the [troubleshooting information](#troubleshooting).
 
 ### Troubleshooting
 
@@ -188,7 +190,7 @@ If `aclk-available` is `false` and all other keys are `true`, your Agent is havi
 through the ACLK. Please check your system's firewall.
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-claiming](#claiming-through-a-proxy).
+claiming](#claim-through-a-proxy).
 
 If you are certain firewall and proxy settings are not the issue, you should consult the Agent's `error.log` at
 `/var/log/netdata/error.log` and contact us by [creating an issue on
