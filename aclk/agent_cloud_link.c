@@ -1392,7 +1392,6 @@ exited:
         RSA_free(aclk_private_key);
 
     aclk_main_cleanup(ptr);
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
 
