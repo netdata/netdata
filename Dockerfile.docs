@@ -15,6 +15,9 @@ RUN apk add --no-cache -U git
 # The scripts also use GNU find options
 RUN apk add --no-cache -U findutils
 
+# (20200415) Some Python dependnecy now requires gcc as part of its build step.
+RUN apk add --no-cache -U build-base
+
 # Copy and Install build dependencies first to cache them so we don't have to
 # do this every single time we want to rebuild the docs. The cache is busted
 # when/if the SHA of the requirements.txt is changed.
