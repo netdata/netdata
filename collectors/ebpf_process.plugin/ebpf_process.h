@@ -108,6 +108,7 @@ typedef struct netdata_error_report {
 //Kernel versions calculated with the formula:
 //   R = MAJOR*65536 + MINOR*256 + PATCH
 # define NETDATA_KERNEL_V5_3 328448
+# define NETDATA_KERNEL_V4_15 265984
 
 //Index from kernel
 # define NETDATA_KEY_CALLS_DO_SYS_OPEN 0
