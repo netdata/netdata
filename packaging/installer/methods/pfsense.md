@@ -38,7 +38,7 @@ You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.
 
 To start Netdata manually, run `service netdata onestart`.
 
-**Warning:** If you are using the plugin `apcupsd`, you need to make sure that apcupsd is up before starting netdata. Otherwise a infinitely running `cat` process triggerd by the default activated netdata apcuspd charts plugin will eat up CPU and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies for `OPNsense`.
+**Warning:** If you are using the `apcupsd` collector, you need to make sure that apcupsd is up before starting Netdata. Otherwise a infinitely running `cat` process triggered by the default activated apcuspd charts plugin will eat up CPU and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies to `OPNsense`.
 
 Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
 
