@@ -59,7 +59,7 @@ the conflicts with the python version.
 To enable it, run:
 
 ```bash
-cd /etc/netdata
+cd /etc/netdata # Replace this path with your Netdata config directory
 sudo ./edit-config charts.d.conf
 ```
 
