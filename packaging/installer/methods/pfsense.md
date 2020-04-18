@@ -36,7 +36,7 @@ URL instead, or you can try manually changing the netdata version in the URL to 
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
-To start Netdata manually, run `service netdata onestart`
+To start Netdata manually, run `service netdata onestart`.
 
 **Warning:** If you are using the plugin `apcupsd`, you need to make sure that apcupsd is up before starting netdata. Otherwise a infinitely running `cat` process triggerd by the default activated netdata apcuspd charts plugin will eat up CPU and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies for `OPNsense`.
 
