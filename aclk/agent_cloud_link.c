@@ -748,6 +748,7 @@ static char *aclk_encode_response(char *src, size_t content_size, int keep_newli
             case 0x01 ... 0x08:
             case 0x0b ... 0x1F:
                 *dst++ = '\\';
+                *dst++ = 'u';
                 *dst++ = '0';
                 *dst++ = '0';
                 *dst++ = (*src < 0x0F) ? '0' : '1';
