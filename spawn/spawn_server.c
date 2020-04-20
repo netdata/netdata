@@ -287,6 +287,14 @@ static void on_read_alloc(uv_handle_t *handle,
     buf->len = suggested_size;
 }
 
+static void ignore_signal_handler(int signo) {
+    /*
+     * By having a signal handler we allow spawned processes to reset default signal dispositions. Setting SIG_IGN
+     * would be inherited by the spawned children which is not desirable.
+     */
+    (void)signo;
+}
+
 void spawn_server(void)
 {
     int error;
@@ -313,7 +321,7 @@ void spawn_server(void)
     unsigned i;
     for (i = 0; i < ignore_length ; ++i) {
         sa.sa_flags = 0;
-        sa.sa_handler = SIG_IGN;
+        sa.sa_handler = ignore_signal_handler;
         if(sigaction(signals_to_ignore[i], &sa, NULL) == -1)
             fprintf(stderr, "SPAWN: Failed to change signal handler for signal: %d.\n", signals_to_ignore[i]);
     }
