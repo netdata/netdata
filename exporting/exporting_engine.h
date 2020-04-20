@@ -87,6 +87,11 @@ struct aws_kinesis_specific_config {
     char *secure_key;
 };
 
+struct pubsub_specific_config {
+    char *project_id;
+    char *topic_id;
+};
+
 struct mongodb_specific_config {
     char *database;
     char *collection;

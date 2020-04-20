@@ -1,112 +1,102 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <aws/core/Aws.h>
-#include <aws/core/client/ClientConfiguration.h>
-#include <aws/core/auth/AWSCredentials.h>
-#include <aws/core/utils/Outcome.h>
-#include <aws/kinesis/KinesisClient.h>
-#include <aws/kinesis/model/PutRecordRequest.h>
-#include "aws_kinesis_put_record.h"
+#include <google/pubsub/v1/pubsub.grpc.pb.h>
+#include <grpcpp/grpcpp.h>
+#include <stdexcept>
+#include "pubsub_publish.h"
 
-using namespace Aws;
+#define EVENT_CHECK_TIMEOUT 50
 
-static SDKOptions options;
-
-struct request_outcome {
-    Kinesis::Model::PutRecordOutcomeCallable future_outcome;
-    size_t data_len;
+struct response {
+    google::pubsub::v1::PublishResponse *publish_response;
+    size_t tag;
+    grpc::Status *status;
 };
 
 /**
- * Initialize AWS SDK API
- */
-void aws_sdk_init()
-{
-    InitAPI(options);
-}
-
-/**
- * Shutdown AWS SDK API
- */
-void aws_sdk_shutdown()
-{
-    ShutdownAPI(options);
-}
-
-/**
- * Initialize a client and a data structure for request outcomes
+ * Initialize a Pub/Sub client and a data structure for responses.
  *
- * @param kinesis_specific_data_p a pointer to a structure with client and request outcome information.
- * @param region AWS region.
- * @param access_key_id AWS account access key ID.
- * @param secret_key AWS account secret access key.
- * @param timeout communication timeout.
+ * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
+ * @param pubsub_specific_config_p a pointer to a structure with configuration strings.
+ * @return Returns 0 on success, 1 on failure.
  */
-void kinesis_init(
-    void *kinesis_specific_data_p, const char *region, const char *access_key_id, const char *secret_key,
-    const long timeout)
+int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
 {
-    struct aws_kinesis_specific_data *kinesis_specific_data =
-        (struct aws_kinesis_specific_data *)kinesis_specific_data_p;
+    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
-    Client::ClientConfiguration config;
+    try {
+        std::unique_ptr<google::pubsub::v1::Publisher::Stub> stub = google::pubsub::v1::Publisher::NewStub(
+            grpc::CreateChannel("pubsub.googleapis.com", grpc::GoogleDefaultCredentials()));
 
-    config.region = region;
-    config.requestTimeoutMs = timeout;
-    config.connectTimeoutMs = timeout;
+        if (!stub) {
+            std::cerr << "EXPORTING: Can't create a Pub/Sub stub" << std::endl;
+            return 1;
+        }
 
-    Kinesis::KinesisClient *client;
+        pubsub_specific_data->stub = (void *)&stub;
 
-    if (access_key_id && *access_key_id && secret_key && *secret_key) {
-        client = New<Kinesis::KinesisClient>("client", Auth::AWSCredentials(access_key_id, secret_key), config);
-    } else {
-        client = New<Kinesis::KinesisClient>("client", config);
+        google::pubsub::v1::PublishRequest *request = new google::pubsub::v1::PublishRequest;
+        request->set_topic(std::string("projects/") + project_id + "/topics/" + topic_id);
+
+        pubsub_specific_data->request = (void *)request;
+        pubsub_specific_data->completion_queue = (void *)new grpc::CompletionQueue;
+        pubsub_specific_data->responses = (void *)new std::vector<struct response *>;
+        pubsub_specific_data->last_tag = 0;
+
+    } catch (std::exception const &ex) {
+        std::cerr << "EXPORTING: Standard exception raised: " << ex.what() << std::endl;
+        return 1;
     }
-    kinesis_specific_data->client = (void *)client;
 
-    Vector<request_outcome> *request_outcomes;
-
-    request_outcomes = new Vector<request_outcome>;
-    kinesis_specific_data->request_outcomes = (void *)request_outcomes;
+    return 0;
 }
 
-/**
- * Deallocate Kinesis specific data
- *
- * @param kinesis_specific_data_p a pointer to a structure with client and request outcome information.
- */
-void kinesis_shutdown(void *kinesis_specific_data_p)
+void pubsub_add_message(void *pubsub_specific_data_p, char *data)
 {
-    struct aws_kinesis_specific_data *kinesis_specific_data =
-        (struct aws_kinesis_specific_data *)kinesis_specific_data_p;
+    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    google::pubsub::v1::PublishRequest *request = (google::pubsub::v1::PublishRequest *)pubsub_specific_data->request;
 
-    Delete((Kinesis::KinesisClient *)kinesis_specific_data->client);
-    delete (Vector<request_outcome> *)kinesis_specific_data->request_outcomes;
+    google::pubsub::v1::PubsubMessage *message = request->add_messages();
+    message->set_data(data);
+}
+
+void pubsub_clear_messages(void *pubsub_specific_data_p)
+{
+    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    google::pubsub::v1::PublishRequest *request = (google::pubsub::v1::PublishRequest *)pubsub_specific_data->request;
+
+    request->clear_messages();
 }
 
 /**
- * Send data to the Kinesis service
+ * Send data to the Pub/Sub service
  *
- * @param kinesis_specific_data_p a pointer to a structure with client and request outcome information.
+ * @param pubsub_specific_data_p a pointer to a structure with client and request outcome information.
  * @param stream_name the name of a stream to send to.
  * @param partition_key a partition key which automatically maps data to a specific stream.
  * @param data a data buffer to send to the stream.
  * @param data_len the length of the data buffer.
  */
-void kinesis_put_record(
-    void *kinesis_specific_data_p, const char *stream_name, const char *partition_key, const char *data,
-    size_t data_len)
+void pubsub_publish(void *pubsub_specific_data_p)
 {
-    struct aws_kinesis_specific_data *kinesis_specific_data =
-        (struct aws_kinesis_specific_data *)kinesis_specific_data_p;
-    Kinesis::Model::PutRecordRequest request;
+    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    std::unique_ptr<google::pubsub::v1::Publisher::Stub> *stub =
+        (std::unique_ptr<google::pubsub::v1::Publisher::Stub> *)pubsub_specific_data->stub;
+    google::pubsub::v1::PublishRequest *request = (google::pubsub::v1::PublishRequest *)pubsub_specific_data->request;
+    grpc::CompletionQueue *completion_queue = (grpc::CompletionQueue *)pubsub_specific_data->completion_queue;
 
-    request.SetStreamName(stream_name);
-    request.SetPartitionKey(partition_key);
-    request.SetData(Utils::ByteBuffer((unsigned char *)data, data_len));
+    grpc::ClientContext context;
+    std::unique_ptr<grpc::ClientAsyncResponseReader<google::pubsub::v1::PublishResponse> > rpc(
+        (*stub)->AsyncPublish(&context, *request, completion_queue));
 
-    ((Vector<request_outcome> *)(kinesis_specific_data->request_outcomes))->push_back(
-        { ((Kinesis::KinesisClient *)(kinesis_specific_data->client))->PutRecordCallable(request), data_len });
+    struct response *response = new struct response;
+    response->publish_response = new google::pubsub::v1::PublishResponse;
+    response->status = new grpc::Status;
+    response->tag = pubsub_specific_data->last_tag++;
+
+    rpc->Finish(response->publish_response, response->status, (void *)response->tag);
+
+    ((std::vector<struct response *> *)(pubsub_specific_data->responses))->push_back(response);
 }
 
 /**
@@ -118,28 +108,54 @@ void kinesis_put_record(
  * @param lost_bytes report to a caller how many bytes was lost during transmission.
  * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission
  */
-int kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
+int pubsub_get_result(void *pubsub_specific_data_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
 {
-    Vector<request_outcome> *request_outcomes = (Vector<request_outcome> *)request_outcomes_p;
-    Kinesis::Model::PutRecordOutcome outcome;
+    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    grpc::CompletionQueue *completion_queue = (grpc::CompletionQueue *)pubsub_specific_data->completion_queue;
+    std::vector<struct response *> *responses = (std::vector<struct response *> *)pubsub_specific_data->responses;
     *sent_bytes = 0;
     *lost_bytes = 0;
 
-    for (auto request_outcome = request_outcomes->begin(); request_outcome != request_outcomes->end();) {
-        std::future_status status = request_outcome->future_outcome.wait_for(std::chrono::microseconds(100));
+    while (1) {
+        grpc_impl::CompletionQueue::NextStatus next_status;
+        void *got_tag;
+        bool ok = false;
 
-        if (status == std::future_status::ready || status == std::future_status::deferred) {
-            outcome = request_outcome->future_outcome.get();
-            *sent_bytes += request_outcome->data_len;
+        auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(EVENT_CHECK_TIMEOUT);
+        next_status = completion_queue->AsyncNext(&got_tag, &ok, deadline);
 
-            if (!outcome.IsSuccess()) {
-                *lost_bytes += request_outcome->data_len;
-                outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);
+        if (next_status == grpc::CompletionQueue::GOT_EVENT) {
+            struct response *response = nullptr;
+            google::pubsub::v1::PublishResponse *publish_response = nullptr;
+
+            for (auto &current_response : *responses) {
+                if ((void *)current_response->tag == got_tag) {
+                    publish_response = current_response->publish_response;
+                    response = current_response;
+                    break;
+                }
             }
 
-            request_outcomes->erase(request_outcome);
+            if (!response) {
+                strncpy(error_message, "EXPORTING: Cannot get Pub/Sub response", ERROR_LINE_MAX);
+                return 1;
+            }
+
+            if (ok) {
+                // *sent_metrics +=
+                publish_response->message_ids_size();
+                // *sent_bytes += response->data_len;             // TODO
+            } else {
+                // *lost_metrics +=
+                publish_response->message_ids_size();
+                // *lost_bytes += response->data_len;             // TODO
+                response->status->error_message().copy(error_message, ERROR_LINE_MAX);
+            }
+
+            std::remove(responses->begin(), responses->end(), response);
+            delete response;
         } else {
-            ++request_outcome;
+            break;
         }
     }
 
