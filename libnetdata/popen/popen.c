@@ -86,7 +86,7 @@ static void myp_del(pid_t pid) {
  * Returns -1 on failure, 0 on success. When FLAG_CREATE_PIPE is set, on success set the FILE *fp pointer.
  */
 static inline int custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t flags, FILE **fpp) {
-    FILE *fp;
+    FILE *fp = NULL;
     int ret = 0; // success by default
     int pipefd[2], error;
     pid_t pid;
