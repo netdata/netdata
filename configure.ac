@@ -603,6 +603,7 @@ if test "$enable_cloud" != "no"; then
     else
         enable_aclk=$aclk_required
     fi
+    AC_SUBST([can_enable_aclk])
 
     if test "${enable_aclk}" = "yes"; then
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
@@ -610,6 +611,7 @@ if test "$enable_cloud" != "no"; then
 
     AC_MSG_RESULT([${enable_aclk}])
 fi
+AC_SUBST([enable_cloud])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------

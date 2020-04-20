@@ -90,6 +90,14 @@ if ! command -v openssl >/dev/null 2>&1 ; then
         exit 3
 fi
 
+if [ "@enable_cloud_POST@" != "yes" ]; then
+    echo >&2 "This agent was build with --disable-cloud and cannot be claimed"
+    exit 3
+fi
+if [ "@can_enable_aclk_POST@" != "yes" ]; then
+    echo >&2 "This agent was build without the dependencies for Cloud and cannot be claimed"
+    exit 3
+fi
 
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
