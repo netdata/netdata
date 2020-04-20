@@ -99,6 +99,20 @@ if [ "@can_enable_aclk_POST@" != "yes" ]; then
     exit 3
 fi
 
+get_config_value() {
+    section="${1}"
+    key_name="${2}"
+    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$section" "$key_name")
+    if [ $? != 0 ]; then
+       echo "cli failed, manual attempt"
+       config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$section" "$key_name" unknown_default)
+    fi
+}
+
+get_config_value global "run as user"
+echo "Netdata user: $config_result"
+exit 0
+
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 

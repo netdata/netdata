@@ -500,10 +500,10 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-#  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-#    echo "Skipping cloud"
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+    echo "Skipping cloud"
     return 0
-#  fi
+  fi
 
   progress "Prepare custom libmosquitto version"
 
