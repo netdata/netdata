@@ -304,6 +304,20 @@ void spawn_server(void)
     // Have the libuv IPC pipe be closed when forking child processes
     (void) fcntl(0, F_SETFD, FD_CLOEXEC);
     fprintf(stderr, "Spawn server is up.\n");
+
+    // Define signals we want to ignore
+    struct sigaction sa;
+    int signals_to_ignore[] = {SIGPIPE, SIGINT, SIGQUIT, SIGTERM, SIGHUP, SIGUSR1, SIGUSR2, SIGBUS, SIGCHLD};
+    unsigned ignore_length = sizeof(signals_to_ignore) / sizeof(signals_to_ignore[0]);
+
+    unsigned i;
+    for (i = 0; i < ignore_length ; ++i) {
+        sa.sa_flags = 0;
+        sa.sa_handler = SIG_IGN;
+        if(sigaction(signals_to_ignore[i], &sa, NULL) == -1)
+            fprintf(stderr, "SPAWN: Failed to change signal handler for signal: %d.\n", signals_to_ignore[i]);
+    }
+
     signals_unblock();
 
     loop = uv_default_loop();
