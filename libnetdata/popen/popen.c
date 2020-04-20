@@ -82,8 +82,11 @@ static void myp_del(pid_t pid) {
 #define FLAG_CREATE_PIPE    1 // Create a pipe like popen() when set, otherwise set stdout to /dev/null
 #define FLAG_CLOSE_FD       2 // Close all file descriptors other than STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO
 
-static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t flags) {
-    FILE *fp = (FILE *)1; // set to 1 to differentiate from NULL when running NO_PIPE_NULL_STDOUT
+/*
+ * Returns NULL on failure. When FLAG_CREATE_PIPE is set returns the FILE * pointer
+ */
+static inline unsigned long custom_popene(const char *command, volatile pid_t *pidptr, char **env, uint8_t flags) {
+    FILE *fp = (FILE *)1; // set to 1 to differentiate from NULL when not setting FLAG_CREATE_PIPE
     int pipefd[2], error;
     pid_t pid;
     char *const spawn_argv[] = {
@@ -97,7 +100,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
 
     if (flags & FLAG_CREATE_PIPE) {
         if (pipe(pipefd) == -1)
-            return NULL;
+            return (unsigned long)NULL;
         if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
             goto error_after_pipe;
         }
@@ -170,7 +173,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
 
-    return fp;
+    return (unsigned long)fp;
 
 error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
@@ -184,7 +187,7 @@ error_after_pipe:
 
         close(pipefd[PIPE_WRITE]);
     }
-    return NULL;
+    return (unsigned long)NULL;
 }
 
 // See man environ
@@ -245,17 +248,17 @@ int myp_reap(pid_t pid) {
 }
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
-    return custom_popene(command, pidptr, environ, FLAG_CREATE_PIPE | FLAG_CLOSE_FD);
+    return (FILE *)custom_popene(command, pidptr, environ, FLAG_CREATE_PIPE | FLAG_CLOSE_FD);
 }
 
 FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
-    return custom_popene(command, pidptr, env, FLAG_CREATE_PIPE | FLAG_CLOSE_FD);
+    return (FILE *)custom_popene(command, pidptr, env, FLAG_CREATE_PIPE | FLAG_CLOSE_FD);
 }
 
 // returns 0 on success, -1 on failure
 int netdata_spawn(const char *command, volatile pid_t *pidptr) {
-    FILE *fp = custom_popene(command, pidptr, environ, 0);
-    return (fp != NULL) ? 0 : -1;
+    unsigned long ret = custom_popene(command, pidptr, environ, 0);
+    return (ret != (unsigned long)NULL) ? 0 : -1;
 }
 
 int custom_pclose(FILE *fp, pid_t pid) {

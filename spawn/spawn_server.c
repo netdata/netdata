@@ -322,6 +322,7 @@ void spawn_server(void)
     unsigned i;
     for (i = 0; i < ignore_length ; ++i) {
         sa.sa_flags = 0;
+        sigemptyset(&sa.sa_mask);
         sa.sa_handler = ignore_signal_handler;
         if(sigaction(signals_to_ignore[i], &sa, NULL) == -1)
             fprintf(stderr, "SPAWN: Failed to change signal handler for signal: %d.\n", signals_to_ignore[i]);
