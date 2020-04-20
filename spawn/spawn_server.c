@@ -125,11 +125,12 @@ static void wait_children(void *arg)
                 break;
             }
             if (i.si_pid == 0) {
-                fprintf(stderr, "No child exited.\n");
+                fprintf(stderr, "SPAWN: No child exited.\n");
                 break;
             }
-            fprintf(stderr, "Successfully waited for pid:%d.\n", (int) i.si_pid);
-
+#ifdef SPAWN_DEBUG
+            fprintf(stderr, "SPAWN: Successfully waited for pid:%d.\n", (int) i.si_pid);
+#endif
             assert(CLD_EXITED == i.si_code);
             tmp.pid = (pid_t)i.si_pid;
             while (NULL == (ret_avl = avl_remove_lock(&spawn_outstanding_exec_tree, (avl *)&tmp))) {
