@@ -1,5 +1,6 @@
 <!--
 title: "Netdata style guide"
+date: 2020-04-20
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
 -->
 
@@ -177,7 +178,7 @@ However, if you are referring to a process, user, or group on a Linux system, yo
 those are typically lowercased. In this case, you should also fence these terms in an inline code block: `` `netdata`
 ``.
 
-```
+```markdown
 # Not recommended
 The netdata agent, which spawns the netdata process, is actively maintained by netdata, inc.
 
@@ -194,13 +195,17 @@ guidelines.
 
 Also, don't put a period (`.`) or colon (`:`) at the end of a title or header.
 
-**Document titles**:
+```markdown
+# Not recommended
+Getting Started Guide
+Service Discovery and Auto-Detection:
+Install netdata with docker
 
-| Capitalization  | Not recommended | Recommended 
-| --- | --- | --- 
-| Document titles | Getting Started Guide | Getting started guide 
-| Page headings   | Service Discovery and Auto-Detection: | Service discovery and auto-detection
-| Proper nouns    | Install netdata with docker | Install Netdata with Docker
+# Recommended
+Getting started guide
+Service discovery and auto-detection
+Install Netdata with Docker
+```
 
 ### Second person
 
@@ -213,7 +218,7 @@ Avoid using "we," "I," "let's," and "us" in documentation whenever possible.
 
 The "you" pronoun can also be implied, depending on your sentence structure. 
 
-```
+```markdown
 # Not recommended
 To install Netdata, we should try the one-line installer...
 
@@ -319,23 +324,20 @@ reference the label text of the link/button with Markdown's (`**bold text**`) ta
 Click on the **Sign in** button.
 ```
 
-> Whenever possible, avoid using directional language to orient readers, because not every reader can use instructions
-> like "look at the top-left corner" to find their way around an interface.
+> ⚠️ Avoid using directional language to orient readers, because not every reader can use instructions like "look at the
+> top-left corner" to find their way around an interface.
 
 If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
 
-We're also working to establish standards for how we refer to certain elements of the Netdata's web interface. We'll include that in this style guide as soon as it's complete.
+We're also working to establish standards for how we refer to certain elements of the Netdata's web interface. We'll
+include that in this style guide as soon as it's complete.
 
 ### Language-specific syntax highlighting in code blocks
 
-Our documentation uses the [Highlight
-extension](https://facelessuser.github.io/pymdown-extensions/extensions/highlight/) for syntax highlighting. Highlight
-is fully compatible with [Pygments](http://pygments.org/), allowing you to highlight the syntax within code blocks in a
-number of interesting ways.
-
-For a full list of languages, see [Pygment's supported languages](http://pygments.org/languages/). Netdata documentation
-will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`, and `go`. If
-no language is specified, the Highlight extension doesn't apply syntax highlighting.
+Our documentation site at [learn.netdata.cloud]() uses
+[Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata
+documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`,
+and `go`. If no language is specified, Prism tries to guess the language based on its content.
 
 Include the language directly after the three backticks (```` ``` ````) that start the code block. For highlighting C
 code, for example:
@@ -392,7 +394,7 @@ the image.
 In Markdown, use the standard image syntax, `![]()`, and place the alt text between the brackets `[]`. Here's an example
 using our logo:
 
-```
+```markdown
 ![The Netdata logo](../../web/gui/images/netdata-logomark.svg)
 ```
 

@@ -1,5 +1,6 @@
 <!--
 title: "Contributing to documentation"
+date: 2020-04-20
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/contributing-documentation.md
 -->
 
@@ -68,8 +69,8 @@ button.
 After you've hit that button, jump down to our instructions on [pull requests and
 cleanup](#pull-requests-and-final-steps) for your next steps. 
 
-> This process will create a branch directly on the `netdata/netdata` repository, which then requires manual cleanup. If
-> you're going to make significant documentation contributions, or contribute often, we recommend the local editing
+> ⚠️ This process will create a branch directly on the `netdata/netdata` repository, which then requires manual cleanup.
+> If you're going to make significant documentation contributions, or contribute often, we recommend the local editing
 > process just below.
 
 ## Edit documentation locally
@@ -99,13 +100,13 @@ All of Netdata's documentation is stored within the repository itself, as close 
 to. Many sub-folders contain a `README.md` file, which is then used to populate the documentation about that
 feature/component of Netdata.
 
-For example, the file at `packaging/installer/README.md` becomes `https://docs.netdata.cloud/packaging/installer/` and
-is our installation documentation. By co-locating it with quick-start installtion code, we ensure documentation is
-always tightly-knit with the functions it describes.
+For example, the installation documentation at `packaging/installer/README.md` becomes
+`https://learn.netdata.cloud/docs/agent/packaging/installer/`. By co-locating it with quick-start installtion code, we
+ensure documentation is always tightly-knit with the functions it describes.
 
 You might find other `.md` files within these directories. The `packaging/installer/` folder also contains `UPDATE.md`
-and `UNINSTALL.md`, which become `https://docs.netdata.cloud/packaging/installer/update/` and
-`https://docs.netdata.cloud/packaging/installer/uninstall/`, respectively.
+and `UNINSTALL.md`, which become `https://learn.netdata.cloud/docs/agent/packaging/installer/update/` and
+`https://learn.netdata.cloud/docs/agent/packaging/installer/uninstall/`, respectively.
 
 If the documentation you're working on has a direct correlation to some component of Netdata, place it into the correct
 folder and either name it `README.md` for generic documentation, or with another name for very specific instructions.
@@ -118,6 +119,9 @@ a direct relationship to a specific component of Netdata.
 If the documentation you're working on doesn't have a direct relaionship to a component of Netdata, it can be placed in
 this `docs/` folder.
 
+These documents will end up at the "root" of the Agent documentation at `https://learn.netdata.cloud/docs/agent/`. For
+example, the file at `docs/getting-started.md` becomes `https://learn.netdata.cloud/docs/agent/getting-started/`.
+
 ### Make your edits
 
 Now that you're set up and understand where to find or create your `.md` file, you can now begin to make your edits.
@@ -128,65 +132,6 @@ site's navigation. This is true for any file added to the `docs/` folder.
 
 Be sure to periodically add/commit your edits so that you don't lose your work! We use version control software for a
 reason.
-
-### Build the documentation
-
-Building the documentation periodically gives you a glimpse into the final product, and is generally required if you're
-making changes to the table of contents.
-
-We have a [netdata/docs Docker Image](https://hub.docker.com/r/netdata/os-test) available on the Docker Hub
-that greatly simplifies building the documentation on any [Docker](https://www.docker.com) supported platform.
-
-To build the docs using this image via Docker simply run the following commands in your shell:
-
-```bash
-cd /path/to/netdata
-docker run -i -t -v $PWD:/netdata netdata/docs
-```
-
-----
-
-if you are using a GNU/Linux based system for developing / contribiting to our documentation, you may build the
-docs with the provided Shell scripts in `./docs/generator/buildhtml.sh`. This requires GNU Bash and findutils
-as well as Python/pip and some Python packages `mkdocs` and `mkdocs-material` installed in your environment.
-
-Follow the [Python installation instructions](https://www.python.org/downloads/) for your machine.
-
-Use `pip`, which was installed alongside Python, to install `mkdocs` and `mkdocs-material`. Your operating system might
-force you to use `pip2` or `pip3` instead, depending on which version of Python you have installed.
-
-```bash
-pip install mkdocs mkdocs-material --user
-```
-
-> If you're having trouble with the installation of Python, `mkdocs`, or `mkdocs-material`, try looking into the
-> `mkdocs` [installation instructions](https://squidfunk.github.io/mkdocs-material/getting-started/#installation).
-
-When `pip` is finished installing, navigate to the root directory of the Netdata repository and run the documentation
-generator script.
-
-```bash
-sh docs/generator/buildhtml.sh
-```
-
-This process will take some time. Once finished, the built documentation site will be located at
-`docs/generator/build/`.
-
-### Run a local web server to test documentation
-
-The best way to view the documentation site you just built is to run a simple web server from the
-`docs/generator/build/` directory. So, navigate there and run a Python-based web server:
-
-```sh
-cd docs/generator/build/
-python3 -m http.server 20000
-```
-
-Feel free to replace the port number you want this web server to listen on (port `20000` in this case (only one higher
-than the agent!)).
-
-Open your web browser and navigate to `http://localhost:20000`. If you replaced the port earlier, change it here as
-well. You can now navigate through the documentation as you would on the live site!
 
 ## Pull requests and final steps
 
