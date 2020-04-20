@@ -62,8 +62,13 @@ the [troubleshooting information](#troubleshooting).
 
 ### Claim an Agent running in Docker
 
-You can execute the claiming script on a running agent by appending the script offered by Cloud to a `docker exec ...`
-command:
+The claiming process works with Agents running inside of Docker containers. You can use `docker exec` to run the
+claiming script on containers already running, or append the claiming script to `docker run` to create a new container
+and immediately claim it.
+
+#### Running Agent containers
+
+Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command:
 
 ```bash
 docker exec -it netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
@@ -72,8 +77,13 @@ docker exec -it netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://ap
 The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the
 [troubleshooting information](#troubleshooting).
 
-You can also claim a newly-created container with `docker run ...`, using our recommended [Docker
-installation](/packaging/docker/README.md#run-netdata-with-the-docker-command).
+#### New/ephemeral Agent containers
+
+Claim a newly-created container with `docker run ...`.
+
+In the example below, the last line calls the [daemon binary](/daemon/README.md), sets essential variables, and then
+executes claiming using the information after `-W "claim... `. You should copy the relevant token, rooms, and URL from
+Cloud.
 
 ```bash
 docker run -d --name=netdata \
