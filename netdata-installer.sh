@@ -1016,30 +1016,8 @@ fi
 
 # -----------------------------------------------------------------------------
 
-clean_existing_dashboard() {
-  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ] ; then
-    rm -rf "${NETDATA_WEB_DIR}-react"
-
-    # shellcheck disable=SC2013
-    for item in $(cat "${NETDATA_WEB_DIR}-classic/.files") ; do
-      rm -f "${NETDATA_WEB_DIR}/${item}"
-    done
-
-    rm -rf "${NETDATA_WEB_DIR}-classic"
-  elif [ -e "${NETDATA_WEB_DIR}/.files" ] ; then
-    rm -rf "$(cat "${NETDATA_WEB_DIR}/.files")"
-  else
-    rm -f "$(find "${NETDATA_WEB_DIR}" -path "${NETDATA_WEB_DIR}/old" -prune -o -type f)"
-  fi
-}
-
 copy_react_dashboard() {
   run cp -a $(find ${1} -mindepth 1 -maxdepth 1) "${NETDATA_WEB_DIR}"
-  run cp -a "${NETDATA_WEB_DIR}/old/dashboard_info.js" "${NETDATA_WEB_DIR}"
-  run cp -a "${NETDATA_WEB_DIR}/old/dashboard.slate.css" "${NETDATA_WEB_DIR}"
-  run cp -a "${NETDATA_WEB_DIR}/old/dashboard.css" "${NETDATA_WEB_DIR}"
-  run cp -a "${NETDATA_WEB_DIR}/old/main.css" "${NETDATA_WEB_DIR}"
-  run echo $(cd ${1} && find . -type f | sed -e 's/\.\///') > "${NETDATA_WEB_DIR}/.files"
   run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
 }
 
