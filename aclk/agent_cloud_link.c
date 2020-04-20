@@ -808,7 +808,7 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         buffer_sprintf(local_buffer, "\n}");
 
-        info("Response:%s", encoded_header);
+        debug(D_ACLK, "Response:%s", encoded_header);
 
         aclk_send_message(this_query->topic, local_buffer->buffer, this_query->msg_id);
 
