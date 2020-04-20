@@ -14,14 +14,20 @@ Note that the first four packages are downloaded from the pfSense repository for
 Netdata, Judy and Python are downloaded from the FreeBSD repository.
 
 ```sh
-pkg install pkgconf
-pkg install bash
-pkg install e2fsprogs-libuuid
-pkg install libuv
+pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
-ln -s /usr/local/lib/libjson-c.so /usr/local/lib/libjson-c.so.4
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.17.1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.4.5.1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.19.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cffi-1.14.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-six-1.14.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cryptography-2.6.1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-idna-2.8.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-openssl-19.0.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pysocks-1.7.1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.7,1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.2.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.20.0_3.txz
 ```
 
 **Note:** If you receive a `Not Found` error during the last two commands above, you will either need to manually look
@@ -30,7 +36,9 @@ URL instead, or you can try manually changing the netdata version in the URL to 
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
-To start Netdata manually, run `service netdata onestart`  
+To start Netdata manually, run `service netdata onestart`.
+
+**Warning:** If you are using the `apcupsd` collector, you need to make sure that apcupsd is up before starting Netdata. Otherwise a infinitely running `cat` process triggered by the default activated apcuspd charts plugin will eat up CPU and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies to `OPNsense`.
 
 Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
 
