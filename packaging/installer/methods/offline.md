@@ -34,7 +34,7 @@ curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "bro
 curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
 
 # Netdata dependency handling script
-curl -s https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh | wget -qi -
+wget -q - https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh
 
 # go.d plugin 
 # For binaries for OS types and architectures not listed on [go.d releases](https://github.com/netdata/go.d.plugin/releases/latest), kindly open a github issue and we will do our best to serve your request
@@ -70,10 +70,10 @@ option requires you to specify the location and names of the files you just down
 
 ```bash
 # kickstart.sh
-bash kickstart.sh --local-files /tmp/netdata-version-number-here.tar.gz /tmp/sha256sums.txt /tmp/go.d-binary-filename.tar.gz /tmp/config.tar.gz /tmp/install-required-packages.sh
+bash kickstart.sh --local-files /tmp/netdata-(version-number-here).tar.gz /tmp/sha256sums.txt /tmp/go.d.plugin-(version-number-here).(OS)-(architecture).tar.gz /tmp/config.tar.gz /tmp/install-required-packages.sh
 
 # kickstart-static64.sh
-bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run /tmp/sha256sums.txt
+bash kickstart-static64.sh --local-files /tmp/netdata-(version-number-here).gz.run /tmp/sha256sums.txt
 ```
 
 Now that Netdata is installed, be sure to visit our [getting started guide](../../../docs/getting-started.md) for a
