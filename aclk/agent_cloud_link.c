@@ -124,6 +124,10 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
                     data->payload = mallocz(len+1);
                     if (!url_decode_r(data->payload, e->data.string, len + 1))
                         strcpy(data->payload, e->data.string);
+                    else {
+                        data->payload[0] = 0;
+                        error("Malformed URL from cloud, cannot decode: %s",e->data.string);
+                    }
                 }
                 break;
             }
