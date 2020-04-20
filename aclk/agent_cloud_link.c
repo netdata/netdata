@@ -776,6 +776,7 @@ int aclk_execute_query(struct aclk_query *this_query)
         w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
         w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+        now_realtime_timeval(&w->tv_ready);
         strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
         w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
         w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
