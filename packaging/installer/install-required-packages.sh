@@ -597,6 +597,17 @@ declare -A pkg_cmake=(
   ['default']="cmake"
 )
 
+declare -A pkg_json_c_dev=(
+  ['alpine']="json-c-dev"
+  ['arch']="json-c"
+  ['clearlinux']="devpkg-json-c"
+  ['debian']="libjson-c-dev"
+  ['gentoo']="dev-libs/json-c"
+  ['sabayon']="dev-libs/json-c"
+  ['suse']="libjson-c-devel"
+  ['default']="json-c-devel"
+)
+
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
@@ -1170,6 +1181,7 @@ packages() {
     suitable_package libz-dev
     suitable_package libuuid-dev
     suitable_package libmnl-dev
+    suitable_package json-c-dev
   fi
 
   # -------------------------------------------------------------------------
