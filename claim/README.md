@@ -68,10 +68,10 @@ and immediately claim it.
 
 #### Running Agent containers
 
-Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command:
+Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing `netdata` with the name of your running container:
 
 ```bash
-docker exec -it netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the
@@ -99,10 +99,12 @@ docker run -d --name=netdata \
   /usr/sbin/netdata -D -W set global "netdata cloud" enable -W set cloud "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
 ```
 
-The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run the following to find any error output and use that to guide your [troubleshooting](#troubleshooting):
+The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run
+the following to find any error output and use that to guide your [troubleshooting](#troubleshooting). Replace `netdata`
+with the name of your container if different.
 
 ```bash
-docker logs netdata 2>&1 | grep -E 'ACLK|claim|cloud'
+docker logs netdata 2>&1 | grep -E --line-buffered 'ACLK|claim|cloud'
 ```
 
 ### Claim through a proxy
@@ -149,8 +151,8 @@ the [troubleshooting information](#troubleshooting).
 
 If you're having trouble claiming a node, this may be because the ACLK cannot connect to Cloud.
 
-With the Netdata Agent running, visit `http://localhost:19999/api/v1/info` in your browser. The returned JSON contains four
-keys that will be helpful to diagnose any issues you might be having with the ACLK or claiming process.
+With the Netdata Agent running, visit `http://localhost:19999/api/v1/info` in your browser. The returned JSON contains
+four keys that will be helpful to diagnose any issues you might be having with the ACLK or claiming process.
 
 ```json
 	"cloud-enabled"
