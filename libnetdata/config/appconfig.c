@@ -289,10 +289,13 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
 {
     struct config_option *cv;
 
+    // Only calls internal to this file check for a NULL result and they do not supply a NULL arg.
+    // External caller should treat NULL as an error case.
     cv = appconfig_option_index_find(co, name, 0);
-    if(!cv) {
+    if (!cv) {
+        if (!default_value) return NULL;
         cv = appconfig_value_create(co, name, default_value);
-        if(!cv) return NULL;
+        if (!cv) return NULL;
     }
     cv->flags |= CONFIG_VALUE_USED;
 
@@ -308,9 +311,13 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
     return(cv->value);
 }
 
+
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
+    if (default_value == NULL)
+        debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
+    else
+        debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) co = appconfig_section_create(root, section);
