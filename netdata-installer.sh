@@ -441,7 +441,12 @@ You may need to check these:
    If your system cannot find zlib, although it is installed
    run me with the option:  --libs-are-really-here
 
-3. You need basic build tools installed, like:
+3. The pacakge json-c-dev (or json-c-devel)has to be installed.
+
+   If your system cannot find json-c, although it is installed
+   run me with the option:  --libs-are-really-here
+
+4. You need basic build tools installed, like:
 
    gcc make autoconf automake pkg-config
 

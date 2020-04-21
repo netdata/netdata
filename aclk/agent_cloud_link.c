@@ -1277,11 +1277,11 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
  */
 void *aclk_main(void *ptr)
 {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
 
     if (!netdata_cloud_setting) {
         info("Killing ACLK thread -> cloud functionality has been disabled");
-        struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
         return NULL;
     }
@@ -1300,6 +1300,7 @@ void *aclk_main(void *ptr)
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
     if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
         error("Configuration error - cannot use agent cloud link");
+        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
         return NULL;
     }
     port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value

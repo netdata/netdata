@@ -56,7 +56,14 @@ supported by `lm-sensors`.
 Netdata also has a bash version of the sensors plugin that can read RPi temperatures. It is disabled by default to avoid
 the conflicts with the python version.
 
-To enable it, run `sudo edit-config charts.d.conf` and uncomment this line:
+To enable it, run:
+
+```bash
+cd /etc/netdata # Replace this path with your Netdata config directory
+sudo ./edit-config charts.d.conf
+```
+
+and uncomment this line:
 
 ```sh
 sensors=force

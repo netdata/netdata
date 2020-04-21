@@ -6,17 +6,31 @@
 
 **Merged pull requests:**
 
+- fix\_lock: Add the missing lock [\#8780](https://github.com/netdata/netdata/pull/8780) ([thiagoftsm](https://github.com/thiagoftsm))
+- Added JSON-C dependency handling to instlal and packaging. [\#8776](https://github.com/netdata/netdata/pull/8776) ([Ferroin](https://github.com/Ferroin))
+- web/gui/demo2.html: Silence Netlify's mixed content warnings [\#8759](https://github.com/netdata/netdata/pull/8759) ([knatsakis](https://github.com/knatsakis))
+- dashboard v.0.4.17: [\#8757](https://github.com/netdata/netdata/pull/8757) ([jacekkolasa](https://github.com/jacekkolasa))
+- Additional cases for the thread exit fix [\#8750](https://github.com/netdata/netdata/pull/8750) ([amoss](https://github.com/amoss))
+- Ebpf index size [\#8743](https://github.com/netdata/netdata/pull/8743) ([thiagoftsm](https://github.com/thiagoftsm))
+- \[docs\]: fix enabling charts.d modules instruction for IOT [\#8740](https://github.com/netdata/netdata/pull/8740) ([Jiab77](https://github.com/Jiab77))
 - Improved ACLK reconnection sequence [\#8729](https://github.com/netdata/netdata/pull/8729) ([stelfrag](https://github.com/stelfrag))
 - Revert "Improved ACLK reconnection sequence " [\#8728](https://github.com/netdata/netdata/pull/8728) ([cosmix](https://github.com/cosmix))
+- Fix crash when shutdown with ACLK disabled [\#8725](https://github.com/netdata/netdata/pull/8725) ([lassebm](https://github.com/lassebm))
 - Docs: Combined claiming+ACLK documentation [\#8724](https://github.com/netdata/netdata/pull/8724) ([joelhans](https://github.com/joelhans))
+- Fix docs Docker-based builder image [\#8718](https://github.com/netdata/netdata/pull/8718) ([prologic](https://github.com/prologic))
 - Fixed the build matrix in the build & install checks. [\#8715](https://github.com/netdata/netdata/pull/8715) ([Ferroin](https://github.com/Ferroin))
+- capitalize title [\#8712](https://github.com/netdata/netdata/pull/8712) ([zack-shoylev](https://github.com/zack-shoylev))
 - Improved ACLK reconnection sequence  [\#8708](https://github.com/netdata/netdata/pull/8708) ([stelfrag](https://github.com/stelfrag))
+- added whoisquery health templates [\#8700](https://github.com/netdata/netdata/pull/8700) ([yasharne](https://github.com/yasharne))
 - Fixed Arch Linux Ci checks. [\#8699](https://github.com/netdata/netdata/pull/8699) ([Ferroin](https://github.com/Ferroin))
 - yamllint: enable truthy rule [\#8698](https://github.com/netdata/netdata/pull/8698) ([ilyam8](https://github.com/ilyam8))
 - Fixes compatibility with RH 7.x family [\#8694](https://github.com/netdata/netdata/pull/8694) ([thiagoftsm](https://github.com/thiagoftsm))
 - charts.d/apcupsd: fix ups status check [\#8688](https://github.com/netdata/netdata/pull/8688) ([ilyam8](https://github.com/ilyam8))
+- Update pfSense doc and add warning for apcupsd users [\#8686](https://github.com/netdata/netdata/pull/8686) ([cryptoluks](https://github.com/cryptoluks))
 - added certificate revocation alert [\#8684](https://github.com/netdata/netdata/pull/8684) ([yasharne](https://github.com/yasharne))
+- \[ReOpen \#8626\] Improved offline installation instructions to point to correct installation scripts and clarify process [\#8680](https://github.com/netdata/netdata/pull/8680) ([IceCodeNew](https://github.com/IceCodeNew))
 - Docs: Standardize links between documentation [\#8638](https://github.com/netdata/netdata/pull/8638) ([joelhans](https://github.com/joelhans))
+- Added support for building libmosquitto on FreeBSD/macOS. [\#8254](https://github.com/netdata/netdata/pull/8254) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
@@ -194,10 +208,6 @@
 - Adding testing section to the PR template. [\#8068](https://github.com/netdata/netdata/pull/8068) ([amoss](https://github.com/amoss))
 - Update to new release of libmosquitto fork. [\#8067](https://github.com/netdata/netdata/pull/8067) ([Ferroin](https://github.com/Ferroin))
 - Make temporary directories relative to $TEMPDIR. [\#8066](https://github.com/netdata/netdata/pull/8066) ([Ferroin](https://github.com/Ferroin))
-- collectors: apps.plugin: apps\_groups: create 'dns' group. [\#8058](https://github.com/netdata/netdata/pull/8058) ([k0ste](https://github.com/k0ste))
-- Added hack to sha256sums.txt to force users of NetData on v1.19.0-483 with a broken updater to update to latest [\#8057](https://github.com/netdata/netdata/pull/8057) ([prologic](https://github.com/prologic))
-- Add config instructions to each collector module README  [\#8052](https://github.com/netdata/netdata/pull/8052) ([joelhans](https://github.com/joelhans))
-- Add required build dep for ACLK dependencies to Dockerfile. [\#8047](https://github.com/netdata/netdata/pull/8047) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 

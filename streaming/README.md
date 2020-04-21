@@ -34,7 +34,7 @@ of maintaining a local database and accepting dashboard requests, it streams all
 
 The same `master` can collect data for any number of `slaves`.
 
-### database replication
+### Database Replication
 
 Local Netdata (`slave`), **with a local database (and possibly alarms)**, collects metrics and
 sends them to another Netdata (`master`).
