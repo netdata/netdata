@@ -776,7 +776,6 @@ int aclk_execute_query(struct aclk_query *this_query)
         w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
         w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-        now_realtime_timeval(&w->tv_ready);
         strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
         w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
         w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
@@ -793,7 +792,9 @@ int aclk_execute_query(struct aclk_query *this_query)
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
         w->response.code = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
-        web_client_build_http_header(w);
+        now_realtime_timeval(&w->tv_ready);
+        w->response.data->date = w->tv_ready.tv_sec;
+        web_client_build_http_header(w);  // TODO: this function should offset from date, not tv_ready
         BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
