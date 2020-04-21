@@ -591,6 +591,8 @@ static void get_netdata_configured_variables() {
         netdata_cloud_setting = 0;
     }
 #endif
+    // This must be set before any point in the code that accesses it. Do not move it from this function.
+    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
 static void get_system_timezone(void) {

@@ -37,7 +37,7 @@ char *is_agent_claimed(void)
 
 extern struct registry registry;
 
-/* rrd_init() must have been called before this function */
+/* rrd_init() and get_netdata_configured_variables() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
     if (!netdata_cloud_setting) {
@@ -51,7 +51,10 @@ void claim_agent(char *claiming_arguments)
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
     FILE *fp;
 
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+    // This is guaranteed to be set early in main via get_netdata_configured_variables()
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
+    if (cloud_base_url == NULL)
+        fatal("Do not move the cloud base url out of get_netdata_configured_variables!!");
     const char *proxy_str;
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
