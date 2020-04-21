@@ -54,14 +54,60 @@ With `sudo`:
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`.
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see
+the [troubleshooting information](#troubleshooting).
 
 > Your node may need up to 60 seconds to connect to Netdata Cloud after finishing the claiming process. Please be
 > patient!
 
-If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
+### Claim an Agent running in Docker
 
-### Claiming through a proxy
+The claiming process works with Agents running inside of Docker containers. You can use `docker exec` to run the
+claiming script on containers already running, or append the claiming script to `docker run` to create a new container
+and immediately claim it.
+
+#### Running Agent containers
+
+Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing `netdata` with the name of your running container:
+
+```bash
+docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+```
+
+The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the
+[troubleshooting information](#troubleshooting).
+
+#### New/ephemeral Agent containers
+
+Claim a newly-created container with `docker run ...`.
+
+In the example below, the last line calls the [daemon binary](/daemon/README.md), sets essential variables, and then
+executes claiming using the information after `-W "claim... `. You should copy the relevant token, rooms, and URL from
+Cloud.
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata \
+  /usr/sbin/netdata -D -W set global "netdata cloud" enable -W set cloud "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
+```
+
+The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run
+the following to find any error output and use that to guide your [troubleshooting](#troubleshooting). Replace `netdata`
+with the name of your container if different.
+
+```bash
+docker logs netdata 2>&1 | grep -E --line-buffered 'ACLK|claim|cloud'
+```
+
+### Claim through a proxy
 
 A Space's administrator can claim a node through a SOCKS5 or HTTP(S) proxy.
 
@@ -88,7 +134,8 @@ For example, a SOCKS5 proxy setting may look like the following:
     proxy = socks5h://proxy.example.com:1080 # With a URL
 ```
 
-You can now move on to claiming. Be sure to switch to the `netdata` user or use `sudo` as explained in the [step above](#how-to-claim-a-node).
+You can now move on to claiming. Be sure to switch to the `netdata` user or use `sudo` as explained in the [step
+above](#how-to-claim-a-node).
 
 When you claim with the `netdata-claim.sh` script, add the `-proxy=` parameter and append the same proxy setting you
 added to `netdata.conf`.
@@ -97,19 +144,15 @@ added to `netdata.conf`.
 netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -url=https://app.netdata.cloud -proxy=socks5h://203.0.113.0:1080
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`.
-
-> Your node may need up to 60 seconds to connect to Netdata Cloud after finishing the claiming process. Please be
-> patient!
-
-If the claiming script returns errors, see the [troubleshooting information](#troubleshooting).
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see
+the [troubleshooting information](#troubleshooting).
 
 ### Troubleshooting
 
 If you're having trouble claiming a node, this may be because the ACLK cannot connect to Cloud.
 
-With the Netdata Agent running, visit `http://127.0.0.1/api/v1/info` in your browser. The returned JSON contains four
-keys that will be helpful to diagnose any issues you might be having with the ACLK or claiming process.
+With the Netdata Agent running, visit `http://localhost:19999/api/v1/info` in your browser. The returned JSON contains
+four keys that will be helpful to diagnose any issues you might be having with the ACLK or claiming process.
 
 ```json
 	"cloud-enabled"
@@ -182,7 +225,7 @@ If `aclk-available` is `false` and all other keys are `true`, your Agent is havi
 through the ACLK. Please check your system's firewall.
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-claiming](#claiming-through-a-proxy).
+claiming](#claim-through-a-proxy).
 
 If you are certain firewall and proxy settings are not the issue, you should consult the Agent's `error.log` at
 `/var/log/netdata/error.log` and contact us by [creating an issue on

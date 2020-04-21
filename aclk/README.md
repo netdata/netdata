@@ -27,7 +27,7 @@ in the `[cloud]` section of `netdata.conf`.
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-claiming](/claim/README.md#claiming-through-a-proxy).
+claiming](/claim/README.md#claim-through-a-proxy).
 
 ## Disable the ACLK
 
