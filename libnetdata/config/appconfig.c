@@ -320,6 +320,8 @@ char *appconfig_get(struct config *root, const char *section, const char *name, 
         debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
     struct section *co = appconfig_section_find(root, section);
+    if (!co && !default_value)
+        return NULL;
     if(!co) co = appconfig_section_create(root, section);
 
     return appconfig_get_by_section(co, name, default_value);
