@@ -1118,7 +1118,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     return bytes;
 }
 
-static inline void web_client_send_http_header(struct web_client *w) {
+void web_client_build_http_header(struct web_client *w) {
     if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 
@@ -1252,6 +1252,10 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     // end of HTTP header
     buffer_strcat(w->response.header_output, "\r\n");
+}
+
+static inline void web_client_send_http_header(struct web_client *w) {
+    web_client_build_http_header(w);
 
     // sent the HTTP header
     debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"

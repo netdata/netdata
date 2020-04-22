@@ -723,6 +723,50 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     }
 
     _free_collector(tmp_collector);
+
+}
+/*
+ * Take a buffer, encode it and rewrite it
+ *
+ */
+
+static char *aclk_encode_response(char *src, size_t content_size, int keep_newlines)
+{
+    char *tmp_buffer = mallocz(content_size * 2);
+    char *dst = tmp_buffer;
+    while (content_size > 0) {
+        switch (*src) {
+            case '\n':
+                if (keep_newlines)
+                {
+                    *dst++ = '\\';
+                    *dst++ = 'n';
+                }
+                break;
+            case '\t':
+                break;
+            case 0x01 ... 0x08:
+            case 0x0b ... 0x1F:
+                *dst++ = '\\';
+                *dst++ = 'u';
+                *dst++ = '0';
+                *dst++ = '0';
+                *dst++ = (*src < 0x0F) ? '0' : '1';
+                *dst++ = to_hex(*src);
+                break;
+            case '\"':
+                *dst++ = '\\';
+                *dst++ = *src;
+                break;
+            default:
+                *dst++ = *src;
+        }
+        src++;
+        content_size--;
+    }
+    *dst = '\0';
+
+    return tmp_buffer;
 }
 
 int aclk_execute_query(struct aclk_query *this_query)
@@ -730,6 +774,8 @@ int aclk_execute_query(struct aclk_query *this_query)
     if (strncmp(this_query->query, "/api/v1/", 8) == 0) {
         struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
         w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+        w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+        w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
         strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
         w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
         w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
@@ -745,26 +791,36 @@ int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        int rc = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        w->response.code = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        now_realtime_timeval(&w->tv_ready);
+        w->response.data->date = w->tv_ready.tv_sec;
+        web_client_build_http_header(w);  // TODO: this function should offset from date, not tv_ready
         BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
 
         aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0);
         buffer_strcat(local_buffer, ",\n\t\"payload\": ");
-        char *encoded_response = aclk_encode_response(w->response.data);
+        char *encoded_response = aclk_encode_response(w->response.data->buffer, w->response.data->len, 0);
+        char *encoded_header = aclk_encode_response(w->response.header_output->buffer, w->response.header_output->len, 1);
 
         buffer_sprintf(
-            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\"\n}", rc, encoded_response);
+            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\",\n\"headers\": \"%s\"\n}", 
+            w->response.code, encoded_response, encoded_header);
 
         buffer_sprintf(local_buffer, "\n}");
+
+        debug(D_ACLK, "Response:%s", encoded_header);
 
         aclk_send_message(this_query->topic, local_buffer->buffer, this_query->msg_id);
 
         buffer_free(w->response.data);
+        buffer_free(w->response.header);
+        buffer_free(w->response.header_output);
         freez(w);
         buffer_free(local_buffer);
         freez(encoded_response);
+        freez(encoded_header);
         return 0;
     }
     return 1;
@@ -1535,46 +1591,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, ts_secs);
 }
 
-/*
- * Take a buffer, encode it and rewrite it
- *
- */
-
-char *aclk_encode_response(BUFFER *contents)
-{
-    char *tmp_buffer = mallocz(contents->len * 2);
-    char *src, *dst;
-    size_t content_size = contents->len;
-
-    src = contents->buffer;
-    dst = tmp_buffer;
-    while (content_size > 0) {
-        switch (*src) {
-            case '\n':
-            case '\t':
-                break;
-            case 0x01 ... 0x08:
-            case 0x0b ... 0x1F:
-                *dst++ = '\\';
-                *dst++ = '0';
-                *dst++ = '0';
-                *dst++ = (*src < 0x0F) ? '0' : '1';
-                *dst++ = to_hex(*src);
-                break;
-            case '\"':
-                *dst++ = '\\';
-                *dst++ = *src;
-                break;
-            default:
-                *dst++ = *src;
-        }
-        src++;
-        content_size--;
-    }
-    *dst = '\0';
-
-    return tmp_buffer;
-}
 
 /*
  * This will send alarm information which includes
