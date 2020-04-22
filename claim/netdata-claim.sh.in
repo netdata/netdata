@@ -182,8 +182,6 @@ echo >&2 "Hostname: $HOSTNAME"
 echo >&2 "Proxy: $PROXY"
 echo >&2 "Netdata user: $NETDATA_USER"
 
-exit 0
-
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
         mkdir -p "${CLAIMING_DIR}" && chmod 0770 "${CLAIMING_DIR}"
@@ -303,9 +301,24 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
+
+        # Rewrite the netdata.conf on the disk
+        T=$(mktemp)
+        sed -e 's/^[^#]*netdata cloud =/#\0/;s/^[^#]*cloud base url =/#\0/' @configdir_POST@/netdata.conf >$T
+        cat >>$T <<HERE_DOC
+        [global]
+          netdata cloud = enable
+        [cloud]
+          cloud base url = $URL_BASE
+HERE_DOC
+        cp $T @configdir_POST@/netdata.conf
+        rm $T
         if [ "${RELOAD}" == "0" ] ; then
             exit 0
         fi
+        # Update the netdata.conf in the agent memory
+        netdatacli write-config 'global|netdata cloud|enable' && \
+        netdatacli write-config "cloud|cloud base url|$URL_BASE" && \
         netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
         echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
         exit 6
