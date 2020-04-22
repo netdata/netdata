@@ -1280,17 +1280,23 @@ void *aclk_main(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
 
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK)
     if (!netdata_cloud_setting) {
         info("Killing ACLK thread -> cloud functionality has been disabled");
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
         return NULL;
     }
+#endif
 
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
         sleep_usec(USEC_PER_MS * 300);
     }
 
+    while (!netdata_cloud_setting) {
+        sleep_usec(USEC_PER_SEC * 5);
+    }
+    
     last_init_sequence = now_realtime_sec();
     query_thread = NULL;
 

@@ -40,12 +40,7 @@ int registry_init(void) {
     registry.hostname = config_get(CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);
     registry.verify_cookies_redirects = config_get_boolean(CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
 
-    // This is guaranteed to be set early in main via post_conf_load()
-    registry.cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
-    if (registry.cloud_base_url == NULL)
-        fatal("Do not move the cloud base url out of post_conf_load!!");
-
-    setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
+    registry_update_cloud_base_url();
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
     setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);
 
