@@ -114,6 +114,9 @@ void load_claiming_state(void)
         claimed_id = NULL;
     }
 
+    // Propagate into aclk and registry. Be kind of atomic...
+    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);   
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
 
@@ -125,4 +128,19 @@ void load_claiming_state(void)
     }
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+    netdata_cloud_setting = 0;
+#else
+    char *cloud = config_get(CONFIG_SECTION_GLOBAL, "netdata cloud", "coming soon");
+    if (!strcmp(cloud, "coming soon")) {
+        netdata_cloud_setting = 0;          // Note: this flips to 1 after the release
+    } else if (!strcmp(cloud, "enable")) {
+        netdata_cloud_setting = 1;
+    } else if (!strcmp(cloud, "disable")) {
+        netdata_cloud_setting = 0;
+    }
+#endif
 }
