@@ -62,11 +62,11 @@ docker run --rm --privileged multiarch/qemu-user-static:register --reset
 # Build images using multi-arch Dockerfile.
 TAG="${REPOSITORY,,}:${VERSION}-${ARCH}"
 echo "Building tag ${TAG}.."
-eval docker build --no-cache \
-     --build-arg ARCH="${ARCH}" \
-     --build-arg RELEASE_CHANNEL="${RELEASE_CHANNEL}" \
-     --tag "${TAG}" \
-     --file packaging/docker/Dockerfile ./
+docker build --no-cache                                  \
+	--build-arg ARCH="${ARCH}"                       \
+	--build-arg RELEASE_CHANNEL="${RELEASE_CHANNEL}" \
+	--tag "${TAG}"                                   \
+	--file packaging/docker/Dockerfile .
 echo "..Done!"
 
 echo "Docker build process completed!"
