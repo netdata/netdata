@@ -108,7 +108,7 @@ get_latest_version() {
   if [ "${RELEASE_CHANNEL}" == "stable" ]; then
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
   else
-    latest="$(download "https://storage.googleapis.com/netdata-nightlies/latest-version.txt" /dev/stdout)"
+    latest="$(download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout)"
   fi
   parse_version "$latest"
 }
@@ -123,13 +123,12 @@ set_tarball_urls() {
   if [ "$1" = "stable" ]; then
     local latest
     # Simple version
-    # latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.${extension}"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.${extension}"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/netdata-latest.${extension}"
+    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_NIGHTLIES_BASEURL/sha256sums.txt"
   fi
 }
 
@@ -185,8 +184,8 @@ update() {
       do_not_start="--dont-start-it"
     fi
 
-    if [ -n "${NETDATA_SELECTED_DASHBOARD}" ] ; then
-        env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
+    if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
+      env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
     fi
 
     info "Re-installing netdata..."
@@ -221,6 +220,9 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
 # Source the tarbal checksum, if not already available from environment (for existing installations with the old logic)
 [[ -z "${NETDATA_TARBALL_CHECKSUM}" ]] && [[ -f ${NETDATA_LIB_DIR}/netdata.tarball.checksum ]] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
+
+# Grab the nightlies baseurl (defaulting to our Google Storage bucket)
+[ -z "$NETDATA_NIGHTLIES_BASEURL" ] && NETDATA_NIGHTLIES_BASEURL=https://storage.googleapis.com/netdata-nightlies
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
