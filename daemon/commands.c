@@ -44,6 +44,7 @@ static cmd_status_t cmd_fatal_execute(char *args, char **message);
 static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message);
 static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
 static cmd_status_t cmd_read_config_execute(char *args, char **message);
+static cmd_status_t cmd_write_config_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -54,7 +55,8 @@ static command_info_t command_info_array[] = {
         {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
         {"reload-claiming-state", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
         {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
-        {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT}
+        {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
+        {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -187,17 +189,11 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
 {
     (void)args;
     (void)message;
-#ifdef DISABLE_CLOUD
+#if defined(DISABLE_CLOUD) || !defined(ENABLE_ACLK)
     info("The claiming feature has been explicitly disabled");
     *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
     return CMD_STATUS_FAILURE;
 #endif
-#ifndef ENABLE_ACLK
-    info("Cloud functionality is not enabled because of missing dependencies at build-time.");
-    *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
-    return CMD_STATUS_FAILURE;
-#endif
-
     error_log_limit_unlimited();
     info("COMMAND: Reloading Agent Claiming configuration.");
     load_claiming_state();
@@ -232,7 +228,6 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 
 static cmd_status_t cmd_read_config_execute(char *args, char **message)
 {
-    error("read-config %s", args);
     size_t n = strlen(args);
     char *separator = strchr(args,'|');
     if (separator == NULL)
@@ -253,11 +248,34 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
     else
     {
         (*message) = strdupz(value);
-        error("read-config success, result=%s",value);
         freez(temp);
         return CMD_STATUS_SUCCESS;
     }
 
+}
+
+static cmd_status_t cmd_write_config_execute(char *args, char **message)
+{
+    UNUSED(message);
+    info("write-config %s", args);
+    size_t n = strlen(args);
+    char *separator = strchr(args,'|');
+    if (separator == NULL)
+        return CMD_STATUS_FAILURE;
+    char *separator2 = strchr(separator+1,'|');
+    if (separator2 == NULL)
+        return CMD_STATUS_FAILURE;
+    char *temp = callocz(n + 1, 1);
+    strcpy(temp, args);
+    size_t offset = separator-args;
+    temp[offset] = 0;
+    size_t offset2 = separator2-args;
+    temp[offset2] = 0;
+
+    config_set(temp, temp+offset+1, temp+offset2+1);
+    info("write-config section=%s key=%s value=%s",temp, temp+offset+1, temp+offset2+1);
+    freez(temp);
+    return CMD_STATUS_SUCCESS;
 }
 
 static void cmd_lock_exclusive(unsigned index)
