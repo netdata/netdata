@@ -57,17 +57,6 @@ ARG ARCH
 # This image contains preinstalled dependecies
 FROM netdata/base:${ARCH}
 
-# Conditional subscription to Polyverse's Polymorphic Linux repositories
-RUN if [ "$(uname -m)" == "x86_64" ]; then \
-        apk update && apk upgrade; \
-        curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
-        if [ $? -eq 0 ]; then \
-                apk update && \
-                apk upgrade --available --no-cache && \
-                sed -in 's/^#//g' /etc/apk/repositories; \
-        fi \
-    fi
-
 # Copy files over
 RUN mkdir -p /opt/src
 COPY --from=builder /app /
