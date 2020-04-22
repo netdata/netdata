@@ -66,12 +66,20 @@ int tls_select_version(const char *lversion) {
         return TLS1_1_VERSION;
     else if (!strcmp(lversion, "1.2"))
         return TLS1_2_VERSION;
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
+#if (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111 && !defined(LIBRESSL_VERSION_NUMBER)) || ((defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)))
     else if (!strcmp(lversion, "1.3"))
         return TLS1_3_VERSION;
 #endif
 
+#if !defined(LIBRESSL_VERSION_NUMBER)
     return TLS_MAX_VERSION;
+#else
+# if defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)
+    return TLS1_3_VERSION;
+# else
+    return TLS1_2_VERSION;
+# endif
+#endif
 }
 #endif
 
