@@ -88,12 +88,7 @@ dist_noinst_SCRIPTS = \
     packaging/installer/kickstart.sh \
     packaging/installer/kickstart-static64.sh \
     packaging/installer/functions.sh \
-    netdata-installer.sh \
-    docs/generator/buildhtml.sh \
-    docs/generator/buildyaml.sh \
-    docs/generator/checklinks.sh \
-    docs/generator/requirements.txt \
-    docs/generator/runtime.txt \
+    netdata-installer.sh
     $(NULL)
 
 # -----------------------------------------------------------------------------
