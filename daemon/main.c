@@ -577,22 +577,7 @@ static void get_netdata_configured_variables() {
     get_system_cpus();
     get_system_pid_max();
 
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
-#ifdef DISABLE_CLOUD
-    netdata_cloud_setting = 0;
-#else
-    char *cloud = config_get(CONFIG_SECTION_GLOBAL, "netdata cloud", "coming soon");
-    if (!strcmp(cloud, "coming soon")) {
-        netdata_cloud_setting = 0;          // Note: this flips to 1 after the release
-    } else if (!strcmp(cloud, "enable")) {
-        netdata_cloud_setting = 1;
-    } else if (!strcmp(cloud, "disable")) {
-        netdata_cloud_setting = 0;
-    }
-#endif
-    // This must be set before any point in the code that accesses it. Do not move it from this function.
-    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+
 }
 
 static void get_system_timezone(void) {
@@ -853,11 +838,48 @@ void set_silencers_filename() {
     silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
 }
 
+/* Any config setting that can be accessed without a default value i.e. configget(...,...,NULL) *MUST*
+   be set in this procedure to be called in all the relevant code paths.
+*/
+void post_conf_load(char **user)
+{
+    // --------------------------------------------------------------------
+    // get the user we should run
+
+    // IMPORTANT: this is required before web_files_uid()
+    if(getuid() == 0) {
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
+    }
+    else {
+        struct passwd *passwd = getpwuid(getuid());
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
+    }
+
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#ifdef DISABLE_CLOUD
+    netdata_cloud_setting = 0;
+#else
+    char *cloud = config_get(CONFIG_SECTION_GLOBAL, "netdata cloud", "coming soon");
+    if (!strcmp(cloud, "coming soon")) {
+        netdata_cloud_setting = 0;          // Note: this flips to 1 after the release
+    } else if (!strcmp(cloud, "enable")) {
+        netdata_cloud_setting = 1;
+    } else if (!strcmp(cloud, "disable")) {
+        netdata_cloud_setting = 0;
+    }
+#endif
+    // This must be set before any point in the code that accesses it. Do not move it from this function.
+    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+}
+
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
     size_t default_stacksize;
+    char *user = NULL;
+
 
     netdata_ready=0;
     // set the name for logging
@@ -920,6 +942,7 @@ int main(int argc, char **argv) {
                     }
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
+                        post_conf_load(&user);
                         config_loaded = 1;
                     }
                     break;
@@ -1111,6 +1134,7 @@ int main(int argc, char **argv) {
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
                                 load_netdata_conf(NULL, 0);
+                                post_conf_load(&user);
                             }
 
                             get_netdata_configured_variables();
@@ -1151,7 +1175,10 @@ int main(int argc, char **argv) {
 #endif
 
     if(!config_loaded)
+    {
         load_netdata_conf(NULL, 0);
+        post_conf_load(&user);
+    }
 
 
     // ------------------------------------------------------------------------
@@ -1180,8 +1207,6 @@ int main(int argc, char **argv) {
         if(chdir(netdata_configured_user_config_dir) == -1)
             fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
     }
-
-    char *user = NULL;
 
     {
         // --------------------------------------------------------------------
@@ -1245,19 +1270,6 @@ int main(int argc, char **argv) {
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
-        }
-
-
-        // --------------------------------------------------------------------
-        // get the user we should run
-
-        // IMPORTANT: this is required before web_files_uid()
-        if(getuid() == 0) {
-            user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
-        }
-        else {
-            struct passwd *passwd = getpwuid(getuid());
-            user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
         }
 
 

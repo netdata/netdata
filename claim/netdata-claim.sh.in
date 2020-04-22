@@ -102,9 +102,9 @@ fi
 get_config_value() {
     section="${1}"
     key_name="${2}"
-    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$section" "$key_name")
-    if [ $? != 0 ]; then
-       echo "cli failed, manual attempt"
+    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$section|$key_name"; exit $?)
+    if [ "$?" != "0" ]; then
+       echo "cli failed ($?, $config_result), manual attempt"
        config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$section" "$key_name" unknown_default)
     fi
 }

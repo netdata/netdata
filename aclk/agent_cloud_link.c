@@ -1297,10 +1297,10 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
     uint32_t port_num = 0;
-    // This is guaranteed to be set early in main via get_netdata_configured_variables()
+    // This is guaranteed to be set early in main via post_conf_load()
     char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
     if (cloud_base_url == NULL)
-        fatal("Do not move the cloud base url out of get_netdata_configured_variables!!");
+        fatal("Do not move the cloud base url out of post_conf_load!!");
     if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
         error("Configuration error - cannot use agent cloud link");
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;

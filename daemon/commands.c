@@ -43,6 +43,7 @@ static cmd_status_t cmd_exit_execute(char *args, char **message);
 static cmd_status_t cmd_fatal_execute(char *args, char **message);
 static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message);
 static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
+static cmd_status_t cmd_read_config_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -53,6 +54,7 @@ static command_info_t command_info_array[] = {
         {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
         {"reload-claiming-state", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
         {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
+        {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -230,6 +232,36 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
+static cmd_status_t cmd_read_config_execute(char *args, char **message)
+{
+    error("read-config %s", args);
+    size_t n = strlen(args);
+    char *separator = strchr(args,'|');
+    if (separator == NULL)
+        return CMD_STATUS_FAILURE;
+
+    char *temp = callocz(n + 1, 1);
+    strcpy(temp, args);
+    size_t offset = separator-args;
+    temp[offset] = 0;
+
+    char *value =config_get(temp, temp+offset+1, NULL);
+    if (value == NULL)
+    {
+        error("Cannot execute read-config section=%s / key=%s because no value set", temp, temp+offset+1);
+        freez(temp);
+        return CMD_STATUS_FAILURE;
+    }
+    else
+    {
+        (*message) = strdupz(value);
+        error("read-config success, result=%s",value);
+        freez(temp);
+        return CMD_STATUS_SUCCESS;
+    }
+
+}
+
 static void cmd_lock_exclusive(unsigned index)
 {
     (void)index;
@@ -371,7 +403,7 @@ static void schedule_command(uv_work_t *req)
 
 static void parse_commands(struct command_context *cmd_ctx)
 {
-    char *message = NULL, *pos;
+    char *message = NULL, *pos, *lstrip, *rstrip;
     cmd_t i;
     cmd_status_t status;
 
@@ -381,9 +413,12 @@ static void parse_commands(struct command_context *cmd_ctx)
     for (pos = cmd_ctx->command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) {;}
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
+            for (lstrip=pos + strlen(command_info_array[i].cmd_str); isspace(*lstrip) && ('\0' != *lstrip); ++lstrip) {;}
+            for (rstrip=lstrip+strlen(lstrip)-1; isspace(*rstrip) && rstrip>lstrip; *(rstrip--) = 0 );
+
             cmd_ctx->work.data = cmd_ctx;
             cmd_ctx->idx = i;
-            cmd_ctx->args = pos + strlen(command_info_array[i].cmd_str);
+            cmd_ctx->args = lstrip;
             cmd_ctx->message = NULL;
 
             assert(0 == uv_queue_work(loop, &cmd_ctx->work, schedule_command, after_schedule_command));
