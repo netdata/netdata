@@ -115,8 +115,9 @@ entry in the menu and new interactive charts!
 Collector not working? Learn about collector troubleshooting in our [collector
 reference](REFERENCE.md#troubleshoot-a-collector).
 
-View our [collectors tutorials](README.md#tutorials) to get specific instructions on enabling new and popular
-collectors.
+View our [collectors tutorials](/collectors/README.md#tutorials) to get specific instructions on enabling new and
+popular collectors.
 
 Finally, learn more advanced collector features, such as disabling plugins or developing a custom collector, in our
-[internal plugin API](REFERENCE.md#internal-plugins-api) or our [external plugin docs](plugins.d/README.md).
+[internal plugin API](/collectors/REFERENCE.md#internal-plugins-api) or our [external plugin
+docs](/collectors/plugins.d/README.md).

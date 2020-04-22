@@ -70,6 +70,13 @@ events is:
 Furthermore, the FATAL event sends the Netdata process & thread name, along with the source code function, source code
 filename and source code line number of the fatal error.
 
+Starting with v1.21, we additionally collect information about:
+
+-   Failures to build the dependencies required to use Cloud features.
+-   Unavailability of Cloud features in an agent.
+-   Failures to connect to the Cloud in case the agent has been [claimed](/claim/README.md). This includes error codes
+    to inform the Netdata team about the reason why the connection failed.
+
 To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The
 template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins
 directory`, which is usually `/usr/libexec/netdata/plugins.d`. 
@@ -84,13 +91,13 @@ installation, including manual, offline, and macOS installations. Create the fil
 .opt-out-from-anonymous-statistics` from your Netdata configuration directory.
 
 **Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
-docs](../packaging/installer/README.md).** You can append this option during the initial installation or a manual
+docs](/packaging/installer/README.md).** You can append this option during the initial installation or a manual
 update. You can also export the environment variable `DO_NOT_TRACK` with a non-zero or non-empty value
 (e.g: `export DO_NOT_TRACK=1`).
 
 When using Docker, **set your `DO_NOT_TRACK` environment variable to `1`.** You can set this variable with the following
 command: `export DO_NOT_TRACK=1`. When creating a container using Netdata's [Docker
-image](../packaging/docker/README.md#run-netdata-with-the-docker-command) for the first time, this variable will disable
+image](/packaging/docker/README.md#run-netdata-with-the-docker-command) for the first time, this variable will disable
 the anonymous statistics script inside of the container.
 
 Each of these opt-out processes does the following:

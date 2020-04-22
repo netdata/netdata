@@ -48,6 +48,8 @@ typedef struct netdata_syscall_stat {
     struct netdata_syscall_stat  *next; //Link list
 }netdata_syscall_stat_t;
 
+typedef uint64_t netdata_idx_t;
+
 typedef struct netdata_publish_syscall {
     char *dimension;
     char *name;
@@ -76,6 +78,7 @@ typedef struct netdata_error_report {
     int err;
 }netdata_error_report_t;
 
+//Chart defintions
 # define NETDATA_EBPF_FAMILY "ebpf"
 # define NETDATA_FILE_GROUP "File"
 # define NETDATA_VFS_GROUP "VFS"
@@ -96,8 +99,51 @@ typedef struct netdata_error_report {
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
 # define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
 
+//Log file
 # define NETDATA_DEVELOPER_LOG_FILE "developer.log"
 
+//Maximum number of processors monitored on perf events
 # define NETDATA_MAX_PROCESSOR 512
+
+//Kernel versions calculated with the formula:
+//   R = MAJOR*65536 + MINOR*256 + PATCH
+# define NETDATA_KERNEL_V5_3 328448
+# define NETDATA_KERNEL_V4_15 265984
+
+//Index from kernel
+# define NETDATA_KEY_CALLS_DO_SYS_OPEN 0
+# define NETDATA_KEY_ERROR_DO_SYS_OPEN 1
+
+# define NETDATA_KEY_CALLS_VFS_WRITE 2
+# define NETDATA_KEY_ERROR_VFS_WRITE 3
+# define NETDATA_KEY_BYTES_VFS_WRITE 4
+
+# define NETDATA_KEY_CALLS_VFS_READ 5
+# define NETDATA_KEY_ERROR_VFS_READ 6
+# define NETDATA_KEY_BYTES_VFS_READ 7
+
+# define NETDATA_KEY_CALLS_VFS_UNLINK 8
+# define NETDATA_KEY_ERROR_VFS_UNLINK 9
+
+# define NETDATA_KEY_CALLS_DO_EXIT 10
+
+# define NETDATA_KEY_CALLS_RELEASE_TASK 11
+
+# define NETDATA_KEY_CALLS_DO_FORK 12
+# define NETDATA_KEY_ERROR_DO_FORK 13
+
+# define NETDATA_KEY_CALLS_CLOSE_FD 14
+# define NETDATA_KEY_ERROR_CLOSE_FD 15
+
+# define NETDATA_KEY_CALLS_SYS_CLONE 16
+# define NETDATA_KEY_ERROR_SYS_CLONE 17
+
+# define NETDATA_KEY_CALLS_VFS_WRITEV 18
+# define NETDATA_KEY_ERROR_VFS_WRITEV 19
+# define NETDATA_KEY_BYTES_VFS_WRITEV 20
+
+# define NETDATA_KEY_CALLS_VFS_READV 21
+# define NETDATA_KEY_ERROR_VFS_READV 22
+# define NETDATA_KEY_BYTES_VFS_READV 23
 
 #endif

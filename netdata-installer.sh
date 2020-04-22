@@ -441,7 +441,12 @@ You may need to check these:
    If your system cannot find zlib, although it is installed
    run me with the option:  --libs-are-really-here
 
-3. You need basic build tools installed, like:
+3. The pacakge json-c-dev (or json-c-devel)has to be installed.
+
+   If your system cannot find json-c, although it is installed
+   run me with the option:  --libs-are-really-here
+
+4. You need basic build tools installed, like:
 
    gcc make autoconf automake pkg-config
 
@@ -471,7 +476,23 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
-  run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+  if [ "$(uname -s)" = Linux ]; then
+    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+  else
+    pushd ${1} > /dev/null || return 1
+    if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
+      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+        -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+        -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
+        -D WITH_STATIC_LIBRARIES:boolean=YES \
+        .
+    else
+      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
+    fi
+    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C lib
+    run mv lib/libmosquitto_static.a lib/libmosquitto.a
+    popd || return 1
+  fi
 }
 
 copy_libmosquitto() {
@@ -489,12 +510,6 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  if [ "$(uname)" != "Linux" ]; then
-    echo >&2 " Sorry NetData with custom libmosquitto is unsupported on $(uname) at this time!"
-    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
-    return 0
-  fi
-
   progress "Prepare custom libmosquitto version"
 
   MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
@@ -503,16 +518,14 @@ bundle_libmosquitto() {
   MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
 
   if fetch_and_verify "mosquitto" \
-                     "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" \
-                     "${MOSQUITTO_PACKAGE_BASENAME}" \
-                     "${tmp}" \
-                     "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"
-  then
-    if run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}" && \
-       build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && \
-       copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" && \
-       rm -rf "${tmp}"
-    then
+    "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" \
+    "${MOSQUITTO_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"; then
+    if run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" &&
+      copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto."
@@ -538,7 +551,15 @@ bundle_libmosquitto
 
 build_libwebsockets() {
   pushd "${1}" > /dev/null || exit 1
-  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+  if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
+    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+      -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+      -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
+      -D LWS_WITH_SOCKS5:bool=ON \
+      .
+  else
+    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+  fi
   run env CFLAGS= CXXFLAGS= LDFLAGS= make
   popd > /dev/null || exit 1
 }
@@ -553,7 +574,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
     return 0
   fi
 
@@ -571,16 +592,14 @@ bundle_libwebsockets() {
   LIBWEBSOCKETS_PACKAGE_BASENAME="v${LIBWEBSOCKETS_PACKAGE_VERSION}.tar.gz"
 
   if fetch_and_verify "libwebsockets" \
-                      "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
-                      "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
-                      "${tmp}" \
-                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"
-  then
-    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" && \
-       build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
-       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" && \
-       rm -rf "${tmp}"
-    then
+    "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+    "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"; then
+    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
+      copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
       run_ok "libwebsockets built and prepared."
     else
       run_failed "Failed to build libwebsockets."

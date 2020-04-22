@@ -18,7 +18,6 @@ WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
 declare -A ARCH_MAP
 ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
-DEVEL_ARCHS=(amd64)
 [ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
 DOCKER_CMD="docker --config ${WORKDIR}"
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
@@ -32,11 +31,6 @@ if [ -z ${REPOSITORY} ]; then
 	else
 		echo "REPOSITORY was not detected, attempted to use TRAVIS_REPO_SLUG setting: ${TRAVIS_REPO_SLUG}"
 	fi
-fi
-
-# When development mode is set, build on DEVEL_ARCHS
-if [ ! -z ${DEVEL+x} ]; then
-    declare -a ARCHS=(${DEVEL_ARCHS[@]})
 fi
 
 # Ensure there is a version, the most appropriate one
@@ -79,12 +73,15 @@ echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 for ARCH in ${ARCHS[@]}; do
     TAG="${MANIFEST_LIST}-${ARCH}"
     echo "Publishing image ${TAG}.."
-    $DOCKER_CMD push "${TAG}" &
+    $DOCKER_CMD push "${TAG}"
+
+    published() {
+        curl -s "https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags" | jq -e -r '.results[] | select(.name == "'"${VERSION}-${ARCH}"'")' > /dev/null
+    }
+    retry 5 published
+
     echo "Image ${TAG} published succesfully!"
 done
-
-echo "Waiting for images publishing to complete"
-wait
 
 # Recreate docker manifest list
 echo "Getting tag list for version '${VERSION}'.."

@@ -72,7 +72,8 @@ static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
 static int nprocs;
-uint32_t *hash_values;
+static int isrh;
+netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
@@ -510,15 +511,15 @@ void *process_publisher(void *ptr)
 }
 
 static void move_from_kernel2user_global() {
-    uint32_t idx;
-    uint32_t res[NETDATA_GLOBAL_VECTOR];
+    uint64_t idx;
+    netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
 
-    uint32_t *val = hash_values;
+    netdata_idx_t *val = hash_values;
     for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
         if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
-            uint32_t total = 0;
+            uint64_t total = 0;
             int i;
-            int end = (mykernel < 265984)?1:nprocs;
+            int end = (mykernel < NETDATA_KERNEL_V4_15)?1:nprocs;
             for (i = 0; i < end; i++)
                 total += val[i];
 
@@ -528,26 +529,26 @@ static void move_from_kernel2user_global() {
         }
     }
 
-    aggregated_data[0].call = res[0]; //open
-    aggregated_data[1].call = res[14]; //close
-    aggregated_data[2].call = res[8]; //unlink
-    aggregated_data[3].call = res[5] + res[21]; //read + readv
-    aggregated_data[4].call = res[2] + res[18]; //write + writev
-    aggregated_data[5].call = res[10]; //exit
-    aggregated_data[6].call = res[11]; //release
-    aggregated_data[7].call = res[12]; //fork
-    aggregated_data[8].call = res[16]; //thread
+    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
+    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
+    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
+    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
+    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
+    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
+    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
+    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
+    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
 
-    aggregated_data[0].ecall = res[1]; //open
-    aggregated_data[1].ecall = res[15]; //close
-    aggregated_data[2].ecall = res[9]; //unlink
-    aggregated_data[3].ecall = res[6] + res[22];  //read + readv
-    aggregated_data[4].ecall = res[3] + res[19]; //write + writev
-    aggregated_data[7].ecall = res[13]; //fork
-    aggregated_data[8].ecall = res[17]; //thread
+    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
+    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
+    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
+    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
+    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
+    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
+    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
 
-    aggregated_data[2].bytes = (uint64_t)res[4] + (uint64_t)res[20]; //write + writev
-    aggregated_data[3].bytes = (uint64_t)res[7] + (uint64_t)res[23];//read + readv
+    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
+    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
 static void move_from_kernel2user()
@@ -637,7 +638,7 @@ int allocate_global_vectors() {
         return -1;
     }
 
-    hash_values = callocz(nprocs, sizeof(uint32_t));
+    hash_values = callocz(nprocs, sizeof(netdata_idx_t));
     if(!hash_values) {
         return -1;
     }
@@ -775,16 +776,24 @@ void set_global_variables() {
     if (nprocs > NETDATA_MAX_PROCESSOR) {
         nprocs = NETDATA_MAX_PROCESSOR;
     }
+
+    isrh = get_redhat_release();
 }
 
 static void change_collector_event() {
     int i;
+    if (mykernel < NETDATA_KERNEL_V5_3)
+        collector_events[10].name = NULL;
+
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
+}
 
-    if (mykernel < 328448)
-        collector_events[i].name = NULL;
+static void change_syscalls() {
+    static char *lfork = { "do_fork" };
+    id_names[7] = lfork;
+    collector_events[8].name = lfork;
 }
 
 static inline void what_to_load(char *ptr) {
@@ -796,6 +805,9 @@ static inline void what_to_load(char *ptr) {
         */
     else
         change_collector_event();
+
+    if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+        change_syscalls();
 }
 
 static inline void enable_debug(char *ptr) {
@@ -847,8 +859,10 @@ int main(int argc, char **argv)
     (void)argv;
 
     mykernel =  get_kernel_version();
-    if(!has_condition_to_run(mykernel))
+    if(!has_condition_to_run(mykernel)) {
+        error("[EBPF PROCESS] The current collector cannot run on this kernel.");
         return 1;
+    }
 
     //set name
     program_name = "ebpf_process.plugin";
@@ -874,6 +888,9 @@ int main(int argc, char **argv)
 
     if (load_collector_file(user_config_dir)) {
         info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
+        change_collector_event();
+        if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+            change_syscalls();
     }
 
     if(ebpf_load_libraries()) {
@@ -912,6 +929,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
+        error("[EBPF PROCESS] Cannot start the mutex.");
         int_exit(7);
     }
 

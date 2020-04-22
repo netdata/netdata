@@ -15,9 +15,9 @@ Netdata monitors `tc` QoS classes for all interfaces.
 
 If you also use [FireQOS](http://firehol.org/tutorial/fireqos-new-user/) it will collect interface and class names.
 
-There is a [shell helper](tc-qos-helper.sh.in) for this (all parsing is done by the plugin in `C` code - this shell script is just a configuration for the command to run to get `tc` output).
+There is a [shell helper](https://raw.githubusercontent.com/netdata/netdata/master/collectors/tc.plugin/tc-qos-helper.sh.in) for this (all parsing is done by the plugin in `C` code - this shell script is just a configuration for the command to run to get `tc` output).
 
-The source of the tc plugin is [here](plugin_tc.c). It is somewhat complex, because a state machine was needed to keep track of all the `tc` classes, including the pseudo classes tc dynamically creates.
+The source of the tc plugin is [here](https://raw.githubusercontent.com/netdata/netdata/master/collectors/tc.plugin/plugin_tc.c). It is somewhat complex, because a state machine was needed to keep track of all the `tc` classes, including the pseudo classes tc dynamically creates.
 
 ## Motivation
 
@@ -69,7 +69,7 @@ QoS is about 2 features:
 
     When your system is under a DDoS attack, it will get a lot more bandwidth compared to the one it can handle and probably your applications will crash. Setting a limit on the inbound traffic using QoS, will protect your servers (throttle the requests) and depending on the size of the attack may allow your legitimate users to access the server, while the attack is taking place.
 
-    Using QoS together with a [SYNPROXY](../../collectors/proc.plugin/README.md) will provide a great degree of protection against most DDoS attacks. Actually when I wrote that article, a few folks tried to DDoS the Netdata demo site to see in real-time the SYNPROXY operation. They did not do it right, but anyway a great deal of requests reached the Netdata server. What saved Netdata was QoS. The Netdata demo server has QoS installed, so the requests were throttled and the server did not even reach the point of resource starvation. Read about it [here](../../collectors/proc.plugin/README.md).
+    Using QoS together with a [SYNPROXY](/collectors/proc.plugin/README.md) will provide a great degree of protection against most DDoS attacks. Actually when I wrote that article, a few folks tried to DDoS the Netdata demo site to see in real-time the SYNPROXY operation. They did not do it right, but anyway a great deal of requests reached the Netdata server. What saved Netdata was QoS. The Netdata demo server has QoS installed, so the requests were throttled and the server did not even reach the point of resource starvation. Read about it [here](/collectors/proc.plugin/README.md).
 
 On top of all these, QoS is extremely light. You will configure it once, and this is it. It will not bother you again and it will not use any noticeable CPU resources, especially on application and database servers.
 

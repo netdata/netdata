@@ -7,10 +7,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/README
 
 # Exporting metrics to external databases (experimental)
 
-The exporting engine is an update for the former [backends](../backends/). It's still work in progress. It has a
+The exporting engine is an update for the former [backends](/backends/README.md). It's still work in progress. It has a
 modular structure and supports metric exporting via multiple exporting connector instances at the same time. You can
 have different update intervals and filters configured for every exporting connector instance. The exporting engine has
-its own configuration file `exporting.conf`. Configuration is almost similar to [backends](../backends/#configuration).
+its own configuration file `exporting.conf`. Configuration is almost similar to [backends](/backends/README.md#configuration).
 The only difference is that the type of a connector should be specified in a section name before a colon and a name after
 the colon. At the moment only four types of connectors are supported: `graphite`, `json`, `opentsdb`, `opentsdb:http`.
 

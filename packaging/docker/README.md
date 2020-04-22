@@ -91,7 +91,7 @@ VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
+about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
@@ -105,7 +105,7 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access
+[HAProxy](/docs/running-behind-haproxy/) so that it restricts connections to read-only access
 to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
@@ -181,7 +181,7 @@ Netdata will be running on, using the [command instruction](https://docs.docker.
 ## Install Netdata using docker-compose with SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you should [secure the Netdata
-instance](../../docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
+instance](/docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
 reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
@@ -246,42 +246,6 @@ Caddyfile.
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our Travis CI infrastructure.
-
-### Using tools manually from the command line
-
-The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your
-choosing. 
-
-```bash
-Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PWD> [-s]
-	-s skip build, just push the image
-Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
-```
-
-This is especially useful when testing a Pull Request for Kubernetes, since you can set `image` to an immutable
-repository and tag, set the `imagePullPolicy` to `Always` and just keep uploading new images.
-
-Example:
-
-We get a local copy of the Helm chart at <https://github.com/netdata/helmchart>. We modify `values.yaml` to have the
-following:
-
-```yaml
-image:
-  repository: cakrit/netdata-prs
-  tag: PR5576
-  pullPolicy: Always
-```
-
-We check out PR5576 and run the following:
-
-```bash
-./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
-```
-
-Then we can run `helm install [path to our helmchart clone]`.
-
-If we make changes to the code, we execute the same `build-test.sh` command, followed by `helm upgrade [name] [path to our helmchart clone]`
 
 ### Inside Netdata organization, using Travis CI
 

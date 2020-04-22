@@ -40,19 +40,18 @@ collectors in node.js. It also manages all its data collectors (placed in `/usr/
 instance of node, thus lowering the memory footprint of data collection.
 
 Of course, there can be independent plugins written in node.js (placed in `/usr/libexec/netdata/plugins`).
-These will have to be developed using the guidelines of **[External Plugins](../plugins.d/)**.
+These will have to be developed using the guidelines of **[External Plugins](/collectors/plugins.d/README.md)**.
 
 To run `node.js` plugins you need to have `node` installed in your system.
 
 In some older systems, the package named `node` is not node.js. It is a terminal emulation program called `ax25-node`.
 In this case the node.js package may be referred as `nodejs`. Once you install `nodejs`, we suggest to link
 `/usr/bin/nodejs` to `/usr/bin/node`, so that typing `node` in your terminal, opens node.js.
-For more information check the **\[[Installation]]** guide.
 
 ## configuring `node.d.plugin`
 
 `node.d.plugin` can work even without any configuration. Its default configuration file is
-[/etc/netdata/node.d.conf](node.d.conf) (to edit it on your system run `/etc/netdata/edit-config node.d.conf`).
+`node.d.conf`. To edit it on your system, run `/etc/netdata/edit-config node.d.conf`.
 
 ## configuring `node.d.plugin` modules
 
@@ -234,6 +233,6 @@ The `service` object defines a set of functions to allow you send information to
 ---
 
 _FIXME: document an operational node.d.plugin data collector - the best example is the
-[snmp collector](snmp/snmp.node.js)_
+[snmp collector](https://raw.githubusercontent.com/netdata/netdata/master/collectors/node.d.plugin/snmp/snmp.node.js)_
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fnode.d.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README
 
 Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected
 metrics, in real-time to it. This is quite different to [data archiving to third party time-series
-databases](../backends).
+databases](/backends/README.md).
 
 When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is capable of:
 
@@ -24,23 +24,23 @@ When Netdata streams metrics to another Netdata, the receiving one is able to pe
 Local Netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another Netdata (`master`).
 
-The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` Netdata. The URL has the form <http://master-host:master-port/host/slave-host/>.
+The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` Netdata. The URL has the form `http://master-host:master-port/host/slave-host/`.
 
 Alarms for the `slave` are served by the `master`.
 
 In this mode the `slave` is just a plain data collector. It spawns all external plugins, but instead
 of maintaining a local database and accepting dashboard requests, it streams all metrics to the
-`master`. The memory footprint is reduced significantly, to between 6 MiB and 40 MiB, depending on the enabled plugins. To reduce the memory usage as much as possible, refer to [running Netdata in embedded devices](../docs/Performance.md#running-netdata-in-embedded-devices).
+`master`. The memory footprint is reduced significantly, to between 6 MiB and 40 MiB, depending on the enabled plugins. To reduce the memory usage as much as possible, refer to [running Netdata in embedded devices](/docs/Performance.md#running-netdata-in-embedded-devices).
 
 The same `master` can collect data for any number of `slaves`.
 
-### database replication
+### Database Replication
 
 Local Netdata (`slave`), **with a local database (and possibly alarms)**, collects metrics and
 sends them to another Netdata (`master`).
 
-The user can use all the functions **at both** <http://slave-ip:slave-port/> and
-<http://master-host:master-port/host/slave-host/>.
+The user can use all the functions **at both** `http://slave-ip:slave-port/` and
+`http://master-host:master-port/host/slave-host/`.
 
 The `slave` and the `master` may have different data retention policies for the same metrics.
 
@@ -111,7 +111,7 @@ this host).
 
 ### streaming configuration
 
-A new file is introduced: [stream.conf](stream.conf) (to edit it on your system run
+A new file is introduced: `stream.conf` (to edit it on your system run
 `/etc/netdata/edit-config stream.conf`). This file holds streaming configuration for both the
 sending and the receiving Netdata.
 
@@ -186,7 +186,7 @@ You can also use `default memory mode = dbengine` for an API key or `memory mode
 
 ##### allow from
 
-`allow from` settings are [Netdata simple patterns](../libnetdata/simple_pattern): string matches
+`allow from` settings are [Netdata simple patterns](/libnetdata/simple_pattern/README.md): string matches
 that use `*` as wildcard (any number of times) and a `!` prefix for a negative match.
 So: `allow from = !10.1.2.3 10.*` will allow all IPs in `10.*` except `10.1.2.3`. The order is
 important: left to right, the first positive or negative match is used.
@@ -221,7 +221,7 @@ For Netdata v1.9+, streaming can also be monitored via `access.log`.
 
 ### Securing streaming communications
 
-Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](../web/server/#enabling-tls-support) on the master. With encryption enabled on the receiving side, you need to instruct the slave to use TLS/SSL as well. On the slave's `stream.conf`, configure the destination as follows:
+Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](/web/server/README.md#enabling-tls-support) on the master. With encryption enabled on the receiving side, you need to instruct the slave to use TLS/SSL as well. On the slave's `stream.conf`, configure the destination as follows:
 
 ```
 [stream]
@@ -484,7 +484,7 @@ The `master` Netdata node can also archive metrics, for all `slaves`, to a time-
 -   json document DBs
 -   all the compatibles to the above (e.g. kairosdb, influxdb, etc)
 
-Check the Netdata [backends documentation](../backends) for configuring this.
+Check the Netdata [backends documentation](/backends/README.md) for configuring this.
 
 This is how such a solution will work:
 
@@ -511,7 +511,7 @@ When they maintain a database, they can also run health checks (alarms and notif
 for the remote host that is streaming the metrics.
 
 To configure a proxy, configure it as a receiving and a sending Netdata at the same time,
-using [stream.conf](stream.conf).
+using `stream.conf`.
 
 The sending side of a Netdata proxy, connects and disconnects to the final destination of the
 metrics, following the same pattern of the receiving side.
@@ -579,7 +579,7 @@ ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HO
 Chart data needs to be consistent between slave and master agents. If there are differences between chart data on a
 master and a slave, such as gaps in metrics collection, it most often means your slave's `memory mode` does not match
 the master's. To learn more about the different ways Netdata can store metrics, and thus keep chart data consistent,
-read our [memory mode documentation](../database).
+read our [memory mode documentation](/database/README.md).
 
 ### Forbidding access
 

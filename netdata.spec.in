@@ -120,7 +120,7 @@ BuildRequires: openssl-devel
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
-BuildRequires: json-glib-devel
+BuildRequires: libjson-c-devel
 %else
 BuildRequires: Judy-devel
 BuildRequires: lz4-devel
@@ -138,7 +138,7 @@ Requires:      zlib
 # for libuv, Requires version >= 1
 Requires:      libuv1
 Requires:      libJudy1
-Requires:      json-glib
+Requires:      libjson-c4
 Requires:      libuuid1
 %else
 # for libuv, Requires version >= 1
