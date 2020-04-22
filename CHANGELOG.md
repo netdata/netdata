@@ -10,6 +10,7 @@
 - Added JSON-C dependency handling to instlal and packaging. [\#8776](https://github.com/netdata/netdata/pull/8776) ([Ferroin](https://github.com/Ferroin))
 - web/gui/demo2.html: Silence Netlify's mixed content warnings [\#8759](https://github.com/netdata/netdata/pull/8759) ([knatsakis](https://github.com/knatsakis))
 - dashboard v.0.4.17: [\#8757](https://github.com/netdata/netdata/pull/8757) ([jacekkolasa](https://github.com/jacekkolasa))
+- Docs: Add Docker instructions to claiming [\#8755](https://github.com/netdata/netdata/pull/8755) ([joelhans](https://github.com/joelhans))
 - Additional cases for the thread exit fix [\#8750](https://github.com/netdata/netdata/pull/8750) ([amoss](https://github.com/amoss))
 - Ebpf index size [\#8743](https://github.com/netdata/netdata/pull/8743) ([thiagoftsm](https://github.com/thiagoftsm))
 - \[docs\]: fix enabling charts.d modules instruction for IOT [\#8740](https://github.com/netdata/netdata/pull/8740) ([Jiab77](https://github.com/Jiab77))
@@ -206,8 +207,6 @@
 - updates for issue 8006 [\#8074](https://github.com/netdata/netdata/pull/8074) ([shortpatti](https://github.com/shortpatti))
 - github/actions: update labeler config and bump version [\#8071](https://github.com/netdata/netdata/pull/8071) ([ilyam8](https://github.com/ilyam8))
 - Adding testing section to the PR template. [\#8068](https://github.com/netdata/netdata/pull/8068) ([amoss](https://github.com/amoss))
-- Update to new release of libmosquitto fork. [\#8067](https://github.com/netdata/netdata/pull/8067) ([Ferroin](https://github.com/Ferroin))
-- Make temporary directories relative to $TEMPDIR. [\#8066](https://github.com/netdata/netdata/pull/8066) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
