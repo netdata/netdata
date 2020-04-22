@@ -306,10 +306,10 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         T=$(mktemp)
         sed -e 's/^[^#]*netdata cloud =/#\0/;s/^[^#]*cloud base url =/#\0/' @configdir_POST@/netdata.conf >$T
         cat >>$T <<HERE_DOC
-        [global]
-          netdata cloud = enable
-        [cloud]
-          cloud base url = $URL_BASE
+[global]
+  netdata cloud = enable
+[cloud]
+  cloud base url = $URL_BASE
 HERE_DOC
         cp $T @configdir_POST@/netdata.conf
         rm $T
@@ -317,9 +317,9 @@ HERE_DOC
             exit 0
         fi
         # Update the netdata.conf in the agent memory
-        netdatacli write-config 'global|netdata cloud|enable' && \
-        netdatacli write-config "cloud|cloud base url|$URL_BASE" && \
-        netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
+        @sbindir_POST@/netdatacli write-config 'global|netdata cloud|enable' && \
+        @sbindir_POST@/netdatacli write-config "cloud|cloud base url|$URL_BASE" && \
+        @sbindir_POST@/netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
         echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
         exit 6
 fi
