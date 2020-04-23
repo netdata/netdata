@@ -42,11 +42,13 @@ increased security, you can enable rescrambling of Netdata packages during runti
 
 ## Run the Agent with the Docker command
 
-Quickly start a new Agent with the `docker` command. You can then access the dashboard at `http://localhost:19999`.
+Quickly start a new Agent with the `docker run` command.
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  --mount source=netdatalib,target=/var/lib/netdata \
+  --mount source=netdatacache,target=/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
@@ -58,8 +60,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-Use [named volumes to persist your metrics data](#persist-metrics-data-using-named-volumes) between restarts or updates
-to the Docker image.
+You can then access the dashboard at `http://localhost:19999`.
 
 ## Run the Agent with Docker Compose
 
@@ -81,17 +82,20 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro 
+      - /etc/os-release:/host/etc/os-release:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
 ```
 
 Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
-
-Use [named volumes to persist your metrics data](#persist-metrics-data-using-named-volumes) between restarts or updates
-to the Docker image.
 
 ## Configure Agent containers
 
@@ -99,68 +103,6 @@ You may need to configure the above `docker run...` and `docker-compose` command
 reference the [`docker run`](https://docs.docker.com/engine/reference/run/) and [Docker
 Compose](https://docs.docker.com/compose/) documentation for details, but we'll cover a few recommended configurations
 below, as well as those that are unique to Netdata Agent containers.
-
-### Persist metrics data using named volumes
-
-You can use additional named volumes to ensure your metrics data is persisted across restarts or updates to the image
-that runs the containerized Agent.
-
-Create two folders on the host that will store this data, and set the permissions so that both the host and container
-can read/write into them.
-
-```bash
-mkdir -p $(pwd)/netdata/var/lib/netdata/
-mkdir -p $(pwd)/netdata/var/cache/netdata/
-sudo chown :1024 -R netdata/
-sudo chmod 775 -R netdata/
-```
-
-Now you can supplement the `docker run` command from above to add a `PGID` and create the named volumes that will
-persist your metrics data.
-
-```bash {3-5}
-docker run -d --name=netdata \
-  -p 19999:19999 \
-  -e PGID=1024 \
-  -v $(pwd)/netdata/var/lib/netdata:/var/lib/netdata \
-  -v $(pwd)/netdata/var/cache/netdata:/var/cache/netdata \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --restart unless-stopped \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  netdata/netdata
-```
-
-If you use Docker Compose, you can alter your `docker-compose.yml` file with the same `PGID` and named volumes.
-
-```yaml {13-14,16-17}
-version: '3'
-services:
-  netdata:
-    image: netdata/netdata
-    container_name: netdata
-    hostname: example.com # set to fqdn of host
-    ports:
-      - 19999:19999
-    restart: unless-stopped
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - apparmor:unconfined
-    environment:
-      - PGID=1024
-    volumes:
-      - ./netdata/var/lib/netdata:/var/lib/netdata
-      - ./netdata/var/cache/netdata:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-```
 
 ### Add or remove other volumes
 
