@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Install Netdata with Docker"
+date: 2020-04-23
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
 ---
 -->
@@ -94,15 +95,18 @@ to the Docker image.
 
 ## Configure Agent containers
 
-You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. In particular,
-you may want to supplement the configurations above by using named volumes that retain metrics data between restarts or
-updates to the container.
+You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. You should
+reference the [`docker run`](https://docs.docker.com/engine/reference/run/) and [Docker
+Compose](https://docs.docker.com/compose/) documentation for details, but we'll cover a few recommended configurations
+below, as well as those that are unique to Netdata Agent containers.
 
 ### Persist metrics data using named volumes
 
 You can use additional named volumes to ensure your metrics data is persisted across restarts or updates to the image
-that runs Netdata. Create two folders on the host that will store this data, and set the permissions so that both the
-host and container can read/write into them.
+that runs the containerized Agent.
+
+Create two folders on the host that will store this data, and set the permissions so that both the host and container
+can read/write into them.
 
 ```bash
 mkdir -p $(pwd)/netdata/var/lib/netdata/
