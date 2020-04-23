@@ -370,7 +370,7 @@ Display line numbers by appending `linenums="1"` after the language declaration,
 number of your choice. Highlight lines by appending `hl_lines="2"`, replacing `2` with the line you'd like to highlight.
 Or, multiple lines: `hl_lines="1 2 4 12`.
 
-> Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our
+> ⚠️ Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our
 > [documentation site](https://learn.netdata.cloud/). They should be used sparingly and only when necessary.
 
 ## Accessibility

@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributin
 # Contributing to documentation
 
 We welcome contributions to Netdata's already extensive documentation, which we host at
-[docs.netdata.cloud](https://docs.netdata.cloud/) and store inside of the [main
+[learn.netdata.cloud](https://learn.netdata.cloud/) and store inside of the [main
 repository](https://github.com/netdata/netdata) on GitHub.
 
 Like all contributing to all other aspects of Netdata, we ask that anyone who wants to help with documentation read and
@@ -47,7 +47,7 @@ To continue, follow one of the paths below:
 ## Edit documentation directly on GitHub
 
 Start editing documentation on GitHub by clicking the small pencil icon on any page on Netdata's [documentation
-site](https://docs.netdata.cloud/). You can find them at the top of every page.
+site](https://learn.netdata.cloud/). You can find them at the top of every page.
 
 Clicking on this icon will take you to the associated page in the `netdata/netdata` repository. Then click the small
 pencil icon on any documentation file (those ending in the `.md` Markdown extension) in the `netdata/netdata`

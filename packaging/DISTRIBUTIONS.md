@@ -248,7 +248,8 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 |:---------------:|:------------------:|:----------:|:-------------------:|:----------:|:-----------:|:-----------:|
 |Auto-detect|Auto-detect|Auto-detect|Auto-detect|NO|NO|NO|
 
--   **Flags/instructions to enable**: [Instructions for AWS Kinesis](https://docs.netdata.cloud/backends/aws_kinesis)
+-   **Flags/instructions to enable**: [Instructions for AWS
+    Kinesis](https://learn.netdata.cloud/docs/agent/backends/aws_kinesis)
 -   **Flags to disable from source**: --disable-backend-kinesis
 -   **What packages required for auto-detect?**: `AWS SDK for C++`, `libcurl`, `libssl`, `libcrypto`
 
