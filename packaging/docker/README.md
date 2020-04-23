@@ -12,6 +12,13 @@ you get set up quickly, and doesn't install anything permanent on the system, wh
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
+page.
+
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
+
 ## Limitations running the Agent in Docker
 
 For monitoring the whole host, running the Agent in a container can limit its capabilities. Some data, like the host OS
@@ -50,22 +57,20 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
-page.
-
-The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
-_actively_ contributing to Netdata's future.
+Use [named volumes to persist your metrics data](#persist-metrics-data-using-named-volumes) between restarts or updates
+to the Docker image.
 
 ## Run the Agent with Docker Compose
 
-The above can be converted to a `docker-compose.yml` file for ease of management:
+The above can be converted to a `docker-compose.yml` file to use with [Docker
+Compose](https://docs.docker.com/compose/):
 
 ```yaml
 version: '3'
 services:
   netdata:
     image: netdata/netdata
+    container_name: netdata
     hostname: example.com # set to fqdn of host
     ports:
       - 19999:19999
@@ -79,18 +84,83 @@ services:
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro 
 ```
 
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
-page.
+Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
-The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
-_actively_ contributing to Netdata's future.
+Use [named volumes to persist your metrics data](#persist-metrics-data-using-named-volumes) between restarts or updates
+to the Docker image.
 
-## Configuring your Agent containers
+## Configure Agent containers
 
-Some of the bind-mounts are optional depending on how you use Netdata:
+You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. In particular,
+you may want to supplement the configurations above by using named volumes that retain metrics data between restarts or
+updates to the container.
+
+### Persist metrics data using named volumes
+
+You can use additional named volumes to ensure your metrics data is persisted across restarts or updates to the image
+that runs Netdata. Create two folders on the host that will store this data, and set the permissions so that both the
+host and container can read/write into them.
+
+```bash
+mkdir -p $(pwd)/netdata/var/lib/netdata/
+mkdir -p $(pwd)/netdata/var/cache/netdata/
+sudo chown :1024 -R netdata/
+sudo chmod 775 -R netdata/
+```
+
+Now you can supplement the `docker run` command from above to add a `PGID` and create the named volumes that will
+persist your metrics data.
+
+```bash {3-5}
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -e PGID=1024 \
+  -v $(pwd)/netdata/var/lib/netdata:/var/lib/netdata \
+  -v $(pwd)/netdata/var/cache/netdata:/var/cache/netdata \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata
+```
+
+If you use Docker Compose, you can alter your `docker-compose.yml` file with the same `PGID` and named volumes.
+
+```yaml {13-14,16-17}
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - PGID=1024
+    volumes:
+      - ./netdata/var/lib/netdata:/var/lib/netdata
+      - ./netdata/var/cache/netdata:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+```
+
+### Add or remove other volumes
+
+Some of the volumes are optional depending on how you use Netdata:
 
 -   If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
     (they are used to get proper user and group names for the monitored host) to get slightly better security.
@@ -101,14 +171,14 @@ Some of the bind-mounts are optional depending on how you use Netdata:
     metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
     using, e.g. `--env VIRTUALIZATION=$(systemd-detect-virt -v)`. If you are using a `docker-compose.yml` then add:
 
-```
+```yaml
     environment:
       - VIRTUALIZATION=${VIRTUALIZATION}
 ```
 
 This allows the information to be passed into `docker-compose` using:
 
-```
+```bash
 VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
 
