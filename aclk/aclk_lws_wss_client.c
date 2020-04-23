@@ -152,7 +152,6 @@ static void aclk_lws_wss_log_divert(int level, const char *line)
 static int aclk_lws_wss_client_init( char *target_hostname, int target_port)
 {
     static int lws_logging_initialized = 0;
-    struct lws_context_creation_info info;
 
     if (unlikely(!lws_logging_initialized)) {
         lws_set_log_level(LLL_ERR | LLL_WARN, aclk_lws_wss_log_divert);
@@ -167,14 +166,6 @@ static int aclk_lws_wss_client_init( char *target_hostname, int target_port)
     engine_instance->host = target_hostname;
     engine_instance->port = target_port;
 
-    memset(&info, 0, sizeof(struct lws_context_creation_info));
-    info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-    info.port = CONTEXT_PORT_NO_LISTEN;
-    info.protocols = protocols;
-
-    engine_instance->lws_context = lws_create_context(&info);
-    if (!engine_instance->lws_context)
-        goto failure_cleanup_2;
 
     aclk_lws_mutex_init(&engine_instance->write_buf_mutex);
     aclk_lws_mutex_init(&engine_instance->read_buf_mutex);
@@ -186,8 +177,6 @@ static int aclk_lws_wss_client_init( char *target_hostname, int target_port)
     return 0;
 
 failure_cleanup:
-    lws_context_destroy(engine_instance->lws_context);
-failure_cleanup_2:
     freez(engine_instance);
     return 1;
 }
@@ -267,7 +256,25 @@ int aclk_lws_wss_connect(char *host, int port)
     int n;
 
     if (!engine_instance) {
-        return aclk_lws_wss_client_init(host, port);
+        if (aclk_lws_wss_client_init(host, port))
+            return 1;       // Propagate failure
+    }
+
+    if (!engine_instance->lws_context)
+    {
+        // First time through (on this connection), create the context
+        struct lws_context_creation_info info;
+        memset(&info, 0, sizeof(struct lws_context_creation_info));
+        info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+        info.port = CONTEXT_PORT_NO_LISTEN;
+        info.protocols = protocols;
+        engine_instance->lws_context = lws_create_context(&info);
+        if (!engine_instance->lws_context)
+        {
+            error("Failed to create lws_context, ACLK will not function");
+            return 1;
+        }
+        return 0;
         // PROTOCOL_INIT callback will call again.
     }
 
@@ -473,6 +480,8 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_CLIENT_CLOSED:
         case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
             engine_instance->lws_wsi = NULL; // inside libwebsockets lws_close_free_wsi is called after callback
+            lws_context_destroy(engine_instance->lws_context);
+            engine_instance->lws_context = NULL;
             aclk_lws_connection_closed();
             return -1;                       // the callback response is ignored, hope the above remains true
         case LWS_CALLBACK_WSI_DESTROY:
@@ -481,6 +490,8 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 aclk_lws_wss_fail_report();
             engine_instance->lws_wsi = NULL;
             engine_instance->websocket_connection_up = 0;
+            lws_context_destroy(engine_instance->lws_context);
+            engine_instance->lws_context = NULL;
             aclk_lws_connection_closed();
             break;
         case LWS_CALLBACK_CLIENT_ESTABLISHED:

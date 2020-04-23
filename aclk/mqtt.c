@@ -220,6 +220,7 @@ void aclk_lws_connection_data_received()
 void aclk_lws_connection_closed()
 {
     aclk_disconnect(NULL);
+
 }
 
 
