@@ -170,8 +170,8 @@ If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cl
 Additionally, check that the `netdata cloud` setting in `netdata.conf` is set to `enable`:
 
 ```ini
-[general]
-    netadata cloud = enable
+[cloud]
+    enabled = yes
 ```
 
 To fix this issue, reinstall Netdata using your [preferred method](/packaging/installer/README.md) and do not add the
