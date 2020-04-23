@@ -16,6 +16,7 @@ int init_pubsub_instance(struct instance *instance)
     instance->start_host_formatting = format_host_labels_json_plaintext;
     instance->start_chart_formatting = NULL;
 
+
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_json_plaintext;
     else
@@ -38,6 +39,8 @@ int init_pubsub_instance(struct instance *instance)
 
     struct pubsub_specific_data *connector_specific_data = callocz(1, sizeof(struct pubsub_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
+
+    info("EXPORTING: Connector specific data pointer = %p", instance->connector_specific_data);
 
     struct pubsub_specific_config *pubsub_specific_config =
         (struct pubsub_specific_config *)instance->config.connector_specific_config;
@@ -95,6 +98,7 @@ void pubsub_connector_worker(void *instance_p)
     struct instance *instance = (struct instance *)instance_p;
     struct pubsub_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct pubsub_specific_data *connector_specific_data = instance->connector_specific_data;
+    info("EXPORTING: Connector specific data pointer = %p", connector_specific_data);
 
     while (!netdata_exit) {
         struct stats *stats = &instance->stats;
@@ -130,52 +134,49 @@ void pubsub_connector_worker(void *instance_p)
             connector_specific_config->topic_id,
             buffer_len);
 
-        pubsub_publish(connector_specific_data);
+        pubsub_publish((void *)connector_specific_data);
 
         sent += buffer_len;
         stats->transmission_successes++;
 
-        size_t sent_bytes = 0, lost_bytes = 0;
+        size_t sent_metrics = 0, lost_metrics = 0, sent_bytes = 0, lost_bytes = 0;
 
-        if (unlikely(pubsub_get_result(
-                connector_specific_data->responses, error_message, &sent_bytes, &lost_bytes))) {
-            // oops! we couldn't send (all or some of the) data
-            error("EXPORTING: %s", error_message);
-            error(
-                "EXPORTING: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
+        if (unlikely(pubsub_get_result(connector_specific_data, error_message, &sent_bytes, &lost_bytes))) {
+                // oops! we couldn't send (all or some of the) data
+                error("EXPORTING: %s", error_message);
+                error(
+                    "EXPORTING: failed to write data to database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                    instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
 
-            stats->transmission_failures++;
-            stats->data_lost_events++;
-            stats->lost_bytes += lost_bytes;
+                stats->transmission_failures++;
+                stats->data_lost_events++;
+                stats->lost_metrics += lost_metrics;
+                stats->lost_bytes += lost_bytes;
 
-            // estimate the number of lost metrics
-            stats->lost_metrics += (collected_number)(
-                stats->buffered_metrics *
-                (buffer_len && (lost_bytes > buffer_len) ? (double)lost_bytes / buffer_len : 1));
+                break;
+            } else {
+                stats->receptions++;
+            }
 
-            break;
-        } else {
-            stats->receptions++;
-        }
+            error("EXPORTING: An iteration of the pubsub worker");
 
-        if (unlikely(netdata_exit))
-            break;
+            if (unlikely(netdata_exit))
+                break;
 
-        stats->sent_bytes += sent;
-        if (likely(sent == buffer_len))
-            stats->sent_metrics = stats->buffered_metrics;
+            stats->sent_bytes += sent;
+            if (likely(sent == buffer_len))
+                stats->sent_metrics = sent_metrics;
 
-        buffer_flush(buffer);
+            buffer_flush(buffer);
 
-        send_internal_metrics(instance);
+            send_internal_metrics(instance);
 
-        stats->buffered_metrics = 0;
+            stats->buffered_metrics = 0;
 
-        uv_mutex_unlock(&instance->mutex);
+            uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
         break;
 #endif
-    }
+        }
 }

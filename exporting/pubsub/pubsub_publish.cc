@@ -25,24 +25,32 @@ int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
     try {
-        std::unique_ptr<google::pubsub::v1::Publisher::Stub> stub = google::pubsub::v1::Publisher::NewStub(
-            grpc::CreateChannel("pubsub.googleapis.com", grpc::GoogleDefaultCredentials()));
+        setenv("GOOGLE_APPLICATION_CREDENTIALS", "/etc/netdata/netdata-analytics-ml-921ae1ba188f.json", 0);
 
-        if (!stub) {
-            std::cerr << "EXPORTING: Can't create a Pub/Sub stub" << std::endl;
+        std::shared_ptr<grpc::ChannelCredentials> credentials = grpc::GoogleDefaultCredentials();
+        if (credentials == nullptr) {
+            std::cerr << "EXPORTING: Can't load credentials" << std::endl;
             return 1;
         }
 
-        pubsub_specific_data->stub = (void *)&stub;
+        std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("pubsub.googleapis.com", credentials);
+
+        google::pubsub::v1::Publisher::Stub *stub = new google::pubsub::v1::Publisher::Stub(channel);
+
+        if (!stub)
+            std::cerr << "EXPORTING: Can't create a publisher stub" << std::endl;
+
+        pubsub_specific_data->stub = stub;
 
         google::pubsub::v1::PublishRequest *request = new google::pubsub::v1::PublishRequest;
-        request->set_topic(std::string("projects/") + project_id + "/topics/" + topic_id);
+        pubsub_specific_data->request = request;
 
-        pubsub_specific_data->request = (void *)request;
-        pubsub_specific_data->completion_queue = (void *)new grpc::CompletionQueue;
-        pubsub_specific_data->responses = (void *)new std::vector<struct response *>;
-        pubsub_specific_data->last_tag = 0;
+        grpc::CompletionQueue *cq = new grpc::CompletionQueue;
+        pubsub_specific_data->completion_queue = cq;
 
+        pubsub_specific_data->responses = new std::vector<struct response>;
+
+        return 0;
     } catch (std::exception const &ex) {
         std::cerr << "EXPORTING: Standard exception raised: " << ex.what() << std::endl;
         return 1;
@@ -80,23 +88,36 @@ void pubsub_clear_messages(void *pubsub_specific_data_p)
 void pubsub_publish(void *pubsub_specific_data_p)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    std::unique_ptr<google::pubsub::v1::Publisher::Stub> *stub =
-        (std::unique_ptr<google::pubsub::v1::Publisher::Stub> *)pubsub_specific_data->stub;
-    google::pubsub::v1::PublishRequest *request = (google::pubsub::v1::PublishRequest *)pubsub_specific_data->request;
-    grpc::CompletionQueue *completion_queue = (grpc::CompletionQueue *)pubsub_specific_data->completion_queue;
 
-    grpc::ClientContext context;
+    ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))
+        ->set_topic("projects/netdata-analytics-ml/topics/test_exporting_connector");
+    google::pubsub::v1::PubsubMessage *message =
+        ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->add_messages();
+
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+
+    message->set_data(std::asctime(&tm));
+
+    grpc::ClientContext *context = new grpc::ClientContext;
+
+    std::cerr << "EXPORTING: Publish" << std::endl;
     std::unique_ptr<grpc::ClientAsyncResponseReader<google::pubsub::v1::PublishResponse> > rpc(
-        (*stub)->AsyncPublish(&context, *request, completion_queue));
+        ((google::pubsub::v1::Publisher::Stub *)(pubsub_specific_data->stub))
+            ->AsyncPublish(
+                context, (*(google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request)),
+                ((grpc::CompletionQueue *)(pubsub_specific_data->completion_queue))));
 
-    struct response *response = new struct response;
-    response->publish_response = new google::pubsub::v1::PublishResponse;
-    response->status = new grpc::Status;
-    response->tag = pubsub_specific_data->last_tag++;
+    struct response response;
+    response.publish_response = new google::pubsub::v1::PublishResponse;
+    response.tag = pubsub_specific_data->last_tag++;
+    response.status = new grpc::Status;
 
-    rpc->Finish(response->publish_response, response->status, (void *)response->tag);
+    rpc->Finish(response.publish_response, response.status, (void *)response.tag);
 
-    ((std::vector<struct response *> *)(pubsub_specific_data->responses))->push_back(response);
+    ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->clear_messages();
+
+    ((std::vector<struct response> *)(pubsub_specific_data->responses))->push_back(response);
 }
 
 /**
@@ -111,52 +132,80 @@ void pubsub_publish(void *pubsub_specific_data_p)
 int pubsub_get_result(void *pubsub_specific_data_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    grpc::CompletionQueue *completion_queue = (grpc::CompletionQueue *)pubsub_specific_data->completion_queue;
-    std::vector<struct response *> *responses = (std::vector<struct response *> *)pubsub_specific_data->responses;
-    *sent_bytes = 0;
-    *lost_bytes = 0;
+    // grpc::CompletionQueue *completion_queue = (grpc::CompletionQueue *)pubsub_specific_data->completion_queue;
+    // std::vector<struct response *> *responses = (std::vector<struct response *> *)pubsub_specific_data->responses;
+    // *sent_bytes = 0;
+    // *lost_bytes = 0;
 
-    while (1) {
-        grpc_impl::CompletionQueue::NextStatus next_status;
-        void *got_tag;
-        bool ok = false;
+    // while (1) {
+    //     grpc_impl::CompletionQueue::NextStatus next_status;
+    //     void *got_tag;
+    //     bool ok = false;
 
-        auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(EVENT_CHECK_TIMEOUT);
-        next_status = completion_queue->AsyncNext(&got_tag, &ok, deadline);
+    //     auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(EVENT_CHECK_TIMEOUT);
+    //     next_status = completion_queue->AsyncNext(&got_tag, &ok, deadline);
 
-        if (next_status == grpc::CompletionQueue::GOT_EVENT) {
-            struct response *response = nullptr;
-            google::pubsub::v1::PublishResponse *publish_response = nullptr;
+    //     if (next_status == grpc::CompletionQueue::GOT_EVENT) {
+    //         struct response *response = nullptr;
+    //         google::pubsub::v1::PublishResponse *publish_response = nullptr;
 
-            for (auto &current_response : *responses) {
-                if ((void *)current_response->tag == got_tag) {
-                    publish_response = current_response->publish_response;
-                    response = current_response;
-                    break;
-                }
-            }
+    //         for (auto &current_response : *responses) {
+    //             if ((void *)current_response->tag == got_tag) {
+    //                 publish_response = current_response->publish_response;
+    //                 response = current_response;
+    //                 break;
+    //             }
+    //         }
 
-            if (!response) {
-                strncpy(error_message, "EXPORTING: Cannot get Pub/Sub response", ERROR_LINE_MAX);
-                return 1;
-            }
+    //         if (!response) {
+    //             strncpy(error_message, "EXPORTING: Cannot get Pub/Sub response", ERROR_LINE_MAX);
+    //             return 1;
+    //         }
 
-            if (ok) {
-                // *sent_metrics +=
-                publish_response->message_ids_size();
-                // *sent_bytes += response->data_len;             // TODO
-            } else {
-                // *lost_metrics +=
-                publish_response->message_ids_size();
-                // *lost_bytes += response->data_len;             // TODO
-                response->status->error_message().copy(error_message, ERROR_LINE_MAX);
-            }
+    //         if (ok) {
+    //             // *sent_metrics +=
+    //             publish_response->message_ids_size();
+    //             // *sent_bytes += response->data_len;             // TODO
+    //         } else {
+    //             // *lost_metrics +=
+    //             publish_response->message_ids_size();
+    //             // *lost_bytes += response->data_len;             // TODO
+    //             response->status->error_message().copy(error_message, ERROR_LINE_MAX);
+    //         }
 
-            std::remove(responses->begin(), responses->end(), response);
-            delete response;
-        } else {
-            break;
-        }
+    //         std::remove(responses->begin(), responses->end(), response);
+    //         delete response;
+    //     } else {
+    //         break;
+    //     }
+    // }
+
+    struct response response;
+    response = ((std::vector<struct response> *)(pubsub_specific_data->responses))->front();
+
+    grpc_impl::CompletionQueue::NextStatus next_status;
+    void *got_tag;
+    bool ok = false;
+
+    do {
+        auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(50);
+        next_status =
+            (*(grpc::CompletionQueue *)(pubsub_specific_data->completion_queue)).AsyncNext(&got_tag, &ok, deadline);
+        std::cerr << "EXPORTING: Status = " << next_status << std::endl;
+    } while (next_status != grpc::CompletionQueue::TIMEOUT);
+
+    if (next_status == grpc::CompletionQueue::SHUTDOWN) {
+        std::cerr << "EXPORTING: SHUTDOWN" << std::endl;
+        return 1;
+    }
+
+    if (ok && got_tag == (void *)response.tag) {
+        std::cerr << "EXPORTING: Got right tag and status is OK" << std::endl;
+        for (auto s : response.publish_response->message_ids())
+            std::cerr << "EXPORTING: Message id = " << s << std::endl;
+    } else {
+        std::cerr << "EXPORTING: Status is not OK" << std::endl;
+        std::cerr << "EXPORTING: " << response.status->error_code() << ": " << response.status->error_message() << std::endl;
     }
 
     if (*lost_bytes) {
