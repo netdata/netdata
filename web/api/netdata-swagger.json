@@ -873,6 +873,7 @@
             "schema": {
               "type": "boolean"
             }
+          }
         ],
         "responses": {
           "200": {
