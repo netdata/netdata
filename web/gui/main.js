@@ -1934,7 +1934,7 @@ function renderChartsAndMenu(data) {
 
 function loadJs(url, callback) {
     $.ajax({
-        url: url,
+        url: `../${url}`,
         cache: true,
         dataType: "script",
         xhrFields: { withCredentials: true } // required for the cookie
@@ -1981,7 +1981,7 @@ function loadBootstrapSlider(callback) {
     if (bootstrapSliderLoaded === false) {
         bootstrapSliderLoaded = true;
         loadJs('lib/bootstrap-slider-10.0.0.min.js', function () {
-            NETDATA._loadCSS('css/bootstrap-slider-10.0.0.min.css');
+            NETDATA._loadCSS('../css/bootstrap-slider-10.0.0.min.css');
             callback();
         });
     } else {
