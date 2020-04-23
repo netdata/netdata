@@ -417,6 +417,8 @@ static void schedule_command(uv_work_t *req)
     cmd_ctx->status = execute_command(cmd_ctx->idx, cmd_ctx->args, &cmd_ctx->message);
 }
 
+/* This will alter the state of the command_info_array.cmd_str
+*/
 static void parse_commands(struct command_context *cmd_ctx)
 {
     char *message = NULL, *pos, *lstrip, *rstrip;
