@@ -134,13 +134,6 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_setting = 0;
 #else
-    char *cloud = config_get(CONFIG_SECTION_GLOBAL, "netdata cloud", "coming soon");
-    if (!strcmp(cloud, "coming soon")) {
-        netdata_cloud_setting = 0;          // Note: this flips to 1 after the release
-    } else if (!strcmp(cloud, "enable")) {
-        netdata_cloud_setting = 1;
-    } else if (!strcmp(cloud, "disable")) {
-        netdata_cloud_setting = 0;
-    }
+    netdata_cloud_setting = config_get_boolean(CONFIG_SECTION_CLOUD, "enabled", 1);
 #endif
 }
