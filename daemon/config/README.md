@@ -21,10 +21,12 @@ This config file **is not needed by default**. Netdata works fine out of the box
     settings.
 4.  `[health]` to [configure](#health-section-options) general settings for [health monitoring](/health/README.md)
 5.  `[registry]` for the [Netdata registry](/registry/README.md).
-6.  `[backend]` to set up [streaming and replication](/streaming/README.md) options.
-7.  `[statsd]` for the general settings of the [stats.d.plugin](/collectors/statsd.plugin/README.md).
-8.  `[plugin:NAME]` sections for each collector plugin, under the comment [Per plugin configuration](#per-plugin-configuration).
-9.  `[CHART_NAME]` sections for each chart defined, under the comment [Per chart configuration](#per-chart-configuration).
+6.  `[cloud]` for [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/) and its associated features: the [Agent-Cloud
+    link](/aclk/README.md) and [agent claiming](/claim/README.md).
+7.  `[backend]` to set up [streaming and replication](/streaming/README.md) options.
+8.  `[statsd]` for the general settings of the [stats.d.plugin](/collectors/statsd.plugin/README.md).
+9.  `[plugin:NAME]` sections for each collector plugin, under the comment [Per plugin configuration](#per-plugin-configuration).
+10.  `[CHART_NAME]` sections for each chart defined, under the comment [Per chart configuration](#per-chart-configuration).
 
 The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When you check the running configuration by accessing the URL `/netdata.conf` on your Netdata server, Netdata will add a comment on settings it does not currently use.
 
@@ -128,6 +130,15 @@ monitoring](/health/README.md).
 ### [registry] section options
 
 To understand what this section is and how it should be configured, please refer to the [registry documentation](/registry/README.md).
+
+### [cloud] section options
+
+This section defines how and whether your Agent connects to [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/).
+
+| setting | default | info |
+| :------ | :------ | :--- |
+| cloud base url | https://app.netdata.cloud | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
+| enabled | yes | The runtime option to disable the [Agent-Cloud link](/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud. |
 
 ### [backend]
 
