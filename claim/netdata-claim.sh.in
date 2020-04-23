@@ -85,7 +85,7 @@ get_config_value() {
        echo 2> "cli failed, assume netdata is not running and query the on-disk config"
        config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$section" "$key_name" unknown_default)
     fi
-    echo $config_result
+    echo "$config_result"
 }
 if command -v curl >/dev/null 2>&1 ; then
         URLTOOL="curl"
@@ -305,14 +305,14 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
 
         # Rewrite the netdata.conf on the disk
         T=$(mktemp)
-        sed -e '/[^#]*\[cloud]/,/[^#]*\[.*]/s/[^#]*enabled *= /#\0/;s/^[^#]*cloud base url *=/#\0/' @configdir_POST@/netdata.conf >$T
-        cat >>$T <<HERE_DOC
+        sed -e '/[^#]*\[cloud]/,/[^#]*\[.*]/s/[^#]*enabled *= /#\0/;s/^[^#]*cloud base url *=/#\0/' "@configdir_POST@/netdata.conf" >"$T"
+        cat >>"$T" <<HERE_DOC
 [cloud]
   enabled = yes
   cloud base url = $URL_BASE
 HERE_DOC
-        cp $T @configdir_POST@/netdata.conf
-        rm $T
+        cp "$T" @configdir_POST@/netdata.conf
+        rm "$T"
         if [ "${RELOAD}" == "0" ] ; then
             exit 0
         fi
