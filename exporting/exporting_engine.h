@@ -50,6 +50,7 @@ typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_JSON,                    // Stores the data using JSON.
     EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // The user selected to use Prometheus backend
     EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
+    EXPORTING_CONNECTOR_TYPE_PUBSUB,                  // Send message to Google Cloud Pub/Sub
     EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
     EXPORTING_CONNECTOR_TYPE_NUM                      // Number of backend types
 } EXPORTING_CONNECTOR_TYPE;

@@ -1069,7 +1069,7 @@ test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler
 AC_MSG_CHECKING([if pubsub exporting connector should be enabled])
 if test "${enable_exporting_pubsub}" != "no" -a "${have_pubsub_protos}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_exporting_pubsub="yes"
-    AC_DEFINE([ENABLE_PUBSUB], [1], [Pub/Sub API usability])
+    AC_DEFINE([ENABLE_EXPORTING_PUBSUB], [1], [Pub/Sub API usability])
     OPTIONAL_PUBSUB_CFLAGS="${GRPC_CFLAGS} ${PUBSUB_CFLAGS}"
     CXX11FLAG="-std=c++11"
     OPTIONAL_PUBSUB_LIBS="${GRPC_LIBS} ${PUBSUB_LIBS}"

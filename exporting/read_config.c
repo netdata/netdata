@@ -145,6 +145,8 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
         return EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_KINESIS;
+    } else if (!strcmp(type, "pubsub") || !strcmp(type, "pubsub:plaintext")) {
+        return EXPORTING_CONNECTOR_TYPE_PUBSUB;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
         return EXPORTING_CONNECTOR_TYPE_MONGODB;
 
@@ -310,6 +312,13 @@ struct engine *read_exporting_config()
         }
 #endif
 
+#ifndef ENABLE_EXPORTING_PUBSUB
+        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
+            error("Google Cloud Pub/Sub support isn't compiled");
+            goto next_connector_instance;
+        }
+#endif
+
 #ifndef HAVE_MONGOC
         if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
             error("MongoDB support isn't compiled");
@@ -383,6 +392,17 @@ struct engine *read_exporting_config()
             connector_specific_config->auth_key_id = strdupz(exporter_get(instance_name, "aws_access_key_id", ""));
 
             connector_specific_config->secure_key = strdupz(exporter_get(instance_name, "aws_secret_access_key", ""));
+        }
+
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
+            struct pubsub_specific_config *connector_specific_config =
+                callocz(1, sizeof(struct pubsub_specific_config));
+
+            tmp_instance->config.connector_specific_config = connector_specific_config;
+
+            connector_specific_config->project_id = strdupz(exporter_get(instance_name, "project id", ""));
+
+            connector_specific_config->topic_id = strdupz(exporter_get(instance_name, "topic id", ""));
         }
 
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
