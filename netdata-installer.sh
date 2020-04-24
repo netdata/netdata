@@ -1391,6 +1391,11 @@ install_ebpf() {
     return 0
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+    echo "Removing alpha eBPF collector"
+    rm -rf "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" 
+  fi
+
   progress "Installing eBPF plugin"
 
   # Get and Parse Kernel Version
