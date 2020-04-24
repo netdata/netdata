@@ -81,6 +81,7 @@ get_config_value() {
     section="${1}"
     key_name="${2}"
     config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$section|$key_name"; exit $?)
+    # shellcheck disable=SC2181
     if [ "$?" != "0" ]; then
        echo 2> "cli failed, assume netdata is not running and query the on-disk config"
        config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$section" "$key_name" unknown_default)
