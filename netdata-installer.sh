@@ -1022,21 +1022,14 @@ fi
 # -----------------------------------------------------------------------------
 
 copy_react_dashboard() {
-  run rm -rf "${NETDATA_WEB_DIR}-react"
-  run rm -rf "${NETDATA_WEB_DIR}-classic"
-  run cp -a "${1}/" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/dashboard_info.js" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/dashboard.slate.css" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/dashboard.css" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/main.css" "${NETDATA_WEB_DIR}-react"
-  run echo "$(cd ${NETDATA_WEB_DIR}-react && find . -type f | sed -e 's/\.\///')" > "${NETDATA_WEB_DIR}-react/.files"
-  run cp -a "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
-  run echo "$(find web/gui -type f | sed -e "s/web\/gui\///")" > "${NETDATA_WEB_DIR}-classic/.files"
-  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
+  run cp -a $(find ${1} -mindepth 1 -maxdepth 1) "${NETDATA_WEB_DIR}"
+  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
 }
 
 install_react_dashboard() {
   progress "Fetching and installing dashboard"
+
+  clean_existing_dashboard
 
   DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
 
@@ -1053,13 +1046,7 @@ install_react_dashboard() {
        copy_react_dashboard "${tmp}/build" && \
        rm -rf "${tmp}"
     then
-      if run "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-switch-dashboard.sh" "${NETDATA_SELECTED_DASHBOARD:-react}" ; then
-        run_ok "React dashboard installed."
-      else
-        run_failed "Failed to switch to React dashboard."
-        run rm -rf "${NETDATA_WEB_DIR}"
-        run cp -a "${NETDATA_WEB_DIR}-classic" "${NETDATA_WEB_DIR}"
-      fi
+      run_ok "React dashboard installed."
     else
       run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
     fi
@@ -1620,7 +1607,6 @@ REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
-NETDATA_SELECTED_DASHBOARD="${NETDATA_SELECTED_DASHBOARD:-react}"
 EOF
 run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 
