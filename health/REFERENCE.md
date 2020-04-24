@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Health configuration reference"
-date: 2020-03-31
+date: 2020-04-24
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
 ---
 -->
@@ -13,27 +13,23 @@ Welcome to the health configuration reference.
 This guide contains information about editing health configuration files to tweak existing alarms or create new health
 entities that are customized to the needs of your infrastructure.
 
-To learn the basics of locating and editing health configuration files, see the [health quickstart](QUICKSTART.md).
+To learn the basics of locating and editing health configuration files, see the [health
+quickstart](/health/QUICKSTART.md).
 
-## What's in this reference guide
+## Health configuration files
 
--   [Health entity reference](#health-entity-reference)
-    -   [Entity types](#entity-types)
-    -   [Entity format](#entity-format)
--   [Expressions](#expressions)
-    -   [Special use of the conditional operator](#special-use-of-the-conditional-operator)
--   [Variables](#variables)
--   [Alarm statuses](#alarm-statuses)
--   [Example alarms](#example-alarms)
--   [Troubleshooting](#troubleshooting)
--   [Disabling health checks or silencing notifications at runtime](#disabling-health-checks-or-silencing-notifications-at-runtime)
+The Agent uses a few files in parallel for its health watchdog service.
+
+-   `netdata.conf`: The Agent's main configuration file contains a `[health]` section. In this section, you can disable
+    health monitoring altogether, run health checks more or less often, and more. See [daemon
+    configuration](/docs/agent/daemon/config/#health-section-options) for details.
+-   `health.d/*.conf`: Individual health entitiy files are organized under the `health.d` directory. You should edit
+    these files using the `edit-config` script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
 ## Health entity reference
 
 The following reference contains information about the syntax and options of _health entities_, which Netdata attaches
 to charts in order to trigger alarms.
-
-Entities are written into `.conf` files, inside of the `health.d/` directory, using YAML formatting.
 
 ### Entity types
 

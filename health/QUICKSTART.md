@@ -1,24 +1,18 @@
 <!--
 ---
 title: "Health quickstart"
+date: 2020-04-24
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/QUICKSTART.md
 ---
 -->
 
 # Health quickstart
 
-In this getting started guide, you'll learn the basics of editing health configuration files. With this knowledge, you
+In this quickstart guide, you'll learn the basics of editing health configuration files. With this knowledge, you
 will be able to customize how and when Netdata triggers alarms based on the health and performance of your system or
 infrastructure.
 
 To learn about more advanced health configurations, visit the [health reference guide](REFERENCE.md).
-
-## What's in this getting started guide
-
--   [Edit health configuration files](#edit-health-configuration-files)
--   [Reference Netdata's stock health configuration files](#reference-netdatas-stock-health-configuration-files)
--   [Write a new health entity](#write-a-new-health-entity)
--   [Reload health configuration](#reload-health-configuration)
 
 ## Edit health configuration files
 
@@ -138,7 +132,9 @@ killall -USR2 netdata
 
 ## What's next?
 
-To learn about all of Netdata's health configuration options, view the [reference guide](/health/REFERENCE.md).
+To learn about all of Netdata's health configuration options, view the [reference guide](/health/REFERENCE.md) and
+[daemon configuration](/docs/agent/daemon/config/#health-section-options) for additional options available in the
+`[health]` section of `netdata.conf`.
 
 Or, get guided insights into specific health configurations with our [health tutorials](/health/README.md#tutorials).
 
