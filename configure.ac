@@ -929,16 +929,16 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# ebpf_process.plugin
+# ebpf.plugin
 
-AC_MSG_CHECKING([if ebpf_process.plugin should be enabled])
+AC_MSG_CHECKING([if ebpf.plugin should be enabled])
 if test "${build_target}" == "linux" -a "${EBPF_LIBS}"; then
-    enable_vfs="yes"
+    enable_ebpf="yes"
 else
-    enable_vfs="no"
+    enable_ebpf="no"
 fi
-AC_MSG_RESULT([${enable_vfs}])
-AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_vfs}" = "yes"])
+AC_MSG_RESULT([${enable_ebpf}])
+AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_ebpf}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1358,7 +1358,7 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/slabinfo.plugin/Makefile
     collectors/statsd.plugin/Makefile
-    collectors/ebpf_process.plugin/Makefile
+    collectors/ebpf.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
