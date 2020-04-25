@@ -857,7 +857,7 @@ static void set_global_values() {
 static int load_collector_file(char *path) {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, path, "ebpf_process.conf" );
+    build_complete_path(lpath, 4096, path, "ebpf.conf" );
 
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return 1;
@@ -1055,7 +1055,7 @@ int main(int argc, char **argv)
     }
 
     //set name
-    program_name = "ebpf_process.plugin";
+    program_name = "ebpf.plugin";
 
     //disable syslog
     error_log_syslog = 0;
