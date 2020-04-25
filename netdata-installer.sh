@@ -1029,8 +1029,6 @@ copy_react_dashboard() {
 install_react_dashboard() {
   progress "Fetching and installing dashboard"
 
-  clean_existing_dashboard
-
   DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
 
   tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
