@@ -2,7 +2,7 @@
 ---
 title: "Health configuration reference"
 date: 2020-04-24
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
+custom_edit_url: <https://github.com/netdata/netdata/edit/master/health/REFERENCE.md>
 ---
 -->
 
@@ -20,9 +20,10 @@ quickstart](/health/QUICKSTART.md).
 
 The Agent uses a few files in parallel for its health watchdog service.
 
--   `netdata.conf`: The Agent's main configuration file contains a `[health]` section. In this section, you can disable
-    health monitoring altogether, run health checks more or less often, and more. See [daemon
-    configuration](/docs/agent/daemon/config/#health-section-options) for details.
+-   `netdata.conf`: The Agent's main configuration file contains a `[health]` section. You can disable health monitoring
+    altogether, run health checks more or less often, and more. See [daemon
+    configuration](/docs/agent/daemon/config/#health-section-options) for a table of all the available settings, their
+    default values, and what they control.
 -   `health.d/*.conf`: Individual health entitiy files are organized under the `health.d` directory. You should edit
     these files using the `edit-config` script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
@@ -478,8 +479,9 @@ Which in turn, results in the following behavior:
 ## Variables
 
 You can find all the variables that can be used for a given chart, using
-`http://your.netdata.ip:19999/api/v1/alarm_variables?chart=CHART_NAME` Example: [variables for the `system.cpu` chart of
-the registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
+`http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME`, , replacing `NODE` with the IP address or domain name
+for your Agent dashboard. For example, [variables for the `system.cpu` chart of the
+registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
 > If you don't know how to find the CHART_NAME, you can read about it [here](../web/README.md#charts).
 
@@ -741,21 +743,21 @@ Netdata will create alarms for all dimensions of the chart.
 
 ## Troubleshooting
 
-You can compile Netdata with [debugging](../daemon/README.md#debugging) and then set in `netdata.conf`:
+You can compile Netdata with [debugging](/daemon/README.md#debugging) and then set in `netdata.conf`:
 
 ```yaml
 [global]
    debug flags = 0x0000000000800000
 ```
 
-Then check your `/var/log/netdata/debug.log`. It will show you how it works.
-Important: this will generate a lot of output in debug.log.
+Then check your `/var/log/netdata/debug.log`. It will show you how it works. Important: this will generate a lot of
+output in debug.log.
 
-You can find the context of charts by looking up the chart in either
-`http://your.netdata:19999/netdata.conf` or `http://your.netdata:19999/api/v1/charts`.
+You can find the context of charts by looking up the chart in either `http://NODE:19999/netdata.conf` or
+`http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or domain name for your Agent dashboard.
 
 You can find how Netdata interpreted the expressions by examining the alarm at
-`http://your.netdata:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
+`http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
 config file, and the same expression with additional parentheses added to indicate the evaluation flow of the
 expression.
 
@@ -764,6 +766,6 @@ expression.
 It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need
 to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence
 notifications are runtime. The health checks can be controlled at runtime via the [health management
-api](../web/api/health/).
+api](/web/api/health/README.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Freference%2F&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
