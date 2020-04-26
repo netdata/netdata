@@ -68,6 +68,7 @@ dist_noinst_DATA = \
     packaging/libwebsockets.checksums \
     packaging/mosquitto.version \
     packaging/mosquitto.checksums \
+    packaging/bundle-dashboard.sh \
     packaging/bundle-mosquitto.sh \
     packaging/bundle-lws.sh \
     packaging/installer/README.md \
