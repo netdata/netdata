@@ -67,6 +67,7 @@ services:
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
 ```
 
 Some of the bind-mounts are optional depending on how you use Netdata:
