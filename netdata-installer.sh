@@ -628,7 +628,7 @@ bundle_libwebsockets
 
 build_jsonc() {
   pushd "${1}" > /dev/null || exit 1
-  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake .
+  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -DBUILD_SHARED_LIBS=OFF .
   run env CFLAGS= CXXFLAGS= LDFLAGS= make
   popd > /dev/null || exit 1
 }
