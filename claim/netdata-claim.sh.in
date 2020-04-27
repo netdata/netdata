@@ -83,7 +83,7 @@ get_config_value() {
     config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$section|$key_name"; exit $?)
     # shellcheck disable=SC2181
     if [ "$?" != "0" ]; then
-       echo -n 2> "cli failed, assume netdata is not running and query the on-disk config"
+       echo >&2 "cli failed, assume netdata is not running and query the on-disk config"
        config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$section" "$key_name" unknown_default)
     fi
     echo "$config_result"
@@ -106,6 +106,7 @@ if [ "@enable_cloud_POST@" = "no" ]; then
     echo >&2 "This agent was build with --disable-cloud and cannot be claimed"
     exit 3
 fi
+# shellcheck disable=SC2050
 if [ "@can_enable_aclk_POST@" != "yes" ]; then
     echo >&2 "This agent was build without the dependencies for Cloud and cannot be claimed"
     exit 3
