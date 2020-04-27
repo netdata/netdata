@@ -435,6 +435,21 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
+AC_MSG_WARN([XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx])
+static_jsonc="no"
+if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
+	# Try and detect manual static build presence (from netdata-installer.h)
+	AC_MSG_CHECKING([if staticaly built json-c is present])
+	if test -f "externaldeps/jsonc/libjson-c.a"; then
+		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
+		JSONC_LIBS="static"
+		static_jsonc="yes"
+		OPTIONAL_JSONC_STATIC_CFLAGS="-I externaldeps/jsonc"
+	fi
+	AC_MSG_RESULT([${static_jsonc}])
+fi
+AM_CONDITIONAL([LINK_STATIC_JSONC], [test "${static_jsonc}" = "yes"])
+
 test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
     AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
 
@@ -1218,7 +1233,8 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} \
+	${OPTIONAL_JSONC_STATIC_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 

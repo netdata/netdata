@@ -624,6 +624,10 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
 
+if LINK_STATIC_JSONC
+    NETDATA_COMMON_LIBS += externaldeps/jsonc/libjson-c.a
+endif
+
 NETDATACLI_FILES = \
     daemon/commands.h \
     $(LIBNETDATA_FILES) \
