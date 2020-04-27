@@ -1388,17 +1388,17 @@ should_install_ebpf() {
 
 remove_old_ebpf() {
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
-    echo "Removing alpha eBPF collector."
+    echo >&2 "Removing alpha eBPF collector."
     rm -rf "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" 
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
-    echo "Removing alpha eBPF stock file"
+    echo >&2 "Removing alpha eBPF stock file"
     rm -rf "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" 
   fi
 
   if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
-    echo "Renaming eBPF configuration file."
+    echo >&2 "Renaming eBPF configuration file."
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf" 
   fi
 }
