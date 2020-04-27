@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Health quickstart"
-date: 2020-04-24
+date: 2020-04-27
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/QUICKSTART.md
 ---
 -->
@@ -12,7 +12,7 @@ In this quickstart guide, you'll learn the basics of editing health configuratio
 will be able to customize how and when Netdata triggers alarms based on the health and performance of your system or
 infrastructure.
 
-To learn about more advanced health configurations, visit the [health reference guide](REFERENCE.md).
+To learn about more advanced health configurations, visit the [health reference guide](/health/REFERENCE.md).
 
 ## Edit health configuration files
 
@@ -31,7 +31,7 @@ cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /et
 > You may need to use `sudo` or another method of elevating your privileges: `sudo ./edit-config health.d/cpu.conf`.
 >
 > You can also use the `$EDITOR` environment variable to use your preferred terminal editor with `edit-config`. See 
-> [this page](../docs/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
+> [this page](/docs/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
 
 Each health configuration file contains one or more health entities, which always begin with an `alarm:` or `template:`
 line. You can edit these entities based on your needs. To make any changes live, be sure to [reload your health
@@ -44,8 +44,9 @@ health configuration files Netdata ships with. Stock files can be useful as refe
 file you should edit with `edit-config`.
 
 By default, Netdata will put health configuration files in `/usr/lib/netdata/conf.d/health.d`.  However, you can
-double-check the location of these files by navigating to `http://HOST:19999/netdata.conf` in your browser and looking
-for the `stock health configuration directory` option. The value here will show the correct path for your installation.
+double-check the location of these files by navigating to `http://NODE:19999/netdata.conf`, replacing `NODE` with the IP
+address or hostname for your Agent dashboard, looking for the `stock health configuration directory` option. The value
+here will show the correct path for your installation.
 
 ```conf
 [health]
@@ -133,7 +134,7 @@ killall -USR2 netdata
 ## What's next?
 
 To learn about all of Netdata's health configuration options, view the [reference guide](/health/REFERENCE.md) and
-[daemon configuration](/docs/agent/daemon/config/#health-section-options) for additional options available in the
+[daemon configuration](/daemon/config/README.md#health-section-options) for additional options available in the
 `[health]` section of `netdata.conf`.
 
 Or, get guided insights into specific health configurations with our [health tutorials](/health/README.md#tutorials).
