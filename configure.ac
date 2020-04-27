@@ -436,8 +436,8 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 # JSON-C
 
 if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
-	# Try and detect manual static build presence (from netdata-installer.h)
-	AC_MSG_CHECKING([if staticaly built json-c is present])
+	# Try and detect manual static build presence (from netdata-installer.sh)
+	AC_MSG_CHECKING([if statically built json-c is present])
 	if test -f "externaldeps/jsonc/libjson-c.a"; then
 		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
 		JSONC_LIBS="static"
