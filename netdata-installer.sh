@@ -638,7 +638,7 @@ copy_jsonc() {
 
   run mkdir -p "${target_dir}" "${target_dir}/json-c" || return 1
 
-  run cp "${1}/json-c.a" "${target_dir}/json-c.a" || return 1
+  run cp "${1}/libjson-c.a" "${target_dir}/libjson-c.a" || return 1
   run cp -r "${1}/*.h" "${target_dir}/json-c" || return 1
 }
 
