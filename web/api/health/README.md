@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Health API Calls"
-date: 2020-04-24
+date: 2020-04-27
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/health/README.md
 ---
 -->
@@ -16,7 +16,7 @@ Netdata enables alarms on demand, i.e. when the chart they should be linked to s
 more alarms are configured, only the useful ones are enabled.
 
 To get the list of all enabled alarms, open your browser and navigate to `http://NODE:19999/api/v1/alarms?all`,
-replacing `NODE` with the IP address or domain name for your Agent dashboard.
+replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
 ### Raised Alarms
 

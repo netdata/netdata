@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Health configuration reference"
-date: 2020-04-24
+date: 2020-04-27
 custom_edit_url: <https://github.com/netdata/netdata/edit/master/health/REFERENCE.md>
 ---
 -->
@@ -22,7 +22,7 @@ The Agent uses a few files in parallel for its health watchdog service.
 
 -   `netdata.conf`: The Agent's main configuration file contains a `[health]` section. You can disable health monitoring
     altogether, run health checks more or less often, and more. See [daemon
-    configuration](/docs/agent/daemon/config/#health-section-options) for a table of all the available settings, their
+    configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
     default values, and what they control.
 -   `health.d/*.conf`: Individual health entitiy files are organized under the `health.d` directory. You should edit
     these files using the `edit-config` script. For example: `sudo ./edit-config health.d/cpu.conf`.
@@ -479,8 +479,8 @@ Which in turn, results in the following behavior:
 ## Variables
 
 You can find all the variables that can be used for a given chart, using
-`http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME`, , replacing `NODE` with the IP address or domain name
-for your Agent dashboard. For example, [variables for the `system.cpu` chart of the
+`http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME`, replacing `NODE` with the IP address or hostname for your
+Agent dashboard. For example, [variables for the `system.cpu` chart of the
 registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
 > If you don't know how to find the CHART_NAME, you can read about it [here](../web/README.md#charts).
@@ -754,7 +754,7 @@ Then check your `/var/log/netdata/debug.log`. It will show you how it works. Imp
 output in debug.log.
 
 You can find the context of charts by looking up the chart in either `http://NODE:19999/netdata.conf` or
-`http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or domain name for your Agent dashboard.
+`http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
 You can find how Netdata interpreted the expressions by examining the alarm at
 `http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
