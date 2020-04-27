@@ -601,8 +601,15 @@ if test "$enable_cloud" != "no"; then
         fi
     fi
 
+    # next 2 lines are just to have info for ACLK dependencies in common place
+    AC_MSG_CHECKING([if json-c available for ACLK])
+    AC_MSG_RESULT([${enable_jsonc}])
+
+    test "${aclk_required}" = "yes" -a "${enable_jsonc}" = "no" && \
+        AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
+
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
