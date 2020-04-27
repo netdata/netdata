@@ -435,19 +435,19 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 # -----------------------------------------------------------------------------
 # JSON-C
 
-static_jsonc="no"
 if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
 	# Try and detect manual static build presence (from netdata-installer.h)
 	AC_MSG_CHECKING([if staticaly built json-c is present])
 	if test -f "externaldeps/jsonc/libjson-c.a"; then
 		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
 		JSONC_LIBS="static"
-		static_jsonc="yes"
 		OPTIONAL_JSONC_STATIC_CFLAGS="-I externaldeps/jsonc"
+		AC_MSG_RESULT([yes])
+	else
+		AC_MSG_RESULT([no])
 	fi
-	AC_MSG_RESULT([${static_jsonc}])
 fi
-AM_CONDITIONAL([LINK_STATIC_JSONC], [test "${static_jsonc}" = "yes"])
+AM_CONDITIONAL([LINK_STATIC_JSONC], [test "${JSONC_LIBS}" = "static"])
 
 test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
     AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
