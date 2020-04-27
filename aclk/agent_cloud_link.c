@@ -149,7 +149,7 @@ static RSA *aclk_private_key = NULL;
 static int create_private_key()
 {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
 
     long bytes_read;
     char *private_key = read_by_filename(filename, &bytes_read);

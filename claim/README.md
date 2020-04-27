@@ -234,23 +234,23 @@ with details about your system and relevant output from `error.log`.
 
 ### Unclaim (remove) an Agent from Netdata Cloud
 
-The best method to remove an Agent from Netdata Cloud is to unclaim it by deleting the `claim.d/` directory in your
-Netdata configuration directory.
+The best method to remove an Agent from Netdata Cloud is to unclaim it by deleting the `cloud.d/` directory in your
+Netdata library directory.
 
 ```bash
-cd /etc/netdata   # Replace with your Netdata configuration directory, if not /etc/netdata/
-rm -rf claim.d/
+cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
+rm -rf cloud.d/
 ```
 
 > You may need to use `sudo` or another method of elevating your privileges.
 
-Once you delete the `claim.d/` directory, the ACLK will not connect to Cloud the next time the Agent starts, and Cloud
+Once you delete the `cloud.d/` directory, the ACLK will not connect to Cloud the next time the Agent starts, and Cloud
 will then remove it from the interface.
 
 ## Claiming reference
 
 In the sections below, you can find reference material for the claiming script, claiming via the Agent's command line
-tool, and details about the files found in `claim.d`.
+tool, and details about the files found in `cloud.d`.
 
 ### Claiming script
 
@@ -306,14 +306,14 @@ If need be, the user can override the Agent's defaults by providing additional a
 
 ### Claiming directory
 
-Netdata stores the agent claiming-related state in the user configuration directory under `claim.d`, e.g. in
-`/etc/netdata/claim.d`. The user can put files in this directory to provide defaults to the `-token` and `-rooms`
+Netdata stores the agent claiming-related state in the Netdata library directory under `cloud.d`, e.g. in
+`/var/lib/netdata/cloud.d`. The user can put files in this directory to provide defaults to the `-token` and `-rooms`
 arguments. These files should be owned **by the `netdata` user**.
 
-The `claim.d/token` file should contain the claiming-token and the `claim.d/rooms` file should contain the list of 
+The `cloud.d/token` file should contain the claiming-token and the `cloud.d/rooms` file should contain the list of 
 war-rooms.
 
-The user can also put the Cloud endpoint's full certificate chain in `claim.d/cloud_fullchain.pem` so that the Agent
+The user can also put the Cloud endpoint's full certificate chain in `cloud.d/cloud_fullchain.pem` so that the Agent
 can trust the endpoint if necessary.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fclaim%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
