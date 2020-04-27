@@ -47,8 +47,8 @@ Quickly start a new Agent with the `docker run` command.
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
-  --mount source=netdatalib,target=/var/lib/netdata \
-  --mount source=netdatacache,target=/var/cache/netdata \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
