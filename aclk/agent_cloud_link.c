@@ -1336,6 +1336,10 @@ void *aclk_main(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
 
+    // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
+    // as it must notify the far end that it shutdown gracefully and avoid the LWT.
+    netdata_thread_disable_cancelability();
+
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK)
     info("Killing ACLK thread -> cloud functionality has been disabled");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -1347,8 +1351,13 @@ void *aclk_main(void *ptr)
         sleep_usec(USEC_PER_MS * 300);
     }
 
+    info("Waiting for Cloud to be enabled");
     while (!netdata_cloud_setting) {
-        sleep_usec(USEC_PER_SEC * 5);
+        sleep_usec(USEC_PER_SEC * 1);
+        if (netdata_exit) {
+            static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+            return NULL;
+        }
     }
 
     last_init_sequence = now_realtime_sec();
@@ -1357,37 +1366,41 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
     uint32_t port_num = 0;
-    // This is guaranteed to be set early in main via post_conf_load()
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
-    if (cloud_base_url == NULL)
-        fatal("Do not move the cloud base url out of post_conf_load!!");
-    if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
-        error("Configuration error - cannot use agent cloud link");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return NULL;
-    }
-    port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
-
     info("Waiting for netdata to be claimed");
     while(1) {
         while (likely(!is_agent_claimed())) {
-            sleep_usec(USEC_PER_SEC * 5);
+            sleep_usec(USEC_PER_SEC * 1);
             if (netdata_exit)
                 goto exited;
         }
-        if (!create_private_key() && !_mqtt_lib_init())
-            break;
-
-        if (netdata_exit)
+        // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
+        // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
+        char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
+        if (cloud_base_url == NULL) {
+            error("Do not move the cloud base url out of post_conf_load!!");
             goto exited;
+        }            
+        if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
+            error("Agent is claimed but the configuration is invalid, please fix");
+        }
+        else
+        {
+            port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
+            if (!create_private_key() && !_mqtt_lib_init())
+                break;
+        }
 
-        sleep_usec(USEC_PER_SEC * 60);
+        for (int i=0; i<60; i++) {
+            if (netdata_exit)
+                goto exited;
+
+            sleep_usec(USEC_PER_SEC * 1);
+        }
     }
+
     create_publish_base_topic();
 
     usec_t reconnect_expiry = 0; // In usecs
-
-    netdata_thread_disable_cancelability();
 
     while (!netdata_exit) {
         static int first_init = 0;
