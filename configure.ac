@@ -435,7 +435,7 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
-AC_MSG_WARN([XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx])
+
 static_jsonc="no"
 if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
 	# Try and detect manual static build presence (from netdata-installer.h)
