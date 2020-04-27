@@ -18,14 +18,15 @@ quickstart](/health/QUICKSTART.md).
 
 ## Health configuration files
 
-The Agent uses a few files in parallel for its health watchdog service.
+You can configure the Agent's health watchdog service by editing files in two locations:
 
--   `netdata.conf`: The Agent's main configuration file contains a `[health]` section. You can disable health monitoring
+-   The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
     altogether, run health checks more or less often, and more. See [daemon
     configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
     default values, and what they control.
--   `health.d/*.conf`: Individual health entitiy files are organized under the `health.d` directory. You should edit
-    these files using the `edit-config` script. For example: `sudo ./edit-config health.d/cpu.conf`.
+-   The individual `.conf` files in `health.d/`. These health entitiy files are organized by the type of metric they are
+    performing calculations on or their associated collector. You should edit these files using the `edit-config`
+    script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
 ## Health entity reference
 
