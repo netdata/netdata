@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Removed old function call in netdata-installer.sh [\#8824](https://github.com/netdata/netdata/pull/8824) ([Ferroin](https://github.com/Ferroin))
+- Fix build and add bundle-dashbaord.sh to dist\_noinst\_DATA [\#8823](https://github.com/netdata/netdata/pull/8823) ([prologic](https://github.com/prologic))
 - health: fix mdstat `failed devices` alarm [\#8794](https://github.com/netdata/netdata/pull/8794) ([ilyam8](https://github.com/ilyam8))
 - dashboard v0.4.18 [\#8786](https://github.com/netdata/netdata/pull/8786) ([jacekkolasa](https://github.com/jacekkolasa))
 - fix\_lock: Add the missing lock [\#8780](https://github.com/netdata/netdata/pull/8780) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -205,7 +207,6 @@
 - Update eBPF docs with better install/enable instructions [\#8125](https://github.com/netdata/netdata/pull/8125) ([joelhans](https://github.com/joelhans))
 - Fixes NetData installer on \*BSD systems post libmosquitto / eBPF [\#8121](https://github.com/netdata/netdata/pull/8121) ([prologic](https://github.com/prologic))
 - Fix nightly RPM builds. [\#8109](https://github.com/netdata/netdata/pull/8109) ([Ferroin](https://github.com/Ferroin))
-- Add Patti to docs and .md codeowners [\#8092](https://github.com/netdata/netdata/pull/8092) ([joelhans](https://github.com/joelhans))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
