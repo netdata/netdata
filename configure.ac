@@ -173,7 +173,6 @@ AC_ARG_ENABLE(
     [ enable_cloud="detect" ]
 )
 
-aclk_required="${enable_cloud}"
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
@@ -592,7 +591,7 @@ if test "$enable_cloud" != "no"; then
     fi
     AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 
-    if test "${build_target}" = "linux" -a "${aclk_required}" != "no"; then
+    if test "${build_target}" = "linux" -a "${enable_cloud}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
             AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
         fi
@@ -605,7 +604,7 @@ if test "$enable_cloud" != "no"; then
     AC_MSG_CHECKING([if json-c available for ACLK])
     AC_MSG_RESULT([${enable_jsonc}])
 
-    test "${aclk_required}" = "yes" -a "${enable_jsonc}" = "no" && \
+    test "${enable_cloud}" = "yes" -a "${enable_jsonc}" = "no" && \
         AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
@@ -616,14 +615,14 @@ if test "$enable_cloud" != "no"; then
     fi
     AC_MSG_RESULT([${can_enable_aclk}])
 
-    test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
+    test "${enable_cloud}" = "yes" -a "${can_enable_aclk}" = "no" && \
         AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
 
     AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
-    if test "${aclk_required}" = "detect"; then
+    if test "${enable_cloud}" = "detect"; then
         enable_aclk=$can_enable_aclk
     else
-        enable_aclk=$aclk_required
+        enable_aclk=$enable_cloud
     fi
     AC_SUBST([can_enable_aclk])
 
