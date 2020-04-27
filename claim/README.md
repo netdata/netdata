@@ -263,7 +263,7 @@ and passing the following arguments:
 -rooms=ROOM1,ROOM2,...
     where ROOMX is the War Room this node should be added to. This list is optional.
 -url=URL_BASE
-    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://netdata.cloud.
+    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://app.netdata.cloud.
 -id=AGENT_ID
     where AGENT_ID is the unique identifier of the Agent. This is the Agent's MACHINE_GUID by default.
 -hostname=HOSTNAME

@@ -37,7 +37,7 @@ char *is_agent_claimed(void)
 
 extern struct registry registry;
 
-/* rrd_init() must have been called before this function */
+/* rrd_init() and post_conf_load() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
     if (!netdata_cloud_setting) {
@@ -51,7 +51,10 @@ void claim_agent(char *claiming_arguments)
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
     FILE *fp;
 
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+    // This is guaranteed to be set early in main via post_conf_load()
+    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
+    if (cloud_base_url == NULL)
+        fatal("Do not move the cloud base url out of post_conf_load!!");
     const char *proxy_str;
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
@@ -111,6 +114,9 @@ void load_claiming_state(void)
         claimed_id = NULL;
     }
 
+    // Propagate into aclk and registry. Be kind of atomic...
+    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);   
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
 
@@ -122,4 +128,12 @@ void load_claiming_state(void)
     }
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+    netdata_cloud_setting = 0;
+#else
+    netdata_cloud_setting = config_get_boolean(CONFIG_SECTION_CLOUD, "enabled", 1);
+#endif
 }
