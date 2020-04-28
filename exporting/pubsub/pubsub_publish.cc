@@ -140,81 +140,62 @@ void pubsub_publish(void *pubsub_specific_data_p)
 int pubsub_get_result(void *pubsub_specific_data_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    // grpc::CompletionQueue *completion_queue = (grpc::CompletionQueue *)pubsub_specific_data->completion_queue;
-    // std::vector<struct response *> *responses = (std::vector<struct response *> *)pubsub_specific_data->responses;
-    // *sent_bytes = 0;
-    // *lost_bytes = 0;
-
-    // while (1) {
-    //     grpc_impl::CompletionQueue::NextStatus next_status;
-    //     void *got_tag;
-    //     bool ok = false;
-
-    //     auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(EVENT_CHECK_TIMEOUT);
-    //     next_status = completion_queue->AsyncNext(&got_tag, &ok, deadline);
-
-    //     if (next_status == grpc::CompletionQueue::GOT_EVENT) {
-    //         struct response *response = nullptr;
-    //         google::pubsub::v1::PublishResponse *publish_response = nullptr;
-
-    //         for (auto &current_response : *responses) {
-    //             if ((void *)current_response->tag == got_tag) {
-    //                 publish_response = current_response->publish_response;
-    //                 response = current_response;
-    //                 break;
-    //             }
-    //         }
-
-    //         if (!response) {
-    //             strncpy(error_message, "EXPORTING: Cannot get Pub/Sub response", ERROR_LINE_MAX);
-    //             return 1;
-    //         }
-
-    //         if (ok) {
-    //             // *sent_metrics +=
-    //             publish_response->message_ids_size();
-    //             // *sent_bytes += response->data_len;             // TODO
-    //         } else {
-    //             // *lost_metrics +=
-    //             publish_response->message_ids_size();
-    //             // *lost_bytes += response->data_len;             // TODO
-    //             response->status->error_message().copy(error_message, ERROR_LINE_MAX);
-    //         }
-
-    //         std::remove(responses->begin(), responses->end(), response);
-    //         delete response;
-    //     } else {
-    //         break;
-    //     }
-    // }
-
-    struct response response;
-    response = ((std::vector<struct response> *)(pubsub_specific_data->responses))->front();
-
+    std::vector<struct response> *responses = (std::vector<struct response> *)pubsub_specific_data->responses;
     grpc_impl::CompletionQueue::NextStatus next_status;
-    void *got_tag;
-    bool ok = false;
+
+    *sent_bytes = 0;
+    *lost_bytes = 0;
 
     do {
+        std::vector<struct response>::iterator response;
+        void *got_tag;
+        bool ok = false;
+
         auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(50);
         next_status =
             (*(grpc::CompletionQueue *)(pubsub_specific_data->completion_queue)).AsyncNext(&got_tag, &ok, deadline);
         std::cerr << "EXPORTING: Status = " << next_status << std::endl;
-    } while (next_status != grpc::CompletionQueue::TIMEOUT);
 
-    if (next_status == grpc::CompletionQueue::SHUTDOWN) {
-        std::cerr << "EXPORTING: SHUTDOWN" << std::endl;
-        return 1;
-    }
+        if (next_status == grpc::CompletionQueue::GOT_EVENT) {
+            for (response = responses->begin(); response != responses->end(); ++response) {
+                if ((void *)response->tag == got_tag)
+                    break;
+            }
 
-    if (ok && got_tag == (void *)response.tag) {
-        std::cerr << "EXPORTING: Got right tag and status is OK" << std::endl;
-        for (auto s : response.publish_response->message_ids())
-            std::cerr << "EXPORTING: Message id = " << s << std::endl;
-    } else {
-        std::cerr << "EXPORTING: Status is not OK" << std::endl;
-        std::cerr << "EXPORTING: " << response.status->error_code() << ": " << response.status->error_message() << std::endl;
-    }
+            if (response == responses->end()) {
+                strncpy(error_message, "EXPORTING: Cannot get Pub/Sub response", ERROR_LINE_MAX);
+                return 1;
+            }
+
+            if (ok && got_tag == (void *)response->tag) {
+                std::cerr << "EXPORTING: Got right tag and status is OK" << std::endl;
+                for (auto s : response->publish_response->message_ids())
+                    std::cerr << "EXPORTING: Message id = " << s << std::endl;
+            } else {
+                std::cerr << "EXPORTING: Status is not OK" << std::endl;
+                std::cerr << "EXPORTING: " << response->status->error_code() << ": " << response->status->error_message() << std::endl;
+            }
+            // if (ok) {
+            //     // *sent_metrics +=
+            //     publish_response->message_ids_size();
+            //     // *sent_bytes += response->data_len;             // TODO
+            // } else {
+            //     // *lost_metrics +=
+            //     publish_response->message_ids_size();
+            //     // *lost_bytes += response->data_len;             // TODO
+            //     response->status->error_message().copy(error_message, ERROR_LINE_MAX);
+            // }
+
+            responses->erase(response);
+        }
+
+        if (next_status == grpc::CompletionQueue::SHUTDOWN) {
+            std::cerr << "EXPORTING: Shutdown" << std::endl;
+            return 1;
+        }
+
+    } while (next_status == grpc::CompletionQueue::GOT_EVENT);
+
 
     if (*lost_bytes) {
         return 1;
