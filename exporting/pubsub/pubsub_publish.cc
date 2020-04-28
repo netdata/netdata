@@ -17,7 +17,8 @@ struct response {
  * Initialize a Pub/Sub client and a data structure for responses.
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
- * @param pubsub_specific_config_p a pointer to a structure with configuration strings.
+ * @param project_id a project ID.
+ * @param topic_id a topic ID.
  * @return Returns 0 on success, 1 on failure.
  */
 int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
@@ -59,6 +60,12 @@ int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
     return 0;
 }
 
+/**
+ * Add data to a Pub/Sub request message.
+ *
+ * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
+ * @param data a text buffer with metrics.
+ */
 void pubsub_add_message(void *pubsub_specific_data_p, char *data)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
@@ -68,6 +75,11 @@ void pubsub_add_message(void *pubsub_specific_data_p, char *data)
     message->set_data(data);
 }
 
+/**
+ * Remove all messages from a Pub/Sub request.
+ *
+ * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
+ */
 void pubsub_clear_messages(void *pubsub_specific_data_p)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
@@ -80,10 +92,6 @@ void pubsub_clear_messages(void *pubsub_specific_data_p)
  * Send data to the Pub/Sub service
  *
  * @param pubsub_specific_data_p a pointer to a structure with client and request outcome information.
- * @param stream_name the name of a stream to send to.
- * @param partition_key a partition key which automatically maps data to a specific stream.
- * @param data a data buffer to send to the stream.
- * @param data_len the length of the data buffer.
  */
 void pubsub_publish(void *pubsub_specific_data_p)
 {
@@ -123,11 +131,11 @@ void pubsub_publish(void *pubsub_specific_data_p)
 /**
  * Get results from service responces
  *
- * @param request_outcomes_p request outcome information.
+ * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
  * @param error_message report error message to a caller.
  * @param sent_bytes report to a caller how many bytes was successfuly sent.
  * @param lost_bytes report to a caller how many bytes was lost during transmission.
- * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission
+ * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission.
  */
 int pubsub_get_result(void *pubsub_specific_data_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
 {
