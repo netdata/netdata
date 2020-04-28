@@ -876,14 +876,14 @@ progress "Read installation options from netdata.conf"
 [ ! -f "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ] &&
   touch "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 
-# function to extract values from the config file
+# function to extract values from the netdata.conf config file
 config_option() {
   local section="${1}" key="${2}" value="${3}"
 
   if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]; then
     "${NETDATA_PREFIX}/usr/sbin/netdata" \
       -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
-      -W get "${section}" "${key}" "${value}" ||
+      -W get netdata "${section}" "${key}" "${value}" ||
       echo "${value}"
   else
     echo "${value}"
