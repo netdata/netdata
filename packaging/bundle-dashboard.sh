@@ -12,7 +12,3 @@ sha256sum -c "${SRCDIR}/packaging/dashboard.checksums" || exit 1
 tar -xzf "${DASHBOARD_TARBALL}" -C "${SRCDIR}/tmp" || exit 1
 # shellcheck disable=SC2046
 cp -a $(find "${SRCDIR}/tmp" -mindepth 1 -maxdepth 1) "${WEBDIR}"
-cp -a "${WEBDIR}/old/dashboard_info.js" "${WEBDIR}"
-cp -a "${WEBDIR}/old/dashboard.slate.css" "${WEBDIR}"
-cp -a "${WEBDIR}/old/dashboard.css" "${WEBDIR}"
-cp -a "${WEBDIR}/old/main.css" "${WEBDIR}"
