@@ -860,10 +860,10 @@ void post_conf_load(char **user)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_setting = 0;
 #else
-    netdata_cloud_setting = config_get_boolean(CONFIG_SECTION_CLOUD, "enabled", 1);
+    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
     // This must be set before any point in the code that accesses it. Do not move it from this function.
-    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
 int main(int argc, char **argv) {
@@ -936,6 +936,7 @@ int main(int argc, char **argv) {
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
                         post_conf_load(&user);
+                        load_cloud_conf();
                         config_loaded = 1;
                     }
                     break;
@@ -1085,9 +1086,9 @@ int main(int argc, char **argv) {
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
-                            if(optind + 3 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
-                                        " Overwrites settings of netdata.conf.\n"
+                            if(optind + 4 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W set 'conf_file' 'section' 'key' 'value'\n\n"
+                                        " Overwrites settings of netdata.conf or cloud.conf\n"
                                         "\n"
                                         " These options interact with: -c netdata.conf\n"
                                         " If -c netdata.conf is given on the command line,\n"
@@ -1096,31 +1097,35 @@ int main(int argc, char **argv) {
                                         " If -c netdata.conf is given after (or missing)\n"
                                         " -W set... the user cannot overwrite the command line\n"
                                         " parameters."
+                                        " conf_file can be \"cloud\" or \"netdata\".\n"
                                         "\n"
                                 );
                                 return 1;
                             }
-                            const char *section = argv[optind];
-                            const char *key = argv[optind + 1];
-                            const char *value = argv[optind + 2];
-                            optind += 3;
+                            const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
+                            struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+                            const char *section = argv[optind + 1];
+                            const char *key = argv[optind + 2];
+                            const char *value = argv[optind + 3];
+                            optind += 4;
 
                             // set this one as the default
                             // only if it is not already set in the config file
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            config_set_default(section, key,  value);
+                            appconfig_set_default(tmp_config, section, key,  value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
                         else if(strcmp(optarg, "get") == 0) {
-                            if(optind + 3 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
-                                        " Prints settings of netdata.conf.\n"
+                            if(optind + 4 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W get 'conf_file' 'section' 'key' 'value'\n\n"
+                                        " Prints settings of netdata.conf or cloud.conf\n"
                                         "\n"
                                         " These options interact with: -c netdata.conf\n"
                                         " -c netdata.conf has to be given before -W get.\n"
+                                        " conf_file can be \"cloud\" or \"netdata\".\n"
                                         "\n"
                                 );
                                 return 1;
@@ -1130,14 +1135,17 @@ int main(int argc, char **argv) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
                                 load_netdata_conf(NULL, 0);
                                 post_conf_load(&user);
+                                load_cloud_conf();
                             }
 
                             get_netdata_configured_variables();
 
-                            const char *section = argv[optind];
-                            const char *key = argv[optind + 1];
-                            const char *def = argv[optind + 2];
-                            const char *value = config_get(section, key, def);
+                            const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
+                            struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+                            const char *section = argv[optind + 1];
+                            const char *key = argv[optind + 2];
+                            const char *def = argv[optind + 3];
+                            const char *value = appconfig_get(tmp_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
                         }
@@ -1173,6 +1181,7 @@ int main(int argc, char **argv) {
     {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
+        load_cloud_conf();
     }
 
 

@@ -137,7 +137,7 @@ static inline int registry_person_url_callback_verify_machine_exists(void *entry
 void registry_update_cloud_base_url()
 {
     // This is guaranteed to be set early in main via post_conf_load()
-    registry.cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
+    registry.cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
     if (registry.cloud_base_url == NULL)
         fatal("Do not move the cloud base url out of post_conf_load!!");
 

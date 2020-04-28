@@ -78,13 +78,14 @@
 # Exit code: 15
 
 get_config_value() {
-    section="${1}"
-    key_name="${2}"
-    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$section|$key_name"; exit $?)
+    conf_file="${1}"
+    section="${2}"
+    key_name="${3}"
+    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$conf_file|$section|$key_name"; exit $?)
     # shellcheck disable=SC2181
     if [ "$?" != "0" ]; then
        echo >&2 "cli failed, assume netdata is not running and query the on-disk config"
-       config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$section" "$key_name" unknown_default)
+       config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get "$conf_file" "$section" "$key_name" unknown_default)
     fi
     echo "$config_result"
 }
@@ -119,7 +120,7 @@ fi
 MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
 CLAIMING_DIR="${NETDATA_VARLIB_DIR}/cloud.d"
 TOKEN="unknown"
-URL_BASE=$(get_config_value cloud "cloud base url")
+URL_BASE=$(get_config_value cloud global "cloud base url")
 [ -z "$URL_BASE" ] && URL_BASE="https://app.netdata.cloud"  # Cover post-install with --dont-start
 ID="unknown"
 ROOMS=""
@@ -128,7 +129,7 @@ CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
 RELOAD=1
-NETDATA_USER=$(get_config_value global "run as user")
+NETDATA_USER=$(get_config_value netdata global "run as user")
 [ -z "$EUID" ] && EUID="$(id -u)"
 
 
@@ -306,22 +307,22 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
 
-        # Rewrite the netdata.conf on the disk
+        # Rewrite the cloud.conf on the disk
         T=$(mktemp)
-        sed -e '/[^#]*\[cloud]/,/[^#]*\[.*]/s/[^#]*enabled *= /#\0/;s/^[^#]*cloud base url *=/#\0/' "@configdir_POST@/netdata.conf" >"$T"
+        # sed -e '/[^#]*\[global]/,/[^#]*\[.*]/s/[^#]*enabled *= /#\0/;s/^[^#]*cloud base url *=/#\0/' "$CLAIMING_DIR/cloud.conf" >"$T"
         cat >>"$T" <<HERE_DOC
-[cloud]
+[global]
   enabled = yes
   cloud base url = $URL_BASE
 HERE_DOC
-        cp "$T" @configdir_POST@/netdata.conf
+        cp "$T" "$CLAIMING_DIR/cloud.conf"
         rm "$T"
         if [ "${RELOAD}" == "0" ] ; then
             exit 0
         fi
-        # Update the netdata.conf in the agent memory
-        @sbindir_POST@/netdatacli write-config 'cloud|enabled|yes' && \
-        @sbindir_POST@/netdatacli write-config "cloud|cloud base url|$URL_BASE" && \
+        # Update cloud.conf in the agent memory
+        @sbindir_POST@/netdatacli write-config 'cloud|global|enabled|yes' && \
+        @sbindir_POST@/netdatacli write-config "cloud|global|cloud base url|$URL_BASE" && \
         @sbindir_POST@/netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
         echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
         exit 6

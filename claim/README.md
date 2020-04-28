@@ -96,7 +96,7 @@ docker run -d --name=netdata \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata \
-  /usr/sbin/netdata -D -W set global "netdata cloud" enable -W set cloud "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
+  /usr/sbin/netdata -D -W set cloud global enabled true -W set cloud global "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
 ```
 
 The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run
@@ -167,11 +167,11 @@ Use these keys and the information below to troubleshoot the ACLK.
 
 If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cloud` option.
 
-Additionally, check that the `netdata cloud` setting in `netdata.conf` is set to `enable`:
+Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud.conf` is set to `true`:
 
 ```ini
-[general]
-    netadata cloud = enable
+[global]
+    enabled = true
 ```
 
 To fix this issue, reinstall Netdata using your [preferred method](/packaging/installer/README.md) and do not add the

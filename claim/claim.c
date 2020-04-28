@@ -52,7 +52,7 @@ void claim_agent(char *claiming_arguments)
     FILE *fp;
 
     // This is guaranteed to be set early in main via post_conf_load()
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
+    char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
     if (cloud_base_url == NULL)
         fatal("Do not move the cloud base url out of post_conf_load!!");
     const char *proxy_str;
@@ -115,7 +115,7 @@ void load_claiming_state(void)
     }
 
     // Propagate into aclk and registry. Be kind of atomic...
-    config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);   
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/cloud.d/claimed_id", netdata_configured_varlib_dir);
@@ -136,4 +136,26 @@ void load_claiming_state(void)
 #else
     netdata_cloud_setting = config_get_boolean(CONFIG_SECTION_CLOUD, "enabled", 1);
 #endif
+}
+
+struct config cloud_config = { .first_section = NULL,
+                               .last_section = NULL,
+                               .mutex = NETDATA_MUTEX_INITIALIZER,
+                               .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                          .rwlock = AVL_LOCK_INITIALIZER } };
+
+void load_cloud_conf(void)
+{
+    char *filename;
+    errno = 0;
+
+    int ret = 0;
+
+    filename = strdupz_path_subpath(netdata_configured_varlib_dir, "cloud.d/cloud.conf");
+
+    ret = appconfig_load(&cloud_config, filename, 1, NULL);
+    if(!ret) {
+        info("CONFIG: cannot load cloud config '%s'. Running with internal defaults.", filename);
+    }
+    freez(filename);
 }

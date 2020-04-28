@@ -301,9 +301,9 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
 
     if((cv->flags & CONFIG_VALUE_LOADED) || (cv->flags & CONFIG_VALUE_CHANGED)) {
         // this is a loaded value from the config file
-        // if it is different that the default, mark it
+        // if it is different than the default, mark it
         if(!(cv->flags & CONFIG_VALUE_CHECKED)) {
-            if(strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
+            if(default_value && strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
             cv->flags |= CONFIG_VALUE_CHECKED;
         }
     }
