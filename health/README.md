@@ -13,9 +13,9 @@ worked closely with our community of DevOps engineers, SREs, and developers to d
 alarms that work without any configuration.
 
 The Agent's health monitoring system is also dynamic and fully customizable. You can write entirely new alarms, tune the
-community-configured alarms for every app/service [the Agent collects metrics from](/docs/agent/collectors/collectors/),
-or silence anything you're not interested in. You can even power complex lookups by running statistical algorithms
-against your metrics.
+community-configured alarms for every app/service [the Agent collects metrics from](/collectors/COLLECTORS.md), or
+silence anything you're not interested in. You can even power complex lookups by running statistical algorithms against
+your metrics.
 
 Ready to take the next steps with health monitoring?
 
