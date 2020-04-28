@@ -53,7 +53,7 @@ defer_error_highlighted() {
 }
 
 print_deferred_errors() {
-  if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
+  if [ -n "${NETDATA_DEFERRED_ERRORS}" ]; then
     echo >&2
     echo >&2 "The following non-fatal errors were encountered during the installation process:"
     # shellcheck disable=SC2059
@@ -281,7 +281,7 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
@@ -289,7 +289,7 @@ while [ -n "${1}" ]; do
       fi
       ;;
     "--require-cloud")
-      if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
         echo "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
@@ -532,7 +532,7 @@ bundle_libmosquitto() {
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
@@ -540,7 +540,7 @@ bundle_libmosquitto() {
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
@@ -581,7 +581,7 @@ bundle_libwebsockets() {
     return 0
   fi
 
-  if [ -z "$(command -v cmake)" ] ; then
+  if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     return 0
@@ -606,7 +606,7 @@ bundle_libwebsockets() {
       run_ok "libwebsockets built and prepared."
     else
       run_failed "Failed to build libwebsockets."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
@@ -614,7 +614,7 @@ bundle_libwebsockets() {
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
@@ -643,11 +643,12 @@ copy_jsonc() {
 }
 
 bundle_jsonc() {
-  if [ -z "${NETDATA_DISABLE_CLOUD}" ] && [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c ; then
+  # If --build-json-c flag or not json-c on system, then bundle our own json-c
+  if [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c; then
     return 0
   fi
 
-  if [ -z "$(command -v cmake)" ] ; then
+  if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
     defer_error_highlighted "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
     return 0
@@ -672,7 +673,7 @@ bundle_jsonc() {
       run_ok "JSON-C built and prepared."
     else
       run_failed "Failed to build JSON-C."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
@@ -680,7 +681,7 @@ bundle_jsonc() {
     fi
   else
     run_failed "Unable to fetch sources for JSON-C."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
@@ -693,7 +694,7 @@ bundle_jsonc
 # -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
-if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ] ; then
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
   "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
 fi
 
@@ -1104,15 +1105,13 @@ install_react_dashboard() {
   DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
 
   if fetch_and_verify "dashboard" \
-                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${tmp}" \
-                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
-  then
-    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
-       copy_react_dashboard "${tmp}/build" && \
-       rm -rf "${tmp}"
-    then
+    "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+    "${DASHBOARD_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"; then
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" &&
+      copy_react_dashboard "${tmp}/build" &&
+      rm -rf "${tmp}"; then
       run_ok "React dashboard installed."
     else
       run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
