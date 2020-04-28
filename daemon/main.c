@@ -1119,12 +1119,39 @@ int main(int argc, char **argv) {
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
                         else if(strcmp(optarg, "get") == 0) {
-                            if(optind + 4 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W get 'conf_file' 'section' 'key' 'value'\n\n"
-                                        " Prints settings of netdata.conf or cloud.conf\n"
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
+                                        " Prints settings of netdata.conf.\n"
                                         "\n"
                                         " These options interact with: -c netdata.conf\n"
                                         " -c netdata.conf has to be given before -W get.\n"
+                                        "\n"
+                                );
+                                return 1;
+                            }
+
+                            if(!config_loaded) {
+                                fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
+                                load_netdata_conf(NULL, 0);
+                                post_conf_load(&user);
+                            }
+
+                            get_netdata_configured_variables();
+
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *def = argv[optind + 2];
+                            const char *value = config_get(section, key, def);
+                            printf("%s\n", value);
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "get2") == 0) {
+                            if(optind + 4 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W get2 'conf_file' 'section' 'key' 'value'\n\n"
+                                        " Prints settings of netdata.conf or cloud.conf\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " -c netdata.conf has to be given before -W get2.\n"
                                         " conf_file can be \"cloud\" or \"netdata\".\n"
                                         "\n"
                                 );
