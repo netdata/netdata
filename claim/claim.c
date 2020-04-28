@@ -144,7 +144,7 @@ struct config cloud_config = { .first_section = NULL,
                                .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                           .rwlock = AVL_LOCK_INITIALIZER } };
 
-void load_cloud_conf(void)
+void load_cloud_conf(int silent)
 {
     char *filename;
     errno = 0;
@@ -154,7 +154,7 @@ void load_cloud_conf(void)
     filename = strdupz_path_subpath(netdata_configured_varlib_dir, "cloud.d/cloud.conf");
 
     ret = appconfig_load(&cloud_config, filename, 1, NULL);
-    if(!ret) {
+    if(!ret && !silent) {
         info("CONFIG: cannot load cloud config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);

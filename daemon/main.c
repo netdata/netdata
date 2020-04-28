@@ -936,7 +936,7 @@ int main(int argc, char **argv) {
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
                         post_conf_load(&user);
-                        load_cloud_conf();
+                        load_cloud_conf(1);
                         config_loaded = 1;
                     }
                     break;
@@ -1135,7 +1135,7 @@ int main(int argc, char **argv) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
                                 load_netdata_conf(NULL, 0);
                                 post_conf_load(&user);
-                                load_cloud_conf();
+                                load_cloud_conf(1);
                             }
 
                             get_netdata_configured_variables();
@@ -1181,7 +1181,7 @@ int main(int argc, char **argv) {
     {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
-        load_cloud_conf();
+        load_cloud_conf(0);
     }
 
 

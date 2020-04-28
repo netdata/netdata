@@ -11,6 +11,6 @@ extern struct config cloud_config;
 void claim_agent(char *claiming_arguments);
 char *is_agent_claimed(void);
 void load_claiming_state(void);
-void load_cloud_conf(void);
+void load_cloud_conf(int silent);
 
 #endif //NETDATA_CLAIM_H
