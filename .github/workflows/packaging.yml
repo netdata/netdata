@@ -26,6 +26,7 @@ jobs:
           - ubuntu16.04
           - ubuntu18.04
           - ubuntu19.10
+          - ubuntu20.04
           - centos7
           - centos8
           - fedora30
@@ -72,6 +73,13 @@ jobs:
             version: "19.10"
             pkgclouddistro: Ubuntu
             pkgcloudversion: "19.10"
+            format: deb
+            base_image: ubuntu
+          - platform: ubuntu20.04
+            distro: ubuntu
+            version: "20.04"
+            pkgclouddistro: Ubuntu
+            pkgcloudversion: "20.04"
             format: deb
             base_image: ubuntu
           - platform: centos7
