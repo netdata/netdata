@@ -181,12 +181,23 @@ failure_cleanup:
     return 1;
 }
 
+void aclk_lws_wss_destroy_context()
+{
+    if (!engine_instance)
+        return;
+    if (!engine_instance->lws_context)
+        return;
+    lws_context_destroy(engine_instance->lws_context);
+    engine_instance->lws_context = NULL;
+}
+
+
 void aclk_lws_wss_client_destroy()
 {
     if (engine_instance == NULL)
         return;
-    lws_context_destroy(engine_instance->lws_context);
-    engine_instance->lws_context = NULL;
+
+    aclk_lws_wss_destroy_context();
     engine_instance->lws_wsi = NULL;
 
     aclk_lws_wss_clear_io_buffers(engine_instance);
@@ -480,8 +491,6 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_CLIENT_CLOSED:
         case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
             engine_instance->lws_wsi = NULL; // inside libwebsockets lws_close_free_wsi is called after callback
-            lws_context_destroy(engine_instance->lws_context);
-            engine_instance->lws_context = NULL;
             aclk_lws_connection_closed();
             return -1;                       // the callback response is ignored, hope the above remains true
         case LWS_CALLBACK_WSI_DESTROY:
@@ -490,8 +499,6 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 aclk_lws_wss_fail_report();
             engine_instance->lws_wsi = NULL;
             engine_instance->websocket_connection_up = 0;
-            lws_context_destroy(engine_instance->lws_context);
-            engine_instance->lws_context = NULL;
             aclk_lws_connection_closed();
             break;
         case LWS_CALLBACK_CLIENT_ESTABLISHED:
