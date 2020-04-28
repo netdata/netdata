@@ -98,8 +98,8 @@ RUN \
         /var/cache/netdata \
         /var/lib/netdata \
         /var/log/netdata && \
-    chown -R netdata:netdata /etc/netdata/claim.d && \
-    chmod 0700 /etc/netdata/claim.d && \
+    chown -R netdata:netdata /var/lib/netdata/cloud.d && \
+    chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \

@@ -149,7 +149,7 @@ static RSA *aclk_private_key = NULL;
 static int create_private_key()
 {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
 
     long bytes_read;
     char *private_key = read_by_filename(filename, &bytes_read);
@@ -1375,7 +1375,7 @@ void *aclk_main(void *ptr)
         }
         // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
-        char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", NULL);
+        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
         if (cloud_base_url == NULL) {
             error("Do not move the cloud base url out of post_conf_load!!");
             goto exited;

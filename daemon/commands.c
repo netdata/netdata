@@ -232,16 +232,25 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
     char *separator = strchr(args,'|');
     if (separator == NULL)
         return CMD_STATUS_FAILURE;
+    char *separator2 = strchr(separator + 1,'|');
+    if (separator2 == NULL)
+        return CMD_STATUS_FAILURE;
 
     char *temp = callocz(n + 1, 1);
     strcpy(temp, args);
-    size_t offset = separator-args;
+    size_t offset = separator - args;
     temp[offset] = 0;
+    size_t offset2 = separator2 - args;
+    temp[offset2] = 0;
 
-    char *value =config_get(temp, temp+offset+1, NULL);
+    const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
+    struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+
+    char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
     if (value == NULL)
     {
-        error("Cannot execute read-config section=%s / key=%s because no value set", temp, temp+offset+1);
+        error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set", conf_file,
+              temp + offset + 1, temp + offset2 + 1);
         freez(temp);
         return CMD_STATUS_FAILURE;
     }
@@ -262,18 +271,27 @@ static cmd_status_t cmd_write_config_execute(char *args, char **message)
     char *separator = strchr(args,'|');
     if (separator == NULL)
         return CMD_STATUS_FAILURE;
-    char *separator2 = strchr(separator+1,'|');
+    char *separator2 = strchr(separator + 1,'|');
     if (separator2 == NULL)
+        return CMD_STATUS_FAILURE;
+    char *separator3 = strchr(separator2 + 1,'|');
+    if (separator3 == NULL)
         return CMD_STATUS_FAILURE;
     char *temp = callocz(n + 1, 1);
     strcpy(temp, args);
-    size_t offset = separator-args;
+    size_t offset = separator - args;
     temp[offset] = 0;
-    size_t offset2 = separator2-args;
+    size_t offset2 = separator2 - args;
     temp[offset2] = 0;
+    size_t offset3 = separator3 - args;
+    temp[offset3] = 0;
 
-    config_set(temp, temp+offset+1, temp+offset2+1);
-    info("write-config section=%s key=%s value=%s",temp, temp+offset+1, temp+offset2+1);
+    const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
+    struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+
+    appconfig_set(tmp_config, temp + offset + 1, temp + offset2 + 1, temp + offset3 + 1);
+    info("write-config conf_file=%s section=%s key=%s value=%s",conf_file, temp + offset + 1, temp + offset2 + 1,
+         temp + offset3 + 1);
     freez(temp);
     return CMD_STATUS_SUCCESS;
 }
