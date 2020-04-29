@@ -32,33 +32,52 @@ browser, we do not store or log it.
 ## How to claim a node
 
 You can claim a node during the Cloud onboarding process, or after you created a Space by clicking on the **USER's
-Space** dropdown, then **Manage Claimed Nodes**.
+Space** dropdown, then **Manage claimed nodes**.
 
-> ⚠️ You can only claim any given node in a single Space. You can, however, add that claimed node to multiple War Rooms
-> within its Space.
+There are two important notes regarding claiming:
 
-To claim a node, copy the script given by Cloud. **You must run this script as the user running the** `netdata`
-**service**, which is usually the `netdata` user. You have two options: Switch to the appropriate user yourself, or run
-the command using `sudo` to automatically manage permissions.
+-   _You can only claim any given node in a single Space_. You can, however, add that claimed node to multiple War Rooms
+    within that one Space.
+-   You must repeat the claiming process on every node you want to add to Netdata Cloud.
 
-By switching to the `netdata` user:
+To claim a node, select which War Rooms you want to add this node to with the dropdown, then copy the script given by
+Cloud.
 
-```bash
-sudo su -s /bin/bash netdata
-netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
-```
-
-With `sudo`:
+The easiest way to run this script is with `sudo`. The claiming script takes care of the rest.
 
 ```bash
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see
-the [troubleshooting information](#troubleshooting).
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
+you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). 
 
-> Your node may need up to 60 seconds to connect to Netdata Cloud after finishing the claiming process. Please be
-> patient!
+Repeat this process with every node you want to add to Cloud during onboarding. You can also add more nodes once you've
+finished onboarding.
+
+### Claim an Agent manually
+
+If you don't want to use `sudo` with the claiming script from Cloud, you can discover which user is running the Agent,
+switch to that user yourself, and run the claiming script.
+
+Use `grep` to search your `netdata.conf` file, which is typically located at `/etc/netdata/netdata.conf`, for the `run
+as user` setting. For example:
+
+```bash
+grep "run as user" /etc/netdata/netdata.conf 
+    # run as user = netdata
+```
+
+In this case, the user running the Agent is `netdata`. Yours may be different, so pay attention to the output from
+`grep`. Switch to your user, replacing `netdata` a different user if necessary, and run the claiming script.
+
+```bash
+sudo -u netdata bash
+netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+```
+
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
+you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). 
 
 ### Claim an Agent running in Docker
 
@@ -68,14 +87,15 @@ and immediately claim it.
 
 #### Running Agent containers
 
-Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing `netdata` with the name of your running container:
+Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing
+`netdata` with the name of your running container:
 
 ```bash
 docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see the
-[troubleshooting information](#troubleshooting).
+The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
+you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
 
 #### New/ephemeral Agent containers
 
@@ -141,11 +161,11 @@ When you claim with the `netdata-claim.sh` script, add the `-proxy=` parameter a
 added to `netdata.conf`.
 
 ```bash
-netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -url=https://app.netdata.cloud -proxy=socks5h://203.0.113.0:1080
+sudo netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -url=https://app.netdata.cloud -proxy=socks5h://203.0.113.0:1080
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, see
-the [troubleshooting information](#troubleshooting).
+Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
+you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
 
 ### Troubleshooting
 
