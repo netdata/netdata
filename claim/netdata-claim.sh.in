@@ -80,7 +80,6 @@ ERROR_MESSAGES[16]="Gateway Timeout"
 # Error: The service cannot handle the claiming request at this time.
 # HTTP Status code: 503
 # Exit code: 17
-# shellcheck disable=SC2034
 ERROR_KEYS[17]="ErrServiceUnavailable"
 ERROR_MESSAGES[17]="Service Unavailable"
 
@@ -367,5 +366,8 @@ HERE_DOC
 fi
 
 echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
+if [ "${VERBOSE}" == 1 ]; then
+    echo >&2 "Error key was:\"${ERROR_KEYS[$EXIT_CODE]}\""
+fi
 rm -f "${CLAIMING_DIR}/tmpout.txt"
 exit $EXIT_CODE
