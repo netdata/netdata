@@ -290,6 +290,7 @@ struct engine *read_exporting_config()
     while (tmp_ci_list) {
         struct instance *tmp_instance;
         char *instance_name;
+        char *default_destination = "localhost";
 
         info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
@@ -337,7 +338,6 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.name = strdupz(tmp_ci_list->local_ci.instance_name);
 
-        tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", "localhost"));
 
         tmp_instance->config.update_every =
             exporter_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
@@ -385,6 +385,8 @@ struct engine *read_exporting_config()
             struct aws_kinesis_specific_config *connector_specific_config =
                 callocz(1, sizeof(struct aws_kinesis_specific_config));
 
+            default_destination = "us-east-1";
+
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
             connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", "netdata"));
@@ -395,6 +397,8 @@ struct engine *read_exporting_config()
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
             struct pubsub_specific_config *connector_specific_config =
                 callocz(1, sizeof(struct pubsub_specific_config));
+
+            default_destination = "pubsub.googleapis.com";
 
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
@@ -415,6 +419,8 @@ struct engine *read_exporting_config()
             connector_specific_config->collection = strdupz(exporter_get(
                 instance_name, "collection", ""));
         }
+
+        tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
 
 #ifdef NETDATA_INTERNAL_CHECKS
         info(

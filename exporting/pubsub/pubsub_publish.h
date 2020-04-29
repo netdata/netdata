@@ -18,7 +18,9 @@ struct pubsub_specific_data {
     size_t last_tag;
 };
 
-int pubsub_init(void *pubsub_specific_data_p, char *credentials_file, char *project_id, char *topic_id);
+int pubsub_init(
+    void *pubsub_specific_data_p, const char *destination, const char *credentials_file,
+    const char *project_id, const char *topic_id);
 
 void pubsub_add_message(void *pubsub_specific_data_p, char *data);
 

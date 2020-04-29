@@ -45,7 +45,7 @@ int init_pubsub_instance(struct instance *instance)
     struct pubsub_specific_config *pubsub_specific_config =
         (struct pubsub_specific_config *)instance->config.connector_specific_config;
     pubsub_init(
-        (void *)connector_specific_data, pubsub_specific_config->credentials_file,
+        (void *)connector_specific_data, instance->config.destination, pubsub_specific_config->credentials_file,
         pubsub_specific_config->project_id, pubsub_specific_config->topic_id);
 
     return 0;

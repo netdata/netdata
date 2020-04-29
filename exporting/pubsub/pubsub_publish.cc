@@ -22,7 +22,9 @@ struct response {
  * @param topic_id a topic ID.
  * @return Returns 0 on success, 1 on failure.
  */
-int pubsub_init(void *pubsub_specific_data_p, char *credentials_file, char *project_id, char *topic_id)
+int pubsub_init(
+    void *pubsub_specific_data_p, const char *destination, const char *credentials_file,
+    const char *project_id, const char *topic_id)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
@@ -35,7 +37,7 @@ int pubsub_init(void *pubsub_specific_data_p, char *credentials_file, char *proj
             return 1;
         }
 
-        std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel("pubsub.googleapis.com", credentials);
+        std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(destination, credentials);
 
         google::pubsub::v1::Publisher::Stub *stub = new google::pubsub::v1::Publisher::Stub(channel);
 
