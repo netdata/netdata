@@ -68,16 +68,17 @@ fatal() {
 }
 
 run_ok() {
-  printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+  printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} \n\n"
 }
 
 run_failed() {
-  printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+  printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} \n\n"
 }
 
 ESCAPED_PRINT_METHOD=
-printf "%q " test > /dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
+if printf "%q " test > /dev/null 2>&1; then
+  ESCAPED_PRINT_METHOD="printfq"
+fi
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
     printf "%q " "${@}"
@@ -103,9 +104,11 @@ run() {
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
 
-  printf >> "${run_logfile}" "${info}"
-  escaped_print >> "${run_logfile}" "${@}"
-  printf >> "${run_logfile}" " ... "
+  {
+    printf "${info}"
+    escaped_print "${@}"
+    printf " ... "
+  } >> "${run_logfile}"
 
   printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
   escaped_print >&2 "${@}"
@@ -252,9 +255,9 @@ safe_sha256sum() {
   # Within the contexct of the installer, we only use -c option that is common between the two commands
   # We will have to reconsider if we start non-common options
   if command -v sha256sum > /dev/null 2>&1; then
-    sha256sum $@
+    sha256sum "$@"
   elif command -v shasum > /dev/null 2>&1; then
-    shasum -a 256 $@
+    shasum -a 256 "$@"
   else
     fatal "I could not find a suitable checksum binary to use"
   fi
@@ -356,7 +359,7 @@ if [ "${INTERACTIVE}" = "0" ]; then
 fi
 
 TMPDIR=$(create_tmp_directory)
-cd "${TMPDIR}"
+cd "${TMPDIR}" || exit 1
 
 dependencies
 
