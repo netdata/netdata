@@ -141,22 +141,23 @@ void pubsub_connector_worker(void *instance_p)
 
         size_t sent_metrics = 0, lost_metrics = 0, sent_bytes = 0, lost_bytes = 0;
 
-        if (unlikely(pubsub_get_result(connector_specific_data, error_message, &sent_bytes, &lost_bytes))) {
-                // oops! we couldn't send (all or some of the) data
-                error("EXPORTING: %s", error_message);
-                error(
-                    "EXPORTING: failed to write data to database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                    instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
+        if (unlikely(pubsub_get_result(
+                connector_specific_data, error_message, &sent_metrics, &sent_bytes, &lost_metrics, &lost_bytes))) {
+            // oops! we couldn't send (all or some of the) data
+            error("EXPORTING: %s", error_message);
+            error(
+                "EXPORTING: failed to write data to database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
 
-                stats->transmission_failures++;
-                stats->data_lost_events++;
-                stats->lost_metrics += lost_metrics;
-                stats->lost_bytes += lost_bytes;
+            stats->transmission_failures++;
+            stats->data_lost_events++;
+            stats->lost_metrics += lost_metrics;
+            stats->lost_bytes += lost_bytes;
 
-                break;
-            } else {
-                stats->receptions++;
-            }
+            break;
+        } else {
+            stats->receptions++;
+        }
 
             error("EXPORTING: An iteration of the pubsub worker");
 

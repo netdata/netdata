@@ -137,13 +137,17 @@ void pubsub_publish(void *pubsub_specific_data_p)
  * @param lost_bytes report to a caller how many bytes was lost during transmission.
  * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission.
  */
-int pubsub_get_result(void *pubsub_specific_data_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes)
+int pubsub_get_result(
+    void *pubsub_specific_data_p, char *error_message,
+    size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
     std::vector<struct response> *responses = (std::vector<struct response> *)pubsub_specific_data->responses;
     grpc_impl::CompletionQueue::NextStatus next_status;
 
+    *sent_metrics = 0;
     *sent_bytes = 0;
+    *lost_metrics = 0;
     *lost_bytes = 0;
 
     do {
@@ -167,24 +171,19 @@ int pubsub_get_result(void *pubsub_specific_data_p, char *error_message, size_t 
                 return 1;
             }
 
-            if (ok && got_tag == (void *)response->tag) {
+            if (ok) {
                 std::cerr << "EXPORTING: Got right tag and status is OK" << std::endl;
                 for (auto s : response->publish_response->message_ids())
                     std::cerr << "EXPORTING: Message id = " << s << std::endl;
+                *sent_metrics += response->publish_response->message_ids_size();
+                // *sent_bytes += response->data_len;             // TODO
             } else {
                 std::cerr << "EXPORTING: Status is not OK" << std::endl;
                 std::cerr << "EXPORTING: " << response->status->error_code() << ": " << response->status->error_message() << std::endl;
+                *lost_metrics += response->publish_response->message_ids_size();
+                // *lost_bytes += response->data_len;             // TODO
+                response->status->error_message().copy(error_message, ERROR_LINE_MAX);
             }
-            // if (ok) {
-            //     // *sent_metrics +=
-            //     publish_response->message_ids_size();
-            //     // *sent_bytes += response->data_len;             // TODO
-            // } else {
-            //     // *lost_metrics +=
-            //     publish_response->message_ids_size();
-            //     // *lost_bytes += response->data_len;             // TODO
-            //     response->status->error_message().copy(error_message, ERROR_LINE_MAX);
-            // }
 
             responses->erase(response);
         }
