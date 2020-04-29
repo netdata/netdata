@@ -76,7 +76,6 @@ dist_noinst_DATA = \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
-    netlify.toml \
     $(NULL)
 
 # until integrated within build

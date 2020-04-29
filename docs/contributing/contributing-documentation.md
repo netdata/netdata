@@ -42,9 +42,7 @@ a typo or clarifying a confusing sentence.
 Editing locally is more complicated but allows you to organize complex projects. By building documentation locally, you
 can preview your work using a local web server before you submit your PR.
 
-In both cases, you'll finish by submitting a pull request (PR). Once you submit your PR, GitHub will initiate a number
-of jobs, including a Netlify preview. You can use this preview to view the documentation site with your changes applied,
-which might help you catch any lingering issues.
+In both cases, you'll finish by submitting a pull request (PR).
 
 To continue, follow one of the paths below:
 
