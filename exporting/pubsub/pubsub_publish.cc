@@ -17,16 +17,17 @@ struct response {
  * Initialize a Pub/Sub client and a data structure for responses.
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
+ * @param credentials_file a full path for a file with google application credentials.
  * @param project_id a project ID.
  * @param topic_id a topic ID.
  * @return Returns 0 on success, 1 on failure.
  */
-int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
+int pubsub_init(void *pubsub_specific_data_p, char *credentials_file, char *project_id, char *topic_id)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
     try {
-        setenv("GOOGLE_APPLICATION_CREDENTIALS", "/etc/netdata/netdata-analytics-ml-921ae1ba188f.json", 0);
+        setenv("GOOGLE_APPLICATION_CREDENTIALS", credentials_file, 0);
 
         std::shared_ptr<grpc::ChannelCredentials> credentials = grpc::GoogleDefaultCredentials();
         if (credentials == nullptr) {

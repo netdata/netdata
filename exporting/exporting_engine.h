@@ -89,6 +89,7 @@ struct aws_kinesis_specific_config {
 };
 
 struct pubsub_specific_config {
+    char *credentials_file;
     char *project_id;
     char *topic_id;
 };

@@ -388,9 +388,7 @@ struct engine *read_exporting_config()
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
             connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", "netdata"));
-
             connector_specific_config->auth_key_id = strdupz(exporter_get(instance_name, "aws_access_key_id", ""));
-
             connector_specific_config->secure_key = strdupz(exporter_get(instance_name, "aws_secret_access_key", ""));
         }
 
@@ -400,8 +398,8 @@ struct engine *read_exporting_config()
 
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
+            connector_specific_config->credentials_file = strdupz(exporter_get(instance_name, "credentials file", ""));
             connector_specific_config->project_id = strdupz(exporter_get(instance_name, "project id", ""));
-
             connector_specific_config->topic_id = strdupz(exporter_get(instance_name, "topic id", ""));
         }
 
