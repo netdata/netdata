@@ -33,7 +33,7 @@
     <meta name="twitter:description"       content="Unparalleled insights, in real-time, of everything happening on your Linux systems and applications, with stunning, interactive web dashboards and powerful performance and health alarms." />
     <meta name="twitter:image"             content="https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif" />
 
-    <script src="../main.js?v20190905-0"></script>
+    <script src="../main.js?v20200429-0"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar" data-offset="100">
@@ -90,7 +90,6 @@
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li title="Nodes view" data-toggle="tooltip" data-placement="bottom"><a onclick="openAuthenticatedUrl('console.html');" class="btn" target="_blank"><i class="fas fa-tv"></i>&nbsp;<span class="hidden-sm hidden-md">Nodes<sup class="beta"> beta</sup></span></a></li>
                     <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fas fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
                     <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fas fa-cog"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
                     <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fas fa-cloud-download-alt"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
