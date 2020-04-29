@@ -329,18 +329,14 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ]
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
 
         # Rewrite the cloud.conf on the disk
-        T=$(mktemp)
-        # sed -e '/[^#]*\[global]/,/[^#]*\[.*]/s/[^#]*enabled *= /#\0/;s/^[^#]*cloud base url *=/#\0/' "$CLAIMING_DIR/cloud.conf" >"$T"
-        cat >>"$T" <<HERE_DOC
+        cat > "$CLAIMING_DIR/cloud.conf" <<HERE_DOC
 [global]
   enabled = yes
   cloud base url = $URL_BASE
 HERE_DOC
-        cp "$T" "$CLAIMING_DIR/cloud.conf"
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
-        rm "$T"
         if [ "${RELOAD}" == "0" ] ; then
             exit $EXIT_CODE
         fi
