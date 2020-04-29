@@ -49,12 +49,9 @@ jobs:
 
           - distro: 'archlinux:latest'
             pre: 'pacman --noconfirm -Sy grep libffi'
-            rmjsonc: 'pacman -R --noconfirm json-c'
 
           - distro: 'centos:8'
             rmjsonc: 'dnf remove -y json-c-devel'
-          - distro: 'centos:7'
-            rmjsonc: 'yum remove -y json-c-devel'
 
           - distro: 'debian:bullseye'
             pre: 'apt-get update'
@@ -114,6 +111,7 @@ jobs:
         run: |
           docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
+        if: matrix.rmjsonc != ''
         run: |
           docker run -w /netdata test \
               /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
