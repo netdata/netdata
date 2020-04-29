@@ -51,42 +51,6 @@ int init_pubsub_instance(struct instance *instance)
 }
 
 /**
- * Format dimension using collected data for Pub/Sub connector
- *
- * @param instance an instance data structure.
- * @param rd a dimension.
- * @return Always returns 0.
- */
-int format_dimension_collected_pubsub(struct instance *instance, RRDDIM *rd)
-{
-    BUFFER *buffer = (BUFFER *)instance->buffer;
-
-    format_dimension_collected_json_plaintext(instance, rd);
-    pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer));
-    buffer_flush(buffer);
-
-    return 0;
-}
-
-/**
- * Format dimension using a calculated value from stored data for Pub/Sub connector
- *
- * @param instance an instance data structure.
- * @param rd a dimension.
- * @return Always returns 0.
- */
-int format_dimension_stored_pubsub(struct instance *instance, RRDDIM *rd)
-{
-    BUFFER *buffer = (BUFFER *)instance->buffer;
-
-    format_dimension_stored_json_plaintext(instance, rd);
-    pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer));
-    buffer_flush(buffer);
-
-    return 0;
-}
-
-/**
  * Pub/Sub connector worker
  *
  * Runs in a separate thread for every instance.
@@ -134,6 +98,9 @@ void pubsub_connector_worker(void *instance_p)
             connector_specific_config->topic_id,
             buffer_len);
 
+        pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer));
+        buffer_flush(buffer);
+
         pubsub_publish((void *)connector_specific_data);
 
         sent += buffer_len;
@@ -167,8 +134,6 @@ void pubsub_connector_worker(void *instance_p)
             stats->sent_bytes += sent;
             if (likely(sent == buffer_len))
                 stats->sent_metrics = sent_metrics;
-
-            buffer_flush(buffer);
 
             send_internal_metrics(instance);
 

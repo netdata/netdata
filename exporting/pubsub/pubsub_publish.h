@@ -21,7 +21,6 @@ struct pubsub_specific_data {
 int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id);
 
 void pubsub_add_message(void *pubsub_specific_data_p, char *data);
-void pubsub_clear_messages(void *pubsub_specific_data_p);
 
 void pubsub_publish(void *pubsub_specific_data_p);
 int pubsub_get_result(

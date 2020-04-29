@@ -71,9 +71,10 @@ int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
 void pubsub_add_message(void *pubsub_specific_data_p, char *data)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    google::pubsub::v1::PublishRequest *request = (google::pubsub::v1::PublishRequest *)pubsub_specific_data->request;
 
-    google::pubsub::v1::PubsubMessage *message = request->add_messages();
+    google::pubsub::v1::PubsubMessage *message =
+        ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->add_messages();
+
     message->set_data(data);
 }
 
@@ -98,14 +99,6 @@ void pubsub_clear_messages(void *pubsub_specific_data_p)
 void pubsub_publish(void *pubsub_specific_data_p)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-
-    google::pubsub::v1::PubsubMessage *message =
-        ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->add_messages();
-
-    auto t = std::time(nullptr);
-    auto tm = *std::localtime(&t);
-
-    message->set_data(std::asctime(&tm));
 
     grpc::ClientContext *context = new grpc::ClientContext;
 
