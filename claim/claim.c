@@ -12,17 +12,19 @@ static char *claiming_errors[] = {
         "Problems with claiming working directory",     // 2
         "Missing dependencies",                         // 3
         "Failure to connect to endpoint",               // 4
-        "Unknown HTTP error message",                   // 5
-        "invalid node id",                              // 6
-        "invalid node name",                            // 7
-        "invalid room id",                              // 8
-        "invalid public key",                           // 9
-        "token expired/token not found/invalid token",  // 10
-        "already claimed",                              // 11
-        "processing claiming",                          // 12
-        "Internal Server Error",                        // 13
-        "Gateway Timeout",                              // 14
-        "Service Unavailable"                           // 15
+        "The CLI didn't work",                          // 5
+        "Wrong user",                                   // 6
+        "Unknown HTTP error message",                   // 7
+        "invalid node id",                              // 8
+        "invalid node name",                            // 9
+        "invalid room id",                              // 10
+        "invalid public key",                           // 11
+        "token expired/token not found/invalid token",  // 12
+        "already claimed",                              // 13
+        "processing claiming",                          // 14
+        "Internal Server Error",                        // 15
+        "Gateway Timeout",                              // 16
+        "Service Unavailable"                           // 17
 };
 
 static char *claimed_id = NULL;
@@ -134,7 +136,7 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_setting = 0;
 #else
-    netdata_cloud_setting = config_get_boolean(CONFIG_SECTION_CLOUD, "enabled", 1);
+    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
 }
 
