@@ -45,6 +45,8 @@ int pubsub_init(void *pubsub_specific_data_p, char *project_id, char *topic_id)
 
         google::pubsub::v1::PublishRequest *request = new google::pubsub::v1::PublishRequest;
         pubsub_specific_data->request = request;
+        ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))
+            ->set_topic(std::string("projects/") + project_id + "/topics/" + topic_id);
 
         grpc::CompletionQueue *cq = new grpc::CompletionQueue;
         pubsub_specific_data->completion_queue = cq;
@@ -97,8 +99,6 @@ void pubsub_publish(void *pubsub_specific_data_p)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
-    ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))
-        ->set_topic("projects/netdata-analytics-ml/topics/test_exporting_connector");
     google::pubsub::v1::PubsubMessage *message =
         ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->add_messages();
 
