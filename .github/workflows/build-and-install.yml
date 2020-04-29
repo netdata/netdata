@@ -9,6 +9,7 @@ jobs:
   build:
     name: Build & Install
     strategy:
+      fail-fast: false
       matrix:
         distro:
           - 'alpine:edge'
