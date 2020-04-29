@@ -272,6 +272,16 @@ will then remove it from the interface.
 In the sections below, you can find reference material for the claiming script, claiming via the Agent's command line
 tool, and details about the files found in `cloud.d`.
 
+### The `cloud.d/cloud.conf` file
+
+This section defines how and whether your Agent connects to [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/)
+using the [ACLK](/aclk/README.md).
+
+| setting        | default                   | info                                                                                                                                   |
+|:-------------- |:------------------------- |:-------------------------------------------------------------------------------------------------------------------------------------- |
+| cloud base url | https://app.netdata.cloud | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
+| enabled        | yes                       | The runtime option to disable the [Agent-Cloud link](/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud.         |
+
 ### Claiming script
 
 A Space's administrator can claim an Agent by directly calling the `netdata-claim.sh` script **as the `netdata` user**
