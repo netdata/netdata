@@ -23,6 +23,7 @@ static char *aclk_password = NULL;
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
 int aclk_connected = 0;             // Exposed in the web-api
+int aclk_force_reconnect = 0;       // Indication from lower layers
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
@@ -47,7 +48,7 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
 
 void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
-
+void aclk_lws_wss_destroy_context();
 /*
  * Maintain a list of collectors and chart count
  * If all the charts of a collector are deleted
@@ -1406,9 +1407,14 @@ void *aclk_main(void *ptr)
         static int first_init = 0;
         size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+
+        if (aclk_force_reconnect) {
+            aclk_lws_wss_destroy_context();
+            aclk_force_reconnect = 0;
+        }
         //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
         //   first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
-        if (unlikely(!netdata_exit && !aclk_connected)) {
+        if (unlikely(!netdata_exit && !aclk_connected && !aclk_force_reconnect)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
@@ -1434,7 +1440,7 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        if (unlikely(!aclk_connected))
+        if (unlikely(!aclk_connected || aclk_force_reconnect))
             continue;
         /*static int stress_counter = 0;
         if (write_q_bytes==0 && stress_counter ++ >5)
@@ -1570,6 +1576,7 @@ void aclk_disconnect()
     waiting_init = 1;
     aclk_connected = 0;
     aclk_connecting = 0;
+    aclk_force_reconnect = 1;
 }
 
 void aclk_shutdown()

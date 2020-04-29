@@ -70,6 +70,7 @@ struct aclk_lws_wss_engine_instance {
 };
 
 void aclk_lws_wss_client_destroy();
+void aclk_lws_wss_destroy_context();
 
 int aclk_lws_wss_connect(char *host, int port);
 
