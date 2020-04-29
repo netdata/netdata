@@ -80,6 +80,7 @@ ERROR_MESSAGES[16]="Gateway Timeout"
 # Error: The service cannot handle the claiming request at this time.
 # HTTP Status code: 503
 # Exit code: 17
+# shellcheck disable=SC2034
 ERROR_KEYS[17]="ErrServiceUnavailable"
 ERROR_MESSAGES[17]="Service Unavailable"
 
@@ -323,7 +324,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         EXIT_CODE=0
 fi
 
-if [ "${HTTP_STATUS_CODE}" = "204" -o "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
+if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
         echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
