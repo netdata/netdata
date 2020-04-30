@@ -533,7 +533,7 @@ build_libmosquitto() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   if [ "$(uname -s)" = Linux ]; then
@@ -613,7 +613,7 @@ build_libwebsockets() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || exit 1
