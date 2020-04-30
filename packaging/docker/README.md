@@ -74,7 +74,7 @@ Some of the bind-mounts are optional depending on how you use Netdata:
 * If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
   (they are used to get proper user and group names for the monitored host) to get slightly better security.
 
-* Most modern linux distos supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
+* Most modern linux distros supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
   this is the case you can change the line above that mounts the file inside the container to
   `-v /etc/lsb-release:/host/etc/lsb-release:ro`.
 
