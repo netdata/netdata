@@ -40,13 +40,18 @@ int init_pubsub_instance(struct instance *instance)
     struct pubsub_specific_data *connector_specific_data = callocz(1, sizeof(struct pubsub_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
 
-    info("EXPORTING: Connector specific data pointer = %p", instance->connector_specific_data);
-
     struct pubsub_specific_config *pubsub_specific_config =
         (struct pubsub_specific_config *)instance->config.connector_specific_config;
-    pubsub_init(
-        (void *)connector_specific_data, instance->config.destination, pubsub_specific_config->credentials_file,
-        pubsub_specific_config->project_id, pubsub_specific_config->topic_id);
+    char error_message[ERROR_LINE_MAX + 1] = "";
+    if (pubsub_init(
+            (void *)connector_specific_data, error_message, instance->config.destination,
+            pubsub_specific_config->credentials_file, pubsub_specific_config->project_id,
+            pubsub_specific_config->topic_id)) {
+        error(
+            "EXPORTING: Cannot initialize a Pub/Sub publisher for instance %s: %s",
+            instance->config.name, error_message);
+        return 1;
+    }
 
     return 0;
 }
@@ -63,10 +68,10 @@ void pubsub_connector_worker(void *instance_p)
     struct instance *instance = (struct instance *)instance_p;
     struct pubsub_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct pubsub_specific_data *connector_specific_data = instance->connector_specific_data;
-    info("EXPORTING: Connector specific data pointer = %p", connector_specific_data);
 
     while (!netdata_exit) {
         struct stats *stats = &instance->stats;
+        char error_message[ERROR_LINE_MAX + 1] = "";
 
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
@@ -88,16 +93,30 @@ void pubsub_connector_worker(void *instance_p)
 
         stats->buffered_bytes = buffer_len;
 
-        char error_message[ERROR_LINE_MAX + 1] = "";
+        if (pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer))) {
+            error("EXPORTING: Instance %s: Cannot add data to a message", instance->config.name);
+
+            stats->data_lost_events++;
+            stats->lost_metrics += stats->buffered_metrics;
+            stats->lost_bytes += buffer_len;
+
+            goto cleanup;
+        }
 
         debug(
             D_BACKEND, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
             connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 
-        pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer));
-        buffer_flush(buffer);
+        if (pubsub_publish((void *)connector_specific_data, error_message, stats->buffered_metrics, buffer_len)) {
+            error("EXPORTING: Instance: %s: Cannot publish a message: %s", instance->config.name, error_message);
 
-        pubsub_publish((void *)connector_specific_data, stats->buffered_metrics, buffer_len);
+            stats->transmission_failures++;
+            stats->data_lost_events++;
+            stats->lost_metrics += stats->buffered_metrics;
+            stats->lost_bytes += buffer_len;
+
+            goto cleanup;
+        }
 
         stats->sent_bytes = buffer_len;
         stats->transmission_successes++;
@@ -121,13 +140,10 @@ void pubsub_connector_worker(void *instance_p)
             stats->sent_metrics = sent_metrics;
         }
 
-        error("EXPORTING: An iteration of the pubsub worker");
-
-        if (unlikely(netdata_exit))
-            break;
-
+cleanup:
         send_internal_metrics(instance);
 
+        buffer_flush(buffer);
         stats->buffered_metrics = 0;
 
         uv_mutex_unlock(&instance->mutex);

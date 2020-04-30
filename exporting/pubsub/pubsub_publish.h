@@ -19,12 +19,12 @@ struct pubsub_specific_data {
 };
 
 int pubsub_init(
-    void *pubsub_specific_data_p, const char *destination, const char *credentials_file,
+    void *pubsub_specific_data_p, char *error_message, const char *destination, const char *credentials_file,
     const char *project_id, const char *topic_id);
 
-void pubsub_add_message(void *pubsub_specific_data_p, char *data);
+int pubsub_add_message(void *pubsub_specific_data_p, char *data);
 
-void pubsub_publish(void *pubsub_specific_data_p, size_t buffered_metrics, size_t buffered_bytes);
+int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buffered_metrics, size_t buffered_bytes);
 int pubsub_get_result(
     void *pubsub_specific_data_p, char *error_message,
     size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes);
