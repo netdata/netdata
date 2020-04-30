@@ -1,6 +1,6 @@
 ---
-# Runs Tests on Pushes to `master` and Pull Requests
-name: Tests
+# Runs Unit Tests on Pushes to `master` and Pull Requests
+name: Unit Tests
 on:
   push:
     branches:
@@ -13,8 +13,8 @@ on:
       - '**.c'
       - '**.h'
 jobs:
-  unit-tests-legacy:
-    name: Unit Tests (legacy)
+  legacy:
+    name: Legacy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,14 +25,14 @@ jobs:
           sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
                                   libnetfilter-acct-dev
-      - name: Run ./tests/run-unit-tests.sh
+      - name: Run Tests
         env:
           CFLAGS: "-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1"
         run: |
-          ./tests/run-unit-tests.sh
+          ./tests/run-legacy-unit-tests.sh
 
-  unit-tests-cmocka:
-    name: Unit Tests (cmocka)
+  cmocka:
+    name: CMocka
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,7 +67,7 @@ jobs:
             -D MONGOC_LIBRARY=/usr/lib/x86_64-linux-gnu/libmongoc-1.0.so \
             ..
           make
-      - name: Run ctest
+      - name: Run Tests
         run: |
           cd build-tmp
           ctest
