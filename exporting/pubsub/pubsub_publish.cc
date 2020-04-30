@@ -85,19 +85,6 @@ void pubsub_add_message(void *pubsub_specific_data_p, char *data)
 }
 
 /**
- * Remove all messages from a Pub/Sub request.
- *
- * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
- */
-void pubsub_clear_messages(void *pubsub_specific_data_p)
-{
-    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    google::pubsub::v1::PublishRequest *request = (google::pubsub::v1::PublishRequest *)pubsub_specific_data->request;
-
-    request->clear_messages();
-}
-
-/**
  * Send data to the Pub/Sub service
  *
  * @param pubsub_specific_data_p a pointer to a structure with client and request outcome information.
