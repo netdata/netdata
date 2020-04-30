@@ -134,7 +134,7 @@ A Space's administrator can claim a node through a SOCKS5 or HTTP(S) proxy.
 You should first configure the proxy in the `[cloud]` section of `netdata.conf`. The proxy settings you specify here
 will also be used to tunnel the ACLK. The default `proxy` setting is `none`.
 
-```ini
+```conf
 [cloud]
     proxy = none
 ```
@@ -189,7 +189,7 @@ If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cl
 
 Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud.conf` is set to `true`:
 
-```ini
+```conf
 [global]
     enabled = true
 ```
