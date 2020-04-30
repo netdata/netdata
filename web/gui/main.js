@@ -499,10 +499,12 @@ function toggleAgentItem(e, guid) {
 // When you stream metrics from netdata to netdata, the recieving netdata now
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
+const OLD_DASHBOARD_SUFFIX = "old"
 function renderStreamedHosts(options) {
     let html = `<div class="info-item">Databases streamed to this agent</div>`;
 
-    var base = document.location.origin.toString() + document.location.pathname.toString();
+    var base = document.location.origin.toString() +
+      document.location.pathname.toString().replace(`/${OLD_DASHBOARD_SUFFIX}`, "");
     if (base.endsWith("/host/" + options.hostname + "/")) {
         base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
     }
@@ -536,10 +538,10 @@ function renderStreamedHosts(options) {
         displayedDatabases = true;
 
         if (hostname === master) {
-            url = `${base}/`;
+            url = `${base}/${OLD_DASHBOARD_SUFFIX}/`;
             icon = 'home';
         } else {
-            url = `${base}/host/${hostname}/`;
+            url = `${base}/host/${hostname}/${OLD_DASHBOARD_SUFFIX}/`;
             icon = 'window-restore';
         }
 
@@ -1932,7 +1934,7 @@ function renderChartsAndMenu(data) {
 
 function loadJs(url, callback) {
     $.ajax({
-        url: url,
+        url: `../${url}`,
         cache: true,
         dataType: "script",
         xhrFields: { withCredentials: true } // required for the cookie
@@ -1979,7 +1981,7 @@ function loadBootstrapSlider(callback) {
     if (bootstrapSliderLoaded === false) {
         bootstrapSliderLoaded = true;
         loadJs('lib/bootstrap-slider-10.0.0.min.js', function () {
-            NETDATA._loadCSS('css/bootstrap-slider-10.0.0.min.css');
+            NETDATA._loadCSS('../css/bootstrap-slider-10.0.0.min.css');
             callback();
         });
     } else {
