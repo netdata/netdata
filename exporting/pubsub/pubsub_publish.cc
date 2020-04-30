@@ -20,6 +20,8 @@ struct response {
  * Initialize a Pub/Sub client and a data structure for responses.
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
+ * @param error_message report error message to a caller.
+ * @param destination a Pub/Sub service endpoint.
  * @param credentials_file a full path for a file with google application credentials.
  * @param project_id a project ID.
  * @param topic_id a topic ID.
@@ -77,6 +79,7 @@ int pubsub_init(
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
  * @param data a text buffer with metrics.
+ * @return Returns 0 on success, 1 on failure.
  */
 int pubsub_add_message(void *pubsub_specific_data_p, char *data)
 {
@@ -101,6 +104,10 @@ int pubsub_add_message(void *pubsub_specific_data_p, char *data)
  * Send data to the Pub/Sub service
  *
  * @param pubsub_specific_data_p a pointer to a structure with client and request outcome information.
+ * @param error_message report error message to a caller.
+ * @param buffered_metrics the number of metrics we are going to send.
+ * @param buffered_bytes the number of bytes we are going to send.
+ * @return Returns 0 on success, 1 on failure.
  */
 int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buffered_metrics, size_t buffered_bytes)
 {
@@ -141,7 +148,9 @@ int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buf
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
  * @param error_message report error message to a caller.
+ * @param sent_metrics report to a caller how many metrics was successfuly sent.
  * @param sent_bytes report to a caller how many bytes was successfuly sent.
+ * @param lost_metrics report to a caller how many metrics was lost during transmission.
  * @param lost_bytes report to a caller how many bytes was lost during transmission.
  * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission.
  */
