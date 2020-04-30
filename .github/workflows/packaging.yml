@@ -31,6 +31,7 @@ jobs:
           - centos8
           - fedora30
           - fedora31
+          - fedora32
           - opensuse15.1
         include:
           - platform: debian8
@@ -108,6 +109,13 @@ jobs:
             version: "31"
             pkgclouddistro: Fedora
             pkgcloudversion: "31.0"
+            format: rpm
+            base_image: fedora
+          - platform: fedora32
+            distro: fedora
+            version: "32"
+            pkgclouddistro: Fedora
+            pkgcloudversion: "32.0"
             format: rpm
             base_image: fedora
           - platform: opensuse15.1
