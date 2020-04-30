@@ -13,14 +13,15 @@ The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdat
 [MQTT](https://en.wikipedia.org/wiki/MQTT) over secure websockets to first create, persist, encrypt the connection, and
 then enable the features found in Netdata Cloud. _No data is exchanged with Netdata Cloud until you claim a node._
 
-For a guide for claiming a node using the ACLK, plus additional troubleshooting and reference information, read our
+For a guide to claiming a node using the ACLK, plus additional troubleshooting and reference information, read our
 [claiming documentation](/claim/README.md) or the [get started with
 Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide.
 
 ## Enable and configure the ACLK
 
-The ACLK is enabled by default and automatically configured if the prerequisites installed correctly. You can see this
-in the `[global]` section of `var/lib/netdata/cloud.d/cloud.conf`.
+The ACLK is enabled by default, with its settings automatically configured and stored in the Agent's memory. No file is
+created at `var/lib/netdata/cloud.d/cloud.conf` until you either claim a node or create it yourself. The default
+configuration uses two settings:
 
 ```conf
 [global]
@@ -59,16 +60,13 @@ Change the `enabled` setting to `no`:
     enabled = no
 ```
 
-If the file at `var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it.
+If the file at `var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it. After you cut and paste the
+first two lines, the prompt will change to `cat`. Paste in lines 3-6, and after the final `EOF`, hit **Ente**. To get
+your normal prompt back, the final line must contain only `EOF`, nothing else.
 
 ```bash
 cd /var/lib/netdata/cloud.d
 cat > cloud.conf << EOF
-```
-
-Copy the following text into the `cat` prompt and then hit `Enter`:
-
-```conf
 [global]
     enabled = no
     cloud base url = https://app.netdata.cloud
@@ -79,8 +77,8 @@ You also need to change the file's permissions. Use `grep "run as user" /etc/net
 user your Agent runs as, and replace `netdata:netdata` as shown below if necessary:
 
 ```bash
-chmod 0770 cloud.conf
-chown netdata:netdata cloud.conf
+sudo chmod 0770 cloud.conf
+sudo chown netdata:netdata cloud.conf
 ```
 
 Restart your Agent to disable the ACLK.

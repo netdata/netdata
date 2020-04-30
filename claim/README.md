@@ -219,6 +219,12 @@ You may see one of the following error messages during installation:
     Netdata Cloud.
 -   Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect
     this node to Netdata Cloud.
+-   Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not
+    be able to connect this node to Netdata Cloud.
+-   Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud
+    support will be disabled.
+-   Failed to build JSON-C. Netdata Cloud support will be disabled.
+-   Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled.
 
 One common cause of the installer failing to build Cloud features is not having one of the following dependencies on
 your system: `cmake` and OpenSSL, including the `devel` package.
