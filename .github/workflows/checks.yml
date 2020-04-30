@@ -37,22 +37,6 @@ jobs:
       - name: Compare generated Dashboard vs. Backed up Dashboard
         run: |
           diff -sNrdu /tmp/dashboard.js web/gui/dashboard.js
-  libressl-checks:
-    name: LibreSSL
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Build
-        run: >
-          docker run -v "$PWD":/netdata -w /netdata alpine:3.11 /bin/sh -c
-          'apk add bash;
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
-          apk del openssl openssl-dev;
-          apk add libressl libressl-dev;
-          autoreconf -ivf;
-          ./configure;
-          make;'
   dist-checks:
     name: Dist
     runs-on: ubuntu-latest
