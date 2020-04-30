@@ -1,0 +1,15 @@
+FROM debian:buster AS build
+
+# Install all build dependencies
+COPY packaging/installer/install-required-packages.sh /tmp/install-required-packages.sh
+RUN /tmp/install-required-packages.sh --dont-wait --non-interactive netdata
+
+# Copy sources
+WORKDIR /netdata
+COPY . .
+
+# Build Netdata
+RUN ./netdata-installer.sh --dont-wait --dont-start-it --disable-go
+
+# RUn it!
+CMD ["/usr/sbin/netdata", "-D"]
