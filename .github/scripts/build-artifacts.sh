@@ -16,6 +16,7 @@ prepare_build() {
   progress "Preparing build"
   (
     test -d artifacts || mkdir -p artifacts
+    echo "${VERSION}" > packaging/version
   ) >&2
 }
 
@@ -50,8 +51,8 @@ prepare_assets() {
     cp packaging/version artifacts/latest-version.txt
 
     cd artifacts || exit 1
-    ln -s "${BASENAME}.tar.gz" netdata-latest.tar.gz
-    ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
+    ln -f "${BASENAME}.tar.gz" netdata-latest.tar.gz
+    ln -f "${BASENAME}.gz.run" netdata-latest.gz.run
     sha256sum -b ./* > "sha256sums.txt"
   ) >&2
 }
