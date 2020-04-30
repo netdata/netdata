@@ -53,7 +53,7 @@ defer_error_highlighted() {
 }
 
 print_deferred_errors() {
-  if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
+  if [ -n "${NETDATA_DEFERRED_ERRORS}" ]; then
     echo >&2
     echo >&2 "The following non-fatal errors were encountered during the installation process:"
     # shellcheck disable=SC2059
@@ -281,7 +281,7 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
@@ -289,7 +289,7 @@ while [ -n "${1}" ]; do
       fi
       ;;
     "--require-cloud")
-      if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
         echo "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
@@ -476,20 +476,21 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
+  CFLAGS="-fPIC"
   if [ "$(uname -s)" = Linux ]; then
-    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+    run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= make -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+      run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= cmake \
         -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
         -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
         -D WITH_STATIC_LIBRARIES:boolean=YES \
         .
     else
-      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
+      run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C lib
+    run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= make -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -529,7 +530,7 @@ bundle_libmosquitto() {
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
@@ -537,7 +538,7 @@ bundle_libmosquitto() {
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
@@ -550,17 +551,18 @@ bundle_libmosquitto
 # -----------------------------------------------------------------------------
 
 build_libwebsockets() {
+  CFLAGS="-fPIC"
   pushd "${1}" > /dev/null || exit 1
   if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+    run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
       -D LWS_WITH_SOCKS5:bool=ON \
       .
   else
-    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+    run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
   fi
-  run env CFLAGS= CXXFLAGS= LDFLAGS= make
+  run env CFLAGS="$CFLAGS" CXXFLAGS= LDFLAGS= make
   popd > /dev/null || exit 1
 }
 
@@ -578,7 +580,7 @@ bundle_libwebsockets() {
     return 0
   fi
 
-  if [ -z "$(command -v cmake)" ] ; then
+  if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     return 0
@@ -603,7 +605,7 @@ bundle_libwebsockets() {
       run_ok "libwebsockets built and prepared."
     else
       run_failed "Failed to build libwebsockets."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
@@ -611,7 +613,7 @@ bundle_libwebsockets() {
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
@@ -624,7 +626,7 @@ bundle_libwebsockets
 # -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
-if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ] ; then
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
   "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
 fi
 
@@ -1035,15 +1037,13 @@ install_react_dashboard() {
   DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
 
   if fetch_and_verify "dashboard" \
-                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${tmp}" \
-                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
-  then
-    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
-       copy_react_dashboard "${tmp}/build" && \
-       rm -rf "${tmp}"
-    then
+    "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+    "${DASHBOARD_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"; then
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" &&
+      copy_react_dashboard "${tmp}/build" &&
+      rm -rf "${tmp}"; then
       run_ok "React dashboard installed."
     else
       run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
