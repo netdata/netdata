@@ -2,7 +2,7 @@
 ---
 title: "Agent claiming"
 description: "Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud. A Space's administrator creates a claiming token, which is used to add an Agent to their Space via the Agent-Cloud link."
-date: 2020-04-29
+date: 2020-04-30
 custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 ---
 -->
@@ -12,6 +12,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud. A Space's
 administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
 (ACLK)](/aclk/README.md).
+
+Just starting out with Netdata Cloud? See our [get started with
+Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide.
 
 Claiming nodes is a security feature in Netdata Cloud. Through the process of claiming, you demonstrate in a few ways
 that you have administrative access to that node and the configuration settings for its Agent. By logging into the node,
@@ -29,8 +32,6 @@ TLS while it is in transit. We use the the RSA keypair created during claiming t
 when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way from Agents to the
 browser, we do not store or log it.
 
-## How to claim a node
-
 You can claim a node during the Cloud onboarding process, or after you created a Space by clicking on the **USER's
 Space** dropdown, then **Manage claimed nodes**.
 
@@ -40,10 +41,14 @@ There are two important notes regarding claiming:
     within that one Space.
 -   You must repeat the claiming process on every node you want to add to Netdata Cloud.
 
+## How to claim a node
+
 To claim a node, select which War Rooms you want to add this node to with the dropdown, then copy the script given by
 Cloud.
 
-The easiest way to run this script is with `sudo`. The claiming script takes care of the rest.
+The easiest way to run this script is with `sudo`. The claiming script takes care of the rest. If you want to claim an
+agent without using root privileges, see our [claiming
+documentation](#claim-an-agent-without-root-privileges).
 
 ```bash
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
@@ -55,10 +60,10 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 Repeat this process with every node you want to add to Cloud during onboarding. You can also add more nodes once you've
 finished onboarding.
 
-### Claim an Agent manually
+### Claim an agent without root privileges
 
-If you don't want to use `sudo` with the claiming script from Cloud, you can discover which user is running the Agent,
-switch to that user yourself, and run the claiming script.
+If you don't want to run the claiming script with root privileges, you can discover which user is running the Agent,
+switch to that user, and run the claiming script.
 
 Use `grep` to search your `netdata.conf` file, which is typically located at `/etc/netdata/netdata.conf`, for the `run
 as user` setting. For example:
@@ -68,11 +73,10 @@ grep "run as user" /etc/netdata/netdata.conf
     # run as user = netdata
 ```
 
-In this case, the user running the Agent is `netdata`. Yours may be different, so pay attention to the output from
-`grep`. Switch to your user, replacing `netdata` a different user if necessary, and run the claiming script.
+The default user is `netdata`. Yours may be different, so pay attention to the output from `grep`. Switch to that user
+and run the claiming script.
 
 ```bash
-sudo -u netdata bash
 netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
@@ -108,11 +112,14 @@ Cloud.
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata \
@@ -265,20 +272,18 @@ Netdata library directory.
 
 ```bash
 cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
-rm -rf cloud.d/
+sudo rm -rf cloud.d/
 ```
 
-> You may need to use `sudo` or another method of elevating your privileges.
-
 Once you delete the `cloud.d/` directory, the ACLK will not connect to Cloud the next time the Agent starts, and Cloud
-will then remove it from the interface.
+will show it as **unreachable**. You can then remove it from your War Rooms.
 
 ## Claiming reference
 
 In the sections below, you can find reference material for the claiming script, claiming via the Agent's command line
 tool, and details about the files found in `cloud.d`.
 
-### The `cloud.d/cloud.conf` file
+### The `cloud.conf` file
 
 This section defines how and whether your Agent connects to [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/)
 using the [ACLK](/aclk/README.md).
@@ -290,8 +295,8 @@ using the [ACLK](/aclk/README.md).
 
 ### Claiming script
 
-A Space's administrator can claim an Agent by directly calling the `netdata-claim.sh` script **as the `netdata` user**
-and passing the following arguments:
+A Space's administrator can claim an Agent by directly calling the `netdata-claim.sh` script either with root privileges
+using `sudo`, or as the user running the Agent (typically `netdata`), and passing the following arguments:
 
 ```sh
 -token=TOKEN
@@ -342,9 +347,9 @@ If need be, the user can override the Agent's defaults by providing additional a
 
 ### Claiming directory
 
-Netdata stores the agent claiming-related state in the Netdata library directory under `cloud.d`, e.g. in
-`/var/lib/netdata/cloud.d`. The user can put files in this directory to provide defaults to the `-token` and `-rooms`
-arguments. These files should be owned **by the `netdata` user**.
+Netdata stores the agent claiming-related state in the Netdata library directory under `cloud.d`. For a default
+installation, this directory exists at `/var/lib/netdata/cloud.d`. The directory and its files should be owned by the
+user that runs the Agent, which is typically the `netdata` user.
 
 The `cloud.d/token` file should contain the claiming-token and the `cloud.d/rooms` file should contain the list of 
 war-rooms.

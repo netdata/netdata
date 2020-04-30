@@ -2,20 +2,20 @@
 ---
 title: "Agent-Cloud link (ACLK)"
 description: "The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud."
-date: 2020-04-29
+date: 2020-04-30
 custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 ---
 -->
 
 # Agent-cloud link (ACLK)
 
-The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata Agent to Netdata Cloud. The ACLK uses
-[MQTT](https://en.wikipedia.org/wiki/MQTT) over secure websockets to first create, persist, encrypt the connection, and
-then enable the features found in Netdata Cloud. _No data is exchanged with Netdata Cloud until you claim a node._
+The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
+through Netdata Cloud. The ACLK is encrypted and safe, and _does not exchange data with Netdata Cloud until you claim a
+node_.
 
-For a guide to claiming a node using the ACLK, plus additional troubleshooting and reference information, read our
-[claiming documentation](/claim/README.md) or the [get started with
-Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide.
+For a guide to claiming a node using the ACLK, plus additional troubleshooting and reference information, read our [get
+started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or the full [claiming
+documentation](/claim/README.md).
 
 ## Enable and configure the ACLK
 
@@ -43,26 +43,28 @@ You can pass the `--disable-cloud` parameter to the Agent installation when usin
 [kickstart-static64.sh](/packaging/installer/methods/kickstart-64.md)), or a [manual installation from
 Git](/packaging/installer/methods/manual.md).
 
-When you pass this parameter, the installer does not download or compile any extra libraries, and the Agent behaves as
-though the ACLK, and thus Netdata Cloud, does not exist. ACLK functionality is available in the Agent but remains fully
-inactive.
+When you pass this parameter, the installer does not download or compile any extra libraries. Once running, the Agent
+kills the thread responsible for the ACLK and claiming behavior, and behaves as though the ACLK, and thus Netdata Cloud,
+does not exist.
 
 ### Disable at runtime
 
-You can change a runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` file to disable the ACLK. This setting
-only stops the Agent from attempting any connection via the ACLK, but does not prevent the installer from downloading
-and compiling the ACLK's dependencies.
+You can change a runtime setting in your `cloud.conf` file to disable the ACLK. This setting only stops the Agent from
+attempting any connection via the ACLK, but does not prevent the installer from downloading and compiling the ACLK's
+dependencies.
 
-Change the `enabled` setting to `no`:
+The file typically exists at `/var/lib/netdata/cloud.d/cloud.conf`, but can change if you set a prefix during
+installation. To disable the ACLK, open that file and change the `enabled` setting to `no`:
 
 ```conf
 [global]
     enabled = no
 ```
 
-If the file at `var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it. After you cut and paste the
-first two lines, the prompt will change to `cat`. Paste in lines 3-6, and after the final `EOF`, hit **Ente**. To get
-your normal prompt back, the final line must contain only `EOF`, nothing else.
+If the file at `/var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it. 
+
+Copy and paste the first two lines from below, which will change your prompt to `cat`. Copy and paste in lines 3-6, and
+after the final `EOF`, hit **Enter**. To get your normal prompt back, the final line must contain only `EOF`.
 
 ```bash
 cd /var/lib/netdata/cloud.d
@@ -74,7 +76,7 @@ EOF
 ```
 
 You also need to change the file's permissions. Use `grep "run as user" /etc/netdata/netdata.conf` to figure out which
-user your Agent runs as, and replace `netdata:netdata` as shown below if necessary:
+user your Agent runs as (typically `netdata`), and replace `netdata:netdata` as shown below if necessary:
 
 ```bash
 sudo chmod 0770 cloud.conf
