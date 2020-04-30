@@ -88,23 +88,18 @@ void pubsub_connector_worker(void *instance_p)
 
         stats->buffered_bytes = buffer_len;
 
-        size_t sent = 0;
-
         char error_message[ERROR_LINE_MAX + 1] = "";
 
         debug(
-            D_BACKEND,
-            "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
-            connector_specific_config->project_id,
-            connector_specific_config->topic_id,
-            buffer_len);
+            D_BACKEND, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
+            connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 
         pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer));
         buffer_flush(buffer);
 
-        pubsub_publish((void *)connector_specific_data);
+        pubsub_publish((void *)connector_specific_data, stats->buffered_metrics, buffer_len);
 
-        sent += buffer_len;
+        stats->sent_bytes = buffer_len;
         stats->transmission_successes++;
 
         size_t sent_metrics = 0, lost_metrics = 0, sent_bytes = 0, lost_bytes = 0;
@@ -114,36 +109,31 @@ void pubsub_connector_worker(void *instance_p)
             // oops! we couldn't send (all or some of the) data
             error("EXPORTING: %s", error_message);
             error(
-                "EXPORTING: failed to write data to database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
+                "EXPORTING: failed to write data to service '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                instance->config.destination, lost_bytes, sent_bytes);
 
             stats->transmission_failures++;
             stats->data_lost_events++;
             stats->lost_metrics += lost_metrics;
             stats->lost_bytes += lost_bytes;
-
-            break;
         } else {
             stats->receptions++;
+            stats->sent_metrics = sent_metrics;
         }
 
-            error("EXPORTING: An iteration of the pubsub worker");
+        error("EXPORTING: An iteration of the pubsub worker");
 
-            if (unlikely(netdata_exit))
-                break;
+        if (unlikely(netdata_exit))
+            break;
 
-            stats->sent_bytes += sent;
-            if (likely(sent == buffer_len))
-                stats->sent_metrics = sent_metrics;
+        send_internal_metrics(instance);
 
-            send_internal_metrics(instance);
+        stats->buffered_metrics = 0;
 
-            stats->buffered_metrics = 0;
-
-            uv_mutex_unlock(&instance->mutex);
+        uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
         break;
 #endif
-        }
+    }
 }

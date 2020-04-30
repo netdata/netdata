@@ -11,6 +11,9 @@ struct response {
     google::pubsub::v1::PublishResponse *publish_response;
     size_t tag;
     grpc::Status *status;
+
+    size_t published_metrics;
+    size_t published_bytes;
 };
 
 /**
@@ -99,7 +102,7 @@ void pubsub_clear_messages(void *pubsub_specific_data_p)
  *
  * @param pubsub_specific_data_p a pointer to a structure with client and request outcome information.
  */
-void pubsub_publish(void *pubsub_specific_data_p)
+void pubsub_publish(void *pubsub_specific_data_p, size_t buffered_metrics, size_t buffered_bytes)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
@@ -116,6 +119,9 @@ void pubsub_publish(void *pubsub_specific_data_p)
     response.publish_response = new google::pubsub::v1::PublishResponse;
     response.tag = pubsub_specific_data->last_tag++;
     response.status = new grpc::Status;
+    response.published_metrics = buffered_metrics;
+    response.published_bytes = buffered_bytes;
+
 
     rpc->Finish(response.publish_response, response.status, (void *)response.tag);
 
@@ -167,17 +173,18 @@ int pubsub_get_result(
                 return 1;
             }
 
-            if (ok) {
+            if (ok && response->publish_response->message_ids_size()) {
                 std::cerr << "EXPORTING: Got right tag and status is OK" << std::endl;
                 for (auto s : response->publish_response->message_ids())
                     std::cerr << "EXPORTING: Message id = " << s << std::endl;
-                *sent_metrics += response->publish_response->message_ids_size();
-                // *sent_bytes += response->data_len;             // TODO
+                *sent_metrics += response->published_metrics;
+                *sent_bytes += response->published_bytes;
             } else {
                 std::cerr << "EXPORTING: Status is not OK" << std::endl;
-                std::cerr << "EXPORTING: " << response->status->error_code() << ": " << response->status->error_message() << std::endl;
-                *lost_metrics += response->publish_response->message_ids_size();
-                // *lost_bytes += response->data_len;             // TODO
+                std::cerr << "EXPORTING: " << response->status->error_code() << ": "
+                          << response->status->error_message() << std::endl;
+                *lost_metrics += response->published_metrics;
+                *lost_bytes += response->published_bytes;
                 response->status->error_message().copy(error_message, ERROR_LINE_MAX);
             }
 
@@ -192,7 +199,7 @@ int pubsub_get_result(
     } while (next_status == grpc::CompletionQueue::GOT_EVENT);
 
 
-    if (*lost_bytes) {
+    if (*lost_metrics) {
         return 1;
     }
 
