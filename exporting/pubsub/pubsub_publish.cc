@@ -57,7 +57,7 @@ int pubsub_init(
         grpc::CompletionQueue *cq = new grpc::CompletionQueue;
         pubsub_specific_data->completion_queue = cq;
 
-        pubsub_specific_data->responses = new std::vector<struct response>;
+        pubsub_specific_data->responses = new std::list<struct response>;
 
         return 0;
     } catch (std::exception const &ex) {
@@ -127,7 +127,7 @@ void pubsub_publish(void *pubsub_specific_data_p, size_t buffered_metrics, size_
 
     ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->clear_messages();
 
-    ((std::vector<struct response> *)(pubsub_specific_data->responses))->push_back(response);
+    ((std::list<struct response> *)(pubsub_specific_data->responses))->push_back(response);
 }
 
 /**
@@ -144,7 +144,7 @@ int pubsub_get_result(
     size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes)
 {
     struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    std::vector<struct response> *responses = (std::vector<struct response> *)pubsub_specific_data->responses;
+    std::list<struct response> *responses = (std::list<struct response> *)pubsub_specific_data->responses;
     grpc_impl::CompletionQueue::NextStatus next_status;
 
     *sent_metrics = 0;
@@ -153,7 +153,7 @@ int pubsub_get_result(
     *lost_bytes = 0;
 
     do {
-        std::vector<struct response>::iterator response;
+        std::list<struct response>::iterator response;
         void *got_tag;
         bool ok = false;
 
