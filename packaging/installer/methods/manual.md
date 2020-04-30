@@ -208,7 +208,11 @@ To apply the changes you made, you have to restart Netdata.
 
 ### 'nonrepresentable section on output' errors
 
-Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux. If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against `.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC` and you are trying to build with `clang` on Linux, you will need to instead build using GCC to get a fully functional install of Netdata. In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
+Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux.
+
+If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install. 
+
+In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
 ## What's next?
 
