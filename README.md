@@ -353,9 +353,6 @@ charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf
 _Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the
 mouse pointer is over a chart._
 
-> The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server when navigating via the
-> [My nodes menu](/registry/README.md).
-
 ### Highlighted time-frame
 
 To improve visual anomaly detection across charts, the user can highlight a time-frame (by pressing `Alt` + `mouse
@@ -366,9 +363,6 @@ timeframe](https://user-images.githubusercontent.com/1153921/80839611-6ef0c800-8
 
 _A highlighted time-frame can be given by pressing `Alt` + `mouse selection` on any chart. Netdata will highlight the
 same range on all charts._
-
-> Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [My nodes
-> menu](/registry/README.md).
 
 ## What Netdata monitors
 

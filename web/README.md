@@ -50,8 +50,7 @@ forward or backward in time, or selecting a specific timeframe for more in-depth
 analysis.
 
 Whenever you use a chart in this way, Netdata synchronizes all the other charts
-to match it. Chart synchronization even works between separate Netdata agents if you connect
-them using the [**My nodes** menu](/registry/README.md)!
+to match it.
 
 You can change how charts show their metrics in a few different ways, each of
 which have a few methods:

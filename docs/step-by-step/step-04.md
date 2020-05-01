@@ -111,7 +111,7 @@ netdata.conf](https://user-images.githubusercontent.com/1153921/65470254-4422e20
 Now, let's make a slightly more substantial edit to `netdata.conf`—change the agent's name.
 
 If you edit the value of the `hostname` option, you can change the name of your Netdata agent on the dashboard and a
-handful of other places, like the **My nodes** menu.
+handful of other places, like the Visited nodes menu _and_ Netdata Cloud.
 
 Use `edit-config` to change the `hostname` option to a name like `hello-world`. Be sure to uncomment it!
 

@@ -236,7 +236,8 @@ and `init.d`:
 ## What's next?
 
 Even after you've configured `netdata.conf`, tweaked alarms, learned the basics of performance troubleshooting, and
-added all your systems to the **My nodes** menu, you've just gotten started with Netdata.
+claimed all your systems in Netdata Cloud or added them to the Visited nodes menu, you've just gotten started with
+Netdata.
 
 Take a look at some more advanced features and configurations:
 
