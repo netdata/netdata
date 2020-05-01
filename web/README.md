@@ -66,9 +66,8 @@ which have a few methods:
 
 Here's how chart synchronization looks while zooming and panning:
 
-![Animated GIF of the standard Netdata dashboard being manipulated and
-synchronizing
-charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
+charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
 
 You can also perform all these actions using the small
 rewind/play/fast-forward/zoom-in/zoom-out buttons that appear in the
@@ -191,7 +190,8 @@ To improve clarity on charts, Netdata dashboards present **positive** values for
 metrics representing `read`, `input`, `inbound`, `received` and **negative**
 values for metrics representing `write`, `output`, `outbound`, `sent`.
 
-![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
+![Screenshot showing positive and negative
+values](https://user-images.githubusercontent.com/1153921/80838078-03f1c200-8bad-11ea-834a-a0085b39adb6.png)
 
 _Netdata charts showing the bandwidth and packets of a network interface.
 `received` is positive and `sent` is negative._
@@ -201,7 +201,8 @@ _Netdata charts showing the bandwidth and packets of a network interface.
 Netdata charts automatically zoom vertically, to visualize the variation of each
 metric within the visible timeframe.
 
-![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
+![Animated GIF showing the auso-scaling Y
+axis](https://user-images.githubusercontent.com/1153921/80838276-8084a080-8bad-11ea-8167-8d5ab2fb1be1.gif)
 
 _A zero-based `stacked` chart, automatically switches to an auto-scaled `area`
 chart when a single dimension is selected._
