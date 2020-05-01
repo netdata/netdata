@@ -1,16 +1,8 @@
 <!--
 ---
 title: "What is Netdata?"
-date: 2020-04-07
+date: 2020-05-01
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/what-is-netdata.md
----
--->
-
-<!--
----
-title: "Netdata"
-date: 2020-04-06
-custom_edit_url: https://github.com/netdata/netdata/edit/master/README.md
 ---
 -->
 
@@ -63,17 +55,16 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 2.  [Our userbase](#user-base) - Enterprises we help monitor and our userbase
 3.  [Quickstart](#quickstart) - How to try it now on your systems
 4.  [Why Netdata](#why-netdata) - Why people love Netdata and how it compares with other solutions
-5.  [News](#news) - The latest news about Netdata
-6.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
-7.  [Infographic](#infographic) - Everything about Netdata in a single graphic
-8.  [Features](#features) - How you'll use Netdata on your systems
-9.  [Visualization](#visualization) - Learn about visual anomaly detection
-10. [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
-11. [Documentation](#documentation) - Read the documentation
-12. [Community](#community) - Discuss Netdata with others and get support
-13. [License](#license) - Check Netdata's licencing
-14. [Is it any good?](#is-it-any-good) - Yes.
-15. [Is it awesome?](#is-it-awesome) - Yes.
+5.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
+6.  [Infographic](#infographic) - Everything about Netdata in a single graphic
+7.  [Features](#features) - How you'll use Netdata on your systems
+8.  [Visualization](#visualization) - Learn about visual anomaly detection
+9.  [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
+10. [Documentation](#documentation) - Read the documentation
+11. [Community](#community) - Discuss Netdata with others and get support
+12. [License](#license) - Check Netdata's licencing
+13. [Is it any good?](#is-it-any-good) - Yes.
+14. [Is it awesome?](#is-it-awesome) - Yes.
 
 ## What does it look like?
 

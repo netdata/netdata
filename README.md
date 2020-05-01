@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Netdata"
-date: 2020-04-06
+date: 2020-05-01
 custom_edit_url: https://github.com/netdata/netdata/edit/master/README.md
 ---
 -->
