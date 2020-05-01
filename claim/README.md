@@ -43,19 +43,16 @@ There are two important notes regarding claiming:
 
 ## How to claim a node
 
-To claim a node, select which War Rooms you want to add this node to with the dropdown, then copy the script given by
-Cloud.
-
-The easiest way to run this script is with `sudo`. The claiming script takes care of the rest. If you want to claim an
-agent without using root privileges, see our [claiming
-documentation](#claim-an-agent-without-root-privileges).
+To claim a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
+given by Cloud into your node's terminal. Hit **Enter**.
 
 ```bash
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
-Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
-you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). 
+The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if you don't see
+the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). If you prefer not to
+use root privileges via `sudo` to run the claiming script, see the next section.
 
 Repeat this process with every node you want to add to Cloud during onboarding. You can also add more nodes once you've
 finished onboarding.
@@ -161,11 +158,8 @@ For example, a SOCKS5 proxy setting may look like the following:
     proxy = socks5h://proxy.example.com:1080 # With a URL
 ```
 
-You can now move on to claiming. Be sure to switch to the `netdata` user or use `sudo` as explained in the [step
-above](#how-to-claim-a-node).
-
-When you claim with the `netdata-claim.sh` script, add the `-proxy=` parameter and append the same proxy setting you
-added to `netdata.conf`.
+You can now move on to claiming. When you claim with the `netdata-claim.sh` script, add the `-proxy=` parameter and
+append the same proxy setting you added to `netdata.conf`.
 
 ```bash
 sudo netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2 -url=https://app.netdata.cloud -proxy=socks5h://203.0.113.0:1080
