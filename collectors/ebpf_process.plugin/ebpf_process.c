@@ -874,9 +874,9 @@ static inline void ebpf_disable_apps() {
     }
 }
 
-static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int apps) {
+static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int disable_apps) {
     em->enabled = 1;
-    if (!apps) {
+    if (!disable_apps) {
         em->apps_charts = 1;
     }
     em->global_charts = 1;
@@ -889,14 +889,24 @@ static inline void ebpf_enable_all_charts(int apps) {
     }
 }
 
-static inline void ebpf_enable_chart(int enable, int apps) {
+static inline void ebpf_enable_chart(int enable, int disable_apps) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
         if (i == enable) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], apps);
+            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
             break;
         }
     }
+}
+
+static inline void ebpf_set_thread_mode(int mode) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_modules[i].mode = mode;
+    }
+}
+
+void ebpf_print_help() {
 }
 
 static void parse_args(int argc, char **argv)
@@ -914,6 +924,11 @@ static void parse_args(int argc, char **argv)
             }
         }
 
+        if (strcmp("help", w) == 0 || strcmp("-help", w) == 0 || strcmp("--help", w) == 0 || strcmp("-h", w) == 0 || strcmp("-H", w) == 0) {
+            ebpf_print_help();
+            exit(0);
+        }
+
         if (strcmp("version", w) == 0 || strcmp("-version", w) == 0 || strcmp("--version", w) == 0 || strcmp("-v", w) == 0 || strcmp("-V", w) == 0) {
             printf("ebpf.plugin %s\n", VERSION);
             exit(0);
@@ -921,29 +936,34 @@ static void parse_args(int argc, char **argv)
 
         if (strcmp("return", w) == 0 || strcmp("-return", w) == 0 || strcmp("--return", w) == 0 || strcmp("-r", w) == 0 || strcmp("-R", w) == 0) {
             mode = 0;
-            //ADD DEBUG MESSAGES HERE
+            ebpf_set_thread_mode(mode);
+            debug(D_OPTIONS, "EBPF working in \"return\" mode, because it was started with the option %s.", w);
             continue;
         }
 
         if (strcmp("global", w) == 0 || strcmp("-global", w) == 0 || strcmp("--global", w) == 0 || strcmp("-g", w) == 0 || strcmp("-G", w) == 0) {
             disable_apps = 1;
             ebpf_disable_apps();
+            debug(D_OPTIONS, "EBPF working only with global charts, because it was started with the option %s.", w);
             continue;
         }
 
         if (strcmp("all", w) == 0 || strcmp("-all", w) == 0 || strcmp("--all", w) == 0 || strcmp("-a", w) == 0 || strcmp("-A", w) == 0) {
             ebpf_enable_all_charts(disable_apps);
+            debug(D_OPTIONS, "EBPF working only with global charts, because it was started with the option %s.", w);
             continue;
         }
 
         if (strcmp("net", w) == 0 || strcmp("-net", w) == 0 || strcmp("--net", w) == 0 || strcmp("-n", w) == 0 || strcmp("-N", w) == 0) {
             ebpf_enable_chart(1, disable_apps);
+            debug(D_OPTIONS, "EBPF enabling \"NET\" charts, because it was started with the option %s.", w);
             enabled = 1;
             continue;
         }
 
         if (strcmp("process", w) == 0 || strcmp("-process", w) == 0 || strcmp("--process", w) == 0 || strcmp("-p", w) == 0 || strcmp("-P", w) == 0) {
             ebpf_enable_chart(0, disable_apps);
+            debug(D_OPTIONS, "EBPF enabling \"PROCESS\" charts, because it was started with the option %s.", w);
             enabled = 1;
             continue;
         }
