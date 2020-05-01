@@ -77,6 +77,20 @@ netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
+static struct ebpf_module {
+    const char *thread_name;
+    int enabled;
+    void (*start_routine) (void *);
+    int update_time;
+    int global_charts;
+    int apps_charts;
+    int mode;
+} ebpf_modules[] = {
+    { .thread_name = "process", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = 2 },
+    { .thread_name = "network_viewer", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = 2 },
+    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = 2 },
+};
+
 static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write", "process", "task", "process", "thread" };
 static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write", "do_exit", "release_task", "_do_fork", "sys_clone" };
 static char *status[] = { "process", "zombie" };
@@ -853,11 +867,99 @@ static int load_collector_file(char *path) {
     return 0;
 }
 
+static inline void ebpf_disable_apps() {
+    int i ;
+    for (i = 0 ;ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_modules[i].apps_charts = 0;
+    }
+}
+
+static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int apps) {
+    em->enabled = 1;
+    if (!apps) {
+        em->apps_charts = 1;
+    }
+    em->global_charts = 1;
+}
+
+static inline void ebpf_enable_all_charts(int apps) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_enable_specific_chart(&ebpf_modules[i], apps);
+    }
+}
+
+static inline void ebpf_enable_chart(int enable, int apps) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        if (i == enable) {
+            ebpf_enable_specific_chart(&ebpf_modules[i], apps);
+            break;
+        }
+    }
+}
+
+static void parse_args(int argc, char **argv)
+{
+    int i, freq = 0;
+    int enabled = 0;
+    int disable_apps = 0;
+    for (i = 1; i < argc ; i++) {
+        char *w = argv[i];
+        if (!freq) {
+            int n = (int)str2l(w);
+            if(n > 0) {
+                freq = n;
+                continue;
+            }
+        }
+
+        if (strcmp("version", w) == 0 || strcmp("-version", w) == 0 || strcmp("--version", w) == 0 || strcmp("-v", w) == 0 || strcmp("-V", w) == 0) {
+            printf("ebpf.plugin %s\n", VERSION);
+            exit(0);
+        }
+
+        if (strcmp("return", w) == 0 || strcmp("-return", w) == 0 || strcmp("--return", w) == 0 || strcmp("-r", w) == 0 || strcmp("-R", w) == 0) {
+            mode = 0;
+            //ADD DEBUG MESSAGES HERE
+            continue;
+        }
+
+        if (strcmp("global", w) == 0 || strcmp("-global", w) == 0 || strcmp("--global", w) == 0 || strcmp("-g", w) == 0 || strcmp("-G", w) == 0) {
+            disable_apps = 1;
+            ebpf_disable_apps();
+            continue;
+        }
+
+        if (strcmp("all", w) == 0 || strcmp("-all", w) == 0 || strcmp("--all", w) == 0 || strcmp("-a", w) == 0 || strcmp("-A", w) == 0) {
+            ebpf_enable_all_charts(disable_apps);
+            continue;
+        }
+
+        if (strcmp("net", w) == 0 || strcmp("-net", w) == 0 || strcmp("--net", w) == 0 || strcmp("-n", w) == 0 || strcmp("-N", w) == 0) {
+            ebpf_enable_chart(1, disable_apps);
+            enabled = 1;
+            continue;
+        }
+
+        if (strcmp("process", w) == 0 || strcmp("-process", w) == 0 || strcmp("--process", w) == 0 || strcmp("-p", w) == 0 || strcmp("-P", w) == 0) {
+            ebpf_enable_chart(0, disable_apps);
+            enabled = 1;
+            continue;
+        }
+    }
+
+    if (freq > 0) {
+        update_every = freq;
+    }
+
+    if (!enabled) {
+        ebpf_enable_all_charts(disable_apps);
+    }
+}
+
 int main(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
-
     mykernel =  get_kernel_version();
     if(!has_condition_to_run(mykernel)) {
         error("[EBPF PROCESS] The current collector cannot run on this kernel.");
@@ -874,16 +976,13 @@ int main(int argc, char **argv)
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    if (argc > 1) {
-        update_every = (int)strtol(argv[1], NULL, 10);
-    }
-
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("[EBPF PROCESS] setrlimit(RLIMIT_MEMLOCK)");
         return 2;
     }
 
+    parse_args(argc, argv);
     set_global_variables();
 
     if (load_collector_file(user_config_dir)) {
