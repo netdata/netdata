@@ -172,7 +172,7 @@ For more information about running Netdata in Docker, check the [docker installa
 
 From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
-page](docs/anonymous-statistics.md).
+page](/docs/anonymous-statistics.md).
 
 ## Why Netdata
 
@@ -293,8 +293,8 @@ This is what you should expect from Netdata:
     [flock.com](/health/notifications/flock/), [hangouts](/health/notifications/hangouts/),
     [irc](/health/notifications/irc/), [kavenegar.com](/health/notifications/kavenegar/),
     [messagebird.com](/health/notifications/messagebird/), [pagerduty.com](/health/notifications/pagerduty/),
-    [prowl](health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
-    [pushover.net](health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
+    [prowl](/health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
+    [pushover.net](/health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
     [slack.com](/health/notifications/slack/), [smstools3](/health/notifications/smstools3/),
     [syslog](/health/notifications/syslog/), [telegram.org](/health/notifications/telegram/),
     [twilio.com](/health/notifications/twilio/), [web](/health/notifications/web/) and [custom
