@@ -907,6 +907,39 @@ static inline void ebpf_set_thread_mode(int mode) {
 }
 
 void ebpf_print_help() {
+    const time_t t = time(NULL);
+    struct tm *ct = localtime(&t);
+
+    fprintf(stderr,
+            "\n"
+            " Netdata ebpf.plugin %s\n"
+            " Copyright (C) 2016-%d Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Released under GNU General Public License v3 or later.\n"
+            " All rights reserved.\n"
+            "\n"
+            " This program is a data collector plugin for netdata.\n"
+            "\n"
+            " Available command line options:\n"
+            "\n"
+            " SECONDS              set the data collection frequency.\n"
+            "\n"
+            " help or -h or -H      show this help.\n"
+            "\n"
+            " version or -v or -V   show software version.\n"
+            "\n"
+            " global or -g or -G    disable charts per application.\n"
+            "\n"
+            " all or -a or -A       Enable all chart groups (global and apps), unless -g is also given.\n"
+            "\n"
+            " net or -n or -N       Enable network viewer charts.\n"
+            "\n"
+            " process or -p or -P   Enable charts related to process run time.\n"
+            "\n"
+            " return or -r or -R    Run the collector in return mode.\n"
+            "\n"
+            , VERSION
+            , (ct->tm_year >= 116)?ct->tm_year + 1900: 2020
+    );
 }
 
 static void parse_args(int argc, char **argv)
@@ -934,23 +967,16 @@ static void parse_args(int argc, char **argv)
             exit(0);
         }
 
-        if (strcmp("return", w) == 0 || strcmp("-return", w) == 0 || strcmp("--return", w) == 0 || strcmp("-r", w) == 0 || strcmp("-R", w) == 0) {
-            mode = 0;
-            ebpf_set_thread_mode(mode);
-            debug(D_OPTIONS, "EBPF working in \"return\" mode, because it was started with the option %s.", w);
-            continue;
-        }
-
         if (strcmp("global", w) == 0 || strcmp("-global", w) == 0 || strcmp("--global", w) == 0 || strcmp("-g", w) == 0 || strcmp("-G", w) == 0) {
             disable_apps = 1;
             ebpf_disable_apps();
-            debug(D_OPTIONS, "EBPF working only with global charts, because it was started with the option %s.", w);
+            debug(D_OPTIONS, "EBPF running with global chart group, because it was started with the option %s.", w);
             continue;
         }
 
         if (strcmp("all", w) == 0 || strcmp("-all", w) == 0 || strcmp("--all", w) == 0 || strcmp("-a", w) == 0 || strcmp("-A", w) == 0) {
             ebpf_enable_all_charts(disable_apps);
-            debug(D_OPTIONS, "EBPF working only with global charts, because it was started with the option %s.", w);
+            debug(D_OPTIONS, "EBPF running with all chart groups, because it was started with the option %s.", w);
             continue;
         }
 
@@ -965,6 +991,13 @@ static void parse_args(int argc, char **argv)
             ebpf_enable_chart(0, disable_apps);
             debug(D_OPTIONS, "EBPF enabling \"PROCESS\" charts, because it was started with the option %s.", w);
             enabled = 1;
+            continue;
+        }
+
+        if (strcmp("return", w) == 0 || strcmp("-return", w) == 0 || strcmp("--return", w) == 0 || strcmp("-r", w) == 0 || strcmp("-R", w) == 0) {
+            mode = 0;
+            ebpf_set_thread_mode(mode);
+            debug(D_OPTIONS, "EBPF running in \"return\" mode, because it was started with the option %s.", w);
             continue;
         }
     }
