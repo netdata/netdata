@@ -970,26 +970,34 @@ static void parse_args(int argc, char **argv)
         if (strcmp("global", w) == 0 || strcmp("-global", w) == 0 || strcmp("--global", w) == 0 || strcmp("-g", w) == 0 || strcmp("-G", w) == 0) {
             disable_apps = 1;
             ebpf_disable_apps();
-            debug(D_OPTIONS, "EBPF running with global chart group, because it was started with the option %s.", w);
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("EBPF running with global chart group, because it was started with the option \"%s\".", w);
+#endif
             continue;
         }
 
         if (strcmp("all", w) == 0 || strcmp("-all", w) == 0 || strcmp("--all", w) == 0 || strcmp("-a", w) == 0 || strcmp("-A", w) == 0) {
             ebpf_enable_all_charts(disable_apps);
-            debug(D_OPTIONS, "EBPF running with all chart groups, because it was started with the option %s.", w);
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("EBPF running with all chart groups, because it was started with the option \"%s\".", w);
+#endif
             continue;
         }
 
         if (strcmp("net", w) == 0 || strcmp("-net", w) == 0 || strcmp("--net", w) == 0 || strcmp("-n", w) == 0 || strcmp("-N", w) == 0) {
             ebpf_enable_chart(1, disable_apps);
-            debug(D_OPTIONS, "EBPF enabling \"NET\" charts, because it was started with the option %s.", w);
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("EBPF enabling \"NET\" charts, because it was started with the option \"%s\".", w);
+#endif
             enabled = 1;
             continue;
         }
 
         if (strcmp("process", w) == 0 || strcmp("-process", w) == 0 || strcmp("--process", w) == 0 || strcmp("-p", w) == 0 || strcmp("-P", w) == 0) {
             ebpf_enable_chart(0, disable_apps);
-            debug(D_OPTIONS, "EBPF enabling \"PROCESS\" charts, because it was started with the option %s.", w);
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"%s\".", w);
+#endif
             enabled = 1;
             continue;
         }
@@ -997,8 +1005,9 @@ static void parse_args(int argc, char **argv)
         if (strcmp("return", w) == 0 || strcmp("-return", w) == 0 || strcmp("--return", w) == 0 || strcmp("-r", w) == 0 || strcmp("-R", w) == 0) {
             mode = 0;
             ebpf_set_thread_mode(mode);
-            debug(D_OPTIONS, "EBPF running in \"return\" mode, because it was started with the option %s.", w);
-            continue;
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("EBPF running in \"return\" mode, because it was started with the option \"%s\".", w);
+#endif
         }
     }
 
@@ -1008,6 +1017,9 @@ static void parse_args(int argc, char **argv)
 
     if (!enabled) {
         ebpf_enable_all_charts(disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
+#endif
     }
 }
 
