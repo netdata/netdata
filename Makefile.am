@@ -915,6 +915,10 @@ if ENABLE_EXPORTING_PUBSUB
     exporting_tests_exporting_engine_testdriver_SOURCES += $(PUBSUB_EXPORTING_FILES)
     exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PUBSUB_LIBS)
     exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=pubsub_init \
+        -Wl,--wrap=pubsub_add_message \
+        -Wl,--wrap=pubsub_publish \
+        -Wl,--wrap=pubsub_get_result \
         $(NULL)
 endif
 if ENABLE_BACKEND_MONGODB

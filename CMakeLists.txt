@@ -1109,6 +1109,10 @@ if(ENABLE_EXPORTING_PUBSUB)
     list(APPEND EXPORTING_ENGINE_FILES ${PUBSUB_EXPORTING_FILES})
     list(
         APPEND PUBSUB_LINK_OPTIONS
+        -Wl,--wrap=pubsub_init
+        -Wl,--wrap=pubsub_add_message
+        -Wl,--wrap=pubsub_publish
+        -Wl,--wrap=pubsub_get_result
     )
 endif()
 if(MONGOC_LIBRARIES)

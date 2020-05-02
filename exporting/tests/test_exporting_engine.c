@@ -1470,6 +1470,144 @@ static void test_aws_kinesis_connector_worker(void **state)
 }
 #endif // HAVE_KINESIS
 
+#if ENABLE_EXPORTING_PUBSUB
+static void test_init_pubsub_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+
+    struct pubsub_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct pubsub_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->credentials_file = strdupz("/test/credentials/file");
+    connector_specific_config->project_id = strdupz("test_project_id");
+    connector_specific_config->topic_id = strdupz("test_topic_id");
+
+    expect_function_call(__wrap_pubsub_init);
+    expect_not_value(__wrap_pubsub_init, pubsub_specific_data_p, NULL);
+    expect_string(__wrap_pubsub_init, destination, "localhost");
+    expect_string(__wrap_pubsub_init, error_message, "");
+    expect_string(__wrap_pubsub_init, credentials_file, "/test/credentials/file");
+    expect_string(__wrap_pubsub_init, project_id, "test_project_id");
+    expect_string(__wrap_pubsub_init, topic_id, "test_topic_id");
+    will_return(__wrap_pubsub_init, 0);
+
+    assert_int_equal(init_pubsub_instance(instance), 0);
+
+    assert_ptr_equal(instance->worker, pubsub_connector_worker);
+    assert_ptr_equal(instance->start_batch_formatting, NULL);
+    assert_ptr_equal(instance->start_host_formatting, format_host_labels_json_plaintext);
+    assert_ptr_equal(instance->start_chart_formatting, NULL);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_json_plaintext);
+    assert_ptr_equal(instance->end_chart_formatting, NULL);
+    assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
+    assert_ptr_equal(instance->end_batch_formatting, NULL);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+    assert_ptr_not_equal(instance->connector_specific_data, NULL);
+    freez(instance->connector_specific_data);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+
+    expect_function_call(__wrap_pubsub_init);
+    expect_not_value(__wrap_pubsub_init, pubsub_specific_data_p, NULL);
+    expect_string(__wrap_pubsub_init, destination, "localhost");
+    expect_string(__wrap_pubsub_init, error_message, "");
+    expect_string(__wrap_pubsub_init, credentials_file, "/test/credentials/file");
+    expect_string(__wrap_pubsub_init, project_id, "test_project_id");
+    expect_string(__wrap_pubsub_init, topic_id, "test_topic_id");
+    will_return(__wrap_pubsub_init, 0);
+
+    assert_int_equal(init_pubsub_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_json_plaintext);
+
+    free(connector_specific_config->credentials_file);
+    free(connector_specific_config->project_id);
+    free(connector_specific_config->topic_id);
+}
+
+static void test_pubsub_connector_worker(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+    struct stats *stats = &instance->stats;
+
+    __real_mark_scheduled_instances(engine);
+
+    expect_function_call(__wrap_rrdhost_is_exportable);
+    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
+    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
+    will_return(__wrap_rrdhost_is_exportable, 1);
+
+    RRDSET *st = localhost->rrdset_root;
+    expect_function_call(__wrap_rrdset_is_exportable);
+    expect_value(__wrap_rrdset_is_exportable, instance, instance);
+    expect_value(__wrap_rrdset_is_exportable, st, st);
+    will_return(__wrap_rrdset_is_exportable, 1);
+
+    __real_prepare_buffers(engine);
+
+    struct pubsub_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct pubsub_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->credentials_file = strdupz("/test/credentials/file");
+    connector_specific_config->project_id = strdupz("test_project_id");
+    connector_specific_config->topic_id = strdupz("test_topic_id");
+
+    struct pubsub_specific_data *connector_specific_data = callocz(1, sizeof(struct pubsub_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    expect_function_call(__wrap_pubsub_add_message);
+    expect_not_value(__wrap_pubsub_add_message, pubsub_specific_data_p, NULL);
+    // The buffer is prepared by Graphite exporting connector
+    expect_string(
+        __wrap_pubsub_add_message, data,
+        "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
+    will_return(__wrap_pubsub_add_message, 0);
+
+    expect_function_call(__wrap_pubsub_publish);
+    expect_not_value(__wrap_pubsub_publish, pubsub_specific_data_p, NULL);
+    expect_string(__wrap_pubsub_publish, error_message, "");
+    expect_value(__wrap_pubsub_publish, buffered_metrics, 1);
+    expect_value(__wrap_pubsub_publish, buffered_bytes, 84);
+    will_return(__wrap_pubsub_publish, 0);
+
+    expect_function_call(__wrap_pubsub_get_result);
+    expect_not_value(__wrap_pubsub_get_result, pubsub_specific_data_p, NULL);
+    expect_not_value(__wrap_pubsub_get_result, error_message, NULL);
+    expect_not_value(__wrap_pubsub_get_result, sent_metrics, NULL);
+    expect_not_value(__wrap_pubsub_get_result, sent_bytes, NULL);
+    expect_not_value(__wrap_pubsub_get_result, lost_metrics, NULL);
+    expect_not_value(__wrap_pubsub_get_result, lost_bytes, NULL);
+    will_return(__wrap_pubsub_get_result, 0);
+
+    expect_function_call(__wrap_send_internal_metrics);
+    expect_value(__wrap_send_internal_metrics, instance, instance);
+    will_return(__wrap_send_internal_metrics, 0);
+
+    pubsub_connector_worker(instance);
+
+    assert_int_equal(stats->buffered_metrics, 0);
+    assert_int_equal(stats->buffered_bytes, 84);
+    assert_int_equal(stats->received_bytes, 0);
+    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_metrics, 0);
+    assert_int_equal(stats->lost_metrics, 0);
+    assert_int_equal(stats->receptions, 1);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->transmission_failures, 0);
+    assert_int_equal(stats->data_lost_events, 0);
+    assert_int_equal(stats->lost_bytes, 0);
+    assert_int_equal(stats->reconnects, 0);
+
+    free(connector_specific_config->credentials_file);
+    free(connector_specific_config->project_id);
+    free(connector_specific_config->topic_id);
+}
+#endif // ENABLE_EXPORTING_PUBSUB
+
 #if HAVE_MONGOC
 static void test_init_mongodb_instance(void **state)
 {
@@ -1774,6 +1912,17 @@ int main(void)
     };
 
     test_res += cmocka_run_group_tests_name("kinesis_exporting_connector", kinesis_tests, NULL, NULL);
+#endif
+
+#if ENABLE_EXPORTING_PUBSUB
+    const struct CMUnitTest pubsub_tests[] = {
+        cmocka_unit_test_setup_teardown(
+            test_init_pubsub_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_pubsub_connector_worker, setup_initialized_engine, teardown_initialized_engine),
+    };
+
+    test_res += cmocka_run_group_tests_name("pubsub_exporting_connector", pubsub_tests, NULL, NULL);
 #endif
 
 #if HAVE_MONGOC

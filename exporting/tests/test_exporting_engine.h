@@ -18,6 +18,10 @@
 #include "exporting/aws_kinesis/aws_kinesis.h"
 #endif
 
+#if ENABLE_EXPORTING_PUBSUB
+#include "exporting/pubsub/pubsub.h"
+#endif
+
 #if HAVE_MONGOC
 #include "exporting/mongodb/mongodb.h"
 #endif
@@ -144,6 +148,16 @@ void __wrap_kinesis_put_record(
     void *kinesis_specific_data_p, const char *stream_name, const char *partition_key, const char *data,
     size_t data_len);
 int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes);
+
+int __wrap_pubsub_init(
+    void *pubsub_specific_data_p, char *error_message, const char *destination, const char *credentials_file,
+    const char *project_id, const char *topic_id);
+int __wrap_pubsub_add_message(void *pubsub_specific_data_p, char *data);
+int __wrap_pubsub_publish(
+    void *pubsub_specific_data_p, char *error_message, size_t buffered_metrics, size_t buffered_bytes);
+int __wrap_pubsub_get_result(
+    void *pubsub_specific_data_p, char *error_message,
+    size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes);
 
 void __wrap_mongoc_init();
 mongoc_uri_t *__wrap_mongoc_uri_new_with_error(const char *uri_string, bson_error_t *error);
