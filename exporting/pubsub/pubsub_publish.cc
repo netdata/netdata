@@ -31,7 +31,7 @@ int pubsub_init(
     void *pubsub_specific_data_p, char *error_message, const char *destination, const char *credentials_file,
     const char *project_id, const char *topic_id)
 {
-    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    struct pubsub_specific_data *connector_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
     try {
         setenv("GOOGLE_APPLICATION_CREDENTIALS", credentials_file, 0);
@@ -52,17 +52,17 @@ int pubsub_init(
             return 1;
         }
 
-        pubsub_specific_data->stub = stub;
+        connector_specific_data->stub = stub;
 
         google::pubsub::v1::PublishRequest *request = new google::pubsub::v1::PublishRequest;
-        pubsub_specific_data->request = request;
-        ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))
+        connector_specific_data->request = request;
+        ((google::pubsub::v1::PublishRequest *)(connector_specific_data->request))
             ->set_topic(std::string("projects/") + project_id + "/topics/" + topic_id);
 
         grpc::CompletionQueue *cq = new grpc::CompletionQueue;
-        pubsub_specific_data->completion_queue = cq;
+        connector_specific_data->completion_queue = cq;
 
-        pubsub_specific_data->responses = new std::list<struct response>;
+        connector_specific_data->responses = new std::list<struct response>;
 
         return 0;
     } catch (std::exception const &ex) {
@@ -83,11 +83,11 @@ int pubsub_init(
  */
 int pubsub_add_message(void *pubsub_specific_data_p, char *data)
 {
-    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    struct pubsub_specific_data *connector_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
     try {
         google::pubsub::v1::PubsubMessage *message =
-            ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->add_messages();
+            ((google::pubsub::v1::PublishRequest *)(connector_specific_data->request))->add_messages();
 
         if (!message)
             return 1;
@@ -111,29 +111,29 @@ int pubsub_add_message(void *pubsub_specific_data_p, char *data)
  */
 int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buffered_metrics, size_t buffered_bytes)
 {
-    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    struct pubsub_specific_data *connector_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
 
     try {
         grpc::ClientContext *context = new grpc::ClientContext;
 
         std::unique_ptr<grpc::ClientAsyncResponseReader<google::pubsub::v1::PublishResponse> > rpc(
-            ((google::pubsub::v1::Publisher::Stub *)(pubsub_specific_data->stub))
+            ((google::pubsub::v1::Publisher::Stub *)(connector_specific_data->stub))
                 ->AsyncPublish(
-                    context, (*(google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request)),
-                    ((grpc::CompletionQueue *)(pubsub_specific_data->completion_queue))));
+                    context, (*(google::pubsub::v1::PublishRequest *)(connector_specific_data->request)),
+                    ((grpc::CompletionQueue *)(connector_specific_data->completion_queue))));
 
         struct response response;
         response.publish_response = new google::pubsub::v1::PublishResponse;
-        response.tag = pubsub_specific_data->last_tag++;
+        response.tag = connector_specific_data->last_tag++;
         response.status = new grpc::Status;
         response.published_metrics = buffered_metrics;
         response.published_bytes = buffered_bytes;
 
         rpc->Finish(response.publish_response, response.status, (void *)response.tag);
 
-        ((google::pubsub::v1::PublishRequest *)(pubsub_specific_data->request))->clear_messages();
+        ((google::pubsub::v1::PublishRequest *)(connector_specific_data->request))->clear_messages();
 
-        ((std::list<struct response> *)(pubsub_specific_data->responses))->push_back(response);
+        ((std::list<struct response> *)(connector_specific_data->responses))->push_back(response);
     } catch (std::exception const &ex) {
         std::string em(std::string("Standard exception raised: ") + ex.what());
         std::strncpy(error_message, em.c_str(), ERROR_LINE_MAX);
@@ -158,8 +158,8 @@ int pubsub_get_result(
     void *pubsub_specific_data_p, char *error_message,
     size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes)
 {
-    struct pubsub_specific_data *pubsub_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
-    std::list<struct response> *responses = (std::list<struct response> *)pubsub_specific_data->responses;
+    struct pubsub_specific_data *connector_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+    std::list<struct response> *responses = (std::list<struct response> *)connector_specific_data->responses;
     grpc_impl::CompletionQueue::NextStatus next_status;
 
     *sent_metrics = 0;
@@ -175,7 +175,7 @@ int pubsub_get_result(
 
             auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(50);
             next_status =
-                (*(grpc::CompletionQueue *)(pubsub_specific_data->completion_queue)).AsyncNext(&got_tag, &ok, deadline);
+                (*(grpc::CompletionQueue *)(connector_specific_data->completion_queue)).AsyncNext(&got_tag, &ok, deadline);
 
             if (next_status == grpc::CompletionQueue::GOT_EVENT) {
                 for (response = responses->begin(); response != responses->end(); ++response) {

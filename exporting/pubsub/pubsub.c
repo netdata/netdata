@@ -40,13 +40,13 @@ int init_pubsub_instance(struct instance *instance)
     struct pubsub_specific_data *connector_specific_data = callocz(1, sizeof(struct pubsub_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
 
-    struct pubsub_specific_config *pubsub_specific_config =
+    struct pubsub_specific_config *connector_specific_config =
         (struct pubsub_specific_config *)instance->config.connector_specific_config;
     char error_message[ERROR_LINE_MAX + 1] = "";
     if (pubsub_init(
             (void *)connector_specific_data, error_message, instance->config.destination,
-            pubsub_specific_config->credentials_file, pubsub_specific_config->project_id,
-            pubsub_specific_config->topic_id)) {
+            connector_specific_config->credentials_file, connector_specific_config->project_id,
+            connector_specific_config->topic_id)) {
         error(
             "EXPORTING: Cannot initialize a Pub/Sub publisher for instance %s: %s",
             instance->config.name, error_message);
