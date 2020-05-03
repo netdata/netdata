@@ -39,14 +39,12 @@ int pubsub_init(
         std::shared_ptr<grpc::ChannelCredentials> credentials = grpc::GoogleDefaultCredentials();
         if (credentials == nullptr) {
             std::strncpy(error_message, "Can't load credentials", ERROR_LINE_MAX);
-
             return 1;
         }
 
         std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(destination, credentials);
 
         google::pubsub::v1::Publisher::Stub *stub = new google::pubsub::v1::Publisher::Stub(channel);
-
         if (!stub) {
             std::strncpy(error_message, "Can't create a publisher stub", ERROR_LINE_MAX);
             return 1;
@@ -88,7 +86,6 @@ int pubsub_add_message(void *pubsub_specific_data_p, char *data)
     try {
         google::pubsub::v1::PubsubMessage *message =
             ((google::pubsub::v1::PublishRequest *)(connector_specific_data->request))->add_messages();
-
         if (!message)
             return 1;
 
@@ -174,8 +171,8 @@ int pubsub_get_result(
             bool ok = false;
 
             auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(50);
-            next_status =
-                (*(grpc::CompletionQueue *)(connector_specific_data->completion_queue)).AsyncNext(&got_tag, &ok, deadline);
+            next_status = (*(grpc::CompletionQueue *)(connector_specific_data->completion_queue))
+                              .AsyncNext(&got_tag, &ok, deadline);
 
             if (next_status == grpc::CompletionQueue::GOT_EVENT) {
                 for (response = responses->begin(); response != responses->end(); ++response) {

@@ -140,7 +140,7 @@ void pubsub_connector_worker(void *instance_p)
             stats->sent_metrics = sent_metrics;
         }
 
-cleanup:
+    cleanup:
         send_internal_metrics(instance);
 
         buffer_flush(buffer);
