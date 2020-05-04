@@ -10,7 +10,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
 # Agent-cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
-through Netdata Cloud. The ACLK is encrypted and safe, and _does not exchange data with Netdata Cloud until you claim a
+through Netdata Cloud. The ACLK is encrypted, safe, and _does not exchange data with Netdata Cloud until you claim a
 node_.
 
 For a guide to claiming a node using the ACLK, plus additional troubleshooting and reference information, read our [get
@@ -63,12 +63,19 @@ installation. To disable the ACLK, open that file and change the `enabled` setti
 
 If the file at `/var/lib/netdata/cloud.d/cloud.conf` doesn't exist, you need to create it. 
 
-Copy and paste the first two lines from below, which will change your prompt to `cat`. Copy and paste in lines 3-6, and
-after the final `EOF`, hit **Enter**. To get your normal prompt back, the final line must contain only `EOF`.
+Copy and paste the first two lines from below, which will change your prompt to `cat`.
 
 ```bash
 cd /var/lib/netdata/cloud.d
 cat > cloud.conf << EOF
+```
+
+Copy and paste in lines 3-6, and after the final `EOF`, hit **Enter**. The final line must contain only `EOF`. Hit **Enter** again to return to your normal prompt with the newly-created file.
+
+To get your normal prompt back, the final line
+must contain only `EOF`.
+
+```bash
 [global]
     enabled = no
     cloud base url = https://app.netdata.cloud
@@ -87,7 +94,7 @@ Restart your Agent to disable the ACLK.
 
 ### Re-enable the ACLK
 
-If you first disable the ACLK and any Cloud functionality, and then decide you would like to use Cloud, you must either
+If you first disable the ACLK and any Cloud functionality and then decide you would like to use Cloud, you must either
 reinstall Netdata with Cloud enabled or change the runtime setting in your `cloud.conf` file.
 
 If you passed `--disable-cloud` to `netdata-installer.sh` during installation, you must reinstall your Agent. Use the
@@ -100,7 +107,6 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
 ```conf
 [global]
     enabled = yes
-    cloud base url = https://app.netdata.cloud
 ```
 
 Restart your Agent and [claim your node](/claim/README.md#claim-a-node).

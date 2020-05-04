@@ -13,8 +13,9 @@ Agent claiming allows a Netdata Agent, running on a distributed node, to securel
 administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
 (ACLK)](/aclk/README.md).
 
-Just starting out with Netdata Cloud? See our [get started with
-Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide.
+Are you just starting out with Netdata Cloud? See our [get started with
+Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide for a walkthrough of the process and simplified
+instructions.
 
 Claiming nodes is a security feature in Netdata Cloud. Through the process of claiming, you demonstrate in a few ways
 that you have administrative access to that node and the configuration settings for its Agent. By logging into the node,
@@ -28,7 +29,7 @@ Netdata Cloud.
 > Space, or War Room that you did not authorize.
 
 By claiming a node, you opt-in to sending data from your Agent to Netdata Cloud via the ACLK. This data is encrypted by
-TLS while it is in transit. We use the the RSA keypair created during claiming to authenticate the identity of the agent
+TLS while it is in transit. We use the RSA keypair created during claiming to authenticate the identity of the Agent
 when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way from Agents to the
 browser, we do not store or log it.
 
@@ -248,7 +249,7 @@ You must [claim your node](#how-to-claim-a-node).
 
 #### aclk-available is false
 
-If `aclk-available` is `false` and all other keys are `true`, your Agent is having trouble connection to the Cloud
+If `aclk-available` is `false` and all other keys are `true`, your Agent is having trouble connecting to the Cloud
 through the ACLK. Please check your system's firewall.
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
@@ -341,12 +342,12 @@ If need be, the user can override the Agent's defaults by providing additional a
 
 ### Claiming directory
 
-Netdata stores the agent claiming-related state in the Netdata library directory under `cloud.d`. For a default
+Netdata stores the Agent's claiming-related state in the Netdata library directory under `cloud.d`. For a default
 installation, this directory exists at `/var/lib/netdata/cloud.d`. The directory and its files should be owned by the
 user that runs the Agent, which is typically the `netdata` user.
 
-The `cloud.d/token` file should contain the claiming-token and the `cloud.d/rooms` file should contain the list of 
-war-rooms.
+The `cloud.d/token` file should contain the claiming-token and the `cloud.d/rooms` file should contain the list of War
+Rooms you added that node to.
 
 The user can also put the Cloud endpoint's full certificate chain in `cloud.d/cloud_fullchain.pem` so that the Agent
 can trust the endpoint if necessary.
