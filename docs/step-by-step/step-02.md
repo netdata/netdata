@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Step 2. Get to know Netdata's dashboard"
-date: 2020-05-01
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-02.md
 ---
 -->
@@ -154,9 +154,9 @@ To learn more about other options and chart interactivity, read our [dashboard d
 
 ## See raised alarms and the alarm log
 
-Aside from performance troubleshooting, Netdata is designed to help you monitor the health of your systems and
-applications. That's why every Netdata installation comes with dozens of pre-configured alarms that trigger alerts when
-your system starts acting strangely.
+Aside from performance troubleshooting, the Agent helps you monitor the health of your systems and applications. That's
+why every Netdata installation comes with dozens of pre-configured alarms that trigger alerts when your system starts
+acting strangely.
 
 Find the **Alarms** button in the top navigation bring up a modal that shows currently raised alarms, all running
 alarms, and the alarms log.
@@ -173,15 +173,15 @@ And a static screenshot of the raised CPU alarm:
 The alarm itself is named *system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
 shows the latest value the chart that triggered the alarm.
 
-With the three icons beneath that and the **role** designation, you can **1)** scroll to the chart associated with this
-raised alarm, **2)** copy a link to the badge to your clipboard, and **3)** copy the code to embed the badge onto
-another web page using an `<embed>` element.
+With the three icons beneath that and the **role** designation, you can:
 
-The table on the right-hand side displays information about the alarm's configuration.
+1.  Scroll to the chart associated with this raised alarm.
+2.  Copy a link to the badge to your clipboard.
+3.  Copy the code to embed the badge onto another web page using an `<embed>` element.
 
-In this example, Netdata triggers a warning alarm when CPU usage is between 75 and 85%, and a critical alarm when above
-85%. It's a _little_ more complicated than that, but we'll get into more complex health entity configurations in a later
-step.
+The table on the right-hand side displays information about the alarm's configuration. In above example, Netdata
+triggers a warning alarm when CPU usage is between 75 and 85%, and a critical alarm when above 85%. It's a _little_ more
+complicated than that, but we'll get into more complex health entity configurations in a later step.
 
 The `calculation` field is the equation used to calculate those percentages, and the `check every` field specifies how
 often Netdata should be calculating these metrics to see if the alarm should remain triggered.

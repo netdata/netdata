@@ -1,7 +1,7 @@
 <!--
 ---
 title: "The standard web dashboard"
-date: 2020-05-01
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
 ---
 -->
@@ -23,8 +23,8 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
 
 > In v1.21 of the Agent, we replaced the legacy dashboard with a refactored dashboard written in React. By using React,
 > we simplify our code and give our engineers better tools to add new features and fix bugs. The only UI change with
-> this dashboard are the top navigation and left-hand navigation for the [Cloud integration](/docs/agent-cloud.md). The
-> old dashboard is still accessible at the `http://NODE:19999/old` subfolder.
+> this dashboard is the top navigation and left-hand navigation for [Cloud integration](/docs/agent-cloud.md). The old
+> dashboard is still accessible at the `http://NODE:19999/old` subfolder.
 
 Netdata uses an [internal, static-threaded web server](/web/server/README.md) to host the
 HTML, CSS, and JavaScript files that make up the standard dashboard. You don't
@@ -86,8 +86,8 @@ you to the Netdata Cloud web interface.
 ![A screenshot of the Cloud
 menus](https://user-images.githubusercontent.com/1153921/80837210-3f8b8c80-8bab-11ea-9c75-128c2d823ef8.png)
 
-If you want to know more about how this menu is populated, and the Agent-Cloud integration at a high level, see our
-document on [using the Agent with Netdata Cloud](/docs/agent-cloud.md)
+If you want to know more about how Cloud populates this menu, and the Agent-Cloud integration at a high level, see our
+document on [using the Agent with Netdata Cloud](/docs/agent-cloud.md).
 
 ## Customizing the standard dashboard
 
