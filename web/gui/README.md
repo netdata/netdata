@@ -23,8 +23,8 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
 
 > In v1.21 of the Agent, we replaced the legacy dashboard with a refactored dashboard written in React. By using React,
 > we simplify our code and give our engineers better tools to add new features and fix bugs. The only UI change with
-> this dashboard are the top navigation and left-hand navigation for the [Cloud integration](/docs/cloud.md). The old
-> dashboard is still accessible at the `http://NODE:19999/old` subfolder.
+> this dashboard are the top navigation and left-hand navigation for the [Cloud integration](/docs/agent-cloud.md). The
+> old dashboard is still accessible at the `http://NODE:19999/old` subfolder.
 
 Netdata uses an [internal, static-threaded web server](/web/server/README.md) to host the
 HTML, CSS, and JavaScript files that make up the standard dashboard. You don't

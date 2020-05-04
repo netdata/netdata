@@ -1,10 +1,12 @@
 <!--
 ---
-title: "Using the Agent with Netdata Cloud" 
-date: 2020-05-01 
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/cloud.md
+title: "Use the Agent with Netdata Cloud"
+date: 2020-05-04
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/agent-cloud.md
 ---
 -->
+
+# Use the Agent with Netdata Cloud
 
 While the Netdata Agent is an enormously powerful _distributed_ health monitoring and performance troubleshooting tool,
 many of its users need to monitor dozens or hundreds of systems at the same time. That's why we built Netdata Cloud, a
