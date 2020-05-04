@@ -344,7 +344,7 @@ HERE_DOC
         if [ -z "${PROXY}" ]; then
            PROXYMSG=""
         else
-           PROXYMSG="You have claimed this node through a proxy - please update your the proxy setting in your netdata.conf to {$PROXY}. "
+           PROXYMSG="You have attempted to claim this node through a proxy - please update your the proxy setting in your netdata.conf to {$PROXY}. "
         fi
         # Update cloud.conf in the agent memory
         @sbindir_POST@/netdatacli write-config 'cloud|global|enabled|yes' && \
