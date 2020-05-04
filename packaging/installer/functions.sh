@@ -400,7 +400,10 @@ install_non_systemd_init() {
   return 1
 }
 
+# This is used by netdata-installer.sh
+# shellcheck disable=SC2034
 NETDATA_SHUTDOWN_CMD="netdatacli shutdown-agent"
+
 NETDATA_START_CMD="netdata"
 NETDATA_INSTALLER_START_CMD=""
 
