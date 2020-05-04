@@ -121,6 +121,7 @@ int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buf
                     ((grpc::CompletionQueue *)(connector_specific_data->completion_queue))));
 
         struct response response;
+        response.context = context;
         response.publish_response = new google::pubsub::v1::PublishResponse;
         response.tag = connector_specific_data->last_tag++;
         response.status = new grpc::Status;
