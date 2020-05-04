@@ -108,9 +108,9 @@ Here's the process in GIF form!
 ![Animated GIF of creating a fake option in
 netdata.conf](https://user-images.githubusercontent.com/1153921/65470254-4422e200-de1f-11e9-9597-a97c89ee59b8.gif)
 
-Now, let's make a slightly more substantial edit to `netdata.conf`—change the agent's name.
+Now, let's make a slightly more substantial edit to `netdata.conf`: change the Agent's name.
 
-If you edit the value of the `hostname` option, you can change the name of your Netdata agent on the dashboard and a
+If you edit the value of the `hostname` option, you can change the name of your Netdata Agent on the dashboard and a
 handful of other places, like the Visited nodes menu _and_ Netdata Cloud.
 
 Use `edit-config` to change the `hostname` option to a name like `hello-world`. Be sure to uncomment it!
