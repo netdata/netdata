@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Step 7. Netdata's dashboard in depth"
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-07.md
 ---
 -->
@@ -78,7 +79,7 @@ snapshot, and send it to a colleague for further analysis.
 To export a snapshot, click on the **export** icon.
 
 ![Animated GIF of opening the export
-modal](https://user-images.githubusercontent.com/12263278/64901454-48b60080-d691-11e9-9c14-1539bc841735.gif)
+modal](https://user-images.githubusercontent.com/1153921/80993197-82d63d00-8def-11ea-88fa-98827814e930.gif)
 
 Edit the snapshot file name and select your desired compression method. Click on **Export**.
 

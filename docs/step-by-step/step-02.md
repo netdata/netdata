@@ -120,7 +120,7 @@ timeframes for further analysis, resize charts, and more.
 Best of all, Whenever you use a chart in this way, Netdata synchronizes all the other charts to match it.
 
 ![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
-charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
+charts](https://user-images.githubusercontent.com/1153921/80993004-33900c80-8def-11ea-81f4-43b4a64b7db9.gif)
 
 ### Pan, zoom, highlight, and reset charts
 
