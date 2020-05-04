@@ -150,16 +150,26 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
          * store the value directly without extending the page_length
          */
         if (unlikely(point_in_time < descr->start_time)) {
-            debug(D_RRDENGINE, "Metric not in the current page; discarding");
+            errno = 0;
+            error("Metric not in the current page; discarding");
             return;
         }
 
-        if (unlikely(point_in_time >= descr->start_time && point_in_time <= descr->end_time)) {
+        if (unlikely(point_in_time <= descr->end_time)) {
             uint64_t metric_index;
+            unsigned entries;
+
+            if (likely(descr->start_time != descr->end_time)) {
+                entries = descr->page_length / sizeof(storage_number);
+
+                metric_index = ((uint64_t)(point_in_time - descr->start_time)) * (entries - 1) /
+                               (descr->end_time - descr->start_time);
+            } else
+                metric_index = 0;
+
             page = descr->pg_cache_descr->page;
-            metric_index = (uint64_t) (point_in_time - descr->start_time) / (USEC_PER_SEC * sizeof(number));
             page[metric_index] = number;
-            debug(D_RRDENGINE, "Overwriting metric at index %"PRIu64, metric_index);
+            debug(D_RRDENGINE, "Overwriting metric at index %" PRIu64, metric_index);
             return;
         }
 
