@@ -8,6 +8,7 @@
 #define EVENT_CHECK_TIMEOUT 50
 
 struct response {
+    grpc::ClientContext *context;
     google::pubsub::v1::PublishResponse *publish_response;
     size_t tag;
     grpc::Status *status;
@@ -194,6 +195,9 @@ int pubsub_get_result(
                     response->status->error_message().copy(error_message, ERROR_LINE_MAX);
                 }
 
+                delete response->context;
+                delete response->publish_response;
+                delete response->status;
                 responses->erase(response);
             }
 
