@@ -921,21 +921,21 @@ void ebpf_print_help() {
             "\n"
             " Available command line options:\n"
             "\n"
-            " SECONDS              set the data collection frequency.\n"
+            " SECONDS           set the data collection frequency.\n"
             "\n"
-            " help or -h or -H      show this help.\n"
+            " --help or -h      show this help.\n"
             "\n"
-            " version or -v or -V   show software version.\n"
+            " --version or -v   show software version.\n"
             "\n"
-            " global or -g or -G    disable charts per application.\n"
+            " --global or -g    disable charts per application.\n"
             "\n"
-            " all or -a or -A       Enable all chart groups (global and apps), unless -g is also given.\n"
+            " --all or -a       Enable all chart groups (global and apps), unless -g is also given.\n"
             "\n"
-            " net or -n or -N       Enable network viewer charts.\n"
+            " --net or -n       Enable network viewer charts.\n"
             "\n"
-            " process or -p or -P   Enable charts related to process run time.\n"
+            " --process or -p   Enable charts related to process run time.\n"
             "\n"
-            " return or -r or -R    Run the collector in return mode.\n"
+            " --return or -r    Run the collector in return mode.\n"
             "\n"
             , VERSION
             , (ct->tm_year >= 116)?ct->tm_year + 1900: 2020
@@ -944,70 +944,85 @@ void ebpf_print_help() {
 
 static void parse_args(int argc, char **argv)
 {
-    int i, freq = 0;
     int enabled = 0;
     int disable_apps = 0;
-    for (i = 1; i < argc ; i++) {
-        char *w = argv[i];
-        if (!freq) {
-            int n = (int)str2l(w);
-            if(n > 0) {
-                freq = n;
-                continue;
+    int freq = 0;
+    int c;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"help",     no_argument,    0,  'h' },
+        {"version",  no_argument,    0,  'v' },
+        {"global",   no_argument,    0,  'g' },
+        {"all",      no_argument,    0,  'a' },
+        {"net",      no_argument,    0,  'n' },
+        {"process",  no_argument,    0,  'p' },
+        {"return",   no_argument,    0,  'r' },
+        {0, 0, 0, 0}
+    };
+
+    if (argc > 1) {
+        int n = (int)str2l(argv[1]);
+        if(n > 0) {
+            freq = n;
+        }
+    }
+
+    while (1) {
+        c = getopt_long(argc, argv, "hvganpr",long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+            case 'h': {
+                ebpf_print_help();
+                exit(0);
             }
-        }
-
-        if (strcmp("help", w) == 0 || strcmp("-help", w) == 0 || strcmp("--help", w) == 0 || strcmp("-h", w) == 0 || strcmp("-H", w) == 0) {
-            ebpf_print_help();
-            exit(0);
-        }
-
-        if (strcmp("version", w) == 0 || strcmp("-version", w) == 0 || strcmp("--version", w) == 0 || strcmp("-v", w) == 0 || strcmp("-V", w) == 0) {
-            printf("ebpf.plugin %s\n", VERSION);
-            exit(0);
-        }
-
-        if (strcmp("global", w) == 0 || strcmp("-global", w) == 0 || strcmp("--global", w) == 0 || strcmp("-g", w) == 0 || strcmp("-G", w) == 0) {
-            disable_apps = 1;
-            ebpf_disable_apps();
+            case 'v': {
+                printf("ebpf.plugin %s\n", VERSION);
+                exit(0);
+            }
+            case 'g': {
+                disable_apps = 1;
+                ebpf_disable_apps();
 #ifdef NETDATA_INTERNAL_CHECKS
-            info("EBPF running with global chart group, because it was started with the option \"%s\".", w);
+                info("EBPF running with global chart group, because it was started with the option \"--global\" or \"-g\".");
 #endif
-            continue;
-        }
-
-        if (strcmp("all", w) == 0 || strcmp("-all", w) == 0 || strcmp("--all", w) == 0 || strcmp("-a", w) == 0 || strcmp("-A", w) == 0) {
-            ebpf_enable_all_charts(disable_apps);
+                break;
+            }
+            case 'a': {
+                ebpf_enable_all_charts(disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
-            info("EBPF running with all chart groups, because it was started with the option \"%s\".", w);
+                info("EBPF running with all chart groups, because it was started with the option \"--all\" or \"-a\".");
 #endif
-            continue;
-        }
-
-        if (strcmp("net", w) == 0 || strcmp("-net", w) == 0 || strcmp("--net", w) == 0 || strcmp("-n", w) == 0 || strcmp("-N", w) == 0) {
-            ebpf_enable_chart(1, disable_apps);
+                break;
+            }
+            case 'n': {
+                enabled = 1;
+                ebpf_enable_chart(1, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
-            info("EBPF enabling \"NET\" charts, because it was started with the option \"%s\".", w);
+                info("EBPF enabling \"NET\" charts, because it was started with the option \"--net\" or \"-n\".");
 #endif
-            enabled = 1;
-            continue;
-        }
-
-        if (strcmp("process", w) == 0 || strcmp("-process", w) == 0 || strcmp("--process", w) == 0 || strcmp("-p", w) == 0 || strcmp("-P", w) == 0) {
-            ebpf_enable_chart(0, disable_apps);
+                break;
+            }
+            case 'p': {
+                enabled = 1;
+                ebpf_enable_chart(0, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
-            info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"%s\".", w);
+                info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"--process\" or \"-p\".");
 #endif
-            enabled = 1;
-            continue;
-        }
-
-        if (strcmp("return", w) == 0 || strcmp("-return", w) == 0 || strcmp("--return", w) == 0 || strcmp("-r", w) == 0 || strcmp("-R", w) == 0) {
-            mode = 0;
-            ebpf_set_thread_mode(mode);
+                break;
+            }
+            case 'r': {
+                mode = 0;
+                ebpf_set_thread_mode(mode);
 #ifdef NETDATA_INTERNAL_CHECKS
-            info("EBPF running in \"return\" mode, because it was started with the option \"%s\".", w);
+                info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
 #endif
+                break;
+            }
+            default: {
+                break;
+            }
         }
     }
 
