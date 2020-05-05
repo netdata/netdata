@@ -402,7 +402,7 @@ install_non_systemd_init() {
 
 # This is used by netdata-installer.sh
 # shellcheck disable=SC2034
-NETDATA_SHUTDOWN_CMD="netdatacli shutdown-agent"
+NETDATA_STOP_CMD="netdatacli shutdown-agent"
 
 NETDATA_START_CMD="netdata"
 NETDATA_INSTALLER_START_CMD=""
@@ -429,6 +429,8 @@ install_netdata_service() {
         return 0
       else
         echo >&2 "Installing MacOS X plist file..."
+        # This is used by netdata-installer.sh
+        # shellcheck disable=SC2034
         run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
           run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
           NETDATA_START_CMD="launchctl start com.github.netdata" &&
@@ -437,7 +439,8 @@ install_netdata_service() {
       fi
 
     elif [ "${uname}" = "FreeBSD" ]; then
-
+      # This is used by netdata-installer.sh
+      # shellcheck disable=SC2034
       run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
         NETDATA_STOP_CMD="service netdata stop" &&
         NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
@@ -451,6 +454,8 @@ install_netdata_service() {
     elif issystemd; then
       # systemd is running on this system
       NETDATA_START_CMD="systemctl start netdata"
+      # This is used by netdata-installer.sh
+      # shellcheck disable=SC2034
       NETDATA_STOP_CMD="systemctl stop netdata"
       NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
 
@@ -491,9 +496,13 @@ install_netdata_service() {
       if [ ${ret} -eq 0 ]; then
         if [ -n "${service_cmd}" ]; then
           NETDATA_START_CMD="service netdata start"
+          # This is used by netdata-installer.sh
+          # shellcheck disable=SC2034
           NETDATA_STOP_CMD="service netdata stop"
         elif [ -n "${rcservice_cmd}" ]; then
           NETDATA_START_CMD="rc-service netdata start"
+          # This is used by netdata-installer.sh
+          # shellcheck disable=SC2034
           NETDATA_STOP_CMD="rc-service netdata stop"
         fi
         NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
