@@ -899,16 +899,22 @@ static inline void ebpf_enable_chart(int enable, int disable_apps) {
     }
 }
 
-static inline void ebpf_set_thread_mode(int mode) {
+static inline void ebpf_set_thread_mode(int lmode) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
-        ebpf_modules[i].mode = mode;
+        ebpf_modules[i].mode = lmode;
     }
 }
 
 void ebpf_print_help() {
     const time_t t = time(NULL);
-    struct tm *ct = localtime(&t);
+    struct tm ct;
+    struct tm *test = localtime_r(&t, &ct);
+    int year;
+    if (test)
+        year = ct.tm_year;
+    else
+        year = 0;
 
     fprintf(stderr,
             "\n"
@@ -938,7 +944,7 @@ void ebpf_print_help() {
             " --return or -r    Run the collector in return mode.\n"
             "\n"
             , VERSION
-            , (ct->tm_year >= 116)?ct->tm_year + 1900: 2020
+            , (year >= 116)?year + 1900: 2020
     );
 }
 
