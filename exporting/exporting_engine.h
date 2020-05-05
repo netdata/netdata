@@ -197,7 +197,7 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
 int init_connectors(struct engine *engine);
 
 int mark_scheduled_instances(struct engine *engine);
-int prepare_buffers(struct engine *engine);
+void prepare_buffers(struct engine *engine);
 
 size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 

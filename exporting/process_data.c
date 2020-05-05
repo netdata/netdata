@@ -308,9 +308,8 @@ void end_batch_formatting(struct engine *engine)
  * configured rules.
  *
  * @param engine an engine data structure.
- * @return Returns 0 on success, 1 on failure.
  */
-int prepare_buffers(struct engine *engine)
+void prepare_buffers(struct engine *engine)
 {
     netdata_thread_disable_cancelability();
     start_batch_formatting(engine);
@@ -342,8 +341,6 @@ int prepare_buffers(struct engine *engine)
     netdata_thread_enable_cancelability();
 
     end_batch_formatting(engine);
-
-    return 0;
 }
 
 /**
