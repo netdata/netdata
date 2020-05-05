@@ -60,10 +60,6 @@ static void test_exporting_engine(void **state)
     expect_memory(__wrap_prepare_buffers, engine, engine, sizeof(struct engine));
     will_return(__wrap_prepare_buffers, 0);
 
-    expect_function_call(__wrap_notify_workers);
-    expect_memory(__wrap_notify_workers, engine, engine, sizeof(struct engine));
-    will_return(__wrap_notify_workers, 0);
-
     expect_function_call(__wrap_send_main_rusage);
     expect_value(__wrap_send_main_rusage, st_rusage, NULL);
     expect_value(__wrap_send_main_rusage, rd_user, NULL);

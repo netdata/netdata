@@ -198,7 +198,6 @@ int init_connectors(struct engine *engine);
 
 int mark_scheduled_instances(struct engine *engine);
 int prepare_buffers(struct engine *engine);
-int notify_workers(struct engine *engine);
 
 size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 

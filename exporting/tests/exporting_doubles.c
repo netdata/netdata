@@ -75,13 +75,6 @@ int __wrap_prepare_buffers(struct engine *engine)
     return mock_type(int);
 }
 
-int __wrap_notify_workers(struct engine *engine)
-{
-    function_called();
-    check_expected_ptr(engine);
-    return mock_type(int);
-}
-
 void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system)
 {
     function_called();

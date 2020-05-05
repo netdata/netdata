@@ -55,11 +55,6 @@ void *exporting_main(void *ptr)
             }
         }
 
-        if (notify_workers(engine) != 0) {
-            error("EXPORTING: cannot communicate with exporting connector instance working threads");
-            break;
-        }
-
         send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
 
 #ifdef UNIT_TESTING

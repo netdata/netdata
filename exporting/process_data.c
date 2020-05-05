@@ -375,18 +375,3 @@ int simple_connector_update_buffered_bytes(struct instance *instance)
 
     return 0;
 }
-
-/**
- * Notify workers
- *
- * Notify exporting connector instance working threads that data is ready to send.
- *
- * @param engine an engine data structure.
- * @return Returns 0 on success, 1 on failure.
- */
-int notify_workers(struct engine *engine)
-{
-    (void)engine;
-
-    return 0;
-}
