@@ -1423,6 +1423,40 @@ prompt() {
   done
 }
 
+validate_tree_debian() {
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+    export DEBIAN_FRONTEND="noninteractive"
+  fi
+
+  if [ "$distribution" = "ubuntu" ]; then
+    echo >&2 " > Ubuntu Version: ${version} ..."
+
+    if [[ "${version}" =~ ^14\.([0-9])+$ ]]; then
+      echo >&2 " > You are on an old enough verison of Ubuntu we have to enable some extra repositories..."
+      echo >&2
+
+      echo >&2 " > Checking for ppa:acooks/libwebsockets6 ..."
+      if ! run apt-cache policy | grep 'ppa:acooks/libwebsockets6'; then
+        if ! command -v add-apt-repository > /dev/null; then
+          if prompt "software-properties-common not found, shall I install it?"; then
+            run ${sudo} apt-get install ${opts} software-properties-common
+          else
+            echo >&2 " WARNING: software-properties-common is required by this tool to manage apt repositories"
+          fi
+        fi
+        if prompt "ppa:acooks/libwebsockets6 not found, shall I install it?"; then
+          run ${sudo} add-apt-repository ${opts} ppa:acooks/libwebsockets6
+        fi
+      fi
+    fi
+  else
+    echo >&2 " > Debian Version: ${version} ..."
+  fi
+}
+
 validate_tree_centos() {
   local opts=
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
