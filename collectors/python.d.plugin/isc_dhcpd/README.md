@@ -2,6 +2,7 @@
 ---
 title: "ISC DHCP monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/isc_dhcpd/README.md
+sidebar_label: "isc_dhcpd"
 ---
 -->
 

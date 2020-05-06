@@ -2,6 +2,7 @@
 ---
 title: "AM2320 sensor monitoring with netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/am2320/README.md
+sidebar_label: "am2320"
 ---
 -->
 
