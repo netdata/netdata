@@ -17,6 +17,12 @@ struct response {
     size_t published_bytes;
 };
 
+static inline void copy_error_message(char *error_message_dst, const char *error_message_src)
+{
+    std::strncpy(error_message_dst, error_message_src, ERROR_LINE_MAX);
+    error_message_dst[ERROR_LINE_MAX] = '\0';
+}
+
 /**
  * Initialize a Pub/Sub client and a data structure for responses.
  *
@@ -39,7 +45,7 @@ int pubsub_init(
 
         std::shared_ptr<grpc::ChannelCredentials> credentials = grpc::GoogleDefaultCredentials();
         if (credentials == nullptr) {
-            std::strncpy(error_message, "Can't load credentials", ERROR_LINE_MAX);
+            copy_error_message(error_message, "Can't load credentials");
             return 1;
         }
 
@@ -47,7 +53,7 @@ int pubsub_init(
 
         google::pubsub::v1::Publisher::Stub *stub = new google::pubsub::v1::Publisher::Stub(channel);
         if (!stub) {
-            std::strncpy(error_message, "Can't create a publisher stub", ERROR_LINE_MAX);
+            copy_error_message(error_message, "Can't create a publisher stub");
             return 1;
         }
 
@@ -66,7 +72,7 @@ int pubsub_init(
         return 0;
     } catch (std::exception const &ex) {
         std::string em(std::string("Standard exception raised: ") + ex.what());
-        std::strncpy(error_message, em.c_str(), ERROR_LINE_MAX);
+        copy_error_message(error_message, em.c_str());
         return 1;
     }
 
@@ -135,7 +141,7 @@ int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buf
         ((std::list<struct response> *)(connector_specific_data->responses))->push_back(response);
     } catch (std::exception const &ex) {
         std::string em(std::string("Standard exception raised: ") + ex.what());
-        std::strncpy(error_message, em.c_str(), ERROR_LINE_MAX);
+        copy_error_message(error_message, em.c_str());
         return 1;
     }
 
@@ -183,7 +189,7 @@ int pubsub_get_result(
                 }
 
                 if (response == responses->end()) {
-                    std::strncpy(error_message, "Cannot get Pub/Sub response", ERROR_LINE_MAX);
+                    copy_error_message(error_message, "Cannot get Pub/Sub response");
                     return 1;
                 }
 
@@ -194,6 +200,7 @@ int pubsub_get_result(
                     *lost_metrics += response->published_metrics;
                     *lost_bytes += response->published_bytes;
                     response->status->error_message().copy(error_message, ERROR_LINE_MAX);
+                    error_message[ERROR_LINE_MAX] = '\0';
                 }
 
                 delete response->context;
@@ -203,14 +210,14 @@ int pubsub_get_result(
             }
 
             if (next_status == grpc::CompletionQueue::SHUTDOWN) {
-                std::strncpy(error_message, "Completion queue shutdown", ERROR_LINE_MAX);
+                copy_error_message(error_message, "Completion queue shutdown");
                 return 1;
             }
 
         } while (next_status == grpc::CompletionQueue::GOT_EVENT);
     } catch (std::exception const &ex) {
         std::string em(std::string("Standard exception raised: ") + ex.what());
-        std::strncpy(error_message, em.c_str(), ERROR_LINE_MAX);
+        copy_error_message(error_message, em.c_str());
         return 1;
     }
 
