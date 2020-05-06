@@ -66,7 +66,7 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
-static int mode = 2;
+static netdata_run_mode_t mode = MODE_ENTRY;
 static int debug_log = 0;
 static int use_stdout = 0;
 struct config collector_config;
@@ -84,11 +84,11 @@ static struct ebpf_module {
     int update_time;
     int global_charts;
     int apps_charts;
-    int mode;
+    netdata_run_mode_t mode;
 } ebpf_modules[] = {
-    { .thread_name = "process", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = 2 },
-    { .thread_name = "network_viewer", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = 2 },
-    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = 2 },
+    { .thread_name = "process", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
+    { .thread_name = "network_viewer", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
+    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY },
 };
 
 static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write", "process", "task", "process", "thread" };
@@ -153,7 +153,7 @@ static void int_exit(int sig)
         publish_aggregated = NULL;
     }
 
-    if(mode == 1 && debug_log) {
+    if(mode == MODE_DEVMODE && debug_log) {
         unmap_memory();
     }
 
@@ -293,7 +293,7 @@ static void netdata_global_charts_create() {
             , publish_aggregated
             , 2);
 
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_FILE_OPEN_ERR_COUNT
                 , "Calls"
@@ -322,7 +322,7 @@ static void netdata_global_charts_create() {
             , &publish_aggregated[NETDATA_IN_START_BYTE]
             , 2);
 
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         netdata_create_io_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_IO_FILE_BYTES
                 , "bytes/s"
@@ -364,7 +364,7 @@ static void netdata_global_charts_create() {
             , NETDATA_PROCESS_GROUP
             , 978);
 
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
                 , "Calls"
@@ -493,7 +493,7 @@ static void netdata_publish_data() {
     write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
         write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
         write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
@@ -611,7 +611,7 @@ void *process_log(void *ptr)
 {
     (void) ptr;
 
-    if (mode == 1 && debug_log) {
+    if (mode == MODE_DEVMODE && debug_log) {
         netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
     }
 
@@ -709,7 +709,7 @@ static int ebpf_load_libraries()
             return -1;
         }
 
-        if(mode == 1) {
+        if(mode == MODE_DEVMODE) {
             set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
             if ((err = dlerror()) != NULL) {
                 error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
@@ -742,7 +742,7 @@ static int ebpf_load_libraries()
 char *select_file() {
     if(!mode)
         return "rnetdata_ebpf_process.o";
-    if(mode == 1)
+    if(mode == MODE_DEVMODE)
         return "dnetdata_ebpf_process.o";
 
     return "pnetdata_ebpf_process.o";
@@ -812,7 +812,7 @@ static void change_syscalls() {
 
 static inline void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
-        mode = 0;
+        mode = MODE_RETURN;
     /*
     else if (!strcasecmp(ptr, "dev"))
         mode = 1;
@@ -899,7 +899,7 @@ static inline void ebpf_enable_chart(int enable, int disable_apps) {
     }
 }
 
-static inline void ebpf_set_thread_mode(int lmode) {
+static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
         ebpf_modules[i].mode = lmode;
@@ -1019,7 +1019,7 @@ static void parse_args(int argc, char **argv)
                 break;
             }
             case 'r': {
-                mode = 0;
+                mode = MODE_RETURN;
                 ebpf_set_thread_mode(mode);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
@@ -1046,6 +1046,8 @@ static void parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    parse_args(argc, argv);
+
     mykernel =  get_kernel_version();
     if(!has_condition_to_run(mykernel)) {
         error("[EBPF PROCESS] The current collector cannot run on this kernel.");
@@ -1068,7 +1070,6 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    parse_args(argc, argv);
     set_global_variables();
 
     if (load_collector_file(user_config_dir)) {
@@ -1098,7 +1099,7 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
-    if(mode == 1 && debug_log) {
+    if(mode == MODE_DEVMODE && debug_log) {
         if(map_memory()) {
             thread_finished++;
             error("[EBPF_PROCESS] Cannot map memory used with perf events.");
