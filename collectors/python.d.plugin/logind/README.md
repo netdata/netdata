@@ -1,7 +1,8 @@
 <!--
 ---
-title: "Systemd-Logind monitoring with Netdata"
+title: "systemd-logind monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/logind/README.md
+sidebar_label: "systemd-logind"
 ---
 -->
 
