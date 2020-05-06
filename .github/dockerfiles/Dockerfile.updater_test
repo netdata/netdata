@@ -1,8 +1,17 @@
 FROM debian:buster AS build
 
+# Install a small but valid init
+ARG TINI_VERSION=v0.19.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
+ENTRYPOINT ["/tini", "--"]
+
 # Install all build dependencies
 COPY packaging/installer/install-required-packages.sh /tmp/install-required-packages.sh
 RUN /tmp/install-required-packages.sh --dont-wait --non-interactive netdata
+
+# Copy our startup script that will run `/usr/sbin/netdata -D` in a loop.
+COPY .github/dockerfiles/start.sh /start.sh
 
 # Copy sources
 WORKDIR /netdata
@@ -11,5 +20,5 @@ COPY . .
 # Build Netdata
 RUN ./netdata-installer.sh --dont-wait --dont-start-it --disable-go
 
-# RUn it!
-CMD ["/usr/sbin/netdata", "-D"]
+# Run it!
+CMD ["/start.sh"]
