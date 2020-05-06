@@ -1,11 +1,12 @@
 <!--
 ---
-title: "Access Point monitoring with Netdata"
+title: "Access point monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/ap/README.md
+sidebar_label: "Access point"
 ---
 -->
 
-# Access Point monitoring with Netdata
+# Access point monitoring with Netdata
 
 The `ap` collector visualizes data related to access points.
 

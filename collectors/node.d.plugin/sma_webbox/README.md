@@ -2,6 +2,7 @@
 ---
 title: "SMA Sunny WebBox monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/sma_webbox/README.md
+sidebar_label: "SMA Sunny WebBox"
 ---
 -->
 

@@ -1,7 +1,8 @@
 <!--
 ---
-title: "ISC BIND monitoring with Netdata "
+title: "ISC BIND monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/named/README.md
+sidebar_label: "ISC BIND"
 ---
 -->
 
