@@ -14,8 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 100
+      - run: |
+          git fetch --prune --unshallow
       - name: Build Test Image
         run: |
           docker build -f tests/integration/dockerfiles/Dockerfile.test -t netdata/ntestdata:test .
@@ -26,6 +26,10 @@ jobs:
           tar -xvf static_0.0.2_Linux_x86_64.tar.gz static
           mkdir -p ./artifacts
           nobup ./static -r ./artifacts > /dev/null 2>&1 &
+      - name: Setup Git
+        run: |
+          git config --global user.email "bot@netdata.cloud"
+          git config --global user.name "Netdata Bot"
       - name: Build Test Artifacts
         run: |
           .github/scripts/bump-version.sh && .github/scripts/build-artifacts.sh
