@@ -41,5 +41,4 @@ dist_plugins_SCRIPTS = \
     $(NULL)
 
 dist_noinst_SCRIPTS = \
-    stress.sh \
     $(NULL)
