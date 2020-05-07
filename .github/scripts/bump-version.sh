@@ -2,5 +2,4 @@
 
 VERSION="$(git describe)"
 echo "$VERSION" > packaging/version
-git add -A
-git ci -m "[netdata nightly] $VERSION"
+git commit -a -m "[netdata nightly] $VERSION"

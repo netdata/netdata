@@ -26,7 +26,7 @@ jobs:
           nobup ./static -r ./artifacts > /dev/null 2>&1 &
       - name: Build Test Artifacts
         run: |
-          .github/scripts/build-version.sh && .github/scripts/build-artifacts.sh
+          .github/scripts/bump-version.sh && .github/scripts/build-artifacts.sh
       - name: Run Tests
         run: |
           ./tests/integration/run.sh
