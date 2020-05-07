@@ -11,7 +11,7 @@ COPY packaging/installer/install-required-packages.sh /tmp/install-required-pack
 RUN /tmp/install-required-packages.sh --dont-wait --non-interactive netdata
 
 # Copy our startup script that will run `/usr/sbin/netdata -D` in a loop.
-COPY .github/dockerfiles/start.sh /start.sh
+COPY tests/integration/dockerfiles/start.sh /start.sh
 
 # Copy sources
 WORKDIR /netdata
