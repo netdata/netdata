@@ -1,0 +1,31 @@
+---
+# Runs Integration Tests on Pushes to `master` and Pull Requests
+# TODO: Kick off UI/UX tests from here in future...
+name: Tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  integration:
+    name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build Test Image
+        run: |
+          docker build -f tests/integration/dockerfiles/Dockerfile.test -t netdata/ntestdata:test .
+      - name: Setup Artifacts Server
+        run: |
+          curl -q -s -O https://github.com/prologic/static/releases/download/0.0.2/static_0.0.2_Linux_x86_64.tar.gz
+          tar -xvf static_0.0.2_Linux_x86_64.tar.gz static
+          mkdir -p ./artifacts
+          nobup ./static -r ./artifacts > /dev/null 2>&1 &
+      - name: Build Test Artifacts
+        run: |
+          .github/scripts/build-version.sh && .github/scripts/build-artifacts.sh
+      - name: Run Tests
+        run: |
+          ./tests/integration/run.sh
