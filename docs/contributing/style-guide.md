@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata style guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
----
 -->
 
 # Netdata style guide
@@ -114,10 +112,10 @@ reader.
 
 ```
 # Not recommended
-To install Netdata, click [here](https://docs.netdata.cloud/packaging/installer/).
+To install Netdata, click [here](https://learn.netdata.cloud/docs/agent/packaging/installer/).
 
 # Recommended
-To install Netdata, read our [installation instructions](https://docs.netdata.cloud/packaging/installer/).
+To install Netdata, read our [installation instructions](https://learn.netdata.cloud/docs/agent/packaging/installer/).
 ```
 
 In general, guides should include fewer hyperlinks to keep the reader focused on the task at hand. Documentation should
@@ -370,8 +368,8 @@ Display line numbers by appending `linenums="1"` after the language declaration,
 number of your choice. Highlight lines by appending `hl_lines="2"`, replacing `2` with the line you'd like to highlight.
 Or, multiple lines: `hl_lines="1 2 4 12`.
 
-!!! note Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on
-    our [documentation site](https://docs.netdata.cloud/). They should be used sparingly and only when necessary.
+> Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our
+> [documentation site](https://learn.netdata.cloud/). They should be used sparingly and only when necessary.
 
 ## Accessibility
 
