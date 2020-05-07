@@ -71,8 +71,10 @@ static int debug_log = 0;
 static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
+static char kernel_string[64];
 static int nprocs;
-uint32_t *hash_values;
+static int isrh;
+netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
@@ -510,15 +512,15 @@ void *process_publisher(void *ptr)
 }
 
 static void move_from_kernel2user_global() {
-    uint32_t idx;
-    uint32_t res[NETDATA_GLOBAL_VECTOR];
+    uint64_t idx;
+    netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
 
-    uint32_t *val = hash_values;
+    netdata_idx_t *val = hash_values;
     for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
         if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
-            uint32_t total = 0;
+            uint64_t total = 0;
             int i;
-            int end = (mykernel < 265984)?1:nprocs;
+            int end = (mykernel < NETDATA_KERNEL_V4_15)?1:nprocs;
             for (i = 0; i < end; i++)
                 total += val[i];
 
@@ -528,26 +530,26 @@ static void move_from_kernel2user_global() {
         }
     }
 
-    aggregated_data[0].call = res[0]; //open
-    aggregated_data[1].call = res[14]; //close
-    aggregated_data[2].call = res[8]; //unlink
-    aggregated_data[3].call = res[5] + res[21]; //read + readv
-    aggregated_data[4].call = res[2] + res[18]; //write + writev
-    aggregated_data[5].call = res[10]; //exit
-    aggregated_data[6].call = res[11]; //release
-    aggregated_data[7].call = res[12]; //fork
-    aggregated_data[8].call = res[16]; //thread
+    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
+    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
+    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
+    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
+    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
+    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
+    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
+    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
+    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
 
-    aggregated_data[0].ecall = res[1]; //open
-    aggregated_data[1].ecall = res[15]; //close
-    aggregated_data[2].ecall = res[9]; //unlink
-    aggregated_data[3].ecall = res[6] + res[22];  //read + readv
-    aggregated_data[4].ecall = res[3] + res[19]; //write + writev
-    aggregated_data[7].ecall = res[13]; //fork
-    aggregated_data[8].ecall = res[17]; //thread
+    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
+    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
+    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
+    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
+    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
+    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
+    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
 
-    aggregated_data[2].bytes = (uint64_t)res[4] + (uint64_t)res[20]; //write + writev
-    aggregated_data[3].bytes = (uint64_t)res[7] + (uint64_t)res[23];//read + readv
+    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
+    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
 static void move_from_kernel2user()
@@ -637,7 +639,7 @@ int allocate_global_vectors() {
         return -1;
     }
 
-    hash_values = callocz(nprocs, sizeof(uint32_t));
+    hash_values = callocz(nprocs, sizeof(netdata_idx_t));
     if(!hash_values) {
         return -1;
     }
@@ -669,79 +671,106 @@ static int ebpf_load_libraries()
 {
     char *err = NULL;
     char lpath[4096];
+    char netdatasl[128];
+    char *libbase = { "libnetdata_ebpf.so" };
 
-    build_complete_path(lpath, 4096, plugin_dir, "libnetdata_ebpf.so");
+    snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
+    build_complete_path(lpath, 4096, plugin_dir, netdatasl);
     libnetdata = dlopen(lpath, RTLD_LAZY);
     if (!libnetdata) {
-        error("[EBPF_PROCESS] Cannot load %s.", lpath);
-        return -1;
+        info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
+
+        //Update kernel
+        char *library = ebpf_library_suffix(mykernel, (isrh < 0)?0:1);
+        size_t length = strlen(library);
+        strncpyz(kernel_string, library, length);
+        kernel_string[length] = '\0';
+
+        //Try to load the default version
+        snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
+        build_complete_path(lpath, 4096, plugin_dir, netdatasl);
+        libnetdata = dlopen(lpath, RTLD_LAZY);
+        if (!libnetdata) {
+            error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
+            return -1;
+        } else {
+            info("[EBPF_PROCESS] Default shared library %s loaded with success.", lpath);
+        }
     } else {
-        load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+        info("[EBPF_PROCESS] Current shared library %s loaded with success.", lpath);
+    }
+
+    load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
+        return -1;
+    }
+
+    map_fd =  dlsym(libnetdata, "map_fd");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
+        return -1;
+    }
+
+    bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+        return -1;
+    }
+
+    if(mode == 1) {
+        set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
+            error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
             return -1;
         }
 
-        map_fd =  dlsym(libnetdata, "map_fd");
+        perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
+            error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
             return -1;
         }
 
-        bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+        perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+            error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
             return -1;
         }
 
-        if(mode == 1) {
-            set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
-                return -1;
-            }
-
-            perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
-                return -1;
-            }
-
-            perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
-                return -1;
-            }
-
-            netdata_perf_loop_multi = dlsym(libnetdata, "netdata_perf_loop_multi");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find netdata_perf_loop_multi: %s", err);
-                return -1;
-            }
+        netdata_perf_loop_multi = dlsym(libnetdata, "netdata_perf_loop_multi");
+        if ((err = dlerror()) != NULL) {
+            error("[EBPF_PROCESS] Cannot find netdata_perf_loop_multi: %s", err);
+            return -1;
         }
     }
 
     return 0;
 }
 
-char *select_file() {
-    if(!mode)
-        return "rnetdata_ebpf_process.o";
-    if(mode == 1)
-        return "dnetdata_ebpf_process.o";
+int select_file(char *name, int length) {
+    int ret = -1;
+    if (!mode)
+        ret = snprintf(name, (size_t)length, "rnetdata_ebpf_process.%s.o", kernel_string);
+    else if(mode == 1)
+        ret = snprintf(name, (size_t)length, "dnetdata_ebpf_process.%s.o", kernel_string);
+    else if(mode == 2)
+        ret = snprintf(name, (size_t)length, "pnetdata_ebpf_process.%s.o", kernel_string);
 
-    return "pnetdata_ebpf_process.o";
+    return ret;
 }
 
 int process_load_ebpf()
 {
     char lpath[4096];
+    char name[128];
 
-    char *name = select_file();
+    int test = select_file(name, 127);
+    if (test < 0 || test > 127)
+        return -1;
 
     build_complete_path(lpath, 4096, plugin_dir,  name);
     event_pid = getpid();
-    if (load_bpf_file(lpath, event_pid) ) {
+    if (load_bpf_file(lpath, event_pid)) {
         error("[EBPF_PROCESS] Cannot load program: %s", lpath);
         return -1;
     } else {
@@ -775,16 +804,24 @@ void set_global_variables() {
     if (nprocs > NETDATA_MAX_PROCESSOR) {
         nprocs = NETDATA_MAX_PROCESSOR;
     }
+
+    isrh = get_redhat_release();
 }
 
 static void change_collector_event() {
     int i;
+    if (mykernel < NETDATA_KERNEL_V5_3)
+        collector_events[10].name = NULL;
+
     for (i = 0; collector_events[i].name ; i++ ) {
         collector_events[i].type = 'p';
     }
+}
 
-    if (mykernel < 328448)
-        collector_events[i].name = NULL;
+static void change_syscalls() {
+    static char *lfork = { "do_fork" };
+    id_names[7] = lfork;
+    collector_events[8].name = lfork;
 }
 
 static inline void what_to_load(char *ptr) {
@@ -796,6 +833,9 @@ static inline void what_to_load(char *ptr) {
         */
     else
         change_collector_event();
+
+    if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+        change_syscalls();
 }
 
 static inline void enable_debug(char *ptr) {
@@ -846,9 +886,11 @@ int main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
-    mykernel =  get_kernel_version();
-    if(!has_condition_to_run(mykernel))
+    mykernel =  get_kernel_version(kernel_string, 63);
+    if(!has_condition_to_run(mykernel)) {
+        error("[EBPF PROCESS] The current collector cannot run on this kernel.");
         return 1;
+    }
 
     //set name
     program_name = "ebpf_process.plugin";
@@ -874,6 +916,9 @@ int main(int argc, char **argv)
 
     if (load_collector_file(user_config_dir)) {
         info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
+        change_collector_event();
+        if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
+            change_syscalls();
     }
 
     if(ebpf_load_libraries()) {
@@ -912,6 +957,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
+        error("[EBPF PROCESS] Cannot start the mutex.");
         int_exit(7);
     }
 
