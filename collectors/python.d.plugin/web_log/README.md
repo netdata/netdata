@@ -1,9 +1,7 @@
 <!--
----
 title: "Web server log (Apache, NGINX, Squid) monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/web_log/README.md
 sidebar_label: "Web server logs (Apache, NGINX, Squid)"
----
 -->
 
 # Web server log (Apache, NGINX, Squid) monitoring with Netdata
