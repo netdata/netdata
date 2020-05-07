@@ -68,9 +68,9 @@ button.
 After you've hit that button, jump down to our instructions on [pull requests and
 cleanup](#pull-requests-and-final-steps) for your next steps. 
 
-!!! note This process will create a branch directly on the `netdata/netdata` repository, which then requires manual
-    cleanup. If you're going to make significant documentation contributions, or contribute often, we recommend the
-    local editing process just below.
+> This process will create a branch directly on the `netdata/netdata` repository, which then requires manual cleanup. If
+> you're going to make significant documentation contributions, or contribute often, we recommend the local editing
+> process just below.
 
 ## Edit documentation locally
 

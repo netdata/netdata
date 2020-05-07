@@ -319,8 +319,8 @@ reference the label text of the link/button with Markdown's (`**bold text**`) ta
 Click on the **Sign in** button.
 ```
 
-!!! note Whenever possible, avoid using directional language to orient readers, because not every reader can use
-    instructions like "look at the top-left corner" to find their way around an interface.
+> Whenever possible, avoid using directional language to orient readers, because not every reader can use instructions
+> like "look at the top-left corner" to find their way around an interface.
 
 If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
 

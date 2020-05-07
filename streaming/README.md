@@ -230,8 +230,10 @@ Netdata does not activate TLS encryption by default. To encrypt streaming connec
 
 The word `SSL` appended to the end of the destination tells the slave that connections must be encrypted.
 
-??? info "Differences in TLS and SSL terminology"
-    While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol, it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS` or `TLS/SSL`.
+> While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol,
+> it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata
+> itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS`
+> or `TLS/SSL`.
 
 #### Certificate verification
 
@@ -276,8 +278,8 @@ Now you update the list of certificates running the following, again either as `
 # update-ca-certificates
 ```
 
-!!! note
-    Some Linux distributions have different methods of updating the certificate list. For more details, please read this guide on [addding trusted root certificates](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
+> Some Linux distributions have different methods of updating the certificate list. For more details, please read this
+> guide on [addding trusted root certificates](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
 
 Once you update your certificate list, you can set the stream parameters for Netdata to trust the master certificate. Open `stream.conf` for editing and change the following lines:
 
