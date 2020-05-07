@@ -19,7 +19,7 @@ jobs:
           docker build -f tests/integration/dockerfiles/Dockerfile.test -t netdata/ntestdata:test .
       - name: Setup Artifacts Server
         run: |
-          curl -q -s -O https://github.com/prologic/static/releases/download/0.0.2/static_0.0.2_Linux_x86_64.tar.gz
+          curl -q -s -S -L -O https://github.com/prologic/static/releases/download/0.0.2/static_0.0.2_Linux_x86_64.tar.gz
           tar -xvf static_0.0.2_Linux_x86_64.tar.gz static
           mkdir -p ./artifacts
           nobup ./static -r ./artifacts > /dev/null 2>&1 &
