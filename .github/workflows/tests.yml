@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 100
       - name: Build Test Image
         run: |
           docker build -f tests/integration/dockerfiles/Dockerfile.test -t netdata/ntestdata:test .
