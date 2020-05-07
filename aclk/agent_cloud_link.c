@@ -1684,7 +1684,7 @@ int aclk_send_info_metadata()
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (aclk_metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "connect", msg_id, 0, 0);
+        aclk_create_header(local_buffer, "update", msg_id, 0, 0);
     else
         aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
