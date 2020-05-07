@@ -16,6 +16,11 @@ jobs:
         uses: actions/checkout@v2
       - run: |
           git fetch --prune --unshallow
+      - name: Prepare Environment
+        run: |
+          ./packaging/installer/install-required-packages.sh \
+            --dont-wait --non-interactive \
+            netdata
       - name: Build Test Image
         run: |
           docker build -f tests/integration/dockerfiles/Dockerfile.test -t netdata/ntestdata:test .
