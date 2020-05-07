@@ -2,7 +2,7 @@
 ---
 title: "Nvidia GPU monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nvidia_smi/README.md
-sidebar_label: "Nvidia GPU"
+sidebar_label: "Nvidia GPUs"
 ---
 -->
 
