@@ -89,7 +89,7 @@ restore_argv() {
 
 fnmatch() {
   case "$2" in
-    $1)
+    "$1")
       return 0
       ;;
     *)
