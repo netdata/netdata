@@ -1,8 +1,7 @@
 <!--
----
 title: "Memcached monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/memcached/README.md
----
+sidebar_label: "Memcached"
 -->
 
 # Memcached monitoring with Netdata

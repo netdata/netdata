@@ -2,6 +2,7 @@
 ---
 title: "eBPF monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf_process.plugin/README.md
+sidebar_label: "eBPF"
 ---
 -->
 

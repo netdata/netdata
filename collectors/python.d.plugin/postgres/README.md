@@ -1,8 +1,7 @@
 <!--
----
 title: "PostgreSQL monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/postgres/README.md
----
+sidebar_label: "PostgreSQL"
 -->
 
 # PostgreSQL monitoring with Netdata

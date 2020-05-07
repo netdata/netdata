@@ -1,8 +1,7 @@
 <!--
----
 title: "Monit monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/monit/README.md
----
+sidebar_label: "Monit"
 -->
 
 # Monit monitoring with Netdata

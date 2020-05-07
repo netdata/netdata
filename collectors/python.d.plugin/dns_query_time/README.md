@@ -1,8 +1,7 @@
 <!--
----
 title: "DNS query RTT monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dns_query_time/README.md
----
+sidebar_label: "DNS query RTT"
 -->
 
 # DNS query RTT monitoring with Netdata

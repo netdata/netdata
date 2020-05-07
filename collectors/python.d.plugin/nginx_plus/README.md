@@ -1,8 +1,7 @@
 <!--
----
 title: "NGINX Plus monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nginx_plus/README.md
----
+sidebar_label: "NGINX Plus"
 -->
 
 # NGINX Plus monitoring with Netdata

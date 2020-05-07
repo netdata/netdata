@@ -1,8 +1,7 @@
 <!--
----
 title: "PowerDNS monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/powerdns/README.md
----
+sidebar_label: "PowerDNS"
 -->
 
 # PowerDNS monitoring with Netdata

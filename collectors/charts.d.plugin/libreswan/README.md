@@ -1,8 +1,7 @@
 <!--
----
 title: "Libreswan IPSec tunnel monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/libreswan/README.md
----
+sidebar_label: "Libreswan IPSec tunnels"
 -->
 
 # Libreswan IPSec tunnel monitoring with Netdata

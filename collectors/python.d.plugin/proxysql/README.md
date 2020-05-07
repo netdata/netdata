@@ -1,8 +1,7 @@
 <!--
----
 title: "ProxySQL monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/proxysql/README.md
----
+sidebar_label: "ProxySQL"
 -->
 
 # ProxySQL monitoring with Netdata

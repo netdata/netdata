@@ -1,8 +1,7 @@
 <!--
----
 title: "OpenVPN monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ovpn_status_log/README.md
----
+sidebar_label: "OpenVPN"
 -->
 
 # OpenVPN monitoring with Netdata

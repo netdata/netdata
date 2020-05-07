@@ -1,8 +1,7 @@
 <!--
----
 title: "MySQL monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/mysql/README.md
----
+sidebar_label: "MySQL"
 -->
 
 # MySQL monitoring with Netdata
