@@ -175,7 +175,7 @@ def disk_charts_template(name):
 
 VARNISHSTAT = 'varnishstat'
 
-re_version = re.compile(r'varnish-(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)')
+re_version = re.compile(r'varnish-(?:plus-)?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)')
 
 
 class VarnishVersion:
