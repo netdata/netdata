@@ -122,11 +122,12 @@ thoughts.
 
 Also, be sure to check out these useful resources:
 
--   [Netdata's CockroachDB documentation](https://docs.netdata.cloud/collectors/go.d.plugin/modules/cockroachdb/)
+-   [Netdata's CockroachDB
+    documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/cockroachdb/)
 -   [Netdata's CockroachDB
     configuration](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/cockroachdb.conf)
 -   [Netdata's CockroachDB
-    alarms](https://github.com/netdata/netdata/blob/29d9b5e51603792ee27ef5a21f1de0ba8e130158/health/health.d/cockroachdb.conf)
+    alarms](https://github.com/netdata/netdata/blob/master/health/health.d/cockroachdb.conf)
 -   [CockroachDB homepage](https://www.cockroachlabs.com/product/)
 -   [CockroachDB documentation](https://www.cockroachlabs.com/docs/stable/)
 -   [`_status/vars` endpoint
