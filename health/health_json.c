@@ -346,22 +346,25 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
 void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-    buffer_strcat(wb, "[");
+    buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
+                       "\n\t\"alarms\": {\n",
+                   host->hostname);
 
     unsigned int max = host->health_log.max;
     unsigned int count = 0;
     ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae && count < max ; count++, ae = ae->next) {
+    for(ae = host->health_log.alarms; ae && count < max ; ae = ae->next) {
 
         if(likely(!((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL)
                    && (ae->old_status != RRDCALC_STATUS_WARNING || ae->old_status != RRDCALC_STATUS_CRITICAL)
                     && !ae->updated_by_id)))
             continue;
+
         if(likely(count)) buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
+        count++;
     }
-
-    buffer_strcat(wb, "\n]\n");
+    buffer_strcat(wb, "\n\t}\n}\n");
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }

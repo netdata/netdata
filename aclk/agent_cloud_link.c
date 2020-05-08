@@ -1649,16 +1649,16 @@ void aclk_send_alarm_metadata()
     health_alarms2json(localhost, local_buffer, 1);
     debug(D_ACLK, "Metadata %s with configured alarms has %zu bytes", msg_id, local_buffer->len);
 
-    buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
+    //buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
     //health_alarm_log2json(localhost, local_buffer, 0);
-    health_active_log_alarms_2json(localhost, local_buffer);
+    //health_active_log_alarms_2json(localhost, local_buffer);
     //info("%s", local_buffer->buffer);
-    debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
+    //debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ",\n\t \"alarms-active\" : ");
-    health_alarms_values2json(localhost, local_buffer, 0);
+    //health_alarms_values2json(localhost, local_buffer, 0);
+    health_active_log_alarms_2json(localhost, local_buffer);
     debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
-
     buffer_sprintf(local_buffer, "\n}\n}");
     aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
 
