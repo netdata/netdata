@@ -112,10 +112,10 @@ reader.
 
 ```
 # Not recommended
-To install Netdata, click [here](https://learn.netdata.cloud/docs/agent/packaging/installer/).
+To install Netdata, click [here](/example/path/README.md).
 
 # Recommended
-To install Netdata, read our [installation instructions](https://learn.netdata.cloud/docs/agent/packaging/installer/).
+To install Netdata, read our [installation instructions](/example/path/README.md).
 ```
 
 In general, guides should include fewer hyperlinks to keep the reader focused on the task at hand. Documentation should
