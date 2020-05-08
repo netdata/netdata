@@ -347,7 +347,7 @@ void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
-                       "\n\t\"alarms\": {\n",
+                       "\n\t\"alarms\": [\n",
                    host->hostname);
 
     unsigned int max = host->health_log.max;
@@ -364,7 +364,7 @@ void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
             health_alarm_entry2json_nolock(wb, ae, host);
         count++;
     }
-    buffer_strcat(wb, "\n\t}\n}\n");
+    buffer_strcat(wb, "\n\t]\n}\n");
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
