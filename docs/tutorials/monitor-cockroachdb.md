@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/m
 
 [CockroachDB](https://github.com/cockroachdb/cockroach) is an open-source project that brings SQL databases into
 scalable, disaster-resilient cloud deployments. Thanks to a [new CockroachDB
-collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/cockroachdb/) released in
+collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/cockroachdb/) released in
 [v1.20](https://blog.netdata.cloud/posts/release-1.20/), you can now monitor any number of CockroachDB databases with
 maximum granularity using Netdata. Collect more than 50 unique metrics and put them on interactive visualizations
 designed for better visual anomaly detection.
