@@ -564,6 +564,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-comments"></i>',
         info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
     },
+
+	'vnstat': {
+        title: 'vnstat',
+        icon: '<i class="fas fa-tachometer-alt"></i>',
+        info: undefined
+    },
 };
 
 
@@ -3406,5 +3412,15 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
         ],
+    },
+
+	// ------------------------------------------------------------------------
+    // vnstat
+
+    'vnstat.total': {
+        colors: NETDATA.colors[4],
+        mainheads: [
+            netdataDashboard.gaugeChart('Total Bandwidth Used', '12%', '', NETDATA.colors[4])
+        ]
     },
 };
