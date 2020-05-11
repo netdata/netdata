@@ -28,10 +28,10 @@ Netdata Cloud.
 > The claiming process ensures no third party can add your node, and then view your node's metrics, in a Cloud account,
 > Space, or War Room that you did not authorize.
 
-By claiming a node, you opt-in to sending data from your Agent to Netdata Cloud via the ACLK. This data is encrypted by
-TLS while it is in transit. We use the RSA keypair created during claiming to authenticate the identity of the Agent
-when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way from Agents to the
-browser, we do not store or log it.
+By claiming a node, you opt-in to sending data from your Agent to Netdata Cloud via the [ACLK](/aclk/README.md). This
+data is encrypted by TLS while it is in transit. We use the RSA keypair created during claiming to authenticate the
+identity of the Agent when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way
+from Agents to the browser, we do not store or log it.
 
 You can claim a node during the Cloud onboarding process, or after you created a Space by clicking on the **USER's
 Space** dropdown, then **Manage claimed nodes**.
@@ -171,10 +171,11 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 
 ### Troubleshooting
 
-If you're having trouble claiming a node, this may be because the ACLK cannot connect to Cloud.
+If you're having trouble claiming a node, this may be because the [ACLK](/aclk/README.md) cannot connect to Cloud.
 
-With the Netdata Agent running, visit `http://localhost:19999/api/v1/info` in your browser. The returned JSON contains
-four keys that will be helpful to diagnose any issues you might be having with the ACLK or claiming process.
+With the Netdata Agent running, visit `http://NODE:19999/api/v1/info` in your browser, replacing `NODE` with the IP
+address or hostname of your Agent. The returned JSON contains four keys that will be helpful to diagnose any issues you
+might be having with the ACLK or claiming process.
 
 ```json
 	"cloud-enabled"
