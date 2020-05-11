@@ -37,8 +37,8 @@ settings](/web/server/README.md#other-netdataconf-web-section-options) in the
 Beyond charts, the standard dashboard can be broken down into three key areas:
 
 1.  [**Sections**](#sections)
-2.  [**Menus/submenus**](#metrics-menus)
-3.  [**Cloud menus Spaces, War Rooms, and Visited nodes)**](#cloud-menus-spaces-war-rooms-and-visited-nodes)
+2.  [**Metrics menus/submenus**](#metrics-menus)
+3.  [**Cloud menus: Spaces, War Rooms, and Visited nodes)**](#cloud-menus-spaces-war-rooms-and-visited-nodes)
 
 ![Annotated screenshot of the
 dashboard](https://user-images.githubusercontent.com/1153921/80834497-ac9c2380-8ba5-11ea-83c4-b323dd89557f.png)
