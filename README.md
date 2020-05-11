@@ -214,21 +214,27 @@ metrics, but also troubleshoot complex performance problems.
 
 ## News
 
-`April 6, 2020` - **[Netdata v1.21.0 released!](https://github.com/netdata/netdata/releases)**
+`May 11, 2020` - **[Netdata v1.22.0 released!](https://github.com/netdata/netdata/releases)**
 
-Release v1.21.0 contains 2 new collectors, 3 new exporting connectors, 37 bug fixes, 46 improvements, and 25 documentation updates. We also made 26 bug fixes or improvements related to the upcoming release of Netdata Cloud.
+Release v1.22.0 marks the official launch of our rearchitected Netdata Cloud! This Agent release contains both backend and interface changes necessary to connect your distributed nodes to this dramatically improved experience.
 
-We added a new **collector for Apache Pulsar**, a popular open-source distributed pub-sub messaging system. We use Pulsar in our Netdata Cloud infrastructure (more on that later this month!), and are excited to start sharing metrics about our own Pulsar systems when the time comes. The Pulsar collector attempts to auto-detect any running Pulsar processes, but you can always [configure the collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/pulsar/#configuration) based on your setup.
+Netdata Cloud builds on top of our open source monitoring Agent to give you real-time visibility for your entire infrastructure. Once you've connected your Agents to Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface. When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
 
-Also new in v1.21 is a **VerneMQ collector**. We use the open-source MQ Telemetry Transport (MQTT) broker for Netdata Cloud as well. As with Pulsar, you can [configure the VerneMQ collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/vernemq/#vernemq-monitoring-with-netdata) to auto-detect your installation in just a few steps.
+![Animated GIF of Netdata Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
 
-Our experimental exporting engine received significant updates with new connectors for **[Prometheus remote write](https://docs.netdata.cloud/exporting/prometheus/remote_write/)**, **[MongoDB](https://docs.netdata.cloud/exporting/mongodb/)**, and **[AWS Kinesis Data Streams](https://docs.netdata.cloud/exporting/aws_kinesis/)**. You can now send Netdata metrics to more than 20 additional external storage providers for long-term archiving and deeper analysis. Learn more about the [exporting engine](https://docs.netdata.cloud/exporting/) in our documentation.
+**[Sign in to Cloud](https://app.netdata.cloud)** and read our [Get started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started/) guide for details on updating your nodes, claiming them, and navigating the new Cloud.
 
-We upgraded our **TLS compatibility to include 1.3**, which applies to HTTPS for both Netdata's web server and streaming connections. TLS 1.3 is the most up-to-date version of the TLS protocol, and contains important fixes and improvements to ensure strong encryption. If you enabled TLS in the web server or streaming, Netdata attempts to use 1.3 by default, but you can also set the version and ciphers explicitly. Learn more in the [documentation](https://docs.netdata.cloud/web/server/#select-tls-version).
+While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or centralized in any way. Metrics data remains with your nodes and is only streamed to your browser through Cloud.
 
-The Netdata dashboard has been **completely re-written in React**. While the look and behavior hasn't changed, these under-the-hood changes enable a suite of new features, UX improvements, and design overhauls. With React, we'll be able to work faster and better resource our talented engineers.
+In addition, Cloud only expands on the functionality of the wildly popular free and open source Agent. We will never make any of our open source Agent features Cloud-exclusive, and we will actively continue to develop the Agent so that we can integrate new features with Netdata Cloud.
 
-As part of the ongoing work to polish our **eBPF collector tech preview**, we've now proven the collector's performance is very good, and have vastly expanded the number of operating system versions the collector works on. Learn how to [enable it](https://docs.netdata.cloud/collectors/ebpf_process.plugin/) in our documentation. We've also extensively stress-tested the eBPF collector and found that it's impressively fast given the depth of metrics it collects! Read up on our benchmarking analysis [on GitHub](https://github.com/netdata/netdata/issues/8195).
+We added a new collector called `whoisquery` that helps you **monitor a domain name's expiration date**. You can track as many domains as you'd like, and set custom warning and critical thresholds for each. For more information on setup and configuration, see the [Whois domain expiry monitoring documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/whoisquery/).
+
+We added a new connector to our experimental exporting engine: **[Prometheus remote write](https://learn.netdata.cloud/docs/agent/exporting/prometheus/remote_write/)**. You can use this connector to send Netdata metrics to your choice of more than 20 external storage providers for long-term archiving and further analysis.
+
+Our new documentation experience is now available at **[Netdata Learn](https://learn.netdata.cloud)**! We encourage you to try it out and give us feedback or ask questions in our [GitHub issues](https://github.com/netdata/netdata/issues/new/choose). Learn features documentation for both the Agent and Cloud in separate-but-connected vaults, which streamlines the experience of learning about both products.
+
+While Learn only features documentation for now, we plan on releasing more types of educational content serving the Agent's open-source community of developers, sysadmins, and DevOps folks. We'll have more to announce soon, but in the meantime, we hope you enjoy what we believe is a smoother (and prettier) docs experience.
 
 ---
 
