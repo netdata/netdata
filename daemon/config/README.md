@@ -76,8 +76,8 @@ Please note that your data history will be lost if you have modified `history` p
 | debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](/daemon/README.md#debugging).|||
 | error log|`/var/log/netdata/error.log`|The filename to save error messages for Netdata daemon and all plugins (`stderr` is sent here for all Netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.|||
 | access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing Netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.|||
-| errors flood protection period|`1200`|UNUSED - Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|||
-| errors to trigger flood protection|`200`|UNUSED - Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.|||
+| errors flood protection period|`1200`|Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|||
+| errors to trigger flood protection|`200`|Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.|||
 | run as user|`netdata`|The user Netdata will run as.|||
 | pthread stack size|auto-detected||||
 | cleanup obsolete charts after seconds|`3600`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also sets the timeout for cleaning up obsolete dimensions|||
