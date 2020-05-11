@@ -96,7 +96,7 @@ docker run -d --name=netdata \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata \
-  /usr/sbin/netdata -D -W set global "netdata cloud" enable -W set cloud "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
+  /usr/sbin/netdata -D -W set cloud global enabled true -W set cloud global "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
 ```
 
 The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run
@@ -167,11 +167,11 @@ Use these keys and the information below to troubleshoot the ACLK.
 
 If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cloud` option.
 
-Additionally, check that the `netdata cloud` setting in `netdata.conf` is set to `enable`:
+Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud.conf` is set to `true`:
 
 ```ini
-[general]
-    netadata cloud = enable
+[global]
+    enabled = true
 ```
 
 To fix this issue, reinstall Netdata using your [preferred method](/packaging/installer/README.md) and do not add the
@@ -234,23 +234,23 @@ with details about your system and relevant output from `error.log`.
 
 ### Unclaim (remove) an Agent from Netdata Cloud
 
-The best method to remove an Agent from Netdata Cloud is to unclaim it by deleting the `claim.d/` directory in your
-Netdata configuration directory.
+The best method to remove an Agent from Netdata Cloud is to unclaim it by deleting the `cloud.d/` directory in your
+Netdata library directory.
 
 ```bash
-cd /etc/netdata   # Replace with your Netdata configuration directory, if not /etc/netdata/
-rm -rf claim.d/
+cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
+rm -rf cloud.d/
 ```
 
 > You may need to use `sudo` or another method of elevating your privileges.
 
-Once you delete the `claim.d/` directory, the ACLK will not connect to Cloud the next time the Agent starts, and Cloud
+Once you delete the `cloud.d/` directory, the ACLK will not connect to Cloud the next time the Agent starts, and Cloud
 will then remove it from the interface.
 
 ## Claiming reference
 
 In the sections below, you can find reference material for the claiming script, claiming via the Agent's command line
-tool, and details about the files found in `claim.d`.
+tool, and details about the files found in `cloud.d`.
 
 ### Claiming script
 
@@ -263,7 +263,7 @@ and passing the following arguments:
 -rooms=ROOM1,ROOM2,...
     where ROOMX is the War Room this node should be added to. This list is optional.
 -url=URL_BASE
-    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://netdata.cloud.
+    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://app.netdata.cloud.
 -id=AGENT_ID
     where AGENT_ID is the unique identifier of the Agent. This is the Agent's MACHINE_GUID by default.
 -hostname=HOSTNAME
@@ -306,14 +306,14 @@ If need be, the user can override the Agent's defaults by providing additional a
 
 ### Claiming directory
 
-Netdata stores the agent claiming-related state in the user configuration directory under `claim.d`, e.g. in
-`/etc/netdata/claim.d`. The user can put files in this directory to provide defaults to the `-token` and `-rooms`
+Netdata stores the agent claiming-related state in the Netdata library directory under `cloud.d`, e.g. in
+`/var/lib/netdata/cloud.d`. The user can put files in this directory to provide defaults to the `-token` and `-rooms`
 arguments. These files should be owned **by the `netdata` user**.
 
-The `claim.d/token` file should contain the claiming-token and the `claim.d/rooms` file should contain the list of 
+The `cloud.d/token` file should contain the claiming-token and the `cloud.d/rooms` file should contain the list of 
 war-rooms.
 
-The user can also put the Cloud endpoint's full certificate chain in `claim.d/cloud_fullchain.pem` so that the Agent
+The user can also put the Cloud endpoint's full certificate chain in `cloud.d/cloud_fullchain.pem` so that the Agent
 can trust the endpoint if necessary.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fclaim%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

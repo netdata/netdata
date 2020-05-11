@@ -792,11 +792,6 @@ function renderMyNetdataMenu(machinesArray) {
     if (!isSignedIn()) {
         html += (
             `<div class="agent-item">
-                <i class="fas fa-tv"></i>
-                <a onClick="openAuthenticatedUrl('console.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
-                <div></div>
-            </div>
-            <div class="agent-item">
                 <i class="fas fa-cog""></i>
                 <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
                 <div></div>
@@ -4807,11 +4802,7 @@ function signInDidClick(e) {
 }
 
 function shouldShowSignInBanner() {
-    if (isSignedIn()) {
-        return false;
-    }
-
-    return localStorage.getItem("signInBannerClosed") != "true";
+    return false;
 }
 
 function closeSignInBanner() {
@@ -4895,43 +4886,6 @@ function signOut() {
     cloudSSOSignOut();
 }
 
-function renderAccountUI() {
-    if (!NETDATA.registry.isCloudEnabled) {
-        return
-    }
-
-    const container = document.getElementById("account-menu-container");
-    if (isSignedIn()) {
-        container.removeAttribute("title");
-        container.removeAttribute("data-original-title");
-        container.removeAttribute("data-placement");
-        container.innerHTML = (
-            `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
-            <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
-                <li>
-                    <a onclick="openAuthenticatedUrl('console.html');" target="_blank" class="btn">
-                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup class="beta"> beta</sup></span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="btn" onclick="signOutDidClick(event); return false">
-                    <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
-                    </a>
-                </li>
-            </ul>`
-        )
-        document.getElementById("amc-account-name").textContent = cloudAccountName; // Anti-XSS
-    } else {
-        container.setAttribute("data-original-title", "sign in");
-        container.setAttribute("data-placement", "bottom");
-        container.innerHTML = (
-            `<a href="#" class="btn sign-in-btn theme-${netdataTheme}" onclick="signInDidClick(event); return false">
-                <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
-            </a>`
-        )
-    }
-}
-
 function handleMessage(e) {
     switch (e.data.type) {
         case "sign-in":
@@ -4964,7 +4918,6 @@ function handleSignInMessage(e) {
 
 function handleSignOutMessage(e) {
     clearCloudVariables();
-    renderAccountUI();
     renderMyNetdataMenu(registryAgents);
 }
 
@@ -5118,7 +5071,6 @@ function initCloud() {
     }
 
     touchAgent();
-    renderAccountUI();
 }
 
 // This callback is called after NETDATA.registry is initialized.
