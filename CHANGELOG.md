@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.22.0](https://github.com/netdata/netdata/tree/v1.22.0) (2020-05-11)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.21.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.21.1...v1.22.0)
 
 **Merged pull requests:**
 
