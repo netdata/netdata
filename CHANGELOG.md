@@ -1,5 +1,16 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.22.0...HEAD)
+
+**Merged pull requests:**
+
+- Remove UNUSED word from flood protection documentation [\#8964](https://github.com/netdata/netdata/pull/8964) ([mfundul](https://github.com/mfundul))
+- Docs: Update with go-live claiming and ACLK information \(\#8859\) [\#8960](https://github.com/netdata/netdata/pull/8960) ([prologic](https://github.com/prologic))
+- Docs: Fix internal links and remove obsolete admonitions [\#8946](https://github.com/netdata/netdata/pull/8946) ([joelhans](https://github.com/joelhans))
+- Fix shutdown via netdatacli with musl C library [\#8931](https://github.com/netdata/netdata/pull/8931) ([mfundul](https://github.com/mfundul))
+
 ## [v1.22.0](https://github.com/netdata/netdata/tree/v1.22.0) (2020-05-11)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.21.1...v1.22.0)
