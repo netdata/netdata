@@ -58,11 +58,11 @@ command from a remote system, and it fails, it's likely that a firewall is block
 Another option is to put Netdata behind web server, which will proxy requests through standard HTTP/HTTPS ports
 (80/443), which are likely already open on your instance. We have a number of guides available:
 
--   [Apache](../../../docs/Running-behind-apache.md)
--   [Nginx](../../../docs/Running-behind-nginx.md)
--   [Caddy](../../../docs/Running-behind-caddy.md)
--   [HAProxy](../../../docs/Running-behind-haproxy.md)
--   [lighttpd](../../../docs/Running-behind-lighttpd.md)
+-   [Apache](/docs/Running-behind-apache.md)
+-   [Nginx](/docs/Running-behind-nginx.md)
+-   [Caddy](/docs/Running-behind-caddy.md)
+-   [HAProxy](/docs/Running-behind-haproxy.md)
+-   [lighttpd](/docs/Running-behind-lighttpd.md)
 
 The next few sections outline how to add firewall rules to GCP, AWS, and Azure instances.
 

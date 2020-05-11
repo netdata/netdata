@@ -37,7 +37,7 @@ cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /et
 > You may need to use `sudo` or another method of elevating your privileges: `sudo ./edit-config health.d/cpu.conf`.
 >
 > You can also use the `$EDITOR` environment variable to use your preferred terminal editor with `edit-config`. See 
-> [this page](../docs/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
+> [this page](/docs/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
 
 Each health configuration file contains one or more health entities, which always begin with an `alarm:` or `template:`
 line. You can edit these entities based on your needs. To make any changes live, be sure to [reload your health

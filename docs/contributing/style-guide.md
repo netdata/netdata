@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata style guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
----
 -->
 
 # Netdata style guide
@@ -112,12 +110,12 @@ Conciseness leads to more accurate and understandable writing.
 Hyperlinks should clearly state its destination. Don't use words like "here" to describe where a link will take your
 reader.
 
-```
+```markdown
 # Not recommended
-To install Netdata, click [here](https://docs.netdata.cloud/packaging/installer/).
+To install Netdata, click [here](/packaging/installer/README.md).
 
 # Recommended
-To install Netdata, read our [installation instructions](https://docs.netdata.cloud/packaging/installer/).
+To install Netdata, read our [installation instructions](/packaging/installer/README.md).
 ```
 
 In general, guides should include fewer hyperlinks to keep the reader focused on the task at hand. Documentation should
@@ -321,8 +319,8 @@ reference the label text of the link/button with Markdown's (`**bold text**`) ta
 Click on the **Sign in** button.
 ```
 
-!!! note Whenever possible, avoid using directional language to orient readers, because not every reader can use
-    instructions like "look at the top-left corner" to find their way around an interface.
+> Whenever possible, avoid using directional language to orient readers, because not every reader can use instructions
+> like "look at the top-left corner" to find their way around an interface.
 
 If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
 
@@ -370,8 +368,8 @@ Display line numbers by appending `linenums="1"` after the language declaration,
 number of your choice. Highlight lines by appending `hl_lines="2"`, replacing `2` with the line you'd like to highlight.
 Or, multiple lines: `hl_lines="1 2 4 12`.
 
-!!! note Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on
-    our [documentation site](https://docs.netdata.cloud/). They should be used sparingly and only when necessary.
+> Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our
+> [documentation site](https://learn.netdata.cloud/). They should be used sparingly and only when necessary.
 
 ## Accessibility
 
