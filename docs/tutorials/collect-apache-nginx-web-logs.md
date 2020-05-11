@@ -106,10 +106,10 @@ jobs:
 ```
 
 However, if your log files were not auto-detected, it might be because they are in a different location. Try the default
-`weblog.conf` file.
+`web_log.conf` file.
 
 ```bash
-./edit-config go.d/weblog.conf
+./edit-config go.d/web_log.conf
 ```
 
 To create a new custom configuration, you need to set the `path` parameter to point to your web server's access log
