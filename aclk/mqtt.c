@@ -29,7 +29,7 @@ void publish_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(mosq);
     UNUSED(obj);
     UNUSED(rc);
-
+    info("Publish_callback: mid=%d", rc);
     // TODO: link this with a msg_id so it can be traced
     return;
 }
@@ -219,7 +219,8 @@ void aclk_lws_connection_data_received()
 
 void aclk_lws_connection_closed()
 {
-    aclk_disconnect(NULL);
+    aclk_disconnect();
+
 }
 
 

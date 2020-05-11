@@ -9,74 +9,92 @@
 # Exit code: 2 - Problems with claiming working directory
 # Exit code: 3 - Missing dependencies
 # Exit code: 4 - Failure to connect to endpoint
-# Exit code: 5 - Unknown HTTP error message
-# Exit code: 6 - The CLI didn't work
-# Exit code: 7 - Wrong user
+# Exit code: 5 - The CLI didn't work
+# Exit code: 6 - Wrong user
+# Exit code: 7 - Unknown HTTP error message
 #
 # OK: Agent claimed successfully
 # HTTP Status code: 204
 # Exit code: 0
 #
+# Unknown HTTP error message
+# HTTP Status code: 422
+# Exit code: 7
+ERROR_KEYS[7]="None"
+ERROR_MESSAGES[7]="Unknown HTTP error message"
+
 # Error: The agent id is invalid; it does not fulfill the constraints
 # HTTP Status code: 422
-# Error key: "ErrInvalidNodeID"
-# Error message: "invalid node id"
-# Exit code: 6
+# Exit code: 8
+ERROR_KEYS[8]="ErrInvalidNodeID"
+ERROR_MESSAGES[8]="invalid node id"
 
 # Error: The agent hostname is invalid; it does not fulfill the constraints
 # HTTP Status code: 422
-# Error key: "ErrInvalidNodeName"
-# Error message: "invalid node name"
-# Exit code: 7
-#
+# Exit code: 9
+ERROR_KEYS[9]="ErrInvalidNodeName"
+ERROR_MESSAGES[9]="invalid node name"
+
 # Error: At least one of the given rooms ids is invalid; it does not fulfill the constraints
 # HTTP Status code: 422
-# Error key: "ErrInvalidRoomID"
-# Error message: "invalid room id"
-# Exit code: 8
-#
+# Exit code: 10
+ERROR_KEYS[10]="ErrInvalidRoomID"
+ERROR_MESSAGES[10]="invalid room id"
+
 # Error: Invalid public key; the public key is empty or not present
 # HTTP Status code: 422
-# Error key: "ErrInvalidPublicKey"
-# Error message: "invalid public key"
-# Exit code: 9
+# Exit code: 11
+ERROR_KEYS[11]="ErrInvalidPublicKey"
+ERROR_MESSAGES[11]="invalid public key"
 #
 # Error: Expired, missing or invalid token
 # HTTP Status code: 403
-# Error key: "ErrForbidden"
-# Error message: "token expired" | "token not found" | "invalid token"
-# Exit code: 10
-#
+# Exit code: 12
+ERROR_KEYS[12]="ErrForbidden"
+ERROR_MESSAGES[12]="token expired/token not found/invalid token"
+
 # Error: Duplicate agent id; an agent with the same id is already registered in the cloud
 # HTTP Status code: 409
-# Error key: "ErrAlreadyClaimed"
-# Error message: "already claimed"
-# Exit code: 11
-#
+# Exit code: 13
+ERROR_KEYS[13]="ErrAlreadyClaimed"
+ERROR_MESSAGES[13]="already claimed"
+
 # Error: The node claiming process is still in progress.
 # HTTP Status code: 102
-# Error key: "ErrProcessingClaim"
-# Error message: "processing claiming"
-# Exit code: 12
-#
+# Exit code: 14
+ERROR_KEYS[14]="ErrProcessingClaim"
+ERROR_MESSAGES[14]="processing claiming"
+
 # Error: Internal server error. Any other unexpected error (DB problems, etc.)
 # HTTP Status code: 500
-# Error key: "ErrInternalServerError"
-# Error message: "Internal Server Error"
-# Exit code: 13
-#
+# Exit code: 15
+ERROR_KEYS[15]="ErrInternalServerError"
+ERROR_MESSAGES[15]="Internal Server Error"
+
 # Error: There was a timout processing the claim.
 # HTTP Status code: 504
-# Error key: "ErrGatewayTimeout"
-# Error message: "Gateway Timeout"
-# Exit code: 14
-#
+# Exit code: 16
+ERROR_KEYS[16]="ErrGatewayTimeout"
+ERROR_MESSAGES[16]="Gateway Timeout"
+
 # Error: The service cannot handle the claiming request at this time.
 # HTTP Status code: 503
-# Error key: "ErrServiceUnavailable"
-# Error message: "Service Unavailable"
-# Exit code: 15
+# Exit code: 17
+ERROR_KEYS[17]="ErrServiceUnavailable"
+ERROR_MESSAGES[17]="Service Unavailable"
 
+get_config_value() {
+    conf_file="${1}"
+    section="${2}"
+    key_name="${3}"
+    config_result=$(@sbindir_POST@/netdatacli 2>/dev/null read-config "$conf_file|$section|$key_name"; exit $?)
+    # shellcheck disable=SC2181
+    if [ "$?" != "0" ]; then
+       echo >&2 "cli failed, assume netdata is not running and query the on-disk config"
+       config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get2 "$conf_file" "$section" "$key_name" unknown_default)
+    fi
+    echo "$config_result"
+}
 if command -v curl >/dev/null 2>&1 ; then
         URLTOOL="curl"
 elif command -v wget >/dev/null 2>&1 ; then
@@ -90,15 +108,26 @@ if ! command -v openssl >/dev/null 2>&1 ; then
         exit 3
 fi
 
+# shellcheck disable=SC2050
+if [ "@enable_cloud_POST@" = "no" ]; then
+    echo >&2 "This agent was built with --disable-cloud and cannot be claimed"
+    exit 3
+fi
+# shellcheck disable=SC2050
+if [ "@can_enable_aclk_POST@" != "yes" ]; then
+    echo >&2 "This agent was built without the dependencies for Cloud and cannot be claimed"
+    exit 3
+fi
 
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_VARLIB_DIR}" ] && NETDATA_VARLIB_DIR="@varlibdir_POST@"
 MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
-CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
+CLAIMING_DIR="${NETDATA_VARLIB_DIR}/cloud.d"
 TOKEN="unknown"
-URL_BASE="https://netdata.cloud"
+URL_BASE=$(get_config_value cloud global "cloud base url")
+[ -z "$URL_BASE" ] && URL_BASE="https://app.netdata.cloud"  # Cover post-install with --dont-start
 ID="unknown"
 ROOMS=""
 [ -z "$HOSTNAME" ] && HOSTNAME=$(hostname)
@@ -106,13 +135,8 @@ CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
 VERBOSE=0
 INSECURE=0
 RELOAD=1
-NETDATA_USER=netdata
+NETDATA_USER=$(get_config_value netdata global "run as user")
 [ -z "$EUID" ] && EUID="$(id -u)"
-
-CONF_USER=$(grep '^[ 	#]*run as user[ 	]*=' "${NETDATA_USER_CONFIG_DIR}/netdata.conf" 2>/dev/null)
-if [ -n "$CONF_USER" ]; then
-    NETDATA_USER=$(echo "$CONF_USER" | sed 's/^[^=]*=[ \t]*//' | sed 's/[ \t]*$//')
-fi
 
 
 # get the MACHINE_GUID by default
@@ -152,7 +176,7 @@ done
 
 if [ "$EUID" != "0" ] && [ "$(whoami)" != "$NETDATA_USER" ]; then
     echo >&2 "This script must be run by the $NETDATA_USER user account"
-    exit 7
+    exit 6
 fi
 
 # if curl not installed give warning SOCKS can't be used
@@ -279,37 +303,73 @@ if [ "${VERBOSE}" == 1 ] ; then
     cat "${CLAIMING_DIR}/tmpout.txt"
 fi
 
-HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
+ERROR_KEY=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
+case ${ERROR_KEY} in
+        "ErrInvalidNodeID") EXIT_CODE=8 ;;
+        "ErrInvalidNodeName") EXIT_CODE=9 ;;
+        "ErrInvalidRoomID") EXIT_CODE=10 ;;
+        "ErrInvalidPublicKey") EXIT_CODE=11 ;;
+        "ErrForbidden") EXIT_CODE=12 ;;
+        "ErrAlreadyClaimed") EXIT_CODE=13 ;;
+        "ErrProcessingClaim") EXIT_CODE=14 ;;
+        "ErrInternalServerError") EXIT_CODE=15 ;;
+        "ErrGatewayTimeout") EXIT_CODE=16 ;;
+        "ErrServiceUnavailable") EXIT_CODE=17 ;;
+        *) EXIT_CODE=7 ;;
+esac
 
+HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
 if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
+        EXIT_CODE=0
+fi
+
+if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
         rm -f "${CLAIMING_DIR}/tmpout.txt"
         echo -n "${ID}" >"${CLAIMING_DIR}/claimed_id" || (echo >&2 "Claiming failed"; set -e; exit 2)
         rm -f "${CLAIMING_DIR}/token" || (echo >&2 "Claiming failed"; set -e; exit 2)
+
+        # Rewrite the cloud.conf on the disk
+        cat > "$CLAIMING_DIR/cloud.conf" <<HERE_DOC
+[global]
+  enabled = yes
+  cloud base url = $URL_BASE
+HERE_DOC
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
         if [ "${RELOAD}" == "0" ] ; then
-            exit 0
+            exit $EXIT_CODE
         fi
-        netdatacli reload-claiming-state && echo >&2 "Node was successfully claimed." && exit 0
-        echo "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud"
-        exit 6
+
+        if [ -z "${PROXY}" ]; then
+           PROXYMSG=""
+        else
+           PROXYMSG="You have attempted to claim this node through a proxy - please update your the proxy setting in your netdata.conf to ${PROXY}. "
+        fi
+        # Update cloud.conf in the agent memory
+        @sbindir_POST@/netdatacli write-config 'cloud|global|enabled|yes' && \
+        @sbindir_POST@/netdatacli write-config "cloud|global|cloud base url|$URL_BASE" && \
+        @sbindir_POST@/netdatacli reload-claiming-state && \
+        if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
+                echo >&2 "${PROXYMSG}Node was successfully claimed."
+        else
+                echo >&2 "The agent cloud base url is set to the url provided."
+                echo >&2 "The cloud may have different credentials already registered for this agent ID and it cannot be reclaimed under different credentials for security reasons. If you are unable to connect use -id=\$(uuidgen) to overwrite this agent ID with a fresh value if the original credentials cannot be restored."
+                echo >&2 "${PROXYMSG}Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
+        fi && exit $EXIT_CODE
+
+        if [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
+                echo >&2 "The cloud may have different credentials already registered for this agent ID and it cannot be reclaimed under different credentials for security reasons. If you are unable to connect use -id=\$(uuidgen) to overwrite this agent ID with a fresh value if the original credentials cannot be restored."
+                echo >&2 "${PROXYMSG}Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
+                exit $EXIT_CODE
+        fi
+        echo >&2 "${PROXYMSG}The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud."
+        exit 5
 fi
 
-ERROR_MESSAGE=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
-case ${ERROR_MESSAGE} in
-        "ErrInvalidNodeID") EXIT_CODE=6 ;;
-        "ErrInvalidNodeName") EXIT_CODE=7 ;;
-        "ErrInvalidRoomID") EXIT_CODE=8 ;;
-        "ErrInvalidPublicKey") EXIT_CODE=9 ;;
-        "ErrForbidden") EXIT_CODE=10 ;;
-        "ErrAlreadyClaimed") EXIT_CODE=11 ;;
-        "ErrProcessingClaim") EXIT_CODE=12 ;;
-        "ErrInternalServerError") EXIT_CODE=13 ;;
-        "ErrGatewayTimeout") EXIT_CODE=14 ;;
-        "ErrServiceUnavailable") EXIT_CODE=15 ;;
-        *) EXIT_CODE=5 ;;
-esac
-echo >&2 "Failed to claim node."
+echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
+if [ "${VERBOSE}" == 1 ]; then
+    echo >&2 "Error key was:\"${ERROR_KEYS[$EXIT_CODE]}\""
+fi
 rm -f "${CLAIMING_DIR}/tmpout.txt"
 exit $EXIT_CODE

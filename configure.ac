@@ -173,7 +173,6 @@ AC_ARG_ENABLE(
     [ enable_cloud="detect" ]
 )
 
-aclk_required="${enable_cloud}"
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
@@ -435,6 +434,35 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
+
+if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
+	# Try and detect manual static build presence (from netdata-installer.sh)
+	AC_MSG_CHECKING([if statically built json-c is present])
+	HAVE_libjson_c_a="no"
+	if test -f "externaldeps/jsonc/libjson-c.a"; then
+		LIBS_BKP="${LIBS}"
+		LIBS="externaldeps/jsonc/libjson-c.a"
+		AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/jsonc/json-c/json.h"
+										 int main (int argc, char **argv) {
+											 struct json_object *jobj;
+											 char *str = "{ \"msg-type\": \"random\" }";
+											 jobj = json_tokener_parse(str);
+											 json_object_get_type(jobj);
+										 }]])],
+										[HAVE_libjson_c_a="yes"],
+										[HAVE_libjson_c_a="no"])
+		LIBS="${LIBS_BKP}"
+	fi
+
+	if test "${HAVE_libjson_c_a}" = "yes"; then
+		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
+		JSONC_LIBS="static"
+		OPTIONAL_JSONC_STATIC_CFLAGS="-I externaldeps/jsonc"
+	fi
+	AC_MSG_RESULT([${HAVE_libjson_c_a}])
+fi
+AM_CONDITIONAL([LINK_STATIC_JSONC], [test "${JSONC_LIBS}" = "static"])
+
 test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
     AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
 
@@ -577,7 +605,7 @@ if test "$enable_cloud" != "no"; then
     fi
     AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 
-    if test "${build_target}" = "linux" -a "${aclk_required}" != "no"; then
+    if test "${build_target}" = "linux" -a "${enable_cloud}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
             AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
         fi
@@ -586,23 +614,31 @@ if test "$enable_cloud" != "no"; then
         fi
     fi
 
+    # next 2 lines are just to have info for ACLK dependencies in common place
+    AC_MSG_CHECKING([if json-c available for ACLK])
+    AC_MSG_RESULT([${enable_jsonc}])
+
+    test "${enable_cloud}" = "yes" -a "${enable_jsonc}" = "no" && \
+        AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
+
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
     fi
     AC_MSG_RESULT([${can_enable_aclk}])
 
-    test "${aclk_required}" = "yes" -a "${can_enable_aclk}" = "no" && \
+    test "${enable_cloud}" = "yes" -a "${can_enable_aclk}" = "no" && \
         AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
 
     AC_MSG_CHECKING([if netdata agent-cloud-link should/will be enabled])
-    if test "${aclk_required}" = "detect"; then
+    if test "${enable_cloud}" = "detect"; then
         enable_aclk=$can_enable_aclk
     else
-        enable_aclk=$aclk_required
+        enable_aclk=$enable_cloud
     fi
+    AC_SUBST([can_enable_aclk])
 
     if test "${enable_aclk}" = "yes"; then
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
@@ -610,6 +646,7 @@ if test "$enable_cloud" != "no"; then
 
     AC_MSG_RESULT([${enable_aclk}])
 fi
+AC_SUBST([enable_cloud])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
@@ -1216,7 +1253,8 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} \
+	${OPTIONAL_JSONC_STATIC_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 

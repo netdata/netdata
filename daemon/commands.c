@@ -43,6 +43,8 @@ static cmd_status_t cmd_exit_execute(char *args, char **message);
 static cmd_status_t cmd_fatal_execute(char *args, char **message);
 static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message);
 static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
+static cmd_status_t cmd_read_config_execute(char *args, char **message);
+static cmd_status_t cmd_write_config_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -53,6 +55,8 @@ static command_info_t command_info_array[] = {
         {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
         {"reload-claiming-state", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
         {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
+        {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
+        {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -185,23 +189,15 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
 {
     (void)args;
     (void)message;
-
-#ifdef DISABLE_CLOUD
-    info("The claiming feature has been disabled");
+#if defined(DISABLE_CLOUD) || !defined(ENABLE_ACLK)
+    info("The claiming feature has been explicitly disabled");
+    *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
     return CMD_STATUS_FAILURE;
 #endif
-#ifndef ENABLE_ACLK
-    info("Cloud functionality is not enabled because of missing dependencies at build-time.");
-    return CMD_STATUS_FAILURE;
-#endif
-    if (!netdata_cloud_setting) {
-        error("Cannot reload claiming status -> cloud functionality has been disabled");
-        return CMD_STATUS_FAILURE;
-    }
-
     error_log_limit_unlimited();
     info("COMMAND: Reloading Agent Claiming configuration.");
     load_claiming_state();
+    registry_update_cloud_base_url();
     error_log_limit_reset();
     return CMD_STATUS_SUCCESS;
 }
@@ -227,6 +223,76 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
 
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_read_config_execute(char *args, char **message)
+{
+    size_t n = strlen(args);
+    char *separator = strchr(args,'|');
+    if (separator == NULL)
+        return CMD_STATUS_FAILURE;
+    char *separator2 = strchr(separator + 1,'|');
+    if (separator2 == NULL)
+        return CMD_STATUS_FAILURE;
+
+    char *temp = callocz(n + 1, 1);
+    strcpy(temp, args);
+    size_t offset = separator - args;
+    temp[offset] = 0;
+    size_t offset2 = separator2 - args;
+    temp[offset2] = 0;
+
+    const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
+    struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+
+    char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
+    if (value == NULL)
+    {
+        error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set", conf_file,
+              temp + offset + 1, temp + offset2 + 1);
+        freez(temp);
+        return CMD_STATUS_FAILURE;
+    }
+    else
+    {
+        (*message) = strdupz(value);
+        freez(temp);
+        return CMD_STATUS_SUCCESS;
+    }
+
+}
+
+static cmd_status_t cmd_write_config_execute(char *args, char **message)
+{
+    UNUSED(message);
+    info("write-config %s", args);
+    size_t n = strlen(args);
+    char *separator = strchr(args,'|');
+    if (separator == NULL)
+        return CMD_STATUS_FAILURE;
+    char *separator2 = strchr(separator + 1,'|');
+    if (separator2 == NULL)
+        return CMD_STATUS_FAILURE;
+    char *separator3 = strchr(separator2 + 1,'|');
+    if (separator3 == NULL)
+        return CMD_STATUS_FAILURE;
+    char *temp = callocz(n + 1, 1);
+    strcpy(temp, args);
+    size_t offset = separator - args;
+    temp[offset] = 0;
+    size_t offset2 = separator2 - args;
+    temp[offset2] = 0;
+    size_t offset3 = separator3 - args;
+    temp[offset3] = 0;
+
+    const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
+    struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+
+    appconfig_set(tmp_config, temp + offset + 1, temp + offset2 + 1, temp + offset3 + 1);
+    info("write-config conf_file=%s section=%s key=%s value=%s",conf_file, temp + offset + 1, temp + offset2 + 1,
+         temp + offset3 + 1);
+    freez(temp);
     return CMD_STATUS_SUCCESS;
 }
 
@@ -369,9 +435,11 @@ static void schedule_command(uv_work_t *req)
     cmd_ctx->status = execute_command(cmd_ctx->idx, cmd_ctx->args, &cmd_ctx->message);
 }
 
+/* This will alter the state of the command_info_array.cmd_str
+*/
 static void parse_commands(struct command_context *cmd_ctx)
 {
-    char *message = NULL, *pos;
+    char *message = NULL, *pos, *lstrip, *rstrip;
     cmd_t i;
     cmd_status_t status;
 
@@ -381,9 +449,12 @@ static void parse_commands(struct command_context *cmd_ctx)
     for (pos = cmd_ctx->command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) {;}
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
+            for (lstrip=pos + strlen(command_info_array[i].cmd_str); isspace(*lstrip) && ('\0' != *lstrip); ++lstrip) {;}
+            for (rstrip=lstrip+strlen(lstrip)-1; rstrip>lstrip && isspace(*rstrip); *(rstrip--) = 0 );
+
             cmd_ctx->work.data = cmd_ctx;
             cmd_ctx->idx = i;
-            cmd_ctx->args = pos + strlen(command_info_array[i].cmd_str);
+            cmd_ctx->args = lstrip;
             cmd_ctx->message = NULL;
 
             assert(0 == uv_queue_work(loop, &cmd_ctx->work, schedule_command, after_schedule_command));

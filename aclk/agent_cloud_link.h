@@ -25,7 +25,7 @@
 #define ACLK_MAX_TOPIC 255
 
 #define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
-#define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
+#define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
