@@ -58,7 +58,7 @@ what it's collecting. If you run Netdata on many different systems using differe
 menus and submenus may look a little different for each one.
 
 To learn more about menus, see our documentation about [navigating the standard
-dashboard](/web/gui/README.md#menus).
+dashboard](/web/gui/README.md#metrics-menus).
 
 > ❗ By default, Netdata only creates and displays charts if the metrics are _not zero_. So, you may be missing some
 > charts, menus, and submenus if those charts have zero metrics. You can change this by changing the **Which dimensions
