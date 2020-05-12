@@ -132,7 +132,7 @@ static inline void aclk_lws_wss_clear_io_buffers()
 }
 
 static const struct lws_protocols protocols[] = { { "aclk-wss", aclk_lws_wss_callback,
-                                                    sizeof(struct aclk_lws_wss_perconnect_data), 0, 0, 0, 0 },
+                                                    sizeof(struct aclk_lws_wss_perconnect_data), 32768*4, 0, 0, 32768*4 },
                                                   { NULL, NULL, 0, 0, 0, 0, 0 } };
 
 static void aclk_lws_wss_log_divert(int level, const char *line)
