@@ -1412,8 +1412,6 @@ void *aclk_main(void *ptr)
             aclk_lws_wss_destroy_context();
             aclk_force_reconnect = 0;
         }
-        //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
-        //   first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
         if (unlikely(!netdata_exit && !aclk_connected && !aclk_force_reconnect)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
