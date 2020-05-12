@@ -149,6 +149,16 @@ the following:
 sudo certbot --nginx
 ```
 
+If you receive an `error` after executing the command, like the one shown below: 
+`Saving debug log to /var/log/letsencrypt/letsencrypt.log`
+`The requested nginx plugin does not appear to be installed`
+
+Use this command:
+```bash
+sudo apt-get install python-certbot-nginx
+```
+
+
 You'll be prompted with a few questions. At the `Which names would you like to activate HTTPS for?` question, hit
 `Enter`. Next comes this question:
 
