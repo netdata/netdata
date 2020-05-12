@@ -52,10 +52,10 @@ for f in "${EXCLUDE_LIST[@]}"; do
 	rm "${SRC_DIR}/$f"
 done
 
-echo "Fetching localization project"
-LOC_DIR=${GENERATOR_DIR}/localization
-rm -rf ${LOC_DIR}
-git clone https://github.com/netdata/localization.git ${LOC_DIR}
+# echo "Fetching localization project"
+# LOC_DIR=${GENERATOR_DIR}/localization
+# rm -rf ${LOC_DIR}
+# git clone https://github.com/netdata/localization.git ${LOC_DIR}
 
 echo "Preparing directories"
 MKDOCS_CONFIG_FILE="${GENERATOR_DIR}/mkdocs.yml"
@@ -84,26 +84,23 @@ prep_html() {
 	echo "Calling mkdocs"
 
 	# Build html docs
-	mkdocs build --config-file="${MKDOCS_CONFIG_FILE}"
+	# mkdocs build --config-file="${MKDOCS_CONFIG_FILE}"
 
-	# Fix edit buttons for the markdowns that are not on the main Netdata repo
-	find "${GENERATOR_DIR}/${SITE_DIR}/${GO_D_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/collectors\/go.d.plugin/https:\/\/github.com\/netdata\/go.d.plugin\/blob\/master/g'
-	if [ "${lang}" != "en" ] ; then
-		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
-	fi
+	# # Fix edit buttons for the markdowns that are not on the main Netdata repo
+	# find "${GENERATOR_DIR}/${SITE_DIR}/${GO_D_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/collectors\/go.d.plugin/https:\/\/github.com\/netdata\/go.d.plugin\/blob\/master/g'
+	# if [ "${lang}" != "en" ] ; then
+	# 	find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
+	# fi
 
-	# Replace index.html with DOCUMENTATION/index.html. Since we're moving it up one directory, we need to remove ../ from the links
-	echo "Replacing index.html with DOCUMENTATION/index.html"
-	sed 's/\.\.\///g' ${GENERATOR_DIR}/${SITE_DIR}/DOCUMENTATION/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
+	# # Replace index.html with DOCUMENTATION/index.html. Since we're moving it up one directory, we need to remove ../ from the links
+	# echo "Replacing index.html with DOCUMENTATION/index.html"
+	# sed 's/\.\.\///g' ${GENERATOR_DIR}/${SITE_DIR}/DOCUMENTATION/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
 
 }
 
 for d in "en" ; do
 	echo "Preparing source for $d"
 	cp -r ${SRC_DIR} ${DOCS_DIR}
-	if [ "${d}" != "en" ] ; then
-		cp -a ${LOC_DIR}/${d}/* ${DOCS_DIR}/
-	fi
 	prep_html $d
 	rm -rf ${DOCS_DIR}
 done
