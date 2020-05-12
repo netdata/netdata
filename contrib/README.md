@@ -43,9 +43,14 @@ This should give a package that can be installed in the parent
 directory, which you can install manually with dpkg.
 
 ```sh
-ls ../*.deb
-../netdata_1.0.0_amd64.deb
-sudo dpkg -i ../netdata_1.0.0_amd64.deb
+ls -1 ../*.deb
+../netdata_1.21.0_amd64.deb
+../netdata-dbgsym_1.21.0_amd64.deb
+../netdata-plugin-cups_1.21.0_amd64.deb
+../netdata-plugin-cups-dbgsym_1.21.0_amd64.deb
+../netdata-plugin-freeipmi_1.21.0_amd64.deb
+../netdata-plugin-freeipmi-dbgsym_1.21.0_amd64.deb
+sudo dpkg -i ../netdata_1.21.0_amd64.deb
 ```
 
 ### Reinstalling Netdata
