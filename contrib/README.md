@@ -37,31 +37,6 @@ ls ../*.deb
 sudo dpkg -i ../netdata_1.0.0_amd64.deb
 ```
 
-### Building for a Debian system without systemd
-
-The included packaging is designed for modern Debian systems that
-are based on systemd. To build non-systemd packages (for example,
-for Debian wheezy), you will need to make a couple of minor
-updates first.
-
--   edit `contrib/debian/rules` and adjust the `dh` rule near the
-    top to remove systemd (see comments in that file).
-
--   rename `contrib/debian/control.wheezy` to `contrib/debian/control`.
-
--   change `control.wheezy from contrib/Makefile* to control`.
-
--   uncomment `EXTRA_OPTS="-P /var/run/netdata.pid"` in
-    `contrib/debian/netdata.default`
-
--   edit `contrib/debian/netdata.init` and change `PIDFILE` to
-    `/var/run/netdata.pid`
-
--   remove `dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry` from
-    `contrib/debian/netdata.postinst.in`. If you are going to handle the unique id file differently.
-
-Then proceed as the main instructions above.
-
 ### Reinstalling Netdata
 
 The recommended way to upgrade Netdata packages built from this
