@@ -1,53 +1,317 @@
 <!--
 title: "Supported collectors list"
-date: 2020-05-11
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md
+date: 2020-05-12
+custom_edit_url](https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md
 -->
 
 # Supported collectors list
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
-real-time, interactive charts. The following list includes collectors for both internal system metrics, and external
-apps/services metrics.
+real-time, interactive charts. The following list includes collectors for both external services/applications and
+internal system metrics.
 
 Read more about collectors and how to enable them in our [collectors documentation](/collectors/README.md), or use the
 [collector quickstart](/collectors/QUICKSTART.md) to figure out how to collect metrics from your favorite app/service
 with auto-detection and minimal configuration.
+
+Some collectors have both Go and Python versions. While the Go verisons are newer, they are most often disabled by
+default as we continue our effort to make them enabled by default. See the [Go plugin
+documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/#why-disabled-how-to-enable) for details on
+how to disable the Python collector and enable the Go equivalent.
 
 If you don't see the app/service you'd like to monitor here, check out our [GitHub
 issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
 collector—we may be looking for contributions from users such as yourself!
 
 -   [Service and application collectors](#service-and-application-collectors)
+    -   [APM (application performance monitoring)](#apm-application-performance-monitoring)
+    -   [Containers and VMs](#containers-and-vms)
+    -   [Data stores](#data-stores)
+    -   [Distributed computing](#distributed-computing)
+    -   [Email](#email)
+    -   [Logs](#logs)
+    -   [Messaging](#messaging)
+    -   [Network](#network)
+    -   [Provisioning](#provisioning)
+    -   [Remote devices](#remote-devices)
+    -   [Search](#search)
+    -   [Storage](#storage)
+    -   [Web](#web)
 -   [System collectors](#system-collectors)
+    -   [Applications](#applications)
+    -   [Disks and filesystems](#disks-and-filesystems)
+    -   [eBPF (extended Berkely Backet Filter)](#ebpf)
+    -   [Hardware](#hardware)
+    -   [Memory](#memory)
+    -   [Networks](#networks)
+    -   [Processes](#processes)
+    -   [Resources](#resources)
+    -   [Users](#users)
+-   [Third-party collectors](#third-party-collectors)
 
 ## Service and application collectors
 
-| Service/application                      | Documentation                                                                                     | Description | Compatible OS |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------- | ------------- |
-| Go applications                          | [go_expvar](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/go_expvar/)         | Text        | Any           |
-| Java Spring Boot 2 applications (Go)     | [springboot2](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2/) | Text        | Any           |
-| Java Spring Boot 2 applications (Python) | [springboot](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/springboot/)       | Text        | Any           |
-| statsd                                   | [statsd](https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin/)                        | Text        | Any           |
-| phpDaemon                                | [phpdaemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpdaemon/)     | Text        | Any           |
-| uWSGI                                    | [uwsgi](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/uwsgi/)                 | Text        | Any           |
+The Netdata Agent auto-detects and collects metrics from all of the services and applications below. You can also
+configure any of these collectors according to your setup and infrastructure.
+
+### APM (application performance monitoring)
+
+-   [Go applications](/collectors/python.d.plugin/go_expvar/README.md): 
+-   [Java Spring Boot 2
+    applications](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2/) (Go version): 
+-   [Java Spring Boot 2 applications](/collectors/python.d.plugin/springboot/README.md) (Python version): 
+-   [statsd](/collectors/statsd.plugin/README.md): 
+-   [phpDaemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpdaemon/): 
+-   [uWSGI](/collectors/python.d.plugin/uwsgi/README.md): 
+
+### Containers and VMs
+
+-   [Docker containers](/collectors/cgroups.plugin/README.md): 
+-   [DockerD](/collectors/python.d.plugin/dockerd/README.md): 
+-   [Docker Engine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker_engine/): 
+-   [Docker Hub](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dockerhub/): 
+-   [Kubernetes](https://github.com/netdata/helmchart): 
+-   [Kubelet](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet/): 
+-   [kube-proxy](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy/): 
+-   [Libvirt](/collectors/cgroups.plugin/README.md): 
+-   [LXC](/collectors/cgroups.plugin/README.md): 
+-   [LXD](/collectors/cgroups.plugin/README.md): 
+-   [systemd-nspawn](/collectors/cgroups.plugin/README.md): 
+-   [vCenter Server Appliance](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vcsa/): 
+-   [vSphere](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vsphere/): 
+-   [Xen/XCP-ng](/collectors/xenstat.plugin/README.md): 
+
+### Data stores
+
+-   [CockroachDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/cockroachdb/): 
+-   [Consul](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/consul/): 
+-   [CouchDB](/collectors/python.d.plugin/couchdb/README.md): 
+-   [MongoDB](/collectors/python.d.plugin/mongodb/README.md): 
+-   [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): 
+-   [OracleDB](/collectors/python.d.plugin/oracledb/README.md): 
+-   [Postgres](/collectors/python.d.plugin/postgres/README.md): 
+-   [ProxySQL](/collectors/python.d.plugin/proxysql/README.md): 
+-   [Redis](/collectors/python.d.plugin/redis/): 
+-   [RethinkDB](/collectors/python.d.plugin/rethinkdbs/README.md): 
+-   [Riak KV](/collectors/python.d.plugin/riakkv/README.md): 
+-   [Zookeeper](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/zookeeper/): 
+
+### Distributed computing
+
+-   [BOINC](/collectors/python.d.plugin/boinc/README.md): 
+-   [Gearman](/collectors/python.d.plugin/gearman/README.md): 
+
+### Email
+
+-   [Dovecot](/collectors/python.d.plugin/dovecot/README.md): 
+-   [EXIM](/collectors/python.d.plugin/exim/README.md): 
+-   [Postfix](/collectors/python.d.plugin/postfix/README.md): 
+
+### Logs
+
+-   [Fluentd](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/fluentd/): 
+-   [Logstash](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/logstash/): 
+-   [OpenVPN status logs](/collectors/python.d.plugin/ovpn_status_log/): 
+-   [Web server logs (Apache, NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/): 
+-   [Web server logs (Apache, NGINX, Squid)](/collectors/python.d.plugin/web_log/): 
+
+### Messaging
+
+-   [ActiveMQ](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/activemq/): 
+-   [Pulsar](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pulsar/): 
+-   [Beanstalk](/collectors/python.d.plugin/beanstalk/README.md): 
+-   [RabbitMQ (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/rabbitmq/): 
+-   [RabbitMQ (Python)](/collectors/python.d.plugin/rabbitmq/README.md): 
+-   [VerneMQ](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vernemq/): 
+
+### Network
+
+-   [Bind 9](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/bind/): 
+-   [Chrony](/collectors/python.d.plugin/chrony/README.md): 
+-   [CoreDNS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/coredns/): 
+-   [Dnsmasq](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq_dhcp/): 
+-   [dnsdist](/collectors/python.d.plugin/dnsdist/README.md): 
+-   [dns_query](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsquery/): 
+-   [DNS Query Time](/collectors/python.d.plugin/dns_query_time/README.md): 
+-   [Freeradius (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/freeradius/): 
+-   [Freeradius (Python)](/collectors/python.d.plugin/freeradius/README.md): 
+-   [Libreswan](https://learn.netdata.cloud/docs/agent/collectors/charts.d.plugin/libreswan/): 
+-   [Icecast](/collectors/python.d.plugin/icecast/README.md): 
+-   [ISC BIND](https://learn.netdata.cloud/docs/agent/collectors/node.d.plugin/named/README.md): 
+-   [ISC Bind (RDNC)](/collectors/python.d.plugin/bind_rndc/README.md): 
+-   [ISC DHCP](/collectors/python.d.plugin/isc_dhcpd/README.md): 
+-   [OpenLDAP](/collectors/python.d.plugin/openldap/README.md): 
+-   [NSD](/collectors/python.d.plugin/nsd/README.md): 
+-   [NTP daemon](/collectors/python.d.plugin/ntpd/README.md): 
+-   [OpenSIPS](/collectors/charts.d.plugin/opensips/README.md): 
+-   [OpenVPN](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/openvpn/): 
+-   [Pi-hole](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pihole/): 
+-   [PowerDNS](/collectors/python.d.plugin/powerdns/README.md): 
+-   [Tor](/collectors/python.d.plugin/tor/README.md): 
+-   [Unbound](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/unbound/): 
+
+### Provisioning
+
+-   [Puppet](/collectors/python.d.plugin/puppet/README.md): 
+
+### Remote devices
+
+-   [AM2320](/collectors/python.d.plugin/am2320/README.md): 
+-   [Access point](/collectors/charts.d.plugin/ap/README.md): 
+-   [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): 
+-   [Energi Core](/collectors/python.d.plugin/energid/README.md): 
+-   [Fronius Symo](/collectors/node.d.plugin/fronius/): 
+-   [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): 
+-   [SMA Sunny WebBox](/collectors/node.d.plugin/sma_webbox/README.md): 
+-   [SNMP devices](/collectors/node.d.plugin/snmp/README.md): 
+-   [Stiebel Eltron ISG](/collectors/node.d.plugin/stiebeleltron/README.md): 
+-   [1-Wire sensors](/collectors/python.d.plugin/w1sensor/README.md): 
+
+### Search
+
+-   [ElasticSearch](/collectors/python.d.plugin/elasticsearch/README.md): 
+-   [Solr](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/solr/): 
+
+### Storage
+
+-   [Ceph](/collectors/python.d.plugin/ceph/README.md): 
+-   [HDFS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/hdfs/): 
+-   [IPFS](/collectors/python.d.plugin/ipfs/README.md): 
+-   [Scaleio](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/scaleio/): 
+-   [Samba](/collectors/python.d.plugin/samba/README.md): 
+
+### Web
+
+-   [Apache (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): 
+-   [Apache (Python)](/collectors/python.d.plugin/apache/README.md): 
+-   [HAProxy](/collectors/python.d.plugin/haproxy/README.md): 
+-   [HTTP endpoints (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck/): 
+-   [HTTP endpoints (Python)](/collectors/python.d.plugin/httpcheck/README.md): 
+-   [Lighttpd](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/lighttpd/): 
+-   [Lighttpd2](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/lighttpd2/): 
+-   [Litespeed](/collectors/python.d.plugin/litespeed/README.md): 
+-   [Nginx (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): 
+-   [Nginx (Python)](/collectors/python.d.plugin/nginx/README.md): 
+-   [Nginx Plus](/collectors/python.d.plugin/nginx_plus/README.md): 
+-   [PHP-FPM (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): 
+-   [PHP-FPM (Python)](/collectors/python.d.plugin/phpfpm/README.md): 
+-   [TCP endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/portcheck/): 
+-   [Spigot Minecraft servers](/collectors/python.d.plugin/spigotmc/README.md): 
+-   [Squid](/collectors/python.d.plugin/squid/README.md): 
+-   [Tengine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/tengine/): 
+-   [Tomcat](/collectors/python.d.plugin/tomcat/README.md): 
+-   [Traefik](/collectors/python.d.plugin/traefik/README.md): 
+-   [Varnish](/collectors/python.d.plugin/varnish/README.md): 
+-   [x509 check](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check/): 
+-   [Whois domain expiry](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/whoisquery/): 
 
 ## System collectors
 
+The Netdata Agent can collect these system- and hardware-level metrics using a variety of collectors, some of which
+(such as `proc.plugin`) collect multiple types of metrics simultaneously.
+
+### Applications
+
+-   [Fail2ban](/collectors/python.d.plugin/fail2ban/README.md): 
+-   [Monit](/collectors/python.d.plugin/monit/README.md): 
+-   [WMI (Windows Management Instrumentation)
+    exporter](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi/): 
+
+### Disks and filesystems
+
+-   [BCACHE](/collectors/proc.plugin/README.md): 
+-   [Block devices](/collectors/proc.plugin/README.md): 
+-   [BTRFS](/collectors/proc.plugin/README.md): 
+-   [Device mapper](/collectors/proc.plugin/README.md): 
+-   [Disk space](/collectors/diskspace.plugin/README.md): 
+-   [megacli](/collectors/proc.plugin/README.md): 
+-   [NFS file servers and clients](/collectors/proc.plugin/README.md): 
+-   [RAID arrays](/collectors/proc.plugin/README.md): 
+-   [Veritas volume manager](/collectors/proc.plugin/README.md): 
+-   [ZFS](/collectors/proc.plugin/README.md): 
+
+### eBPF
+
+-   [Files](https://learn.netdata.cloud/docs/agent/collectors/ebpf_process.plugin/): 
+-   [Virtual file system (VFS)](https://learn.netdata.cloud/docs/agent/collectors/ebpf_process.plugin/): 
+-   [Processes](https://learn.netdata.cloud/docs/agent/collectors/ebpf_process.plugin/): 
+
+### Hardware
+
+-   [Adaptec RAID](/collectors/python.d.plugin/adaptec_raid/): 
+-   [CUPS](https://learn.netdata.cloud/docs/agent/collectors/cups.plugin/): 
+-   [FreeIPMI](https://learn.netdata.cloud/docs/agent/collectors/freeipmi.plugin/): 
+-   [Hard drive temperature](/collectors/python.d.plugin/hddtemp/): 
+-   [HP Smart Storage Arrays](/collectors/python.d.plugin/hpssa/): 
+-   [macOS](https://learn.netdata.cloud/docs/agent/collectors/macos.plugin/): 
+-   [MegaRAID](/collectors/python.d.plugin/megacli/): 
+-   [NVIDIA GPU](/collectors/python.d.plugin/nvidia_smi/): 
+-   [Sensors](/collectors/python.d.plugin/sensors/): 
+-   [S.M.A.R.T](/collectors/python.d.plugin/smartd_log/): 
+
+### Memory
+
+-   [Available memory](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Committed memory](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Huge pages](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [KSM](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Memcached](/collectors/python.d.plugin/memcached/): 
+-   [Numa](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Page faults](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [RAM](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [SLAB](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [swap](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Writeback memory](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+
+### Networks
+
+-   [Access points](https://learn.netdata.cloud/docs/agent/collectors/charts.d.plugin/ap/): 
+-   [fping](https://learn.netdata.cloud/docs/agent/collectors/fping.plugin/): 
+-   [Netfilter](https://learn.netdata.cloud/docs/agent/collectors/nfacct.plugin/): 
+-   [Network stack](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Network QoS](https://learn.netdata.cloud/docs/agent/collectors/tc.plugin/): 
+-   [SYNPROXY](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+
+### Processes
+
+-   [Applications](https://learn.netdata.cloud/docs/agent/collectors/apps.plugin/): 
+-   [systemd](https://learn.netdata.cloud/docs/agent/collectors/cgroups.plugin/): 
+-   [System processes](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+
+### Resources
+
+-   [CPU frequency](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [CPU idle](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [CPU performance](https://learn.netdata.cloud/docs/agent/collectors/perf.plugin/): 
+-   [CPU throttling](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [CPU utilization](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Entropy](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Interprocess Communication](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [Interrupts](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [IdleJitter](https://learn.netdata.cloud/docs/agent/collectors/idlejitter.plugin/): 
+-   [SoftIRQs](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+-   [SoftNet](https://learn.netdata.cloud/docs/agent/collectors/proc.plugin/): 
+
+### Users
+
+-   [systemd-logind](/collectors/python.d.plugin/logind): 
+-   [User/group usage](https://learn.netdata.cloud/docs/agent/collectors/apps.plugin/): 
+
+## Third-party collectors
+
+These collectors are developed and maintined by third parties and, unlike the other collectors, are not installed by
+default. To use a third-party collector, visit their GitHub/documentation page and follow their installation procedures.
+
+-   [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin):
+-   [Logged-in users](https://github.com/veksh/netdata-numsessions): Collects the number of currently logged-on users.
+-   [nim-netdata-plugin](https://github.com/FedericoCeratto/nim-netdata-plugin): A helper to create native Netdata
+    plugins using Nim.
+-   [Nvidia GPUs](https://github.com/coraxx/netdata_nv_plugin): Monitors nvidia GPUs. 
+-   [Teamspeak 3](https://github.com/coraxx/netdata_ts3_plugin): Plls active users and bandwidth from TeamSpeak 3
+    servers.
+-   [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitors failed authentication requests of an SSH server.
 
 ---
-
-
--   [Internal plugins](#internal-plugins)
--   [External plugins](#external-plugins)
--   [Collector modules (via plugin orchestrators)](#collector-modules-via-plugin-orchestrators)
-    -   [charts.d.plugin (Bash)](#bash-chartsd)
-    -   [go.d.plugin (Go)](#go-god)
-    -   [node.d.plugin (NodeJS)](#nodejs-noded)
-    -   [python.d.plugin (Python)](#python-pythond)
--   [Third-party plugins](#third-party-plugins)
-
-## Internal plugins
 
 | plugin                                           | O/S     | Description                                                                                |
 | :------------------------------------------------| :-------| :------------------------------------------------------------------------------------------|
