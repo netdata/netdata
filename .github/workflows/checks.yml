@@ -66,4 +66,7 @@ jobs:
           echo "::set-env name=DISTFILE::$(ls netdata-*.tar.gz)"
       - name: Run run_install_with_dist_file.sh
         run: |
-          ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
+          .github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
+      - name: Run run_install_with_dist_file.sh (without json-c)
+        run: |
+          .github/scripts/run_install_with_dist_file-without-jsonc.sh "${DISTFILE}"
