@@ -15,8 +15,6 @@ features, you need to Sign In to Netdata cloud. By signing in, you opt in to let
 information described [here](#what-data-does-the-registry-store). You can still get the node menu, but not the cloud
 features, if you [run your own registry](#run-your-own-registry).
 
-[This is a broken link](/broken/link/README.md).
-
 ## Why?
 
 Netdata provides distributed monitoring.
