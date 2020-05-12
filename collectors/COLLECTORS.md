@@ -1,9 +1,7 @@
 <!--
----
 title: "Supported collectors list"
-date: 2020-03-31
+date: 2020-05-11
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md
----
 -->
 
 # Supported collectors list
@@ -19,6 +17,26 @@ with auto-detection and minimal configuration.
 If you don't see the app/service you'd like to monitor here, check out our [GitHub
 issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
 collector—we may be looking for contributions from users such as yourself!
+
+-   [Service and application collectors](#service-and-application-collectors)
+-   [System collectors](#system-collectors)
+
+## Service and application collectors
+
+| Service/application                      | Documentation                                                                                     | Description | Compatible OS |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------- | ------------- |
+| Go applications                          | [go_expvar](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/go_expvar/)         | Text        | Any           |
+| Java Spring Boot 2 applications (Go)     | [springboot2](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2/) | Text        | Any           |
+| Java Spring Boot 2 applications (Python) | [springboot](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/springboot/)       | Text        | Any           |
+| statsd                                   | [statsd](https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin/)                        | Text        | Any           |
+| phpDaemon                                | [phpdaemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpdaemon/)     | Text        | Any           |
+| uWSGI                                    | [uwsgi](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/uwsgi/)                 | Text        | Any           |
+
+## System collectors
+
+
+---
+
 
 -   [Internal plugins](#internal-plugins)
 -   [External plugins](#external-plugins)
