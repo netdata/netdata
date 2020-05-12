@@ -1086,6 +1086,36 @@ int main(int argc, char **argv) {
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
+                                        " Overwrites settings of netdata.conf.\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " If -c netdata.conf is given on the command line,\n"
+                                        " before -W set... the user may overwrite command\n"
+                                        " line parameters at netdata.conf\n"
+                                        " If -c netdata.conf is given after (or missing)\n"
+                                        " -W set... the user cannot overwrite the command line\n"
+                                        " parameters."
+                                        "\n"
+                                );
+                                return 1;
+                            }
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *value = argv[optind + 2];
+                            optind += 3;
+
+                            // set this one as the default
+                            // only if it is not already set in the config file
+                            // so the caller can use -c netdata.conf before or
+                            // after this parameter to prevent or allow overwriting
+                            // variables at netdata.conf
+                            config_set_default(section, key,  value);
+
+                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                        }
+                        else if(strcmp(optarg, "set2") == 0) {
                             if(optind + 4 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W set 'conf_file' 'section' 'key' 'value'\n\n"
                                         " Overwrites settings of netdata.conf or cloud.conf\n"
