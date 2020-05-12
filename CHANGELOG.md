@@ -1,11 +1,16 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.22.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.22.0...v1.22.1)
 
 **Merged pull requests:**
 
+- Fix the latency issue on the ACLK and suppress the diagnostics [\#8992](https://github.com/netdata/netdata/pull/8992) ([amoss](https://github.com/amoss))
+- Fixed bundling of React dashboard in DEB and RPM packages. [\#8988](https://github.com/netdata/netdata/pull/8988) ([Ferroin](https://github.com/Ferroin))
+- Restore old semantics of "netdata -W set" command [\#8987](https://github.com/netdata/netdata/pull/8987) ([mfundul](https://github.com/mfundul))
+- Added JSON-C packaging fils to make dist. [\#8986](https://github.com/netdata/netdata/pull/8986) ([Ferroin](https://github.com/Ferroin))
+- Remove check for old alarm status \(CID 358436\) [\#8978](https://github.com/netdata/netdata/pull/8978) ([stelfrag](https://github.com/stelfrag))
 - Remove UNUSED word from flood protection documentation [\#8964](https://github.com/netdata/netdata/pull/8964) ([mfundul](https://github.com/mfundul))
 - Docs: Update with go-live claiming and ACLK information \(\#8859\) [\#8960](https://github.com/netdata/netdata/pull/8960) ([prologic](https://github.com/prologic))
 - Docs: Fix internal links and remove obsolete admonitions [\#8946](https://github.com/netdata/netdata/pull/8946) ([joelhans](https://github.com/joelhans))
@@ -217,8 +222,6 @@
 - Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
 - Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
 - Enconde slave fields [\#8216](https://github.com/netdata/netdata/pull/8216) ([thiagoftsm](https://github.com/thiagoftsm))
-- Remove the confusion around the multiple Dockerfile\(s\) we have [\#8214](https://github.com/netdata/netdata/pull/8214) ([prologic](https://github.com/prologic))
-- Remvoed the use of clang-format that does not actually block PRs or surface anything to developers \#8188 [\#8196](https://github.com/netdata/netdata/pull/8196) ([prologic](https://github.com/prologic))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
