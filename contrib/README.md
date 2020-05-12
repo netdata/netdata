@@ -22,6 +22,17 @@ way to do this is with a symlink:
 ln -s contrib/debian
 ```
 
+Edit the `debian/changelog` file to reflect the package version and
+the build time:
+
+```sh
+netdata (1.21.0) unstable; urgency=medium
+
+  * Initial Release
+
+ -- Netdata Builder <bot@netdata.cloud>   Tue, 12 May 2020 10:36:52 +0200
+```
+
 Then build the debian package:
 
 ```sh
