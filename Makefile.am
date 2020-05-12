@@ -64,6 +64,8 @@ dist_noinst_DATA = \
     packaging/dashboard.checksums \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/jsonc.version \
+    packaging/jsonc.checksums \
     packaging/libwebsockets.version \
     packaging/libwebsockets.checksums \
     packaging/mosquitto.version \
