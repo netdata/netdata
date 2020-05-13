@@ -41,6 +41,12 @@
 # include "../../libnetdata/config/appconfig.h"
 # include "../../libnetdata/ebpf/ebpf.h"
 
+typedef enum {
+    MODE_RETURN = 0,    //This attaches kprobe when the function returns
+    MODE_DEVMODE,       //This stores log given description about the errors raised
+    MODE_ENTRY          //This attaches kprobe when the function is called
+} netdata_run_mode_t;
+
 typedef struct netdata_syscall_stat {
     unsigned long bytes;                //total number of bytes
     uint64_t call;                      //total number of calls

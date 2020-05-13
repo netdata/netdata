@@ -66,7 +66,7 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
-static int mode = 2;
+static netdata_run_mode_t mode = MODE_ENTRY;
 static int debug_log = 0;
 static int use_stdout = 0;
 struct config collector_config;
@@ -76,6 +76,20 @@ static int isrh;
 netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
+
+static struct ebpf_module {
+    const char *thread_name;
+    int enabled;
+    void (*start_routine) (void *);
+    int update_time;
+    int global_charts;
+    int apps_charts;
+    netdata_run_mode_t mode;
+} ebpf_modules[] = {
+    { .thread_name = "process", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
+    { .thread_name = "network_viewer", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
+    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY },
+};
 
 static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write", "process", "task", "process", "thread" };
 static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write", "do_exit", "release_task", "_do_fork", "sys_clone" };
@@ -139,7 +153,7 @@ static void int_exit(int sig)
         publish_aggregated = NULL;
     }
 
-    if(mode == 1 && debug_log) {
+    if(mode == MODE_DEVMODE && debug_log) {
         unmap_memory();
     }
 
@@ -279,7 +293,7 @@ static void netdata_global_charts_create() {
             , publish_aggregated
             , 2);
 
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_FILE_OPEN_ERR_COUNT
                 , "Calls"
@@ -308,7 +322,7 @@ static void netdata_global_charts_create() {
             , &publish_aggregated[NETDATA_IN_START_BYTE]
             , 2);
 
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         netdata_create_io_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_IO_FILE_BYTES
                 , "bytes/s"
@@ -350,7 +364,7 @@ static void netdata_global_charts_create() {
             , NETDATA_PROCESS_GROUP
             , 978);
 
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_PROCESS_ERROR_NAME
                 , "Calls"
@@ -479,7 +493,7 @@ static void netdata_publish_data() {
     write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
-    if(mode < 2) {
+    if(mode < MODE_ENTRY) {
         write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
         write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
         write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
@@ -597,7 +611,7 @@ void *process_log(void *ptr)
 {
     (void) ptr;
 
-    if (mode == 1 && debug_log) {
+    if (mode == MODE_DEVMODE && debug_log) {
         netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
     }
 
@@ -695,7 +709,7 @@ static int ebpf_load_libraries()
             return -1;
         }
 
-        if(mode == 1) {
+        if(mode == MODE_DEVMODE) {
             set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
             if ((err = dlerror()) != NULL) {
                 error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
@@ -728,7 +742,7 @@ static int ebpf_load_libraries()
 char *select_file() {
     if(!mode)
         return "rnetdata_ebpf_process.o";
-    if(mode == 1)
+    if(mode == MODE_DEVMODE)
         return "dnetdata_ebpf_process.o";
 
     return "pnetdata_ebpf_process.o";
@@ -798,7 +812,7 @@ static void change_syscalls() {
 
 static inline void what_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
-        mode = 0;
+        mode = MODE_RETURN;
     /*
     else if (!strcasecmp(ptr, "dev"))
         mode = 1;
@@ -853,10 +867,186 @@ static int load_collector_file(char *path) {
     return 0;
 }
 
+static inline void ebpf_disable_apps() {
+    int i ;
+    for (i = 0 ;ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_modules[i].apps_charts = 0;
+    }
+}
+
+static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int disable_apps) {
+    em->enabled = 1;
+    if (!disable_apps) {
+        em->apps_charts = 1;
+    }
+    em->global_charts = 1;
+}
+
+static inline void ebpf_enable_all_charts(int apps) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_enable_specific_chart(&ebpf_modules[i], apps);
+    }
+}
+
+static inline void ebpf_enable_chart(int enable, int disable_apps) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        if (i == enable) {
+            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
+            break;
+        }
+    }
+}
+
+static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_modules[i].mode = lmode;
+    }
+}
+
+void ebpf_print_help() {
+    const time_t t = time(NULL);
+    struct tm ct;
+    struct tm *test = localtime_r(&t, &ct);
+    int year;
+    if (test)
+        year = ct.tm_year;
+    else
+        year = 0;
+
+    fprintf(stderr,
+            "\n"
+            " Netdata ebpf.plugin %s\n"
+            " Copyright (C) 2016-%d Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Released under GNU General Public License v3 or later.\n"
+            " All rights reserved.\n"
+            "\n"
+            " This program is a data collector plugin for netdata.\n"
+            "\n"
+            " Available command line options:\n"
+            "\n"
+            " SECONDS           set the data collection frequency.\n"
+            "\n"
+            " --help or -h      show this help.\n"
+            "\n"
+            " --version or -v   show software version.\n"
+            "\n"
+            " --global or -g    disable charts per application.\n"
+            "\n"
+            " --all or -a       Enable all chart groups (global and apps), unless -g is also given.\n"
+            "\n"
+            " --net or -n       Enable network viewer charts.\n"
+            "\n"
+            " --process or -p   Enable charts related to process run time.\n"
+            "\n"
+            " --return or -r    Run the collector in return mode.\n"
+            "\n"
+            , VERSION
+            , (year >= 116)?year + 1900: 2020
+    );
+}
+
+static void parse_args(int argc, char **argv)
+{
+    int enabled = 0;
+    int disable_apps = 0;
+    int freq = 0;
+    int c;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"help",     no_argument,    0,  'h' },
+        {"version",  no_argument,    0,  'v' },
+        {"global",   no_argument,    0,  'g' },
+        {"all",      no_argument,    0,  'a' },
+        {"net",      no_argument,    0,  'n' },
+        {"process",  no_argument,    0,  'p' },
+        {"return",   no_argument,    0,  'r' },
+        {0, 0, 0, 0}
+    };
+
+    if (argc > 1) {
+        int n = (int)str2l(argv[1]);
+        if(n > 0) {
+            freq = n;
+        }
+    }
+
+    while (1) {
+        c = getopt_long(argc, argv, "hvganpr",long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+            case 'h': {
+                ebpf_print_help();
+                exit(0);
+            }
+            case 'v': {
+                printf("ebpf.plugin %s\n", VERSION);
+                exit(0);
+            }
+            case 'g': {
+                disable_apps = 1;
+                ebpf_disable_apps();
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF running with global chart group, because it was started with the option \"--global\" or \"-g\".");
+#endif
+                break;
+            }
+            case 'a': {
+                ebpf_enable_all_charts(disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF running with all chart groups, because it was started with the option \"--all\" or \"-a\".");
+#endif
+                break;
+            }
+            case 'n': {
+                enabled = 1;
+                ebpf_enable_chart(1, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"NET\" charts, because it was started with the option \"--net\" or \"-n\".");
+#endif
+                break;
+            }
+            case 'p': {
+                enabled = 1;
+                ebpf_enable_chart(0, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"--process\" or \"-p\".");
+#endif
+                break;
+            }
+            case 'r': {
+                mode = MODE_RETURN;
+                ebpf_set_thread_mode(mode);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
+#endif
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    if (freq > 0) {
+        update_every = freq;
+    }
+
+    if (!enabled) {
+        ebpf_enable_all_charts(disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
+#endif
+    }
+}
+
 int main(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
+    parse_args(argc, argv);
 
     mykernel =  get_kernel_version();
     if(!has_condition_to_run(mykernel)) {
@@ -873,10 +1063,6 @@ int main(int argc, char **argv)
     // set errors flood protection to 100 logs per hour
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
-
-    if (argc > 1) {
-        update_every = (int)strtol(argv[1], NULL, 10);
-    }
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
@@ -913,7 +1099,7 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
-    if(mode == 1 && debug_log) {
+    if(mode == MODE_DEVMODE && debug_log) {
         if(map_memory()) {
             thread_finished++;
             error("[EBPF_PROCESS] Cannot map memory used with perf events.");
