@@ -214,7 +214,7 @@ echo -ne "
     - 'collectors/COLLECTORS.md'
     - 'collectors/REFERENCE.md'
     - Internal plugins:
-        - eBPF metrics: collectors/ebpf_process.plugin/README.md
+        - eBPF metrics: collectors/ebpf.plugin/README.md
 "
 
 navpart 3 collectors/proc.plugin
