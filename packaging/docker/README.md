@@ -261,11 +261,17 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
 ```
 
 ### Restrict access with basic auth
