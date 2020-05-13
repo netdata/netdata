@@ -233,7 +233,7 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
  * @param hostname the name of the host that sends the message.
  * @param length the length of the message body.
  */
-static inline void opentsdb_build_message(BUFFER *buffer, char *message, const char *hostname, int length)
+static inline void opentsdb_send_header(BUFFER *buffer, char *message, const char *hostname, int length)
 {
     buffer_sprintf(
         buffer,
@@ -333,7 +333,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         instance->labels ? buffer_tostring(instance->labels) : "");
 
     if (length > 0) {
-        opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
+        opentsdb_send_header(instance->buffer, message, engine->config.hostname, length);
     }
 
     return 0;
@@ -393,7 +393,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         instance->labels ? buffer_tostring(instance->labels) : "");
 
     if (length > 0) {
-        opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
+        opentsdb_send_header(instance->buffer, message, engine->config.hostname, length);
     }
 
     return 0;
