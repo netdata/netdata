@@ -56,7 +56,8 @@ int init_aws_kinesis_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
+    if(uv_mutex_init(&instance->mutex))
+        return 1;
     uv_cond_init(&instance->cond_var);
 
     if (!instance->engine->aws_sdk_initialized) {
