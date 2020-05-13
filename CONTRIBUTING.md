@@ -7,7 +7,7 @@ We love to receive contributions. Maintaining a platform for monitoring everythi
 There are many ways to contribute, with varying requirements of skills, explained in detail in the following sections. 
 Specific GitHub issues we need help with can be seen [here](https://github.com/netdata/netdata/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22). Some of them are also labeled as "good first issue". 
 
-## All NetData Users
+## All Netdata Users
 
 ### Give Netdata a GitHub star
 
@@ -76,7 +76,7 @@ Don't be afraid to submit a pull request with your corrections or additions! We 
 
 We expect most contributions to be for new data collection plugins. You can read about how external plugins work [here](collectors/plugins.d/). Additional instructions are available for [Node.js plugins](collectors/node.d.plugin) and [Python plugins](collectors/python.d.plugin).
 
-Of course we appreciate contributions for any other part of the NetData agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include NetData charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
+Of course we appreciate contributions for any other part of the Netdata agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include Netdata charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
 
 If you are working on the C source code please be aware that we have a standard build configuration that we use. This
 is meant to keep the source tree clean and free of warnings. When you are preparing to work on the code:
@@ -195,7 +195,7 @@ PR Descriptions:
 
 Some PR title examples:
 
-- Fix bug in NetData installer for FreeBSD 11.2
+- Fix bug in Netdata installer for FreeBSD 11.2
 - Improve docs for other installation methods
 - New collector for Prometheus endpoints
 - Add 4.19 Kernel variant for eBPF
