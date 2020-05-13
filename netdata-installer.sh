@@ -53,7 +53,7 @@ defer_error_highlighted() {
 }
 
 print_deferred_errors() {
-  if [ -n "${NETDATA_DEFERRED_ERRORS}" ] ; then
+  if [ -n "${NETDATA_DEFERRED_ERRORS}" ]; then
     echo >&2
     echo >&2 "The following non-fatal errors were encountered during the installation process:"
     # shellcheck disable=SC2059
@@ -281,7 +281,7 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
     "--disable-cloud")
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
@@ -289,12 +289,15 @@ while [ -n "${1}" ]; do
       fi
       ;;
     "--require-cloud")
-      if [ -n "${NETDATA_DISABLE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
         echo "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-cloud/} --enable-cloud"
       fi
+      ;;
+    "--build-json-c")
+      NETDATA_BUILD_JSON_C=1
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
@@ -441,7 +444,12 @@ You may need to check these:
    If your system cannot find zlib, although it is installed
    run me with the option:  --libs-are-really-here
 
-3. You need basic build tools installed, like:
+3. The package json-c-dev (or json-c-devel) has to be installed.
+
+   If your system cannot find json-c, although it is installed
+   run me with the option:  --libs-are-really-here
+
+4. You need basic build tools installed, like:
 
    gcc make autoconf automake pkg-config
 
@@ -524,7 +532,7 @@ bundle_libmosquitto() {
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
@@ -532,7 +540,7 @@ bundle_libmosquitto() {
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
@@ -573,7 +581,7 @@ bundle_libwebsockets() {
     return 0
   fi
 
-  if [ -z "$(command -v cmake)" ] ; then
+  if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
     return 0
@@ -598,7 +606,7 @@ bundle_libwebsockets() {
       run_ok "libwebsockets built and prepared."
     else
       run_failed "Failed to build libwebsockets."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         exit 1
       else
         defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
@@ -606,7 +614,7 @@ bundle_libwebsockets() {
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ] ; then
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
@@ -617,9 +625,76 @@ bundle_libwebsockets() {
 bundle_libwebsockets
 
 # -----------------------------------------------------------------------------
+
+build_jsonc() {
+  pushd "${1}" > /dev/null || exit 1
+  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -DBUILD_SHARED_LIBS=OFF .
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make
+  popd > /dev/null || exit 1
+}
+
+copy_jsonc() {
+  target_dir="${PWD}/externaldeps/jsonc"
+
+  run mkdir -p "${target_dir}" "${target_dir}/json-c" || return 1
+
+  run cp "${1}/libjson-c.a" "${target_dir}/libjson-c.a" || return 1
+  run cp ${1}/*.h "${target_dir}/json-c" || return 1
+}
+
+bundle_jsonc() {
+  # If --build-json-c flag or not json-c on system, then bundle our own json-c
+  if [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c; then
+    return 0
+  fi
+
+  if [ -z "$(command -v cmake)" ]; then
+    run_failed "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
+    defer_error_highlighted "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
+    return 0
+  fi
+
+  progress "Prepare JSON-C"
+
+  JSONC_PACKAGE_VERSION="$(cat packaging/jsonc.version)"
+
+  tmp="$(mktemp -d -t netdata-jsonc-XXXXXX)"
+  JSONC_PACKAGE_BASENAME="json-c-${JSONC_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "jsonc" \
+    "https://github.com/json-c/json-c/archive/${JSONC_PACKAGE_BASENAME}" \
+    "${JSONC_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_JSONC}"; then
+    if run tar -xf "${tmp}/${JSONC_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
+      copy_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "JSON-C built and prepared."
+    else
+      run_failed "Failed to build JSON-C."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for JSON-C."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
+    fi
+  fi
+}
+
+bundle_jsonc
+
+# -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
-if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ] ; then
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
   "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
 fi
 
@@ -848,7 +923,7 @@ NETDATA_LOG_DIR="$(config_option "global" "log directory" "${NETDATA_PREFIX}/var
 NETDATA_USER_CONFIG_DIR="$(config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata")"
 NETDATA_STOCK_CONFIG_DIR="$(config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d")"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
-NETDATA_CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
+NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
 
 cat << OPTIONSEOF
 
@@ -1017,17 +1092,8 @@ fi
 # -----------------------------------------------------------------------------
 
 copy_react_dashboard() {
-  run rm -rf "${NETDATA_WEB_DIR}-react"
-  run rm -rf "${NETDATA_WEB_DIR}-classic"
-  run cp -a "${1}/" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/dashboard_info.js" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/dashboard.slate.css" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/dashboard.css" "${NETDATA_WEB_DIR}-react"
-  run cp -a "${NETDATA_WEB_DIR}/main.css" "${NETDATA_WEB_DIR}-react"
-  run echo "$(cd ${NETDATA_WEB_DIR}-react && find . -type f | sed -e 's/\.\///')" > "${NETDATA_WEB_DIR}-react/.files"
-  run cp -a "${NETDATA_WEB_DIR}" "${NETDATA_WEB_DIR}-classic"
-  run echo "$(find web/gui -type f | sed -e "s/web\/gui\///")" > "${NETDATA_WEB_DIR}-classic/.files"
-  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}-react"
+  run cp -a $(find ${1} -mindepth 1 -maxdepth 1) "${NETDATA_WEB_DIR}"
+  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
 }
 
 install_react_dashboard() {
@@ -1039,22 +1105,14 @@ install_react_dashboard() {
   DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
 
   if fetch_and_verify "dashboard" \
-                      "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${DASHBOARD_PACKAGE_BASENAME}" \
-                      "${tmp}" \
-                      "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"
-  then
-    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" && \
-       copy_react_dashboard "${tmp}/build" && \
-       rm -rf "${tmp}"
-    then
-      if run "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-switch-dashboard.sh" "${NETDATA_SELECTED_DASHBOARD:-react}" ; then
-        run_ok "React dashboard installed."
-      else
-        run_failed "Failed to switch to React dashboard."
-        run rm -rf "${NETDATA_WEB_DIR}"
-        run cp -a "${NETDATA_WEB_DIR}-classic" "${NETDATA_WEB_DIR}"
-      fi
+    "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
+    "${DASHBOARD_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"; then
+    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" &&
+      copy_react_dashboard "${tmp}/build" &&
+      rm -rf "${tmp}"; then
+      run_ok "React dashboard installed."
     else
       run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
     fi
@@ -1415,6 +1473,10 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
+# By default we assume the shutdown/startup of the Netdata Agent are effectively
+# without any system supervisor/init like SystemD or SysV. So we assume the most
+# basic startup/shutdown commands...
+NETDATA_STOP_CMD="${NETDATA_PREFIX}/usr/bin/netdatacli shutdown-agent"
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
@@ -1615,7 +1677,6 @@ REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
-NETDATA_SELECTED_DASHBOARD="${NETDATA_SELECTED_DASHBOARD:-react}"
 EOF
 run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 

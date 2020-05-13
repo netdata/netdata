@@ -22,7 +22,6 @@ RUN pacman --noconfirm --needed -S autoconf \
                                    cmake \
                                    valgrind
 
-ARG ACLK=no
 ARG EXTRA_CFLAGS
 COPY . /opt/netdata/source
 WORKDIR /opt/netdata/source
@@ -46,7 +45,7 @@ RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
 RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
-    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --disable-lto
+    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --require-cloud --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log

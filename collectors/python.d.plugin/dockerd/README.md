@@ -1,11 +1,10 @@
 <!--
----
-title: "Docker engine monitoring with Netdata"
+title: "Docker Engine monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dockerd/README.md
----
+sidebar_label: "Docker Engine"
 -->
 
-# Docker engine monitoring with Netdata
+# Docker Engine monitoring with Netdata
 
 Collects docker container health metrics.
 

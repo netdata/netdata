@@ -69,9 +69,12 @@ The API requests are serviced as follows:
 
 Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data between a slave and its master, via the TLS protocol.
 
-Inbound unix socket connections are unaffected, regardless of the TLS settings.\
-??? info "Differences in TLS and SSL terminology"
-    While Netdata uses Transport Layer Security (TLS) to encrypt communications rather than the obsolete SSL protocol, it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS` or `TLS/SSL`.
+Inbound unix socket connections are unaffected, regardless of the TLS settings.
+
+> While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol,
+> it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata
+> itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS`
+> or `TLS/SSL`.
 
 To enable TLS, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
 
@@ -89,12 +92,13 @@ For test purposes, you can generate self-signed certificates with the following 
 openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 ```
 
-!!! note
-    If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication. `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. You can verify the difference by running:
-
-```sh
-openssl speed rsa2048 rsa4096
-```
+> If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication.
+> `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. You can verify the difference
+> by running:
+>
+> ```sh
+> openssl speed rsa2048 rsa4096
+> ```
 
 ### Select TLS version
 

@@ -306,13 +306,13 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2017, Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
-            " Home Page  : https://my-netdata.io\n"
+            " Home Page  : https://netdata.cloud\n"
             " Source Code: https://github.com/netdata/netdata\n"
-            " Wiki / Docs: https://github.com/netdata/netdata/wiki\n"
+            " Docs       : https://learn.netdata.cloud\n"
             " Support    : https://github.com/netdata/netdata/issues\n"
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
@@ -577,20 +577,7 @@ static void get_netdata_configured_variables() {
     get_system_cpus();
     get_system_pid_max();
 
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
-#ifdef DISABLE_CLOUD
-    netdata_cloud_setting = 0;
-#else
-    char *cloud = config_get(CONFIG_SECTION_GLOBAL, "netdata cloud", "coming soon");
-    if (!strcmp(cloud, "coming soon")) {
-        netdata_cloud_setting = 0;          // Note: this flips to 1 after the release
-    } else if (!strcmp(cloud, "enable")) {
-        netdata_cloud_setting = 1;
-    } else if (!strcmp(cloud, "disable")) {
-        netdata_cloud_setting = 0;
-    }
-#endif
+
 }
 
 static void get_system_timezone(void) {
@@ -851,11 +838,41 @@ void set_silencers_filename() {
     silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
 }
 
+/* Any config setting that can be accessed without a default value i.e. configget(...,...,NULL) *MUST*
+   be set in this procedure to be called in all the relevant code paths.
+*/
+void post_conf_load(char **user)
+{
+    // --------------------------------------------------------------------
+    // get the user we should run
+
+    // IMPORTANT: this is required before web_files_uid()
+    if(getuid() == 0) {
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
+    }
+    else {
+        struct passwd *passwd = getpwuid(getuid());
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
+    }
+
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+    netdata_cloud_setting = 0;
+#else
+    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+#endif
+    // This must be set before any point in the code that accesses it. Do not move it from this function.
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+}
+
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
     size_t default_stacksize;
+    char *user = NULL;
+
 
     netdata_ready=0;
     // set the name for logging
@@ -918,6 +935,8 @@ int main(int argc, char **argv) {
                     }
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
+                        post_conf_load(&user);
+                        load_cloud_conf(1);
                         config_loaded = 1;
                     }
                     break;
@@ -965,6 +984,8 @@ int main(int argc, char **argv) {
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
                             if(unit_test_str2ld()) return 1;
+                            // No call to load the config file on this code-path
+                            post_conf_load(&user);
                             get_netdata_configured_variables();
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
@@ -1094,6 +1115,39 @@ int main(int argc, char **argv) {
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
+                        else if(strcmp(optarg, "set2") == 0) {
+                            if(optind + 4 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W set 'conf_file' 'section' 'key' 'value'\n\n"
+                                        " Overwrites settings of netdata.conf or cloud.conf\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " If -c netdata.conf is given on the command line,\n"
+                                        " before -W set... the user may overwrite command\n"
+                                        " line parameters at netdata.conf\n"
+                                        " If -c netdata.conf is given after (or missing)\n"
+                                        " -W set... the user cannot overwrite the command line\n"
+                                        " parameters."
+                                        " conf_file can be \"cloud\" or \"netdata\".\n"
+                                        "\n"
+                                );
+                                return 1;
+                            }
+                            const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
+                            struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+                            const char *section = argv[optind + 1];
+                            const char *key = argv[optind + 2];
+                            const char *value = argv[optind + 3];
+                            optind += 4;
+
+                            // set this one as the default
+                            // only if it is not already set in the config file
+                            // so the caller can use -c netdata.conf before or
+                            // after this parameter to prevent or allow overwriting
+                            // variables at netdata.conf
+                            appconfig_set_default(tmp_config, section, key,  value);
+
+                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                        }
                         else if(strcmp(optarg, "get") == 0) {
                             if(optind + 3 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
@@ -1109,6 +1163,7 @@ int main(int argc, char **argv) {
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
                                 load_netdata_conf(NULL, 0);
+                                post_conf_load(&user);
                             }
 
                             get_netdata_configured_variables();
@@ -1117,6 +1172,37 @@ int main(int argc, char **argv) {
                             const char *key = argv[optind + 1];
                             const char *def = argv[optind + 2];
                             const char *value = config_get(section, key, def);
+                            printf("%s\n", value);
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "get2") == 0) {
+                            if(optind + 4 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W get2 'conf_file' 'section' 'key' 'value'\n\n"
+                                        " Prints settings of netdata.conf or cloud.conf\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " -c netdata.conf has to be given before -W get2.\n"
+                                        " conf_file can be \"cloud\" or \"netdata\".\n"
+                                        "\n"
+                                );
+                                return 1;
+                            }
+
+                            if(!config_loaded) {
+                                fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
+                                load_netdata_conf(NULL, 0);
+                                post_conf_load(&user);
+                                load_cloud_conf(1);
+                            }
+
+                            get_netdata_configured_variables();
+
+                            const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
+                            struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+                            const char *section = argv[optind + 1];
+                            const char *key = argv[optind + 2];
+                            const char *def = argv[optind + 3];
+                            const char *value = appconfig_get(tmp_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
                         }
@@ -1149,7 +1235,11 @@ int main(int argc, char **argv) {
 #endif
 
     if(!config_loaded)
+    {
         load_netdata_conf(NULL, 0);
+        post_conf_load(&user);
+        load_cloud_conf(0);
+    }
 
 
     // ------------------------------------------------------------------------
@@ -1178,8 +1268,6 @@ int main(int argc, char **argv) {
         if(chdir(netdata_configured_user_config_dir) == -1)
             fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
     }
-
-    char *user = NULL;
 
     {
         // --------------------------------------------------------------------
@@ -1243,19 +1331,6 @@ int main(int argc, char **argv) {
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
-        }
-
-
-        // --------------------------------------------------------------------
-        // get the user we should run
-
-        // IMPORTANT: this is required before web_files_uid()
-        if(getuid() == 0) {
-            user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
-        }
-        else {
-            struct passwd *passwd = getpwuid(getuid());
-            user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
         }
 
 

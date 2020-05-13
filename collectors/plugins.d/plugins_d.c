@@ -655,7 +655,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(!host->labels) {
                 host->labels = new_labels;
             } else {
+                rrdhost_rdlock(host);
                 replace_label_list(host, new_labels);
+                rrdhost_unlock(host);
             }
 
             new_labels = NULL;

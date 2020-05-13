@@ -82,7 +82,7 @@ Despite Netdata's auto-detection capabilities, it's important to know how to edi
 
 You should always edit configuration files with the `edit-config` script that comes with every installation of Netdata.
 To edit a collector configuration file, navigate to your [Netdata configuration
-directory](../docs/step-by-step/step-04.md#find-your-netdataconf-file). Launch `edit-config` with the path to the
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file). Launch `edit-config` with the path to the
 collector's configuration file.
 
 How do you find that path to the collector's configuration file? Look under the **Configuration** heading in the
@@ -105,7 +105,7 @@ Most collectors are enabled and will auto-detect their app/service without manua
 restart Netdata to trigger the auto-detection process.
 
 To restart Netdata on most systems, use `service netdata restart`. For other systems, see the [other restart
-methods](../docs/getting-started.md#start-stop-and-restart-netdata).
+methods](/docs/getting-started.md#start-stop-and-restart-netdata).
 
 Open Netdata's dashboard in your browser, or refresh the page if you already have it open. You should now see a new
 entry in the menu and new interactive charts!

@@ -1,8 +1,7 @@
 <!--
----
 title: "PowerDNS dnsdist monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/dnsdist/README.md
----
+sidebar_label: "PowerDNS dnsdist"
 -->
 
 # PowerDNS dnsdist monitoring with Netdata

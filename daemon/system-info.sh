@@ -192,6 +192,9 @@ if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1 ; then
         CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
         CPU_MODEL="$(echo "${lscpu_output}" | grep "^Model name:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
         possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU max MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*') MHz"
+        if [ "${possible_cpu_freq}" = " MHz" ] ; then
+            possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*') MHz"
+        fi
 elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1 ; then
         dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
         CPU_INFO_SOURCE="dmidecode"

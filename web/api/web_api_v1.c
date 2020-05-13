@@ -865,11 +865,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef DISABLE_CLOUD
     buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
 #else
-    if (netdata_cloud_setting)
-        buffer_strcat(wb, "\t\"cloud-enabled\": true,\n");
-    else
-        buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
+    buffer_sprintf(wb, "\t\"cloud-enabled\": %s,\n",
+                   appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false");
 #endif
+
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
 #else

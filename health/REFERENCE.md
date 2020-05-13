@@ -382,7 +382,7 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `host labels`
 
-Defines the list of labels present on a host. See our [host labels tutorial](../docs/tutorials/using-host-labels.md) for
+Defines the list of labels present on a host. See our [host labels tutorial](/docs/tutorials/using-host-labels.md) for
 an explanation of host labels and how to implement them.
 
 For example, let's suppose that `netdata.conf` is configured with the following labels:

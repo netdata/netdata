@@ -1,8 +1,7 @@
 <!--
----
 title: "Elasticsearch monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/elasticsearch/README.md
----
+sidebar_label: "Elasticsearch"
 -->
 
 # Elasticsearch monitoring with Netdata

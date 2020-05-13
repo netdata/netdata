@@ -23,6 +23,7 @@ static char *aclk_password = NULL;
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
 int aclk_connected = 0;             // Exposed in the web-api
+int aclk_force_reconnect = 0;       // Indication from lower layers
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
@@ -47,7 +48,7 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
 
 void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
-
+void aclk_lws_wss_destroy_context();
 /*
  * Maintain a list of collectors and chart count
  * If all the charts of a collector are deleted
@@ -149,7 +150,7 @@ static RSA *aclk_private_key = NULL;
 static int create_private_key()
 {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
 
     long bytes_read;
     char *private_key = read_by_filename(filename, &bytes_read);
@@ -723,6 +724,50 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     }
 
     _free_collector(tmp_collector);
+
+}
+/*
+ * Take a buffer, encode it and rewrite it
+ *
+ */
+
+static char *aclk_encode_response(char *src, size_t content_size, int keep_newlines)
+{
+    char *tmp_buffer = mallocz(content_size * 2);
+    char *dst = tmp_buffer;
+    while (content_size > 0) {
+        switch (*src) {
+            case '\n':
+                if (keep_newlines)
+                {
+                    *dst++ = '\\';
+                    *dst++ = 'n';
+                }
+                break;
+            case '\t':
+                break;
+            case 0x01 ... 0x08:
+            case 0x0b ... 0x1F:
+                *dst++ = '\\';
+                *dst++ = 'u';
+                *dst++ = '0';
+                *dst++ = '0';
+                *dst++ = (*src < 0x0F) ? '0' : '1';
+                *dst++ = to_hex(*src);
+                break;
+            case '\"':
+                *dst++ = '\\';
+                *dst++ = *src;
+                break;
+            default:
+                *dst++ = *src;
+        }
+        src++;
+        content_size--;
+    }
+    *dst = '\0';
+
+    return tmp_buffer;
 }
 
 int aclk_execute_query(struct aclk_query *this_query)
@@ -730,6 +775,8 @@ int aclk_execute_query(struct aclk_query *this_query)
     if (strncmp(this_query->query, "/api/v1/", 8) == 0) {
         struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
         w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+        w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+        w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
         strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
         w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
         w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
@@ -745,26 +792,36 @@ int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        int rc = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        w->response.code = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        now_realtime_timeval(&w->tv_ready);
+        w->response.data->date = w->tv_ready.tv_sec;
+        web_client_build_http_header(w);  // TODO: this function should offset from date, not tv_ready
         BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
 
         aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0);
         buffer_strcat(local_buffer, ",\n\t\"payload\": ");
-        char *encoded_response = aclk_encode_response(w->response.data);
+        char *encoded_response = aclk_encode_response(w->response.data->buffer, w->response.data->len, 0);
+        char *encoded_header = aclk_encode_response(w->response.header_output->buffer, w->response.header_output->len, 1);
 
         buffer_sprintf(
-            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\"\n}", rc, encoded_response);
+            local_buffer, "{\n\"code\": %d,\n\"body\": \"%s\",\n\"headers\": \"%s\"\n}", 
+            w->response.code, encoded_response, encoded_header);
 
         buffer_sprintf(local_buffer, "\n}");
+
+        debug(D_ACLK, "Response:%s", encoded_header);
 
         aclk_send_message(this_query->topic, local_buffer->buffer, this_query->msg_id);
 
         buffer_free(w->response.data);
+        buffer_free(w->response.header);
+        buffer_free(w->response.header_output);
         freez(w);
         buffer_free(local_buffer);
         freez(encoded_response);
+        freez(encoded_header);
         return 0;
     }
     return 1;
@@ -1280,15 +1337,28 @@ void *aclk_main(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
 
-    if (!netdata_cloud_setting) {
-        info("Killing ACLK thread -> cloud functionality has been disabled");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return NULL;
-    }
+    // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
+    // as it must notify the far end that it shutdown gracefully and avoid the LWT.
+    netdata_thread_disable_cancelability();
+
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK)
+    info("Killing ACLK thread -> cloud functionality has been disabled");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    return NULL;
+#endif
 
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
         sleep_usec(USEC_PER_MS * 300);
+    }
+
+    info("Waiting for Cloud to be enabled");
+    while (!netdata_cloud_setting) {
+        sleep_usec(USEC_PER_SEC * 1);
+        if (netdata_exit) {
+            static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+            return NULL;
+        }
     }
 
     last_init_sequence = now_realtime_sec();
@@ -1297,42 +1367,52 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
     uint32_t port_num = 0;
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-    if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
-        error("Configuration error - cannot use agent cloud link");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return NULL;
-    }
-    port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
-
     info("Waiting for netdata to be claimed");
     while(1) {
         while (likely(!is_agent_claimed())) {
-            sleep_usec(USEC_PER_SEC * 5);
+            sleep_usec(USEC_PER_SEC * 1);
             if (netdata_exit)
                 goto exited;
         }
-        if (!create_private_key() && !_mqtt_lib_init())
-            break;
-
-        if (netdata_exit)
+        // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
+        // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
+        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        if (cloud_base_url == NULL) {
+            error("Do not move the cloud base url out of post_conf_load!!");
             goto exited;
+        }            
+        if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
+            error("Agent is claimed but the configuration is invalid, please fix");
+        }
+        else
+        {
+            port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
+            if (!create_private_key() && !_mqtt_lib_init())
+                break;
+        }
 
-        sleep_usec(USEC_PER_SEC * 60);
+        for (int i=0; i<60; i++) {
+            if (netdata_exit)
+                goto exited;
+
+            sleep_usec(USEC_PER_SEC * 1);
+        }
     }
+
     create_publish_base_topic();
 
     usec_t reconnect_expiry = 0; // In usecs
-
-    netdata_thread_disable_cancelability();
 
     while (!netdata_exit) {
         static int first_init = 0;
         size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
-        //   first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
-        if (unlikely(!netdata_exit && !aclk_connected)) {
+
+        if (aclk_force_reconnect) {
+            aclk_lws_wss_destroy_context();
+            aclk_force_reconnect = 0;
+        }
+        if (unlikely(!netdata_exit && !aclk_connected && !aclk_force_reconnect)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
@@ -1358,7 +1438,7 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        if (unlikely(!aclk_connected))
+        if (unlikely(!aclk_connected || aclk_force_reconnect))
             continue;
         /*static int stress_counter = 0;
         if (write_q_bytes==0 && stress_counter ++ >5)
@@ -1494,6 +1574,7 @@ void aclk_disconnect()
     waiting_init = 1;
     aclk_connected = 0;
     aclk_connecting = 0;
+    aclk_force_reconnect = 1;
 }
 
 void aclk_shutdown()
@@ -1535,46 +1616,6 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
     debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, ts_secs);
 }
 
-/*
- * Take a buffer, encode it and rewrite it
- *
- */
-
-char *aclk_encode_response(BUFFER *contents)
-{
-    char *tmp_buffer = mallocz(contents->len * 2);
-    char *src, *dst;
-    size_t content_size = contents->len;
-
-    src = contents->buffer;
-    dst = tmp_buffer;
-    while (content_size > 0) {
-        switch (*src) {
-            case '\n':
-            case '\t':
-                break;
-            case 0x01 ... 0x08:
-            case 0x0b ... 0x1F:
-                *dst++ = '\\';
-                *dst++ = '0';
-                *dst++ = '0';
-                *dst++ = (*src < 0x0F) ? '0' : '1';
-                *dst++ = to_hex(*src);
-                break;
-            case '\"':
-                *dst++ = '\\';
-                *dst++ = *src;
-                break;
-            default:
-                *dst++ = *src;
-        }
-        src++;
-        content_size--;
-    }
-    *dst = '\0';
-
-    return tmp_buffer;
-}
 
 /*
  * This will send alarm information which includes
@@ -1582,6 +1623,7 @@ char *aclk_encode_response(BUFFER *contents)
  *    alarm_log
  *    active alarms
  */
+void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb);
 void aclk_send_alarm_metadata()
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -1602,17 +1644,18 @@ void aclk_send_alarm_metadata()
         aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
+
     buffer_sprintf(local_buffer, "{\n\t \"configured-alarms\" : ");
     health_alarms2json(localhost, local_buffer, 1);
     debug(D_ACLK, "Metadata %s with configured alarms has %zu bytes", msg_id, local_buffer->len);
-
-    buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
-    health_alarm_log2json(localhost, local_buffer, 0);
-    debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
-
+    //    buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
+    //   health_alarm_log2json(localhost, local_buffer, 0);
+    //   debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
     buffer_sprintf(local_buffer, ",\n\t \"alarms-active\" : ");
-    health_alarms_values2json(localhost, local_buffer, 0);
-    debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
+    health_active_log_alarms_2json(localhost, local_buffer);
+    //debug(D_ACLK, "Metadata message %s", local_buffer->buffer);
+
+
 
     buffer_sprintf(local_buffer, "\n}\n}");
     aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
@@ -1641,7 +1684,7 @@ int aclk_send_info_metadata()
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (aclk_metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "connect", msg_id, 0, 0);
+        aclk_create_header(local_buffer, "update", msg_id, 0, 0);
     else
         aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
