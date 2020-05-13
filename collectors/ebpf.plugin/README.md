@@ -1,8 +1,7 @@
 <!--
 ---
 title: "eBPF monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf_process.plugin/README.md
-sidebar_label: "eBPF"
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf.plugin/README.md
 ---
 -->
 
@@ -87,18 +86,18 @@ This process will not overwrite any changes you made to configuration files.
 ### Edit `netdata.conf` to enable the collector
 
 After installing Netdata with the `--enable-ebpf` option, you still need to enable the plugin explicitly. To do so, use
-`edit-config` to open `netdata.conf` and set `ebpf_process = yes` in the `[plugins]` section.
+`edit-config` to open `netdata.conf` and set `ebpf = yes` in the `[plugins]` section.
 
 ```bash
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
 ./edit-config netdata.conf
 ```
 
-Scroll down to the `[plugins]` section and uncomment the `ebpf_process` line after changing its setting to `yes`.
+Scroll down to the `[plugins]` section and uncomment the `ebpf` line after changing its setting to `yes`.
 
 ```conf
 [plugins]
-   ebpf_process = yes
+   ebpf = yes
 ```
 
 Restart Netdata with `service netdata restart`, or the appropriate method for your system, and reload your browser to
@@ -106,7 +105,7 @@ see eBPF charts.
 
 ## Charts
 
-The first version of `ebpf_process.plugin` gives a general vision about process running on computer. The charts related
+The first version of `ebpf.plugin` gives a general vision about process running on computer. The charts related
 to this plugin are inside the **eBPF** option on dashboard menu and divided in three groups `file`, `vfs`, and
 `process`.
 
@@ -180,14 +179,14 @@ process and thread creation.
 ## Configuration
 
 This plugin has different configuration modes, all of which can be adjusted with its configuration file at
-`ebpf_process.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
+`ebpf.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
 plugin works using `entry` by reading this configuration file.
 
 You can always edit this file with `edit-config`:
 
 ```bash
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config ebpf_process.conf
+./edit-config ebpf.conf
 ```
 
 ### `[global]`

@@ -3,7 +3,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#include "ebpf_process.h"
+#include "ebpf.h"
 
 // callback required by eval()
 int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
@@ -857,7 +857,7 @@ static void set_global_values() {
 static int load_collector_file(char *path) {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, path, "ebpf_process.conf" );
+    build_complete_path(lpath, 4096, path, "ebpf.conf" );
 
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return 1;
@@ -1055,7 +1055,7 @@ int main(int argc, char **argv)
     }
 
     //set name
-    program_name = "ebpf_process.plugin";
+    program_name = "ebpf.plugin";
 
     //disable syslog
     error_log_syslog = 0;

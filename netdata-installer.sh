@@ -1067,9 +1067,9 @@ if [ "${UID}" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin" ]; then
+    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
@@ -1386,10 +1386,29 @@ should_install_ebpf() {
   return 0
 }
 
+remove_old_ebpf() {
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+    echo >&2 "Removing alpha eBPF collector."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" 
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
+    echo >&2 "Removing alpha eBPF stock file"
+    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" 
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
+    echo >&2 "Renaming eBPF configuration file."
+    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf" 
+  fi
+}
+
 install_ebpf() {
   if ! should_install_ebpf; then
     return 0
   fi
+
+  remove_old_ebpf
 
   progress "Installing eBPF plugin"
 

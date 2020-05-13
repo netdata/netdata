@@ -236,6 +236,8 @@ Our new documentation experience is now available at **[Netdata Learn](https://l
 
 While Learn only features documentation for now, we plan on releasing more types of educational content serving the Agent's open-source community of developers, sysadmins, and DevOps folks. We'll have more to announce soon, but in the meantime, we hope you enjoy what we believe is a smoother (and prettier) docs experience.
 
+As part of the ongoing work to polish our **eBPF collector tech preview**, we've now proven the collector's performance is very good, and have vastly expanded the number of operating system versions the collector works on. Learn how to [enable it](https://docs.netdata.cloud/collectors/ebpf.plugin/) in our documentation. We've also extensively stress-tested the eBPF collector and found that it's impressively fast given the depth of metrics it collects! Read up on our benchmarking analysis [on GitHub](https://github.com/netdata/netdata/issues/8195).
+
 ---
 
 See more news and previous releases at our [blog](https://blog.netdata.cloud) or our [releases

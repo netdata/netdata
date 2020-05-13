@@ -265,9 +265,9 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-EBPF_PROCESS_PLUGIN_FILES = \
-    collectors/ebpf_process.plugin/ebpf_process.c \
-    collectors/ebpf_process.plugin/ebpf_process.h \
+EBPF_PLUGIN_FILES = \
+    collectors/ebpf.plugin/ebpf.c \
+    collectors/ebpf.plugin/ebpf.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -697,9 +697,9 @@ if ENABLE_PLUGIN_FREEIPMI
 endif
 
 if ENABLE_PLUGIN_EBPF
-    plugins_PROGRAMS += ebpf_process.plugin
-    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
-    ebpf_process_plugin_LDADD = \
+    plugins_PROGRAMS += ebpf.plugin
+    ebpf_plugin_SOURCES = $(EBPF_PLUGIN_FILES)
+    ebpf_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif

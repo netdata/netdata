@@ -408,7 +408,7 @@ set(SLABINFO_PLUGIN_FILES
         )
 
 set(EBPF_PROCESS_PLUGIN_FILES
-        collectors/ebpf_process.plugin/ebpf_process.c
+        collectors/ebpf.plugin/ebpf.c
         )
 
 set(PROC_PLUGIN_FILES
@@ -974,13 +974,13 @@ ENDIF()
 # ebpf_process.plugin
 
 IF(ENABLE_PLUGIN_EBPF)
-    message(STATUS "ebpf_process.plugin: enabled")
-    add_executable(ebpf_process.plugin config.h ${EBPF_PROCESS_PLUGIN_FILES})
-    target_link_libraries (ebpf_process.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
-    target_include_directories(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
-    target_compile_options(ebpf_process.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+    message(STATUS "ebpf.plugin: enabled")
+    add_executable(ebpf.plugin config.h ${EBPF_PROCESS_PLUGIN_FILES})
+    target_link_libraries (ebpf.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(ebpf.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(ebpf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
-    message(STATUS "ebpf_process.plugin: disabled")
+    message(STATUS "ebpf.plugin: disabled")
 ENDIF()
 
 
