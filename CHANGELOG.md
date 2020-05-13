@@ -221,7 +221,6 @@
 - Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 - Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
 - Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
-- Enconde slave fields [\#8216](https://github.com/netdata/netdata/pull/8216) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
