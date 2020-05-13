@@ -327,7 +327,7 @@ To improve clarity on charts, Netdata dashboards present **positive** values for
 `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
 ![Screenshot showing positive and negative
-values](https://user-images.githubusercontent.com/1153921/80838078-03f1c200-8bad-11ea-834a-a0085b39adb6.png)
+values](https://user-images.githubusercontent.com/1153921/81870401-9d649080-952a-11ea-80e3-4a7b480252ee.gif)
 
 _Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is
 negative._

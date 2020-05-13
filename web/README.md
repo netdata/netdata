@@ -72,6 +72,12 @@ You can also perform all these actions using the small
 rewind/play/fast-forward/zoom-in/zoom-out buttons that appear in the
 bottom-right corner of each chart.
 
+Additionally, resize charts by clicking-and-dragging the icon on the bottom-right corner of any chart. To restore the
+chart to its original height, double-click the same icon.
+
+![Animated GIF of resizing a chart and resetting it to the default
+height](https://user-images.githubusercontent.com/1153921/80842459-7d41e280-8bb6-11ea-9488-1bc29f94d7f2.gif)
+
 ## Charts, contexts, families
 
 Before customizing the standard web dashboard, creating a custom dashboard,
@@ -190,7 +196,7 @@ metrics representing `read`, `input`, `inbound`, `received` and **negative**
 values for metrics representing `write`, `output`, `outbound`, `sent`.
 
 ![Screenshot showing positive and negative
-values](https://user-images.githubusercontent.com/1153921/80838078-03f1c200-8bad-11ea-834a-a0085b39adb6.png)
+values](https://user-images.githubusercontent.com/1153921/81870401-9d649080-952a-11ea-80e3-4a7b480252ee.gif)
 
 _Netdata charts showing the bandwidth and packets of a network interface.
 `received` is positive and `sent` is negative._

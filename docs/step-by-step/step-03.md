@@ -17,7 +17,7 @@ manually, to move from one system to another? Maybe I should just make a bunch o
 on top of the hundred I have already?"
 
 We get it. That's why we built [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/), which connects many distributed
-agents for a seamless experience when monitoring an entire infrastructure of Agent-monitored nodes.
+agents for a seamless experience when monitoring an entire infrastructure of Netdata-monitored nodes.
 
 ![Animated GIF of Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
@@ -28,7 +28,7 @@ In this step of the Netdata guide, we'll talk about the following:
 
 -   [Why you should use Netdata Cloud](#why-use-netdata-cloud)
 -   [Get started with Netdata Cloud](#get-started-with-netdata-cloud)
--   [Navigate between dashboards with Visited nodes](#navigate-between-dashboards-with-visited-nodes)
+-   [Navigate between dashboards with Visited Nodes](#navigate-between-dashboards-with-visited-nodes)
 
 ## Why use Netdata Cloud?
 
@@ -55,27 +55,26 @@ Or, if you're feeling confident, dive right in.
 When you finish that guide, circle back to this step in the tutorial to learn how to use the Visited Nodes feature on
 top of Cloud's centralized web interface.
 
-## Navigate between dashboards with Visited nodes
+## Navigate between dashboards with Visited Nodes
 
-To add nodes to your Visited nodes menu, you first need to navigate to that node's dashboard, then click the **Sign in**
+To add nodes to your visited nodes, you first need to navigate to that node's dashboard, then click the **Sign in**
 button at the top of the dashboard. On the screen that appears, which states your node is requesting access to your
 Netdata Cloud account, sign in with your preferred method.
 
-Cloud redirects you back to your node's dashboard, which is now connected to your Netdata Cloud account. You can now see
-the Visited nodes menu, which is populated by a single node.
+Cloud redirects you back to your node's dashboard, which is now connected to your Netdata Cloud account. You can now see the menu populated by a single visited node.
 
 ![An Agent's dashboard with the Visited nodes
 menu](https://user-images.githubusercontent.com/1153921/80830383-b6ba2400-8b9d-11ea-9eb2-379c7eccd22f.png)
 
-If you previously went through the Cloud onboarding process to create a Space and War Room, you will also see these in
-the Visited Nodes menu. You can click on your Space or any of your War Rooms to navigate to Netdata Cloud and continue
-monitoring your infrastructure from there.
+If you previously went through the Cloud onboarding process to create a Space and War Room, you will also see these
+alongside your visited nodes. You can click on your Space or any of your War Rooms to navigate to Netdata Cloud and
+continue monitoring your infrastructure from there.
 
 ![A Agent's dashboard with the Visited nodes menu, plus Spaces and War
 Rooms](https://user-images.githubusercontent.com/1153921/80830382-b6218d80-8b9d-11ea-869c-1170b95eeb4a.png)
 
-To add more Agents to your Visited nodes menu, visit them and sign in again. This process connects that node to your
-Cloud account and further populates the menu.
+To add other visited nodes, navigate to their dashboard and sign in to Cloud by clicking on the **Sign in** button. This
+process connects that node to your Cloud account and further populates the menu.
 
 Once you've added more than one node, you can use the menu to switch between various dashboards without remembering IP
 addresses or hostnames or saving bookmarks for every node you want to monitor.
