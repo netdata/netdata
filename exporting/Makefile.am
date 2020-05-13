@@ -23,3 +23,8 @@ dist_noinst_DATA = \
     TIMESCALE.md \
     WALKTHROUGH.md \
     $(NULL)
+
+
+dist_noinst_SCRIPTS = \
+    nc-backend.sh \
+    $(NULL)
