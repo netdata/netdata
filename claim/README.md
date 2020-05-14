@@ -261,18 +261,24 @@ If you are certain firewall and proxy settings are not the issue, you should con
 GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=ACLK-available-is-false)
 with details about your system and relevant output from `error.log`.
 
-### Unclaim (remove) an Agent from Netdata Cloud
+### Remove and reclaim a node
 
-The best method to remove an Agent from Netdata Cloud is to unclaim it by deleting the `cloud.d/` directory in your
-Netdata library directory.
+To remove a node from your Space in Netdata Cloud, delete the `cloud.d/` directory in your Netdata library directory.
 
 ```bash
 cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
 sudo rm -rf cloud.d/
 ```
 
-Once you delete the `cloud.d/` directory, the ACLK will not connect to Cloud the next time the Agent starts, and Cloud
-will show it as **unreachable**. You can then remove it from your War Rooms.
+This node no longer has access to the credentials it was claimed with and cannot connect to Netdata Cloud via the ACLK.
+You will still be able to see this node in your War Rooms in an **unreachable** state.
+
+If you want to reclaim this node into a different Space, you need to create a new identity by adding `-id=$(uuidgen)` to
+the claiming script parameters. For example, using the default claiming script:
+
+```bash
+sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud -id=$(uuidgen)
+```
 
 ## Claiming reference
 
