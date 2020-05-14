@@ -237,7 +237,6 @@ char *pluginsd_get_from_buffer(char *output, int *bytesread, char *input, SSL *s
 }
 #endif
 
-
 static void pluginsd_worker_thread_cleanup(void *arg)
 {
     struct plugind *cd = (struct plugind *)arg;

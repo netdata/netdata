@@ -34,3 +34,4 @@ RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
 
 CMD ["/usr/sbin/netdata","-D"]
+ENTRYPOINT []
