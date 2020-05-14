@@ -78,6 +78,12 @@ AC_ARG_ENABLE(
     [enable_backend_kinesis="detect"]
 )
 AC_ARG_ENABLE(
+    [exporting-pubsub],
+    [AS_HELP_STRING([--enable-exporting-pubsub], [enable pubsub exporting connector @<:@default autodetect@:>@])],
+    ,
+    [enable_exporting_pubsub="detect"]
+)
+AC_ARG_ENABLE(
     [backend-prometheus-remote-write],
     [AS_HELP_STRING([--enable-backend-prometheus-remote-write], [enable prometheus remote write backend @<:@default autodetect@:>@])],
     ,
@@ -1065,6 +1071,54 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 
 # -----------------------------------------------------------------------------
+# Pub/Sub exporting connector - googleapis
+
+PKG_CHECK_MODULES(
+    [GRPC],
+    [grpc],
+    [have_libgrpc=yes],
+    [have_libgrpc=no]
+)
+
+PKG_CHECK_MODULES(
+    [PUBSUB],
+    [googleapis_cpp_pubsub_protos],
+    [have_pubsub_protos=yes],
+    [have_pubsub_protos=no]
+)
+
+AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
+AS_IF(
+    [test x"${CXX_BINARY}" == x"no"],
+    [have_CXX_compiler=no],
+    [have_CXX_compiler=yes]
+)
+
+test "${enable_pubsub}" = "yes" -a "${have_grpc}" != "yes" && \
+    AC_MSG_ERROR([libgrpc required but not found. try installing grpc])
+
+test "${enable_pubsub}" = "yes" -a "${have_pubsub_protos}" != "yes" && \
+    AC_MSG_ERROR([libgoogleapis_cpp_pubsub_protos required but not found. try installing googleapis])
+
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
+    AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
+
+AC_MSG_CHECKING([if pubsub exporting connector should be enabled])
+if test "${enable_exporting_pubsub}" != "no" -a "${have_pubsub_protos}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
+    enable_exporting_pubsub="yes"
+    AC_DEFINE([ENABLE_EXPORTING_PUBSUB], [1], [Pub/Sub API usability])
+    OPTIONAL_PUBSUB_CFLAGS="${GRPC_CFLAGS} ${PUBSUB_CFLAGS}"
+    CXX11FLAG="-std=c++11"
+    OPTIONAL_PUBSUB_LIBS="${GRPC_LIBS} ${PUBSUB_LIBS}"
+else
+    enable_pubsub="no"
+fi
+
+AC_MSG_RESULT([${enable_exporting_pubsub}])
+AM_CONDITIONAL([ENABLE_EXPORTING_PUBSUB], [test "${enable_exporting_pubsub}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # Prometheus remote write backend - libprotobuf, libsnappy, protoc
 
 PKG_CHECK_MODULES(
@@ -1223,7 +1277,9 @@ AC_MSG_RESULT([${enable_lto}])
 
 # -----------------------------------------------------------------------------
 
-AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" -o "${enable_backend_prometheus_remote_write}" = "yes"])
+AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
+                                     -o "${enable_exporting_pubsub}" = "yes" \
+                                     -o "${enable_backend_prometheus_remote_write}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -1253,8 +1309,8 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} \
-	${OPTIONAL_JSONC_STATIC_CFLAGS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
+    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1295,6 +1351,8 @@ AC_SUBST([OPTIONAL_XENSTAT_CFLAGS])
 AC_SUBST([OPTIONAL_XENSTAT_LIBS])
 AC_SUBST([OPTIONAL_KINESIS_CFLAGS])
 AC_SUBST([OPTIONAL_KINESIS_LIBS])
+AC_SUBST([OPTIONAL_PUBSUB_CFLAGS])
+AC_SUBST([OPTIONAL_PUBSUB_LIBS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
@@ -1373,6 +1431,7 @@ AC_CONFIG_FILES([
     exporting/prometheus/Makefile
     exporting/prometheus/remote_write/Makefile
     exporting/aws_kinesis/Makefile
+    exporting/pubsub/Makefile
     exporting/mongodb/Makefile
     exporting/tests/Makefile
     health/Makefile

@@ -79,6 +79,8 @@ int is_valid_connector(char *type, int check_reserved)
         return rc;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return rc;
+    } else if (!strcmp(type, "pubsub") || !strcmp(type, "pubsub:plaintext")) {
+        return rc;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
         return rc;
     }

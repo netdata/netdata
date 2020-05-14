@@ -252,6 +252,23 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # later we use:
 # ${HAVE_KINESIS}
 
+# -----------------------------------------------------------------------------
+# Detect libgrpc
+
+pkg_check_modules(GRPC grpc)
+# later we use:
+# ${GRPCF_LIBRARIES}
+# ${GRPC_CFLAGS_OTHER}
+# ${GRPC_INCLUDE_DIRS}
+
+# -----------------------------------------------------------------------------
+# Detect libgoogleapis_cpp_pubsub_protos
+
+pkg_check_modules(PUBSUB googleapis_cpp_pubsub_protos)
+# later we use:
+# ${PUBSUB_LIBRARIES}
+# ${PUBSUB_CFLAGS_OTHER}
+# ${PUBSUB_INCLUDE_DIRS}
 
 # -----------------------------------------------------------------------------
 # Detect libprotobuf
@@ -662,6 +679,13 @@ set(KINESIS_EXPORTING_FILES
         exporting/aws_kinesis/aws_kinesis_put_record.h
         )
 
+set(PUBSUB_EXPORTING_FILES
+        exporting/pubsub/pubsub.c
+        exporting/pubsub/pubsub.h
+        exporting/pubsub/pubsub_publish.cc
+        exporting/pubsub/pubsub_publish.h
+        )
+
 set(MONGODB_EXPORTING_FILES
         exporting/mongodb/mongodb.c
         exporting/mongodb/mongodb.h
@@ -756,6 +780,25 @@ IF(ENABLE_BACKEND_KINESIS)
     list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
 ELSE()
     message(STATUS "kinesis backend: disabled (requires AWS SDK for C++)")
+ENDIF()
+
+# -----------------------------------------------------------------------------
+# Pub/Sub exporting connector
+
+IF(GRPC_LIBRARIES AND PUBSUB_LIBRARIES)
+    SET(ENABLE_EXPORTING_PUBSUB True)
+ELSE()
+    SET(ENABLE_EXPORTING_PUBSUB False)
+ENDIF()
+
+IF(ENABLE_EXPORTING_PUBSUB)
+    message(STATUS "pubsub exporting connector: enabled")
+    list(APPEND NETDATA_FILES ${PUBSUB_EXPORTING_FILES})
+    list(APPEND NETDATA_COMMON_LIBRARIES ${GRPC_LIBRARIES} ${PUBSUB_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${GRPC_INCLUDE_DIRS} ${PUBSUB_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${GRPC_CFLAGS_OTHER} ${PUBSUB_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "pubsub exporting connector: disabled (requires grpc and googleapis)")
 ENDIF()
 
 # -----------------------------------------------------------------------------
@@ -867,7 +910,7 @@ ELSEIF(MACOS)
 
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS OR ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+IF(ENABLE_BACKEND_KINESIS OR ENABLE_EXPORTING_PUBSUB OR ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
     set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
@@ -1040,6 +1083,7 @@ if(BUILD_TESTING)
     set(TEST_NAME exporting_engine)
     set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)
     set(KINESIS_LINK_OPTIONS)
+    set(PUBSUB_LINK_OPTIONS)
     set(MONGODB_LINK_OPTIONS)
 if(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     list(APPEND EXPORTING_ENGINE_FILES ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
@@ -1059,6 +1103,16 @@ if(ENABLE_BACKEND_KINESIS)
         -Wl,--wrap=kinesis_init
         -Wl,--wrap=kinesis_put_record
         -Wl,--wrap=kinesis_get_result
+    )
+endif()
+if(ENABLE_EXPORTING_PUBSUB)
+    list(APPEND EXPORTING_ENGINE_FILES ${PUBSUB_EXPORTING_FILES})
+    list(
+        APPEND PUBSUB_LINK_OPTIONS
+        -Wl,--wrap=pubsub_init
+        -Wl,--wrap=pubsub_add_message
+        -Wl,--wrap=pubsub_publish
+        -Wl,--wrap=pubsub_get_result
     )
 endif()
 if(MONGOC_LIBRARIES)
@@ -1116,6 +1170,7 @@ endif()
         -Wl,--wrap=send_main_rusage
         ${PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS}
         ${KINESIS_LINK_OPTIONS}
+        ${PUBSUB_LINK_OPTIONS}
         ${MONGODB_LINK_OPTIONS}
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})

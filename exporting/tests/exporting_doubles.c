@@ -262,6 +262,55 @@ int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, siz
 }
 #endif // HAVE_KINESIS
 
+#if ENABLE_EXPORTING_PUBSUB
+int __wrap_pubsub_init(
+    void *pubsub_specific_data_p, char *error_message, const char *destination, const char *credentials_file,
+    const char *project_id, const char *topic_id)
+{
+    function_called();
+    check_expected_ptr(pubsub_specific_data_p);
+    check_expected_ptr(error_message);
+    check_expected_ptr(destination);
+    check_expected_ptr(credentials_file);
+    check_expected_ptr(project_id);
+    check_expected_ptr(topic_id);
+    return mock_type(int);
+}
+
+int __wrap_pubsub_add_message(void *pubsub_specific_data_p, char *data)
+{
+    function_called();
+    check_expected_ptr(pubsub_specific_data_p);
+    check_expected_ptr(data);
+    return mock_type(int);
+}
+
+int __wrap_pubsub_publish(
+    void *pubsub_specific_data_p, char *error_message, size_t buffered_metrics, size_t buffered_bytes)
+{
+    function_called();
+    check_expected_ptr(pubsub_specific_data_p);
+    check_expected_ptr(error_message);
+    check_expected(buffered_metrics);
+    check_expected(buffered_bytes);
+    return mock_type(int);
+}
+
+int __wrap_pubsub_get_result(
+    void *pubsub_specific_data_p, char *error_message,
+    size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes)
+{
+    function_called();
+    check_expected_ptr(pubsub_specific_data_p);
+    check_expected_ptr(error_message);
+    check_expected_ptr(sent_metrics);
+    check_expected_ptr(sent_bytes);
+    check_expected_ptr(lost_metrics);
+    check_expected_ptr(lost_bytes);
+    return mock_type(int);
+}
+#endif // ENABLE_EXPORTING_PUBSUB
+
 #if HAVE_MONGOC
 void __wrap_mongoc_init()
 {
