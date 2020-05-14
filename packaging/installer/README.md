@@ -165,3 +165,16 @@ the community helps fix any bugs that might have been introduced in previous rel
 -   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
     installation
 -   Retain more control over the Netdata version you use
+
+## Installation notes
+
+We are tracking a few ongoing issues related to installation and packaging.
+
+**Multiple versions of SSL**: We've received reports from the community about issues with running the `kickstart.sh`
+script on systems that have both a distribution-installed version of OpenSSL and a manually-installed local version. The
+Agent's installer cannot handle both, and so you must remove one or the other to install the Agent.
+
+**CentOS 6 and CentOS 8 dependencies**: To install the Agent on certain CentOS and RHEL systems, you must enable
+non-default repositories, such as EPEL or PowerTools, to gather hard dependencies. See the [CentOS
+6](/packaging/installer/methods/manual.md#centos-rehel-6-x) and [CentOS
+8](/packaging/installer/methods/manual.md#centos-rehel-8-x) sections for more information.
