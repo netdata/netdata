@@ -132,7 +132,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "\"timestamp\":%llu}\n",
 
         engine->config.prefix,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,
@@ -209,7 +209,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"timestamp\": %llu}\n",
 
         engine->config.prefix,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,
