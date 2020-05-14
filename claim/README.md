@@ -280,7 +280,7 @@ the claiming script parameters. For example, using the default claiming script:
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud -id=$(uuidgen)
 ```
 
-The agent *must be restarted* after this change.
+The agent _must be restarted_ after this change.
 
 ## Claiming reference
 
