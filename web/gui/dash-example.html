@@ -446,7 +446,7 @@ class PickNSort {
             try {
                 return JSON.parse(localStorage.getItem('netdata_ordered_hosts')).enabled
             } catch (e) {
-                return this.netdata_info.mirrored_hosts;
+                return this.netdata_info.mirrored_hosts.sort();
             }
         }
 
@@ -550,9 +550,9 @@ class PickNSort {
 
             for (var i=0, len=hosts.length; i<len; i++) {
                 var hostname = hosts[i];
-                $('#alarms .alarm-host-list').append('<div class="host-alarms ' + hostname + '"><a target="_blank" href="' + this.get_host_url(hostname, true) + '/"><h2>' + hostname + '</h2></a></div>');
+                $('#alarms .alarm-host-list').append('<div class="host-alarms ' + hostname + '"><a onclick="return dash.scroll_to_host_stats(' + "'" + hostname + "'" + ')" href="#' + hostname + '"><h2>' + hostname + '</h2></a></div>');
 
-                $template.clone().removeClass('template').appendTo('#dash');
+                $template.clone().removeClass('template').attr('id', hostname).appendTo('#dash');
                 var $newest = $('.netdata-host-stats-container').last();
                 this.build_stats($newest, hostname);
             }
@@ -624,6 +624,14 @@ class PickNSort {
             });
 
             $graph.appendTo($wrapper);
+        }
+        
+        scroll_to_host_stats (hostname) {
+            event.preventDefault();
+            $('#dash').scrollLeft(document.getElementById(hostname).offsetLeft - $('#' + hostname).width());
+            
+            // Prevent regular event from happening
+            return false;
         }
 
         all_alarms_are_warnings () {
