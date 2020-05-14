@@ -576,6 +576,7 @@ struct alarm_entry {
     char *recipient;
     time_t exec_run_timestamp;
     int exec_code;
+    uint64_t exec_spawn_serial;
 
     char *source;
     char *units;
@@ -601,6 +602,8 @@ struct alarm_entry {
     time_t last_repeat;
 
     struct alarm_entry *next;
+    struct alarm_entry *next_in_progress;
+    struct alarm_entry *prev_in_progress;
 };
 
 

@@ -906,6 +906,11 @@ int main(int argc, char **argv) {
             else i++;
         }
     }
+    if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
+        // don't run netdata, this is the spawn server
+        spawn_server();
+        exit(0);
+    }
 
     // parse options
     {
@@ -1376,6 +1381,9 @@ int main(int argc, char **argv) {
     web_files_gid();
 
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
+
+    // fork the spawn server
+    spawn_init();
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.

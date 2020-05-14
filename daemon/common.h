@@ -68,6 +68,9 @@
 // netdata agent cloud link
 #include "aclk/agent_cloud_link.h"
 
+// netdata agent spawn server
+#include "spawn/spawn.h"
+
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"
