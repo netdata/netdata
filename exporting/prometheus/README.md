@@ -390,10 +390,10 @@ names are human friendly labels (also unique).
 Most charts and metrics have the same ID and name, but in several cases they are different: disks with device-mapper,
 interrupts, QoS classes, statsd synthetic charts, etc.
 
-The default is controlled in `netdata.conf`:
+The default is controlled in `exporting.conf`:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	send names instead of ids = yes | no
 ```
 
@@ -407,7 +407,7 @@ You can overwrite it from Prometheus, by appending to the URL:
 Netdata can filter the metrics it sends to Prometheus with this setting:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	send charts matching = *
 ```
 
@@ -422,7 +422,7 @@ is used.
 Netdata sends all metrics prefixed with `netdata_`. You can change this in `netdata.conf`, like this:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	prefix = netdata
 ```
 
