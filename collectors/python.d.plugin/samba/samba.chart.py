@@ -112,7 +112,7 @@ class Service(ExecutableService):
         if not smbstatus_binary:
             self.error("can't locate '{0}' binary".format(SMBSTATUS))
             return False
-        
+
         if os.getuid() != 0:
             sudo_binary = find_binary(SUDO)
             if not sudo_binary:
