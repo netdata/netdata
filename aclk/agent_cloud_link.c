@@ -24,6 +24,7 @@ static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
 int aclk_connected = 0;             // Exposed in the web-api
 int aclk_force_reconnect = 0;       // Indication from lower layers
+int aclk_kill_link = 0;             // Tell the agent to tear down the link
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
@@ -990,6 +991,39 @@ void *aclk_query_main_thread(void *ptr)
     return NULL;
 }
 
+static void aclk_graceful_disconnect()
+{
+    size_t write_q, write_q_bytes, read_q;
+    time_t event_loop_timeout;
+
+    // Send a graceful disconnect message
+    BUFFER *b = buffer_create(512);
+    aclk_create_header(b, "disconnect", NULL, 0, 0);
+    buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
+    aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
+    buffer_free(b);
+
+    event_loop_timeout = now_realtime_sec() + 5;
+    write_q = 1;
+    while (write_q && event_loop_timeout > now_realtime_sec()) {
+        _link_event_loop();
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+    }
+
+    aclk_shutting_down = 1;
+    _link_shutdown();
+    aclk_lws_wss_mqtt_layer_disconect_notif();
+
+    write_q = 1;
+    event_loop_timeout = now_realtime_sec() + 5;
+    while (write_q && event_loop_timeout > now_realtime_sec()) {
+        _link_event_loop();
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+    }
+    aclk_shutting_down = 0;
+}
+
+
 // Thread cleanup
 static void aclk_main_cleanup(void *ptr)
 {
@@ -999,35 +1033,9 @@ static void aclk_main_cleanup(void *ptr)
     info("cleaning up...");
 
     if (is_agent_claimed() && aclk_connected) {
-        size_t write_q, write_q_bytes, read_q;
-        time_t event_loop_timeout;
-
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
-        // Send a graceful disconnect message
-        BUFFER *b = buffer_create(512);
-        aclk_create_header(b, "disconnect", NULL, 0, 0);
-        buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
-        aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
-        buffer_free(b);
-
-        event_loop_timeout = now_realtime_sec() + 5;
-        write_q = 1;
-        while (write_q && event_loop_timeout > now_realtime_sec()) {
-            _link_event_loop();
-            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        }
-
-        aclk_shutting_down = 1;
-        _link_shutdown();
-        aclk_lws_wss_mqtt_layer_disconect_notif();
-
-        write_q = 1;
-        event_loop_timeout = now_realtime_sec() + 5;
-        while (write_q && event_loop_timeout > now_realtime_sec()) {
-            _link_event_loop();
-            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        }
+        aclk_graceful_disconnect();
     }
 
 
@@ -1403,8 +1411,14 @@ void *aclk_main(void *ptr)
 
     while (!netdata_exit) {
         static int first_init = 0;
-        size_t write_q, write_q_bytes, read_q;
-        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+ /*       size_t write_q, write_q_bytes, read_q;
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);*/
+
+        if (aclk_kill_link) {
+            aclk_kill_link = 0;
+            aclk_graceful_disconnect();
+            continue;
+        }
 
         if (aclk_force_reconnect) {
             aclk_lws_wss_destroy_context();
@@ -1575,13 +1589,13 @@ void aclk_disconnect()
     aclk_force_reconnect = 1;
 }
 
-void aclk_shutdown()
+/*void aclk_shutdown()
 {
     info("Shutdown initiated");
     aclk_connected = 0;
     _link_shutdown();
     info("Shutdown complete");
-}
+}*/
 
 inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us)
 {

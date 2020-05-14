@@ -109,11 +109,25 @@ void claim_agent(char *claiming_arguments)
 #endif
 }
 
+extern int aclk_connected, aclk_kill_link;
+extern void aclk_graceful_disconnect();
+/* Change the claimed state of the agent.
+ *
+ * This only happens when the user has explicitly requested it:
+ *   - via the cli tool by reloading the claiming state
+ *   - after spawning the claim because of a command-line argument
+ * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
+ */
 void load_claiming_state(void)
 {
     if (claimed_id != NULL) {
         freez(claimed_id);
         claimed_id = NULL;
+    }
+    if (aclk_connected)
+    {
+        info("Agent was already connected to Cloud - forcing reconnection under new credentials");
+        aclk_kill_link = 1;
     }
 
     // Propagate into aclk and registry. Be kind of atomic...
