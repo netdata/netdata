@@ -280,10 +280,10 @@ This is what you should expect from Netdata:
 ### Integrations
 
 -   **Time-series databases** - Netdata can archive its metrics to **Graphite**, **OpenTSDB**, **Prometheus**, **AWS
-    Kinesis**, **MongoDB**, **JSON document DBs**, in the same or lower resolution (lower: to prevent it from congesting
-    these servers due to the amount of data collected). Netdata also supports **Prometheus remote write API**, which
-    allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**, **PostgreSQL/TimescaleDB**,
-    **Splunk**, **VictoriaMetrics** and a lot of other [storage
+    Kinesis**, **Google Cloud Pub/Sub**, **MongoDB**, **JSON document DBs**, in the same or lower resolution (lower: to
+    prevent it from congesting these servers due to the amount of data collected). Netdata also supports **Prometheus
+    remote write API**, which allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**,
+    **PostgreSQL/TimescaleDB**, **Splunk**, **VictoriaMetrics** and a lot of other [storage
     providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
 
 ## Visualization
