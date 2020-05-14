@@ -1,6 +1,7 @@
 <!--
 title: "Contributing to documentation"
-date: 2020-04-20
+date: 2020-05-14
+description: Want to contribute to Netdata's documentation? 
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/contributing-documentation.md
 -->
 
@@ -20,6 +21,10 @@ guidance on how we write and organize our documentation.
 All our documentation uses the Markdown syntax. If you're not familiar with how it works, please read the [Markdown
 introduction post](https://daringfireball.net/projects/markdown/) by its creator, followed by [Mastering
 Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub.
+
+Our [documentation site](https://learn.netdata.cloud/) is built with [Docusaurus](https://v2.docusaurus.io/). If you
+want to contribute to the generated documentation site, and have experience in React and/or Docusaurus itself, send us
+an email: [info@netdata.cloud](mailto:info@netdata.cloud).
 
 ## How contributing to the documentation works
 
@@ -138,8 +143,11 @@ reason.
 When you're finished with your changes, add and commit them to your fork of the Netdata repository. Head over to GitHub
 to create your pull request (PR).
 
-Once we receive your pull request (PR), we'll take time to read through it and assess it for correctness, conciseness,
+Once we receive your pull request (PR), the Netdata team reads through it and assesses it for correctness, conciseness,
 and overall quality. We may point to specific sections and ask for additional information or other fixes.
+
+After merging your PR, we then rebuild the [documentation site](https://learn.netdata.cloud), which is built with
+[Docusaurus](https://v2.docusaurus.io/).
 
 ## What's next
 

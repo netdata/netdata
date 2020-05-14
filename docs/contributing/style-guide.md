@@ -1,6 +1,6 @@
 <!--
 title: "Netdata style guide"
-date: 2020-04-20
+date: 2020-05-14
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
 -->
 
@@ -334,7 +334,7 @@ include that in this style guide as soon as it's complete.
 
 ### Language-specific syntax highlighting in code blocks
 
-Our documentation site at [learn.netdata.cloud]() uses
+Our documentation site at [learn.netdata.cloud](https://learn.netdata.cloud) uses
 [Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata
 documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`,
 and `go`. If no language is specified, Prism tries to guess the language based on its content.
@@ -362,13 +362,8 @@ inline char *health_stock_config_dir(void) {
 }
 ```
 
-You can also use the Highlight and
-[SuperFences](https://facelessuser.github.io/pymdown-extensions/extensions/superfences/) extensions together to show
-line numbers or highlight specific lines.
-
-Display line numbers by appending `linenums="1"` after the language declaration, replacing `1` with the starting line
-number of your choice. Highlight lines by appending `hl_lines="2"`, replacing `2` with the line you'd like to highlight.
-Or, multiple lines: `hl_lines="1 2 4 12`.
+Prism also supports titles and line highlighting. See the [Docusaurus
+documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
 
 > ⚠️ Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our
 > [documentation site](https://learn.netdata.cloud/). They should be used sparingly and only when necessary.
