@@ -12,8 +12,8 @@ long term?
 
 Many people think Netdata can only store about an hour's worth of real-time metrics, but that's simply not true any
 more. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of historical,
-per-second metrics without having to rely on a [backend](../../backends/) or [exporting
-connector](../../exporting/README.md).
+per-second metrics without having to rely on a [backend](/backends/README.md) or [exporting
+connector](/exporting/README.md).
 
 This tutorial gives two options for configuring Netdata to store more metrics. **We recommend the default [database
 engine](#using-the-database-engine)**, but you can stick with or switch to the round-robin database if you prefer.
@@ -65,7 +65,7 @@ Based on our testing, these default settings will retain about a day's worth of 
 more historical metrics.
 
 But before you change these options too dramatically, read up on the [database engine's memory
-footprint](../../database/engine/README.md#memory-requirements).
+footprint](/database/engine/README.md#memory-requirements).
 
 With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
 redundancy.
@@ -158,9 +158,9 @@ Now that you have either configured database engine or round-robin database engi
 probably want to see it in action!
 
 For more information about how to pan charts to view historical metrics, see our documentation on [using
-charts](../../web/README.md#using-charts).
+charts](/web/README.md#using-charts).
 
-And if you'd now like to reduce Netdata's resource usage, view our [performance guide](../../docs/Performance.md) for
+And if you'd now like to reduce Netdata's resource usage, view our [performance guide](/docs/Performance.md) for
 our best practices on optimization.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Ftutorials%2Flonger-metrics-storage&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

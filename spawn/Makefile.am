@@ -7,6 +7,3 @@ dist_noinst_DATA = \
     README.md \
     $(NULL)
 
-dist_libconfig_DATA = \
-    ebpf_process.conf \
-    $(NULL)

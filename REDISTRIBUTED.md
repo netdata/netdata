@@ -10,7 +10,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md
 Netdata copyright info:
  Copyright 2016-2018, Costa Tsaousis.
  Copyright 2018, Netdata Inc.
- Released under [GPL v3 or later](LICENSE).
+ Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netdata/master/LICENSE).
 
 Netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
@@ -163,7 +163,7 @@ connectivity is not available.
       Copyright (c) 2014 Lucas Garron
       [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
 
--   [Utilities for writing code that runs on Python 2 and 3](collectors/python.d.plugin/python_modules/urllib3/packages/six.py)
+-   [Utilities for writing code that runs on Python 2 and 3](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/python_modules/urllib3/packages/six.py)
 
       Copyright (c) 2010-2015 Benjamin Peterson
       [MIT License](https://github.com/benjaminp/six/blob/master/LICENSE)

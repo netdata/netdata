@@ -655,7 +655,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(!host->labels) {
                 host->labels = new_labels;
             } else {
+                rrdhost_rdlock(host);
                 replace_label_list(host, new_labels);
+                rrdhost_unlock(host);
             }
 
             new_labels = NULL;
@@ -828,7 +830,7 @@ void *pluginsd_main(void *ptr) {
 
     // disable some plugins by default
     config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
-    config_get_boolean(CONFIG_SECTION_PLUGINS, "ebpf_process", CONFIG_BOOLEAN_NO);
+    config_get_boolean(CONFIG_SECTION_PLUGINS, "ebpf", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop

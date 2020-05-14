@@ -1,8 +1,6 @@
 <!--
----
 title: "Contributing to documentation"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/contributing-documentation.md
----
 -->
 
 # Contributing to documentation
@@ -12,8 +10,8 @@ We welcome contributions to Netdata's already extensive documentation, which we 
 repository](https://github.com/netdata/netdata) on GitHub.
 
 Like all contributing to all other aspects of Netdata, we ask that anyone who wants to help with documentation read and
-abide by the [Contributor Convenant Code of Conduct](https://docs.netdata.cloud/code_of_conduct/) and follow the
-instructions outlined in our [Contributing document](../../CONTRIBUTING.md).
+abide by the [Contributor Convenant Code of Conduct](/CODE_OF_CONDUCT.md) and follow the
+instructions outlined in our [Contributing document](/CONTRIBUTING.md).
 
 We also ask you to read our [documentation style guide](style-guide.md), which, while not complete, will give you some
 guidance on how we write and organize our documentation.
@@ -70,9 +68,9 @@ button.
 After you've hit that button, jump down to our instructions on [pull requests and
 cleanup](#pull-requests-and-final-steps) for your next steps. 
 
-!!! note This process will create a branch directly on the `netdata/netdata` repository, which then requires manual
-    cleanup. If you're going to make significant documentation contributions, or contribute often, we recommend the
-    local editing process just below.
+> This process will create a branch directly on the `netdata/netdata` repository, which then requires manual cleanup. If
+> you're going to make significant documentation contributions, or contribute often, we recommend the local editing
+> process just below.
 
 ## Edit documentation locally
 
@@ -115,9 +113,7 @@ folder and either name it `README.md` for generic documentation, or with another
 #### The `docs` folder
 
 At the root of the Netdata repository is a `docs/` folder. Inside this folder we place documentation that does not have
-a direct relationship to a specific component of Netdata. It's where we house our [getting started
-guide](../../docs/getting-started.md), guides on [running Netdata behind Nginx](../../docs/Running-behind-nginx.md), and
-more.
+a direct relationship to a specific component of Netdata.
 
 If the documentation you're working on doesn't have a direct relaionship to a component of Netdata, it can be placed in
 this `docs/` folder.

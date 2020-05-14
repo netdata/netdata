@@ -27,7 +27,7 @@ int init_json_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = NULL;
+    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
 
     instance->send_header = NULL;
     instance->check_response = exporting_discard_response;
@@ -132,7 +132,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "\"timestamp\":%llu}\n",
 
         engine->config.prefix,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,
@@ -209,7 +209,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"timestamp\": %llu}\n",
 
         engine->config.prefix,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,

@@ -25,7 +25,7 @@
 #define ACLK_MAX_TOPIC 255
 
 #define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
-#define ACLK_STABLE_TIMEOUT 10 // Minimum delay to mark AGENT as stable
+#define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
@@ -73,16 +73,12 @@ void *aclk_main(void *ptr);
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 
-//int     aclk_init();
-//char    *get_base_topic();
-
 extern char *is_agent_claimed(void);
 extern void aclk_lws_wss_mqtt_layer_disconect_notif();
 char *create_uuid();
 
 // callbacks for agent cloud link
 int aclk_subscribe(char *topic, int qos);
-void aclk_shutdown();
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
@@ -105,7 +101,6 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_alarm_reload();
 void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
-char *aclk_encode_response(BUFFER *contents);
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 void aclk_single_update_enable();

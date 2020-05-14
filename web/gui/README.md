@@ -15,21 +15,27 @@ toolkit. You've probably seen it before:
 dashboard](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
 Learn more about how dashboards work and how they're populated using the
-`dashboards.js` file in our [web dashboards overview](../).
+`dashboards.js` file in our [web dashboards overview](/web/README.md).
 
 By default, Netdata starts a web server for its dashboard at port `19999`. Open
 up your web browser of choice and navigate to `http://SERVER-IP:19999`, or
 `http://localhost:19999` on `localhost`.
 
-Netdata uses an [internal, static-threaded web server](../server/) to host the
+Netdata uses an [internal, static-threaded web server](/web/server/README.md) to host the
 HTML, CSS, and JavaScript files that make up the standard dashboard. You don't
 have to configure anything to access it, although you can adjust [your
-settings](../server/#other-netdataconf-web-section-options) in the
+settings](/web/server/README.md#other-netdataconf-web-section-options) in the
 `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
 
 <details markdown="1"><summary>Want to see the dashboard and its features in action? Check out our video.</summary>
 <iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </details>
+
+## New React Dashboard
+
+We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
+
+The new dashboard is added to the codebase, but the old version is still here. If you want to use it, run `/usr/libexec/netdata/netdata-switch-dashboard.sh  classic`. To switch back, do `netdata-switch-dashboard.sh  react`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
 
 ## Navigating the standard dashboard
 
@@ -46,8 +52,8 @@ dashboard](https://user-images.githubusercontent.com/1153921/62810777-ef681980-b
 
 Netdata is broken up into multiple **sections**, such as **System Overview**,
 **CPU**, **Disk**, and more. Inside each section you'll find a number of charts,
-broken down into [contexts](../#contexts) and
-[families](../#families).
+broken down into [contexts](/web/README.md#contexts) and
+[families](/web/README.md#families).
 
 An example of the **Memory** section on a Linux desktop system.
 
@@ -68,7 +74,7 @@ associated with.
 menu](https://user-images.githubusercontent.com/1153921/62811361-38b96880-bab6-11e9-8d41-4d9b29778e86.png)
 
 Most menu items will contain several **submenu** entries, which represent any
-[families](../#families) from that section. Netdata automatically
+[families](/web/README.md#families) from that section. Netdata automatically
 generates these submenu entries.
 
 Here's a **Disks** menu with several submenu entries for each disk drive and
@@ -83,22 +89,22 @@ The nodes menu appears in the top-left corner of the standard dashboard and is
 labeled with the hostname of the system Netdata is monitoring.
 
 Clicking on it will display a drop-down menu of any nodes you might have
-connected via the [Netdata registry](../../registry/). By default, you'll find
+connected via the [Netdata registry](/registry/README.md). By default, you'll find
 nothing under the **My nodes** heading, but you can try out any of the demo
 Netdata nodes to see how the nodes menu works.
 
 ![Screenshot of the default (empty) nodes
 menu](https://user-images.githubusercontent.com/1153921/62795508-c3d13900-ba8b-11e9-98ed-f0be1b201340.png)
 
-Once you add nodes via [Netdata Cloud](../../docs/netdata-cloud/) or a [private
-registry](../../registry/#run-your-own-registry), you will see them appear under
+Once you add nodes via [Netdata Cloud](/docs/netdata-cloud/README.md) or a [private
+registry](/registry/README.md#run-your-own-registry), you will see them appear under
 the **My nodes** heading.
 
 ![Screenshot of a nodes menu populated by registry
 agents](https://user-images.githubusercontent.com/1153921/62795509-c3d13900-ba8b-11e9-8459-e85bf71f7ceb.png)
 
 The nodes menu will also show the master netdata node and all slave nodes
-streaming to that master, if you have [configured streaming](../../streaming).
+streaming to that master, if you have [configured streaming](/streaming/README.md).
 
 ![Screenshot of a nodes menu populated by streaming
 agents.](https://user-images.githubusercontent.com/1153921/62965774-90a7e600-bdba-11e9-8b80-495f35b29ecb.png)
@@ -126,8 +132,7 @@ If you want to customize this information, you should avoid editing
 overwrite the file when it's updated. Instead, you should create a new file with
 your customizations.
 
-We created an example file at
-[`dashboard_info_custom_example.js`](dashboard_info_custom_example.js). You can
+We created an example file at `dashboard_info_custom_example.js`. You can
 copy this to a new file with a name of your choice in the `web/` directory. This
 directory changes based on your operating system and installation method. If
 you're on a Linux system, it should be at `/usr/share/netdata/web/`.
@@ -165,7 +170,7 @@ file](https://user-images.githubusercontent.com/1153921/62798924-570e6c80-ba94-1
 
 ## Custom dashboards
 
-For information on creating custom dashboards from scratch, see the [custom
-dashboards](custom/) or [Atlassian Confluence dashboards](confluence/) guides.
+For information on creating custom dashboards from scratch, see the [custom dashboards](/web/gui/custom/README.md) or
+[Atlassian Confluence dashboards](/web/gui/confluence/README.md) guides.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

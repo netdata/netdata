@@ -1,8 +1,6 @@
 <!--
----
 title: "python.d.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/README.md
----
 -->
 
 # python.d.plugin
@@ -81,7 +79,8 @@ Writing new python module is simple. You just need to remember to include 5 majo
 
 If you plan to submit the module in a PR, make sure and go through the [PR checklist for new modules](#pull-request-checklist-for-python-plugins) beforehand to make sure you have updated all the files you need to. 
 
-For a quick start, you can look at the [example plugin](example/example.chart.py).
+For a quick start, you can look at the [example
+plugin](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/example/example.chart.py).
 
 ### Global variables `ORDER` and `CHART`
 
@@ -204,7 +203,8 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 
 _Examples: `apache`, `nginx`, `tomcat`_
 
-_Multiple Endpoints (urls) Examples: [`rabbitmq`](rabbitmq/README.md) (simpler) , [`elasticsearch`](elasticsearch/README.md) (threaded)_
+_Multiple Endpoints (urls) Examples: [`rabbitmq`](/collectors/python.d.plugin/rabbitmq/README.md) (simpler) ,
+[`elasticsearch`](/collectors/python.d.plugin/elasticsearch/README.md) (threaded)_
 
 
 _Variables from config file_: `url`, `user`, `pass`.

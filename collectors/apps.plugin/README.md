@@ -14,7 +14,7 @@ for every process found running.
 
 Since Netdata needs to present this information in charts and track them through time,
 instead of presenting a `top` like list, `apps.plugin` uses a pre-defined list of **process groups**
-to which it assigns all running processes. This list is [customizable](apps_groups.conf) and Netdata
+to which it assigns all running processes. This list is customizable via `apps_groups.conf`, and Netdata
 ships with a good default for most cases (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 
 So, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
@@ -22,7 +22,7 @@ processes together (evaluating both child and parent processes) so that the resu
 a predefined set of members (of course, only process groups found running are reported).
 
 > If you find that `apps.plugin` categorizes standard applications as `other`, we would be
-> glad to accept pull requests improving the [defaults](apps_groups.conf) shipped with Netdata.
+> glad to accept pull requests improving the defaults shipped with Netdata in `apps_groups.conf`.
 
 Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
 utilization of exit processes. Their utilization is accounted at their currently running parents.
@@ -67,7 +67,7 @@ Each of these sections provides the same number of charts:
 
 The above are reported:
 
--   For **Applications** per [target configured](apps_groups.conf).
+-   For **Applications** per target configured.
 -   For **Users** per username or UID (when the username is not available).
 -   For **User Groups** per groupname or GID (when groupname is not available).
 
@@ -97,8 +97,7 @@ its CPU resources will be cut in half, and data collection will be once every 2 
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](apps_groups.conf)).
-To edit it on your system run `/etc/netdata/edit-config apps_groups.conf`.
+The configuration file is `/etc/netdata/apps_groups.conf`. To edit it on your system, run `/etc/netdata/edit-config apps_groups.conf`.
 
 The configuration file works accepts multiple lines, each having this format:
 
@@ -224,7 +223,7 @@ Examples below for process group `sql`:
 -   Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
 -   Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
 
-For more information about badges check [Generating Badges](../../web/api/badges)
+For more information about badges check [Generating Badges](/web/api/badges/README.md)
 
 ## Comparison with console tools
 
@@ -358,9 +357,7 @@ So, the `ssh` session is using 95% CPU time.
 
 Why `ssh`?
 
-`apps.plugin` groups all processes based on its configuration file
-[`/etc/netdata/apps_groups.conf`](apps_groups.conf)
-(to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
+`apps.plugin` groups all processes based on its configuration file.
 The default configuration has nothing for `bash`, but it has for `sshd`, so Netdata accumulates
 all ssh sessions to a dimension on the charts, called `ssh`. This includes all the processes in
 the process tree of `sshd`, **including the exited children**.
@@ -375,10 +372,9 @@ the process tree of `sshd`, **including the exited children**.
 Netdata reads `/proc/<pid>/stat` for all processes, once per second and extracts `utime` and
 `stime` (user and system cpu utilization), much like all the console tools do.
 
-But it [also extracts `cutime` and `cstime`](https://github.com/netdata/netdata/blob/62596cc6b906b1564657510ca9135c08f6d4cdda/src/apps_plugin.c#L636-L642)
-that account the user and system time of the exit children of each process. By keeping a map in
-memory of the whole process tree, it is capable of assigning the right time to every process,
-taking into account all its exited children.
+But it also extracts `cutime` and `cstime` that account the user and system time of the exit children of each process.
+By keeping a map in memory of the whole process tree, it is capable of assigning the right time to every process, taking
+into account all its exited children.
 
 It is tricky, since a process may be running for 1 hour and once it exits, its parent should not
 receive the whole 1 hour of cpu time in just 1 second - you have to subtract the cpu time that has

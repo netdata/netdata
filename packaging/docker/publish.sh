@@ -16,10 +16,12 @@ fi
 
 WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
-declare -A ARCH_MAP
-ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
-DEVEL_ARCHS=(amd64)
-[ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
+
+if [ -z "${ARCH}" ]; then
+  echo "ARCH not set, build cannot proceed"
+  exit 1
+fi
+
 DOCKER_CMD="docker --config ${WORKDIR}"
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
@@ -32,11 +34,6 @@ if [ -z ${REPOSITORY} ]; then
 	else
 		echo "REPOSITORY was not detected, attempted to use TRAVIS_REPO_SLUG setting: ${TRAVIS_REPO_SLUG}"
 	fi
-fi
-
-# When development mode is set, build on DEVEL_ARCHS
-if [ ! -z ${DEVEL+x} ]; then
-    declare -a ARCHS=(${DEVEL_ARCHS[@]})
 fi
 
 # Ensure there is a version, the most appropriate one
@@ -64,10 +61,10 @@ if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
 fi
 
 echo "Docker image publishing in progress.."
-echo "Version       : ${VERSION}"
-echo "Repository    : ${REPOSITORY}"
-echo "Architectures : ${ARCHS[*]}"
-echo "Manifest list : ${MANIFEST_LIST}"
+echo "Version      : ${VERSION}"
+echo "Repository   : ${REPOSITORY}"
+echo "Architecture : ${ARCH}"
+echo "Manifest list: ${MANIFEST_LIST}"
 
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
 echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
@@ -76,15 +73,16 @@ echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
-for ARCH in ${ARCHS[@]}; do
-    TAG="${MANIFEST_LIST}-${ARCH}"
-    echo "Publishing image ${TAG}.."
-    $DOCKER_CMD push "${TAG}" &
-    echo "Image ${TAG} published succesfully!"
-done
+TAG="${MANIFEST_LIST}-${ARCH}"
+echo "Publishing image ${TAG}.."
+$DOCKER_CMD push "${TAG}"
 
-echo "Waiting for images publishing to complete"
-wait
+published() {
+	curl -s "https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags" | jq -e -r '.results[] | select(.name == "'"${VERSION}-${ARCH}"'")' > /dev/null
+}
+retry 5 published
+
+echo "Image ${TAG} published succesfully!"
 
 # Recreate docker manifest list
 echo "Getting tag list for version '${VERSION}'.."
@@ -94,6 +92,8 @@ echo "Creating manifest list.."
 $DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" "${TAGS[@]/#/${REPOSITORY}:}"
 
 # Annotate manifest with CPU architecture information
+declare -A ARCH_MAP
+ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 
 echo "Executing manifest annotate.."
 for TAG in "${TAGS[@]}"; do

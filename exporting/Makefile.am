@@ -10,6 +10,7 @@ SUBDIRS = \
     opentsdb \
     prometheus \
     aws_kinesis \
+    pubsub \
     mongodb \
     $(NULL)
 

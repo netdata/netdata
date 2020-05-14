@@ -1,7 +1,7 @@
 <!--
 ---
 title: "eBPF monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf_process.plugin/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf.plugin/README.md
 ---
 -->
 
@@ -71,9 +71,9 @@ commands. You can also configure your system's `/etc/fstab` configuration to mou
 
 eBPF collection is only enabled if you install Netdata with the `--enable-ebpf` option. 
 
-If you installed via the [one-line installation script](../../packaging/installer/README.md), [64-bit
-binary](../../packaging/installer/methods/kickstart-64.md), or [manually](../../packaging/installer/methods/manual.md),
-you can append the `--enable-ebpf` option when you reinstall.
+If you installed via the [one-line installation script](/packaging/installer/README.md), [64-bit
+binary](/packaging/installer/methods/kickstart-64.md), or [manually](/packaging/installer/methods/manual.md), you can
+append the `--enable-ebpf` option when you reinstall.
 
 For example, if you used the one-line installation script, you can reinstall Netdata with the following:
 
@@ -86,18 +86,18 @@ This process will not overwrite any changes you made to configuration files.
 ### Edit `netdata.conf` to enable the collector
 
 After installing Netdata with the `--enable-ebpf` option, you still need to enable the plugin explicitly. To do so, use
-`edit-config` to open `netdata.conf` and set `ebpf_process = yes` in the `[plugins]` section.
+`edit-config` to open `netdata.conf` and set `ebpf = yes` in the `[plugins]` section.
 
 ```bash
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
 ./edit-config netdata.conf
 ```
 
-Scroll down to the `[plugins]` section and uncomment the `ebpf_process` line after changing its setting to `yes`.
+Scroll down to the `[plugins]` section and uncomment the `ebpf` line after changing its setting to `yes`.
 
 ```conf
 [plugins]
-   ebpf_process = yes
+   ebpf = yes
 ```
 
 Restart Netdata with `service netdata restart`, or the appropriate method for your system, and reload your browser to
@@ -105,7 +105,7 @@ see eBPF charts.
 
 ## Charts
 
-The first version of `ebpf_process.plugin` gives a general vision about process running on computer. The charts related
+The first version of `ebpf.plugin` gives a general vision about process running on computer. The charts related
 to this plugin are inside the **eBPF** option on dashboard menu and divided in three groups `file`, `vfs`, and
 `process`.
 
@@ -179,14 +179,14 @@ process and thread creation.
 ## Configuration
 
 This plugin has different configuration modes, all of which can be adjusted with its configuration file at
-`ebpf_process.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
+`ebpf.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
 plugin works using `entry` by reading this configuration file.
 
 You can always edit this file with `edit-config`:
 
 ```bash
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config ebpf_process.conf
+./edit-config ebpf.conf
 ```
 
 ### `[global]`
@@ -214,6 +214,6 @@ Because eBPF monitoring is complex, we are evaluating the performance of this ne
 conditions, across various system loads, and when monitoring complex applications.
 
 Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
-nearly identical to our [apps.plugin collector](../apps.plugin/), despite collecting and displaying much more
-sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of your
-complex applications at any load.
+nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.md), despite collecting and displaying
+much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
+your complex applications at any load.

@@ -206,10 +206,18 @@ You can edit this file to set options. One common option to tweak is `history`, 
 
 To apply the changes you made, you have to restart Netdata.
 
+### 'nonrepresentable section on output' errors
+
+Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux.
+
+If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install. 
+
+In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
+
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
+When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md)
 for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](../../../docs/getting-started.md) for a quick overview.
+guide](/docs/getting-started.md) for a quick overview.

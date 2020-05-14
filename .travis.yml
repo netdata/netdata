@@ -103,7 +103,8 @@ jobs:
 
     - name: Docker container build process (alpine installation)
       script: packaging/docker/build.sh
-      env: DEVEL="true"
+      env:
+        - ARCH=amd64
       after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
     - name: Build/Install for ubuntu 18.04 (not containerized)
@@ -374,25 +375,25 @@ jobs:
       <<: *RELEASE_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=i386
+        - ARCH=i386
 
     - name: Build & Publish docker image for amd64
       <<: *RELEASE_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=amd64
+        - ARCH=amd64
 
     - name: Build & Publish docker image for armhf
       <<: *RELEASE_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=armhf
+        - ARCH=armhf
 
     - name: Build & Publish docker image for aarch64
       <<: *RELEASE_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=aarch64
+        - ARCH=aarch64
 
     - name: Create release draft
       git:
@@ -455,25 +456,25 @@ jobs:
       <<: *NIGHTLY_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=i386
+        - ARCH=i386
 
     - name: Build & Publish docker image for amd64
       <<: *NIGHTLY_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=amd64
+        - ARCH=amd64
 
     - name: Build & Publish docker image for armhf
       <<: *NIGHTLY_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=armhf
+        - ARCH=armhf
 
     - name: Build & Publish docker image for aarch64
       <<: *NIGHTLY_TEMPLATE
       env:
         - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCHS=aarch64
+        - ARCH=aarch64
 
     - name: Create nightly release artifacts, publish to GCS
       script:

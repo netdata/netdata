@@ -64,10 +64,13 @@ dist_noinst_DATA = \
     packaging/dashboard.checksums \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/jsonc.version \
+    packaging/jsonc.checksums \
     packaging/libwebsockets.version \
     packaging/libwebsockets.checksums \
     packaging/mosquitto.version \
     packaging/mosquitto.checksums \
+    packaging/bundle-dashboard.sh \
     packaging/bundle-mosquitto.sh \
     packaging/bundle-lws.sh \
     packaging/installer/README.md \
@@ -109,6 +112,7 @@ SUBDIRS += \
     web \
     claim \
     aclk \
+    spawn \
     $(NULL)
 
 
@@ -262,9 +266,9 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-EBPF_PROCESS_PLUGIN_FILES = \
-    collectors/ebpf_process.plugin/ebpf_process.c \
-    collectors/ebpf_process.plugin/ebpf_process.h \
+EBPF_PLUGIN_FILES = \
+    collectors/ebpf.plugin/ebpf.c \
+    collectors/ebpf.plugin/ebpf.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -494,6 +498,13 @@ endif
 
 
 
+SPAWN_PLUGIN_FILES = \
+    spawn/spawn.c \
+    spawn/spawn_server.c \
+    spawn/spawn_client.c \
+    spawn/spawn.h \
+    $(NULL)
+
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
     exporting/exporting_engine.h \
@@ -526,6 +537,13 @@ KINESIS_EXPORTING_FILES = \
     exporting/aws_kinesis/aws_kinesis.h \
     exporting/aws_kinesis/aws_kinesis_put_record.cc \
     exporting/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
+PUBSUB_EXPORTING_FILES = \
+    exporting/pubsub/pubsub.c \
+    exporting/pubsub/pubsub.h \
+    exporting/pubsub/pubsub_publish.cc \
+    exporting/pubsub/pubsub_publish.h \
     $(NULL)
 
 MONGODB_EXPORTING_FILES = \
@@ -585,6 +603,7 @@ NETDATA_FILES = \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
     $(ACLK_FILES) \
+    $(SPAWN_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -622,6 +641,10 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
+
+if LINK_STATIC_JSONC
+    NETDATA_COMMON_LIBS += externaldeps/jsonc/libjson-c.a
+endif
 
 NETDATACLI_FILES = \
     daemon/commands.h \
@@ -690,9 +713,9 @@ if ENABLE_PLUGIN_FREEIPMI
 endif
 
 if ENABLE_PLUGIN_EBPF
-    plugins_PROGRAMS += ebpf_process.plugin
-    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
-    ebpf_process_plugin_LDADD = \
+    plugins_PROGRAMS += ebpf.plugin
+    ebpf_plugin_SOURCES = $(EBPF_PLUGIN_FILES)
+    ebpf_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
@@ -743,6 +766,11 @@ endif
 if ENABLE_BACKEND_KINESIS
     netdata_SOURCES += $(KINESIS_BACKEND_FILES) $(KINESIS_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
+
+if ENABLE_EXPORTING_PUBSUB
+    netdata_SOURCES += $(PUBSUB_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_PUBSUB_LIBS)
 endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
@@ -859,7 +887,6 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=rrdset_is_exportable \
         -Wl,--wrap=exporting_calculate_value_from_stored_data \
         -Wl,--wrap=prepare_buffers \
-        -Wl,--wrap=notify_workers \
         -Wl,--wrap=send_internal_metrics \
         -Wl,--wrap=now_realtime_sec \
         -Wl,--wrap=uv_thread_set_name_np \
@@ -873,6 +900,8 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=recv \
         -Wl,--wrap=send \
         -Wl,--wrap=connect_to_one_of \
+        -Wl,--wrap=create_main_rusage_chart \
+        -Wl,--wrap=send_main_rusage \
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
@@ -895,6 +924,16 @@ if ENABLE_BACKEND_KINESIS
         -Wl,--wrap=kinesis_init \
         -Wl,--wrap=kinesis_put_record \
         -Wl,--wrap=kinesis_get_result \
+        $(NULL)
+endif
+if ENABLE_EXPORTING_PUBSUB
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(PUBSUB_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PUBSUB_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=pubsub_init \
+        -Wl,--wrap=pubsub_add_message \
+        -Wl,--wrap=pubsub_publish \
+        -Wl,--wrap=pubsub_get_result \
         $(NULL)
 endif
 if ENABLE_BACKEND_MONGODB

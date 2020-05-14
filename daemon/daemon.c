@@ -437,7 +437,7 @@ int become_daemon(int dont_fork, const char *user)
     sched_setscheduler_set();
 
     // Set claiming directory based on user config directory with correct ownership
-    snprintfz(claimingdirectory, FILENAME_MAX, "%s/claim.d", netdata_configured_user_config_dir);
+    snprintfz(claimingdirectory, FILENAME_MAX, "%s/cloud.d", netdata_configured_varlib_dir);
 
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {

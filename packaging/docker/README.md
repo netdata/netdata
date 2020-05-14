@@ -1,23 +1,32 @@
 <!--
 ---
 title: "Install Netdata with Docker"
+date: 2020-04-23
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
 ---
 -->
 
-# Install Netdata with Docker
+# Install the Netdata Agent with Docker
 
-Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set
-up quickly, and doesn't install anything permanent on the system, which makes uninstalling Netdata easy.
+Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
+you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-## Limitations running Netdata in Docker
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
+page.
 
-For monitoring the whole host, running Netdata in a container can limit its capabilities. Some data, like the host OS
-performance or status, is not accessible or not as detailed in a container as when running Netdata directly on the host.
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
 
-A way around this is to provide special mounts to the Docker container so that Netdata can get visibility on host OS
+## Limitations running the Agent in Docker
+
+For monitoring the whole host, running the Agent in a container can limit its capabilities. Some data, like the host OS
+performance or status, is not accessible or not as detailed in a container as when running the Agent directly on the
+host.
+
+A way around this is to provide special mounts to the Docker container so that the Agent can get visibility on host OS
 information like `/sys` and `/proc` folders or even `/etc/group` and shadow files.
 
 Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint)
@@ -31,71 +40,93 @@ Our x86_64 Docker images use [Polymorphic Polyverse Linux package scrambling](ht
 increased security, you can enable rescrambling of Netdata packages during runtime by setting the environment variable
 `RESCRAMBLE=true` while starting Netdata with a Docker container.
 
-## Run Netdata with the docker command
+## Run the Agent with the Docker command
 
-Quickly start Netdata with the `docker` command. Netdata is then available at `http://host:19999`.
+Quickly start a new Agent with the `docker run` command.
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
 ```
 
-The above can be converted to a `docker-compose.yml` file for ease of management:
+You can then access the dashboard at `http://localhost:19999`.
+
+## Run the Agent with Docker Compose
+
+The above can be converted to a `docker-compose.yml` file to use with [Docker
+Compose](https://docs.docker.com/compose/):
 
 ```yaml
 version: '3'
 services:
   netdata:
     image: netdata/netdata
+    container_name: netdata
     hostname: example.com # set to fqdn of host
     ports:
       - 19999:19999
+    restart: unless-stopped
     cap_add:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
 ```
 
-Some of the bind-mounts are optional depending on how you use Netdata:
+Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
-* If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
-  (they are used to get proper user and group names for the monitored host) to get slightly better security.
+## Configure Agent containers
 
-* Most modern linux distos supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
-  this is the case you can change the line above that mounts the file inside the container to
-  `-v /etc/lsb-release:/host/etc/lsb-release:ro`.
+You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. You should
+reference the [`docker run`](https://docs.docker.com/engine/reference/run/) and [Docker
+Compose](https://docs.docker.com/compose/) documentation for details, but we'll cover a few recommended configurations
+below, as well as those that are unique to Netdata Agent containers.
 
-* If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
-  metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
-  using, e.g. `--env VIRTUALIZATION=$(systemd-detect-virt -v)`. If you are using a `docker-compose.yml` then add:
-```
+### Add or remove other volumes
+
+Some of the volumes are optional depending on how you use Netdata:
+
+-   If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
+    (they are used to get proper user and group names for the monitored host) to get slightly better security.
+-   Most modern linux distros supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
+    this is the case you can change the line above that mounts the file inside the container to
+    `-v /etc/lsb-release:/host/etc/lsb-release:ro`.
+-   If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
+    metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
+    using, e.g. `--env VIRTUALIZATION=$(systemd-detect-virt -v)`. If you are using a `docker-compose.yml` then add:
+
+```yaml
     environment:
       - VIRTUALIZATION=${VIRTUALIZATION}
 ```
+
 This allows the information to be passed into `docker-compose` using:
-```
+
+```bash
 VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
-
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
-page.
-
-The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
-_actively_ contributing to Netdata's future.
 
 ### Docker container names resolution
 
@@ -105,7 +136,7 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access
+[HAProxy](/docs/running-behind-haproxy/) so that it restricts connections to read-only access
 to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
@@ -178,10 +209,10 @@ Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#e
 [Netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address
 Netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
-## Install Netdata using docker-compose with SSL/TLS enabled HTTP Proxy
+## Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you should [secure the Netdata
-instance](../../docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
+instance](/docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
 reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
@@ -230,11 +261,17 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
 ```
 
 ### Restrict access with basic auth
@@ -246,42 +283,6 @@ Caddyfile.
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our Travis CI infrastructure.
-
-### Using tools manually from the command line
-
-The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your
-choosing. 
-
-```bash
-Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PWD> [-s]
-	-s skip build, just push the image
-Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
-```
-
-This is especially useful when testing a Pull Request for Kubernetes, since you can set `image` to an immutable
-repository and tag, set the `imagePullPolicy` to `Always` and just keep uploading new images.
-
-Example:
-
-We get a local copy of the Helm chart at <https://github.com/netdata/helmchart>. We modify `values.yaml` to have the
-following:
-
-```yaml
-image:
-  repository: cakrit/netdata-prs
-  tag: PR5576
-  pullPolicy: Always
-```
-
-We check out PR5576 and run the following:
-
-```bash
-./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
-```
-
-Then we can run `helm install [path to our helmchart clone]`.
-
-If we make changes to the code, we execute the same `build-test.sh` command, followed by `helm upgrade [name] [path to our helmchart clone]`
 
 ### Inside Netdata organization, using Travis CI
 

@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Kavenegar
 
-[Kavenegar](https://www.kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
+[Kavenegar](https://kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
 
 Will look like this on your Android device:
 

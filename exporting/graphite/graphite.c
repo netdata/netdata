@@ -27,7 +27,7 @@ int init_graphite_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = NULL;
+    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
 
     instance->send_header = NULL;
     instance->check_response = exporting_discard_response;
@@ -127,7 +127,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
         engine->config.prefix,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
@@ -174,7 +174,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
         engine->config.prefix,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",

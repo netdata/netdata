@@ -15,14 +15,14 @@ you can better understand what's happening on your infrastructure. Too many bad 
 few small SVG icons. Too many requsests? Time to batten down the hatches—it's a DDoS.
 
 Netdata has been capable of monitoring web log files for quite some time, thanks for the [weblog python.d
-module](../../collectors/python.d.plugin/web_log/README.md), but we recently refactored this module in Go, and that
-effort comes with a ton of improvements.
+module](/collectors/python.d.plugin/web_log/README.md), but we recently refactored this module in Go, and that effort
+comes with a ton of improvements.
 
 You can now use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](https://blog.netdata.cloud/posts/release-1.19/).
 
-The [go.d plugin](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog) is currently compatible with
+The [go.d plugin](/collectors/go.d.plugin/modules/weblog/README.md) is currently compatible with
 [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This tutorial will walk you through using the new Go-based web log collector to turn the logs these web servers
@@ -106,10 +106,10 @@ jobs:
 ```
 
 However, if your log files were not auto-detected, it might be because they are in a different location. Try the default
-`weblog.conf` file.
+`web_log.conf` file.
 
 ```bash
-./edit-config go.d/weblog.conf
+./edit-config go.d/web_log.conf
 ```
 
 To create a new custom configuration, you need to set the `path` parameter to point to your web server's access log
@@ -130,8 +130,9 @@ web server's access log and begin showing real-time charts!
 The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll
 leave that topic for a separate tutorial.
 
-We do have [extensive documentation](../../collectors/go.d.plugin/modules/weblog/#custom-log-format) on how to build
-custom parsing for Nginx and Apache logs.
+We do have [extensive
+documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/#custom-log-format) on how
+to build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alarms
 
@@ -148,13 +149,13 @@ You can also edit this file directly with `edit-config`:
 ```
 
 For more information about editing the defaults or writing new alarm entities, see our [health monitoring
-documentation](../../health/README.md).
+documentation](/health/README.md).
 
 ## What's next?
 
 Now that you have web log collection up and running, we recommend you take a look at the documentation for our
-[python.d](../../collectors/python.d.plugin/web_log/README.md) for some ideas of how you can turn these rather "boring"
-logs into powerful real-time tools for keeping your servers happy.
+[python.d](/collectors/python.d.plugin/web_log/README.md) for some ideas of how you can turn these rather "boring" logs
+into powerful real-time tools for keeping your servers happy.
 
 Don't forget to give GitHub user [Wing924](https://github.com/Wing924) a big 👍 for his hard work in starting up the Go
 refactoring effort.

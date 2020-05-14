@@ -1,8 +1,7 @@
 <!--
----
 title: "Samba monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/samba/README.md
----
+sidebar_label: "Samba"
 -->
 
 # Samba monitoring with Netdata
@@ -83,7 +82,7 @@ samba: yes
 ```
 
 Edit the `python.d/samba.conf` configuration file using `edit-config` from the your agent's [config
-directory](../../../docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
