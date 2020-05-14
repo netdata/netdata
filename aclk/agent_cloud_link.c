@@ -429,10 +429,8 @@ struct aclk_query *aclk_queue_pop()
 
 // This will give the base topic that the agent will publish messages.
 // subtopics will be sent under the base topic e.g.  base_topic/subtopic
-// This is called by aclk_init(), to compute the base topic once and have
-// it stored internally.
-// Need to check if additional logic should be added to make sure that there
-// is enough information to determine the base topic at init time
+// This is called during the connection, we delete any previous topic
+// in-case the user has changed the agent id and reclaimed.
 
 char *create_publish_base_topic()
 {
@@ -441,15 +439,15 @@ char *create_publish_base_topic()
 
     ACLK_LOCK;
 
-    if (unlikely(!global_base_topic)) {
-        char tmp_topic[ACLK_MAX_TOPIC + 1], *tmp;
+    if (global_base_topic)
+        freez(global_base_topic);
+    char tmp_topic[ACLK_MAX_TOPIC + 1], *tmp;
 
-        snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, is_agent_claimed());
-        tmp = strchr(tmp_topic, '\n');
-        if (unlikely(tmp))
-            *tmp = '\0';
-        global_base_topic = strdupz(tmp_topic);
-    }
+    snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, is_agent_claimed());
+    tmp = strchr(tmp_topic, '\n');
+    if (unlikely(tmp))
+        *tmp = '\0';
+    global_base_topic = strdupz(tmp_topic);
 
     ACLK_UNLOCK;
     return global_base_topic;
@@ -1319,6 +1317,8 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
+    create_publish_base_topic();
+
 }
 
 
@@ -1398,8 +1398,6 @@ void *aclk_main(void *ptr)
             sleep_usec(USEC_PER_SEC * 1);
         }
     }
-
-    create_publish_base_topic();
 
     usec_t reconnect_expiry = 0; // In usecs
 
