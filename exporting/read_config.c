@@ -390,7 +390,7 @@ struct engine *read_exporting_config()
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
             connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", ""));
-            if (!connector_specific_config->stream_name)
+            if (!strcmp(connector_specific_config->stream_name, ""))
                 error("stream name is a mandatory Kinesis parameter but it is not configured");
 
             connector_specific_config->auth_key_id = strdupz(exporter_get(instance_name, "aws_access_key_id", ""));
