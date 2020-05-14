@@ -22,7 +22,7 @@ You can now use the [LTSV log format](http://ltsv.org/), track TLS and cipher us
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](https://blog.netdata.cloud/posts/release-1.19/).
 
-The [go.d plugin](/collectors/go.d.plugin/modules/weblog/README.md) is currently compatible with
+The [go.d plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) is currently compatible with
 [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This tutorial will walk you through using the new Go-based web log collector to turn the logs these web servers
