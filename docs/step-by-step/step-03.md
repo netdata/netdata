@@ -13,7 +13,7 @@ and performance](step-01.md).
 
 You might be thinking, "So, now I have to remember all these IP addresses, and type them into my browser
 manually, to move from one system to another? Maybe I should just make a bunch of bookmarks. What's a few more tabs
-on top of the hundred I have already? 🤬"
+on top of the hundred I have already?"
 
 We get it. That's why we built [Netdata Cloud](/docs/netdata-cloud/README.md), which connects many distributed agents
 together for a seamless experience when monitoring multiple systems.
