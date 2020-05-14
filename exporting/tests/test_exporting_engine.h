@@ -93,8 +93,6 @@ calculated_number __wrap_exporting_calculate_value_from_stored_data(
 int __real_prepare_buffers(struct engine *engine);
 int __wrap_prepare_buffers(struct engine *engine);
 
-int __wrap_notify_workers(struct engine *engine);
-
 void __real_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
 void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
 

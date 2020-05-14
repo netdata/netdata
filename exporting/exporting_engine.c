@@ -48,17 +48,8 @@ void *exporting_main(void *ptr)
         heartbeat_next(&hb, step_ut);
         engine->now = now_realtime_sec();
 
-        if (mark_scheduled_instances(engine)) {
-            if (prepare_buffers(engine) != 0) {
-                error("EXPORTING: cannot prepare data to send");
-                break;
-            }
-        }
-
-        if (notify_workers(engine) != 0) {
-            error("EXPORTING: cannot communicate with exporting connector instance working threads");
-            break;
-        }
+        if (mark_scheduled_instances(engine))
+            prepare_buffers(engine);
 
         send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
 

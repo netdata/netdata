@@ -1152,7 +1152,6 @@ endif()
         -Wl,--wrap=rrdset_is_exportable
         -Wl,--wrap=exporting_calculate_value_from_stored_data
         -Wl,--wrap=prepare_buffers
-        -Wl,--wrap=notify_workers
         -Wl,--wrap=send_internal_metrics
         -Wl,--wrap=now_realtime_sec
         -Wl,--wrap=uv_thread_set_name_np
