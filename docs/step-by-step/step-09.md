@@ -18,16 +18,15 @@ That's a lot of metrics. We're talking 345,600,000 individual data points. And t
 a portion of the RAM available on most systems.
 
 To store _even more_ metrics, you have two options. First, you can tweak the database engine's options to expand the RAM
-or disk it uses. Second, you can archive metrics to a different backend. For that, we'll use MongoDB and Prometheus as
-examples.
+or disk it uses. Second, you can archive metrics to an external database. For that, we'll use MongoDB as examples.
 
 ## What you'll learn in this step
 
 In this step of the Netdata guide, you'll learn how to:
 
 -   [Tweak the database engine's settings](#tweak-the-database-engines-settings)
--   [Archive metrics to a backend](#archive-metrics-to-a-backend)
-    -   [Use the MongoDB backend](#archive-metrics-via-the-mongodb-backend)
+-   [Archive metrics to an external database](#archive-metrics-to-an-external-database)
+    -   [Use the MongoDB database](#archive-metrics-via-the-mongodb-exporting-connector)
 
 Let's get started!
 
@@ -73,15 +72,16 @@ the right-hand side. You can find `dbengine` metrics after `queries`.
 ![Image of the database engine reflected in the Netdata
 Dashboard](https://user-images.githubusercontent.com/12263278/64781383-9c71fe00-d55a-11e9-962b-efd5558efbae.png)
 
-## Archive metrics to a backend
+## Archive metrics to an external database
 
-You can archive all the metrics collected by Netdata to what we call **backends**. The supported backends include
-Graphite, OpenTSDB, Prometheus, AWS Kinesis Data Streams, MongoDB, and the list is always growing.
+You can archive all the metrics collected by Netdata to **external databases**. The supported databases and services
+include Graphite, OpenTSDB, Prometheus, AWS Kinesis Data Streams, Google Cloud Pub/Sub, MongoDB, and the list is always
+growing.
 
 As we said in [step 1](/docs/step-by-step/step-01.md), we have only complimentary systems, not competitors! We're happy
 to support these archiving methods and are always working to improve them.
 
-A lot of Netdata users archive their metrics to one of these backends for long-term storage or further analysis. Since
+A lot of Netdata users archive their metrics to one of these databases for long-term storage or further analysis. Since
 Netdata collects so many metrics every second, they can quickly overload small devices or even big servers that are
 aggregating metrics streaming in from other Netdata agents.
 
@@ -91,11 +91,7 @@ sum of every X seconds of metrics. This reduces the sheer amount of data, albeit
 How you archive metrics, or if you archive metrics at all, is entirely up to you! But let's cover two easy archiving
 methods, MongoDB and Prometheus remote write, to get you started.
 
-> Currently, Netdata can only use a single backend at a time. We are currently working on a new archiving solution,
-> which we call "exporters," that simplifies the configuration process and allows you to archive to multiple backends.
-> We'll update this tutorial as soon as exporters are enabled.
-
-### Archive metrics via the MongoDB backend
+### Archive metrics via the MongoDB exporting connector
 
 Begin by installing MongoDB its dependencies via the correct package manager for your system.
 
@@ -122,7 +118,7 @@ use netdata
 db.createCollection("netdata_metrics")
 ```
 
-Next, Netdata needs to be reinstalled in order to detect that the required libraries to make this backend connection
+Next, Netdata needs to be reinstalled in order to detect that the required libraries to make this exporting connection
 exist. Since you most likely installed Netdata using the one-line installer script, all you have to do is run that
 script again. Don't worry—any configuration changes you made along the way will be retained!
 
@@ -130,45 +126,31 @@ script again. Don't worry—any configuration changes you made along the way wil
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-Now, from your Netdata config directory, edit your `netdata.conf` file and set these options in the `[backend]` section:
-
-```conf
-[backend]
-    enabled = yes
-    type = mongodb
-```
-
-You now need to initialize and edit a `mongodb.conf` file to tell Netdata where to find the database you just created.
+Now, from your Netdata config directory, initialize and edit a `exporting.conf` file to tell Netdata where to find the
+database you just created.
 
 ```sh
-./edit-config mongodb.conf
+./edit-config exporting.conf
 ```
 
-Add the following values to the file:
+Add the following section to the file:
 
-```yaml
-# MongoDB backend configuration
-#
-# All options in this file are mandatory
-
-# URI
-uri = mongodb://localhost
-
-# database name
-database = netdata
-
-# collection name
-collection = netdata_metrics
+```conf
+[mongodb:my_mongo_instance]
+    enabled = yes
+    destination = mongodb://localhost
+    database = netdata
+    collection = netdata_metrics
 ```
 
-[Restart](/docs/getting-started.md#start-stop-and-restart-netdata) Netdata to enable the MongoDB backend. Click on the
-**Netdata Montioring** menu and check out the **backend** sub-menu. You should start seeing these charts fill up with
-data about your MongoDB backend!
+[Restart](/docs/getting-started.md#start-stop-and-restart-netdata) Netdata to enable the MongoDB exporting connector.
+Click on the **Netdata Montioring** menu and check out the **exporting my mongo instance** sub-menu. You should start
+seeing these charts fill up with data about the exporting process!
 
 ![image](https://user-images.githubusercontent.com/1153921/70443852-25171200-1a56-11ea-8be3-494544b1c295.png)
 
-If you'd like to try connecting Netdata to another backend, such as Prometheus or OpenTSDB, read our [backends
-documentation](/backends/README.md).
+If you'd like to try connecting Netdata to another database, such as Prometheus or OpenTSDB, read our [exporting
+documentation](/exporting/README.md).
 
 ## What's next?
 
