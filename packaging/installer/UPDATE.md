@@ -17,8 +17,7 @@ Before you update Netdata using one of the methods below, check to see if your N
 opening the update modal in the dashboard. Click the **Update** button in the top navigation to open it. The modal tells
 you whether your agent is up-to-date or not.
 
-![Opening the update
-modal](https://user-images.githubusercontent.com/1153921/76559153-d5cced00-645b-11ea-8dcd-893f8d16f7a8.gif)
+![Opening the Agent's Update modal](https://user-images.githubusercontent.com/1153921/80829493-1adbe880-8b9c-11ea-9770-cc3b23a89414.gif)
 
 If your agent can be updated, use one of the methods below. **The method you chose for updating Netdata depends on how
 you installed it.** Choose from the following list to see the appropriate update instructions for your system.

@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Step 7. Netdata's dashboard in depth"
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-07.md
 ---
 -->
@@ -31,14 +32,9 @@ operation of your Netdata server/daemon. They take effect immediately and are pe
 You can see the **Performance**, **Synchronization**, **Visual**, and **Locale** tabs on the dashboard settings modal.
 
 ![Animated GIF of opening the settings
-modal](https://user-images.githubusercontent.com/12263278/64901553-967f3880-d692-11e9-95ac-dd485d36535c.gif)
+modal](https://user-images.githubusercontent.com/1153921/80841197-c93f5800-8bb3-11ea-907d-85bfe23565e1.gif)
 
-To change any setting, click on the toggle button.
-
-![Animated GIF of opening the settings
-modal](https://user-images.githubusercontent.com/1153921/65188394-2c182080-da23-11e9-9e2f-11bcdee28f30.gif)
-
-We recommend you spend some time reading the descriptions for each setting to understand them before making changes.
+To change any setting, click on the toggle button. We recommend you spend some time reading the descriptions for each setting to understand them before making changes.
 
 Pay particular attention to the following settings, as they have dramatic impacts on the performance and appearance of
 your Netdata dashboard:
@@ -55,8 +51,7 @@ Some settings are applied immediately, and others are only reflected after you r
 
 You can always check if there is an update available from the **Update** area of your Netdata dashboard.
 
-![Animated GIF of opening the update
-modal](https://user-images.githubusercontent.com/12263278/64876743-be957a00-d647-11e9-83dd-2f0a8df572cb.gif)
+![Opening the Agent's Update modal](https://user-images.githubusercontent.com/1153921/80829493-1adbe880-8b9c-11ea-9770-cc3b23a89414.gif)
 
 If an update is available, you'll see a modal similar to the one above.
 
@@ -84,7 +79,7 @@ snapshot, and send it to a colleague for further analysis.
 To export a snapshot, click on the **export** icon.
 
 ![Animated GIF of opening the export
-modal](https://user-images.githubusercontent.com/12263278/64901454-48b60080-d691-11e9-9c14-1539bc841735.gif)
+modal](https://user-images.githubusercontent.com/1153921/80993197-82d63d00-8def-11ea-88fa-98827814e930.gif)
 
 Edit the snapshot file name and select your desired compression method. Click on **Export**.
 

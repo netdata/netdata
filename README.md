@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Netdata"
-date: 2020-04-06
+date: 2020-05-01
 custom_edit_url: https://github.com/netdata/netdata/edit/master/README.md
 ---
 -->
@@ -72,7 +72,7 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 The following animated GIF shows the top part of a typical Netdata dashboard.
 
 ![The Netdata dashboard in
-action](https://user-images.githubusercontent.com/1153921/70638670-85dd5080-1bf6-11ea-893e-94400f445574.gif)
+action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
 > A typical Netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse
 > wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive,
@@ -175,7 +175,7 @@ For more information about running Netdata in Docker, check the [docker installa
 
 From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
-page](docs/anonymous-statistics.md).
+page](/docs/anonymous-statistics.md).
 
 ## Why Netdata
 
@@ -304,8 +304,8 @@ This is what you should expect from Netdata:
     [flock.com](/health/notifications/flock/), [hangouts](/health/notifications/hangouts/),
     [irc](/health/notifications/irc/), [kavenegar.com](/health/notifications/kavenegar/),
     [messagebird.com](/health/notifications/messagebird/), [pagerduty.com](/health/notifications/pagerduty/),
-    [prowl](health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
-    [pushover.net](health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
+    [prowl](/health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
+    [pushover.net](/health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
     [slack.com](/health/notifications/slack/), [smstools3](/health/notifications/smstools3/),
     [syslog](/health/notifications/syslog/), [telegram.org](/health/notifications/telegram/),
     [twilio.com](/health/notifications/twilio/), [web](/health/notifications/web/) and [custom
@@ -337,7 +337,8 @@ This is what you should expect from Netdata:
 To improve clarity on charts, Netdata dashboards present **positive** values for metrics representing `read`, `input`,
 `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
-![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
+![Screenshot showing positive and negative
+values](https://user-images.githubusercontent.com/1153921/81870401-9d649080-952a-11ea-80e3-4a7b480252ee.gif)
 
 _Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is
 negative._
@@ -346,7 +347,8 @@ negative._
 
 Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible time-frame.
 
-![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
+![Animated GIF showing the auso-scaling Y
+axis](https://user-images.githubusercontent.com/1153921/80838276-8084a080-8bad-11ea-8167-8d5ab2fb1be1.gif)
 
 _A zero-based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is
 selected._
@@ -356,26 +358,22 @@ selected._
 Charts on Netdata dashboards are synchronized to each other. There is no master chart. Any chart can be panned or zoomed
 at any time, and all other charts will follow.
 
-![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
+charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
 
 _Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the
 mouse pointer is over a chart._
-
-> The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server when navigating via the
-> [My nodes menu](/registry/README.md).
 
 ### Highlighted time-frame
 
 To improve visual anomaly detection across charts, the user can highlight a time-frame (by pressing `Alt` + `mouse
 selection`) on all charts.
 
-![highlighted-timeframe](https://user-images.githubusercontent.com/2662304/48311876-f9093300-e5ae-11e8-9c74-e3e291741990.gif)
+![An animated GIF of highlighting a specific
+timeframe](https://user-images.githubusercontent.com/1153921/80839611-6ef0c800-8bb0-11ea-9e9c-f75ec9a2e54c.gif)
 
 _A highlighted time-frame can be given by pressing `Alt` + `mouse selection` on any chart. Netdata will highlight the
 same range on all charts._
-
-> Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [My nodes
-> menu](/registry/README.md).
 
 ## What Netdata monitors
 

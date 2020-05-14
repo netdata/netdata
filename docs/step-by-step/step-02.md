@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Step 2. Get to know Netdata's dashboard"
-date: 2020-03-11
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-02.md
 ---
 -->
@@ -28,30 +28,19 @@ In this step of the Netdata guide, you'll learn how to:
 
 Let's get started!
 
-<details markdown="1"><summary>Like shortcuts? Watch our six-minute quickstart video for Netdata's dashboard.</summary>
-<iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-<p>Once you've finished, <a href="#whats-next">skip ahead</a> or scroll down for the text-based dashboard quickstart.</p>
-</details>
-
 ## Visit and explore the dashboard
 
 Netdata's dashboard is where you interact with your system's metrics. Time to open it up and start exploring. Open up
 your browser of choice.
 
-If you installed Netdata on the same system you're using to open your browser, navigate to `http://localhost:19999/`. 
-
-If you installed Netdata on a remote system, navigate to `http://HOST:19999/` after replacing `HOST` with the IP address
-of that system. To connect to a virtual private server (VPS), for example, you might navigate to
-`http://203.0.113.0:19999`. We'll learn more on monitoring remote systems and [multiple systems](step-03.md)
-later on.
-
-> From here on out in this tutorial, we'll refer to the address you use to view your dashboard as `HOST`. Be sure to 
-> replace it with either `localhost` or the IP address as needed.
-
-Hit `Enter`. Welcome to Netdata!
+Open up your web browser of choice and navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname
+of your Agent. If you're unsure, try `http://localhost:19999` first. Hit **Enter**. Welcome to Netdata!
 
 ![Animated GIF of navigating to the
-dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
+dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
+
+> From here on out in this tutorial, we'll refer to the address you use to view your dashboard as `NODE`. Be sure to
+> replace it with either `localhost`, the IP address, or the hostname of your system.
 
 ## Explore available charts using menus
 
@@ -59,7 +48,7 @@ dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c
 charts you're interested in.
 
 ![Animated GIF of using the menus and
-submenus](https://user-images.githubusercontent.com/1153921/63464031-3ee30980-c413-11e9-886a-44594f60e0a9.gif)
+submenus](https://user-images.githubusercontent.com/1153921/80832425-7c528600-8ba1-11ea-8140-d0a17a62009b.gif)
 
 Netdata shows all its charts on a single page, so you can also scroll up and down using the mouse wheel, your
 touchscreen/touchpad, or the scrollbar.
@@ -69,7 +58,7 @@ what it's collecting. If you run Netdata on many different systems using differe
 menus and submenus may look a little different for each one.
 
 To learn more about menus, see our documentation about [navigating the standard
-dashboard](/web/gui/README.md#menus).
+dashboard](/web/gui/README.md#metrics-menus).
 
 > ❗ By default, Netdata only creates and displays charts if the metrics are _not zero_. So, you may be missing some
 > charts, menus, and submenus if those charts have zero metrics. You can change this by changing the **Which dimensions
@@ -128,11 +117,10 @@ We built Netdata to be a big sandbox for learning more about your systems and ap
 Netdata's charts are fully interactive. You can pan through historical metrics, zoom in and out, select specific
 timeframes for further analysis, resize charts, and more.
 
-Best of all, Whenever you use a chart in this way, Netdata synchronizes all the other charts to match it. This even
-applies across different Netdata agents if you connect them using the [**My nodes** menu](/registry/README.md)!
+Best of all, Whenever you use a chart in this way, Netdata synchronizes all the other charts to match it.
 
-![Aniamted GIF of chart
-synchronziation](https://user-images.githubusercontent.com/1153921/63464271-c03a9c00-c413-11e9-971d-245238926193.gif)
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
+charts](https://user-images.githubusercontent.com/1153921/81867875-3d6beb00-9526-11ea-94b8-388951e2e03d.gif)
 
 ### Pan, zoom, highlight, and reset charts
 
@@ -149,9 +137,6 @@ You can change how charts show their metrics in a few different ways, each of wh
 These interactions can also be triggered using the icons on the bottom-right corner of every chart. They are,
 respectively, `Pan Left`, `Reset`, `Pan Right`, `Zoom In`, and `Zoom Out`.
 
-![Animated GIF of using the icons to interact with
-charts](https://user-images.githubusercontent.com/1153921/65066637-9785c380-d939-11e9-8e26-6933ce78c172.gif)
-
 ### Show and hide dimensions
 
 Each dimension can be hidden by clicking on it. Hiding dimensions simplifies the chart and can help you better discover
@@ -163,40 +148,40 @@ Additionally, resize charts by clicking-and-dragging the icon on the bottom-righ
 chart to its original height, double-click the same icon.
 
 ![Animated GIF of resizing a chart and resetting it to the default
-height](https://user-images.githubusercontent.com/1153921/65066675-aec4b100-d939-11e9-9b5d-cee7316428f6.gif)
+height](https://user-images.githubusercontent.com/1153921/80842459-7d41e280-8bb6-11ea-9488-1bc29f94d7f2.gif)
 
 To learn more about other options and chart interactivity, read our [dashboard documentation](/web/README.md).
 
 ## See raised alarms and the alarm log
 
-Aside from performance troubleshooting, Netdata is designed to help you monitor the health of your systems and
-applications. That's why every Netdata installation comes with dozens of pre-configured alarms that trigger alerts when
-your system starts acting strangely.
+Aside from performance troubleshooting, the Agent helps you monitor the health of your systems and applications. That's
+why every Netdata installation comes with dozens of pre-configured alarms that trigger alerts when your system starts
+acting strangely.
 
 Find the **Alarms** button in the top navigation bring up a modal that shows currently raised alarms, all running
 alarms, and the alarms log.
 
-Here is an example of raised `disk_space._` and `disk_space._home` alarms, followed by the full list and alarm log:
+Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
 
 ![Animated GIF of looking at raised alarms and the alarm
-log](https://user-images.githubusercontent.com/1153921/63468773-85d5fc80-c41d-11e9-8ef9-51bee0f91332.gif)
+log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
 
-Let's look at one of those raised alarms a little more in-depth. Here is a static screenshot:
+And a static screenshot of the raised CPU alarm: 
 
-![Screenshot of a raised disk_space
-alarm](https://user-images.githubusercontent.com/1153921/63468853-af8f2380-c41d-11e9-9cec-1b0cac5d5549.png)
+![Screenshot of a raised system CPU alarm](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
 
-The alarm itself is named **disk - /**, and its context is `disk_space._`. Beneath that is an auto-updating badge that
-shows the latest metric: 28.4% disk space usage.
+The alarm itself is named *system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
+shows the latest value the chart that triggered the alarm.
 
-With the three icons beneath that and the **role** designation, you can **1)** scroll to the chart associated with this
-raised alarm, **2)** copy a link to the badge to your clipboard, and **3)** copy the code to embed the badge onto
-another web page using an `<embed>` element.
+With the three icons beneath that and the **role** designation, you can:
 
-The table on the right-hand side displays information about the alarm's configuration.
+1.  Scroll to the chart associated with this raised alarm.
+2.  Copy a link to the badge to your clipboard.
+3.  Copy the code to embed the badge onto another web page using an `<embed>` element.
 
-In this example, Netdata triggers a warning alarm when any disk on the system is more than 20% full. Netdata triggers a
-critical alarm when the disk is more than 30% full.
+The table on the right-hand side displays information about the alarm's configuration. In above example, Netdata
+triggers a warning alarm when CPU usage is between 75 and 85%, and a critical alarm when above 85%. It's a _little_ more
+complicated than that, but we'll get into more complex health entity configurations in a later step.
 
 The `calculation` field is the equation used to calculate those percentages, and the `check every` field specifies how
 often Netdata should be calculating these metrics to see if the alarm should remain triggered.

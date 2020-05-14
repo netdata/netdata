@@ -108,10 +108,10 @@ Here's the process in GIF form!
 ![Animated GIF of creating a fake option in
 netdata.conf](https://user-images.githubusercontent.com/1153921/65470254-4422e200-de1f-11e9-9597-a97c89ee59b8.gif)
 
-Now, let's make a slightly more substantial edit to `netdata.conf`—change the agent's name.
+Now, let's make a slightly more substantial edit to `netdata.conf`: change the Agent's name.
 
-If you edit the value of the `hostname` option, you can change the name of your Netdata agent on the dashboard and a
-handful of other places, like the **My nodes** menu.
+If you edit the value of the `hostname` option, you can change the name of your Netdata Agent on the dashboard and a
+handful of other places, like the Visited nodes menu _and_ Netdata Cloud.
 
 Use `edit-config` to change the `hostname` option to a name like `hello-world`. Be sure to uncomment it!
 
@@ -123,7 +123,7 @@ Use `edit-config` to change the `hostname` option to a name like `hello-world`. 
 Once you're done, restart Netdata and refresh the dashboard. Say hello to your renamed agent!
 
 ![Animated GIF of editing the hostname option in
-netdata.conf](https://user-images.githubusercontent.com/1153921/65470784-86e5b980-de21-11e9-87bf-fabec7989738.gif)
+netdata.conf](https://user-images.githubusercontent.com/1153921/80994808-1c065300-8df2-11ea-81af-d28dc3ba27c8.gif)
 
 Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon
 configuration](/daemon/config/README.md), or hop into our popular tutorial on [increasing long-term metrics
