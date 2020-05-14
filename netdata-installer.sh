@@ -1471,13 +1471,12 @@ install_ebpf() {
 
   # Get Compatible eBPF Kernel Package
   kpkg="$(get_compatible_kernel_for_ebpf "${kver}" "${rhver}")"
-  fkpg=$(kernel_prefix "${kpkg}")
 
   # Detect libc
   libc="$(detect_libc)"
 
   EBPF_VERSION="$(cat packaging/ebpf.version)"
-  EBPF_TARBALL="netdata_ebpf-${fpkg}_${kpkg}-${libc}.tar.xz"
+  EBPF_TARBALL="netdata-kernel-collector-${libc}.tar.xz"
 
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
