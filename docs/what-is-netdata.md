@@ -394,7 +394,7 @@ You can also find Netdata on:
 
 ## License
 
-Netdata is [GPLv3+](/LICENSE).
+Netdata is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE).
 
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](/REDISTRIBUTED.md).
 
