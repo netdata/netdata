@@ -1,5 +1,21 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.22.1...HEAD)
+
+**Merged pull requests:**
+
+- Caddy section lacked data persist volumes [\#8999](https://github.com/netdata/netdata/pull/8999) ([webash](https://github.com/webash))
+- Add text to ACLK doc mentioning WebSockets and port [\#8968](https://github.com/netdata/netdata/pull/8968) ([joelhans](https://github.com/joelhans))
+- Update daemon output with new URLs and dates [\#8965](https://github.com/netdata/netdata/pull/8965) ([joelhans](https://github.com/joelhans))
+- Update news section of main README with 1.22 news [\#8963](https://github.com/netdata/netdata/pull/8963) ([joelhans](https://github.com/joelhans))
+- Fix file name weblog.conf -\> web\_log.conf [\#8959](https://github.com/netdata/netdata/pull/8959) ([gruentee](https://github.com/gruentee))
+- \[varnish\] : added compatibility for varnish-plus [\#8940](https://github.com/netdata/netdata/pull/8940) ([pgjavier](https://github.com/pgjavier))
+- postgres.chart.py: fix template databases ignore [\#8929](https://github.com/netdata/netdata/pull/8929) ([slavaGanzin](https://github.com/slavaGanzin))
+- Ebpf options [\#8879](https://github.com/netdata/netdata/pull/8879) ([thiagoftsm](https://github.com/thiagoftsm))
+- Rename eBPF collector [\#8822](https://github.com/netdata/netdata/pull/8822) ([thiagoftsm](https://github.com/thiagoftsm))
+
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.22.0...v1.22.1)
@@ -220,7 +236,6 @@
 - Add a Prometheus Remote Write connector to the exporting engine [\#8292](https://github.com/netdata/netdata/pull/8292) ([vlvkobal](https://github.com/vlvkobal))
 - Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 - Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
-- Remove mention saying that .deb packages are experimental [\#8250](https://github.com/netdata/netdata/pull/8250) ([toadjaune](https://github.com/toadjaune))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
