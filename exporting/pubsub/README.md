@@ -1,8 +1,8 @@
 <!--
----
 title: "Export metrics to Google Cloud Pub/Sub Service"
+description: "Export Netdata metrics to the Google Cloud Pub/Sub Service for long-term archiving or analytical processing."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/pubsub/README.md
----
+sidebar_label: Google Cloud Pub/Sub Service
 -->
 
 # Export metrics to Google Cloud Pub/Sub Service
@@ -30,8 +30,7 @@ and set the following options:
 
 Set the `destination` option to a Pub/Sub service endpoint. `pubsub.googleapis.com` is the default one.
 
-Next, create the credentials JSON file by following Google Cloud's [authentication guide]
-(https://cloud.google.com/docs/authentication/getting-started#creating_a_service_account). The user running the Agent
+Next, create the credentials JSON file by following Google Cloud's [authentication guide](https://cloud.google.com/docs/authentication/getting-started#creating_a_service_account). The user running the Agent
 (typically `netdata`) needs read access to `google_cloud_credentials.json`, which you can set with
 `chmod 400 google_cloud_credentials.json; chown netdata google_cloud_credentials.json`. Set the `credentials file`
 option to the full path of the file.
