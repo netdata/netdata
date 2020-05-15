@@ -108,7 +108,7 @@ executes claiming using the information after `-W "claim... `. You should copy t
 Cloud.
 
 ```bash
-  docker run -d --name=netdata \
+docker run -d --name=netdata \
   -p 19999:19999 \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
