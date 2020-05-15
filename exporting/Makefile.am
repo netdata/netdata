@@ -26,5 +26,5 @@ dist_noinst_DATA = \
 
 
 dist_noinst_SCRIPTS = \
-    nc-backend.sh \
+    nc-exporting.sh \
     $(NULL)
