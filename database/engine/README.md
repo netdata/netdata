@@ -62,7 +62,7 @@ All DB engine instances, for localhost and all other streaming recipient nodes i
 The above values are the default and minimum values for Page Cache size and DB engine disk space quota. Both numbers are
 in **MiB**. All DB engine instances will allocate the configured resources separately.
 
-[**See our database engine calculator**](/database/engine/CALCULATOR.md) to help you
+[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
 correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
 slave nodes you have, how many metrics your Agent collects, and more.
 
@@ -115,8 +115,8 @@ and streaming recipient nodes):
 
 An important observation is that RAM usage depends on both the `page cache size` and the `dbengine disk space` options.
 
-You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to validate the
-memory requirements for your particular system(s) and configuration.
+You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
+validate the memory requirements for your particular system(s) and configuration.
 
 ## File descriptor requirements
 

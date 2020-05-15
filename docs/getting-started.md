@@ -68,8 +68,8 @@ You can tweak this custom _database engine_ to store a much larger dataset than 
 particularly if you allow Netdata to use slightly more RAM and disk space than the default configuration.
 
 Read our guide on [changing how long Netdata stores metrics](/docs/tutorials/longer-metrics-storage.md) to learn more
-and use our [database engine calculator](/database/engine/CALCULATOR.md) to figure out the exact settings you'll need
-to store historical metrics right in the Agent's database.
+and use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to figure
+out the exact settings you'll need to store historical metrics right in the Agent's database.
 
 **What's next?**:
 

@@ -56,7 +56,7 @@ size` and `dbengine disk space`.
 `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
 metrics. The default settings retain about two day's worth of metris on a system collecting 2,000 metrics every second.
 
-[**See our database engine calculator**](/database/engine/CALCULATOR.md) to help you
+[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
 correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
 slave nodes you have, how many metrics your Agent collects, and more.
 
