@@ -57,9 +57,10 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 #ifdef ENABLE_HTTPS
+    connector_specific_config->flags = NETDATA_SSL_START;
+    connector_specific_config->conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        connector_specific_config->flags = NETDATA_SSL_START;
-        connector_specific_config->conn = NULL;
+        security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
     }
 #endif
 

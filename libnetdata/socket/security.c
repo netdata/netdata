@@ -66,12 +66,16 @@ int tls_select_version(const char *lversion) {
         return TLS1_1_VERSION;
     else if (!strcmp(lversion, "1.2"))
         return TLS1_2_VERSION;
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
+#if defined(TLS1_3_VERSION)
     else if (!strcmp(lversion, "1.3"))
         return TLS1_3_VERSION;
 #endif
 
+#if defined(TLS_MAX_VERSION)
     return TLS_MAX_VERSION;
+#else
+    return TLS1_2_VERSION;
+#endif
 }
 #endif
 

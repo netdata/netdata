@@ -45,6 +45,9 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         response = buffer_create(1);
 
     struct stats *stats = &instance->stats;
+#ifdef ENABLE_HTTPS
+    struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
+#endif
 
     errno = 0;
 
@@ -53,7 +56,15 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         buffer_need_bytes(response, 4096);
 
         ssize_t r;
+#ifdef ENABLE_HTTPS
+        if (connector_specific_config->conn && !connector_specific_config->flags) {
+            r = SSL_read(connector_specific_config->conn, &response->buffer[response->len], response->size - response->len);
+        } else {
+            r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+        }
+#else
         r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+#endif
         if (likely(r > 0)) {
             // we received some data
             response->len += r;
@@ -96,6 +107,10 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
     flags += MSG_NOSIGNAL;
 #endif
 
+#ifdef ENABLE_HTTPS
+    struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
+#endif
+
     struct stats *stats = &instance->stats;
 
     int ret = 0;
@@ -104,8 +119,17 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     ssize_t written = -1;
 
-    if (!ret)
+    if (!ret) {
+#ifdef ENABLE_HTTPS
+        if (connector_specific_config->conn && connector_specific_config->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            written = SSL_write(connector_specific_config->conn, buffer_tostring(buffer), len);
+        } else {
+            written = send(*sock, buffer_tostring(buffer), len, flags);
+        }
+#else
         written = send(*sock, buffer_tostring(buffer), len, flags);
+#endif
+    }
 
     if(written != -1 && (size_t)written == len) {
         // we sent the data successfully
@@ -208,6 +232,37 @@ void simple_connector_worker(void *instance_p)
                 &reconnects,
                 NULL,
                 0);
+#ifdef ENABLE_HTTPS
+            if(sock != -1) {
+                if(netdata_opentsdb_ctx) {
+                    if (connector_specific_config->conn == NULL) {
+                        connector_specific_config->conn = SSL_new(netdata_opentsdb_ctx);
+                        if(connector_specific_config->conn == NULL) {
+                            error("Failed to allocate SSL structure to socket %d.", sock);
+                            connector_specific_config->flags = NETDATA_SSL_NO_HANDSHAKE;
+                        }
+                    } else {
+                        SSL_clear(connector_specific_config->conn);
+                    }
+                }
+
+                if (connector_specific_config->conn) {
+                    if(SSL_set_fd(connector_specific_config->conn, sock) != 1) {
+                        error("Failed to set the socket to the SSL on socket fd %d.", sock);
+                        connector_specific_config->flags = NETDATA_SSL_NO_HANDSHAKE;
+                    } else {
+                        connector_specific_config->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                        SSL_set_connect_state(connector_specific_config->conn);
+                        int err = SSL_connect(connector_specific_config->conn);
+                        if (err != 1) {
+                            err = SSL_get_error(connector_specific_config->conn, err);
+                            error("SSL cannot connect with the server:  %s ", ERR_error_string((long)SSL_get_error(connector_specific_config->conn, err), NULL));
+                            connector_specific_config->flags = NETDATA_SSL_NO_HANDSHAKE;
+                        }
+                    }
+                }
+            }
+#endif
             stats->reconnects += reconnects;
         }
 
