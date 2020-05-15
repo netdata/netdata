@@ -40,7 +40,7 @@ listen_save_replay_forever() {
 		
 		if [ -s "${file}" ]
 			then
-			if [ ! -z "${real_backend_host}" ] && [ ! -z "${real_backend_port}" ]
+			if [ -n "${real_backend_host}" ] && [ -n "${real_backend_port}" ]
 				then
 				log "Attempting to send the metrics to the real backend at ${real_backend_host}:${real_backend_port}"
 				
