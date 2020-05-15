@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Add agent restart note for reclaiming [\#9049](https://github.com/netdata/netdata/pull/9049) ([zack-shoylev](https://github.com/zack-shoylev))
+- \[python.d/samba\] Only use sudo when not running as root user [\#9038](https://github.com/netdata/netdata/pull/9038) ([Duffyx](https://github.com/Duffyx))
+- Fix link in web server log guide [\#9033](https://github.com/netdata/netdata/pull/9033) ([joelhans](https://github.com/joelhans))
+- Add text to claiming doc about reclaiming with id= [\#9027](https://github.com/netdata/netdata/pull/9027) ([joelhans](https://github.com/joelhans))
 - Caddy section lacked data persist volumes [\#8999](https://github.com/netdata/netdata/pull/8999) ([webash](https://github.com/webash))
 - Add text to ACLK doc mentioning WebSockets and port [\#8968](https://github.com/netdata/netdata/pull/8968) ([joelhans](https://github.com/joelhans))
 - Update daemon output with new URLs and dates [\#8965](https://github.com/netdata/netdata/pull/8965) ([joelhans](https://github.com/joelhans))
@@ -13,8 +17,17 @@
 - Fix file name weblog.conf -\> web\_log.conf [\#8959](https://github.com/netdata/netdata/pull/8959) ([gruentee](https://github.com/gruentee))
 - \[varnish\] : added compatibility for varnish-plus [\#8940](https://github.com/netdata/netdata/pull/8940) ([pgjavier](https://github.com/pgjavier))
 - postgres.chart.py: fix template databases ignore [\#8929](https://github.com/netdata/netdata/pull/8929) ([slavaGanzin](https://github.com/slavaGanzin))
+- Account for zfs.arc\_size.min, and correct calc [\#8913](https://github.com/netdata/netdata/pull/8913) ([araemo](https://github.com/araemo))
+- Fix error handling in exporting connector [\#8910](https://github.com/netdata/netdata/pull/8910) ([vlvkobal](https://github.com/vlvkobal))
+- Fix wrong hostnames in the exporting engine [\#8892](https://github.com/netdata/netdata/pull/8892) ([vlvkobal](https://github.com/vlvkobal))
 - Ebpf options [\#8879](https://github.com/netdata/netdata/pull/8879) ([thiagoftsm](https://github.com/thiagoftsm))
+- Docs: Remove old Cloud/dashboard and replace with new Cloud/dashboard [\#8874](https://github.com/netdata/netdata/pull/8874) ([joelhans](https://github.com/joelhans))
+- removed simley face per Chris since it didn't show up [\#8872](https://github.com/netdata/netdata/pull/8872) ([MeganBishopMoore](https://github.com/MeganBishopMoore))
+- Add a Google Cloud Pub/Sub connector to the exporting engine [\#8855](https://github.com/netdata/netdata/pull/8855) ([vlvkobal](https://github.com/vlvkobal))
 - Rename eBPF collector [\#8822](https://github.com/netdata/netdata/pull/8822) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fixed formatting in API swagger json file [\#8814](https://github.com/netdata/netdata/pull/8814) ([dpsy4](https://github.com/dpsy4))
+- Sort alphabetically and automatic scroll [\#8762](https://github.com/netdata/netdata/pull/8762) ([tnyeanderson](https://github.com/tnyeanderson))
+- Improve the impact of health code on netdata scalability [\#8407](https://github.com/netdata/netdata/pull/8407) ([mfundul](https://github.com/mfundul))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
@@ -86,7 +99,6 @@
 - Docs: Standardize links between documentation [\#8638](https://github.com/netdata/netdata/pull/8638) ([joelhans](https://github.com/joelhans))
 - github/workflow: disable `document-start` yamllint check [\#8522](https://github.com/netdata/netdata/pull/8522) ([ilyam8](https://github.com/ilyam8))
 - bind to should be in \[web\] section and update netdata.service.v235.in too [\#8454](https://github.com/netdata/netdata/pull/8454) ([amishmm](https://github.com/amishmm))
-- Added support for building libmosquitto on FreeBSD/macOS. [\#8254](https://github.com/netdata/netdata/pull/8254) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
@@ -235,7 +247,6 @@
 - Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
 - Add a Prometheus Remote Write connector to the exporting engine [\#8292](https://github.com/netdata/netdata/pull/8292) ([vlvkobal](https://github.com/vlvkobal))
 - Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
-- Added code to bundle LWS in binary packages. [\#8255](https://github.com/netdata/netdata/pull/8255) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
