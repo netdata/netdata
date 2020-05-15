@@ -6,13 +6,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/README
 
 # Exporting metrics to external databases
 
-The exporting engine is an update for the former [backends](/backends/README.md). It has a modular structure and
-supports metric exporting via multiple exporting connector instances at the same time. You can have different update
-intervals and filters configured for every exporting connector instance. The exporting engine has its own configuration
-file `exporting.conf`. Configuration is almost similar to [backends](/backends/README.md#configuration). The most
-important difference is that type of a connector should be specified in a section name before a colon and a name after
-the colon. Also, you can't use `host tags` anymore. Set your labels using the [`[host labels]`
-section](/docs/tutorials/using-host-labels.md) in `netdata.conf`.
+The exporting engine is an update for the former [backends](/backends/README.md) which is deprecated and will be deleted
+soon. It has a modular structure and supports metric exporting via multiple exporting connector instances at the same
+time. You can have different update intervals and filters configured for every exporting connector instance. The
+exporting engine has its own configuration file `exporting.conf`. Configuration is almost similar to
+[backends](/backends/README.md#configuration). The most important difference is that type of a connector should be
+specified in a section name before a colon and a name after the colon. Also, you can't use `host tags` anymore. Set your
+labels using the [`[host labels]` section](/docs/tutorials/using-host-labels.md) in `netdata.conf`.
 
 An example configuration:
 ```conf
@@ -271,10 +271,10 @@ Options:
     apps.*` (so, the order is important: the first pattern matching the chart id or the chart name will be used -
     positive or negative).
 
--   `send names instead of ids = yes | no` controls the metric names Netdata should send to backend. Netdata supports
-    names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names are
-    human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they
-    are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+-   `send names instead of ids = yes | no` controls the metric names Netdata should send to the external database.
+    Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system
+    and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several
+    cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
 -   `send configured labels = yes | no` controls if labels defined in the `[host labels]` section in `netdata.conf`
     should be sent to the external database
