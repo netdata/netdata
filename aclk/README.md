@@ -13,7 +13,7 @@ through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) c
 
 The Cloud IP address is 35.196.244.138.
 
-Netdata is a distributed monitoring system. Very few data are uploaded to the cloud, such as data about:
+Netdata is a distributed monitoring system. Very few data are streamed to the cloud, such as data about:
  - All configured alarms and their current status
  - Metrics that are requested by the cloud user
  - A list of the active collectors
