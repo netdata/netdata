@@ -144,7 +144,7 @@ from your Netdata):
    When multiple servers are defined, Netdata will try the next one when the first one fails. This allows you to
    load-balance different servers: give your backend servers in different order on each Netdata.
 
-   Netdata also ships `../exporting/nc-backend.sh`, a script that can be used as a fallback backend to save the
+   Netdata also ships `nc-backend.sh`, a script that can be used as a fallback backend to save the
    metrics to disk and push them to the time-series database when it becomes available again. It can also be used to
    monitor / trace / debug the metrics Netdata generates.
 
