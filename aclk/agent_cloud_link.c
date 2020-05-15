@@ -150,6 +150,9 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 static RSA *aclk_private_key = NULL;
 static int create_private_key()
 {
+    if (aclk_private_key != NULL)
+        RSA_free(aclk_private_key);
+    aclk_private_key = NULL;
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
 
@@ -1315,6 +1318,10 @@ CLEANUP:
 
 static void aclk_try_to_connect(char *hostname, char *port, int port_num)
 {
+    if (!aclk_private_key) {
+            error("Cannot try to establish the agent cloud link - no private key available!");
+            return;
+    }
     info("Attempting to establish the agent cloud link");
     aclk_get_challenge(hostname, port);
     if (aclk_password == NULL)
@@ -1414,9 +1421,10 @@ void *aclk_main(void *ptr)
  /*       size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);*/
 
-        if (aclk_kill_link) {
+        if (aclk_kill_link) {                       // User has reloaded the claiming state
             aclk_kill_link = 0;
             aclk_graceful_disconnect();
+            create_private_key();
             continue;
         }
 
