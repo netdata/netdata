@@ -12,7 +12,7 @@ time. You can have different update intervals and filters configured for every e
 exporting engine has its own configuration file `exporting.conf`. Configuration is almost similar to
 [backends](/backends/README.md#configuration). The most important difference is that type of a connector should be
 specified in a section name before a colon and an instance name after the colon. Also, you can't use `host tags`
-anymore. Set your labels using the [`[host labels]` section](/docs/tutorials/using-host-labels.md) in `netdata.conf`.
+anymore. Set your labels using the [`[host labels]`](/docs/tutorials/using-host-labels.md) section in `netdata.conf`.
 
 # Metrics long term archiving
 
@@ -250,7 +250,7 @@ Options:
 > Starting from Netdata v1.20 the host tags (defined in the `[backend]` section of `netdata.conf`) are parsed in
 > accordance with a configured backend type and stored as host labels so that they can be reused in API responses and
 > exporting connectors. The parsing is supported for graphite, json, opentsdb, and prometheus (default) backend types.
-> You can check how the host tags were parsed using the /api/v1/info API call. But keep in mind that backends subsystem
+> You can check how the host tags were parsed using the /api/v1/info API call. But, keep in mind that backends subsystem
 > is deprecated and will be deleted soon. Please move your existing tags to the `[host labels]` section.
 
 ## monitoring operation
