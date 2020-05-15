@@ -108,7 +108,7 @@ executes claiming using the information after `-W "claim... `. You should copy t
 Cloud.
 
 ```bash
-docker run -d --name=netdata \
+  docker run -d --name=netdata \
   -p 19999:19999 \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
@@ -121,7 +121,10 @@ docker run -d --name=netdata \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata \
-  -W set2 cloud global enabled true -W set2 cloud global "cloud base url" "https://app.netdata.cloud" -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud"
+  -W set2 cloud global enabled true -W set2 cloud global "cloud base url" "https://app.netdata.cloud" -W "claim \
+  -token=TOKEN \
+  -rooms=ROOM1,ROOM2 \
+  -url=https://app.netdata.cloud"
 ```
 
 The container runs in detached mode, so you won't see any output. If the node does not appear in your Space, you can run
