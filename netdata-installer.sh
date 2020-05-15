@@ -192,7 +192,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
+  --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
@@ -1282,9 +1282,9 @@ function get_kernel_version() {
 }
 
 function get_rh_version() {
-  if [ ! -f /etc/redhat-release ] ; then
-     printf "000000000"
-     return
+  if [ ! -f /etc/redhat-release ]; then
+    printf "000000000"
+    return
   fi
 
   r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
@@ -1334,10 +1334,10 @@ get_compatible_kernel_for_ebpf() {
   kernel_4_15_0="004015000"
   kernel_4_11_0="004011000"
 
-  if [ "${rhver}" -ge "${rhver8}" ] ; then
+  if [ "${rhver}" -ge "${rhver8}" ]; then
     echo >&2 " Using eBPF Kernel Package built against RH Linux 4.18.0"
     kpkg="4_18_0"
-  elif [ "${rhver}" -ge "${rhver7}" ] ; then
+  elif [ "${rhver}" -ge "${rhver7}" ]; then
     echo >&2 " Using eBPF Kernel Package built against RH Linux 3.10.0"
     kpkg="3_10_0"
   elif [ "${kver}" -ge "${kernel_4_17_0}" ]; then
@@ -1413,43 +1413,43 @@ should_install_ebpf() {
 }
 
 kernel_prefix() {
-    kver="${1}"
+  kver="${1}"
 
-    ver4_18_0="004018000"
-    ver4_17_0="004017000"
-    ver4_15_0="004015000"
-    ver4_11_0="004011000"
-    ver3_10_0="003010000"
+  ver4_18_0="004018000"
+  ver4_17_0="004017000"
+  ver4_15_0="004015000"
+  ver4_11_0="004011000"
+  ver3_10_0="003010000"
 
-    if [ "${kver}" -eq "${ver3_10_0}" ]; then
-        kpkg="3.10.0";
-    elif [ "${kver}" -eq "${ver4_18_0}" ]; then
-        kpkg="4.18.0";
-    elif [ "${kver}" -ge "${ver4_17_0}" ]; then
-        kpkg="4.17.0";
-    elif [ "${kver}" -ge "${ver4_15_0}" ]; then
-        kpkg="4.15.0";
-    elif [ "${kver}" -ge "${ver4_11_0}" ]; then
-        kpkg="4.11.0";
-    fi
+  if [ "${kver}" -eq "${ver3_10_0}" ]; then
+    kpkg="3.10.0"
+  elif [ "${kver}" -eq "${ver4_18_0}" ]; then
+    kpkg="4.18.0"
+  elif [ "${kver}" -ge "${ver4_17_0}" ]; then
+    kpkg="4.17.0"
+  elif [ "${kver}" -ge "${ver4_15_0}" ]; then
+    kpkg="4.15.0"
+  elif [ "${kver}" -ge "${ver4_11_0}" ]; then
+    kpkg="4.11.0"
+  fi
 
-    echo "${kpkg}"
+  echo "${kpkg}"
 }
 
 remove_old_ebpf() {
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
     echo >&2 "Removing alpha eBPF collector."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" 
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
     echo >&2 "Removing alpha eBPF stock file"
-    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" 
+    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf"
   fi
 
   if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
     echo >&2 "Renaming eBPF configuration file."
-    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf" 
+    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
   fi
 }
 
@@ -1481,11 +1481,10 @@ install_ebpf() {
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
   if ! fetch_and_verify "ebpf" \
-                        "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
-                        "${EBPF_TARBALL}" \
-                        "${tmp}" \
-                        "${NETDATA_LOCAL_TARBALL_OVERRIDE_EBPF}"
-  then
+    "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
+    "${EBPF_TARBALL}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_EBPF}"; then
     run_failed "Failed to download eBPF collector package"
     echo 2>&" Removing temporary directory ${tmp} ..."
     rm -rf "${tmp}"
