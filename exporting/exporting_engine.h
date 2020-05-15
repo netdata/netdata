@@ -25,6 +25,7 @@ typedef enum exporting_options {
 
     EXPORTING_OPTION_SEND_CONFIGURED_LABELS = (1 << 3),
     EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
+    EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
     EXPORTING_OPTION_SEND_NAMES             = (1 << 16)
 } EXPORTING_OPTIONS;
@@ -77,6 +78,10 @@ struct instance_config {
 
 struct simple_connector_config {
     int default_port;
+#ifdef ENABLE_HTTPS
+    SSL *conn; //SSL connection
+    int flags; //The flags for SSL connection
+#endif
 };
 
 struct prometheus_remote_write_specific_config {
