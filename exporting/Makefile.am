@@ -24,7 +24,6 @@ dist_noinst_DATA = \
     WALKTHROUGH.md \
     $(NULL)
 
-
 dist_noinst_SCRIPTS = \
     nc-exporting.sh \
     $(NULL)
