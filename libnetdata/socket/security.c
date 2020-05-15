@@ -124,7 +124,14 @@ SSL_CTX * security_initialize_openssl_client() {
     ctx = SSL_CTX_new(TLS_client_method());
 #endif
     if(ctx) {
-        security_openssl_common_options(ctx, 1);
+        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
+#if defined(TLS_MAX_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS_MAX_VERSION);
+#elif defined(TLS1_3_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+#elif defined(TLS1_2_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
+#endif
     }
 
     return ctx;
