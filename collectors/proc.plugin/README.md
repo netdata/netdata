@@ -234,13 +234,31 @@ So, to disable performance metrics for all loop devices you could add `performan
 
 ## Monitoring CPUs
 
-The `/proc/stat` module monitors CPU utilization, interrupts, context switches, processes started/running, thermal throttling, frequency, and idle states. It gathers this information from multiple files.
+The `/proc/stat` module monitors CPU utilization, interrupts, context switches, processes started/running, thermal
+throttling, frequency, and idle states. It gathers this information from multiple files.
 
-If more than 50 cores are present in a system then CPU thermal throttling, frequency, and idle state charts are disabled.
+If your system has more than 50 processors (`physical processors * cores per processor * threads per core`), the Agent
+automatically disables CPU thermal throttling, frequency, and idle state charts. To override this default, see the next
+section on configuration.
 
-#### configuration
+### Configuration
 
-`keep per core files open` option in the `[plugin:proc:/proc/stat]` configuration section allows reducing the number of file operations on multiple files.
+The settings for monitoring CPUs is in the `[plugin:proc:/proc/stat]` of your `netdata.conf` file.
+
+The `keep per core files open` option lets you reduce the number of file operations on multiple files.
+
+If your system has more than 50 processors and you would like to see the CPU thermal throttling, frequency, and idle
+state charts that are automatically disabled, you can set the following boolean options in the
+`[plugin:proc:/proc/stat]` section.
+
+```conf
+    keep per core files open = yes
+    keep cpuidle files open = yes
+    core_throttle_count = yes
+    package_throttle_count = yes
+    cpu frequency = yes
+    cpu idle states = yes
+```
 
 ### CPU frequency
 
