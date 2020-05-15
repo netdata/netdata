@@ -174,8 +174,7 @@ We are tracking a few ongoing issues related to installation and packaging.
 `kickstart.sh` script on systems that have both a distribution-installed version of OpenSSL and a manually-installed
 local version. The Agent's installer cannot handle both, and so you must remove one or the other to install the Agent.
 
-**LibreSSL**: The Agent installer is only compatible with OpenSSL. Critical functions do not work on systems with
-LibreSSL installed as a replacement for OpenSSL.
+**LibreSSL**: The Agent cannot build on systems using LibreSSL as a replacement for OpenSSL.
 
 **CentOS 6 and CentOS 8 dependencies**: To install the Agent on certain CentOS and RHEL systems, you must enable
 non-default repositories, such as EPEL or PowerTools, to gather hard dependencies. See the [CentOS
