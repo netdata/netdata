@@ -1,8 +1,8 @@
 <!--
----
-title: "Netdata, Prometheus, Grafana stack"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/WALKTHROUGH.md
----
+title: "Exporting to Netdata, Prometheus, Grafana stack"
+description: "Using Netdata in conjunction with Prometheus and Grafana."
+custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/WALKTHROUGH.md
+sidebar_label: Netdata, Prometheus, Grafana stack
 -->
 
 # Netdata, Prometheus, Grafana stack
@@ -216,7 +216,7 @@ the `chart` dimension. If you’d like you can combine the ‘chart’ and ‘in
 Let’s give this a try: `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
 This is the basics of using Prometheus to query NetData. I’d advise everyone at this point to read [this
-page](../backends/prometheus/#using-netdata-with-prometheus). The key point here is that NetData can export metrics from
+page](../exporting/prometheus/#using-netdata-with-prometheus). The key point here is that NetData can export metrics from
 its internal DB or can send metrics “as-collected” by specifying the ‘source=as-collected’ url parameter like so.
 <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected> If you choose to use
 this method you will need to use Prometheus's set of functions here: <https://prometheus.io/docs/querying/functions/> to
@@ -257,4 +257,4 @@ achieved you do not have to think about the monitoring system until Prometheus c
 happens there are options presented in the Prometheus documentation for solving this. Hope this was helpful, happy
 monitoring.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fexporting%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
