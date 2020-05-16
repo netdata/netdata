@@ -76,10 +76,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
                 switch (sslerrno) {
                     case SSL_ERROR_WANT_READ:
                     case SSL_ERROR_WANT_WRITE:
-                        if (r > 0)
-                            continue;
-                        else // Reached timeout
-                            goto endloop;
+                        goto endloop;
                     default:
                         ERR_error_string_n(sslerr, buf, sizeof(buf));
                         error("SSL error (%s)",
