@@ -1313,51 +1313,6 @@ detect_libc() {
   return 0
 }
 
-get_compatible_kernel_for_ebpf() {
-  kver="${1}"
-  rhver="${2}"
-
-  # XXX: Logic taken from Slack discussion in #ebpf
-  # everything that has a version <= 4.14 can use the code built to 4.14
-  # also all distributions that has a version <= 4.15.256 can use the code built to 4.15
-  # Continue the logic, everything that has a version < 4.19.102 and >= 4.15 can use the code built to 4.19
-  # Kernel 4.19 had a feature added in the version 4.19.102 that force us to break it in two, so version >= 4.19.102
-  # and smaller than < 5.0 runs with code built to 4.19.102
-  # Finally,  everybody that is using 5.X can use what is compiled with 5.4
-
-  kpkg=
-
-  # Kernel variables
-  rhver8="0080000000"
-  rhver7="0070061810"
-  kernel_4_17_0="004017000"
-  kernel_4_15_0="004015000"
-  kernel_4_11_0="004011000"
-
-  if [ "${rhver}" -ge "${rhver8}" ]; then
-    echo >&2 " Using eBPF Kernel Package built against RH Linux 4.18.0"
-    kpkg="4_18_0"
-  elif [ "${rhver}" -ge "${rhver7}" ]; then
-    echo >&2 " Using eBPF Kernel Package built against RH Linux 3.10.0"
-    kpkg="3_10_0"
-  elif [ "${kver}" -ge "${kernel_4_17_0}" ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
-    kpkg="5_4_20"
-  elif [ "${kver}" -ge "${kernel_4_15_0}" ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.16.18"
-    kpkg="4_16_18"
-  elif [ "${kver}" -le "${kernel_4_11_0}" ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
-    kpkg="4_14_171"
-  else
-    echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
-    return 1
-  fi
-
-  echo "${kpkg}"
-  return 0
-}
-
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
     run_failed "eBPF explicitly disabled."
@@ -1368,20 +1323,6 @@ should_install_ebpf() {
   if [ "$(uname)" != "Linux" ]; then
     run_failed "Running on an unsupported system type ($(uname)), not installing eBPF."
     defer_error "Running on an unsupported system type ($(uname)), not installing eBPF."
-    return 1
-  fi
-
-  # Get and Parse Kernel Version
-  kver="$(get_kernel_version)"
-  kver="${kver:-0}"
-
-  #Get RH Version
-  rhver=$(get_rh_version)
-
-  # Check Kernel Compatibility
-  if ! get_compatible_kernel_for_ebpf "${kver}" "${rhver}" > /dev/null; then
-    run_failed "Incompatible kernel detected (${kver}), not installing eBPF"
-    defer_error "Incompatible kernel detected (${kver}), not installing eBPF"
     return 1
   fi
 
@@ -1407,33 +1348,7 @@ should_install_ebpf() {
 
   rm -rf "${tmp}"
 
-  # TODO: Check for current vs. latest version
-
   return 0
-}
-
-kernel_prefix() {
-  kver="${1}"
-
-  ver4_18_0="004018000"
-  ver4_17_0="004017000"
-  ver4_15_0="004015000"
-  ver4_11_0="004011000"
-  ver3_10_0="003010000"
-
-  if [ "${kver}" -eq "${ver3_10_0}" ]; then
-    kpkg="3.10.0"
-  elif [ "${kver}" -eq "${ver4_18_0}" ]; then
-    kpkg="4.18.0"
-  elif [ "${kver}" -ge "${ver4_17_0}" ]; then
-    kpkg="4.17.0"
-  elif [ "${kver}" -ge "${ver4_15_0}" ]; then
-    kpkg="4.15.0"
-  elif [ "${kver}" -ge "${ver4_11_0}" ]; then
-    kpkg="4.11.0"
-  fi
-
-  echo "${kpkg}"
 }
 
 remove_old_ebpf() {
@@ -1461,16 +1376,6 @@ install_ebpf() {
   remove_old_ebpf
 
   progress "Installing eBPF plugin"
-
-  # Get and Parse Kernel Version
-  kver="$(get_kernel_version)"
-  kver="${kver:-0}"
-
-  #Get RH Version
-  rhver=$(get_rh_version)
-
-  # Get Compatible eBPF Kernel Package
-  kpkg="$(get_compatible_kernel_for_ebpf "${kver}" "${rhver}")"
 
   # Detect libc
   libc="$(detect_libc)"
