@@ -47,6 +47,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
     struct stats *stats = &instance->stats;
 #ifdef ENABLE_HTTPS
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
+    ERR_clear_error();
 #endif
 
     errno = 0;
@@ -57,8 +58,35 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 
         ssize_t r;
 #ifdef ENABLE_HTTPS
-        if (connector_specific_config->conn && !connector_specific_config->flags) {
-            r = SSL_read(connector_specific_config->conn, &response->buffer[response->len], response->size - response->len);
+        if (connector_specific_config->conn && connector_specific_config->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            r = (ssize_t)SSL_read(connector_specific_config->conn,
+                                  &response->buffer[response->len],
+                             (int) (response->size - response->len));
+
+            if (likely(r > 0)) {
+                // we received some data
+                response->len += r;
+                stats->received_bytes += r;
+                stats->receptions++;
+                continue;
+            } else {
+                int sslerrno = SSL_get_error(connector_specific_config->conn, (int) r);
+                u_long sslerr = ERR_get_error();
+                char buf[256];
+                switch (sslerrno) {
+                    case SSL_ERROR_WANT_READ:
+                    case SSL_ERROR_WANT_WRITE:
+                        if (r > 0)
+                            continue;
+                        else // Reached timeout
+                            goto endloop;
+                    default:
+                        ERR_error_string_n(sslerr, buf, sizeof(buf));
+                        error("SSL error (%s)",
+                              ERR_error_string((long)SSL_get_error(connector_specific_config->conn, (int)r), NULL));
+                        goto endloop;
+                }
+            }
         } else {
             r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
         }
@@ -80,10 +108,14 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
                 error("EXPORTING: cannot receive data from '%s'.", instance->config.destination);
             }
         }
+
 #ifdef UNIT_TESTING
         break;
 #endif
     }
+#ifdef ENABLE_HTTPS
+endloop:
+#endif
 
     // if we received data, process them
     if (buffer_strlen(response))
@@ -109,6 +141,7 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
 #ifdef ENABLE_HTTPS
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
+    ERR_clear_error();
 #endif
 
     struct stats *stats = &instance->stats;
@@ -122,7 +155,7 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
     if (!ret) {
 #ifdef ENABLE_HTTPS
         if (connector_specific_config->conn && connector_specific_config->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-            written = SSL_write(connector_specific_config->conn, buffer_tostring(buffer), len);
+            written = (ssize_t)SSL_write(connector_specific_config->conn, buffer_tostring(buffer), len);
         } else {
             written = send(*sock, buffer_tostring(buffer), len, flags);
         }
@@ -234,10 +267,13 @@ void simple_connector_worker(void *instance_p)
                 0);
 #ifdef ENABLE_HTTPS
             if(sock != -1) {
-                if(netdata_opentsdb_ctx) {
+                if (netdata_opentsdb_ctx) {
+                    if ( sock_delnonblock(sock) < 0 )
+                        error("Exporting cannot remove the non-blocking flag from socket %d", sock);
+
                     if (connector_specific_config->conn == NULL) {
                         connector_specific_config->conn = SSL_new(netdata_opentsdb_ctx);
-                        if(connector_specific_config->conn == NULL) {
+                        if (connector_specific_config->conn == NULL) {
                             error("Failed to allocate SSL structure to socket %d.", sock);
                             connector_specific_config->flags = NETDATA_SSL_NO_HANDSHAKE;
                         }
@@ -247,7 +283,7 @@ void simple_connector_worker(void *instance_p)
                 }
 
                 if (connector_specific_config->conn) {
-                    if(SSL_set_fd(connector_specific_config->conn, sock) != 1) {
+                    if (SSL_set_fd(connector_specific_config->conn, sock) != 1) {
                         error("Failed to set the socket to the SSL on socket fd %d.", sock);
                         connector_specific_config->flags = NETDATA_SSL_NO_HANDSHAKE;
                     } else {
@@ -256,13 +292,28 @@ void simple_connector_worker(void *instance_p)
                         int err = SSL_connect(connector_specific_config->conn);
                         if (err != 1) {
                             err = SSL_get_error(connector_specific_config->conn, err);
-                            error("SSL cannot connect with the server:  %s ", ERR_error_string((long)SSL_get_error(connector_specific_config->conn, err), NULL));
+                            error("SSL cannot connect with the server:  %s ",
+                                  ERR_error_string((long)SSL_get_error(connector_specific_config->conn, err), NULL));
                             connector_specific_config->flags = NETDATA_SSL_NO_HANDSHAKE;
+                        } else {
+                            info("Exporting established a SSL connection.");
+
+                            struct timeval tv;
+                            tv.tv_sec = timeout.tv_sec /4;
+                            tv.tv_usec = 0;
+
+                            if (!tv.tv_sec)
+                                tv.tv_sec = 2;
+
+                            if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)))
+                                error("Cannot set timeout to socket %d, this can block communication", sock);
+
                         }
                     }
                 }
             }
 #endif
+
             stats->reconnects += reconnects;
         }
 
