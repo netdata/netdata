@@ -1381,7 +1381,7 @@ install_ebpf() {
   libc="$(detect_libc)"
 
   EBPF_VERSION="$(cat packaging/ebpf.version)"
-  EBPF_TARBALL="netdata-kernel-collector-${libc}.tar.xz"
+  EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
 
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
