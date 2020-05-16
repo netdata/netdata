@@ -190,7 +190,7 @@ Options:
    destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
 
-   When multiple servers are defined, Netdata will try the next one when the first one fails. This allows you to
+   When multiple servers are defined, Netdata will try the next one when the previous one fails. This allows you to
    load-balance different servers: give your external database servers in different order on each Netdata.
 
    Netdata also ships `nc-exporting.sh`, a script that can be used as a fallback exporting connector to save the
