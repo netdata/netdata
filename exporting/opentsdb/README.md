@@ -12,6 +12,7 @@ in the Netdata configuration directory and set the following options:
 
 ```conf
 [opentsdb:http:my_instance]
+    enabled = yes
     destination = localhost:4242
 ```
 
@@ -29,6 +30,7 @@ After your proxy is configured, make the following changes to `exporting.conf`:
 
 ```conf
 [opentsdb:https:my_instance]
+    enabled = yes
     destination = localhost:8082
 ```
 
