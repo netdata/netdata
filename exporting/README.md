@@ -271,7 +271,7 @@ Netdata provides 5 charts:
 
 ## alarms
 
-Netdata adds 4 alarms:
+Netdata adds 3 alarms:
 
 1.  `exporting_last_buffering`, number of seconds since the last successful buffering of exported data
 2.  `exporting_metrics_sent`, percentage of metrics sent to the external database server
