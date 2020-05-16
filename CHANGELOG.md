@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Add proc.plugin configuration example for high-processor systems [\#9062](https://github.com/netdata/netdata/pull/9062) ([joelhans](https://github.com/joelhans))
+- claim: fix `New/ephemeral Agent containers` instruction [\#9058](https://github.com/netdata/netdata/pull/9058) ([ilyam8](https://github.com/ilyam8))
+- Add frontmatter to exporting connectors [\#9052](https://github.com/netdata/netdata/pull/9052) ([joelhans](https://github.com/joelhans))
 - Add agent restart note for reclaiming [\#9049](https://github.com/netdata/netdata/pull/9049) ([zack-shoylev](https://github.com/zack-shoylev))
 - \[python.d/samba\] Only use sudo when not running as root user [\#9038](https://github.com/netdata/netdata/pull/9038) ([Duffyx](https://github.com/Duffyx))
 - Fix link in web server log guide [\#9033](https://github.com/netdata/netdata/pull/9033) ([joelhans](https://github.com/joelhans))
@@ -27,6 +30,8 @@
 - Rename eBPF collector [\#8822](https://github.com/netdata/netdata/pull/8822) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fixed formatting in API swagger json file [\#8814](https://github.com/netdata/netdata/pull/8814) ([dpsy4](https://github.com/dpsy4))
 - Sort alphabetically and automatic scroll [\#8762](https://github.com/netdata/netdata/pull/8762) ([tnyeanderson](https://github.com/tnyeanderson))
+- Typo. [\#8703](https://github.com/netdata/netdata/pull/8703) ([cherouvim](https://github.com/cherouvim))
+- Update freebsd.md [\#8643](https://github.com/netdata/netdata/pull/8643) ([thenktor](https://github.com/thenktor))
 - Improve the impact of health code on netdata scalability [\#8407](https://github.com/netdata/netdata/pull/8407) ([mfundul](https://github.com/mfundul))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
@@ -245,8 +250,6 @@
 - Fixed missing folders in `/var/` by creating them during postinst [\#8314](https://github.com/netdata/netdata/pull/8314) ([SamK](https://github.com/SamK))
 - Add standards for abbreviations/acronyms to docs style guide [\#8313](https://github.com/netdata/netdata/pull/8313) ([joelhans](https://github.com/joelhans))
 - Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
-- Add a Prometheus Remote Write connector to the exporting engine [\#8292](https://github.com/netdata/netdata/pull/8292) ([vlvkobal](https://github.com/vlvkobal))
-- Fix dependencies for Debian Jessie. [\#8290](https://github.com/netdata/netdata/pull/8290) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
