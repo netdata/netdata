@@ -110,13 +110,13 @@ In `/etc/netdata/exporting.conf` you should have something like this:
 
 ```conf
 [exporting:global]
-enabled = yes
-send configured labels = no
-send automatic labels = no
-update every = 10
+    enabled = yes
+    send configured labels = no
+    send automatic labels = no
+    update every = 10
 
 [prometheus:exporter]
-send charts matching = system.processes
+    send charts matching = system.processes
 
 [graphite:my_instance_1]
     enabled = yes
@@ -132,25 +132,25 @@ send charts matching = system.processes
     send names instead of ids = yes
 
 [json:my_instance2]
-enabled = yes
-destination = localhost:5448
-data source = as collected
-update every = 2
-send charts matching = system.active_processes
+    enabled = yes
+    destination = localhost:5448
+    data source = as collected
+    update every = 2
+    send charts matching = system.active_processes
 
 [opentsdb:my_instance3]
-enabled = yes
-destination = localhost:4242
-data source = sum
-update every = 10
-send charts matching = system.cpu
+    enabled = yes
+    destination = localhost:4242
+    data source = sum
+    update every = 10
+    send charts matching = system.cpu
 
 [opentsdb:http:my_instance4]
-enabled = yes
-destination = localhost:4243
-data source = average
-update every = 3
-send charts matching = system.active_processes
+    enabled = yes
+    destination = localhost:4243
+    data source = average
+    update every = 3
+    send charts matching = system.active_processes
 ```
 
 Sections:
