@@ -158,9 +158,9 @@ Sections:
 - `[prometheus:exporter]` defines settings for Prometheus exporter API queries (e.g.:
   `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`).
 - `[<type>:<name>]` keeps settings for a particular exporting connector instance, where:
-  - type selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http | opentsdb:https |
+  - `type` selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http | opentsdb:https |
     prometheus_remote_write | json | kinesis | pubsub | mongodb
-  - name can be arbitrary instance name you chose.
+  - `name` can be arbitrary instance name you chose.
 
 Options:
 -   `enabled = yes | no`, enables or disables an exporting connector instance
