@@ -1214,6 +1214,7 @@ static int rrdpush_receive(int fd
             .obsolete = 0,
             .started_t = now_realtime_sec(),
             .next = NULL,
+            .version = 0,
     };
 
     // put the client IP and port into the buffers used by plugins.d
@@ -1289,7 +1290,8 @@ static int rrdpush_receive(int fd
     info("STREAM %s [receive from [%s]:%s]: receiving metrics...", host->hostname, client_ip, client_port);
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "CONNECTED");
 
-    size_t count = pluginsd_process(host, &cd, fp, 1);
+    cd.version = stream_version;
+    size_t count = incremental_pluginsd_process(host, &cd, fp, 1);
 
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", host->hostname, client_ip, client_port, count);

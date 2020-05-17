@@ -74,5 +74,8 @@ extern int pluginsd_split_words(char *str, char **words, int max_words);
 extern int pluginsd_initialize_plugin_directories();
 
 extern int config_isspace(char c);
+extern int pluginsd_space(char c);
+extern int pluginsd_update_buffer(char *output, SSL *ssl);
+extern char * pluginsd_get_from_buffer(char *output, int *bytesread, char *input, SSL *ssl, char *src);
 
 #endif /* NETDATA_PLUGINS_D_H */
