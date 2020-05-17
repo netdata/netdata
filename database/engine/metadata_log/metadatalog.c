@@ -74,6 +74,8 @@ static void commit_record(struct metalog_worker_config* wc, struct metalog_recor
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, buf, sizeof(*mlf_header) + payload_length);
     crc32set(mlf_trailer->checksum, crc);
+
+    buffer_free(io_descr->buffer);
 }
 
 static void do_commit_record(struct metalog_worker_config* wc, uint8_t type, void *data)

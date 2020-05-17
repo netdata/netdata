@@ -92,6 +92,7 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
     uv_fs_t req;
     int fd, current_flags;
 
+    assert(0 == direct || 1 == direct);
     for ( ; direct >= 0 ; --direct) {
 #ifdef __APPLE__
         /* Apple OS does not support O_DIRECT */

@@ -5,7 +5,11 @@
 
 #include "metadatalog.h"
 
-void metalog_commit_create_host(RRDHOST *host);
+extern void metalog_commit_update_host(RRDHOST *host);
+extern void metalog_commit_update_chart(RRDSET *st);
+extern void metalog_commit_delete_chart(RRDSET *st);
+extern void metalog_commit_update_dimension(RRDDIM *rd);
+extern void metalog_commit_delete_dimension(RRDDIM *rd);
 
 /* must call once before using anything */
 extern int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx);
