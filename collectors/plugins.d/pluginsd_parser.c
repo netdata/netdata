@@ -470,17 +470,16 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
         return 0;
     }
 
-    int rc = parser_add_keyword(parser, "SET", pluginsd_set);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
+    int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-    //parser_add_keyword(parser, "_unknown", pluginsd_unknown_keyword);
+    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
+    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
+    rc += parser_add_keyword(parser, "SET", pluginsd_set);
 
     info("Registered %d keywords for the parser", rc);
     user->parser = parser;
@@ -488,7 +487,6 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
     while (likely(!parser_next(parser))) {
         if (unlikely(netdata_exit || parser_action(parser)))
             break;
-        //parser_action(parser);
     }
     info("PARSER ended");
 

@@ -282,7 +282,6 @@ inline int parser_action(INCREMENTAL_PARSER *working_parser)
 
     int w = find_keyword(working_parser->buffer, command, PLUGINSD_LINE_MAX, pluginsd_space);
     if (w == 0) {
-        printf("ERROR\n");
         return 1;
     }
 
@@ -304,9 +303,6 @@ inline int parser_action(INCREMENTAL_PARSER *working_parser)
 
     uint32_t command_hash = simple_hash(command);
 
-    //action_function_list = NULL;
-    // rc = PARSER_RC_OK;
-
     while(tmp_keyword) {
         if (command_hash == tmp_keyword->keyword_hash &&
                 (!strcmp(command, tmp_keyword->keyword))) {
@@ -321,7 +317,9 @@ inline int parser_action(INCREMENTAL_PARSER *working_parser)
             rc = working_parser->unknown_function(words, working_parser->user);
         else
             rc = PARSER_RC_ERROR;
-        info("Unknown keyword [%s]", words[0]);
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("Unknown keyword [%s]", words[0]);
+#endif
     }
     else {
         while ((action_function = *action_function_list) != NULL) {
