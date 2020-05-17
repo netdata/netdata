@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- python.d/proxysql: add `Requirements` to the readme [\#9071](https://github.com/netdata/netdata/pull/9071) ([ilyam8](https://github.com/ilyam8))
 - Add proc.plugin configuration example for high-processor systems [\#9062](https://github.com/netdata/netdata/pull/9062) ([joelhans](https://github.com/joelhans))
 - claim: fix `New/ephemeral Agent containers` instruction [\#9058](https://github.com/netdata/netdata/pull/9058) ([ilyam8](https://github.com/ilyam8))
 - Add frontmatter to exporting connectors [\#9052](https://github.com/netdata/netdata/pull/9052) ([joelhans](https://github.com/joelhans))
