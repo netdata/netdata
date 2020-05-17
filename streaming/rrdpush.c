@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "../incremental_parser/incremental_parser.h"
 
 /*
  * rrdpush

@@ -60,7 +60,7 @@ struct plugind {
     volatile sig_atomic_t enabled;      // if this is enabled or not
 
     time_t started_t;
-
+    uint32_t version;
     struct plugind *next;
 };
 

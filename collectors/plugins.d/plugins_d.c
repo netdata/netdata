@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugins_d.h"
+#include "pluginsd_parser.h"
 
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
 struct plugind *pluginsd_root = NULL;
 
-static inline int pluginsd_space(char c)
-{
-    switch (c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case '=':
-            return 1;
+inline int pluginsd_space(char c) {
+    switch(c) {
+    case ' ':
+    case '\t':
+    case '\r':
+    case '\n':
+    case '=':
+        return 1;
 
-        default:
-            return 0;
+    default:
+        return 0;
     }
 }
 
@@ -332,10 +332,8 @@ void *pluginsd_worker_thread(void *arg)
         }
 
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
-        count = pluginsd_process(localhost, cd, fp, 0);
-        error(
-            "'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid,
-            count);
+        count = incremental_pluginsd_process(localhost, cd, fp, 0);
+        error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid);
 
         int worker_ret_code = mypclose(fp, cd->pid);
