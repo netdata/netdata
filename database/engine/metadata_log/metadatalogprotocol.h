@@ -23,9 +23,10 @@ struct rrdeng_metalog_sb {
 /*
  * Metadata log record types
  */
-#define STORE_PADDING       (0)
-#define STORE_DATA          (1)
-#define STORE_LOGS          (2) /* reserved */
+#define METALOG_STORE_PADDING       (0)
+#define METALOG_CREATE_OBJECT       (1)
+#define METALOG_DELETE_OBJECT       (2)
+#define METALOG_OTHER               (3) /* reserved */
 
 /*
  * Metadata log record header

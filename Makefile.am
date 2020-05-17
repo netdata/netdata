@@ -369,14 +369,14 @@ if ENABLE_DBENGINE
         database/engine/pagecache.h \
         database/engine/rrdenglocking.c \
         database/engine/rrdenglocking.h \
-        $(NULL)
-if ENABLE_METADATALOG
-    RRD_PLUGIN_FILES += \
+        database/engine/metadata_log/metadatalog.c \
+        database/engine/metadata_log/metadatalog.h \
+        database/engine/metadata_log/metadatalogapi.c \
+        database/engine/metadata_log/metadatalogapi.h \
         database/engine/metadata_log/logfile.h \
         database/engine/metadata_log/logfile.c \
         database/engine/metadata_log/metadatalogprotocol.h \
         $(NULL)
-endif
 endif
 
 API_PLUGIN_FILES = \

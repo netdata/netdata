@@ -1409,6 +1409,9 @@ int main(int argc, char **argv) {
 
     // Load host labels
     reload_host_labels();
+#ifdef ENABLE_DBENGINE
+    metalog_commit_create_host(localhost);
+#endif
 
     // ------------------------------------------------------------------------
     // spawn the threads

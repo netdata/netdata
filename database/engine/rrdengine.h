@@ -17,7 +17,7 @@
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
-#include "metadata_log/logfile.h"
+#include "metadata_log/metadatalog.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
 #include "rrdenglocking.h"
@@ -171,15 +171,13 @@ extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
 extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
 
 struct rrdengine_instance {
+    struct metalog_instance *metalog_ctx;
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
     uint8_t drop_metrics_under_page_cache_pressure; /* boolean */
     uint8_t global_compress_alg;
-
     struct transaction_commit_log commit_log;
-    struct metadata_record_commit_log metadata_record_log;
-
     struct rrdengine_datafile_list datafiles;
     char dbfiles_path[FILENAME_MAX+1];
     uint64_t disk_space;
