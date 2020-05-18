@@ -1399,6 +1399,9 @@ install_ebpf() {
   echo >&2 " Extracting ${EBPF_TARBALL} ..."
   tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
+  # chown everything to root:netdata before we start copying out of our package
+  run chown -R root:netdata "${tmp}"
+
   run cp -a -v "${tmp}"/library/* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
   run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
   run cp -a -v "${tmp}"/libnetdata_ebpf.so.* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
