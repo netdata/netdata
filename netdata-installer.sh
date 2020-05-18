@@ -1399,12 +1399,9 @@ install_ebpf() {
   echo >&2 " Extracting ${EBPF_TARBALL} ..."
   tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
-  run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
-  run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run ln -v -f -s "${libdir}"/libbpf_kernel.so "${libdir}"/libbpf_kernel.so.0
-  run ldconfig
+  run cp -a -v "${tmp}"/library/* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  run cp -a -v "${tmp}"/*netdata_ebpf_process*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  run cp -a -v "${tmp}"/libnetdata_ebpf.so.* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
 
   rm -rf "${tmp}"
 
