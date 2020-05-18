@@ -1400,7 +1400,7 @@ install_ebpf() {
   tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
   run cp -a -v "${tmp}"/library/* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
-  run cp -a -v "${tmp}"/*netdata_ebpf_process*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
   run cp -a -v "${tmp}"/libnetdata_ebpf.so.* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
 
   rm -rf "${tmp}"
