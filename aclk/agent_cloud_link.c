@@ -1307,9 +1307,10 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     if (aclk_password != NULL )
         freez(aclk_password);
-    if (aclk_username == NULL)
-        aclk_username = strdupz(agent_id);
     aclk_password = password.result;
+    if (aclk_username != NULL)
+        freez(aclk_username);
+    aclk_username = strdupz(agent_id);
 
 CLEANUP:
     freez(data_buffer);
