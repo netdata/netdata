@@ -68,6 +68,7 @@
 // netdata agent cloud link
 #include "aclk/agent_cloud_link.h"
 
+// global GUID map functions
 // netdata agent spawn server
 #include "spawn/spawn.h"
 

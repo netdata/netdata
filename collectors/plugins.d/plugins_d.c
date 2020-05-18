@@ -556,32 +556,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     st->id, id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
                     options ? options : "");
 
-            {
-                extern int find_guid_by_object(char *object, uuid_t *uuid);
-                extern int guid_store(uuid_t uuid, char *object);
-                extern int guid_find(uuid_t uuid, char *object, size_t max_bytes);
-
-
-                char mine[500];
-                uuid_t uuid;
-                sprintf(mine, "%s.%s.%s", st->id, id, name ? name : "");
-                if (find_guid_by_object(mine, &uuid)) {
-                    char uuid_s[37];
-                    uuid_generate(uuid);
-                    uuid_unparse(uuid, uuid_s);
-                    if (unlikely(guid_store(uuid, mine))) {
-                        error("Failed to add GUID for %s", mine);
-                    }
-                    char wstr[500];
-                    guid_find(uuid, wstr, 499);
-                    info("Stored %s = %s", uuid_s, wstr);
-                } else {
-                    char uuid_s[37];
-                    uuid_unparse(uuid, uuid_s);
-                    info("Object [%s] already maps to [%s]", mine, uuid_s);
-                }
-            }
-
             RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
             rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
             rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
