@@ -10,40 +10,39 @@ static int guid_object_compare(void* a, void* b) {
 static Pvoid_t JGUID_map = (Pvoid_t) NULL;
 static Pvoid_t JGUID_object_map = (Pvoid_t) NULL;
 
-avl_tree guid_object_map = {
-    NULL,
-    guid_object_compare
-};
-
-#define add_object_with_guid(object) avl_insert(&guid_object_map, (avl *)(fd))
-
-static inline GUID_OBJECT *add_object_with_guid(avl_tree_lock *tree, guid_object *value) {
-    RRDVAR *ret = (RRDVAR *)avl_insert_lock(tree, (avl *)(rv));
-    if(ret != rv)
-        debug(D_VARIABLES, "Request to insert RRDVAR '%s' into index failed. Already exists.", rv->name);
-
-    return ret;
-}
-
 int guid_store(uuid_t uuid, char *object)
 {
+    static uint32_t count = 0;
     if (unlikely(!object))
         return 0;
 
-    PWord_t *PValue = (PWord_t *) JudyHSIns(&JGUID_map, (void *)&uuid, (Word_t) sizeof(uuid_t), PJE0);
-    if (PValue) {
-        *PValue = (PWord_t) strdupz(object);
-        return 0;
+    Pvoid_t *PValue;
+
+    PValue = (PWord_t *)JudyHSIns(&JGUID_map, (void *)&uuid, (Word_t)sizeof(uuid_t), PJE0);
+    if (!PValue)
+        return 1;
+
+    *PValue = (Pvoid_t *) strdupz(object);
+
+
+    PValue = (PWord_t *)JudyHSIns(&JGUID_object_map, (void *)&object, (Word_t)strlen(object), PJE0);
+    if (!PValue) {
+        int rc = JudyHSDel(&JGUID_map, (void *)&uuid, (Word_t)sizeof(uuid_t), PJE0);
+        errno = 0;
+        error("Error storing map of object %s to GUID; cleanup rc=%d", object, rc);
+        return 1;
     }
 
-//    PWord_t *PValue = (PWord_t *) JudyHSIns(&JGUID_object_map, (void *)&object, (Word_t) strlen(object), PJE0);
-//    if (PValue) {
-//        *PValue = (PWord_t) strdupz(object);
-//        return 0;
-//    }
-
-
-    return 1;
+    uuid_t *value = mallocz(sizeof(uuid_t));
+    memcpy(value, &uuid, sizeof(uuid_t));
+    *PValue = (PWord_t)value;
+    count++;
+#ifdef NETDATA_INTERNAL_CHECKS
+    char uuid_s[37];
+    uuid_unparse(uuid, uuid_s);
+    info("Added item %ld [%s] on [%s]", count, uuid_s, object);
+#endif
+    return 0;
 }
 
 int guid_find(uuid_t uuid, char *object, size_t max_bytes)
@@ -58,14 +57,13 @@ int guid_find(uuid_t uuid, char *object, size_t max_bytes)
     return 1;
 }
 
-//int find_guid_by_object(char *object, uuid_t *uuid)
-//{
-//    PWord_t *PValue = (PWord_t *) JudyHSGet(JGUID_object_map, (void *) &object, (Word_t) strlen(object));
-//    if (unlikely(!PValue))
-//        return 0;
-//
-//    if (likely(object && max_bytes))
-//        strncpyz(object, (char *) *PValue, max_bytes);
-//
-//    return 1;
-//}
+int find_guid_by_object(char *object, uuid_t *uuid)
+{
+    info("Searching [%s]", object);
+    PWord_t *PValue = (PWord_t *) JudyHSGet(JGUID_object_map, (void *) &object, (Word_t) strlen(object));
+    if (likely(PValue && !*PValue))
+        return 1;
+
+    memcpy(uuid, *PValue, sizeof(*uuid));
+    return 0;
+}

@@ -71,6 +71,8 @@
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
+#include "libnetdata/global_uuid_map/global_uuid_map.h"
+
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"
