@@ -193,11 +193,6 @@ int parser_next(INCREMENTAL_PARSER *working_parser)
         return 0;
     }
 
-    if (unlikely(fileno((FILE *)working_parser->input) == -1)) {
-        error("Stream is no longer valid");
-        return 1;
-    }
-
 #ifdef ENABLE_HTTPS
     int normalread = 1;
     if (netdata_srv_ctx) {
