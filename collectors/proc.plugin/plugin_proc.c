@@ -47,6 +47,7 @@ static struct proc_module {
         { .name = "/proc/net/sctp/snmp", .dim = "sctp", .func = do_proc_net_sctp_snmp },
         { .name = "/proc/net/softnet_stat", .dim = "softnet", .func = do_proc_net_softnet_stat },
         { .name = "/proc/net/ip_vs/stats", .dim = "ipvs", .func = do_proc_net_ip_vs_stats },
+        { .name = "/sys/class/infiniband",   .dim = "infiniband", .func = do_sys_class_infiniband },
 
         // firewall metrics
         { .name = "/proc/net/stat/conntrack", .dim = "conntrack", .func = do_proc_net_stat_conntrack },
