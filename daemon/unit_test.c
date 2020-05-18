@@ -1833,10 +1833,10 @@ int test_dbengine(void)
         }
     }
 error_out:
-    rrdeng_exit(host->rrdeng_ctx);
     rrd_wrlock();
     rrdhost_delete_charts(host);
     rrd_unlock();
+    rrdeng_exit(host->rrdeng_ctx);
 
     return errors;
 }
