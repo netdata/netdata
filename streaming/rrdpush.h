@@ -6,7 +6,7 @@
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)2
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3
 
 extern unsigned int default_rrdpush_enabled;
 extern char *default_rrdpush_destination;
