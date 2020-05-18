@@ -1,3 +1,10 @@
+<!--
+title: "Export metrics to Prometheus"
+description: "Export Netdata metrics to Prometheus for archiving and further analysis."
+custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md
+sidebar_label: Using Netdata with Prometheus
+-->
+
 # Using Netdata with Prometheus
 
 > IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.7. The new Prometheus exporting
@@ -13,7 +20,7 @@ are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM
 
 ### Installing Netdata
 
-There are number of ways to install Netdata according to [Installation](../../packaging/installer/). The suggested way
+There are number of ways to install Netdata according to [Installation](/packaging/installer/README.md). The suggested way
 of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
 
 ```sh
@@ -390,10 +397,10 @@ names are human friendly labels (also unique).
 Most charts and metrics have the same ID and name, but in several cases they are different: disks with device-mapper,
 interrupts, QoS classes, statsd synthetic charts, etc.
 
-The default is controlled in `netdata.conf`:
+The default is controlled in `exporting.conf`:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	send names instead of ids = yes | no
 ```
 
@@ -407,7 +414,7 @@ You can overwrite it from Prometheus, by appending to the URL:
 Netdata can filter the metrics it sends to Prometheus with this setting:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	send charts matching = *
 ```
 
@@ -422,7 +429,7 @@ is used.
 Netdata sends all metrics prefixed with `netdata_`. You can change this in `netdata.conf`, like this:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	prefix = netdata
 ```
 

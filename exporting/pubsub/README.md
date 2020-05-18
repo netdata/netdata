@@ -11,8 +11,12 @@ sidebar_label: Google Cloud Pub/Sub Service
 
 To use the Pub/Sub service for metric collecting and processing, you should first
 [install](https://github.com/googleapis/cpp-cmakefiles) Google Cloud Platform C++ Proto Libraries.
-Pub/Sub support is also dependent on the dependencies of those libraries, like `protobuf` and `grpc`. Next, Netdata
-should be re-installed from the source. The installer will detect that the required libraries are now available.
+Pub/Sub support is also dependent on the dependencies of those libraries, like `protobuf`, `protoc`, and `grpc`. Next,
+Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
+
+> Some distributions don't have `.cmake` files in packages. To build the C++ Proto Libraries on such distributions we
+> advise you to delete `protobuf`, `protoc`, and `grpc` related packages and
+> [install](https://github.com/grpc/grpc/blob/master/BUILDING.md) `grpc` with its dependencies from source.
 
 ## Configuration
 
