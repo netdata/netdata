@@ -6,9 +6,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributin
 
 # Contributing to documentation
 
-We welcome contributions to Netdata's already extensive documentation, which we host at
-[learn.netdata.cloud](https://learn.netdata.cloud/) and store inside of the [`netdata/netdata`
-repository](https://github.com/netdata/netdata) on GitHub.
+We welcome contributions to Netdata's already extensive documentation. We store documentation related to our open source
+monitoring Agent inside of the [`netdata/netdata` repository](https://github.com/netdata/netdata) on GitHub.
+
+Documentation related to Netdata Cloud is stored in a private repository and is not currently open to community
+contributions.
+
+All our documentation is aggregated and published at [learn.netdata.cloud](https://learn.netdata.cloud/).
 
 Like all contributing to all other aspects of Netdata, we ask that anyone who wants to help with documentation read and
 abide by the [Contributor Convenant Code of Conduct](/CODE_OF_CONDUCT.md) and follow the

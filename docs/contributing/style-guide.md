@@ -22,7 +22,7 @@ products.
 ## Welcome
 
 Proper documentation is essential to the success of any open-source project. Netdata is no different. The health of our
-monitoring agent and its community depends on this effort.
+monitoring agent and our community depends on this effort.
 
 We're here to make developers, sysadmins, and DevOps engineers better at their jobs, after all!
 
@@ -39,7 +39,7 @@ following principles:
 -   Conciseness
 -   Accessibility
 
-These principles will make the documentation better for everyone who wants to use Netdata, whether they’re a beginner or
+These principles will make the documentation better for everyone who wants to use Netdata, whether they're a beginner or
 an expert.
 
 ### Breaking the rules
@@ -137,6 +137,9 @@ one-line installer requires fewer steps than manually installing from source."
 
 A particular word, phrase, or metaphor you're familiar with might not translate well to the other cultures featured
 among Netdata's global community. We recommended you avoid slang or colloquialisms in your writing.
+
+In addition, don't use abbreviations that have not yet been defined in the document. See our section on
+[abbreviations](#abbreviations-acronyms-and-initialisms) for more information.
 
 If you must use industry jargon, such as "white-box monitoring," in a document, define the term as clearly and concisely
 as you can.
@@ -315,6 +318,19 @@ please read the [Markdown introduction post](https://daringfireball.net/projects
 
 You can follow the syntax specified in the above resources for the majority of documents, but the following sections
 specify a few particular use cases.
+
+### Linking between documents
+
+Documentation should link to relevant pages whenever it's relevant and provides valuable context to the reader. To
+ensure links function properly on both GitHub and our generated documentation on [Netdata
+Learn](https://learn.netdata.cloud/), links should always reference the full path to the document, beginning at the root
+of the Agent repository (`/`). Links should also always end with the filename of the destination document, ending in the
+`.md` extension.
+
+Avoid relative links or traversing up directories using `../`.
+
+For example, if you want to link to our installation guide, you should link to `/packaging/installer/README.md`. To
+reference the guide for increasing metrics storage, use `/docs/tutorials/longer-metrics-storage.md`.
 
 ### References to UI elements
 
