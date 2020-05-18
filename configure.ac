@@ -1447,6 +1447,7 @@ AC_CONFIG_FILES([
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
+    libnetdata/global_uuid_map/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/popen/Makefile

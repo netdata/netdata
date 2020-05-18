@@ -148,6 +148,8 @@ LIBNETDATA_FILES = \
     libnetdata/ebpf/ebpf.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
+    libnetdata/global_uuid_map/global_uuid_map.c \
+    libnetdata/global_uuid_map/global_uuid_map.h \
     libnetdata/inlined.h \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
