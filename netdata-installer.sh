@@ -1320,33 +1320,12 @@ should_install_ebpf() {
     return 1
   fi
 
-  if [ "$(uname)" != "Linux" ]; then
-    run_failed "Running on an unsupported system type ($(uname)), not installing eBPF."
-    defer_error "Running on an unsupported system type ($(uname)), not installing eBPF."
-    return 1
-  fi
-
   # Check Kernel Config
-
-  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
-
-  echo >&2 " Downloading check-kernel-config.sh ..."
-  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
-    run_failed "Failed to download check-kernel-config.sh"
-    echo 2>&" Removing temporary directory ${tmp} ..."
-    rm -rf "${tmp}"
-    return 1
-  fi
-
-  run chmod +x "${tmp}"/check-kernel-config.sh
-
-  if ! run "${tmp}"/check-kernel-config.sh; then
+  if ! run "${INSTALLER_DIR}"/packaging/installer/check-kernel-config.sh; then
     run_failed "Kernel unsupported or missing required config"
     defer_error "Kernel unsupported or missing required config, not installing eBPF collector"
     return 1
   fi
-
-  rm -rf "${tmp}"
 
   return 0
 }
