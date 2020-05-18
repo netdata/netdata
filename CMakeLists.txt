@@ -665,6 +665,7 @@ set(EXPORTING_ENGINE_FILES
         exporting/prometheus/prometheus.c
         exporting/prometheus/prometheus.h
         exporting/read_config.c
+        exporting/clean_connectors.c
         exporting/init_connectors.c
         exporting/process_data.c
         exporting/check_filters.c
