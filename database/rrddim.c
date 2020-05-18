@@ -446,6 +446,9 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
+#ifdef ENABLE_DBENGINE
+    metalog_commit_delete_dimension(rd); /* TODO: move this to dbengine rotation when GUID lookup is available */
+#endif
     rd->state->collect_ops.finalize(rd);
     freez(rd->state);
 
@@ -492,9 +495,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
-#endif
-#ifdef ENABLE_DBENGINE
-    metalog_commit_delete_dimension(rd); /* TODO: move this to dbengine rotation when GUID lookup is available */
 #endif
 
 }
