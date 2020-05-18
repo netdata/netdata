@@ -186,10 +186,10 @@ pointless busy loop. On the shell do the following:
 ```
 
 Our NetData cpu graph should be showing some activity. Let's represent this in Prometheus. In order to do this let's
-keep our metrics page open for reference: <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes>  We are
+keep our metrics page open for reference: <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes>. We are
 setting out to graph the data in the CPU chart so let's search for `system.cpu` in the metrics page above. We come
 across a section of metrics with the first comments  `# COMMENT homogeneous chart "system.cpu", context "system.cpu",
-family "cpu", units "percentage"` Followed by the metrics. This is a good start now let us drill down to the specific
+family "cpu", units "percentage"` followed by the metrics. This is a good start now let us drill down to the specific
 metric we would like to graph.
 
 ```conf
@@ -236,7 +236,6 @@ docker run -i -p 3000:3000 --network=netdata-tutorial grafana/grafana
 ```
 
 This will get grafana running at <http://localhost:3000/>. Let's go there and
-
 login using the credentials Admin:Admin.
 
 The first thing we want to do is click "Add data source". Let's make it look like the following screenshot
