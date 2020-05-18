@@ -235,7 +235,7 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
 void send_internal_metrics(struct instance *instance);
 
-extern void instance_clean(struct instance *ptr);
+extern void clean_instance(struct instance *ptr);
 
 static inline void disable_instance(struct instance *instance)
 {

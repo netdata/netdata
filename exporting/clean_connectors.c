@@ -7,7 +7,7 @@
  *
  * @param ptr a pointer to the structure with variables to clean.
  */
-void instance_clean(struct instance *ptr)
+void clean_instance(struct instance *ptr)
 {
     if (ptr->buffer)
         freez(ptr->buffer);
