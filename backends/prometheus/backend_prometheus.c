@@ -175,14 +175,14 @@ static int print_host_variables(RRDVAR *rv, void *data) {
             opts->host_header_printed = 1;
 
             if(opts->output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP) {
-                buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
+                buffer_sprintf(opts->wb, "\n# HELP global host and chart variables\n");
             }
         }
 
         calculated_number value = rrdvar2number(rv);
         if(isnan(value) || isinf(value)) {
             if(opts->output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP)
-                buffer_sprintf(opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rv->name, (isnan(value))?"NAN":"INF");
+                buffer_sprintf(opts->wb, "# HELP variable \"%s\" is %s. Skipped.\n", rv->name, (isnan(value))?"NAN":"INF");
 
             return 0;
         }
@@ -321,7 +321,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             }
 
             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
-                buffer_sprintf(wb, "\n# COMMENT %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
+                buffer_sprintf(wb, "\n# HELP %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
                                , (homogeneous)?"homogeneous":"heterogeneous"
                                , (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id
                                , st->context
@@ -358,7 +358,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 
                             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(wb
-                                               , "# COMMENT %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                               , "# HELP %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
                                                , prefix
                                                , context
                                                , suffix
@@ -415,7 +415,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 
                             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(wb
-                                               , "# COMMENT %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                               , "# HELP %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
                                                , prefix
                                                , context
                                                , dimension
@@ -483,7 +483,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             backends_prometheus_label_copy(dimension, (output_options & BACKENDS_PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_HELP))
-                                buffer_sprintf(wb, "# COMMENT %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
+                                buffer_sprintf(wb, "# HELP %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
                                                , prefix
                                                , context
                                                , units
@@ -737,7 +737,7 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
         else
             mode = "unknown";
 
-        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s, time range %lu to %lu\n\n"
+        buffer_sprintf(wb, "# HELP netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s, time range %lu to %lu\n\n"
                 , host->hostname
                 , (first_seen)?"FIRST SEEN ":""
                 , server
