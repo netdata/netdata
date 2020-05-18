@@ -1399,19 +1399,6 @@ install_ebpf() {
   echo >&2 " Extracting ${EBPF_TARBALL} ..."
   tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
-  echo >&2 " Finding suitable lib directory ..."
-  libdir=
-  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
-  if [ -z "${libdir}" ]; then
-    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
-  fi
-
-  if [ -z "${libdir}" ]; then
-    run_failed "Could not find a suitable lib directory"
-    rm -rf "${tmp}"
-    return 1
-  fi
-
   run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
   run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
   run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
