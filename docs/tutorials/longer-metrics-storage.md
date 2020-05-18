@@ -1,8 +1,7 @@
 <!--
----
 title: "Change how long Netdata stores metrics"
+description: "With a single configuration change, the Netdata Agent can store days, weeks, or months of metrics at its famous per-second granularity."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/longer-metrics-storage.md
----
 -->
 
 # Change how long Netdata stores metrics
@@ -37,9 +36,6 @@ using, check out your `netdata.conf` file and look for the `memory mode` setting
 If `memory mode` is set to anything but `dbengine`, change it and restart Netdata using the standard command for
 restarting services on your system. You're now using the database engine!
 
-> Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
-> we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
-
 What makes the database engine efficient? While it's structured like a traditional database, the database engine splits
 data between RAM and disk. The database engine caches and indexes data on RAM to keep memory usage low, and then
 compresses older metrics onto disk for long-term storage.
@@ -58,14 +54,11 @@ size` and `dbengine disk space`.
 
 `page cache size` sets the maximum amount of RAM (in MiB) the database engine will use for caching and indexing.
 `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
-metrics.
+metrics. The default settings retain about two day's worth of metris on a system collecting 2,000 metrics every second.
 
-Based on our testing, these default settings will retain about a day's worth of metrics when Netdata collects roughly
-4,000 metrics every second. If you increase either `page cache size` or `dbengine disk space`, Netdata will retain even
-more historical metrics.
-
-But before you change these options too dramatically, read up on the [database engine's memory
-footprint](/database/engine/README.md#memory-requirements).
+[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
+correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
+slave nodes you have, how many metrics your Agent collects, and more.
 
 With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
 redundancy.

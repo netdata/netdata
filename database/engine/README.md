@@ -1,8 +1,7 @@
 <!--
----
 title: "Database engine"
+description: "The highly-efficient database engine stores per-second metrics in RAM and then spills historical metrics to disk long-term storage."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/README.md
----
 -->
 
 # Database engine
@@ -63,6 +62,10 @@ All DB engine instances, for localhost and all other streaming recipient nodes i
 The above values are the default and minimum values for Page Cache size and DB engine disk space quota. Both numbers are
 in **MiB**. All DB engine instances will allocate the configured resources separately.
 
+[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
+correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
+slave nodes you have, how many metrics your Agent collects, and more.
+
 The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching Netdata metric values
 themselves as far as queries are concerned. The total page cache size will be greater since data collection itself will
 consume additional memory as is described in the [Memory requirements](#memory-requirements) section.
@@ -107,6 +110,9 @@ and streaming recipient nodes):
         footprint.
 
 An important observation is that RAM usage depends on both the `page cache size` and the `dbengine disk space` options.
+
+You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
+validate the memory requirements for your particular system(s) and configuration.
 
 ## File descriptor requirements
 
