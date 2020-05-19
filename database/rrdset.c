@@ -430,6 +430,10 @@ void rrdset_delete(RRDSET *st) {
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
     }
 #endif
+#ifdef ENABLE_DBENGINE
+    metalog_commit_delete_chart(st); /* TODO: move this to dbengine rotation when GUID lookup is available */
+#endif
+
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -775,6 +779,10 @@ RRDSET *rrdset_create_custom(
         aclk_update_chart(host, st->id, ACLK_CMD_CHART);
     }
 #endif
+#ifdef ENABLE_DBENGINE
+    metalog_commit_update_chart(st);
+#endif
+
     return(st);
 }
 
