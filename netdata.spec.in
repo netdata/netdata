@@ -93,6 +93,10 @@ Group:		Applications/System
 Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
 
+# Remove conflicting EPEL packages
+Obsoletes:  %{name}-conf
+Obsoletes:  %{name}-data
+
 # #####################################################################
 # Core build/install/runtime dependencies
 # #####################################################################
