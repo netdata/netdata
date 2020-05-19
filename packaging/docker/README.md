@@ -207,8 +207,9 @@ services:
 ### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
-[Netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address
-Netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
+[Netdata daemon command line options](https://learn.netdata.cloud/docs/agent/daemon/#command-line-options) such as the
+IP address Netdata will be running on, using the [command
+instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
 ## Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 
