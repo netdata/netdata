@@ -78,17 +78,22 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
     return 0;
 }
 
-/*
- * Tries to open a file in direct I/O mode, falls back to buffered mode if not possible.
- * Returns UV error number that is < 0 on failure.
- * On success sets (*file) to be the uv_file that was opened.
+/**
+ * Open file for I/O.
+ *
+ * @param path The full path of the file.
+ * @param flags Same flags as the open() system call uses.
+ * @param file On success sets (*file) to be the uv_file that was opened.
+ * @param direct Tries to open a file in direct I/O mode when direct=1, falls back to buffered mode if not possible.
+ * @return Returns UV error number that is < 0 on failure. 0 on success.
  */
-int open_file_direct_io(char *path, int flags, uv_file *file)
+int open_file_for_io(char *path, int flags, uv_file *file, int direct)
 {
     uv_fs_t req;
-    int fd, current_flags, direct;
+    int fd, current_flags;
 
-    for (direct = 1 ; direct >= 0 ; --direct) {
+    assert(0 == direct || 1 == direct);
+    for ( ; direct >= 0 ; --direct) {
 #ifdef __APPLE__
         /* Apple OS does not support O_DIRECT */
         direct = 0;
