@@ -241,6 +241,17 @@ void mongodb_cleanup(struct instance *instance)
     }
 
     buffer_free(instance->buffer);
+
+    struct bson_buffer *next_buffer = connector_specific_data->first_buffer;
+    for (int i = 0; i < instance->config.buffer_on_failures; i++) {
+        struct bson_buffer *current_buffer = next_buffer;
+        next_buffer = next_buffer->next;
+
+        if (current_buffer->insert)
+            free_bson(current_buffer->insert, current_buffer->documents_inserted);
+        freez(current_buffer);
+    }
+
     freez(connector_specific_data);
 
     info("EXPORTING: instance %s exited", instance->config.name);
