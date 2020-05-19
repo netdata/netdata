@@ -5,6 +5,7 @@
 // Sample action here
 PARSER_RC pluginsd_begin_action(void *user, char *chart_id, usec_t microseconds)
 {
+    UNUSED(user);
     info("This is the begin action on %s -- %d", chart_id, (int ) microseconds);
     return PARSER_RC_OK;
 }
@@ -62,9 +63,12 @@ PARSER_RC pluginsd_begin(char **words, void *user)
     char *id = words[1];
     char *microseconds_txt = words[2];
 
+    usec_t microseconds = 0;
+    if (microseconds_txt && *microseconds_txt)
+        microseconds = str2ull(microseconds_txt);
+
     if (((PARSER_USER_OBJECT *) user)->plugins_action->begin_action) {
-        info("Calling action for BEGIN");
-        ((PARSER_USER_OBJECT *) user)->plugins_action->begin_action(user, id, (microseconds_txt && *microseconds_txt)?str2ull(microseconds_txt):0);
+        return ((PARSER_USER_OBJECT *) user)->plugins_action->begin_action(user, id, microseconds);
     }
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
@@ -82,10 +86,6 @@ PARSER_RC pluginsd_begin(char **words, void *user)
     }
 
     if (likely(st->counter_done)) {
-        usec_t microseconds = 0;
-        if (microseconds_txt && *microseconds_txt)
-            microseconds = str2ull(microseconds_txt);
-
         if (likely(microseconds)) {
             if (((PARSER_USER_OBJECT *) user)->trust_durations)
                 rrdset_next_usec_unfiltered(st, microseconds);
@@ -255,26 +255,6 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
     char *divisor_s = words[5];
     char *options = words[6];
 
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-//    if (((PARSER_USER_OBJECT *) user)->plugins_action->dimension_action) {
-//        return ((PARSER_USER_OBJECT *) user)->plugins_action->dimension_action(user, id, name, algorithm, multiplier,
-//                                                                              divisor, algorithm_type);
-//    }
-
-    if (unlikely(!id || !*id)) {
-        error(
-            "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname,
-            st ? st->id : "UNSET");
-        goto disable;
-    }
-
-    if (unlikely(!st)) {
-        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
-        goto disable;
-    }
-
     long multiplier = 1;
     if (multiplier_s && *multiplier_s)
         multiplier = strtol(multiplier_s, NULL, 0);
@@ -289,6 +269,42 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
 
     if (unlikely(!algorithm || !*algorithm))
         algorithm = "absolute";
+
+    if (((PARSER_USER_OBJECT *) user)->plugins_action->dimension_action) {
+        return ((PARSER_USER_OBJECT *) user)->plugins_action->dimension_action(
+                user, (!id || !*id) ? NULL : id, name, algorithm,
+            multiplier, divisor, (options && *options)?options:NULL, rrd_algorithm_id(algorithm));
+    }
+
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!id || !*id)) {
+        error(
+            "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname,
+            st ? st->id : "UNSET");
+        goto disable;
+    }
+
+    if (unlikely(!st)) {
+        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+//    long multiplier = 1;
+//    if (multiplier_s && *multiplier_s)
+//        multiplier = strtol(multiplier_s, NULL, 0);
+//    if (unlikely(!multiplier))
+//        multiplier = 1;
+//
+//    long divisor = 1;
+//    if (likely(divisor_s && *divisor_s))
+//        divisor = strtol(divisor_s, NULL, 0);
+//    if (unlikely(!divisor))
+//        divisor = 1;
+
+//    if (unlikely(!algorithm || !*algorithm))
+//        algorithm = "absolute";
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(
@@ -330,22 +346,22 @@ PARSER_RC pluginsd_variable(char **words, void *user)
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
-//    if (((PARSER_USER_OBJECT *) user)->plugins_action->variable_action) {
-//        return ((PARSER_USER_OBJECT *) user)->plugins_action->variable_action(user, global, name, value);
-//    }
-
     int global = (st) ? 0 : 1;
 
-    if (name && *name) {
-        if ((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
-            global = 1;
-            name = words[2];
-            value = words[3];
-        } else if ((strcmp(name, "LOCAL") == 0 || strcmp(name, "CHART") == 0)) {
+    if (((PARSER_USER_OBJECT *) user)->plugins_action->variable_action) {
+        if (name && *name) {
             global = 0;
-            name = words[2];
-            value = words[3];
+            if ((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
+                global = 1;
+                name = words[2];
+                value = words[3];
+            } else if ((strcmp(name, "LOCAL") == 0 || strcmp(name, "CHART") == 0)) {
+                global = 0;
+                name = words[2];
+                value = words[3];
+            }
         }
+        return ((PARSER_USER_OBJECT *) user)->plugins_action->variable_action(user, global, name, value);
     }
 
     if (unlikely(!name || !*name)) {
