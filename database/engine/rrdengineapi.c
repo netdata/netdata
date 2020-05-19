@@ -5,7 +5,7 @@
 static struct rrdengine_instance default_global_ctx;
 
 int default_rrdeng_page_cache_mb = 32;
-int default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+int default_rrdeng_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
