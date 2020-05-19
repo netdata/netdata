@@ -22,7 +22,7 @@ This is how to install the latest Netdata version from source on FreeBSD:
 
 ```sh
 # install required packages
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake
 
 # download Netdata
 git clone https://github.com/netdata/netdata.git --depth=100
