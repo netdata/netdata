@@ -116,8 +116,11 @@ void claim_agent(char *claiming_arguments)
 #endif
 }
 
+#ifdef ENABLE_ACLK
 extern int aclk_connected, aclk_kill_link;
 extern void aclk_graceful_disconnect();
+#endif
+
 /* Change the claimed state of the agent.
  *
  * This only happens when the user has explicitly requested it:
@@ -127,6 +130,11 @@ extern void aclk_graceful_disconnect();
  */
 void load_claiming_state(void)
 {
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+    netdata_cloud_setting = 0;
+#else
     netdata_mutex_lock(&claim_mutex);
     if (claimed_id != NULL) {
         freez(claimed_id);
@@ -153,12 +161,6 @@ void load_claiming_state(void)
     }
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_setting = 0;
-#else
     netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
 }
