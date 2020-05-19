@@ -148,8 +148,6 @@ LIBNETDATA_FILES = \
     libnetdata/ebpf/ebpf.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
-    libnetdata/global_uuid_map/global_uuid_map.c \
-    libnetdata/global_uuid_map/global_uuid_map.h \
     libnetdata/inlined.h \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
@@ -186,6 +184,13 @@ LIBNETDATA_FILES = \
     libnetdata/health/health.h \
     libnetdata/string/utf8.h \
     $(NULL)
+
+if ENABLE_DBENGINE
+    LIBNETDATA_FILES += \
+    libnetdata/global_uuid_map/global_uuid_map.c \
+    libnetdata/global_uuid_map/global_uuid_map.h \
+    $(NULL)
+endif
 
 APPS_PLUGIN_FILES = \
     collectors/apps.plugin/apps_plugin.c \
