@@ -69,10 +69,13 @@
 #include "aclk/agent_cloud_link.h"
 
 // global GUID map functions
+
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
+#ifdef ENABLE_DBENGINE
 #include "libnetdata/global_uuid_map/global_uuid_map.h"
+#endif
 
 // the netdata deamon
 #include "daemon.h"
