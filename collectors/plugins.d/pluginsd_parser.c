@@ -14,12 +14,13 @@ PARSER_RC pluginsd_set(char **words, void *user)
     char *dimension = words[1];
     char *value = words[2];
 
+    if (((PARSER_USER_OBJECT *)user)->plugins_action->set_action) {
+        return ((PARSER_USER_OBJECT *)user)->plugins_action->set_action(
+                user, (!dimension || !*dimension) ? NULL : dimension, (!value || !*value) ? 0 : strtoll(value, NULL, 0));
+    }
+
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    if (((PARSER_USER_OBJECT *) user)->plugins_action->set_action) {
-        return ((PARSER_USER_OBJECT *) user)->plugins_action->set_action(user, dimension, value);
-    }
 
     if (unlikely(!dimension || !*dimension)) {
         error("requested a SET on chart '%s' of host '%s', without a dimension. Disabling it.", st->id, host->hostname);
@@ -61,13 +62,13 @@ PARSER_RC pluginsd_begin(char **words, void *user)
     char *id = words[1];
     char *microseconds_txt = words[2];
 
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
     if (((PARSER_USER_OBJECT *) user)->plugins_action->begin_action) {
         info("Calling action for BEGIN");
-        ((PARSER_USER_OBJECT *) user)->plugins_action->begin_action(user, id, microseconds_txt && *microseconds_txt?str2ull(microseconds_txt):0);
+        ((PARSER_USER_OBJECT *) user)->plugins_action->begin_action(user, id, (microseconds_txt && *microseconds_txt)?str2ull(microseconds_txt):0);
     }
+
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     if (unlikely(!id)) {
         error("requested a BEGIN without a chart id for host '%s'. Disabling it.", host->hostname);
@@ -105,12 +106,12 @@ PARSER_RC pluginsd_end(char **words, void *user)
 {
     UNUSED(words);
 
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
     if (((PARSER_USER_OBJECT *) user)->plugins_action->end_action) {
         return ((PARSER_USER_OBJECT *) user)->plugins_action->end_action(user);
     }
+
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     if (unlikely(!st)) {
         error("requested an END, without a BEGIN on host '%s'. Disabling it.", host->hostname);
@@ -395,11 +396,12 @@ PARSER_RC pluginsd_variable(char **words, void *user)
 PARSER_RC pluginsd_flush(char **words, void *user)
 {
     UNUSED(words);
-    debug(D_PLUGINSD, "requested a FLUSH");
 
     if (((PARSER_USER_OBJECT *)user)->plugins_action->flush_action) {
         return ((PARSER_USER_OBJECT *)user)->plugins_action->flush_action(user);
     }
+
+    debug(D_PLUGINSD, "requested a FLUSH");
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     return PARSER_RC_OK;
@@ -409,12 +411,11 @@ PARSER_RC pluginsd_disable(char **words, void *user)
 {
     UNUSED(user);
     UNUSED(words);
-    info("called DISABLE. Disabling it.");
 
     if (((PARSER_USER_OBJECT *)user)->plugins_action->disable_action) {
         return ((PARSER_USER_OBJECT *)user)->plugins_action->disable_action(user);
     }
-
+    info("called DISABLE. Disabling it.");
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
     return PARSER_RC_ERROR;
 }

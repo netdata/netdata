@@ -15,14 +15,16 @@ typedef enum parser_rc {
 } PARSER_RC;
 
 typedef struct pluginsd_action {
-    PARSER_RC (*set_action)(void *user, char *variable, char *value);
+    PARSER_RC (*set_action)(void *user, char *variable, long long int value);
     PARSER_RC (*begin_action)(void *user, char *chart_id, usec_t microseconds);
     PARSER_RC (*end_action)(void *user);
+
     PARSER_RC (*chart_action)(void *user, char *type, char *id, char *title,
      char *units, char *family, char *context, RRDSET_TYPE chart_type, int priority, int update_every,
      char *options, char *plugin, char *module);
     PARSER_RC (*dimension_action)
     (void *user, char *id, char *name, char *algorithm, long multiplier, long divisor, RRD_ALGORITHM algorithm_type);
+
     PARSER_RC (*flush_action)(void *user);
     PARSER_RC (*disable_action)(void *user);
     PARSER_RC (*variable_action)(void *user, int global, char *name, calculated_number value);
