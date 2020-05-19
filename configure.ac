@@ -426,9 +426,6 @@ fi
 AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
-AC_DEFINE([ENABLE_METADATALOG], [1], [netdata metadata log])
-AM_CONDITIONAL([ENABLE_METADATALOG], [test "yes" = "yes"])
-
 AC_MSG_CHECKING([if netdata https should be used])
 if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
     enable_https="yes"
