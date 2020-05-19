@@ -35,7 +35,7 @@ struct rrdeng_metalog_record_header {
     /* when set to STORE_PADDING jump to start of next block */
     uint8_t type;
 
-    uint32_t reserved; /* reserved for future use */
+    uint32_t header_length;
     uint64_t id;
     uint16_t payload_length;
 } __attribute__ ((packed));
