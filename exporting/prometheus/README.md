@@ -389,6 +389,8 @@ To save bandwidth, and because Prometheus does not use them anyway, `# TYPE` and
 wanted they can be re-enabled via `types=yes` and `help=yes`, e.g.
 `/api/v1/allmetrics?format=prometheus&types=yes&help=yes`
 
+Note that if enabled, the `# TYPE` and `# HELP` lines are repeated for every occurrence of a metric, which goes against the Prometheus documentation's [specification for these lines](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#comments-help-text-and-type-information).
+
 ### Names and IDs
 
 Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and
