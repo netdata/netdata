@@ -192,7 +192,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
+  --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
@@ -279,7 +279,7 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
@@ -1281,6 +1281,19 @@ function get_kernel_version() {
   printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
 }
 
+function get_rh_version() {
+  if [ ! -f /etc/redhat-release ]; then
+    printf "000000000"
+    return
+  fi
+
+  r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
 detect_libc() {
   libc=
   if ldd --version 2>&1 | grep -q -i glibc; then
@@ -1300,88 +1313,19 @@ detect_libc() {
   return 0
 }
 
-get_compatible_kernel_for_ebpf() {
-  kver="${1}"
-
-  # XXX: Logic taken from Slack discussion in #ebpf
-  # everything that has a version <= 4.14 can use the code built to 4.14
-  # also all distributions that has a version <= 4.15.256 can use the code built to 4.15
-  # Continue the logic, everything that has a version < 4.19.102 and >= 4.15 can use the code built to 4.19
-  # Kernel 4.19 had a feature added in the version 4.19.102 that force us to break it in two, so version >= 4.19.102
-  # and smaller than < 5.0 runs with code built to 4.19.102
-  # Finally,  everybody that is using 5.X can use what is compiled with 5.4
-
-  kpkg=
-
-  if [ "${kver}" -ge 005000000 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
-    kpkg="5_4_20"
-  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
-    kpkg="4_19_104"
-  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
-    kpkg="4_19_98"
-  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
-    kpkg="4_15_18"
-  elif [ "${kver}" -le 004014999 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
-    kpkg="4_14_171"
-  else
-    echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
-    return 1
-  fi
-
-  echo "${kpkg}"
-  return 0
-}
-
 should_install_ebpf() {
-  if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
-    run_failed "ebpf not enabled. --enable-ebpf to enable"
-    return 1
-  fi
-
-  if [ "$(uname)" != "Linux" ]; then
-    echo >&2 " Sorry eBPF Collector is currently unsupproted on $(uname) Systems at this time."
-    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
-    return 1
-  fi
-
-  # Get and Parse Kernel Version
-  kver="$(get_kernel_version)"
-  kver="${kver:-0}"
-
-  # Check Kernel Compatibility
-  if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
-    echo >&2 " Detected Kernel: ${kver}"
-    run_failed "Kernel incompatible. Please contact NetData support!"
+  if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
+    run_failed "eBPF explicitly disabled."
+    defer_error "eBPF explicitly disabled."
     return 1
   fi
 
   # Check Kernel Config
-
-  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
-
-  echo >&2 " Downloading check-kernel-config.sh ..."
-  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
-    run_failed "Failed to download check-kernel-config.sh"
-    echo 2>&" Removing temporary directory ${tmp} ..."
-    rm -rf "${tmp}"
-    return 1
-  fi
-
-  run chmod +x "${tmp}"/check-kernel-config.sh
-
-  if ! run "${tmp}"/check-kernel-config.sh; then
+  if ! run "${INSTALLER_DIR}"/packaging/installer/check-kernel-config.sh; then
     run_failed "Kernel unsupported or missing required config"
+    defer_error "Kernel unsupported or missing required config, not installing eBPF collector"
     return 1
   fi
-
-  rm -rf "${tmp}"
-
-  # TODO: Check for current vs. latest version
 
   return 0
 }
@@ -1389,17 +1333,17 @@ should_install_ebpf() {
 remove_old_ebpf() {
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
     echo >&2 "Removing alpha eBPF collector."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" 
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
     echo >&2 "Removing alpha eBPF stock file"
-    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" 
+    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf"
   fi
 
   if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
     echo >&2 "Renaming eBPF configuration file."
-    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf" 
+    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
   fi
 }
 
@@ -1412,67 +1356,41 @@ install_ebpf() {
 
   progress "Installing eBPF plugin"
 
-  # Get and Parse Kernel Version
-  kver="$(get_kernel_version)"
-  kver="${kver:-0}"
-
-  # Get Compatible eBPF Kernel Package
-  kpkg="$(get_compatible_kernel_for_ebpf "${kver}")"
-
   # Detect libc
   libc="$(detect_libc)"
 
-  PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
-
-  echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
-
-  PACKAGE_TARBALL_URL=
-  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | grep -o -E "\"browser_download_url\": \".*${PACKAGE_TARBALL}\"" | sed -e 's/"browser_download_url": "\(.*\)"/\1/')"
-
-  if [ -z "${PACKAGE_TARBALL_URL}" ]; then
-    run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
-    return 1
-  fi
+  EBPF_VERSION="$(cat packaging/ebpf.version)"
+  EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
 
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
-  echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
-  if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
-    run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
+  if ! fetch_and_verify "ebpf" \
+    "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
+    "${EBPF_TARBALL}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_EBPF}"; then
+    run_failed "Failed to download eBPF collector package"
     echo 2>&" Removing temporary directory ${tmp} ..."
     rm -rf "${tmp}"
     return 1
   fi
 
-  echo >&2 " Extracting ${PACKAGE_TARBALL} ..."
-  tar -xf "${tmp}/${PACKAGE_TARBALL}" -C "${tmp}"
+  echo >&2 " Extracting ${EBPF_TARBALL} ..."
+  tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
-  echo >&2 " Finding suitable lib directory ..."
-  libdir=
-  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
-  if [ -z "${libdir}" ]; then
-    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
-  fi
+  # chown everything to root:netdata before we start copying out of our package
+  run chown -R root:netdata "${tmp}"
 
-  if [ -z "${libdir}" ]; then
-    run_failed "Could not find a suitable lib directory"
-    return 1
-  fi
+  run cp -a -v "${tmp}"/library/* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  run cp -a -v "${tmp}"/libnetdata_ebpf.so.* "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
 
-  run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
-  run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run ln -v -f -s "${libdir}"/libbpf_kernel.so "${libdir}"/libbpf_kernel.so.0
-  run ldconfig
-
-  echo >&2 "ePBF installation all done!"
   rm -rf "${tmp}"
 
   return 0
 }
 
-progress "eBPF Kernel Collector (opt-in)"
+progress "eBPF Kernel Collector"
 install_ebpf
 
 # -----------------------------------------------------------------------------
