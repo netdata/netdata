@@ -5,12 +5,39 @@
 static struct engine *engine = NULL;
 
 /**
- * Clean up the main exporting thread and all connector workers on Netdata exit
+ * Exporting Clean Engine
  *
- * @param ptr thread data.
+ * Clean all variables allocated inside engine structure
+ *
+ * @param en a pointer to the strcuture that will be cleaned.
  */
-static void exporting_main_cleanup(void *ptr)
+static void exporting_clean_engine()
 {
+    if (!engine)
+        return NULL;
+
+    for (struct instance *instance = engine->instance_root; instance;) {
+        struct instance *current_instance = instance;
+        instance = instance->next;
+        clean_instance(current_instance);
+    }
+
+    if (engine->config.prefix)
+        freez((void *)engine->config.prefix);
+    if (engine->config.hostname)
+        freez((void *)engine->config.hostname);
+    freez(engine);
+}
+
+
+/**
+ * Exporting Main cleanup
+ *
+ * Set values for static_therad structure
+ *
+ * @param ptr a pointer to the structure
+ */
+static void exporting_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -48,17 +75,7 @@ static void exporting_main_cleanup(void *ptr)
         }
     }
 
-    for (struct instance *instance = engine->instance_root; instance;) {
-        struct instance *current_instance = instance;
-        instance = instance->next;
-        clean_instance(current_instance);
-    }
-
-    if (engine->config.prefix)
-        freez((void *)engine->config.prefix);
-    if (engine->config.hostname)
-        freez((void *)engine->config.hostname);
-    freez(engine);
+    exporting_clean_engine();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }

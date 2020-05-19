@@ -149,7 +149,7 @@ void simple_connector_cleanup(struct instance *instance)
 {
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
-    // TODO free allocated resources
+    clean_instance(instance);
 
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
@@ -164,6 +164,8 @@ void simple_connector_cleanup(struct instance *instance)
  */
 void simple_connector_worker(void *instance_p)
 {
+    netdata_thread_cleanup_push(simple_connector_cleanup, instance_p);
+
     struct instance *instance = (struct instance*)instance_p;
 
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
@@ -257,4 +259,5 @@ void simple_connector_worker(void *instance_p)
     }
 
     simple_connector_cleanup(instance);
+    netdata_thread_cleanup_pop(1);
 }
