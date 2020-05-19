@@ -94,7 +94,7 @@ void *exporting_main(void *ptr)
         send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
 
 #ifdef UNIT_TESTING
-        break;
+        return NULL;
 #endif
     }
 
