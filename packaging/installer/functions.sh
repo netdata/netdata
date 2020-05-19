@@ -202,6 +202,11 @@ safe_pidof() {
 
 # -----------------------------------------------------------------------------
 find_processors() {
+  # Most UNIX systems have `nproc` as part of their userland (including macOS, Linux and BSD)
+  if command -v nproc > /dev/null; then
+    nproc && return
+  fi
+
   local cpus
   if [ -f "/proc/cpuinfo" ]; then
     # linux

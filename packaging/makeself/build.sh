@@ -4,6 +4,8 @@
 # -----------------------------------------------------------------------------
 # parse command line arguments
 
+set -e
+
 export NETDATA_BUILD_WITH_DEBUG=0
 
 while [ -n "${1}" ]; do
@@ -37,17 +39,13 @@ if [ ! -f ../../netdata-installer.sh ]; then
 fi
 
 cat >&2 << EOF
-
 This program will create a self-extracting shell package containing
 a statically linked netdata, able to run on any 64bit Linux system,
 without any dependencies from the target system.
 
 It can be used to have netdata running in no-time, or in cases the
 target Linux system cannot compile netdata.
-
 EOF
-
-# read -p "Press ENTER to continue > "
 
 if [ ! -d tmp ]; then
   mkdir tmp || exit 1
