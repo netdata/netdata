@@ -7,7 +7,7 @@
 
 #define RRDENG_METALOG_MAGIC "netdata-metadata-log"
 
-#define RRDENG_METALOG_VER "1.0"
+#define RRDENG_METALOG_VER "1"
 
 #define RRDENG_METALOG_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + RRDENG_VER_SZ + sizeof(uint8_t)))
 /*
