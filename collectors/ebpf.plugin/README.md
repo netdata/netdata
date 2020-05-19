@@ -30,8 +30,8 @@ applications.
 only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels
 on CentOS 7.6 or later._
 
-If your Agent is v1.22 or older, you will need to explicitly [install the eBPF collector and enable
-it](#install-and-enable-the-eBPF-collector).
+If your Agent is v1.22 or older, you will need to [install the eBPF collector and enable it
+explicitly](#install-and-enable-the-eBPF-collector).
 
 ## Charts
 
@@ -41,14 +41,13 @@ process, but charts only show the difference between the values collected in the
 
 ### File
 
-This group has two charts to demonstrate how software interacts with the Linux kernel to open and close file
-descriptors.
+This group has two charts demonstrating how software interacts with the Linux kernel to open and close file descriptors.
 
 #### File descriptor
 
-This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
-functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)`, and
-`close(2)`.
+This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. Most
+software do not commonly call these functions directly, but they are behind the system calls `open(2)`, `openat(2)`,
+and `close(2)`.
 
 #### File error
 
@@ -58,11 +57,11 @@ This charts demonstrate the number of times some software tried and failed to op
 
 A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
 filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
-group won't show _all_ the actions that occured on your system.
+group won't show _all_ the actions that occurred on your system.
 
 #### Deleted objects
 
-This chart monitors calls for `vfs_unlink`. This function is responsible for removing object from the file system.
+This chart monitors calls for `vfs_unlink`. This function is responsible for removing objects from the file system.
 
 #### IO
 
@@ -73,11 +72,11 @@ This chart shows the number of calls to the functions `vfs_read` and `vfs_write`
 This chart also monitors `vfs_read` and `vfs_write`, but instead shows the total of bytes read and written with these
 functions.
 
-Netdata displays the number of bytes written as negative, because they are moving down to disk.
+The Agent displays the number of bytes written as negative because they are moving down to disk.
 
 #### IO errors
 
-Netdata counts and shows the number of instances where a running program experiences a read or write error.
+The Agent counts and shows the number of instances where a running program experiences a read or write error.
 
 ### Process
 
@@ -86,16 +85,16 @@ following charts.
 
 #### Process thread
 
-Internally, the Linux kernel treats both process and threads as `tasks`. To create a thread, the kernel offers a few
-system calls: `fork(2)`, `vfork(2)` and `clone(2)`. Each of these system calls in turn use the function `_do_fork`. To
-generate this chart, Netdata monitors `_do_fork` to populate the `process` dimension, and monitors `sys_clone` to
-identify threads
+Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
+system calls: `fork(2)`, `vfork(2)` and `clone(2)`. In turn, each of these system calls use the function `_do_fork`. To
+generate this chart, the eBPF collector monitors `_do_fork` to populate the `process` dimension, and monitors
+`sys_clone` to identify threads.
 
 #### Exit
 
-Ending a task is actually two steps. The first is a call to the internal function `do_exit`, which notifies the
-operating system that the task is finishing its work. The second step is the release of kernel information, which is
-done with the internal function `release_task`. The difference between the two dimensions can help you discover [zombie
+Ending a task requires two steps. The first is a call to the internal function `do_exit`, which notifies the operating
+system that the task is finishing its work. The second step is to release the kernel information with the internal
+function `release_task`. The difference between the two dimensions can help you discover [zombie
 processes](https://en.wikipedia.org/wiki/Zombie_process).
 
 #### Task error
@@ -121,7 +120,7 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 
 ### `[global]`
 
-In this section we define variables applied to the whole collector and the other subsections.
+The `[global]` section defines settings for the whole eBPF collector.
 
 #### load
 
@@ -129,7 +128,7 @@ The collector has two different eBPF programs. These programs monitor the same f
 monitor, process, and display different kinds of information.
 
 By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
-system, but also offer important information if you are developing or debugging software. The `load` option accepts the
+system, but also offer valuable information if you are developing or debugging software. The `load` option accepts the
 following values: ​
 
 -   `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described
@@ -140,8 +139,8 @@ following values: ​
 
 ## Install and enable the eBPF collector
 
-Systems running _v1.22 or earlier_ of the Agent will need to both install and enable the eBPF collector manually. The
-collecetor is enabled by default on later versions of the Agent.
+Systems running _v1.22 or earlier_ of the Agent will need to install and enable the eBPF collector manually. The
+collector is enabled by default on later versions of the Agent.
 
 If you installed via the one-line installation script, 64-bit binary, or manually, you can append the `--enable-ebpf`
 option when you reinstall.
@@ -184,7 +183,7 @@ sudo -u netdata bash
 You can also use `grep` to search the Agent's `error.log` for messages related to eBPF monitoring.
 
 ```bash
-grep ebpf /var/log/netdata/error.log
+grep -i ebpf /var/log/netdata/error.log
 ```
 
 ### Confirm kernel compatibility
@@ -226,8 +225,8 @@ sudo mount -t debugfs nodev /sys/kernel/debug
 sudo mount -t tracefs nodev /sys/kernel/tracing
 ```
 
-If they are already mounted, you will see an error. If they are not mounted, they should be after running those two
-commands. You can also configure your system's `/etc/fstab` configuration to mount these filesystems.
+If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to
+mount these filesystems on startup.
 
 ## Performance
 
