@@ -34,7 +34,7 @@ static char *claimed_id = NULL;
 */
 char *is_agent_claimed()
 {
-char *result;
+    char *result;
     netdata_mutex_lock(&claim_mutex);
     result = (claimed_id == NULL) ? NULL : strdup(claimed_id);
     netdata_mutex_unlock(&claim_mutex);
@@ -118,7 +118,6 @@ void claim_agent(char *claiming_arguments)
 
 #ifdef ENABLE_ACLK
 extern int aclk_connected, aclk_kill_link;
-extern void aclk_graceful_disconnect();
 #endif
 
 /* Change the claimed state of the agent.

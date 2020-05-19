@@ -438,7 +438,7 @@ struct aclk_query *aclk_queue_pop()
 
 char *create_publish_base_topic()
 {
-char *agent_id = is_agent_claimed();
+    char *agent_id = is_agent_claimed();
     if (unlikely(!agent_id))
         return NULL;
 
@@ -1606,14 +1606,6 @@ void aclk_disconnect()
     aclk_connecting = 0;
     aclk_force_reconnect = 1;
 }
-
-/*void aclk_shutdown()
-{
-    info("Shutdown initiated");
-    aclk_connected = 0;
-    _link_shutdown();
-    info("Shutdown complete");
-}*/
 
 inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us)
 {
