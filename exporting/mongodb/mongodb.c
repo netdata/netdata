@@ -80,34 +80,6 @@ int mongodb_init(struct instance *instance)
 }
 
 /**
- * Clean a MongoDB connector instance up
- *
- * @param instance an instance data structure.
- */
-void mongodb_cleanup(struct instance *instance)
-{
-    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
-
-    struct mongodb_specific_data *connector_specific_data =
-        (struct mongodb_specific_data *)instance->connector_specific_data;
-
-    mongoc_collection_destroy(connector_specific_data->collection);
-    mongoc_client_destroy(connector_specific_data->client);
-    if (instance->engine->mongoc_initialized) {
-        mongoc_cleanup();
-        instance->engine->mongoc_initialized = 0;
-    }
-
-    buffer_free(instance->buffer);
-    freez(connector_specific_data);
-
-    info("EXPORTING: instance %s exited", instance->config.name);
-    instance->exited = 1;
-
-    return;
-}
-
-/**
  * Initialize a MongoDB connector instance
  *
  * @param instance an instance data structure.
@@ -247,6 +219,34 @@ int format_batch_mongodb(struct instance *instance)
     connector_specific_data->last_buffer = connector_specific_data->last_buffer->next;
 
     return 0;
+}
+
+/**
+ * Clean a MongoDB connector instance up
+ *
+ * @param instance an instance data structure.
+ */
+void mongodb_cleanup(struct instance *instance)
+{
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+
+    struct mongodb_specific_data *connector_specific_data =
+        (struct mongodb_specific_data *)instance->connector_specific_data;
+
+    mongoc_collection_destroy(connector_specific_data->collection);
+    mongoc_client_destroy(connector_specific_data->client);
+    if (instance->engine->mongoc_initialized) {
+        mongoc_cleanup();
+        instance->engine->mongoc_initialized = 0;
+    }
+
+    buffer_free(instance->buffer);
+    freez(connector_specific_data);
+
+    info("EXPORTING: instance %s exited", instance->config.name);
+    instance->exited = 1;
+
+    return;
 }
 
 /**
