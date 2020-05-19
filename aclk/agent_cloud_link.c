@@ -438,7 +438,8 @@ struct aclk_query *aclk_queue_pop()
 
 char *create_publish_base_topic()
 {
-    if (unlikely(!is_agent_claimed()))
+char *agent_id = is_agent_claimed();
+    if (unlikely(!agent_id))
         return NULL;
 
     ACLK_LOCK;
@@ -447,13 +448,14 @@ char *create_publish_base_topic()
         freez(global_base_topic);
     char tmp_topic[ACLK_MAX_TOPIC + 1], *tmp;
 
-    snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, is_agent_claimed());
+    snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, agent_id);
     tmp = strchr(tmp_topic, '\n');
     if (unlikely(tmp))
         *tmp = '\0';
     global_base_topic = strdupz(tmp_topic);
 
     ACLK_UNLOCK;
+    freez(agent_id);
     return global_base_topic;
 }
 
@@ -1035,7 +1037,9 @@ static void aclk_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    if (is_agent_claimed() && aclk_connected) {
+    char *agent_id = is_agent_claimed();
+    if (agent_id && aclk_connected) {
+        freez(agent_id);
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
         aclk_graceful_disconnect();
@@ -1310,9 +1314,12 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     aclk_password = password.result;
     if (aclk_username != NULL)
         freez(aclk_username);
-    aclk_username = strdupz(agent_id);
+    aclk_username = agent_id;
+    agent_id = NULL;
 
 CLEANUP:
+    if (agent_id != NULL)
+        freez(agent_id);
     freez(data_buffer);
     return;
 }
@@ -1329,12 +1336,11 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
         return;
     int rc;
     aclk_connecting = 1;
+    create_publish_base_topic();
     rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
-    create_publish_base_topic();
-
 }
 
 
@@ -1385,18 +1391,21 @@ void *aclk_main(void *ptr)
     uint32_t port_num = 0;
     info("Waiting for netdata to be claimed");
     while(1) {
-        while (likely(!is_agent_claimed())) {
+        char *agent_id = is_agent_claimed();
+        while (likely(!agent_id)) {
             sleep_usec(USEC_PER_SEC * 1);
             if (netdata_exit)
                 goto exited;
+            agent_id = is_agent_claimed();
         }
+        freez(agent_id);
         // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
         char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
         if (cloud_base_url == NULL) {
             error("Do not move the cloud base url out of post_conf_load!!");
             goto exited;
-        }            
+        }
         if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
             error("Agent is claimed but the configuration is invalid, please fix");
         }

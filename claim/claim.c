@@ -26,12 +26,19 @@ static char *claiming_errors[] = {
         "Gateway Timeout",                              // 16
         "Service Unavailable"                           // 17
 };
-
+static netdata_mutex_t claim_mutex = NETDATA_MUTEX_INITIALIZER;
 static char *claimed_id = NULL;
 
-char *is_agent_claimed(void)
+/* Retrieve the claim id for the agent.
+ * Caller owns the string.
+*/
+char *is_agent_claimed()
 {
-    return claimed_id;
+char *result;
+    netdata_mutex_lock(&claim_mutex);
+    result = (claimed_id == NULL) ? NULL : strdup(claimed_id);
+    netdata_mutex_unlock(&claim_mutex);
+    return result;
 }
 
 #define CLAIMING_COMMAND_LENGTH 16384
@@ -120,6 +127,7 @@ extern void aclk_graceful_disconnect();
  */
 void load_claiming_state(void)
 {
+    netdata_mutex_lock(&claim_mutex);
     if (claimed_id != NULL) {
         freez(claimed_id);
         claimed_id = NULL;
@@ -138,6 +146,7 @@ void load_claiming_state(void)
 
     long bytes_read;
     claimed_id = read_by_filename(filename, &bytes_read);
+    netdata_mutex_unlock(&claim_mutex);   // Only the main thread can call this function, safe to release and then read
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
