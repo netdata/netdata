@@ -16,6 +16,11 @@ static void exporting_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
+    if (!engine) {
+        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
     engine->exit = 1;
 
     int found = 0;
