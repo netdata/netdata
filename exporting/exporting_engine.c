@@ -53,6 +53,12 @@ static void exporting_main_cleanup(void *ptr)
         clean_instance(current_instance);
     }
 
+    if (engine->config.prefix)
+        freez((void *)engine->config.prefix);
+    if (engine->config.hostname)
+        freez((void *)engine->config.hostname);
+    freez(engine);
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
