@@ -63,7 +63,6 @@ static void commit_record(struct metalog_worker_config* wc, struct metalog_recor
 
     mlf_header = buf;
     mlf_header->type = type;
-    mlf_header->reserved = 0;
     mlf_header->id = ctx->records_log.record_id++;
     mlf_header->payload_length = payload_length;
 
