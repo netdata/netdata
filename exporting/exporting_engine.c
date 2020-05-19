@@ -42,7 +42,7 @@ static void exporting_main_cleanup(void *ptr)
         }
     }
 
-    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+    for (struct instance *instance = engine->instance_root; instance;) {
         struct instance *current_instance = instance;
         instance = instance->next;
         clean_instance(current_instance);
