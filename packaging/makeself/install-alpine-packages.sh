@@ -34,8 +34,9 @@ apk add --no-cache -U \
   openssl-dev \
   snappy-dev \
   protobuf-dev \
-  binutils ||
-  exit 1
+  binutils \
+  gzip \
+  xz || exit 1
 
 # snappy doesnt have static version in alpine, let's compile it
 export SNAPPY_VER="1.1.7"
