@@ -71,6 +71,7 @@ static int debug_log = 0;
 static int use_stdout = 0;
 struct config collector_config;
 static int mykernel = 0;
+static char kernel_string[64];
 static int nprocs;
 static int isrh;
 netdata_idx_t *hash_values;
@@ -684,28 +685,69 @@ static int ebpf_load_libraries()
 {
     char *err = NULL;
     char lpath[4096];
+    char netdatasl[128];
+    char *libbase = { "libnetdata_ebpf.so" };
 
-    build_complete_path(lpath, 4096, plugin_dir, "libnetdata_ebpf.so");
+    snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
+    build_complete_path(lpath, 4096, plugin_dir, netdatasl);
     libnetdata = dlopen(lpath, RTLD_LAZY);
     if (!libnetdata) {
-        error("[EBPF_PROCESS] Cannot load %s.", lpath);
-        return -1;
+        info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
+
+        //Update kernel
+        char *library = ebpf_library_suffix(mykernel, (isrh < 0)?0:1);
+        size_t length = strlen(library);
+        strncpyz(kernel_string, library, length);
+        kernel_string[length] = '\0';
+
+        //Try to load the default version
+        snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
+        build_complete_path(lpath, 4096, plugin_dir, netdatasl);
+        libnetdata = dlopen(lpath, RTLD_LAZY);
+        if (!libnetdata) {
+            error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
+            return -1;
+        } else {
+            info("[EBPF_PROCESS] Default shared library %s loaded with success.", lpath);
+        }
     } else {
-        load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+        info("[EBPF_PROCESS] Current shared library %s loaded with success.", lpath);
+    }
+
+    load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
+        return -1;
+    }
+
+    map_fd =  dlsym(libnetdata, "map_fd");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
+        return -1;
+    }
+
+    bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+        return -1;
+    }
+
+    if(mode == 1) {
+        set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
+            error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
             return -1;
         }
 
-        map_fd =  dlsym(libnetdata, "map_fd");
+        perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
+            error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
             return -1;
         }
 
-        bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+        perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
         if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+            error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
             return -1;
         }
 
@@ -739,24 +781,30 @@ static int ebpf_load_libraries()
     return 0;
 }
 
-char *select_file() {
-    if(!mode)
-        return "rnetdata_ebpf_process.o";
-    if(mode == MODE_DEVMODE)
-        return "dnetdata_ebpf_process.o";
+int select_file(char *name, int length) {
+    int ret = -1;
+    if (!mode)
+        ret = snprintf(name, (size_t)length, "rnetdata_ebpf_process.%s.o", kernel_string);
+    else if(mode == 1)
+        ret = snprintf(name, (size_t)length, "dnetdata_ebpf_process.%s.o", kernel_string);
+    else if(mode == 2)
+        ret = snprintf(name, (size_t)length, "pnetdata_ebpf_process.%s.o", kernel_string);
 
-    return "pnetdata_ebpf_process.o";
+    return ret;
 }
 
 int process_load_ebpf()
 {
     char lpath[4096];
+    char name[128];
 
-    char *name = select_file();
+    int test = select_file(name, 127);
+    if (test < 0 || test > 127)
+        return -1;
 
     build_complete_path(lpath, 4096, plugin_dir,  name);
     event_pid = getpid();
-    if (load_bpf_file(lpath, event_pid) ) {
+    if (load_bpf_file(lpath, event_pid)) {
         error("[EBPF_PROCESS] Cannot load program: %s", lpath);
         return -1;
     } else {
@@ -1048,7 +1096,7 @@ int main(int argc, char **argv)
 {
     parse_args(argc, argv);
 
-    mykernel =  get_kernel_version();
+    mykernel =  get_kernel_version(kernel_string, 63);
     if(!has_condition_to_run(mykernel)) {
         error("[EBPF PROCESS] The current collector cannot run on this kernel.");
         return 1;

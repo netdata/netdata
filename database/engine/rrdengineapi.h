@@ -6,7 +6,7 @@
 #include "rrdengine.h"
 
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
-#define RRDENG_MIN_DISK_SPACE_MB (256)
+#define RRDENG_MIN_DISK_SPACE_MB (64)
 
 #define RRDENG_NR_STATS (37)
 

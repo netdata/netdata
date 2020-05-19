@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Clean instances [\#9081](https://github.com/netdata/netdata/pull/9081) ([thiagoftsm](https://github.com/thiagoftsm))
 - python.d/proxysql: add `Requirements` to the readme [\#9071](https://github.com/netdata/netdata/pull/9071) ([ilyam8](https://github.com/ilyam8))
+- Add links to promote database engine calculator [\#9067](https://github.com/netdata/netdata/pull/9067) ([joelhans](https://github.com/joelhans))
+- Update the exporting documentation [\#9066](https://github.com/netdata/netdata/pull/9066) ([vlvkobal](https://github.com/vlvkobal))
 - Add proc.plugin configuration example for high-processor systems [\#9062](https://github.com/netdata/netdata/pull/9062) ([joelhans](https://github.com/joelhans))
 - claim: fix `New/ephemeral Agent containers` instruction [\#9058](https://github.com/netdata/netdata/pull/9058) ([ilyam8](https://github.com/ilyam8))
 - Add frontmatter to exporting connectors [\#9052](https://github.com/netdata/netdata/pull/9052) ([joelhans](https://github.com/joelhans))
@@ -250,7 +253,6 @@
 - Added various fixes and improvements to the installers. [\#8315](https://github.com/netdata/netdata/pull/8315) ([Ferroin](https://github.com/Ferroin))
 - Fixed missing folders in `/var/` by creating them during postinst [\#8314](https://github.com/netdata/netdata/pull/8314) ([SamK](https://github.com/SamK))
 - Add standards for abbreviations/acronyms to docs style guide [\#8313](https://github.com/netdata/netdata/pull/8313) ([joelhans](https://github.com/joelhans))
-- Revert "Fixed Source0 URL in RPM spec \(\#7794\)" [\#8305](https://github.com/netdata/netdata/pull/8305) ([prologic](https://github.com/prologic))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 

@@ -53,11 +53,12 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr) {
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int get_kernel_version() {
+int get_kernel_version(char *out, int size) {
     char major[16], minor[16], patch[16];
     char ver[256];
     char *version = ver;
 
+    out[0] = '\0';
     int fd = open("/proc/sys/kernel/osrelease", O_RDONLY);
     if (fd < 0)
         return -1;
@@ -87,6 +88,10 @@ int get_kernel_version() {
     move = patch;
     while (*version) *move++ = *version++;
     *move = '\0';
+
+    fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
+    if (fd > size)
+        error("[EBPF]: The buffer to store kernel version is not smaller than necessary.");
 
     return ((int)(str2l(major)*65536) + (int)(str2l(minor)*256) + (int)str2l(patch));
 }
@@ -142,4 +147,24 @@ int has_condition_to_run(int version) {
         return 0;
 
     return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+char *ebpf_library_suffix(int version, int isrh) {
+    if (isrh) {
+        if (version >= NETDATA_EBPF_KERNEL_4_11)
+            return "4.18.0";
+        else
+            return "3.10.0";
+    } else {
+        if (version >= NETDATA_EBPF_KERNEL_4_17)
+            return "5.4.20";
+        else if (version >= NETDATA_EBPF_KERNEL_4_15)
+            return "4.16.18";
+        else if (version >= NETDATA_EBPF_KERNEL_4_11)
+            return "4.14.171";
+    }
+
+    return NULL;
 }
