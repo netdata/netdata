@@ -74,7 +74,7 @@
 #include "spawn/spawn.h"
 
 #ifdef ENABLE_DBENGINE
-#include "libnetdata/global_uuid_map/global_uuid_map.h"
+#include "database/engine/global_uuid_map/global_uuid_map.h"
 #endif
 
 // the netdata deamon

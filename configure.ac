@@ -1424,6 +1424,7 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     database/engine/metadata_log/Makefile
+    database/engine/global_uuid_map/Makefile
     diagrams/Makefile
     exporting/Makefile
     exporting/graphite/Makefile
@@ -1447,7 +1448,6 @@ AC_CONFIG_FILES([
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
-    libnetdata/global_uuid_map/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/popen/Makefile

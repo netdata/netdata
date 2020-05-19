@@ -12,7 +12,6 @@ SUBDIRS = \
     dictionary \
     ebpf \
     eval \
-    global_uuid_map \
     json \
     health \
     locks \

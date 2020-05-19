@@ -3,7 +3,7 @@
 #ifndef NETDATA_GLOBAL_UUID_MAP_H
 #define NETDATA_GLOBAL_UUID_MAP_H
 
-#include "../libnetdata.h"
+#include "libnetdata/libnetdata.h"
 #include <Judy.h>
 
 extern int guid_store(uuid_t uuid, char *object);
