@@ -39,7 +39,7 @@ void metalog_commit_update_host(RRDHOST *host)
     rrdhost_rdlock(host);
 
     buffer_sprintf(buffer,
-                   "HOST \"%s\" \"%s\" \"%s\" %d \"%s\" \"%s\" \"%s\"",
+                   "HOST \"%s\" \"%s\" \"%s\" %d \"%s\" \"%s\" \"%s\"\n",
 //                 "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\""  /* system */
 //                 "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", /* info   */
                    host->machine_guid,
