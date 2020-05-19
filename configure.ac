@@ -1437,6 +1437,7 @@ AC_CONFIG_FILES([
     daemon/Makefile
     database/Makefile
     database/engine/Makefile
+    database/engine/metadata_log/Makefile
     diagrams/Makefile
     exporting/Makefile
     exporting/graphite/Makefile
