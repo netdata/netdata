@@ -61,7 +61,7 @@ int init_pubsub_instance(struct instance *instance)
  *
  * @param instance an instance data structure.
  */
-void pubsub_cleanup(struct instance *instance)
+void clean_pubsub_instance(struct instance *instance)
 {
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
@@ -178,5 +178,5 @@ void pubsub_connector_worker(void *instance_p)
 #endif
     }
 
-    pubsub_cleanup(instance);
+    clean_pubsub_instance(instance);
 }
