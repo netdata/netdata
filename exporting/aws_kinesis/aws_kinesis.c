@@ -7,7 +7,7 @@
  */
 void aws_kinesis_cleanup(struct instance *instance)
 {
-    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    info("EXPORTING: cleaning up instance (aws_kinesis_cleanup) %s ...", instance->config.name);
     if (instance->buffer)
         buffer_free(instance->buffer);
 
@@ -34,7 +34,9 @@ void aws_kinesis_cleanup(struct instance *instance)
         freez(connector_specific_config);
     }
 
-    info("EXPORTING: instance %s exited", instance->config.name);
+    clean_instance(instance);
+
+    info("EXPORTING: instance (aws_kinesis_cleanup) exited");
     instance->exited = 1;
 }
 

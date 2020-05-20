@@ -76,10 +76,6 @@ struct instance_config {
 
 struct simple_connector_config {
     int default_port;
-#ifdef ENABLE_HTTPS
-    SSL *conn; //SSL connection
-    int flags; //The flags for SSL connection
-#endif
 };
 
 struct prometheus_remote_write_specific_config {

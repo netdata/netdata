@@ -147,7 +147,7 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
  */
 void simple_connector_cleanup(struct instance *instance)
 {
-    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    info("EXPORTING: cleaning up instance (simple_connector_cleanup) %s ...", instance->config.name);
 
     clean_instance(instance);
     if (instance->buffer)
@@ -156,10 +156,7 @@ void simple_connector_cleanup(struct instance *instance)
     if (instance->config.connector_specific_config)
         freez(instance->config.connector_specific_config);
 
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP)
-        opentsdb_cleanup(instance);
-
-    info("EXPORTING: instance %s exited", instance->config.name);
+    info("EXPORTING: instance exited (simple_connector_cleanup)");
     instance->exited = 1;
 }
 
@@ -226,7 +223,10 @@ void simple_connector_worker(void *instance_p)
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
 
-        if(unlikely(instance->engine->exit)) break;
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
+            break;
+        }
 
         if (likely(sock != -1)) {
             simple_connector_send_buffer(&sock, &failures, instance);

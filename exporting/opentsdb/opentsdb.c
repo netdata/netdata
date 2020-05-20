@@ -12,7 +12,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
@@ -53,7 +53,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
@@ -399,11 +399,3 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     return 0;
 }
 
-void opentsdb_cleanup(struct instance *instance)
-{
-#ifdef ENABLE_HTTPS
-    struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
-    if (connector_specific_config->conn)
-        SSL_free(connector_specific_config->conn);
-#endif
-}
