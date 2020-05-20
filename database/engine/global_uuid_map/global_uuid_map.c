@@ -16,12 +16,16 @@ int guid_store(uuid_t uuid, char *object)
     Pvoid_t *PValue;
 
     PValue = JudyHSIns(&JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t), PJE0);
+    if (PPJERR == PValue)
+        fatal("JudyHSIns() fatal error.");
     if (*PValue)
         return 1;
 
     *PValue = (Pvoid_t *) strdupz(object);
 
     PValue = JudyHSIns(&JGUID_object_map, (void *)object, (Word_t)strlen(object), PJE0);
+    if (PPJERR == PValue)
+        fatal("JudyHSIns() fatal error.");
     if (*PValue == NULL) {
         uuid_t *value = mallocz(sizeof(uuid_t));
         memcpy(value, &uuid, sizeof(uuid_t));
@@ -50,7 +54,7 @@ int guid_find(uuid_t uuid, char *object, size_t max_bytes)
         return 1;
 
     if (likely(object && max_bytes))
-        strncpyz(object, (char *) *PValue, max_bytes);
+        strncpyz(object, (char *)*PValue, max_bytes - 1);
 
     return 0;
 }
