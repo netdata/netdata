@@ -3,35 +3,36 @@
 #include "exporting_engine.h"
 
 /**
- * Clean the instance config.
- * @param ptr
+ * Clean the instance config
+ *
+ * @param config an instance config structure.
  */
-static void clean_instance_config(struct instance_config *ptr)
+static void clean_instance_config(struct instance_config *config)
 {
-    if (ptr->name)
-        freez((void *)ptr->name);
+    if (config->name)
+        freez((void *)config->name);
 
-    if (ptr->destination)
-        freez((void *)ptr->destination);
+    if (config->destination)
+        freez((void *)config->destination);
 
-    if (ptr->charts_pattern)
-        simple_pattern_free(ptr->charts_pattern);
+    if (config->charts_pattern)
+        simple_pattern_free(config->charts_pattern);
 
-    if (ptr->hosts_pattern)
-        simple_pattern_free(ptr->hosts_pattern);
+    if (config->hosts_pattern)
+        simple_pattern_free(config->hosts_pattern);
 }
 
 /**
  * Clean the allocated variables
  *
- * @param ptr a pointer to the structure with variables to clean.
+ * @param instance an instance data structure.
  */
-void clean_instance(struct instance *ptr)
+void clean_instance(struct instance *instance)
 {
-    clean_instance_config(&ptr->config);
-    if (ptr->labels)
-        buffer_free(ptr->labels);
+    clean_instance_config(&instance->config);
+    if (instance->labels)
+        buffer_free(instance->labels);
 
-    uv_mutex_destroy(&ptr->mutex);
-    uv_cond_destroy(&ptr->cond_var);
+    uv_cond_destroy(&instance->cond_var);
+    // uv_mutex_destroy(&instance->mutex);
 }

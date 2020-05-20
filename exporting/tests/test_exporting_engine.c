@@ -65,8 +65,6 @@ static void test_exporting_engine(void **state)
     expect_value(__wrap_send_main_rusage, rd_user, NULL);
     expect_value(__wrap_send_main_rusage, rd_system, NULL);
 
-    expect_function_call(__wrap_info_int);
-
     void *ptr = malloc(sizeof(struct netdata_static_thread));
     assert_ptr_equal(exporting_main(ptr), NULL);
     assert_int_equal(engine->now, 2);
@@ -667,6 +665,9 @@ static void test_simple_connector_worker(void **state)
     expect_function_call(__wrap_send_internal_metrics);
     expect_value(__wrap_send_internal_metrics, instance, instance);
     will_return(__wrap_send_internal_metrics, 0);
+
+    expect_function_call(__wrap_info_int);
+    expect_function_call(__wrap_info_int);
 
     simple_connector_worker(instance);
 

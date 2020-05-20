@@ -180,6 +180,8 @@ struct instance {
     size_t index;
     struct instance *next;
     struct engine *engine;
+
+    volatile sig_atomic_t exited;
 };
 
 struct engine {
@@ -192,6 +194,8 @@ struct engine {
     int mongoc_initialized;
 
     struct instance *instance_root;
+
+    volatile sig_atomic_t exit;
 };
 
 extern struct instance *prometheus_exporter_instance;
