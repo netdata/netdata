@@ -83,6 +83,18 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
 }
 
 /**
+ * Clean up remote write instance
+ *
+ * @param instance an instance data structure.
+ */
+void clean_prometheus_remote_write_instance(struct instance *instance)
+{
+    buffer_free(instance->buffer);
+
+    freez(instance->connector_specific_data);
+}
+
+/**
  * Initialize Prometheus Remote Write connector instance
  *
  * @param instance an instance data structure.

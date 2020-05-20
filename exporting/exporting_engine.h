@@ -250,6 +250,7 @@ static inline void disable_instance(struct instance *instance)
 }
 
 #include "exporting/prometheus/prometheus.h"
+#include "exporting/prometheus/remote_write/remote_write.h"
 #include "exporting/aws_kinesis/aws_kinesis.h"
 #include "exporting/opentsdb/opentsdb.h"
 

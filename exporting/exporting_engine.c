@@ -16,18 +16,33 @@ static void exporting_clean_engine()
     if (!engine)
         return;
 
+    int disable_awk_sdk = 0;
+    int disable_remote_write = 0;
     for (struct instance *instance = engine->instance_root; instance;) {
         struct instance *current_instance = instance;
         instance = instance->next;
 
-        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
-            prometheus_clean_server_root();
-        else if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS
-                 && current_instance->engine->aws_sdk_initialized)
+        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+            clean_prometheus_remote_write_instance(instance);
+            if (!disable_remote_write) {
+                protocol_buffers_shutdown();
+                disable_remote_write = 1;
+            }
+#endif
+        } else if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS
+                 && current_instance->engine->aws_sdk_initialized && !disable_awk_sdk) {
+#if HAVE_KINESIS
             aws_sdk_shutdown();
+#endif
+            disable_awk_sdk = 1;
+        }
 
         clean_instance(current_instance);
     }
+
+    //Cleanup web api
+    prometheus_clean_server_root();
 
     if (engine->config.prefix)
         freez((void *)engine->config.prefix);
