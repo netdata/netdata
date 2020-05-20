@@ -156,6 +156,9 @@ void simple_connector_cleanup(struct instance *instance)
     if (instance->config.connector_specific_config)
         freez(instance->config.connector_specific_config);
 
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP)
+        opentsdb_cleanup(instance);
+
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 }

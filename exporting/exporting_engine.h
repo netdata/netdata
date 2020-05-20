@@ -76,6 +76,10 @@ struct instance_config {
 
 struct simple_connector_config {
     int default_port;
+#ifdef ENABLE_HTTPS
+    SSL *conn; //SSL connection
+    int flags; //The flags for SSL connection
+#endif
 };
 
 struct prometheus_remote_write_specific_config {
@@ -251,5 +255,6 @@ static inline void disable_instance(struct instance *instance)
 
 #include "exporting/prometheus/prometheus.h"
 #include "exporting/aws_kinesis/aws_kinesis.h"
+#include "exporting/opentsdb/opentsdb.h"
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */
