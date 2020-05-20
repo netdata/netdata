@@ -20,14 +20,31 @@ You also need to enable the netdata service in `/etc/rc.conf` (add `netdata_enab
 ## Install latest version
 This is how to install the latest Netdata version from source on FreeBSD:
 
+install required packages (need root permission)
 ```sh
-# install required packages
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake
-
-# download Netdata
-git clone https://github.com/netdata/netdata.git --depth=100
-
-# install Netdata in /opt/netdata
-cd netdata
-./netdata-installer.sh --install /opt
+# pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake
 ```
+
+download Netdata
+```sh
+# git clone https://github.com/netdata/netdata.git --depth=100 && cd netdata
+```
+
+install Netdata in /opt/netdata (need root permission)
+```sh
+# ./netdata-installer.sh --install /opt
+```
+
+Now we will include the flag that will make Netdata boot with FreeBSD, whenever you turn on or restart your computer (need root permission):
+```sh
+# sysrc netdata_enable="YES"
+```
+
+Finally, and very importantly, update Netdata using the script provided by the Netdata team (need root permission):
+```sh
+# cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
+```
+
+# Important
+whenever you have an update available from Netdata, repeat the last step to update Netdata; the netdata-updater.sh script will update. For now, this is the way that the Netdata team offers to make Netdata updates, whenever there is a new version.
+
