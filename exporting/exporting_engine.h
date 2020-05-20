@@ -250,5 +250,6 @@ static inline void disable_instance(struct instance *instance)
 }
 
 #include "exporting/prometheus/prometheus.h"
+#include "exporting/aws_kinesis/aws_kinesis.h"
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */
