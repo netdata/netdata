@@ -1117,7 +1117,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
         "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
         "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
         "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
-        "# COMMENT TYPE test_prefix_test_context gauge\n"
+        "# TYPE test_prefix_test_context gauge\n"
         "test_prefix_test_context{chart=\"chart_name\",family=\"test_family\",dimension=\"dimension_name\"} 690565856.0000000\n");
 
     buffer_flush(buffer);
