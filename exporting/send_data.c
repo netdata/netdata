@@ -164,8 +164,6 @@ void simple_connector_cleanup(struct instance *instance)
  */
 void simple_connector_worker(void *instance_p)
 {
-    netdata_thread_cleanup_push(simple_connector_cleanup, instance_p);
-
     struct instance *instance = (struct instance*)instance_p;
 
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;

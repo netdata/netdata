@@ -29,15 +29,13 @@ static void exporting_clean_engine()
     freez(engine);
 }
 
-
 /**
- * Exporting Main cleanup
+ * Clean up the main exporting thread and all connector workers on Netdata exit
  *
- * Set values for static_therad structure
- *
- * @param ptr a pointer to the structure
+ * @param ptr thread data.
  */
-static void exporting_main_cleanup(void *ptr) {
+static void exporting_main_cleanup(void *ptr)
+{
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
@@ -76,7 +74,6 @@ static void exporting_main_cleanup(void *ptr) {
     }
 
     exporting_clean_engine();
-
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 

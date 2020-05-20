@@ -3,7 +3,7 @@
 #include "exporting_engine.h"
 
 /**
- * Clean the instance config
+ * Clean the instance config.
  *
  * @param config an instance config structure.
  */
