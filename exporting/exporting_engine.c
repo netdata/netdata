@@ -14,11 +14,15 @@ static struct engine *engine = NULL;
 static void exporting_clean_engine()
 {
     if (!engine)
-        return NULL;
+        return;
 
     for (struct instance *instance = engine->instance_root; instance;) {
         struct instance *current_instance = instance;
         instance = instance->next;
+
+        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
+            prometheus_clean_server_root();
+
         clean_instance(current_instance);
     }
 

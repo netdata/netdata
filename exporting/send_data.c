@@ -265,5 +265,4 @@ void simple_connector_worker(void *instance_p)
     }
 
     simple_connector_cleanup(instance);
-    netdata_thread_cleanup_pop(1);
 }
