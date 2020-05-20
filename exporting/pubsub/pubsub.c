@@ -67,10 +67,17 @@ void clean_pubsub_instance(struct instance *instance)
 
     struct pubsub_specific_data *connector_specific_data =
         (struct pubsub_specific_data *)instance->connector_specific_data;
+    pubsub_cleanup(connector_specific_data);
+    freez(connector_specific_data);
 
     buffer_free(instance->buffer);
 
-    freez(connector_specific_data);
+    struct pubsub_specific_config *connector_specific_config =
+        (struct pubsub_specific_config *)instance->config.connector_specific_config;
+    freez(connector_specific_config->credentials_file);
+    freez(connector_specific_config->project_id);
+    freez(connector_specific_config->topic_id);
+    freez(connector_specific_config);
 
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
