@@ -1438,6 +1438,7 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     database/engine/metadata_log/Makefile
+    database/engine/global_uuid_map/Makefile
     diagrams/Makefile
     exporting/Makefile
     exporting/graphite/Makefile
