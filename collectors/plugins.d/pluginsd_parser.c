@@ -215,11 +215,7 @@ PARSER_RC pluginsd_chart(char **words, void *user)
     char *plugin = words[11];
     char *module = words[12];
 
-//    if (((PARSER_USER_OBJECT *) user)->plugins_action->chart_action) {
-//        return ((PARSER_USER_OBJECT *) user)->plugins_action->chart_action(user, name, title, units, family,
-//                                                                          context, chart_type, priority, update_every,
-//                                                                          options, plugin, module);
-//    }
+    int have_action = ((((PARSER_USER_OBJECT *) user)->plugins_action->chart_action) != NULL);
 
     // parse the id from type
     char *id = NULL;
@@ -229,7 +225,7 @@ PARSER_RC pluginsd_chart(char **words, void *user)
     }
 
     // make sure we have the required variables
-    if (unlikely(!type || !*type || !id || !*id)) {
+    if (unlikely((!type || !*type || !id || !*id) && !have_action)) {
         error("requested a CHART, without a type.id, on host '%s'. Disabling it.", host->hostname);
         ((PARSER_USER_OBJECT *) user)->enabled = 0;
         return PARSER_RC_ERROR;
@@ -280,6 +276,14 @@ PARSER_RC pluginsd_chart(char **words, void *user)
         "creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d",
         type, id, name ? name : "", family ? family : "", context ? context : "", rrdset_type_name(chart_type),
         priority, update_every);
+
+    if (have_action) {
+        ((PARSER_USER_OBJECT *)user)->plugins_action->chart_action
+            (user, name, title, units, family, context, rrdset_type_name(chart_type), priority, update_every, options, plugin, module);
+    }
+//    PARSER_RC (*chart_action)(void *user, char *type, char *id, char *title,
+//                              char *units, char *family, char *context, RRDSET_TYPE chart_type, int priority, int update_every,
+//                              char *options, char *plugin, char *module);
 
     st = rrdset_create(
         host, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *) user)->cd->filename, module,
@@ -358,21 +362,6 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
         error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
         goto disable;
     }
-
-//    long multiplier = 1;
-//    if (multiplier_s && *multiplier_s)
-//        multiplier = strtol(multiplier_s, NULL, 0);
-//    if (unlikely(!multiplier))
-//        multiplier = 1;
-//
-//    long divisor = 1;
-//    if (likely(divisor_s && *divisor_s))
-//        divisor = strtol(divisor_s, NULL, 0);
-//    if (unlikely(!divisor))
-//        divisor = 1;
-
-//    if (unlikely(!algorithm || !*algorithm))
-//        algorithm = "absolute";
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(
