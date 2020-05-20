@@ -150,6 +150,11 @@ void simple_connector_cleanup(struct instance *instance)
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
     clean_instance(instance);
+    if (instance->buffer)
+        buffer_free(instance->buffer);
+
+    if (instance->config.connector_specific_config)
+        freez(instance->config.connector_specific_config);
 
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
