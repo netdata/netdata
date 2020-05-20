@@ -17,7 +17,9 @@ static void exporting_clean_engine()
         return;
 
     int disable_awk_sdk = 0;
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
     int disable_remote_write = 0;
+#endif
     for (struct instance *instance = engine->instance_root; instance;) {
         struct instance *current_instance = instance;
         instance = instance->next;
