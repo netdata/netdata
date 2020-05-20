@@ -147,16 +147,15 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
  */
 void simple_connector_cleanup(struct instance *instance)
 {
-    info("EXPORTING: cleaning up instance (simple_connector_cleanup) %s ...", instance->config.name);
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
-    clean_instance(instance);
     if (instance->buffer)
         buffer_free(instance->buffer);
 
     if (instance->config.connector_specific_config)
         freez(instance->config.connector_specific_config);
 
-    info("EXPORTING: instance exited (simple_connector_cleanup)");
+    info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 }
 

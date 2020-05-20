@@ -7,36 +7,23 @@
  */
 void aws_kinesis_cleanup(struct instance *instance)
 {
-    info("EXPORTING: cleaning up instance (aws_kinesis_cleanup) %s ...", instance->config.name);
-    if (instance->buffer)
-        buffer_free(instance->buffer);
-
-    if (instance->engine->aws_sdk_initialized)
-        aws_sdk_shutdown();
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    buffer_free(instance->buffer);
 
     kinesis_shutdown(instance->connector_specific_data);
 
-    if (instance->connector_specific_data) {
-        freez(instance->connector_specific_data);
-    }
+    freez(instance->connector_specific_data);
 
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
     if (connector_specific_config) {
-        if (connector_specific_config->auth_key_id)
-            freez(connector_specific_config->auth_key_id);
-
-        if (connector_specific_config->secure_key)
-            freez(connector_specific_config->secure_key);
-
-        if (connector_specific_config->stream_name)
-            freez(connector_specific_config->stream_name);
+        freez(connector_specific_config->auth_key_id);
+        freez(connector_specific_config->secure_key);
+        freez(connector_specific_config->stream_name);
 
         freez(connector_specific_config);
     }
 
-    clean_instance(instance);
-
-    info("EXPORTING: instance (aws_kinesis_cleanup) exited");
+    info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 }
 
@@ -210,7 +197,7 @@ void aws_kinesis_connector_worker(void *instance_p)
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        break;
+        return;
 #endif
     }
 

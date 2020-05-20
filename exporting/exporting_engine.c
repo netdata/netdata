@@ -22,6 +22,9 @@ static void exporting_clean_engine()
 
         if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
             prometheus_clean_server_root();
+        else if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS
+                 && current_instance->engine->aws_sdk_initialized)
+            aws_sdk_shutdown();
 
         clean_instance(current_instance);
     }
