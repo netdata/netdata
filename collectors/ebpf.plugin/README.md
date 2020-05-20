@@ -28,10 +28,10 @@ applications.
 
 **The eBPF collector is installed and enabled by default on new nightly installations of the Agent**. eBPF monitoring
 only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels
-on CentOS 7.6 or later._
+on CentOS 7.6 or later.
 
-If your Agent is v1.22 or older, you will need to [install the eBPF collector and enable it
-explicitly](#install-and-enable-the-eBPF-collector).
+If your Agent is v1.22 or older, you may to enable the collector yourself. See the [configuration](#configuration)
+section for details.
 
 ## Charts
 
@@ -111,6 +111,14 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 ./edit-config netdata.conf
 ```
 
+To enable the collector, scroll down to the `[plugins]` section ensure the relevant line references `ebpf` (not
+`ebpf_process`), is uncommented, and is set to `yes`.
+
+```conf
+[plugins]
+   ebpf = yes
+```
+
 You can also configure the eBPF collector's behavior by editing `ebpf.conf`.
 
 ```bash
@@ -137,39 +145,6 @@ following values: ​
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
 
-## Install and enable the eBPF collector
-
-Systems running _v1.22 or earlier_ of the Agent will need to install and enable the eBPF collector manually. The
-collector is enabled by default on later versions of the Agent.
-
-If you installed via the one-line installation script, 64-bit binary, or manually, you can append the `--enable-ebpf`
-option when you reinstall.
-
-For example, if you used the [one-line installation
-script](/packaging/installer/README.md#automatic-one-line-installation-script), you can reinstall Netdata with the
-following:
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --enable-ebpf
-```
-
-Next, enable the collector in `netdata.conf`. Use `edit-config` to open `netdata.conf`.
-
-```bash
-cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config netdata.conf
-```
-
-Scroll down to the `[plugins]` section and uncomment the `ebpf` line after changing its setting to `yes`.
-
-```conf
-[plugins]
-   ebpf = yes
-```
-
-Restart Netdata with `service netdata restart`, or the appropriate method for your system, and reload your browser to
-see eBPF charts.
-
 ## Troubleshooting
 
 If the eBPF collector does not work, you can troubleshoot it by running the `ebpf.plugin` command and investigating its output.
@@ -191,22 +166,18 @@ grep -i ebpf /var/log/netdata/error.log
 The eBPF collector only works on Linux systems and with specific Linux kernels. We support all kernels more recent than
 `4.11.0`, and all kernels on CentOS 7.6 or later.
 
-In addition, the kernel must be compiled with the option `CONFIG_KPROBES=y`. You can verify whether your kernel has this
-option enabled by running the following commands:
+You can run our helper script to determine whether your system can support eBPF monitoring.
 
 ```bash
-grep CONFIG_KPROBES=y /boot/config-$(uname -r)
-zgrep CONFIG_KPROBES=y /proc/config.gz
+curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh | sudo sh
 ```
 
-If `Kprobes` is enabled, you will see `CONFIG_KPROBES=y` as the command's output, and can skip ahead to the next step:
-[mount `debugfs` and `tracefs`](#mount-debugfs-and-tracefs).
+If this script returns no output, your system is ready to compile and run the eBPF collector.
 
-If you don't see `CONFIG_KPROBES=y` for any of the commands above, you will have to recompile your kernel to enable it.
-
-The process of recompiling Linux kernels varies based on your distribution and version. Read the documentation for your
-system's distribution to learn more about the specific workflow for recompiling the kernel, ensuring that you set the
-`CONFIG_KPROBES` setting to `y` in the process.
+If you see a warning about a missing kerkel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
+BPF_JIT`), you will need to recompile your kernel to support this configuration. The process of recompiling Linux
+kernels varies based on your distribution and version. Read the documentation for your system's distribution to learn
+more about the specific workflow for recompiling the kernel, ensuring that you set all the necessary 
 
 -   [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
 -   [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
