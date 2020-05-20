@@ -212,7 +212,10 @@ trap cleanup EXIT
 
 # Random sleep to aileviate stampede effect of Agents upgrading
 # and disconnecting/reconnecting at the same time (or near to).
-sleep $(((RANDOM % 10) + 1))s
+# But only we're not a controlling terminal (tty)
+if [ ! -t 1 ]; then
+  sleep $((RANDOM % (3600 - 1800 + 1) + 1800))s
+fi
 
 # Usually stored in /etc/netdata/.environment
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
