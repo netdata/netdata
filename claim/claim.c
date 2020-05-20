@@ -26,12 +26,19 @@ static char *claiming_errors[] = {
         "Gateway Timeout",                              // 16
         "Service Unavailable"                           // 17
 };
-
+static netdata_mutex_t claim_mutex = NETDATA_MUTEX_INITIALIZER;
 static char *claimed_id = NULL;
 
-char *is_agent_claimed(void)
+/* Retrieve the claim id for the agent.
+ * Caller owns the string.
+*/
+char *is_agent_claimed()
 {
-    return claimed_id;
+    char *result;
+    netdata_mutex_lock(&claim_mutex);
+    result = (claimed_id == NULL) ? NULL : strdup(claimed_id);
+    netdata_mutex_unlock(&claim_mutex);
+    return result;
 }
 
 #define CLAIMING_COMMAND_LENGTH 16384
@@ -109,11 +116,33 @@ void claim_agent(char *claiming_arguments)
 #endif
 }
 
+#ifdef ENABLE_ACLK
+extern int aclk_connected, aclk_kill_link;
+#endif
+
+/* Change the claimed state of the agent.
+ *
+ * This only happens when the user has explicitly requested it:
+ *   - via the cli tool by reloading the claiming state
+ *   - after spawning the claim because of a command-line argument
+ * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
+ */
 void load_claiming_state(void)
 {
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+    netdata_cloud_setting = 0;
+#else
+    netdata_mutex_lock(&claim_mutex);
     if (claimed_id != NULL) {
         freez(claimed_id);
         claimed_id = NULL;
+    }
+    if (aclk_connected)
+    {
+        info("Agent was already connected to Cloud - forcing reconnection under new credentials");
+        aclk_kill_link = 1;
     }
 
     // Propagate into aclk and registry. Be kind of atomic...
@@ -124,18 +153,13 @@ void load_claiming_state(void)
 
     long bytes_read;
     claimed_id = read_by_filename(filename, &bytes_read);
+    netdata_mutex_unlock(&claim_mutex);   // Only the main thread can call this function, safe to release and then read
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
     }
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_setting = 0;
-#else
     netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
 }
