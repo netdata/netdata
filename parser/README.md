@@ -39,7 +39,7 @@ Output
 
 
 ----
-##### parse_push(INCREMENTAL_PARSER *parser, char *line)
+##### parse_push(PARSER *parser, char *line)
 
 Push a new line for processing
 
@@ -59,7 +59,7 @@ Returns
 - 1 error detected
   
 ----   
-##### parse_add_keyword(INCREMENTAL_PARSER *parser, char *keyword, keyword_function callback_function)
+##### parse_add_keyword(PARSER *parser, char *keyword, keyword_function callback_function)
 
 The function will add callbacks for keywords. The callback function is defined as
 
@@ -87,7 +87,7 @@ Returns
 
    
 ----
-##### parser_next(INCREMENTAL_PARSER *parser)
+##### parser_next(PARSER *parser)
 Return the next item to parse
 
 Input
@@ -102,12 +102,14 @@ Returns
 - 1 No more items to parse
 
 ----
-##### parser_action(INCREMENTAL_PARSER *parser)
+##### parser_action(PARSER *parser, char *input)
 Return the next item to parse
 
 Input
 - parser
   - The parser object as returned by the `parser_init`
+- input
+  - Process the input specified instead of using the internal buffer
   
 Output
 - The current keyword will be processed by calling all the registered callbacks
@@ -117,7 +119,7 @@ Returns
 - 1 Failed
 
 ----
-##### parser_destroy(INCREMENTAL_PARSER *parser)
+##### parser_destroy(PARSER *parser)
 Cleanup a previously allocated parser
 
 Input
@@ -130,3 +132,16 @@ Output
 Returns
 - none
   
+----
+##### parser_recover_input(PARSER *parser)
+Cleanup a previously allocated parser
+
+Input
+- parser
+  - The parser object as returned by the `parser_init`
+  
+Output
+- The parser is deallocated
+
+Returns
+- none

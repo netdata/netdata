@@ -3,11 +3,11 @@
 #ifndef NETDATA_PLUGINSD_PARSER_H
 #define NETDATA_PLUGINSD_PARSER_H
 
-#include "../../incremental_parser/incremental_parser.h"
+#include "../../parser/parser.h"
 
 
 typedef struct parser_user_object {
-    INCREMENTAL_PARSER  *parser;
+    PARSER  *parser;
 
     RRDSET *st;
     RRDHOST *host;

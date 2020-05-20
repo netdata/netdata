@@ -36,10 +36,11 @@ inline int config_isspace(char c)
 }
 
 // split a text into words, respecting quotes
-static inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char))
+static inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
 {
     char *s = str, quote = 0;
-    int i = 0, j;
+    int i = 0, j, rec = 0;
+    char *recover = recover_input;
 
     // skip all white space
     while (unlikely(custom_isspace(*s)))
@@ -65,6 +66,10 @@ static inline int quoted_strings_splitter(char *str, char **words, int max_words
         // if it is quote
         else if (unlikely(*s == quote)) {
             quote = 0;
+            if (recover && rec < max_recover) {
+                recover_location[rec++] = s;
+                *recover++ = *s;
+            }
             *s = ' ';
             continue;
         }
@@ -72,6 +77,12 @@ static inline int quoted_strings_splitter(char *str, char **words, int max_words
         // if it is a space
         else if (unlikely(quote == 0 && custom_isspace(*s))) {
             // terminate the word
+            if (recover && rec < max_recover) {
+                if (!rec || (rec && recover_location[rec-1] != s)) {
+                    recover_location[rec++] = s;
+                    *recover++ = *s;
+                }
+            }
             *s++ = '\0';
 
             // skip all white space
@@ -120,12 +131,12 @@ inline int pluginsd_initialize_plugin_directories()
     }
 
     // Parse it and store it to plugin directories
-    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
+    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace, NULL, NULL, 0);
 }
 
-inline int pluginsd_split_words(char *str, char **words, int max_words)
+inline int pluginsd_split_words(char *str, char **words, int max_words, char *recover_input, char **recover_location, int max_recover)
 {
-    return quoted_strings_splitter(str, words, max_words, pluginsd_space);
+    return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
 }
 
 #ifdef ENABLE_HTTPS
@@ -332,7 +343,7 @@ void *pluginsd_worker_thread(void *arg)
         }
 
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
-        count = incremental_pluginsd_process(localhost, cd, fp, 0);
+        count = pluginsd_process(localhost, cd, fp, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid);
 

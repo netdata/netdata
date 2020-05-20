@@ -105,7 +105,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-    incremental_parser \
+    parser \
     aclk \
     spawn \
     $(NULL)
@@ -484,9 +484,9 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
-INCREMENTAL_PARSER_FILES = \
-    incremental_parser/incremental_parser.c \
-    incremental_parser/incremental_parser.h \
+PARSER_FILES = \
+    parser/parser.c \
+    parser/parser.h \
     $(NULL)
 
 ACLK_FILES = \
@@ -614,7 +614,7 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
-    $(INCREMENTAL_PARSER_FILES) \
+    $(PARSER_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)

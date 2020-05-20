@@ -6,6 +6,7 @@
 #include "../daemon/common.h"
 
 #define PARSER_MAX_CALLBACKS 20
+#define PARSER_MAX_RECOVER_KEYWORDS 128
 
 // PARSER return codes
 typedef enum parser_rc {
@@ -69,19 +70,22 @@ typedef struct incremental_parser {
     int (*eof_function)(void *input);
     keyword_function unknown_function;
     char buffer[PLUGINSD_LINE_MAX];
+    char *recover_location[PARSER_MAX_RECOVER_KEYWORDS+1];
+    char recover_input[PARSER_MAX_RECOVER_KEYWORDS];
 #ifdef ENABLE_HTTPS
     int bytesleft;
     char tmpbuffer[PLUGINSD_LINE_MAX];
     char *readfrom;
 #endif
-} INCREMENTAL_PARSER;
+} PARSER;
 
-INCREMENTAL_PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags);
-int parser_add_keyword(INCREMENTAL_PARSER *working_parser, char *keyword, keyword_function func);
-int parser_next(INCREMENTAL_PARSER *working_parser);
-int parser_action(INCREMENTAL_PARSER *working_parser);
-int parser_push(INCREMENTAL_PARSER *working_parser, char *line);
-void parser_destroy(INCREMENTAL_PARSER *working_parser);
+PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags);
+int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
+int parser_next(PARSER *working_parser);
+int parser_action(PARSER *working_parser, char *input);
+int parser_push(PARSER *working_parser, char *line);
+void parser_destroy(PARSER *working_parser);
+int parser_recover_input(PARSER *working_parser);
 
 extern size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
 

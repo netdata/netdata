@@ -572,7 +572,7 @@ PARSER_RC pluginsd_overwrite(char **words, void *user)
 
 // New plugins.d parser
 
-inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
 {
     int enabled = cd->enabled;
 
@@ -594,7 +594,7 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
     ((PARSER_USER_OBJECT *) user)->cd = cd;
     ((PARSER_USER_OBJECT *) user)->trust_durations = trust_durations;
 
-    INCREMENTAL_PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT | PARSER_INPUT_ORIGINAL);
+    PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT | PARSER_INPUT_ORIGINAL);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
@@ -603,7 +603,7 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
     }
 
     user->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
-    user->plugins_action->begin_action = &pluginsd_begin_action;
+    //user->plugins_action->begin_action = &pluginsd_begin_action;
 
     int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
@@ -624,7 +624,7 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
     user->parser = parser;
 
     while (likely(!parser_next(parser))) {
-        if (unlikely(netdata_exit || parser_action(parser)))
+        if (unlikely(netdata_exit || parser_action(parser,  NULL)))
             break;
     }
     info("PARSER ended");
@@ -633,6 +633,8 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
 
     cd->enabled = ((PARSER_USER_OBJECT *) user)->enabled;
     size_t count = ((PARSER_USER_OBJECT *) user)->count;
+
+    freez(user->plugins_action);
     freez(user);
 
     if (likely(count)) {

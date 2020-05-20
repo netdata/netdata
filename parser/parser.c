@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "incremental_parser.h"
+#include "parser.h"
 
 static inline int find_keyword(char *str, char *keyword, int max_size, int (*custom_isspace)(char))
 {
@@ -28,9 +28,9 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
  * 
  */
 
-INCREMENTAL_PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags)
+PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags)
 {
-    INCREMENTAL_PARSER *working_parser;
+    PARSER *working_parser;
 
     // If no parsing input flags, assume SPLIT only
     if (unlikely(!(flags & (PARSER_INPUT_SPLIT | PARSER_INPUT_ORIGINAL))))
@@ -62,7 +62,7 @@ INCREMENTAL_PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_I
  *
  */
 
-int parser_push(INCREMENTAL_PARSER *working_parser, char *line)
+int parser_push(PARSER *working_parser, char *line)
 {
     PARSER_DATA    *tmp_parser_data;
     
@@ -90,7 +90,7 @@ int parser_push(INCREMENTAL_PARSER *working_parser, char *line)
  *       : 0 Error
  */
 
-int parser_add_keyword(INCREMENTAL_PARSER *working_parser, char *keyword, keyword_function func)
+int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func)
 {
     PARSER_KEYWORD  *tmp_keyword;
 
@@ -138,7 +138,7 @@ int parser_add_keyword(INCREMENTAL_PARSER *working_parser, char *keyword, keywor
  * Cleanup a previously allocated parser
  */
 
-void parser_destroy(INCREMENTAL_PARSER *working_parser)
+void parser_destroy(PARSER *working_parser)
 {
     if (unlikely(!working_parser))
         return;
@@ -174,7 +174,7 @@ void parser_destroy(INCREMENTAL_PARSER *working_parser)
  *
  */
 
-int parser_next(INCREMENTAL_PARSER *working_parser)
+int parser_next(PARSER *working_parser)
 {
     char    *tmp = NULL;
 
@@ -255,19 +255,19 @@ int parser_next(INCREMENTAL_PARSER *working_parser)
 *
 */
 
-inline int parser_action(INCREMENTAL_PARSER *working_parser)
+inline int parser_action(PARSER *working_parser, char *input)
 {
     PARSER_RC   rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     char command[PLUGINSD_LINE_MAX];
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
-    char *local_copy = NULL; 
 
     if (unlikely(!working_parser))
         return 1;
 
-    if (unlikely(working_parser->flags & PARSER_INPUT_PROCESSED))
+    // if not direct input check if we have reprocessed this
+    if (unlikely(!input && working_parser->flags & PARSER_INPUT_PROCESSED))
         return 0;
 
     PARSER_KEYWORD  *tmp_keyword = working_parser->keyword;
@@ -275,26 +275,16 @@ inline int parser_action(INCREMENTAL_PARSER *working_parser)
         return 1;
     }
 
-    int w = find_keyword(working_parser->buffer, command, PLUGINSD_LINE_MAX, pluginsd_space);
-    if (w == 0) {
-        return 1;
-    }
+    if (unlikely(!input))
+        input = working_parser->buffer;
 
-    if ((working_parser->flags & PARSER_INPUT_FULL) == PARSER_INPUT_FULL) {
-        local_copy = strdupz(working_parser->buffer);
-        pluginsd_split_words(working_parser->buffer, words, PLUGINSD_MAX_WORDS);
-        words[0] = local_copy;
-    }
-    else {
-        local_copy = NULL;
-        if (working_parser->flags & PARSER_INPUT_SPLIT) {
-            pluginsd_split_words(working_parser->buffer, words, PLUGINSD_MAX_WORDS);
-        }
-        else {
-            words[0] = working_parser->buffer;
-            words[1] = NULL;
-        }
-    }
+    if (unlikely(!find_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
+        return 1;
+
+    if ((working_parser->flags & PARSER_INPUT_FULL) == PARSER_INPUT_FULL)
+        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, working_parser->recover_input, working_parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
+    else
+        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
     uint32_t command_hash = simple_hash(command);
 
@@ -324,10 +314,22 @@ inline int parser_action(INCREMENTAL_PARSER *working_parser)
                 action_function_list++;
         }
     }
-    if (local_copy)
-        freez(local_copy);
 
-    working_parser->flags |= PARSER_INPUT_PROCESSED;
+    if (likely(input == working_parser->buffer))
+        working_parser->flags |= PARSER_INPUT_PROCESSED;
 
     return (rc == PARSER_RC_ERROR);
+}
+
+inline int parser_recover_input(PARSER *working_parser)
+{
+    if (unlikely(!working_parser))
+        return 1;
+
+    for(int i=0; i < PARSER_MAX_RECOVER_KEYWORDS && working_parser->recover_location[i]; i++)
+        *(working_parser->recover_location[i]) = working_parser->recover_input[i];
+
+    working_parser->recover_location[0] = 0x0;
+
+    return 0;
 }

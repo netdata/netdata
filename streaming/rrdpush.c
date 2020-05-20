@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "../incremental_parser/incremental_parser.h"
+#include "../parser/parser.h"
 
 /*
  * rrdpush
@@ -1292,7 +1292,7 @@ static int rrdpush_receive(int fd
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "CONNECTED");
 
     cd.version = stream_version;
-    size_t count = incremental_pluginsd_process(host, &cd, fp, 1);
+    size_t count = pluginsd_process(host, &cd, fp, 1);
 
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", host->hostname, client_ip, client_port, count);
