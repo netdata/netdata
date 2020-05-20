@@ -105,8 +105,10 @@ void pubsub_connector_worker(void *instance_p)
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
 
-        if (unlikely(instance->engine->exit))
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
             break;
+        }
 
         // reset the monitoring chart counters
         stats->received_bytes =
