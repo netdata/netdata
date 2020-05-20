@@ -325,33 +325,32 @@ void mongodb_connector_worker(void *instance_p)
             connector_specific_config->collection,
             data_size);
 
-        if (unlikely(documents_inserted == 0))
-            continue;
+        if (likely(documents_inserted != 0)) {
+            bson_error_t bson_error;
+            if (likely(mongoc_collection_insert_many(
+                    connector_specific_data->collection,
+                    (const bson_t **)insert,
+                    documents_inserted,
+                    NULL,
+                    NULL,
+                    &bson_error))) {
+                stats->sent_metrics = documents_inserted;
+                stats->sent_bytes += data_size;
+                stats->transmission_successes++;
+                stats->receptions++;
+            } else {
+                // oops! we couldn't send (all or some of the) data
+                error("EXPORTING: %s", bson_error.message);
+                error(
+                    "EXPORTING: failed to write data to the database '%s'. "
+                    "Willing to write %zu bytes, wrote %zu bytes.",
+                    instance->config.destination, data_size, 0UL);
 
-        bson_error_t bson_error;
-        if (likely(mongoc_collection_insert_many(
-                connector_specific_data->collection,
-                (const bson_t **)insert,
-                documents_inserted,
-                NULL,
-                NULL,
-                &bson_error))) {
-            stats->sent_metrics = documents_inserted;
-            stats->sent_bytes += data_size;
-            stats->transmission_successes++;
-            stats->receptions++;
-        } else {
-            // oops! we couldn't send (all or some of the) data
-            error("EXPORTING: %s", bson_error.message);
-            error(
-                "EXPORTING: failed to write data to the database '%s'. "
-                "Willing to write %zu bytes, wrote %zu bytes.",
-                instance->config.destination, data_size, 0UL);
-
-            stats->transmission_failures++;
-            stats->data_lost_events++;
-            stats->lost_bytes += buffered_bytes;
-            stats->lost_metrics += documents_inserted;
+                stats->transmission_failures++;
+                stats->data_lost_events++;
+                stats->lost_bytes += buffered_bytes;
+                stats->lost_metrics += documents_inserted;
+            }
         }
 
         free_bson(insert, documents_inserted);
