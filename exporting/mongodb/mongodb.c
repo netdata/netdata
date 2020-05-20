@@ -254,6 +254,12 @@ void mongodb_cleanup(struct instance *instance)
 
     freez(connector_specific_data);
 
+    struct mongodb_specific_config *connector_specific_config =
+        (struct mongodb_specific_config *)instance->config.connector_specific_config;
+    freez(connector_specific_config->database);
+    freez(connector_specific_config->collection);
+    freez(connector_specific_config);
+
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 
