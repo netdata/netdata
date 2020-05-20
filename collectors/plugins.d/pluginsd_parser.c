@@ -3,6 +3,74 @@
 #include "pluginsd_parser.h"
 
 // Sample action here
+
+PARSER_RC pluginsd_context_action(void *user, char *context)
+{
+    UNUSED(user);
+    UNUSED(context);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_guid_action(void *user, char *guid)
+{
+    UNUSED(user);
+    UNUSED(guid);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_host_action(void *user, char *context)      // TODO: 7 params
+{
+    UNUSED(user);
+    UNUSED(context);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_tombstone_action(void *user, char *guid)
+{
+    UNUSED(user);
+    UNUSED(guid);
+
+    return PARSER_RC_OK;
+}
+
+
+// Callbacks
+
+PARSER_RC pluginsd_context(char **words, void *user)
+{
+    UNUSED(user);
+    UNUSED(words);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_guid(char **words, void *user)
+{
+    UNUSED(user);
+    UNUSED(words);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_host(char **words, void *user)
+{
+    UNUSED(user);
+    UNUSED(words);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_tombstone(char **words, void *user)
+{
+    UNUSED(user);
+    UNUSED(words);
+
+    return PARSER_RC_OK;
+}
+
 PARSER_RC pluginsd_begin_action(void *user, char *chart_id, usec_t microseconds)
 {
     UNUSED(user);
@@ -370,6 +438,19 @@ PARSER_RC pluginsd_variable(char **words, void *user)
         return PARSER_RC_ERROR;
     }
 
+    if (name && *name) {
+        global = 0;
+        if ((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
+            global = 1;
+            name = words[2];
+            value = words[3];
+        } else if ((strcmp(name, "LOCAL") == 0 || strcmp(name, "CHART") == 0)) {
+            global = 0;
+            name = words[2];
+            value = words[3];
+        }
+    }
+
     if (unlikely(!value || !*value))
         value = NULL;
 
@@ -525,6 +606,10 @@ inline size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FI
     user->plugins_action->begin_action = &pluginsd_begin_action;
 
     int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
+    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
+    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid);
+    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
+    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_TOMBSTONE, pluginsd_tombstone);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);

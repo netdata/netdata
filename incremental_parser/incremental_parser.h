@@ -28,7 +28,7 @@ typedef struct pluginsd_action {
 
     PARSER_RC (*flush_action)(void *user);
     PARSER_RC (*disable_action)(void *user);
-    PARSER_RC (*variable_action)(void *user, int global, char *name, calculated_number value);
+    PARSER_RC (*variable_action)(void *user, int global, char *name, char *value);  // TODO: value is calculated
     PARSER_RC (*label_action)(void *user, char *labels);
     PARSER_RC (*overwrite_action)(void *user);
 } PLUGINSD_ACTION;
