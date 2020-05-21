@@ -342,7 +342,7 @@ else
                            (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") && \
                            grep -qv 1 "${disk}/removable"
                         then
-                            size="$(cat "${disk}/size")"
+                            size="$(($(cat "${disk}/size") * 512))"
                             DISK_SIZE="$((DISK_SIZE + size))"
                         fi
                 done
