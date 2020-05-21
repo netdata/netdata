@@ -130,10 +130,6 @@ int init_prometheus_remote_write_instance(struct instance *instance)
 
     connector_specific_data->write_request = init_write_request();
 
-    struct prometheus_remote_write_specific_config *connector_specific_config =
-        instance->config.connector_specific_config;
-    connector_specific_config->remote_write_path = NULL;
-
     instance->engine->protocol_buffers_initialized = 1;
 
     return 0;

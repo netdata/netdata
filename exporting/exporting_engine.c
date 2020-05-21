@@ -16,22 +16,19 @@ static void exporting_clean_engine()
     if (!engine)
         return;
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if (engine->protocol_buffers_initialized)
+        error("here");
+        //protocol_buffers_shutdown();
+#endif
+#if HAVE_KINESIS
+    if (engine->aws_sdk_initialized)
+        aws_sdk_shutdown();
+#endif
+
     for (struct instance *instance = engine->instance_root; instance;) {
         struct instance *current_instance = instance;
         instance = instance->next;
-
-        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE && engine->protocol_buffers_initialized) {
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-            //protocol_buffers_shutdown();
-#endif
-            engine->protocol_buffers_initialized = 0;
-        } else if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS
-                 && current_instance->engine->aws_sdk_initialized && engine->aws_sdk_initialized) {
-#if HAVE_KINESIS
-            aws_sdk_shutdown();
-#endif
-            engine->aws_sdk_initialized = 0;
-        }
 
         clean_instance(current_instance);
     }
