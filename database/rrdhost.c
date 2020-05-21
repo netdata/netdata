@@ -262,12 +262,15 @@ RRDHOST *rrdhost_create(const char *hostname,
         BUFFER *object = buffer_create(512);
         buffer_sprintf(object, "%s", host->machine_guid);
         host->host_uuid = callocz(1, sizeof(uuid_t));
-        find_or_generate_guid((char *)buffer_tostring(object), host->host_uuid);
-        {
-            char uuid_s[36 + 1];
-            uuid_unparse(*host->host_uuid, uuid_s);
-            info("HOST [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
+        if (unlikely(find_or_generate_guid((char *)buffer_tostring(object), host->host_uuid))) {
+            errno = 0;
+            error("FAILED to generate GUID for %s", buffer_tostring(object));
         }
+#ifdef NETDATA_INTERNAL_CHECKS
+        char uuid_s[36 + 1];
+        uuid_unparse(*host->host_uuid, uuid_s);
+        info("Host GUID [%s] on machine GUID [%s]", uuid_s, (char *)buffer_tostring(object));
+#endif
         buffer_free(object);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");

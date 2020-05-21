@@ -773,12 +773,15 @@ RRDSET *rrdset_create_custom(
     BUFFER *object = buffer_create(512);
     buffer_sprintf(object, "%s/%s", host->machine_guid, st->id);
     st->chart_uuid = callocz(1, sizeof(uuid_t));
-    find_or_generate_guid((char *)buffer_tostring(object), st->chart_uuid);
-    {
+    if (unlikely(find_or_generate_guid((char *)buffer_tostring(object), st->chart_uuid))) {
+       errno = 0;
+       error("FAILED to generate GUID for %s", buffer_tostring(object));
+    }
+#ifdef NETDATA_INTERNAL_CHECKS
         char uuid_s[36 + 1];
         uuid_unparse(*st->chart_uuid, uuid_s);
-        info("Chart [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
-    }
+        info("Chart GUID [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
+#endif
     buffer_free(object);
 
     rrdhost_cleanup_obsolete_charts(host);

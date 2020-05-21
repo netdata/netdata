@@ -32,7 +32,15 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     BUFFER *object = buffer_create(512);
     buffer_sprintf(object, "%s/%s/%s", rd->rrdset->rrdhost->machine_guid, rd->rrdset->id, rd->id);
     rd->state->metric_uuid = callocz(1, sizeof(uuid_t));
-    find_or_generate_guid((char *)buffer_tostring(object), rd->state->metric_uuid);
+    if (unlikely(find_or_generate_guid((char *)buffer_tostring(object), rd->state->metric_uuid))) {
+        errno = 0;
+        error("FAILED to generate GUID for %s", buffer_tostring(object));
+    }
+#ifdef NETDATA_INTERNAL_CHECKS
+    char uuid_s[36 + 1];
+    uuid_unparse(rd->state->metric_uuid, uuid_s);
+    info("Metric GUID [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
+#endif
     buffer_free(object);
 //    int rc = find_guid_by_object((char *)buffer_tostring(object), &temp_id);
 //    if (rc) {
