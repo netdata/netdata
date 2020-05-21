@@ -5,10 +5,10 @@ on:
     branches:
       - master
     paths:
-      - '*.md'
+      - '**.md'
   pull_request:
     paths:
-      - '*.md'
+      - '**.md'
 jobs:
   markdown-link-check:
     name: Broken Links
