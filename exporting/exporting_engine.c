@@ -16,28 +16,21 @@ static void exporting_clean_engine()
     if (!engine)
         return;
 
-    int disable_awk_sdk = 0;
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-    int disable_remote_write = 0;
-#endif
     for (struct instance *instance = engine->instance_root; instance;) {
         struct instance *current_instance = instance;
         instance = instance->next;
 
-        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
+        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE && engine->protocol_buffers_initialized) {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-            clean_prometheus_remote_write_instance(instance);
-            if (!disable_remote_write) {
-                protocol_buffers_shutdown();
-                disable_remote_write = 1;
-            }
+            protocol_buffers_shutdown();
 #endif
+            engine->protocol_buffers_initialized = 0;
         } else if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS
-                 && current_instance->engine->aws_sdk_initialized && !disable_awk_sdk) {
+                 && current_instance->engine->aws_sdk_initialized && engine->aws_sdk_initialized) {
 #if HAVE_KINESIS
             aws_sdk_shutdown();
 #endif
-            disable_awk_sdk = 1;
+            engine->aws_sdk_initialized = 0;
         }
 
         clean_instance(current_instance);
@@ -46,10 +39,8 @@ static void exporting_clean_engine()
     //Cleanup web api
     prometheus_clean_server_root();
 
-    if (engine->config.prefix)
-        freez((void *)engine->config.prefix);
-    if (engine->config.hostname)
-        freez((void *)engine->config.hostname);
+    freez((void *)engine->config.prefix);
+    freez((void *)engine->config.hostname);
     freez(engine);
 }
 

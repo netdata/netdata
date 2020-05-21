@@ -191,6 +191,7 @@ struct engine {
     time_t now;
 
     int aws_sdk_initialized;
+    int protocol_buffers_initialized;
     int mongoc_initialized;
 
     struct instance *instance_root;

@@ -129,6 +129,8 @@ int init_prometheus_remote_write_instance(struct instance *instance)
 
     connector_specific_data->write_request = init_write_request();
 
+    instance->engine->protocol_buffers_initialized = 1;
+
     return 0;
 }
 
