@@ -59,6 +59,7 @@ struct engine;
 
 struct instance_config {
     EXPORTING_CONNECTOR_TYPE type;
+    const char *type_name;
 
     const char *name;
     const char *destination;
