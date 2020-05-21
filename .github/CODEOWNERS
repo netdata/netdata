@@ -54,7 +54,6 @@ Dockerfile* @Ferroin @knatsakis @ncmans @prologic @cosmix
 .yamllint.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
 netdata.spec.in @cosmix @Ferroin @knatsakis @ncmans @prologic
 netdata-installer.sh @cosmix @Ferroin @knatsakis @ncmans @prologic
-netlify.toml @cosmix
 package.json @jacekkolasa
 packaging/version @netdatabot
 
