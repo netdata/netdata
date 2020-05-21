@@ -581,7 +581,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     ((PARSER_USER_OBJECT *) user)->cd = cd;
     ((PARSER_USER_OBJECT *) user)->trust_durations = trust_durations;
 
-    PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT | PARSER_INPUT_ORIGINAL);
+    PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
@@ -589,7 +589,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         return 0;
     }
 
-    user->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
+    //user->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
     //user->plugins_action->begin_action = &pluginsd_begin_action;
 
     int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
@@ -621,7 +621,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     cd->enabled = ((PARSER_USER_OBJECT *) user)->enabled;
     size_t count = ((PARSER_USER_OBJECT *) user)->count;
 
-    freez(user->plugins_action);
+    //freez(user->plugins_action);
     freez(user);
 
     if (likely(count)) {
