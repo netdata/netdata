@@ -1400,6 +1400,7 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
+    init_global_guid_map();
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 

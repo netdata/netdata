@@ -259,6 +259,16 @@ RRDHOST *rrdhost_create(const char *hostname,
 
             return host;
         }
+        BUFFER *object = buffer_create(512);
+        buffer_sprintf(object, "%s", host->machine_guid);
+        host->host_uuid = callocz(1, sizeof(uuid_t));
+        find_or_generate_guid((char *)buffer_tostring(object), host->host_uuid);
+        {
+            char uuid_s[36 + 1];
+            uuid_unparse(*host->host_uuid, uuid_s);
+            info("HOST [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
+        }
+        buffer_free(object);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif

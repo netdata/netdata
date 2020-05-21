@@ -769,6 +769,17 @@ RRDSET *rrdset_create_custom(
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
+    //info("STEL: GUID create chart %s.%s", host->machine_guid, st->id);
+    BUFFER *object = buffer_create(512);
+    buffer_sprintf(object, "%s/%s", host->machine_guid, st->id);
+    st->chart_uuid = callocz(1, sizeof(uuid_t));
+    find_or_generate_guid((char *)buffer_tostring(object), st->chart_uuid);
+    {
+        char uuid_s[36 + 1];
+        uuid_unparse(*st->chart_uuid, uuid_s);
+        info("Chart [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
+    }
+    buffer_free(object);
 
     rrdhost_cleanup_obsolete_charts(host);
 
