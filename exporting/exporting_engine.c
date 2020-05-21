@@ -30,6 +30,7 @@ static void exporting_main_cleanup(void *ptr)
         if (!instance->exited) {
             found++;
             info("stopping worker for instance %s", instance->config.name);
+            uv_mutex_unlock(&instance->mutex);
             uv_cond_signal(&instance->cond_var);
         } else
             info("found stopped worker for instance %s", instance->config.name);
