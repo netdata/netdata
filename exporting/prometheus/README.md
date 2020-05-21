@@ -420,11 +420,11 @@ Netdata can filter the metrics it sends to Prometheus with this setting:
 	send charts matching = *
 ```
 
-This settings accepts a space separated list of [simple patterns](../../libnetdata/simple_pattern/README.md) to match
-the **charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is
-valid). Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and
-groups except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right,
-is used.
+This settings accepts a space separated list of [simple patterns](/libnetdata/simple_pattern/README.md) to match the
+**charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is valid).
+Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and groups
+except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right, is
+used.
 
 ### Changing the prefix of Netdata metrics
 
