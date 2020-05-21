@@ -40,7 +40,7 @@ run() {
   else
     retval=$?
     err
-    cat "$logfile" || true
+    tail -n 100 "$logfile" || true
   fi
   rm -rf "$logfile"
   return $retval

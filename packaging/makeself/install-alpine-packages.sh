@@ -12,32 +12,33 @@ apk update
 
 # Add required APK packages
 apk add --no-cache \
-    bash \
-    wget \
-    curl \
-    ncurses \
-    git \
-    netcat-openbsd \
-    alpine-sdk \
-    autoconf \
-    automake \
-    gcc \
-    make \
-    cmake \
-    libtool \
-    pkgconfig \
-    util-linux-dev \
-    openssl-dev \
-    gnutls-dev \
-    zlib-dev \
-    libmnl-dev \
-    libnetfilter_acct-dev \
-    libuv-dev \
-    lz4-dev \
-    openssl-dev \
-    snappy-dev \
-    protobuf-dev \
-    || exit 1
+  bash \
+  wget \
+  curl \
+  ncurses \
+  git \
+  netcat-openbsd \
+  alpine-sdk \
+  autoconf \
+  automake \
+  gcc \
+  make \
+  cmake \
+  libtool \
+  pkgconfig \
+  util-linux-dev \
+  openssl-dev \
+  gnutls-dev \
+  zlib-dev \
+  libmnl-dev \
+  libnetfilter_acct-dev \
+  libuv-dev \
+  lz4-dev \
+  openssl-dev \
+  snappy-dev \
+  protobuf-dev \
+  binutils ||
+  exit 1
 
 # snappy doesnt have static version in alpine, let's compile it
 export SNAPPY_VER="1.1.7"
@@ -60,4 +61,4 @@ rm judy.tar.gz
 cd /judy-${JUDY_VER}
 CFLAGS="-O2 -s" CXXFLAGS="-O2 -s" ./configure
 make
-make install;
+make install
