@@ -150,14 +150,8 @@ void simple_connector_cleanup(struct instance *instance)
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
     buffer_free(instance->buffer);
-
-    /*
     freez(instance->config.connector_specific_config);
-     */
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
-        clean_prometheus_remote_write_instance(instance);
-#endif
+
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
 }

@@ -16,11 +16,6 @@ static void exporting_clean_engine()
     if (!engine)
         return;
 
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-    if (engine->protocol_buffers_initialized)
-        error("here");
-        //protocol_buffers_shutdown();
-#endif
 #if HAVE_KINESIS
     if (engine->aws_sdk_initialized)
         aws_sdk_shutdown();
@@ -32,6 +27,11 @@ static void exporting_clean_engine()
 
         clean_instance(current_instance);
     }
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if (engine->protocol_buffers_initialized)
+        protocol_buffers_shutdown();
+#endif
 
     //Cleanup web api
     prometheus_clean_server_root();

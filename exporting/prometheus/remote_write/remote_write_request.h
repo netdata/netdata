@@ -29,7 +29,6 @@ size_t get_write_request_size(void *write_request_p);
 int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *size);
 
 void protocol_buffers_shutdown();
-void protocol_release_write_request(void *write_request_p);
 
 #ifdef __cplusplus
 }
