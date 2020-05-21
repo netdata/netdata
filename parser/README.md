@@ -1,18 +1,20 @@
 #### Introduction
 
-The incremental parser will be used to parse streaming and plugins input as well as metadata
-
+The parser will be used to process streaming and plugins input as well as metadata
 
 Usage
 
-
-1.  Initialize the parser using `parser_init`
-2.  Register keywords and assosiated callback function using `parser_add_keyword` 
-3.  Start a loop until EOF
-    1.  Fetch the next line using `parser_next`
-    2.  Process the line using `parser_action` 
-        1. The registered callbacks are executed
-4.  Release the parser using `parser_destroy`
+1. Define a structure that will be used to share user state across calls 
+1. Initialize the parser using `parser_init`
+2. Register keywords and assosiated callback function using `parser_add_keyword`
+3. Register actions on the keywords 
+4. Start a loop until EOF
+   1.  Fetch the next line using `parser_next`
+   2.  Process the line using `parser_action` 
+       1. The registered callbacks are executed to parse the input
+       2. The registered action for the callback is called for processing
+4. Release the parser using `parser_destroy`
+5. Release the user structure
 
 #### Functions
 
@@ -27,14 +29,12 @@ Input
 - user
   - User defined structure that is passed in all the calls
 - input
-  - Where the parser will get the input from, depends on flags
-- size
-  - What buffer size to use (input buffer as well)
+  - Where the parser will get the input from
 - flags
   - flags to define processing on the input
 
 Output
-- An incremental parser structure
+- A parser structure
   
 
 
