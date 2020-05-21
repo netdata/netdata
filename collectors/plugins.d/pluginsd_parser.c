@@ -278,12 +278,10 @@ PARSER_RC pluginsd_chart(char **words, void *user)
         priority, update_every);
 
     if (have_action) {
-        ((PARSER_USER_OBJECT *)user)->plugins_action->chart_action
-            (user, name, title, units, family, context, rrdset_type_name(chart_type), priority, update_every, options, plugin, module);
+        return ((PARSER_USER_OBJECT *)user)->plugins_action->chart_action
+            (user, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : NULL, module,
+             priority, update_every, chart_type);
     }
-//    PARSER_RC (*chart_action)(void *user, char *type, char *id, char *title,
-//                              char *units, char *family, char *context, RRDSET_TYPE chart_type, int priority, int update_every,
-//                              char *options, char *plugin, char *module);
 
     st = rrdset_create(
         host, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *) user)->cd->filename, module,
@@ -595,10 +593,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     //user->plugins_action->begin_action = &pluginsd_begin_action;
 
     int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_TOMBSTONE, pluginsd_tombstone);
+    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
+    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid);
+    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
+    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_TOMBSTONE, pluginsd_tombstone);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
     rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);

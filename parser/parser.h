@@ -19,10 +19,9 @@ typedef struct pluginsd_action {
     PARSER_RC (*set_action)(void *user, char *variable, long long int value);
     PARSER_RC (*begin_action)(void *user, char *chart_id, usec_t microseconds);
     PARSER_RC (*end_action)(void *user);
-
-    PARSER_RC (*chart_action)(void *user, char *type, char *id, char *title,
-     char *units, char *family, char *context, RRDSET_TYPE chart_type, int priority, int update_every,
-     char *options, char *plugin, char *module);
+    PARSER_RC (*chart_action)
+    (void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,
+     char *module, int priority, int update_every, RRDSET_TYPE chart_type);
     PARSER_RC (*dimension_action)
     (void *user, char *id, char *name, char *algorithm, long multiplier, long divisor, char *options,
      RRD_ALGORITHM algorithm_type);
