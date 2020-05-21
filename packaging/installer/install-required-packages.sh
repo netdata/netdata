@@ -1435,7 +1435,7 @@ validate_tree_debian() {
     echo >&2 " > Ubuntu Version: ${version} ..."
 
     if [[ "${version}" =~ ^14\.([0-9])+$ ]]; then
-      echo >&2 " > You are on an old enough verison of Ubuntu we have to enable some extra repositories..."
+      echo >&2 " > You are on an old enough version of Ubuntu we have to enable some extra repositories..."
       echo >&2
 
       echo >&2 " > Checking for ppa:acooks/libwebsockets6 ..."
