@@ -3,6 +3,17 @@
 #include "opentsdb.h"
 
 /**
+ * Release allocated memory
+ *
+ * @param instance
+ */
+void cleanup_opentsdb(struct instance *instance) {
+    buffer_free(instance->buffer);
+
+    freez(instance->config.connector_specific_config);
+}
+
+/**
  * Initialize OpenTSDB telnet connector instance
  *
  * @param instance an instance data structure.

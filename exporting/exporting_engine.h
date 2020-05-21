@@ -250,6 +250,8 @@ static inline void disable_instance(struct instance *instance)
     error("EXPORTING: Instance %s disabled", instance->config.name);
 }
 
+#include "exporting/json/json.h"
+#include "exporting/graphite/graphite.h"
 #include "exporting/prometheus/prometheus.h"
 #include "exporting/prometheus/remote_write/remote_write.h"
 #include "exporting/aws_kinesis/aws_kinesis.h"

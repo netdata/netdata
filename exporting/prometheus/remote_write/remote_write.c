@@ -91,7 +91,13 @@ void clean_prometheus_remote_write_instance(struct instance *instance)
 {
     buffer_free(instance->buffer);
 
-    freez(instance->connector_specific_data);
+    struct prometheus_remote_write_specific_config *connector_specific_config =
+        instance->config.connector_specific_config;
+    freez(connector_specific_config);
+
+    struct prometheus_remote_write_specific_data *connector_specific_data =
+        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+    freez(connector_specific_data);
 }
 
 /**
@@ -128,6 +134,10 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->connector_specific_data = (void *)connector_specific_data;
 
     connector_specific_data->write_request = init_write_request();
+
+    struct prometheus_remote_write_specific_config *connector_specific_config =
+        instance->config.connector_specific_config;
+    connector_specific_config->remote_write_path = NULL;
 
     instance->engine->protocol_buffers_initialized = 1;
 

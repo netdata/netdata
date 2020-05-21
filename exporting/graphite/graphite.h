@@ -6,6 +6,7 @@
 #include "exporting/exporting_engine.h"
 
 int init_graphite_instance(struct instance *instance);
+void cleanup_graphite(struct instance *instance);
 
 void sanitize_graphite_label_value(char *dst, char *src, size_t len);
 int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host);
