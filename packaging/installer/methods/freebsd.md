@@ -12,9 +12,9 @@ You can install Netdata from either the `ports` or `packages` collections. To in
 ```sh
 # pkg install netdata
 ```
-You also need to enable the netdata service in `/etc/rc.conf` (add `netdata_enable="YES"`) and start the service:
+You also need to enable the netdata service in `/etc/rc.conf` and start the service:
 ```sh
-# service netdata start
+# sysrc netdata_enable="YES" && service netdata start
 ```
 
 ## Install latest version
