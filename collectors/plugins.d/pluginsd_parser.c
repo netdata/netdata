@@ -2,79 +2,235 @@
 
 #include "pluginsd_parser.h"
 
-// Sample action here
 
-PARSER_RC pluginsd_context_action(void *user, char *context)
+/*
+ * This is the action defined for the FLUSH command
+ */
+
+PARSER_RC pluginsd_flush_action(void *user)
 {
-    UNUSED(user);
-    UNUSED(context);
+    debug(D_PLUGINSD, "requested a FLUSH");
+    ((PARSER_USER_OBJECT *) user)->st = NULL;
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_begin_action(void *user, char *id, usec_t microseconds)
+{
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!id)) {
+        error("requested a BEGIN without a chart id for host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    st = rrdset_find(host, id);
+    if (unlikely(!st)) {
+        error("requested a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", id, host->hostname);
+        goto disable;
+    }
+
+    if (likely(st->counter_done)) {
+        if (likely(microseconds)) {
+            if (((PARSER_USER_OBJECT *) user)->trust_durations)
+                rrdset_next_usec_unfiltered(st, microseconds);
+            else
+                rrdset_next_usec(st, microseconds);
+        } else
+            rrdset_next(st);
+    }
+    ((PARSER_USER_OBJECT *) user)->st = st;
+    return PARSER_RC_OK;
+
+    disable:
+    ((PARSER_USER_OBJECT *) user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+
+PARSER_RC pluginsd_end_action(void *user)
+{
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!st)) {
+        error("requested an END, without a BEGIN on host '%s'. Disabling it.", host->hostname);
+        ((PARSER_USER_OBJECT *) user)->enabled = 0;
+        return PARSER_RC_ERROR;
+    }
+
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+        debug(D_PLUGINSD, "requested an END on chart %s", st->id);
+
+    rrdset_done(st);
+    ((PARSER_USER_OBJECT *) user)->st = NULL;
+    ((PARSER_USER_OBJECT *) user)->count++;
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,
+           char *module, int priority, int update_every, RRDSET_TYPE chart_type, char *options)
+{
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    st = rrdset_create(
+        host, type, id, name, family, context, title, units,
+        (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *)user)->cd->filename, module, priority, update_every,
+        chart_type);
+
+    if (options && *options) {
+        if (strstr(options, "obsolete"))
+            rrdset_is_obsolete(st);
+        else
+            rrdset_isnot_obsolete(st);
+
+        if (strstr(options, "detail"))
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        else
+            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+
+        if (strstr(options, "hidden"))
+            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+        else
+            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
+
+        if (strstr(options, "store_first"))
+            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+        else
+            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+    } else {
+        rrdset_isnot_obsolete(st);
+        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+    }
+    ((PARSER_USER_OBJECT *)user)->st = st;
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_guid_action(void *user, char *guid)
+
+PARSER_RC pluginsd_disable_action(void *user)
 {
     UNUSED(user);
-    UNUSED(guid);
+
+    info("called DISABLE. Disabling it.");
+    ((PARSER_USER_OBJECT *) user)->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+
+PARSER_RC pluginsd_variable_action(void *user, int global, char *name, calculated_number *value)
+{
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!name || !*name)) {
+        error("requested a VARIABLE on host '%s', without a variable name. Disabling it.", host->hostname);
+        ((PARSER_USER_OBJECT *) user)->enabled = 0;
+        return PARSER_RC_ERROR;
+    }
+
+    if (unlikely(!value)) {
+        error("cannot set %s VARIABLE '%s' on host '%s' to an empty value", (global) ? "HOST" : "CHART", name,
+                host->hostname);
+        return PARSER_RC_OK;
+    }
+
+    if (global) {
+        RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
+        if (rv)
+            rrdvar_custom_host_variable_set(host, rv, *value);
+        else
+            error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, host->hostname);
+    } else if (st) {
+        RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
+        if (rs)
+            rrdsetvar_custom_chart_variable_set(rs, *value);
+        else
+            error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, host->hostname, st->id);
+    } else
+        error("cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", name, host->hostname);
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_host_action(void *user, char *context)      // TODO: 7 params
+
+
+PARSER_RC pluginsd_dimension_action(void *user, char *id, char *name, char *algorithm, long multiplier, long divisor, char *options,
+                                    RRD_ALGORITHM algorithm_type)
 {
-    UNUSED(user);
-    UNUSED(context);
+    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (unlikely(!id)) {
+        error(
+            "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname,
+            st ? st->id : "UNSET");
+        goto disable;
+    }
+
+    if (unlikely(!st)) {
+        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
+        goto disable;
+    }
+
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+        debug(
+            D_PLUGINSD,
+            "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
+            st->id, id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
+            options ? options : "");
+
+    RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, algorithm_type);
+    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+    rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+    if (options && *options) {
+        if (strstr(options, "obsolete") != NULL)
+            rrddim_is_obsolete(st, rd);
+        else
+            rrddim_isnot_obsolete(st, rd);
+        if (strstr(options, "hidden") != NULL)
+            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+        if (strstr(options, "noreset") != NULL)
+            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+        if (strstr(options, "nooverflow") != NULL)
+            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+    } else {
+        rrddim_isnot_obsolete(st, rd);
+    }
+    ((PARSER_USER_OBJECT *) user)->st = st;
+    return PARSER_RC_OK;
+
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_label_action(void *user, char *key, char *value, LABEL_SOURCE source)
+{
+
+    ((PARSER_USER_OBJECT *) user)->new_labels = add_label_to_list(((PARSER_USER_OBJECT *) user)->new_labels, key, value, source);
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_tombstone_action(void *user, char *guid)
+
+PARSER_RC pluginsd_overwrite_action(void *user)
 {
-    UNUSED(user);
-    UNUSED(guid);
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
-    return PARSER_RC_OK;
-}
+    debug(D_PLUGINSD, "requested a OVERWITE a variable");
 
+    if (!host->labels) {
+        host->labels = ((PARSER_USER_OBJECT *)user)->new_labels;
+    } else {
+        rrdhost_rdlock(host);
+        replace_label_list(host, ((PARSER_USER_OBJECT *)user)->new_labels);
+        rrdhost_unlock(host);
+    }
 
-// Callbacks
-
-PARSER_RC pluginsd_context(char **words, void *user)
-{
-    UNUSED(user);
-    UNUSED(words);
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_guid(char **words, void *user)
-{
-    UNUSED(user);
-    UNUSED(words);
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_host(char **words, void *user)
-{
-    UNUSED(user);
-    UNUSED(words);
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_tombstone(char **words, void *user)
-{
-    UNUSED(user);
-    UNUSED(words);
-
-    return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_begin_action(void *user, char *chart_id, usec_t microseconds)
-{
-    UNUSED(user);
-    info("This is the begin action on %s -- %d", chart_id, (int ) microseconds);
+    ((PARSER_USER_OBJECT *)user)->new_labels = NULL;
     return PARSER_RC_OK;
 }
 
@@ -139,35 +295,7 @@ PARSER_RC pluginsd_begin(char **words, void *user)
         return ((PARSER_USER_OBJECT *) user)->plugins_action->begin_action(user, id, microseconds);
     }
 
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    if (unlikely(!id)) {
-        error("requested a BEGIN without a chart id for host '%s'. Disabling it.", host->hostname);
-        goto disable;
-    }
-
-    st = rrdset_find(host, id);
-    if (unlikely(!st)) {
-        error("requested a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", id, host->hostname);
-        goto disable;
-    }
-
-    if (likely(st->counter_done)) {
-        if (likely(microseconds)) {
-            if (((PARSER_USER_OBJECT *) user)->trust_durations)
-                rrdset_next_usec_unfiltered(st, microseconds);
-            else
-                rrdset_next_usec(st, microseconds);
-        } else
-            rrdset_next(st);
-    }
-    ((PARSER_USER_OBJECT *) user)->st = st;
     return PARSER_RC_OK;
-
-disable:
-    ((PARSER_USER_OBJECT *) user)->enabled = 0;
-    return PARSER_RC_ERROR;
 }
 
 PARSER_RC pluginsd_end(char **words, void *user)
@@ -177,29 +305,12 @@ PARSER_RC pluginsd_end(char **words, void *user)
     if (((PARSER_USER_OBJECT *) user)->plugins_action->end_action) {
         return ((PARSER_USER_OBJECT *) user)->plugins_action->end_action(user);
     }
-
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    if (unlikely(!st)) {
-        error("requested an END, without a BEGIN on host '%s'. Disabling it.", host->hostname);
-        ((PARSER_USER_OBJECT *) user)->enabled = 0;
-        return PARSER_RC_ERROR;
-    }
-
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "requested an END on chart %s", st->id);
-
-    rrdset_done(st);
-    ((PARSER_USER_OBJECT *) user)->st = NULL;
-
-    ((PARSER_USER_OBJECT *) user)->count++;
     return PARSER_RC_OK;
 }
 
 PARSER_RC pluginsd_chart(char **words, void *user)
 {
-    RRDSET *st = NULL;
+//    RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     char *type = words[1];
@@ -280,39 +391,39 @@ PARSER_RC pluginsd_chart(char **words, void *user)
     if (have_action) {
         return ((PARSER_USER_OBJECT *)user)->plugins_action->chart_action
             (user, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : NULL, module,
-             priority, update_every, chart_type);
+             priority, update_every, chart_type, options);
     }
 
-    st = rrdset_create(
-        host, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *) user)->cd->filename, module,
-        priority, update_every, chart_type);
-
-    if (options && *options) {
-        if (strstr(options, "obsolete"))
-            rrdset_is_obsolete(st);
-        else
-            rrdset_isnot_obsolete(st);
-
-        if (strstr(options, "detail"))
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-
-        if (strstr(options, "hidden"))
-            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
-
-        if (strstr(options, "store_first"))
-            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-    } else {
-        rrdset_isnot_obsolete(st);
-        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-    }
-    ((PARSER_USER_OBJECT *) user)->st = st;
+//    st = rrdset_create(
+//        host, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *) user)->cd->filename, module,
+//        priority, update_every, chart_type);
+//
+//    if (options && *options) {
+//        if (strstr(options, "obsolete"))
+//            rrdset_is_obsolete(st);
+//        else
+//            rrdset_isnot_obsolete(st);
+//
+//        if (strstr(options, "detail"))
+//            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+//        else
+//            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+//
+//        if (strstr(options, "hidden"))
+//            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+//        else
+//            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
+//
+//        if (strstr(options, "store_first"))
+//            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+//        else
+//            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+//    } else {
+//        rrdset_isnot_obsolete(st);
+//        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+//        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+//    }
+//    ((PARSER_USER_OBJECT *) user)->st = st;
     return PARSER_RC_OK;
 }
 
@@ -326,16 +437,18 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
     char *options = words[6];
 
     long multiplier = 1;
-    if (multiplier_s && *multiplier_s)
+    if (multiplier_s && *multiplier_s) {
         multiplier = strtol(multiplier_s, NULL, 0);
-    if (unlikely(!multiplier))
-        multiplier = 1;
+        if (unlikely(!multiplier))
+            multiplier = 1;
+    }
 
     long divisor = 1;
-    if (likely(divisor_s && *divisor_s))
+    if (likely(divisor_s && *divisor_s)) {
         divisor = strtol(divisor_s, NULL, 0);
-    if (unlikely(!divisor))
-        divisor = 1;
+        if (unlikely(!divisor))
+            divisor = 1;
+    }
 
     if (unlikely(!algorithm || !*algorithm))
         algorithm = "absolute";
@@ -346,87 +459,21 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
             multiplier, divisor, (options && *options)?options:NULL, rrd_algorithm_id(algorithm));
     }
 
-    RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    if (unlikely(!id || !*id)) {
-        error(
-            "requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname,
-            st ? st->id : "UNSET");
-        goto disable;
-    }
-
-    if (unlikely(!st)) {
-        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
-        goto disable;
-    }
-
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(
-            D_PLUGINSD,
-            "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
-            st->id, id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
-            options ? options : "");
-
-    RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
-    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    if (options && *options) {
-        if (strstr(options, "obsolete") != NULL)
-            rrddim_is_obsolete(st, rd);
-        else
-            rrddim_isnot_obsolete(st, rd);
-        if (strstr(options, "hidden") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-        if (strstr(options, "noreset") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-        if (strstr(options, "nooverflow") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    } else {
-        rrddim_isnot_obsolete(st, rd);
-    }
-    ((PARSER_USER_OBJECT *) user)->st = st;
     return PARSER_RC_OK;
-
-disable:
-    ((PARSER_USER_OBJECT *) user)->enabled = 0;
-    return PARSER_RC_ERROR;
 }
 
 PARSER_RC pluginsd_variable(char **words, void *user)
 {
     char *name = words[1];
     char *value = words[2];
+    calculated_number v;
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     int global = (st) ? 0 : 1;
 
-    if (((PARSER_USER_OBJECT *) user)->plugins_action->variable_action) {
-        if (name && *name) {
-            global = 0;
-            if ((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
-                global = 1;
-                name = words[2];
-                value = words[3];
-            } else if ((strcmp(name, "LOCAL") == 0 || strcmp(name, "CHART") == 0)) {
-                global = 0;
-                name = words[2];
-                value = words[3];
-            }
-        }
-        return ((PARSER_USER_OBJECT *) user)->plugins_action->variable_action(user, global, name, value);
-    }
-
-    if (unlikely(!name || !*name)) {
-        error("requested a VARIABLE on host '%s', without a variable name. Disabling it.", host->hostname);
-        ((PARSER_USER_OBJECT *) user)->enabled = 0;
-        return PARSER_RC_ERROR;
-    }
-
     if (name && *name) {
-        global = 0;
         if ((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
             global = 1;
             name = words[2];
@@ -443,8 +490,7 @@ PARSER_RC pluginsd_variable(char **words, void *user)
 
     if (value) {
         char *endptr = NULL;
-        calculated_number v = (calculated_number)str2ld(value, &endptr);
-
+        v = (calculated_number)str2ld(value, &endptr);
         if (unlikely(endptr && *endptr)) {
             if (endptr == value)
                 error(
@@ -455,39 +501,22 @@ PARSER_RC pluginsd_variable(char **words, void *user)
                     "the value '%s' of VARIABLE '%s' on host '%s' has leftovers: '%s'", value, name, host->hostname,
                     endptr);
         }
+    }
 
-        if (global) {
-            RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
-            if (rv)
-                rrdvar_custom_host_variable_set(host, rv, v);
-            else
-                error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, host->hostname);
-        } else if (st) {
-            RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
-            if (rs)
-                rrdsetvar_custom_chart_variable_set(rs, v);
-            else
-                error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, host->hostname, st->id);
-        } else
-            error("cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", name, host->hostname);
-    } else
-        error(
-            "cannot set %s VARIABLE '%s' on host '%s' to an empty value", (global) ? "HOST" : "CHART", name,
-            host->hostname);
+    if (((PARSER_USER_OBJECT *) user)->plugins_action->variable_action) {
+        return ((PARSER_USER_OBJECT *) user)->plugins_action->variable_action(user, global, name, value? &v : NULL);
+    }
+
     return PARSER_RC_OK;
 }
 
 PARSER_RC pluginsd_flush(char **words, void *user)
 {
     UNUSED(words);
-
     if (((PARSER_USER_OBJECT *)user)->plugins_action->flush_action) {
         return ((PARSER_USER_OBJECT *)user)->plugins_action->flush_action(user);
     }
-
-    debug(D_PLUGINSD, "requested a FLUSH");
-
-    ((PARSER_USER_OBJECT *) user)->st = NULL;
+    //((PARSER_USER_OBJECT *)user)->st = NULL;
     return PARSER_RC_OK;
 }
 
@@ -499,14 +528,11 @@ PARSER_RC pluginsd_disable(char **words, void *user)
     if (((PARSER_USER_OBJECT *)user)->plugins_action->disable_action) {
         return ((PARSER_USER_OBJECT *)user)->plugins_action->disable_action(user);
     }
-    info("called DISABLE. Disabling it.");
-    ((PARSER_USER_OBJECT *) user)->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
 PARSER_RC pluginsd_label(char **words, void *user)
 {
-    debug(D_PLUGINSD, "requested a LABEL CHANGE");
     char *store;
     if (!words[4])
         store = words[3];
@@ -531,7 +557,40 @@ PARSER_RC pluginsd_label(char **words, void *user)
         }
     }
 
-    ((PARSER_USER_OBJECT *) user)->new_labels = add_label_to_list(((PARSER_USER_OBJECT *) user)->new_labels, words[1], store, strtol(words[2], NULL, 10));
+    if (((PARSER_USER_OBJECT *)user)->plugins_action->label_action) {
+        PARSER_RC rc = ((PARSER_USER_OBJECT *)user)->plugins_action->label_action(user, words[1], store, strtol(words[2], NULL, 10));
+        if (store != words[3])
+            freez(store);
+        return rc;
+    }
+//
+//
+//    debug(D_PLUGINSD, "requested a LABEL CHANGE");
+//    char *store;
+//    if (!words[4])
+//        store = words[3];
+//    else {
+//        store = callocz(PLUGINSD_LINE_MAX + 1, sizeof(char));
+//        size_t remaining = PLUGINSD_LINE_MAX;
+//        char *move = store;
+//        int i = 3;
+//        while (i < PLUGINSD_MAX_WORDS) {
+//            size_t length = strlen(words[i]);
+//            if ((length + 1) >= remaining)
+//                break;
+//
+//            remaining -= (length + 1);
+//            memcpy(move, words[i], length);
+//            move += length;
+//            *move++ = ' ';
+//
+//            i++;
+//            if (!words[i])
+//                break;
+//        }
+//    }
+
+//    ((PARSER_USER_OBJECT *) user)->new_labels = add_label_to_list(((PARSER_USER_OBJECT *) user)->new_labels, words[1], store, strtol(words[2], NULL, 10));
     if (store != words[3])
         freez(store);
     return PARSER_RC_OK;
@@ -541,18 +600,20 @@ PARSER_RC pluginsd_overwrite(char **words, void *user)
 {
     UNUSED(words);
 
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-    debug(D_PLUGINSD, "requested a OVERWITE a variable");
-    if (!host->labels) {
-        host->labels = ((PARSER_USER_OBJECT *) user)->new_labels;
-    } else {
-        rrdhost_rdlock(host);
-        replace_label_list(host, ((PARSER_USER_OBJECT *) user)->new_labels);
-        rrdhost_unlock(host);
+    if (((PARSER_USER_OBJECT *)user)->plugins_action->overwrite_action) {
+        return ((PARSER_USER_OBJECT *)user)->plugins_action->overwrite_action(user);
     }
 
-    ((PARSER_USER_OBJECT *) user)->new_labels = NULL;
+//    debug(D_PLUGINSD, "requested a OVERWITE a variable");
+//    if (!host->labels) {
+//        host->labels = ((PARSER_USER_OBJECT *) user)->new_labels;
+//    } else {
+//        rrdhost_rdlock(host);
+//        replace_label_list(host, ((PARSER_USER_OBJECT *) user)->new_labels);
+//        rrdhost_unlock(host);
+//    }
+//
+//    ((PARSER_USER_OBJECT *) user)->new_labels = NULL;
     return PARSER_RC_OK;
 }
 
@@ -589,8 +650,16 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         return 0;
     }
 
-    //user->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
-    //user->plugins_action->begin_action = &pluginsd_begin_action;
+    user->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
+    user->plugins_action->begin_action     = &pluginsd_begin_action;
+    user->plugins_action->flush_action     = &pluginsd_flush_action;
+    user->plugins_action->end_action       = &pluginsd_end_action;
+    user->plugins_action->disable_action   = &pluginsd_disable_action;
+    user->plugins_action->variable_action  = &pluginsd_variable_action;
+    user->plugins_action->dimension_action = &pluginsd_dimension_action;
+    user->plugins_action->label_action     = &pluginsd_label_action;
+    user->plugins_action->overwrite_action = &pluginsd_overwrite_action;
+    user->plugins_action->chart_action     = &pluginsd_chart_action;
 
     int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
     //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
