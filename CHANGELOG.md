@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Restore SIGCHLD signal handler after being replaced by libuv [\#9107](https://github.com/netdata/netdata/pull/9107) ([mfundul](https://github.com/mfundul))
+- Update eBPF documentation to reflect default enabled status [\#9105](https://github.com/netdata/netdata/pull/9105) ([joelhans](https://github.com/joelhans))
+- Prepare the main cleanup function for the exporting engine [\#9099](https://github.com/netdata/netdata/pull/9099) ([vlvkobal](https://github.com/vlvkobal))
 - Fix typo in dashboard description [\#9096](https://github.com/netdata/netdata/pull/9096) ([Neamar](https://github.com/Neamar))
 - Reduce minimum size for dbengine disk space [\#9094](https://github.com/netdata/netdata/pull/9094) ([mfundul](https://github.com/mfundul))
 - Fix issue \#9085:  Prometheus TYPE lines incorrectly formatted \(when enabled via query parm\) [\#9086](https://github.com/netdata/netdata/pull/9086) ([jeffgdotorg](https://github.com/jeffgdotorg))
@@ -17,7 +20,9 @@
 - claim: fix `New/ephemeral Agent containers` instruction [\#9058](https://github.com/netdata/netdata/pull/9058) ([ilyam8](https://github.com/ilyam8))
 - Add frontmatter to exporting connectors [\#9052](https://github.com/netdata/netdata/pull/9052) ([joelhans](https://github.com/joelhans))
 - Add agent restart note for reclaiming [\#9049](https://github.com/netdata/netdata/pull/9049) ([zack-shoylev](https://github.com/zack-shoylev))
+- Add ACLK Connection Details [\#9047](https://github.com/netdata/netdata/pull/9047) ([zack-shoylev](https://github.com/zack-shoylev))
 - Don't overwrite netdata.conf on update on static installs. [\#9046](https://github.com/netdata/netdata/pull/9046) ([Ferroin](https://github.com/Ferroin))
+- Regenerate topic base on connect [\#9044](https://github.com/netdata/netdata/pull/9044) ([amoss](https://github.com/amoss))
 - \[python.d/samba\] Only use sudo when not running as root user [\#9038](https://github.com/netdata/netdata/pull/9038) ([Duffyx](https://github.com/Duffyx))
 - Fix link in web server log guide [\#9033](https://github.com/netdata/netdata/pull/9033) ([joelhans](https://github.com/joelhans))
 - Included 'cmake' in the list of pkgs installed [\#9031](https://github.com/netdata/netdata/pull/9031) ([zvarnes](https://github.com/zvarnes))
@@ -244,10 +249,6 @@
 - Improve ACLK according to results of the smoke-test. [\#8358](https://github.com/netdata/netdata/pull/8358) ([amoss](https://github.com/amoss))
 - Improve Pull Request template to have a shorter testing section with enhanced instructions [\#8357](https://github.com/netdata/netdata/pull/8357) ([prologic](https://github.com/prologic))
 - Add packaging/bundle-lws.sh to dist\_noinst\_DATA \(was missed\) [\#8356](https://github.com/netdata/netdata/pull/8356) ([prologic](https://github.com/prologic))
-- Remove possible erroneous blank line causing Travis to fail possibly and default to magical behaviour [\#8355](https://github.com/netdata/netdata/pull/8355) ([prologic](https://github.com/prologic))
-- Bulk add frontmatter to all documentation [\#8354](https://github.com/netdata/netdata/pull/8354) ([joelhans](https://github.com/joelhans))
-- Update paragraph on install-required-packages [\#8347](https://github.com/netdata/netdata/pull/8347) ([prologic](https://github.com/prologic))
-- Fix cosmetic error checking for CentOS 8 version in install-required-packages [\#8339](https://github.com/netdata/netdata/pull/8339) ([prologic](https://github.com/prologic))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
