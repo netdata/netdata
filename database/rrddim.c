@@ -358,17 +358,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
         rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-        //info("STEL: GUID create dimension %s.%s.%s", host->machine_guid, rd->id, st->id);
-        // Check if the DBENGINE already has a GUID
-//        if (rd->state->rrdeng_uuid) {
-//            rd->metric_uuid = malloc(sizeof(*rd->metric_uuid));
-//            char uuid_s[36 + 1];
-//            uuid_unparse(rd->metric_uuid, uuid_s);
-//            info("Netdata direct [%s] [%s] with GUID %s", rd->id, rd->rrdset->id, uuid_s);
-//            memcpy(rd->metric_uuid, rd->state->rrdeng_uuid, sizeof(*rd->metric_uuid));
-//        } else {
-        //assign_guid_to_metric(rd);
-//        }
 #endif
     } else {
         rd->state->collect_ops.init         = rrddim_collect_init;
