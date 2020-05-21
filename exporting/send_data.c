@@ -149,16 +149,13 @@ void simple_connector_cleanup(struct instance *instance)
 {
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON) {
-        cleanup_json(instance);
-    } else if ((instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP) ||
-               (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET)) {
-        cleanup_opentsdb(instance);
-    }else if ((instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE)) {
-        cleanup_graphite(instance);
-    }
+    buffer_free(instance->buffer);
+
+    /*
+    freez(instance->config.connector_specific_config);
+     */
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-    else if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
         clean_prometheus_remote_write_instance(instance);
 #endif
     info("EXPORTING: instance %s exited", instance->config.name);

@@ -22,7 +22,7 @@ static void exporting_clean_engine()
 
         if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE && engine->protocol_buffers_initialized) {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-            protocol_buffers_shutdown();
+            //protocol_buffers_shutdown();
 #endif
             engine->protocol_buffers_initialized = 0;
         } else if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_KINESIS

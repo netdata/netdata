@@ -3,17 +3,6 @@
 #include "json.h"
 
 /**
- * Release memory allocated on instance
- *
- * @param instance an instance data structure.
- */
-void cleanup_json(struct instance *instance) {
-    buffer_free(instance->buffer);
-
-    freez(instance->config.connector_specific_config);
-}
-
-/**
  * Initialize JSON connector instance
  *
  * @param instance an instance data structure.

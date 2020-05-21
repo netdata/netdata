@@ -180,7 +180,16 @@ int pack_and_clear_write_request(void *write_request_p, char *buffer, size_t *si
 /**
  * Shuts down the Protobuf library
  */
-void protocol_buffers_shutdown()
+void protocol_buffers_shutdown(void *write_request_p)
+{
+    WriteRequest *write_request = (WriteRequest *)write_request_p;
+    delete write_request;
+}
+
+/**
+ * release write request
+ */
+void protocol_release_write_request(void *write_request_p)
 {
     google::protobuf::ShutdownProtobufLibrary();
 }

@@ -3,17 +3,6 @@
 #include "graphite.h"
 
 /**
- * Release memory allocated on instance
- *
- * @param instance an instance data structure.
- */
-void cleanup_graphite(struct instance *instance) {
-    buffer_free(instance->buffer);
-
-    freez(instance->config.connector_specific_config);
-}
-
-/**
  * Initialize Graphite connector instance
  *
  * @param instance an instance data structure.

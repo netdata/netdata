@@ -12,6 +12,4 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host);
 int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM *rd);
 int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd);
 
-extern void cleanup_json(struct instance *instance);
-
 #endif //NETDATA_EXPORTING_JSON_H

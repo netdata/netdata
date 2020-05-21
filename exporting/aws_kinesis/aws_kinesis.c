@@ -8,8 +8,6 @@
 void aws_kinesis_cleanup(struct instance *instance)
 {
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
-    buffer_free(instance->buffer);
-
     kinesis_shutdown(instance->connector_specific_data);
 
     freez(instance->connector_specific_data);
