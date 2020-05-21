@@ -80,6 +80,35 @@ int pubsub_init(
 }
 
 /**
+ * Clean the PubSub connector instance specific data
+ */
+void pubsub_cleanup(void *pubsub_specific_data_p)
+{
+    struct pubsub_specific_data *connector_specific_data = (struct pubsub_specific_data *)pubsub_specific_data_p;
+
+    std::list<struct response> *responses = (std::list<struct response> *)connector_specific_data->responses;
+    std::list<struct response>::iterator response;
+    for (response = responses->begin(); response != responses->end(); ++response) {
+        // TODO: If we do this, there are a huge amount of possibly lost records. We need to find a right way of
+        // cleaning up contexts
+        // delete response->context;
+        delete response->publish_response;
+        delete response->status;
+    }
+    delete responses;
+
+    ((grpc::CompletionQueue *)connector_specific_data->completion_queue)->Shutdown();
+    delete (grpc::CompletionQueue *)connector_specific_data->completion_queue;
+    delete (google::pubsub::v1::PublishRequest *)connector_specific_data->request;
+    delete (google::pubsub::v1::Publisher::Stub *)connector_specific_data->stub;
+
+    // TODO: Find how to shutdown grpc gracefully. grpc_shutdown() doesn't seem to work.
+    // grpc_shutdown();
+
+    return;
+}
+
+/**
  * Add data to a Pub/Sub request message.
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.

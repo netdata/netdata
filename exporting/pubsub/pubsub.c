@@ -57,6 +57,35 @@ int init_pubsub_instance(struct instance *instance)
 }
 
 /**
+ * Clean a PubSub connector instance
+ *
+ * @param instance an instance data structure.
+ */
+void clean_pubsub_instance(struct instance *instance)
+{
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+
+    struct pubsub_specific_data *connector_specific_data =
+        (struct pubsub_specific_data *)instance->connector_specific_data;
+    pubsub_cleanup(connector_specific_data);
+    freez(connector_specific_data);
+
+    buffer_free(instance->buffer);
+
+    struct pubsub_specific_config *connector_specific_config =
+        (struct pubsub_specific_config *)instance->config.connector_specific_config;
+    freez(connector_specific_config->credentials_file);
+    freez(connector_specific_config->project_id);
+    freez(connector_specific_config->topic_id);
+    freez(connector_specific_config);
+
+    info("EXPORTING: instance %s exited", instance->config.name);
+    instance->exited = 1;
+
+    return;
+}
+
+/**
  * Pub/Sub connector worker
  *
  * Runs in a separate thread for every instance.
@@ -69,12 +98,17 @@ void pubsub_connector_worker(void *instance_p)
     struct pubsub_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct pubsub_specific_data *connector_specific_data = instance->connector_specific_data;
 
-    while (!netdata_exit) {
+    while (!instance->engine->exit) {
         struct stats *stats = &instance->stats;
         char error_message[ERROR_LINE_MAX + 1] = "";
 
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
+
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
+            break;
+        }
 
         // reset the monitoring chart counters
         stats->received_bytes =
@@ -149,7 +183,9 @@ void pubsub_connector_worker(void *instance_p)
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        break;
+        return;
 #endif
     }
+
+    clean_pubsub_instance(instance);
 }
