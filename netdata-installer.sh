@@ -479,20 +479,27 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
+  CFLAGS=
+  LDFLAGS=
+  CXXFLAGS=
+
   if [ "$(uname -s)" = Linux ]; then
-    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+    run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" make -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CXXFLAGS="-I/usr/local/opt/openssl/include"
+
+      run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" cmake \
         -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
         -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
         -D WITH_STATIC_LIBRARIES:boolean=YES \
         .
     else
-      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
+      run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C lib
+    run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" make -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -553,17 +560,24 @@ bundle_libmosquitto
 # -----------------------------------------------------------------------------
 
 build_libwebsockets() {
+  CFLAGS=
+  LDFLAGS=
+  CXXFLAGS=
+
   pushd "${1}" > /dev/null || exit 1
   if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+    LDFLAGS="-L/usr/local/opt/openssl/lib"
+    CXXFLAGS="-I/usr/local/opt/openssl/include"
+
+    run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
       -D LWS_WITH_SOCKS5:bool=ON \
       .
   else
-    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+    run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" cmake -D LWS_WITH_SOCKS5:bool=ON .
   fi
-  run env CFLAGS= CXXFLAGS= LDFLAGS= make
+  run env CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" make
   popd > /dev/null || exit 1
 }
 
