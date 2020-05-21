@@ -15,8 +15,8 @@ contributions.
 All our documentation is aggregated and published at [learn.netdata.cloud](https://learn.netdata.cloud/).
 
 Like all contributing to all other aspects of Netdata, we ask that anyone who wants to help with documentation read and
-abide by the [Contributor Convenant Code of Conduct](https://github.com/netdata/netdata/blob/master/CODE_OF_CONDUCT.md) and follow the
-instructions outlined in our [Contributing document](https://github.com/netdata/netdata/blob/master/CONTRIBUTING.md).
+abide by the [Contributor Convenant Code of Conduct](/CODE_OF_CONDUCT.md) and follow the
+instructions outlined in our [Contributing document](/CONTRIBUTING.md).
 
 We also ask you to read our [documentation style guide](/docs/contributing/style-guide.md), which, while not complete,
 will give you some guidance on how we write and organize our documentation.
@@ -42,7 +42,9 @@ a typo or clarifying a confusing sentence.
 Editing locally is more complicated but allows you to organize complex projects. By building documentation locally, you
 can preview your work using a local web server before you submit your PR.
 
-In both cases, you'll finish by submitting a pull request (PR).
+In both cases, you'll finish by submitting a pull request (PR). Once you submit your PR, GitHub will initiate a number
+of jobs, including a Netlify preview. You can use this preview to view the documentation site with your changes applied,
+which might help you catch any lingering issues.
 
 To continue, follow one of the paths below:
 
