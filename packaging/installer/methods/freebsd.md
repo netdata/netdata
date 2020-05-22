@@ -49,6 +49,7 @@ Finally, and very importantly, update Netdata using the script provided by the N
 cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 ```
 
+All set, we can now access the Netdata Web Interface. Ex: `http://server.ip:19999`:
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
