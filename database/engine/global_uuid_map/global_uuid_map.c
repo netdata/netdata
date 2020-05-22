@@ -17,7 +17,7 @@ void guid_bulk_load_lock()
 
 void guid_bulk_load_unlock()
 {
-    uv_rwlock_wrlock(&global_lock);
+    uv_rwlock_wrunlock(&global_lock);
 }
 
 
