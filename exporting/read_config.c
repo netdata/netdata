@@ -336,6 +336,7 @@ struct engine *read_exporting_config()
 
         instance_name = tmp_ci_list->local_ci.instance_name;
 
+        tmp_instance->config.type_name = strdupz(tmp_ci_list->local_ci.connector_name);
         tmp_instance->config.name = strdupz(tmp_ci_list->local_ci.instance_name);
 
 
