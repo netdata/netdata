@@ -7,19 +7,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on FreeBSD
 
-## Install from ports/packages
-You can install Netdata from either the `ports` or `packages` collections. To install from packages:
-
-```sh
-# pkg install netdata
-```
-
-You also need to enable the netdata service in `/etc/rc.conf` and start the service:
-
-```sh
-# sysrc netdata_enable="YES" && service netdata start
-```
-
 ## Install latest version
 This is how to install the latest Netdata version from source on FreeBSD:
 
@@ -96,4 +83,4 @@ For now, this is the way that the Netdata team offers to update the Agent when t
 | `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
-| `--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
+| --disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
