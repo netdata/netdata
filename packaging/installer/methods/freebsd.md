@@ -58,7 +58,7 @@ For now, this is the way that the Netdata team offers to update the Agent when t
 ## Optional parameters to alter your installation
 | parameters | Description |
 |:-----:|-----------|
-|`--install <path>`| Install netdata in <path>. Ex. --install /opt` will put netdata in /opt/netdata|
+|`--install <path>`| Install netdata in <path>. Ex. `--install /opt` will put netdata in /opt/netdata|
 | `--dont-start-it` | Do not (re)start netdata after installation|
 | `--dont-wait` | Run installation in non-interactive mode|
 | `--auto-update` or `-u` | Install netdata-updater in cron to update netdata automatically once per day|
