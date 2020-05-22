@@ -21,13 +21,6 @@ static void exporting_clean_engine()
         aws_sdk_shutdown();
 #endif
 
-    for (struct instance *instance = engine->instance_root; instance;) {
-        struct instance *current_instance = instance;
-        instance = instance->next;
-
-        clean_instance(current_instance);
-    }
-
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     if (engine->protocol_buffers_initialized)
         protocol_buffers_shutdown();
@@ -35,6 +28,13 @@ static void exporting_clean_engine()
 
     //Cleanup web api
     prometheus_clean_server_root();
+
+    for (struct instance *instance = engine->instance_root; instance;) {
+        struct instance *current_instance = instance;
+        instance = instance->next;
+
+        clean_instance(current_instance);
+    }
 
     freez((void *)engine->config.prefix);
     freez((void *)engine->config.hostname);
