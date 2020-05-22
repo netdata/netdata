@@ -17,7 +17,7 @@ typedef struct parser_user_object {
     struct label *new_labels;
     size_t count;
     int enabled;
-    PLUGINSD_ACTION  *plugins_action;
+    //PLUGINSD_ACTION  *plugins_action;
 } PARSER_USER_OBJECT;
 
 #endif //NETDATA_PLUGINSD_PARSER_H

@@ -234,13 +234,13 @@ PARSER_RC pluginsd_overwrite_action(void *user)
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_set(char **words, void *user)
+PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *dimension = words[1];
     char *value = words[2];
 
-    if (((PARSER_USER_OBJECT *)user)->plugins_action->set_action) {
-        return ((PARSER_USER_OBJECT *)user)->plugins_action->set_action(
+    if (plugins_action->set_action) {
+        return plugins_action->set_action(
                 user, (!dimension || !*dimension) ? NULL : dimension, (!value || !*value) ? 0 : strtoll(value, NULL, 0));
     }
 
@@ -282,7 +282,7 @@ disable:
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_begin(char **words, void *user)
+PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *id = words[1];
     char *microseconds_txt = words[2];
@@ -291,24 +291,24 @@ PARSER_RC pluginsd_begin(char **words, void *user)
     if (microseconds_txt && *microseconds_txt)
         microseconds = str2ull(microseconds_txt);
 
-    if (((PARSER_USER_OBJECT *) user)->plugins_action->begin_action) {
-        return ((PARSER_USER_OBJECT *) user)->plugins_action->begin_action(user, id, microseconds);
+    if (plugins_action->begin_action) {
+        return plugins_action->begin_action(user, id, microseconds);
     }
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_end(char **words, void *user)
+PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     UNUSED(words);
 
-    if (((PARSER_USER_OBJECT *) user)->plugins_action->end_action) {
-        return ((PARSER_USER_OBJECT *) user)->plugins_action->end_action(user);
+    if (plugins_action->end_action) {
+        return plugins_action->end_action(user);
     }
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_chart(char **words, void *user)
+PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
 //    RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
@@ -326,7 +326,7 @@ PARSER_RC pluginsd_chart(char **words, void *user)
     char *plugin = words[11];
     char *module = words[12];
 
-    int have_action = ((((PARSER_USER_OBJECT *) user)->plugins_action->chart_action) != NULL);
+    int have_action = ((plugins_action->chart_action) != NULL);
 
     // parse the id from type
     char *id = NULL;
@@ -389,7 +389,7 @@ PARSER_RC pluginsd_chart(char **words, void *user)
         priority, update_every);
 
     if (have_action) {
-        return ((PARSER_USER_OBJECT *)user)->plugins_action->chart_action
+        return plugins_action->chart_action
             (user, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : NULL, module,
              priority, update_every, chart_type, options);
     }
@@ -427,7 +427,7 @@ PARSER_RC pluginsd_chart(char **words, void *user)
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_dimension(char **words, void *user)
+PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *id = words[1];
     char *name = words[2];
@@ -453,8 +453,8 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
     if (unlikely(!algorithm || !*algorithm))
         algorithm = "absolute";
 
-    if (((PARSER_USER_OBJECT *) user)->plugins_action->dimension_action) {
-        return ((PARSER_USER_OBJECT *) user)->plugins_action->dimension_action(
+    if (plugins_action->dimension_action) {
+        return plugins_action->dimension_action(
                 user, (!id || !*id) ? NULL : id, name, algorithm,
             multiplier, divisor, (options && *options)?options:NULL, rrd_algorithm_id(algorithm));
     }
@@ -462,7 +462,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user)
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_variable(char **words, void *user)
+PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *name = words[1];
     char *value = words[2];
@@ -503,35 +503,35 @@ PARSER_RC pluginsd_variable(char **words, void *user)
         }
     }
 
-    if (((PARSER_USER_OBJECT *) user)->plugins_action->variable_action) {
-        return ((PARSER_USER_OBJECT *) user)->plugins_action->variable_action(user, global, name, value? &v : NULL);
+    if (plugins_action->variable_action) {
+        return plugins_action->variable_action(user, global, name, value? &v : NULL);
     }
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_flush(char **words, void *user)
+PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     UNUSED(words);
-    if (((PARSER_USER_OBJECT *)user)->plugins_action->flush_action) {
-        return ((PARSER_USER_OBJECT *)user)->plugins_action->flush_action(user);
+    if (plugins_action->flush_action) {
+        return plugins_action->flush_action(user);
     }
     //((PARSER_USER_OBJECT *)user)->st = NULL;
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_disable(char **words, void *user)
+PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     UNUSED(user);
     UNUSED(words);
 
-    if (((PARSER_USER_OBJECT *)user)->plugins_action->disable_action) {
-        return ((PARSER_USER_OBJECT *)user)->plugins_action->disable_action(user);
+    if (plugins_action->disable_action) {
+        return plugins_action->disable_action(user);
     }
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC pluginsd_label(char **words, void *user)
+PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *store;
     if (!words[4])
@@ -557,8 +557,8 @@ PARSER_RC pluginsd_label(char **words, void *user)
         }
     }
 
-    if (((PARSER_USER_OBJECT *)user)->plugins_action->label_action) {
-        PARSER_RC rc = ((PARSER_USER_OBJECT *)user)->plugins_action->label_action(user, words[1], store, strtol(words[2], NULL, 10));
+    if (plugins_action->label_action) {
+        PARSER_RC rc = plugins_action->label_action(user, words[1], store, strtol(words[2], NULL, 10));
         if (store != words[3])
             freez(store);
         return rc;
@@ -596,12 +596,12 @@ PARSER_RC pluginsd_label(char **words, void *user)
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_overwrite(char **words, void *user)
+PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     UNUSED(words);
 
-    if (((PARSER_USER_OBJECT *)user)->plugins_action->overwrite_action) {
-        return ((PARSER_USER_OBJECT *)user)->plugins_action->overwrite_action(user);
+    if (plugins_action->overwrite_action) {
+        return plugins_action->overwrite_action(user);
     }
 
 //    debug(D_PLUGINSD, "requested a OVERWITE a variable");
@@ -650,33 +650,16 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         return 0;
     }
 
-    user->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
-    user->plugins_action->begin_action     = &pluginsd_begin_action;
-    user->plugins_action->flush_action     = &pluginsd_flush_action;
-    user->plugins_action->end_action       = &pluginsd_end_action;
-    user->plugins_action->disable_action   = &pluginsd_disable_action;
-    user->plugins_action->variable_action  = &pluginsd_variable_action;
-    user->plugins_action->dimension_action = &pluginsd_dimension_action;
-    user->plugins_action->label_action     = &pluginsd_label_action;
-    user->plugins_action->overwrite_action = &pluginsd_overwrite_action;
-    user->plugins_action->chart_action     = &pluginsd_chart_action;
+    parser->plugins_action->begin_action     = &pluginsd_begin_action;
+    parser->plugins_action->flush_action     = &pluginsd_flush_action;
+    parser->plugins_action->end_action       = &pluginsd_end_action;
+    parser->plugins_action->disable_action   = &pluginsd_disable_action;
+    parser->plugins_action->variable_action  = &pluginsd_variable_action;
+    parser->plugins_action->dimension_action = &pluginsd_dimension_action;
+    parser->plugins_action->label_action     = &pluginsd_label_action;
+    parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
+    parser->plugins_action->chart_action     = &pluginsd_chart_action;
 
-    int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
-    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
-    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid);
-    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
-    //rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_TOMBSTONE, pluginsd_tombstone);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
-    rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
-    rc += parser_add_keyword(parser, "SET", pluginsd_set);
-
-    info("Registered %d keywords for the parser", rc);
     user->parser = parser;
 
     while (likely(!parser_next(parser))) {

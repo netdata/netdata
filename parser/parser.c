@@ -30,28 +30,46 @@ static inline int find_keyword(char *str, char *keyword, int max_size, int (*cus
 
 PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE flags)
 {
-    PARSER *working_parser;
+    PARSER *parser;
 
     // If no parsing input flags, assume SPLIT only
     if (unlikely(!(flags & (PARSER_INPUT_SPLIT | PARSER_INPUT_ORIGINAL))))
         flags |= PARSER_INPUT_SPLIT;
 
-    working_parser = callocz(1, sizeof(*working_parser));
+    parser = callocz(1, sizeof(*parser));
 
-    if (unlikely(!working_parser))
+    if (unlikely(!parser))
         return NULL;
 
-    working_parser->user  = user;
-    working_parser->input = input;
-    working_parser->flags = flags;
-    working_parser->host  = host;
-    //working_parser->unknown_function = NULL;
+    parser->plugins_action = callocz(1, sizeof(PLUGINSD_ACTION));
+    if (unlikely(!parser->plugins_action)) {
+        freez(parser);
+        return NULL;
+    }
+
+    parser->user = user;
+    parser->input = input;
+    parser->flags = flags;
+    parser->host = host;
 #ifdef ENABLE_HTTPS
-    working_parser->bytesleft = 0;
-    working_parser->readfrom  = NULL;
+    parser->bytesleft = 0;
+    parser->readfrom = NULL;
 #endif
 
-    return working_parser;
+    if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
+        int rc = parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
+        rc += parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
+        rc += parser_add_keyword(parser, "SET", pluginsd_set);
+    }
+
+    return parser;
 }
 
 
@@ -62,11 +80,11 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
  *
  */
 
-int parser_push(PARSER *working_parser, char *line)
+int parser_push(PARSER *parser, char *line)
 {
     PARSER_DATA    *tmp_parser_data;
     
-    if (unlikely(!working_parser))
+    if (unlikely(!parser))
         return 1;
 
     if (unlikely(!line))
@@ -74,8 +92,8 @@ int parser_push(PARSER *working_parser, char *line)
 
     tmp_parser_data = callocz(1, sizeof(*tmp_parser_data));
     tmp_parser_data->line = strdupz(line);
-    tmp_parser_data->next = working_parser->data;
-    working_parser->data = tmp_parser_data;
+    tmp_parser_data->next = parser->data;
+    parser->data = tmp_parser_data;
 
     return 0;
 }
@@ -90,28 +108,28 @@ int parser_push(PARSER *working_parser, char *line)
  *       : 0 Error
  */
 
-int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func)
+int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
 {
     PARSER_KEYWORD  *tmp_keyword;
 
     if (strcmp(keyword, "_read") == 0) {
-        working_parser->read_function = (void *) func;
+        parser->read_function = (void *) func;
         return 0;
     }
 
     if (strcmp(keyword, "_eof") == 0) {
-        working_parser->eof_function = (void *) func;
+        parser->eof_function = (void *) func;
         return 0;
     }
 
     if (strcmp(keyword, "_unknown") == 0) {
-        working_parser->unknown_function = (void *) func;
+        parser->unknown_function = (void *) func;
         return 0;
     }
 
     uint32_t    keyword_hash = simple_hash(keyword);
 
-    tmp_keyword = working_parser->keyword;
+    tmp_keyword = parser->keyword;
 
     while (tmp_keyword) {
         if (tmp_keyword->keyword_hash == keyword_hash && (!strcmp(tmp_keyword->keyword, keyword))) {
@@ -129,8 +147,8 @@ int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function f
     tmp_keyword->keyword_hash = keyword_hash;
     tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
 
-    tmp_keyword->next = working_parser->keyword;
-    working_parser->keyword = tmp_keyword;
+    tmp_keyword->next = parser->keyword;
+    parser->keyword = tmp_keyword;
     return tmp_keyword->func_no;
 }
 
@@ -138,16 +156,16 @@ int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function f
  * Cleanup a previously allocated parser
  */
 
-void parser_destroy(PARSER *working_parser)
+void parser_destroy(PARSER *parser)
 {
-    if (unlikely(!working_parser))
+    if (unlikely(!parser))
         return;
 
     PARSER_KEYWORD  *tmp_keyword, *tmp_keyword_next;
     PARSER_DATA     *tmp_parser_data, *tmp_parser_data_next;
     
     // Remove keywords
-    tmp_keyword = working_parser->keyword;
+    tmp_keyword = parser->keyword;
     while (tmp_keyword) {
         tmp_keyword_next = tmp_keyword->next;
         freez(tmp_keyword->keyword);
@@ -156,7 +174,7 @@ void parser_destroy(PARSER *working_parser)
     }
     
     // Remove pushed data if any
-    tmp_parser_data = working_parser->data;
+    tmp_parser_data = parser->data;
     while (tmp_parser_data) {
         tmp_parser_data_next = tmp_parser_data->next;
         freez(tmp_parser_data->line);
@@ -164,7 +182,9 @@ void parser_destroy(PARSER *working_parser)
         tmp_parser_data =  tmp_parser_data_next;
     }
 
-    freez(working_parser);
+    freez(parser->plugins_action);
+
+    freez(parser);
     return;
 }
 
@@ -174,20 +194,20 @@ void parser_destroy(PARSER *working_parser)
  *
  */
 
-int parser_next(PARSER *working_parser)
+int parser_next(PARSER *parser)
 {
     char    *tmp = NULL;
 
-    if (unlikely(!working_parser))
+    if (unlikely(!parser))
         return 1;
 
-    working_parser->flags &= ~(PARSER_INPUT_PROCESSED);
+    parser->flags &= ~(PARSER_INPUT_PROCESSED);
 
-    PARSER_DATA  *tmp_parser_data = working_parser->data;
+    PARSER_DATA  *tmp_parser_data = parser->data;
 
     if (unlikely(tmp_parser_data)) {
-        strncpyz(working_parser->buffer, tmp_parser_data->line, PLUGINSD_LINE_MAX);
-        working_parser->data = tmp_parser_data->next;
+        strncpyz(parser->buffer, tmp_parser_data->line, PLUGINSD_LINE_MAX);
+        parser->data = tmp_parser_data->next;
         freez(tmp_parser_data->line);
         freez(tmp_parser_data);
         return 0;
@@ -196,49 +216,49 @@ int parser_next(PARSER *working_parser)
 #ifdef ENABLE_HTTPS
     int normalread = 1;
     if (netdata_srv_ctx) {
-        if (working_parser->host->stream_ssl.conn && !working_parser->host->stream_ssl.flags) {
-            tmp = working_parser->buffer;
-            if (!working_parser->bytesleft) {
-                working_parser->readfrom = working_parser->tmpbuffer;
-                working_parser->bytesleft =
-                    pluginsd_update_buffer(working_parser->readfrom, working_parser->host->stream_ssl.conn);
-                if (working_parser->bytesleft <= 0) {
+        if (parser->host->stream_ssl.conn && !parser->host->stream_ssl.flags) {
+            tmp = parser->buffer;
+            if (!parser->bytesleft) {
+                parser->readfrom = parser->tmpbuffer;
+                parser->bytesleft =
+                    pluginsd_update_buffer(parser->readfrom, parser->host->stream_ssl.conn);
+                if (parser->bytesleft <= 0) {
                     return 1;
                 }
             }
 
-            working_parser->readfrom = pluginsd_get_from_buffer(
-                working_parser->buffer, &working_parser->bytesleft, working_parser->readfrom,
-                working_parser->host->stream_ssl.conn, working_parser->tmpbuffer);
+            parser->readfrom = pluginsd_get_from_buffer(
+                parser->buffer, &parser->bytesleft, parser->readfrom,
+                parser->host->stream_ssl.conn, parser->tmpbuffer);
 
-            if (!working_parser->readfrom)
+            if (!parser->readfrom)
                 tmp = NULL;
 
             normalread = 0;
         }
     }
     if (normalread) {
-        if (unlikely(working_parser->read_function))
-            tmp = working_parser->read_function(working_parser->buffer, PLUGINSD_LINE_MAX, working_parser->input);
+        if (unlikely(parser->read_function))
+            tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->input);
         else
-            tmp = fgets(working_parser->buffer, PLUGINSD_LINE_MAX, (FILE *)working_parser->input);
+            tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->input);
     }
 #else
-    if (unlikely(working_parser->read_function))
-        tmp = working_parser->read_function(working_parser->buffer, PLUGINSD_LINE_MAX, working_parser->input);
+    if (unlikely(parser->read_function))
+        tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->input);
     else
-        tmp = fgets(working_parser->buffer, PLUGINSD_LINE_MAX, (FILE *)working_parser->input);
+        tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->input);
 #endif
 
     if (unlikely(!tmp)) {
-        if (unlikely(working_parser->eof_function)) {
-            int rc = working_parser->eof_function(working_parser->input);
+        if (unlikely(parser->eof_function)) {
+            int rc = parser->eof_function(parser->input);
             error("read failed: user defined function returned %d", rc);
         }
         else {
-            if (feof((FILE *)working_parser->input))
+            if (feof((FILE *)parser->input))
                 error("read failed: end of file");
-            else if (ferror((FILE *)working_parser->input))
+            else if (ferror((FILE *)parser->input))
                 error("read failed: input error");
             else
                 error("read failed: unknown error");
@@ -255,7 +275,7 @@ int parser_next(PARSER *working_parser)
 *
 */
 
-inline int parser_action(PARSER *working_parser, char *input)
+inline int parser_action(PARSER *parser, char *input)
 {
     PARSER_RC   rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -263,26 +283,26 @@ inline int parser_action(PARSER *working_parser, char *input)
     keyword_function action_function;
     keyword_function *action_function_list = NULL;
 
-    if (unlikely(!working_parser))
+    if (unlikely(!parser))
         return 1;
 
     // if not direct input check if we have reprocessed this
-    if (unlikely(!input && working_parser->flags & PARSER_INPUT_PROCESSED))
+    if (unlikely(!input && parser->flags & PARSER_INPUT_PROCESSED))
         return 0;
 
-    PARSER_KEYWORD  *tmp_keyword = working_parser->keyword;
+    PARSER_KEYWORD  *tmp_keyword = parser->keyword;
     if (unlikely(!tmp_keyword)) {
         return 1;
     }
 
     if (unlikely(!input))
-        input = working_parser->buffer;
+        input = parser->buffer;
 
     if (unlikely(!find_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
         return 1;
 
-    if ((working_parser->flags & PARSER_INPUT_FULL) == PARSER_INPUT_FULL)
-        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, working_parser->recover_input, working_parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
+    if ((parser->flags & PARSER_INPUT_FULL) == PARSER_INPUT_FULL)
+        pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
@@ -298,8 +318,8 @@ inline int parser_action(PARSER *working_parser, char *input)
     }
 
     if (unlikely(!action_function_list)) {
-        if (unlikely(working_parser->unknown_function))
-            rc = working_parser->unknown_function(words, working_parser->user);
+        if (unlikely(parser->unknown_function))
+            rc = parser->unknown_function(words, parser->user, NULL);
         else
             rc = PARSER_RC_ERROR;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -308,28 +328,28 @@ inline int parser_action(PARSER *working_parser, char *input)
     }
     else {
         while ((action_function = *action_function_list) != NULL) {
-                rc = action_function(words, working_parser->user);
+                rc = action_function(words, parser->user, parser->plugins_action);
                 if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
                     break;                
                 action_function_list++;
         }
     }
 
-    if (likely(input == working_parser->buffer))
-        working_parser->flags |= PARSER_INPUT_PROCESSED;
+    if (likely(input == parser->buffer))
+        parser->flags |= PARSER_INPUT_PROCESSED;
 
     return (rc == PARSER_RC_ERROR);
 }
 
-inline int parser_recover_input(PARSER *working_parser)
+inline int parser_recover_input(PARSER *parser)
 {
-    if (unlikely(!working_parser))
+    if (unlikely(!parser))
         return 1;
 
-    for(int i=0; i < PARSER_MAX_RECOVER_KEYWORDS && working_parser->recover_location[i]; i++)
-        *(working_parser->recover_location[i]) = working_parser->recover_input[i];
+    for(int i=0; i < PARSER_MAX_RECOVER_KEYWORDS && parser->recover_location[i]; i++)
+        *(parser->recover_location[i]) = parser->recover_input[i];
 
-    working_parser->recover_location[0] = 0x0;
+    parser->recover_location[0] = 0x0;
 
     return 0;
 }

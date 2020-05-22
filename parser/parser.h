@@ -37,11 +37,13 @@ typedef enum parser_input_type {
     PARSER_INPUT_SPLIT       = 1 << 1,
     PARSER_INPUT_ORIGINAL    = 1 << 2,
     PARSER_INPUT_PROCESSED   = 1 << 3,
+    PARSER_NO_PARSE_INIT     = 1 << 4,
+    PARSER_NO_ACTION_INIT    = 1 << 5,
 } PARSER_INPUT_TYPE;
 
 #define PARSER_INPUT_FULL   (PARSER_INPUT_SPLIT|PARSER_INPUT_ORIGINAL)
 
-typedef PARSER_RC (*keyword_function)(char **, void *);
+typedef PARSER_RC (*keyword_function)(char **, void *, PLUGINSD_ACTION  *plugins_action);
 
 typedef struct parser_keyword {
     char        *keyword;
@@ -56,12 +58,13 @@ typedef struct parser_data {
     struct parser_data *next;
 } PARSER_DATA;
 
-typedef struct incremental_parser {
+typedef struct parser {
     uint8_t version;                // Parser version
     RRDHOST *host;
     void *input;                    // Input source e.g. stream
     PARSER_DATA    *data;           // extra input
     PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
+    PLUGINSD_ACTION *plugins_action;
     void    *user;                  // User defined structure to hold extra state between calls
     uint32_t flags;
 
@@ -86,6 +89,17 @@ int parser_push(PARSER *working_parser, char *line);
 void parser_destroy(PARSER *working_parser);
 int parser_recover_input(PARSER *working_parser);
 
-extern size_t incremental_pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
+extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
+
+extern PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_variable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 
 #endif
