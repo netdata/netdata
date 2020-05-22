@@ -4,7 +4,7 @@ title: "Install Netdata on FreeBSD"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
 ---
 -->
-![image](https://github.com/thoggs/netdata/blob/master/packaging/installer/methods/freebsd-logo.png)
+![image](https://user-images.githubusercontent.com/43221193/82707320-3776b800-9c52-11ea-9b8b-9ff4b1d1d9ac.png)
 
 # Install Netdata on FreeBSD ![image](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png)
 
