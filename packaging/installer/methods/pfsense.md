@@ -29,10 +29,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.7,1
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.2.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.20.0_3.txz
 ```
-
-**Note:** If you receive a `Not Found` error during the last two commands above, you will either need to manually look
-in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its
-URL instead, or you can try manually changing the Netdata version in the URL to the latest version.
+**Note:** If you receive a `Not Found` error running any of the above commands [this bash script](./pfsense_getLatestPackages.sh) will update all of the above packages to the current ones in the repo.  Bash,grep,awk and curl are the only requirements.  These should all be pre-installed on Linux, MacOS, and Windows WSL.
 
 **Note:** On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should should not install Python from the FreeBSD repository as instructed above.
 
