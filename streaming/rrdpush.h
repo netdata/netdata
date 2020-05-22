@@ -3,6 +3,7 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
+#include "../libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 
@@ -23,6 +24,13 @@ typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
+
+/*   TODO: Kill this again
+typedef enum {
+    SENDER_DISCONNECTED,
+    SENDER_CONNECTED
+} SenderState;
+*/
 
 typedef struct {
     char *os_name;
