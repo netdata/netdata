@@ -9,17 +9,12 @@
  */
 static void clean_instance_config(struct instance_config *config)
 {
-    if (config->name)
-        freez((void *)config->name);
+    freez((void *)config->name);
+    freez((void *)config->destination);
 
-    if (config->destination)
-        freez((void *)config->destination);
+    simple_pattern_free(config->charts_pattern);
 
-    if (config->charts_pattern)
-        simple_pattern_free(config->charts_pattern);
-
-    if (config->hosts_pattern)
-        simple_pattern_free(config->hosts_pattern);
+    simple_pattern_free(config->hosts_pattern);
 }
 
 /**
