@@ -37,7 +37,7 @@ Install Netdata in `/opt/netdata` (**need root permission**):
 cd netdata-v* && ./netdata-installer.sh --install /opt
 ```
 
-You also need to enable the netdata service in `/etc/rc.conf` and start the service:
+You also need to enable the netdata service in `/etc/rc.conf`:
 
 ```sh
 sysrc netdata_enable="YES"
