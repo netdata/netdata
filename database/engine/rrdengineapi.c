@@ -42,15 +42,7 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     info("Metric GUID [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
 #endif
     buffer_free(object);
-//    int rc = find_guid_by_object((char *)buffer_tostring(object), &temp_id);
-//    if (rc) {
-//        uuid_generate(temp_id);
-//        int rc = guid_store(temp_id, (char *)buffer_tostring(object));
-//        char uuid_s[36 + 1];
-//        uuid_unparse(temp_id, uuid_s);
-//        info("METRIC INIT GUID [%s] on [%s] rc = %d", uuid_s, (char *) buffer_tostring(object), rc);
-//    }
-    //uuid_copy(*rd->state->metric_uuid, temp_id);
+
     ctx = rd->rrdset->rrdhost->rrdeng_ctx;
     pg_cache = &ctx->pg_cache;
     handle = &rd->state->handle.rrdeng;
@@ -86,13 +78,6 @@ void rrdeng_store_metric_init(RRDDIM *rd)
         uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
     }
     rd->state->rrdeng_uuid = &page_index->id;
-//    {
-//        char old_uuid[36 + 1];
-//        char new_uuid[36 + 1];
-//        uuid_unparse(*rd->state->rrdeng_uuid, old_uuid);
-//        uuid_unparse(*rd->state->metric_uuid, new_uuid);
-//        info("GUID REPL: Old = [%s] --> new [%s]", old_uuid, new_uuid);
-//    }
     handle->page_index = page_index;
 }
 
