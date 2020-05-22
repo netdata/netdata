@@ -251,7 +251,12 @@ static inline void disable_instance(struct instance *instance)
 }
 
 #include "exporting/prometheus/prometheus.h"
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
 #include "exporting/prometheus/remote_write/remote_write.h"
+#endif
+
+#if HAVE_KINESIS
 #include "exporting/aws_kinesis/aws_kinesis.h"
+#endif
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */
