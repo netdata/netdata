@@ -25,13 +25,13 @@ Download Netdata:
 fetch https://github.com/netdata/netdata/releases/download/v1.22.1/netdata-v1.22.1.tar.gz
 ```
 
-Unzip the downloaded file so you can install:
+Unzip the downloaded file:
 
 ```sh
 gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 ```
 
-Install Netdata in `/opt/netdata`, if you want to enable automatic updates, add `--auto-update` or `-u` for install netdata-updater in cron (**need root permission**):
+Install Netdata in `/opt/netdata`, if you want to enable automatic updates, add `--auto-update` or `-u` for install netdata-updater in `cron` (**need root permission**):
 
 ```sh
 cd netdata-v* && ./netdata-installer.sh --install /opt
