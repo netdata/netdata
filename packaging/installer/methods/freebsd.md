@@ -83,4 +83,4 @@ For now, this is the way that the Netdata team offers to update the Agent when t
 | `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
-| --disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
+| `--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
