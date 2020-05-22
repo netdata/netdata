@@ -256,7 +256,7 @@ void simple_connector_worker(void *instance_p)
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        break;
+        return;
 #endif
     }
 
