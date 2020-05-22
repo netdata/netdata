@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 -->
 ![image](https://github.com/thoggs/netdata/blob/master/packaging/installer/methods/freebsd-logo.png)
 
-# Install Netdata on FreeBSD
+# Install Netdata on FreeBSD ![image](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png)
 
 # Netdata ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
