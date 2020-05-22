@@ -95,9 +95,9 @@ Netdata on macOS](/packaging/installer/methods/macos.md)
 FreeBSD](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png) Install
 Netdata on FreeBSD](/packaging/installer/methods/freebsd.md)
 
-[![Install manually from
-source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
-manually from source](/packaging/installer/methods/manual.md)
+[![Install from a Git
+checkout](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
+from a Git checkout](/packaging/installer/methods/manual.md)
 
 [![Install on offline/air-gapped
 systems](https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png) Install on
@@ -118,6 +118,10 @@ installation on FreeNAS](/packaging/installer/methods/freenas.md)
 [![Manual installation on
 Alpine](https://user-images.githubusercontent.com/1153921/76029682-37d4a200-5ef2-11ea-9a2c-a8ffeb1d13c3.png) Manual
 installation on Alpine](/packaging/installer/methods/alpine.md)
+
+[![Build manually from
+source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png)
+Build manually from source](/packaging/installer/methods/source.md)
 
 </div>
 
