@@ -31,7 +31,7 @@ Unzip the downloaded file so you can install:
 gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 ```
 
-Install Netdata in `/opt/netdata` (**need root permission**):
+Install Netdata in `/opt/netdata`, if you want to enable automatic updates, add `--auto-update` or `-u` for install netdata-updater in cron (**need root permission**):
 
 ```sh
 cd netdata-v* && ./netdata-installer.sh --install /opt
