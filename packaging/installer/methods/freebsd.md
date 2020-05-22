@@ -37,7 +37,7 @@ Install Netdata in `/opt/netdata` (**need root permission**):
 cd netdata-v* && ./netdata-installer.sh --install /opt
 ```
 
-Now we will include the flag that will make Netdata boot with FreeBSD, whenever you turn on or restart your computer (**need root permission**):
+You also need to enable the netdata service in `/etc/rc.conf` and start the service:
 
 ```sh
 sysrc netdata_enable="YES"
