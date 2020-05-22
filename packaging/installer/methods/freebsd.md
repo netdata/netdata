@@ -13,25 +13,25 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 ## Install latest version
 This is how to install the latest Netdata version on FreeBSD:
 
-Install required packages (need root permission)
+Install required packages (need root permission):
 
 ```sh
 # pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake
 ```
 
-Download Netdata
+Download Netdata:
 
 ```sh
 # fetch https://github.com/netdata/netdata/releases/download/v1.22.1/netdata-v1.22.1.tar.gz
 ```
 
-Unzip the downloaded file so you can install
+Unzip the downloaded file so you can install:
 
 ```sh
 # gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 ```
 
-Install Netdata in /opt/netdata (need root permission)
+Install Netdata in /opt/netdata (need root permission):
 
 ```sh
 # cd netdata-v* && ./netdata-installer.sh --install /opt
@@ -86,4 +86,4 @@ For now, this is the way that the Netdata team offers to update the Agent when t
 | `--disable-lto` | Disable Link-Time-Optimization. Default: enabled|
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
-| `--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
+|`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
