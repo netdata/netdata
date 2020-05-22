@@ -90,6 +90,10 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
 void clean_prometheus_remote_write(struct instance *instance)
 {
     freez(instance->connector_specific_data);
+
+    struct prometheus_remote_write_specific_config *connector_specific_config =
+        instance->config.connector_specific_config;
+    freez(connector_specific_config->remote_write_path);
 }
 
 /**
