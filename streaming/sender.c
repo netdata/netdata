@@ -21,6 +21,10 @@ struct sender_state {
     size_t not_connected_loops;
 };
 
+extern int netdata_use_ssl_on_stream;
+extern char *netdata_ssl_ca_path;
+extern char *netdata_ssl_ca_file;
+
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     host->rrdpush_sender_connected = 0;
 
