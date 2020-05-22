@@ -422,6 +422,7 @@ API_PLUGIN_FILES = \
 
 STREAMING_PLUGIN_FILES = \
     streaming/rrdpush.c \
+    streaming/sender.c \
     streaming/rrdpush.h \
     $(NULL)
 

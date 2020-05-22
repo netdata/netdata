@@ -6,7 +6,31 @@
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 
+#define CONNECTED_TO_SIZE 100
 #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3
+
+#define STREAMING_PROTOCOL_VERSION "1.1"
+#define START_STREAMING_PROMPT "Hit me baby, push them over..."
+#define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
+#define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
+
+#define HTTP_HEADER_SIZE 8192
+
+#define rrdpush_buffer_lock(host) netdata_mutex_lock(&((host)->rrdpush_sender_buffer_mutex))
+#define rrdpush_buffer_unlock(host) netdata_mutex_unlock(&((host)->rrdpush_sender_buffer_mutex))
+
+typedef enum {
+    RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
+    RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
+} RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
+
+typedef struct {
+    char *os_name;
+    char *os_id;
+    char *os_version;
+    char *kernel_name;
+    char *kernel_version;
+} stream_encoded_t;
 
 extern unsigned int default_rrdpush_enabled;
 extern char *default_rrdpush_destination;
