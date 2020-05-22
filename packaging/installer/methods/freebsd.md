@@ -49,23 +49,23 @@ Finally, and very importantly, update Netdata using the script provided by the N
 cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 ```
 
-![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
-
-From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
-more about the information collected and how to opt-out, check the [anonymous statistics
-page](/docs/anonymous-statistics.md).
-
-
 # Important
 ## Updating the Agent on FreeBSD
 Repeat the last step to update Netdata whenever a new version becomes available. 
 The `netdata-updater.sh` script will update your Agent. 
 For now, this is the way that the Netdata team offers to update the Agent when there is a new version.
 
-## Optional parameters to alter your installation
+
+![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
+
+From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
+more about the information collected and how to opt-out, check the [anonymous statistics
+page](/docs/anonymous-statistics.md).
+
+# Optional parameters to alter your installation
 | parameters | Description |
 |:-----:|-----------|
-|`--install <path>`| Install netdata in `<path>.` Ex: `--install /opt` will put netdata in `/opt/netdata`|
+|`--install <path>`| Install netdata in <path>.` Ex: `--install /opt` will put netdata in `/opt/netdata`|
 | `--dont-start-it` | Do not (re)start netdata after installation|
 | `--dont-wait` | Run installation in non-interactive mode|
 | `--auto-update` or `-u` | Install netdata-updater in cron to update netdata automatically once per day|
