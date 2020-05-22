@@ -33,6 +33,11 @@ static void exporting_clean_engine()
         struct instance *current_instance = instance;
         instance = instance->next;
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+        if (current_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
+            clean_prometheus_remote_write(current_instance);
+#endif
+
         clean_instance(current_instance);
     }
 

@@ -83,6 +83,16 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
 }
 
 /**
+ * Release specific data allocated.
+ *
+ * @param instance an instance data structure.
+ */
+void clean_prometheus_remote_write(struct instance *instance)
+{
+    freez(instance->connector_specific_data);
+}
+
+/**
  * Initialize Prometheus Remote Write connector instance
  *
  * @param instance an instance data structure.
