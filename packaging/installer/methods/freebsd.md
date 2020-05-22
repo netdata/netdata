@@ -49,6 +49,13 @@ Finally, and very importantly, update Netdata using the script provided by the N
 cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 ```
 
+![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
+
+From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
+more about the information collected and how to opt-out, check the [anonymous statistics
+page](/docs/anonymous-statistics.md).
+
+
 # Important
 ## Updating the Agent on FreeBSD
 Repeat the last step to update Netdata whenever a new version becomes available. 
@@ -87,10 +94,3 @@ For now, this is the way that the Netdata team offers to update the Agent when t
 | `--disable-x86-sse` | Disable SSE instructions. By default SSE optimizations are enabled|
 | `--zlib-is-really-here` or `--libs-are-really-here` | If you get errors about missing zlib or libuuid but you know it is available, you might have a broken pkg-config. Use this option to proceed without checking pkg-config|
 |`--disable-telemetry` | Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)|
-
-
-![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
-
-From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
-more about the information collected and how to opt-out, check the [anonymous statistics
-page](/docs/anonymous-statistics.md).
