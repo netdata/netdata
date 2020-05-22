@@ -398,4 +398,3 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 
     return 0;
 }
-
