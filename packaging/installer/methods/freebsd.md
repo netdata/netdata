@@ -3,8 +3,8 @@
 title: "Install Netdata on FreeBSD"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
 ---
--->
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)
+-->
 
 # Install Netdata on FreeBSD
 
