@@ -2,7 +2,7 @@
     "replacementPatterns": [
         {
             "pattern": "^/",
-            "replacement": "./"
+            "replacement": "/github/workspace/"
         }
     ]
 }
