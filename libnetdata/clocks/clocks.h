@@ -60,13 +60,23 @@ typedef struct heartbeat {
 
 #endif // CLOCK_BOOTTIME
 
+#ifndef NSEC_PER_MSEC
 #define NSEC_PER_MSEC   1000000ULL
+#endif
 
+#ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC    1000000000ULL
+#endif
+#ifndef NSEC_PER_USEC
 #define NSEC_PER_USEC   1000ULL
+#endif
 
+#ifndef USEC_PER_SEC
 #define USEC_PER_SEC    1000000ULL
+#endif
+#ifndef MSEC_PER_SEC
 #define MSEC_PER_SEC    1000ULL
+#endif
 
 #define USEC_PER_MS     1000ULL
 
