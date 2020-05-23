@@ -60,7 +60,7 @@ page](/docs/anonymous-statistics.md).
 
 # Important
 ## Updating the Agent on FreeBSD
-If you have not passed the `--auto-update` or` -u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 
+If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 
 The `netdata-updater.sh` script will update your Agent.
 
 ## Optional parameters to alter your installation
