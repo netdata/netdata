@@ -13,43 +13,43 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 ## Install latest version
 This is how to install the latest Netdata version on FreeBSD:
 
-Install required packages (**need root permission**):
+- Install required packages (**need root permission**):
 
 ```sh
 pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake
 ```
 
-Download Netdata:
+- Download Netdata:
 
 ```sh
 fetch https://github.com/netdata/netdata/releases/download/v1.22.1/netdata-v1.22.1.tar.gz
 ```
 
-Unzip the downloaded file:
+- Unzip the downloaded file:
 
 ```sh
 gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 ```
 
-Install Netdata in `/opt/netdata`, if you want to enable automatic updates, add `--auto-update` or `-u` for install netdata-updater in `cron` (**need root permission**):
+- Install Netdata in `/opt/netdata`, if you want to enable automatic updates, add `--auto-update` or `-u` for install netdata-updater in `cron` (**need root permission**):
 
 ```sh
 cd netdata-v* && ./netdata-installer.sh --install /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
 ```
 
-You also need to enable the netdata service in `/etc/rc.conf`:
+- You also need to enable the netdata service in `/etc/rc.conf`:
 
 ```sh
 sysrc netdata_enable="YES"
 ```
 
-Finally, and very importantly, update Netdata using the script provided by the Netdata team (**need root permission**):
+- Finally, and very importantly, update Netdata using the script provided by the Netdata team (**need root permission**):
 
 ```sh
 cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 ```
 
-All set, we can now access the Netdata Web Interface. Ex: `http://server.ip:19999`:
+- All set, we can now access the Netdata Web Interface. Ex: `http://server.ip:19999`:
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
