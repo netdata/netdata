@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix docs CI to handle absolute links between docs [\#9132](https://github.com/netdata/netdata/pull/9132) ([joelhans](https://github.com/joelhans))
 - Fix paths to trigger docs CI workflow [\#9128](https://github.com/netdata/netdata/pull/9128) ([joelhans](https://github.com/joelhans))
+- Send anonymous statistics from backends and exporting engine [\#9125](https://github.com/netdata/netdata/pull/9125) ([vlvkobal](https://github.com/vlvkobal))
+- Fix buffer splitting in the Kinesis exporting connector [\#9122](https://github.com/netdata/netdata/pull/9122) ([vlvkobal](https://github.com/vlvkobal))
 - Dynamic memory cleanup for Pub/Sub exporting connector [\#9112](https://github.com/netdata/netdata/pull/9112) ([vlvkobal](https://github.com/vlvkobal))
 - Package: obsoletes conflicting EPEL packages \(\#6879 \#8784\) [\#9108](https://github.com/netdata/netdata/pull/9108) ([Saruspete](https://github.com/Saruspete))
 - Restore SIGCHLD signal handler after being replaced by libuv [\#9107](https://github.com/netdata/netdata/pull/9107) ([mfundul](https://github.com/mfundul))
@@ -31,6 +34,7 @@
 - Fix link in web server log guide [\#9033](https://github.com/netdata/netdata/pull/9033) ([joelhans](https://github.com/joelhans))
 - Included 'cmake' in the list of pkgs installed [\#9031](https://github.com/netdata/netdata/pull/9031) ([zvarnes](https://github.com/zvarnes))
 - Add text to claiming doc about reclaiming with id= [\#9027](https://github.com/netdata/netdata/pull/9027) ([joelhans](https://github.com/joelhans))
+- Fixes enable/start of netdata service in debian package [\#9005](https://github.com/netdata/netdata/pull/9005) ([MrFreezeex](https://github.com/MrFreezeex))
 - Add GitHub CI job to check Markdown links during PRs [\#9003](https://github.com/netdata/netdata/pull/9003) ([joelhans](https://github.com/joelhans))
 - Update step-10.md [\#9000](https://github.com/netdata/netdata/pull/9000) ([Jelmerrevers](https://github.com/Jelmerrevers))
 - Caddy section lacked data persist volumes [\#8999](https://github.com/netdata/netdata/pull/8999) ([webash](https://github.com/webash))
@@ -244,11 +248,6 @@
 - Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
 - Add Patti's dashboard video to docs [\#8385](https://github.com/netdata/netdata/pull/8385) ([joelhans](https://github.com/joelhans))
 - Added deferred error message handling to the installer. [\#8381](https://github.com/netdata/netdata/pull/8381) ([Ferroin](https://github.com/Ferroin))
-- docs: fix go.d modules in the COLLECTORS.md [\#8380](https://github.com/netdata/netdata/pull/8380) ([ilyam8](https://github.com/ilyam8))
-- Fix streaming scaling [\#8375](https://github.com/netdata/netdata/pull/8375) ([mfundul](https://github.com/mfundul))
-- Change topics for ACLK [\#8374](https://github.com/netdata/netdata/pull/8374) ([amoss](https://github.com/amoss))
-- Migrate make dist validation to GHA Workflows [\#8373](https://github.com/netdata/netdata/pull/8373) ([prologic](https://github.com/prologic))
-- Add proper parsing/stripping of comments around docs frontmatter [\#8372](https://github.com/netdata/netdata/pull/8372) ([joelhans](https://github.com/joelhans))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
