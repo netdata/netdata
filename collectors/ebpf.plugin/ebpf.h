@@ -167,4 +167,9 @@ typedef struct ebpf_module {
 extern void *ebpf_process_thread(void *ptr);
 extern void *ebpf_socket_thread(void *ptr);
 
+//Common variables
+extern int close_ebpf_plugin;
+extern int ebpf_nprocs;
+extern int running_on_kernel;
+
 #endif

@@ -38,7 +38,7 @@ void netdata_cleanup_and_exit(int ret) {
 //Netdata eBPF library
 void *libnetdata = NULL;
 int (*load_bpf_file)(char *, int) = NULL;
-int (*set_bpf_perf_event)(int, int);
+int (*set_bpf_perf_event)(int, int) = NULL;
 int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
 int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
 void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
@@ -48,9 +48,6 @@ int *map_fd = NULL;
 static int pmu_fd[NETDATA_MAX_PROCESSOR];
 static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
 int page_cnt = 8;
-
-//Libbpf (It is necessary to have at least kernel 4.10)
-int (*bpf_map_lookup_elem)(int, const void *, void *);
 
 static char *plugin_dir = PLUGINS_DIR;
 static char *user_config_dir = CONFIG_DIR;
@@ -65,14 +62,14 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 
 static int update_every = 1;
 static int thread_finished = 0;
-static int close_plugin = 0;
+int close_ebpf_plugin = 0;
 static netdata_run_mode_t mode = MODE_ENTRY;
 static int debug_log = 0;
 static int use_stdout = 0;
 struct config collector_config;
-static int mykernel = 0;
+int running_on_kernel = 0;
 static char kernel_string[64];
-static int nprocs;
+int ebpf_nprocs;
 static int isrh;
 netdata_idx_t *hash_values;
 
@@ -89,7 +86,7 @@ static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd
 static char *status[] = { "process", "zombie" };
 
 int event_pid = 0;
-netdata_ebpf_events_t collector_events[] = {
+netdata_ebpf_events_t process_probes[] = {
         { .type = 'r', .name = "vfs_write" },
         { .type = 'r', .name = "vfs_writev" },
         { .type = 'r', .name = "vfs_read" },
@@ -115,7 +112,7 @@ void open_developer_log() {
 static int unmap_memory() {
     int i;
     int size = (int)sysconf(_SC_PAGESIZE)*(page_cnt + 1);
-    for ( i = 0 ; i < nprocs ; i++ ) {
+    for ( i = 0 ; i < ebpf_nprocs ; i++ ) {
         if (perf_event_unmap(headers[i], size) < 0) {
             fprintf(stderr,"[EBPF PROCESS] CANNOT unmap headers.\n");
             return -1;
@@ -129,21 +126,11 @@ static int unmap_memory() {
 
 static void int_exit(int sig)
 {
-    close_plugin = 1;
+    close_ebpf_plugin = 1;
 
     //When both threads were not finished case I try to go in front this address, the collector will crash
     if (!thread_finished) {
         return;
-    }
-
-    if (aggregated_data) {
-        free(aggregated_data);
-        aggregated_data = NULL;
-    }
-
-    if (publish_aggregated) {
-        free(publish_aggregated);
-        publish_aggregated = NULL;
     }
 
     if(mode == MODE_DEVMODE && debug_log) {
@@ -158,10 +145,6 @@ static void int_exit(int sig)
     if (developer_log) {
         fclose(developer_log);
         developer_log = NULL;
-    }
-
-    if (hash_values) {
-        freez(hash_values);
     }
 
     if (event_pid) {
@@ -190,7 +173,7 @@ static void int_exit(int sig)
                     open_developer_log();
                 }
                 debug(D_EXIT, "Wait for father %d die", event_pid);
-                clean_kprobe_events(developer_log, event_pid, collector_events);
+                clean_kprobe_events(developer_log, event_pid, process_probes);
             } else {
                 error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
             }
@@ -503,7 +486,7 @@ void *process_publisher(void *ptr)
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!close_plugin) {
+    while(!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -518,74 +501,13 @@ void *process_publisher(void *ptr)
 }
 
 static void move_from_kernel2user_global() {
-    uint64_t idx;
-    netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
 
-    netdata_idx_t *val = hash_values;
-    for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
-        if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
-            uint64_t total = 0;
-            int i;
-            int end = (mykernel < NETDATA_KERNEL_V4_15)?1:nprocs;
-            for (i = 0; i < end; i++)
-                total += val[i];
-
-            res[idx] = total;
-        } else {
-            res[idx] = 0;
-        }
-    }
-
-    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
-    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
-    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
-    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
-    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
-    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
-    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
-    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
-    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
-
-    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
-    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
-    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
-    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
-    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
-    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
-    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
-
-    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
-    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
-}
-
-static void move_from_kernel2user()
-{
-    move_from_kernel2user_global();
-}
-
-void *process_collector(void *ptr)
-{
-    (void)ptr;
-
-    usec_t step = 778879ULL;
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    while(!close_plugin) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-
-        pthread_mutex_lock(&lock);
-        move_from_kernel2user();
-        pthread_mutex_unlock(&lock);
-    }
-
-    return NULL;
 }
 
 static int netdata_store_bpf(void *data, int size) {
     (void)size;
 
-    if (close_plugin)
+    if (close_ebpf_plugin)
         return 0;
 
     if(!debug_log)
@@ -605,7 +527,7 @@ void *process_log(void *ptr)
     (void) ptr;
 
     if (mode == MODE_DEVMODE && debug_log) {
-        netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
+        netdata_perf_loop_multi(pmu_fd, headers, ebpf_nprocs, &close_ebpf_plugin, netdata_store_bpf, page_cnt);
     }
 
     return NULL;
@@ -634,25 +556,6 @@ void set_global_labels() {
     }
 }
 
-int allocate_global_vectors() {
-    aggregated_data = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_syscall_stat_t));
-    if(!aggregated_data) {
-        return -1;
-    }
-
-    publish_aggregated = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_publish_syscall_t));
-    if(!publish_aggregated) {
-        return -1;
-    }
-
-    hash_values = callocz(nprocs, sizeof(netdata_idx_t));
-    if(!hash_values) {
-        return -1;
-    }
-
-    return 0;
-}
-
 static void build_complete_path(char *out, size_t length,char *path, char *filename) {
     if(path){
         snprintf(out, length, "%s/%s", path, filename);
@@ -663,7 +566,7 @@ static void build_complete_path(char *out, size_t length,char *path, char *filen
 
 static int map_memory() {
     int i;
-    for (i = 0; i < nprocs; i++) {
+    for (i = 0; i < ebpf_nprocs; i++) {
         pmu_fd[i] = set_bpf_perf_event(i, 2);
 
         if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
@@ -687,7 +590,7 @@ static int ebpf_load_libraries()
         info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
 
         //Update kernel
-        char *library = ebpf_library_suffix(mykernel, (isrh < 0)?0:1);
+        char *library = ebpf_library_suffix(running_on_kernel, (isrh < 0)?0:1);
         size_t length = strlen(library);
         strncpyz(kernel_string, library, length);
         kernel_string[length] = '\0';
@@ -826,9 +729,9 @@ void set_global_variables() {
 
     page_cnt *= (int)sysconf(_SC_NPROCESSORS_ONLN);
 
-    nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (nprocs > NETDATA_MAX_PROCESSOR) {
-        nprocs = NETDATA_MAX_PROCESSOR;
+    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {
+        ebpf_nprocs = NETDATA_MAX_PROCESSOR;
     }
 
     isrh = get_redhat_release();
@@ -836,18 +739,18 @@ void set_global_variables() {
 
 static void change_collector_event() {
     int i;
-    if (mykernel < NETDATA_KERNEL_V5_3)
-        collector_events[10].name = NULL;
+    if (running_on_kernel < NETDATA_KERNEL_V5_3)
+        process_probes[10].name = NULL;
 
-    for (i = 0; collector_events[i].name ; i++ ) {
-        collector_events[i].type = 'p';
+    for (i = 0; process_probes[i].name ; i++ ) {
+        process_probes[i].type = 'p';
     }
 }
 
 static void change_syscalls() {
     static char *lfork = { "do_fork" };
     id_names[7] = lfork;
-    collector_events[8].name = lfork;
+    process_probes[8].name = lfork;
 }
 
 static inline void what_to_load(char *ptr) {
@@ -1088,8 +991,8 @@ int main(int argc, char **argv)
 {
     parse_args(argc, argv);
 
-    mykernel =  get_kernel_version(kernel_string, 63);
-    if(!has_condition_to_run(mykernel)) {
+    running_on_kernel =  get_kernel_version(kernel_string, 63);
+    if(!has_condition_to_run(running_on_kernel)) {
         error("[EBPF PROCESS] The current collector cannot run on this kernel.");
         return 1;
     }
@@ -1131,12 +1034,6 @@ int main(int argc, char **argv)
     if (process_load_ebpf()) {
         thread_finished++;
         int_exit(4);
-    }
-
-    if(allocate_global_vectors()) {
-        thread_finished++;
-        error("[EBPF_PROCESS] Cannot allocate necessary vectors.");
-        int_exit(5);
     }
 
     if(mode == MODE_DEVMODE && debug_log) {

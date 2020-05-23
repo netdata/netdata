@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 
 #include "../libnetdata.h"
 
@@ -167,4 +168,23 @@ char *ebpf_library_suffix(int version, int isrh) {
     }
 
     return NULL;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
+{
+    char *err = NULL;
+    char lpath[4096];
+    char netdatasl[128];
+    void *libnetdata;
+
+    snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
+    snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
+    libnetdata = dlopen(lpath, RTLD_LAZY);
+    if (!libnetdata) {
+        info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
+    }
+
+    return 0;
 }
