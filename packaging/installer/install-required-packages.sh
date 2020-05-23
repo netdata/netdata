@@ -980,6 +980,7 @@ declare -A pkg_openssl=(
   ['ubuntu']="libssl-dev"
   ['suse']="libopenssl-devel"
   ['clearlinux']="devpkg-openssl"
+  ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['default']="openssl-devel"
 )
