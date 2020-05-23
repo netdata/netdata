@@ -37,12 +37,14 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
     calculated_number *value = (calculated_number *)rv->value;
 
+    buffer_flush(host->sender_build);
     buffer_sprintf(
-            host->rrdpush_sender_buffer
+            host->sender_build
             , "VARIABLE HOST %s = " CALCULATED_NUMBER_FORMAT "\n"
             , rv->name
             , *value
     );
+    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
 
     debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
 }
@@ -104,10 +106,11 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_buffer_lock(host);
 
-    if(buffer_strlen(host->rrdpush_sender_buffer))
-        error("STREAM %s [send]: discarding %zu bytes of metrics already in the buffer.", host->hostname, buffer_strlen(host->rrdpush_sender_buffer));
+    size_t len = cbuffer_next_unsafe(host->sender_buffer, NULL);
+    if (len)
+        error("STREAM %s [send]: discarding %zu bytes of metrics already in the buffer.", host->hostname, len);
 
-    buffer_flush(host->rrdpush_sender_buffer);
+    cbuffer_remove(host->sender_buffer, len);
 
     rrdpush_sender_thread_reset_all_charts(host);
     rrdpush_sender_thread_send_custom_host_variables(host);
@@ -422,6 +425,7 @@ static void attempt_to_connect(struct sender_state *state)
 }
 
 
+// TODO-GAPS Integrate with new state
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     RRDHOST *host = (RRDHOST *)ptr;
 
@@ -443,8 +447,8 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
         host->rrdpush_sender_pipe[PIPE_WRITE] = -1;
     }
 
-    buffer_free(host->rrdpush_sender_buffer);
-    host->rrdpush_sender_buffer = NULL;
+    buffer_free(host->sender_build);
+    host->sender_build = NULL;
 
     if(!host->rrdpush_sender_join) {
         info("STREAM %s [send]: sending thread detaches itself.", host->hostname);
@@ -457,96 +461,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     rrdhost_unlock(host);
     rrdpush_buffer_unlock(host);
-}
-
-struct circular_buffer {
-    size_t size, write, read, max_size;
-    char *data;
-    netdata_mutex_t mutex;
-};
-
-struct circular_buffer *cbuffer_new(size_t initial, size_t max) {
-    struct circular_buffer *result = mallocz(sizeof(*result));
-    result->size = initial;
-    result->data = mallocz(initial);
-    result->write = 0;
-    result->read = 0;
-    result->max_size = max;
-    netdata_mutex_init(&result->mutex);
-    return result;
-}
-
-static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
-    // Check that we can grow
-    if (buf->size >= buf->max_size)
-        return 1;
-    size_t new_size = buf->size * 2;
-    if (new_size > buf->max_size)
-        new_size = buf->max_size;
-
-    // We know that: size < new_size <= max_size
-    // For simplicity align the current data at the bottom of the new buffer
-    char *new_data = mallocz(new_size);
-    if (buf->read == buf->write)
-        buf->write = 0; // buffer is empty
-    else if (buf->read < buf->write) {
-        memcpy(new_data, buf->data + buf->read, buf->write - buf->read);
-        buf->write -= buf->read;
-    } else {
-        size_t top_part = buf->size - buf->read;
-        memcpy(new_data, buf->data + buf->read, top_part);
-        memcpy(new_data + top_part, buf->data, buf->write);
-        buf->write = top_part + buf->write;
-    }
-    buf->read = 0;
-
-    // Switch buffers
-    freez(buf->data);
-    buf->data = new_data;
-    buf->size = new_size;
-    return 0;
-}
-
-int cbuffer_add(struct circular_buffer *buf, char *d, size_t d_len) {
-    netdata_mutex_lock(&buf->mutex);
-    size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
-    while (d_len + len >= buf->size) {
-        if (cbuffer_realloc_unsafe(buf)) {
-            netdata_mutex_unlock(&buf->mutex);
-            return 1;
-        }
-    }
-    // Guarantee: write + d_len cannot hit read
-    if (buf->write + d_len < buf->size) {
-        memcpy(buf->data + buf->write, d, d_len);
-        buf->write += d_len;
-    }
-    else {
-        size_t top_part = buf->size - buf->write;
-        memcpy(buf->data + buf->write, d, top_part);
-        memcpy(buf->data, d + top_part, d_len - top_part); 
-        buf->write = d_len - top_part;
-    }
-    netdata_mutex_unlock(&buf->mutex);
-    return 0;
-}
-
-// Assume caller does not remove too many bytes (i.e. read will jump over write)
-void cbuffer_remove(struct circular_buffer *buf, size_t num) {
-    netdata_mutex_lock(&buf->mutex);
-    buf->read += num;
-    // Assume num < size (i.e. caller cannot remove more bytes than are in the buffer)
-    if (buf->read >= buf->size)
-        buf->read -= buf->size;
-    netdata_mutex_unlock(&buf->mutex);
-}
-
-size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start) {
-    *start = buf->data + buf->read;
-    if (buf->read <= buf->write) {
-        return buf->write - buf->read;      // Includes empty case
-    }
-    return buf->size - buf->read;
 }
 
 
@@ -581,8 +495,10 @@ void *rrdpush_sender_thread(void *ptr) {
     state.reconnect_delay = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
     //remote_clock_resync_iterations = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations); TODO: REMOVING FOR SLEW / GAPFILLING
 
+    // TODO-GAPS Integreate with new state
     // initialize rrdpush globals
-    state.host->rrdpush_sender_buffer = buffer_create(1);
+    state.host->sender_buffer = cbuffer_new(1024, 1024*1024);
+    state.host->sender_build = buffer_create(1);
     state.host->rrdpush_sender_connected = 0;
     if(pipe(state.host->rrdpush_sender_pipe) == -1) {
         error("STREAM %s [send]: cannot create required pipe. DISABLING STREAMING THREAD", state.host->hostname);
@@ -621,7 +537,9 @@ void *rrdpush_sender_thread(void *ptr) {
 
         ofd->fd = state.host->rrdpush_sender_socket;
         ofd->revents = 0;
-        if(ofd->fd != -1 && state.begin < buffer_strlen(state.host->rrdpush_sender_buffer)) {
+        char *chunk;
+        size_t outstanding = cbuffer_next_unsafe(state.host->sender_buffer, &chunk);
+        if(ofd->fd != -1 && outstanding) {
             debug(D_STREAM, "STREAM: Requesting data output on streaming socket %d...", ofd->fd);
             ofd->events = POLLOUT;
             fdmax = 2;
@@ -633,14 +551,14 @@ void *rrdpush_sender_thread(void *ptr) {
             fdmax = 1;
         }
 
-        debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer length %zu bytes)...", buffer_strlen(state.host->rrdpush_sender_buffer));
+        debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer chunk %zu bytes)...", outstanding);
         if(unlikely(netdata_exit)) break;
         int retval = poll(fds, fdmax, 1000);
         if(unlikely(netdata_exit)) break;
 
 
         if(unlikely(retval == -1)) {
-            debug(D_STREAM, "STREAM: poll() failed (current buffer length %zu bytes)...", buffer_strlen(state.host->rrdpush_sender_buffer));
+            debug(D_STREAM, "STREAM: poll() failed (current buffer chunk %zu bytes)...", outstanding);
 
             if(errno == EAGAIN || errno == EINTR) {
                 debug(D_STREAM, "STREAM: poll() failed with EAGAIN or EINTR...");
@@ -655,8 +573,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         if(likely(retval)) {
             if (ifd->revents & POLLIN || ifd->revents & POLLPRI) {
-                debug(D_STREAM, "STREAM: Data added to send buffer (current buffer length %zu bytes)...",
-                      buffer_strlen(state.host->rrdpush_sender_buffer));
+                debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
 
                 char buffer[1000 + 1];
                 if (read(state.host->rrdpush_sender_pipe[PIPE_READ], buffer, 1000) == -1)
@@ -667,9 +584,8 @@ void *rrdpush_sender_thread(void *ptr) {
             if (ofd->revents & POLLOUT) {
                 rrdpush_send_labels(state.host);
 
-                if (state.begin < buffer_strlen(state.host->rrdpush_sender_buffer)) {
-                    debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes, begin = %zu)...",
-                          buffer_strlen(state.host->rrdpush_sender_buffer), state.begin);
+                if (outstanding) {
+                    debug(D_STREAM, "STREAM: Sending data (current buffer chunk %zu bytes", outstanding);
 
                     // BEGIN RRDPUSH LOCKED SESSION
 
@@ -683,17 +599,17 @@ void *rrdpush_sender_thread(void *ptr) {
                     debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
                     rrdpush_buffer_lock(state.host);
 
-                    debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", state.begin, buffer_strlen(state.host->rrdpush_sender_buffer));
+                    debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", outstanding);
                     ssize_t ret;
 #ifdef ENABLE_HTTPS
                     SSL *conn = state.host->ssl.conn ;
                     if(conn && !state.host->ssl.flags) {
-                        ret = SSL_write(conn,&state.host->rrdpush_sender_buffer->buffer[state.begin], buffer_strlen(state.host->rrdpush_sender_buffer) - state.begin);
+                        ret = SSL_write(conn, chunk, outstanding);
                     } else {
-                        ret = send(state.host->rrdpush_sender_socket, &state.host->rrdpush_sender_buffer->buffer[state.begin], buffer_strlen(state.host->rrdpush_sender_buffer) - state.begin, MSG_DONTWAIT);
+                        ret = send(state.host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
                     }
 #else
-                    ret = send(state.host->rrdpush_sender_socket, &state.host->rrdpush_sender_buffer->buffer[state.begin], buffer_strlen(state.host->rrdpush_sender_buffer) - state.begin, MSG_DONTWAIT);
+                    ret = send(state.host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #endif
                     if (unlikely(ret == -1)) {
                         if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
@@ -706,6 +622,7 @@ void *rrdpush_sender_thread(void *ptr) {
                         }
                     }
                     else if (likely(ret > 0)) {
+                        cbuffer_remove(state.host->sender_buffer, ret);
                         // DEBUG - dump the string to see it
                         //char c = host->rrdpush_sender_buffer->buffer[begin + ret];
                         //host->rrdpush_sender_buffer->buffer[begin + ret] = '\0';
@@ -714,26 +631,12 @@ void *rrdpush_sender_thread(void *ptr) {
 
                         state.sent_bytes_on_this_connection += ret;
                         state.sent_bytes += ret;
-                        state.begin += ret;
 
-                        if (state.begin == buffer_strlen(state.host->rrdpush_sender_buffer)) {
-                            // we send it all
-
-                            debug(D_STREAM, "STREAM: Sent %zd bytes (the whole buffer)...", ret);
-                            buffer_flush(state.host->rrdpush_sender_buffer);
-                            state.begin = 0;
-                        }
-                        else {
-                            debug(D_STREAM, "STREAM: Sent %zd bytes (part of the data buffer)...", ret);
-                        }
-
+                        debug(D_STREAM, "STREAM: Sent %zd bytes", ret);
                         state.last_sent_t = now_monotonic_sec();
                     }
                     else {
-                        debug(D_STREAM, "STREAM: send() returned %zd - closing the socket...", ret);
-                        error("STREAM %s [send to %s]: failed to send metrics (send() returned %zd) - closing connection - we have sent %zu bytes on this connection.",
-                              state.host->hostname, state.connected_to, ret, state.sent_bytes_on_this_connection);
-                        rrdpush_sender_thread_close_socket(state.host);
+                        debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
                     }
 
                     debug(D_STREAM, "STREAM: Releasing exclusive lock on host...");
@@ -771,13 +674,15 @@ void *rrdpush_sender_thread(void *ptr) {
             debug(D_STREAM, "STREAM: poll() timed out.");
         }
 
-        // protection from overflow
+        // TODO-GAPS Overflow will be detected when collector fails to write to buffer, check flag in this
+        //           loop and tear down for restart
+        /*// protection from overflow
         if (buffer_strlen(state.host->rrdpush_sender_buffer) > state.max_size) {
             debug(D_STREAM, "STREAM: Buffer is too big (%zu bytes), bigger than the max (%zu) - flushing it...", buffer_strlen(state.host->rrdpush_sender_buffer), state.max_size);
             errno = 0;
             error("STREAM %s [send to %s]: too many data pending - buffer is %zu bytes long, %zu unsent - we have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", state.host->hostname, state.connected_to, state.host->rrdpush_sender_buffer->len, state.host->rrdpush_sender_buffer->len - state.begin, state.sent_bytes, state.sent_bytes_on_this_connection);
             rrdpush_sender_thread_close_socket(state.host);
-        }
+        }*/
     }
 
     netdata_thread_cleanup_pop(1);

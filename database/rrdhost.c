@@ -1193,11 +1193,12 @@ void reload_host_labels()
     health_label_log_save(localhost);
     rrdhost_unlock(localhost);
 
+/*  TODO-GAPS - fix this so that it looks properly at the state and version of the sender
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
         localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         rrdpush_send_labels(localhost);
     }
-
+*/
     health_reload();
 }
 
