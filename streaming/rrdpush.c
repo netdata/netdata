@@ -203,10 +203,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     }
 
     // info("CHART '%s' '%s'", st->id, name);
+    buffer_flush(host->sender_build);
 
     // send the chart
     buffer_sprintf(
-            host->rrdpush_sender_buffer
+            host->sender_build
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
             , name
@@ -229,7 +230,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
-                host->rrdpush_sender_buffer
+                host->sender_build
                 , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
                 , rd->id
                 , rd->name
@@ -250,13 +251,14 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             calculated_number *value = (calculated_number *) rs->value;
 
             buffer_sprintf(
-                    host->rrdpush_sender_buffer
+                    host->sender_build
                     , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
                     , rs->variable
                     , *value
             );
         }
     }
+    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
@@ -264,19 +266,20 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    buffer_flush(host->sender_build);
+    buffer_sprintf(host->sender_build, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(rd->updated && rd->exposed)
-            buffer_sprintf(host->rrdpush_sender_buffer
+            buffer_sprintf(host->sender_build
                            , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
                            , rd->id
                            , rd->collected_value
         );
     }
-
-    buffer_strcat(host->rrdpush_sender_buffer, "END\n");
+    buffer_strcat(host->sender_build, "END\n");
+    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
 }
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
@@ -305,7 +308,8 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(host->rrdpush_send_enabled && !host->rrdpush_sender_spawn))
         rrdpush_sender_thread_spawn(host);
 
-    if(unlikely(!host->rrdpush_sender_buffer || !host->rrdpush_sender_connected)) {
+    // TODO-GAPS Replace sender_build state with proper state
+    if(unlikely(!host->sender_build || !host->rrdpush_sender_connected)) {
         if(unlikely(!host->rrdpush_sender_error_shown))
             error("STREAM %s [send]: not ready - discarding collected metrics.", host->hostname);
 
@@ -336,13 +340,15 @@ void rrdpush_send_labels(RRDHOST *host) {
     if (!host->labels || !(host->labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
         return;
 
+    // TODO-GAPS Update mutex for new state
+    buffer_flush(host->sender_build);
     rrdpush_buffer_lock(host);
     rrdhost_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
 
     struct label *labels = host->labels;
     while(labels) {
-        buffer_sprintf(host->rrdpush_sender_buffer
+        buffer_sprintf(host->sender_build
                 , "LABEL \"%s\" = %d %s\n"
                 , labels->key
                 , (int)labels->label_source
@@ -351,7 +357,7 @@ void rrdpush_send_labels(RRDHOST *host) {
         labels = labels->next;
     }
 
-    buffer_sprintf(host->rrdpush_sender_buffer
+    buffer_sprintf(host->sender_build
             , "OVERWRITE %s\n", "labels");
 
     netdata_rwlock_unlock(&host->labels_rwlock);
@@ -360,6 +366,7 @@ void rrdpush_send_labels(RRDHOST *host) {
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 
+    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
     rrdpush_buffer_unlock(host);
     host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }

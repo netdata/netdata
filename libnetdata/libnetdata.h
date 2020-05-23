@@ -300,6 +300,7 @@ extern char *netdata_configured_host_prefix;
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"
+#include "circular_buffer/circular_buffer.h"
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"

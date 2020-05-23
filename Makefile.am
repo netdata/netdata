@@ -138,6 +138,8 @@ LIBNETDATA_FILES = \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
+    libnetdata/circular_buffer/circular_buffer.c \
+    libnetdata/circular_buffer/circular_buffer.h \
     libnetdata/clocks/clocks.c \
     libnetdata/clocks/clocks.h \
     libnetdata/dictionary/dictionary.c \
