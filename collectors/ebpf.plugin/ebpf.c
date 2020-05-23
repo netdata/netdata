@@ -78,17 +78,9 @@ netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
-static struct ebpf_module {
-    const char *thread_name;
-    int enabled;
-    void (*start_routine) (void *);
-    int update_time;
-    int global_charts;
-    int apps_charts;
-    netdata_run_mode_t mode;
-} ebpf_modules[] = {
-    { .thread_name = "process", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
-    { .thread_name = "network_viewer", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
+ebpf_module_t ebpf_modules[] = {
+    { .thread_name = "process", .enabled = 0, .start_routine = ebpf_process_thread, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
+    { .thread_name = "network_viewer", .enabled = 0, .start_routine = ebpf_socket_thread, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY },
 };
 
@@ -1175,10 +1167,12 @@ int main(int argc, char **argv)
     int i;
     int end = NETDATA_EBPF_PROCESS_THREADS;
 
-    void * (*function_pointer[])(void *) = {process_publisher, process_collector, process_log };
+    void * (*function_pointer[])(void *) = { ebpf_process_thread, ebpf_socket_thread };
 
     for ( i = 0; i < end ; i++ ) {
-        if ( ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) ) {
+        ebpf_module_t *em = &ebpf_modules[i];
+        em->thread_id = i;
+        if ( ( pthread_create(&thread[i], &attr, function_pointer[i], (void *) em) ) ) {
             error("[EBPF_PROCESS] Cannot create threads.");
             thread_finished++;
             int_exit(8);

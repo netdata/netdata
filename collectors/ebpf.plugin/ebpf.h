@@ -27,7 +27,7 @@
 # define NETDATA_PROCESS_START 7
 # define NETDATA_PROCESS_RUNNING_COUNT 9
 
-# define NETDATA_EBPF_PROCESS_THREADS (uint32_t)3
+# define NETDATA_EBPF_PROCESS_THREADS (uint32_t)2
 
 # include <fcntl.h>
 # include <ctype.h>
@@ -83,6 +83,17 @@ typedef struct netdata_error_report {
     int type;
     int err;
 }netdata_error_report_t;
+
+typedef struct ebpf_module {
+    const char *thread_name;
+    int enabled;
+    void *(*start_routine) (void *);
+    int update_time;
+    int global_charts;
+    int apps_charts;
+    netdata_run_mode_t mode;
+    uint32_t thread_id;
+} ebpf_module_t;
 
 //Chart defintions
 # define NETDATA_EBPF_FAMILY "ebpf"
@@ -151,5 +162,9 @@ typedef struct netdata_error_report {
 # define NETDATA_KEY_CALLS_VFS_READV 21
 # define NETDATA_KEY_ERROR_VFS_READV 22
 # define NETDATA_KEY_BYTES_VFS_READV 23
+
+//Threads
+extern void *ebpf_process_thread(void *ptr);
+extern void *ebpf_socket_thread(void *ptr);
 
 #endif
