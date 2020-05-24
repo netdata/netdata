@@ -162,32 +162,6 @@ static void int_exit(int sig)
     exit(sig);
 }
 
-static int netdata_store_bpf(void *data, int size) {
-    (void)size;
-
-    if (close_ebpf_plugin)
-        return 0;
-
-    netdata_error_report_t *e = data;
-    fprintf(developer_log
-            ,"%llu %s %u: %s, %d\n"
-            , now_realtime_usec() ,e->comm, e->pid, dimension_names[e->type], e->err);
-    fflush(developer_log);
-
-    return -2; //LIBBPF_PERF_EVENT_CONT;
-}
-
-void *process_log(void *ptr)
-{
-    (void) ptr;
-
-    if (mode == MODE_DEVMODE && debug_log) {
-        netdata_perf_loop_multi(pmu_fd, headers, ebpf_nprocs, &close_ebpf_plugin, netdata_store_bpf, page_cnt);
-    }
-
-    return NULL;
-}
-
 void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end) {
     int i;
 
@@ -205,14 +179,6 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
             publish_prev->next = &pio[i];
         }
         publish_prev = &pio[i];
-    }
-}
-
-static void build_complete_path(char *out, size_t length,char *path, char *filename) {
-    if(path){
-        snprintf(out, length, "%s/%s", path, filename);
-    } else {
-        snprintf(out, length, "%s", filename);
     }
 }
 
@@ -449,8 +415,6 @@ void fill_ebpf_functions(ebpf_functions_t *ef) {
 static inline void how_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
         mode = MODE_RETURN;
-    else
-        change_collector_event();
 }
 
 /**
