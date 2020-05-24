@@ -125,31 +125,33 @@ int guid_bulk_load(char *uuid, char *object)
  *   - Optionally return the object
  */
 
-GUID_TYPE guid_find(uuid_t *uuid, char *object, size_t max_bytes)
+GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
 {
     Pvoid_t *PValue;
+    GUID_TYPE   value_type;
 
+    uv_rwlock_rdlock(&global_lock); // TODO: locks
     PValue = JudyHSGet(JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t));
     if (unlikely(!PValue))
         return GUID_TYPE_NOTFOUND;
 
-    char *value = *PValue;
+    value_type = *PValue;
 
     if (likely(object && max_bytes)) {
-        switch (*value) {
+        switch (value_type) {
             case GUID_TYPE_CHAR:
-                if (unlikely(max_bytes - 1 < strlen(value+1)))
+                if (unlikely(max_bytes - 1 < strlen(*PValue+1)))
                     return GUID_TYPE_NOSPACE;
-                strncpyz(object, value+1, max_bytes - 1);
+                strncpyz(object, *PValue+1, max_bytes - 1);
                 break;
             case GUID_TYPE_CHART:
             case GUID_TYPE_DIMENSION:
-                if (unlikely(max_bytes < (size_t) *value * 16))
+                if (unlikely(max_bytes < (size_t) value_type * 16))
                     return GUID_TYPE_NOSPACE;
-                memcpy(object, value+1, *value * 16);
+                memcpy(object, *PValue+1, value_type * 16);
                 break;
             default:
-                return 1;
+                return GUID_TYPE_NOTFOUND;
         }
     }
 
@@ -157,7 +159,7 @@ GUID_TYPE guid_find(uuid_t *uuid, char *object, size_t max_bytes)
     dump_object(uuid, *PValue);
 #endif
 
-    return 0;
+    return value_type;
 }
 
 /*
