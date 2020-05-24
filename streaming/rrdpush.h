@@ -3,6 +3,7 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
+#include "../database/rrd.h"
 #include "../libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
@@ -17,20 +18,10 @@
 
 #define HTTP_HEADER_SIZE 8192
 
-#define rrdpush_buffer_lock(host) netdata_mutex_lock(&((host)->rrdpush_sender_buffer_mutex))
-#define rrdpush_buffer_unlock(host) netdata_mutex_unlock(&((host)->rrdpush_sender_buffer_mutex))
-
 typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
-
-/*   TODO: Kill this again
-typedef enum {
-    SENDER_DISCONNECTED,
-    SENDER_CONNECTED
-} SenderState;
-*/
 
 typedef struct {
     char *os_name;
@@ -40,12 +31,39 @@ typedef struct {
     char *kernel_version;
 } stream_encoded_t;
 
+// Thread-local storage
+    // Metric transmission: collector threads asynchronously fill the buffer, sender thread uses it.
+
+struct sender_state {
+    RRDHOST *host;
+    pid_t task_id;
+    int timeout, default_port;
+    size_t max_size;
+    usec_t reconnect_delay;
+    char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
+    size_t begin;
+    size_t reconnects_counter;
+    size_t sent_bytes;
+    size_t sent_bytes_on_this_connection;
+    size_t send_attempts;
+    time_t last_sent_t;
+    size_t not_connected_loops;
+    // metrics may be collected asynchronously
+    // these synchronize all the threads willing the write to our sending buffer
+    netdata_mutex_t mutex;    // Guard access to buffer / build
+    struct circular_buffer *buffer;
+    BUFFER *build;
+};
+
 extern unsigned int default_rrdpush_enabled;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
+extern void sender_init(struct sender_state *s, RRDHOST *parent);
+void sender_start(struct sender_state *s);
+void sender_commit(struct sender_state *s);
 extern int rrdpush_init();
 extern int configured_as_master();
 extern void rrdset_done_push(RRDSET *st);

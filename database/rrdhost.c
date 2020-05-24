@@ -139,6 +139,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->disk_space_mb       = default_rrdeng_disk_quota_mb;
 #endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
+
+    // TODO-GAPS finish integrating state
+    host->sender = mallocz(sizeof(*host->sender));
+    sender_init(host->sender, host);
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
@@ -156,7 +160,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
 
-    netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels_rwlock);
 
@@ -601,8 +604,13 @@ void rrdhost_free(RRDHOST *host) {
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
-    // stop a possibly running thread
-    rrdpush_sender_thread_stop(host);
+    // ------------------------------------------------------------------------
+    // clean up the sender
+    rrdpush_sender_thread_stop(host); // stop a possibly running thread
+    cbuffer_free(host->sender->buffer);
+    buffer_free(host->sender->build);
+    freez(host->sender);
+    host->sender = NULL;
 
     rrdhost_wrlock(host);   // lock this RRDHOST
 
@@ -667,6 +675,8 @@ void rrdhost_free(RRDHOST *host) {
         if(h) h->next = host->next;
         else error("Request to free RRDHOST '%s': cannot find it", host->hostname);
     }
+
+
 
     // ------------------------------------------------------------------------
     // free it

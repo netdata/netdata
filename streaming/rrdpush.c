@@ -183,7 +183,8 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     return 0;
 }
 
-// sends the current chart definition
+// Send the current chart definition.
+// Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
@@ -202,12 +203,9 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         }
     }
 
-    // info("CHART '%s' '%s'", st->id, name);
-    buffer_flush(host->sender_build);
-
     // send the chart
     buffer_sprintf(
-            host->sender_build
+            host->sender->build
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
             , name
@@ -230,7 +228,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
-                host->sender_build
+                host->sender->build
                 , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
                 , rd->id
                 , rd->name
@@ -251,14 +249,13 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             calculated_number *value = (calculated_number *) rs->value;
 
             buffer_sprintf(
-                    host->sender_build
+                    host->sender->build
                     , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
                     , rs->variable
                     , *value
             );
         }
     }
-    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
@@ -266,24 +263,23 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    buffer_flush(host->sender_build);
-    buffer_sprintf(host->sender_build, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(rd->updated && rd->exposed)
-            buffer_sprintf(host->sender_build
+            buffer_sprintf(host->sender->build
                            , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
                            , rd->id
                            , rd->collected_value
         );
     }
-    buffer_strcat(host->sender_build, "END\n");
-    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
+    buffer_strcat(host->sender->build, "END\n");
 }
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
 
+// Called from the internal collectors to mark a chart obsolete.
 void rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
@@ -291,9 +287,9 @@ void rrdset_push_chart_definition_now(RRDSET *st) {
         return;
 
     rrdset_rdlock(st);
-    rrdpush_buffer_lock(host);
+    sender_start(host->sender);
     rrdpush_send_chart_definition_nolock(st);
-    rrdpush_buffer_unlock(host);
+    sender_commit(host->sender);
     rrdset_unlock(st);
 }
 
@@ -303,25 +299,23 @@ void rrdset_done_push(RRDSET *st) {
 
     RRDHOST *host = st->rrdhost;
 
-    rrdpush_buffer_lock(host);
-
     if(unlikely(host->rrdpush_send_enabled && !host->rrdpush_sender_spawn))
         rrdpush_sender_thread_spawn(host);
 
-    // TODO-GAPS Replace sender_build state with proper state
-    if(unlikely(!host->sender_build || !host->rrdpush_sender_connected)) {
+    // Handle non-connected case
+    if(unlikely(!host->rrdpush_sender_connected)) {
         if(unlikely(!host->rrdpush_sender_error_shown))
             error("STREAM %s [send]: not ready - discarding collected metrics.", host->hostname);
-
         host->rrdpush_sender_error_shown = 1;
-
-        rrdpush_buffer_unlock(host);
         return;
     }
     else if(unlikely(host->rrdpush_sender_error_shown)) {
         info("STREAM %s [send]: sending metrics...", host->hostname);
         host->rrdpush_sender_error_shown = 0;
     }
+
+    // TODO-GAPS Check above works, mutex only covers buffer state
+    sender_start(host->sender);
 
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
@@ -332,7 +326,7 @@ void rrdset_done_push(RRDSET *st) {
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 
-    rrdpush_buffer_unlock(host);
+    sender_commit(host->sender);
 }
 
 // labels
@@ -341,14 +335,13 @@ void rrdpush_send_labels(RRDHOST *host) {
         return;
 
     // TODO-GAPS Update mutex for new state
-    buffer_flush(host->sender_build);
-    rrdpush_buffer_lock(host);
+    sender_start(host->sender);
     rrdhost_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
 
     struct label *labels = host->labels;
     while(labels) {
-        buffer_sprintf(host->sender_build
+        buffer_sprintf(host->sender->build
                 , "LABEL \"%s\" = %d %s\n"
                 , labels->key
                 , (int)labels->label_source
@@ -357,24 +350,26 @@ void rrdpush_send_labels(RRDHOST *host) {
         labels = labels->next;
     }
 
-    buffer_sprintf(host->sender_build
+    buffer_sprintf(host->sender->build
             , "OVERWRITE %s\n", "labels");
 
     netdata_rwlock_unlock(&host->labels_rwlock);
     rrdhost_unlock(host);
+    sender_commit(host->sender);
 
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 
-    cbuffer_add(host->sender_buffer, buffer_tostring(host->sender_build), host->sender_build->len);
-    rrdpush_buffer_unlock(host);
     host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
+// Either the receiver lost the connection or the host is being destroyed.
+// Don't lock the sender buffer - doesn't affect consistency in either case.
+// TODO-GAPS During the host destruction sequence we should make sure the disconnect happens early enough to lock
+//           out collectors hitting the sender. Locking the mutex means there may be waiting threads when we free.
 void rrdpush_sender_thread_stop(RRDHOST *host) {
-    rrdpush_buffer_lock(host);
     rrdhost_wrlock(host);
 
     netdata_thread_t thr = 0;
@@ -394,7 +389,6 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     }
 
     rrdhost_unlock(host);
-    rrdpush_buffer_unlock(host);
 
     if(thr != 0) {
         info("STREAM %s [send]: waiting for the sending thread to stop...", host->hostname);
@@ -736,7 +730,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", host->hostname);
 
-        if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host))
+        if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host->sender))
             error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
         else
             host->rrdpush_sender_spawn = 1;

@@ -1,8 +1,8 @@
 version: '3.3'
 services:
   agent_slave:
-    image: debian_10_dev
-    command: /usr/sbin/netdata -D
+    image: arch_extras_dev
+    command: /usr/sbin/valgrind --leak-check=full /usr/sbin/netdata -D
     ports:
     - 21002:19999
     volumes:

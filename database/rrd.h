@@ -29,6 +29,7 @@ struct pg_cache_page_index;
 #include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
+#include "../streaming/rrdpush.h"
 
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
@@ -692,6 +693,7 @@ struct rrdhost {
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
+    struct sender_state *sender;
     volatile unsigned int rrdpush_sender_spawn:1;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
 
@@ -703,13 +705,6 @@ struct rrdhost {
 
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
-    // Metric transmission: collector threads asynchronously fill the buffer, sender thread uses it.
-    struct circular_buffer *sender_buffer;
-    BUFFER *sender_build;
-
-    // metrics may be collected asynchronously
-    // these synchronize all the threads willing the write to our sending buffer
-    netdata_mutex_t rrdpush_sender_buffer_mutex;    // exclusive access to rrdpush_sender_buffer
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     //BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
 
