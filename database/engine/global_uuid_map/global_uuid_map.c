@@ -9,13 +9,13 @@ static uv_rwlock_t object_lock;
 static uv_rwlock_t global_lock;
 
 
-void   dump_object(uuid_t *index, char *object)
+void   dump_object(uuid_t *index, void *object)
 {
     char uuid_s[36 + 1];
     uuid_unparse_lower(*index, uuid_s);
     char local_object[3 * 36 + 2 + 1];
 
-    switch (*object) {
+    switch (*(char *) object) {
         case GUID_TYPE_CHAR:
             debug(D_GUIDLOG, "OBJECT GUID %s on [%s]", uuid_s, (char *)object + 1);
             break;
@@ -40,18 +40,6 @@ void   dump_object(uuid_t *index, char *object)
     }
 }
 
-void guid_bulk_load_lock()
-{
-    uv_rwlock_wrlock(&global_lock);
-
-}
-
-void guid_bulk_load_unlock()
-{
-    uv_rwlock_wrunlock(&global_lock);
-}
-
-
 static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object_type)
 {
     if (unlikely(!object) || uuid == NULL)
@@ -59,8 +47,6 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
 
     Pvoid_t *PValue;
 
-//    if (likely(lock))
-//        uv_rwlock_wrlock(&global_lock);
     PValue = JudyHSIns(&JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t), PJE0);
     if (PPJERR == PValue)
         fatal("JudyHSIns() fatal error.");
@@ -77,8 +63,6 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
         uuid_copy(*value, *uuid);
         *PValue = value;
     }
-//    if (likely(lock))
-//        uv_rwlock_wrunlock(&global_lock);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t count = 0;
@@ -130,19 +114,21 @@ GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
     Pvoid_t *PValue;
     GUID_TYPE   value_type;
 
-    uv_rwlock_rdlock(&global_lock); // TODO: locks
+    uv_rwlock_rdlock(&global_lock);
     PValue = JudyHSGet(JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t));
-    if (unlikely(!PValue))
+    if (unlikely(!PValue)) {
+        uv_rwlock_rdunlock(&global_lock);
         return GUID_TYPE_NOTFOUND;
+    }
 
-    value_type = *PValue;
+    value_type = *(char *) *PValue;
 
     if (likely(object && max_bytes)) {
         switch (value_type) {
             case GUID_TYPE_CHAR:
-                if (unlikely(max_bytes - 1 < strlen(*PValue+1)))
+                if (unlikely(max_bytes - 1 < strlen((char *) *PValue+1)))
                     return GUID_TYPE_NOSPACE;
-                strncpyz(object, *PValue+1, max_bytes - 1);
+                strncpyz(object, (char *) *PValue+1, max_bytes - 1);
                 break;
             case GUID_TYPE_CHART:
             case GUID_TYPE_DIMENSION:
@@ -151,6 +137,7 @@ GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
                 memcpy(object, *PValue+1, value_type * 16);
                 break;
             default:
+                uv_rwlock_rdunlock(&global_lock);
                 return GUID_TYPE_NOTFOUND;
         }
     }
@@ -158,7 +145,7 @@ GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
 #ifdef NETDATA_INTERNAL_CHECKS
     dump_object(uuid, *PValue);
 #endif
-
+    uv_rwlock_rdunlock(&global_lock);
     return value_type;
 }
 
@@ -172,13 +159,16 @@ int find_guid_by_object(char *object, uuid_t *uuid, GUID_TYPE object_type)
 {
     Pvoid_t *PValue;
 
+    uv_rwlock_rdlock(&global_lock);
     PValue = JudyHSGet(JGUID_object_map, (void *)object, (Word_t)object_type?object_type*16+1:strlen(object+1)+2);
-    if (unlikely(!PValue))
+    if (unlikely(!PValue)) {
+        uv_rwlock_rdunlock(&global_lock);
         return 1;
+    }
 
     if (likely(uuid))
         uuid_copy(*uuid, *PValue);
-
+    uv_rwlock_rdunlock(&global_lock);
     return 0;
 }
 
@@ -214,15 +204,15 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
         default:
             return 1;
     }
-    uv_rwlock_wrlock(&global_lock);
     rc = find_guid_by_object(target_object, uuid, object_type);
     if (rc) {
         uuid_generate(*uuid);
+        uv_rwlock_wrlock(&global_lock);
         int rc = guid_store_nolock(uuid, target_object, object_type);
         uv_rwlock_wrunlock(&global_lock);
         return rc;
     }
-    uv_rwlock_wrunlock(&global_lock);
+    //uv_rwlock_wrunlock(&global_lock);
 #ifdef NETDATA_INTERNAL_CHECKS
     dump_object(uuid, target_object);
 #endif

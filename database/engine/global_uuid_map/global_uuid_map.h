@@ -17,7 +17,7 @@ typedef enum guid_type {
 } GUID_TYPE;
 
 extern int guid_store(uuid_t *uuid, char *object, GUID_TYPE);
-extern GUID_TYPE guid_find(uuid_t *uuid, char *object, size_t max_bytes);
+extern GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes);
 extern int find_guid_by_object(char *object, uuid_t *uuid, GUID_TYPE);
 extern void init_global_guid_map();
 extern int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type);
