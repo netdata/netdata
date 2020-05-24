@@ -109,21 +109,6 @@ void open_developer_log() {
         developer_log = fopen(filename, "a");
 }
 
-static int unmap_memory() {
-    int i;
-    int size = (int)sysconf(_SC_PAGESIZE)*(page_cnt + 1);
-    for ( i = 0 ; i < ebpf_nprocs ; i++ ) {
-        if (perf_event_unmap(headers[i], size) < 0) {
-            fprintf(stderr,"[EBPF PROCESS] CANNOT unmap headers.\n");
-            return -1;
-        }
-
-        close(pmu_fd[i]);
-    }
-
-    return 0;
-}
-
 static void int_exit(int sig)
 {
     close_ebpf_plugin = 1;
@@ -131,10 +116,6 @@ static void int_exit(int sig)
     //When both threads were not finished case I try to go in front this address, the collector will crash
     if (!thread_finished) {
         return;
-    }
-
-    if(mode == MODE_DEVMODE && debug_log) {
-        unmap_memory();
     }
 
     if (libnetdata) {
@@ -564,151 +545,6 @@ static void build_complete_path(char *out, size_t length,char *path, char *filen
     }
 }
 
-static int map_memory() {
-    int i;
-    for (i = 0; i < ebpf_nprocs; i++) {
-        pmu_fd[i] = set_bpf_perf_event(i, 2);
-
-        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
-            return -1;
-        }
-    }
-    return 0;
-}
-
-static int ebpf_load_libraries()
-{
-    char *err = NULL;
-    char lpath[4096];
-    char netdatasl[128];
-    char *libbase = { "libnetdata_ebpf.so" };
-
-    snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
-    build_complete_path(lpath, 4096, plugin_dir, netdatasl);
-    libnetdata = dlopen(lpath, RTLD_LAZY);
-    if (!libnetdata) {
-        info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
-
-        //Update kernel
-        char *library = ebpf_library_suffix(running_on_kernel, (isrh < 0)?0:1);
-        size_t length = strlen(library);
-        strncpyz(kernel_string, library, length);
-        kernel_string[length] = '\0';
-
-        //Try to load the default version
-        snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
-        build_complete_path(lpath, 4096, plugin_dir, netdatasl);
-        libnetdata = dlopen(lpath, RTLD_LAZY);
-        if (!libnetdata) {
-            error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
-            return -1;
-        } else {
-            info("[EBPF_PROCESS] Default shared library %s loaded with success.", lpath);
-        }
-    } else {
-        info("[EBPF_PROCESS] Current shared library %s loaded with success.", lpath);
-    }
-
-    load_bpf_file = dlsym(libnetdata, "load_bpf_file");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
-        return -1;
-    }
-
-    map_fd =  dlsym(libnetdata, "map_fd");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
-        return -1;
-    }
-
-    bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
-        return -1;
-    }
-
-    if(mode == 1) {
-        set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
-        if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
-            return -1;
-        }
-
-        perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
-        if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
-            return -1;
-        }
-
-        perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
-        if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
-            return -1;
-        }
-
-        if(mode == MODE_DEVMODE) {
-            set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
-                return -1;
-            }
-
-            perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
-                return -1;
-            }
-
-            perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
-                return -1;
-            }
-
-            netdata_perf_loop_multi = dlsym(libnetdata, "netdata_perf_loop_multi");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find netdata_perf_loop_multi: %s", err);
-                return -1;
-            }
-        }
-    }
-
-    return 0;
-}
-
-int select_file(char *name, int length) {
-    int ret = -1;
-    if (!mode)
-        ret = snprintf(name, (size_t)length, "rnetdata_ebpf_process.%s.o", kernel_string);
-    else if(mode == 1)
-        ret = snprintf(name, (size_t)length, "dnetdata_ebpf_process.%s.o", kernel_string);
-    else if(mode == 2)
-        ret = snprintf(name, (size_t)length, "pnetdata_ebpf_process.%s.o", kernel_string);
-
-    return ret;
-}
-
-int process_load_ebpf()
-{
-    char lpath[4096];
-    char name[128];
-
-    int test = select_file(name, 127);
-    if (test < 0 || test > 127)
-        return -1;
-
-    build_complete_path(lpath, 4096, plugin_dir,  name);
-    event_pid = getpid();
-    if (load_bpf_file(lpath, event_pid)) {
-        error("[EBPF_PROCESS] Cannot load program: %s", lpath);
-        return -1;
-    } else {
-        info("[EBPF PROCESS]: The eBPF program %s was loaded with success.", name);
-    }
-
-    return 0;
-}
-
 void set_global_variables() {
     //Get environment variables
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
@@ -1022,27 +858,8 @@ int main(int argc, char **argv)
             change_syscalls();
     }
 
-    if(ebpf_load_libraries()) {
-        error("[EBPF_PROCESS] Cannot load library.");
-        thread_finished++;
-        int_exit(3);
-    }
-
     signal(SIGINT, int_exit);
     signal(SIGTERM, int_exit);
-
-    if (process_load_ebpf()) {
-        thread_finished++;
-        int_exit(4);
-    }
-
-    if(mode == MODE_DEVMODE && debug_log) {
-        if(map_memory()) {
-            thread_finished++;
-            error("[EBPF_PROCESS] Cannot map memory used with perf events.");
-            int_exit(6);
-        }
-    }
 
     set_global_labels();
 

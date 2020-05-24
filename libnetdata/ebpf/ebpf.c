@@ -184,6 +184,83 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
     libnetdata = dlopen(lpath, RTLD_LAZY);
     if (!libnetdata) {
         info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
+
+        //Update kernel
+        char *library = ebpf_library_suffix(ef->running_on_kernel, (ef->isrh < 0)?0:1);
+        size_t length = strlen(library);
+        strncpyz(ef->kernel_string, library, length);
+        ef->kernel_string[length] = '\0';
+
+        //Try to load the default version
+        snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
+        snprintf(lpath, 4096, pluginsdir, netdatasl);
+        libnetdata = dlopen(lpath, RTLD_LAZY);
+        if (!libnetdata) {
+            error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
+            return -1;
+        } else {
+            info("[EBPF_PROCESS] Default shared library %s loaded with success.", lpath);
+            ef->libnetdata = libnetdata;
+        }
+    } else {
+        info("[EBPF_PROCESS] Current shared library %s loaded with success.", lpath);
+        ef->libnetdata = libnetdata;
+    }
+
+    ef->load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
+        return -1;
+    }
+
+    ef->map_fd =  dlsym(libnetdata, "map_fd");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
+        return -1;
+    }
+
+    ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+        return -1;
+    }
+
+    ef->bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
+    if ((err = dlerror()) != NULL) {
+        error("[EBPF_PROCESS] Cannot find bpf_map_delete_elem: %s", err);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int select_file(char *name, char *program, int length, int mode , char *kernel_string) {
+    int ret = -1;
+    if (!mode)
+        ret = snprintf(name, (size_t)length, "rnetdata_ebpf_%s.%s.o", program, kernel_string);
+    else if(mode == 1)
+        ret = snprintf(name, (size_t)length, "dnetdata_ebpf_%s.%s.o", program, kernel_string);
+    else if(mode == 2)
+        ret = snprintf(name, (size_t)length, "pnetdata_ebpf_%s.%s.o", program, kernel_string);
+
+    return ret;
+}
+
+int ebpf_load_program(char *plugins_dir, int event_id, int mode , char *kernel_string, int (*load_bpf_file)(char *, int))
+{
+    char lpath[4096];
+    char name[128];
+
+    int test = select_file(name, "program", 127);
+    if (test < 0 || test > 127)
+        return -1;
+
+    snprintf(lpath, 4096, plugins_dir,  name, mode, kernel_string);
+    if (load_bpf_file(lpath, event_id)) {
+        error("[EBPF_PROCESS] Cannot load program: %s", lpath);
+        return -1;
+    } else {
+        info("[EBPF PROCESS]: The eBPF program %s was loaded with success.", name);
     }
 
     return 0;

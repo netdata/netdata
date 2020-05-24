@@ -53,18 +53,12 @@ typedef struct netdata_ebpf_events {
 
 } netdata_ebpf_events_t;
 
-extern int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr);
-extern int get_kernel_version(char *out, int size);
-extern int get_redhat_release();
-extern int has_condition_to_run(int version);
-extern char *ebpf_library_suffix(int version, int isrh);
-
 typedef struct ebpf_functions {
     void *libnetdata = NULL;
     int (*load_bpf_file)(char *, int) = NULL;
-    int (*set_bpf_perf_event)(int, int) = NULL;
     //Libbpf (It is necessary to have at least kernel 4.10)
     int (*bpf_map_lookup_elem)(int, const void *, void *);
+    int (*bpf_map_delete_elem)(int fd, const void *key);
 
     int *map_fd = NULL;
 
@@ -72,5 +66,13 @@ typedef struct ebpf_functions {
     uint32_t running_on_kernel;
     int isrh;
 } ebpf_functions_t;
+
+extern int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr);
+extern int get_kernel_version(char *out, int size);
+extern int get_redhat_release();
+extern int has_condition_to_run(int version);
+extern char *ebpf_library_suffix(int version, int isrh);
+extern int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir);
+extern int int ebpf_load_program(char *plugins_dir, int event_id, int mode , char *kernel_string, int (*load_bpf_file)(char *, int));
 
 #endif
