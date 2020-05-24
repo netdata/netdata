@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 
 #include "ebpf.h"
+#include "ebpf_process.h"
 
 /*****************************************************************
  *
@@ -599,7 +600,7 @@ void *ebpf_process_thread(void *ptr)
         return NULL;
     }
 
-    set_local_pointers();
+    set_local_pointers(em);
     ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
                       em->thread_name, functions.load_bpf_file);
 
