@@ -59,6 +59,7 @@ struct engine;
 
 struct instance_config {
     EXPORTING_CONNECTOR_TYPE type;
+    const char *type_name;
 
     const char *name;
     const char *destination;
@@ -180,6 +181,8 @@ struct instance {
     size_t index;
     struct instance *next;
     struct engine *engine;
+
+    volatile sig_atomic_t exited;
 };
 
 struct engine {
@@ -192,6 +195,8 @@ struct engine {
     int mongoc_initialized;
 
     struct instance *instance_root;
+
+    volatile sig_atomic_t exit;
 };
 
 extern struct instance *prometheus_exporter_instance;

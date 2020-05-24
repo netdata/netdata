@@ -389,6 +389,8 @@ To save bandwidth, and because Prometheus does not use them anyway, `# TYPE` and
 wanted they can be re-enabled via `types=yes` and `help=yes`, e.g.
 `/api/v1/allmetrics?format=prometheus&types=yes&help=yes`
 
+Note that if enabled, the `# TYPE` and `# HELP` lines are repeated for every occurrence of a metric, which goes against the Prometheus documentation's [specification for these lines](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#comments-help-text-and-type-information).
+
 ### Names and IDs
 
 Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and
@@ -418,11 +420,11 @@ Netdata can filter the metrics it sends to Prometheus with this setting:
 	send charts matching = *
 ```
 
-This settings accepts a space separated list of [simple patterns](../../libnetdata/simple_pattern/README.md) to match
-the **charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is
-valid). Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and
-groups except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right,
-is used.
+This settings accepts a space separated list of [simple patterns](/libnetdata/simple_pattern/README.md) to match the
+**charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is valid).
+Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and groups
+except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right, is
+used.
 
 ### Changing the prefix of Netdata metrics
 

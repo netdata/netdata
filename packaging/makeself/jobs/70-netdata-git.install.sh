@@ -22,6 +22,9 @@ run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-start-it \
     ${NULL}
 
+# Remove the netdata.conf file from the tree. It has hard-coded sensible defaults builtin.
+rm -f "${NETDATA_INSTALL_PARENT}/etc/netdata/netdata.conf"
+
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]
 then
     run strip ${NETDATA_INSTALL_PATH}/bin/netdata

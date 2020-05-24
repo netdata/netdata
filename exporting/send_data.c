@@ -141,6 +141,21 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 }
 
 /**
+ * Clean up a simple connector instance on Netdata exit
+ *
+ * @param instance an instance data structure.
+ */
+void simple_connector_cleanup(struct instance *instance)
+{
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+
+    // TODO free allocated resources
+
+    info("EXPORTING: instance %s exited", instance->config.name);
+    instance->exited = 1;
+}
+
+/**
  * Simple connector worker
  *
  * Runs in a separate thread for every instance.
@@ -159,7 +174,7 @@ void simple_connector_worker(void *instance_p)
                               .tv_usec = (instance->config.timeoutms * 1000) % 1000000};
     int failures = 0;
 
-    while(!netdata_exit) {
+    while(!instance->engine->exit) {
 
         // reset the monitoring chart counters
         stats->received_bytes =
@@ -195,13 +210,15 @@ void simple_connector_worker(void *instance_p)
             stats->reconnects += reconnects;
         }
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(instance->engine->exit)) break;
 
         // ------------------------------------------------------------------------
         // if we are connected, send our buffer to the data collecting server
 
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
+
+        if(unlikely(instance->engine->exit)) break;
 
         if (likely(sock != -1)) {
             simple_connector_send_buffer(&sock, &failures, instance);
@@ -238,4 +255,6 @@ void simple_connector_worker(void *instance_p)
         break;
 #endif
     }
+
+    simple_connector_cleanup(instance);
 }

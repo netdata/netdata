@@ -11,6 +11,14 @@ The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting
 through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port
 `443`. The ACLK is encrypted, safe, and _is only established if you claim your node_.
 
+The Cloud App lives at app.netdata.cloud which currently resolves to 35.196.244.138. However, this IP or range of 
+IPs can change without notice. Watch this page for updates.
+
+Netdata is a distributed monitoring system. Very few data are streamed to the cloud, such as data about:
+ - All configured alarms and their current status
+ - Metrics that are requested by the cloud user
+ - A list of the active collectors
+
 For a guide to claiming a node using the ACLK, plus additional troubleshooting and reference information, read our [get
 started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or the full [claiming
 documentation](/claim/README.md).

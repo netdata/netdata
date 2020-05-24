@@ -1,51 +1,183 @@
 <!--
----
 title: "eBPF monitoring with Netdata"
+description: "Use Netdata's extended Berkeley Packet Filter (eBPF) collector to monitor kernel-level metrics about your complex applications with per-second granularity."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf.plugin/README.md
----
+sidebar_label: "eBPF"
 -->
 
 # eBPF monitoring with Netdata
 
-This collector plugin uses eBPF (Extended Berkeley Packet Filter) to monitor system calls inside your operating system's
-kernel. For now, the main goal of this plugin is to monitor IO and process management on the host where it is running.
+Netdata's extended Berkeley Packet Filter (eBPF) collector monitors kernel-level metrics for file descriptors, virtual
+filesystem IO, and process management on Linux systems. You can use our eBPF collector to analyze how and when a process
+accesses files, when it makes system calls, whether it leaks memory or creating zombie processes, and more.
+
+Netdata's eBPF monitoring toolkit uses two custom eBPF programs. The default, called `entry`, monitors calls to a
+variety of kernel functions, such as `do_sys_open`, `__close_fd`, `vfs_read`, `vfs_write`, `_do_fork`, and more. The
+`return` program also monitors the return of each kernel functions to deliver more granular metrics about how your
+system and its applications interact with the Linux kernel.
+
+We expect eBPF monitoring to be particularly valuable in observing and debugging how the Linux kernel handles custom
+applications.
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />
-  <figcaption>An example of VFS charts, made possible by the eBPF collector plugin</figcaption>
+  <figcaption>An example of VFS charts made possible by the eBPF collector plugin.</figcaption>
 </figure>
-
-With this eBPF collector, you can monitor sophisticated system-level metrics about your complex applications while
-maintaining Netdata's [high standards for performance](#performance).
 
 ## Enable the collector on Linux
 
-eBPF is only available on Linux systems, which means this collector only works on Linux.
+**The eBPF collector is installed and enabled by default on new nightly installations of the Agent**. eBPF monitoring
+only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels
+on CentOS 7.6 or later.
 
-The collector is currently in an _alpha_ stage, as we are still working on improving compatibility with more Linux
-distributions and versions, and to ensure the collector works as expected.
+If your Agent is v1.22 or older, you may to enable the collector yourself. See the [configuration](#configuration)
+section for details.
 
-Follow the next few steps to ensure compatibility, prepare your system, install Netdata with eBPF compiled, and enable
-the collector.
+## Charts
 
-### Ensure kernel compatibility
+The eBPF collector creates an **eBPF** menu in the Agent's dashboard along with three sub-menus: **File**, **VFS**, and
+**Process**. All the charts in this section update every second. The collector stores the actual value inside of its
+process, but charts only show the difference between the values collected in the previous and current seconds.
 
-To enable this plugin and its collector, you must be on a Linux system with a kernel that is more recent than `4.11.0`
-and compiled with the option `CONFIG_KPROBES=y`. You can verify whether your kernel has this option enabled by running
-the following commands:
+### File
+
+This group has two charts demonstrating how software interacts with the Linux kernel to open and close file descriptors.
+
+#### File descriptor
+
+This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. Most
+software do not commonly call these functions directly, but they are behind the system calls `open(2)`, `openat(2)`,
+and `close(2)`.
+
+#### File error
+
+This charts demonstrate the number of times some software tried and failed to open or close a file descriptor.
+
+### VFS
+
+A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
+filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
+group won't show _all_ the actions that occurred on your system.
+
+#### Deleted objects
+
+This chart monitors calls for `vfs_unlink`. This function is responsible for removing objects from the file system.
+
+#### IO
+
+This chart shows the number of calls to the functions `vfs_read` and `vfs_write`.
+
+#### IO bytes
+
+This chart also monitors `vfs_read` and `vfs_write`, but instead shows the total of bytes read and written with these
+functions.
+
+The Agent displays the number of bytes written as negative because they are moving down to disk.
+
+#### IO errors
+
+The Agent counts and shows the number of instances where a running program experiences a read or write error.
+
+### Process
+
+For this group, the eBPF collector monitors process/thread creation and process end, and then displays any errors in the
+following charts.
+
+#### Process thread
+
+Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
+system calls: `fork(2)`, `vfork(2)` and `clone(2)`. In turn, each of these system calls use the function `_do_fork`. To
+generate this chart, the eBPF collector monitors `_do_fork` to populate the `process` dimension, and monitors
+`sys_clone` to identify threads.
+
+#### Exit
+
+Ending a task requires two steps. The first is a call to the internal function `do_exit`, which notifies the operating
+system that the task is finishing its work. The second step is to release the kernel information with the internal
+function `release_task`. The difference between the two dimensions can help you discover [zombie
+processes](https://en.wikipedia.org/wiki/Zombie_process).
+
+#### Task error
+
+The functions responsible for ending tasks do not return values, so this chart contains information about failures on
+process and thread creation.
+
+## Configuration
+
+Enable or disable the entire eBPF collector by editing `netdata.conf`.
 
 ```bash
-grep CONFIG_KPROBES=y /boot/config-$(uname -r)
-zgrep CONFIG_KPROBES=y /proc/config.gz
+cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config netdata.conf
 ```
 
-If `Kprobes` is enabled, you will see `CONFIG_KPROBES=y` as the command's output, and can skip ahead to the next step: [mount `debugfs` and `tracefs`](#mount-debugfs-and-tracefs).
+To enable the collector, scroll down to the `[plugins]` section ensure the relevant line references `ebpf` (not
+`ebpf_process`), is uncommented, and is set to `yes`.
 
-If you don't see `CONFIG_KPROBES=y` for any of the commands above, you will have to recompile your kernel to enable it.
+```conf
+[plugins]
+   ebpf = yes
+```
 
-The process of recompiling Linux kernels varies based on your distribution and version. Read the documentation for your
-system's distribution to learn more about the specific workflow for recompiling the kernel, ensuring that you set the
-`CONFIG_KPROBES` setting to `y` in the process.
+You can also configure the eBPF collector's behavior by editing `ebpf.conf`.
+
+```bash
+cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config ebpf.conf
+```
+
+### `[global]`
+
+The `[global]` section defines settings for the whole eBPF collector.
+
+#### load
+
+The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
+monitor, process, and display different kinds of information.
+
+By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
+system, but also offer valuable information if you are developing or debugging software. The `load` option accepts the
+following values: ​
+
+-   `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described
+    in the sections above, and does not show charts related to errors.
+-   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates
+    new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
+    software, such as failing to close file descriptors or creating zombie processes.
+
+## Troubleshooting
+
+If the eBPF collector does not work, you can troubleshoot it by running the `ebpf.plugin` command and investigating its output.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo -u netdata bash
+./ebpf.plugin
+```
+
+You can also use `grep` to search the Agent's `error.log` for messages related to eBPF monitoring.
+
+```bash
+grep -i ebpf /var/log/netdata/error.log
+```
+
+### Confirm kernel compatibility
+
+The eBPF collector only works on Linux systems and with specific Linux kernels. We support all kernels more recent than
+`4.11.0`, and all kernels on CentOS 7.6 or later.
+
+You can run our helper script to determine whether your system can support eBPF monitoring.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh | sudo sh
+```
+
+If this script returns no output, your system is ready to compile and run the eBPF collector.
+
+If you see a warning about a missing kerkel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
+BPF_JIT`), you will need to recompile your kernel to support this configuration. The process of recompiling Linux
+kernels varies based on your distribution and version. Read the documentation for your system's distribution to learn
+more about the specific workflow for recompiling the kernel, ensuring that you set all the necessary 
 
 -   [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
 -   [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
@@ -63,150 +195,9 @@ filesystems using the commands below:
 sudo mount -t debugfs nodev /sys/kernel/debug
 sudo mount -t tracefs nodev /sys/kernel/tracing
 ```
-​
-If they are already mounted, you will see an error. If they are not mounted, they should be after running those two
-commands. You can also configure your system's `/etc/fstab` configuration to mount these filesystems.
 
-### Install Netdata with the `--enable-ebpf` 
-
-eBPF collection is only enabled if you install Netdata with the `--enable-ebpf` option. 
-
-If you installed via the [one-line installation script](/packaging/installer/README.md), [64-bit
-binary](/packaging/installer/methods/kickstart-64.md), or [manually](/packaging/installer/methods/manual.md), you can
-append the `--enable-ebpf` option when you reinstall.
-
-For example, if you used the one-line installation script, you can reinstall Netdata with the following:
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --enable-ebpf
-```
-
-This process will not overwrite any changes you made to configuration files.
-
-### Edit `netdata.conf` to enable the collector
-
-After installing Netdata with the `--enable-ebpf` option, you still need to enable the plugin explicitly. To do so, use
-`edit-config` to open `netdata.conf` and set `ebpf = yes` in the `[plugins]` section.
-
-```bash
-cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config netdata.conf
-```
-
-Scroll down to the `[plugins]` section and uncomment the `ebpf` line after changing its setting to `yes`.
-
-```conf
-[plugins]
-   ebpf = yes
-```
-
-Restart Netdata with `service netdata restart`, or the appropriate method for your system, and reload your browser to
-see eBPF charts.
-
-## Charts
-
-The first version of `ebpf.plugin` gives a general vision about process running on computer. The charts related
-to this plugin are inside the **eBPF** option on dashboard menu and divided in three groups `file`, `vfs`, and
-`process`.
-
-All the collector charts show values per second. The collector retains the total value, but charts only show the
-difference between the previous and current metrics collections.
-
-### File
-
-This group has two charts to demonstrate how software interacts with the Linux kernel to open and close file 
-descriptors.
-
-#### File descriptor
-
-This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. These
-functions are not commonly called from software, but they are behind the system cals `open(2)`, `openat(2)`, and
-`close(2)`. ​
-
-#### File error
-
-This charts demonstrate the number of times some software tried and failed to open or close a file descriptor.
- 
-### VFS
-
-A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
-filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
-group won't show _all_ the actions that occured on your system.
-
-#### Deleted objects
-
-This chart monitors calls for `vfs_unlink`. This function is responsible for removing object from the file system. 
-
-#### IO
-
-This chart shows the number of calls to the functions `vfs_read` and `vfs_write`.
-
-#### IO bytes
-
-This chart also monitors `vfs_read` and `vfs_write`, but instead shows the total of bytes read and written with these
-functions.
- 
-Netdata displays the number of bytes written as negative, because they are moving down to disk. 
- 
-#### IO errors
-
-Netdata counts and shows the number of instances where a running program experiences a read or write error.
-
-### Process
-
-For this group, the eBPF collector monitors process/thread creation and process end, and then displays any errors in the
-following charts.
- 
-#### Process thread
-
-Internally, the Linux kernel treats both process and threads as `tasks`. To create a thread, the kernel offers a few
-system calls: `fork(2)`, `vfork(2)` and `clone(2)`. Each of these system calls in turn use the function `_do_fork`. To
-generate this chart, Netdata monitors `_do_fork` to populate the `process` dimension, and monitors `sys_clone` to
-identify threads
-
-#### Exit
-
-Ending a task is actually two steps. The first is a call to the internal function `do_exit`, which notifies the
-operating system that the task is finishing its work. The second step is the release of kernel information, which is
-done with the internal function `release_task`. The difference between the two dimensions can help you discover [zombie
-processes](https://en.wikipedia.org/wiki/Zombie_process).
-
-#### Task error
-
-The functions responsible for ending tasks do not return values, so this chart contains information about failures on
-process and thread creation.
-
-## Configuration
-
-This plugin has different configuration modes, all of which can be adjusted with its configuration file at
-`ebpf.conf`. By default, the plugin uses the less expensive `entry` mode. You can learn more about how the
-plugin works using `entry` by reading this configuration file.
-
-You can always edit this file with `edit-config`:
-
-```bash
-cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config ebpf.conf
-```
-
-### `[global]`
-
-In this section we define variables applied to the whole collector and the other subsections.
-
-#### load
-
-The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
-monitor, process, and display different kinds of information.
-
-By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
-system, but also offer important information if you are developing or debugging software. The `load` option accepts the
-following values: ​
-
--   `entry`: This is the default mode. In this mode, Netdata monitors only calls for the functions described in the
-    sections above. When this mode is selected, Netdata does not show charts related to errors.
--   `return`: In this mode, Netdata also monitors the calls to function. In the `entry` mode, Netdata only traces kernel
-    functions, but with `return`, Netdata also monitors the return of each function. This mode creates more charts, but
-    also creates an overhead of roughly 110 nanosections for each function call.
+If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to
+mount these filesystems on startup.
 
 ## Performance
 

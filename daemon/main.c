@@ -1384,6 +1384,14 @@ int main(int argc, char **argv) {
 
     // fork the spawn server
     spawn_init();
+    /*
+     * Libuv uv_spawn() uses SIGCHLD internally:
+     * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
+     * and inadvertently replaces the netdata signal handler which was setup during initialization.
+     * Thusly, we must explicitly restore the signal handler for SIGCHLD.
+     * Warning: extreme care is needed when mixing and matching POSIX and libuv.
+     */
+    signals_restore_SIGCHLD();
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.

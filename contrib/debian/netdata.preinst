@@ -14,3 +14,5 @@ dpkg-maintscript-helper dir_to_symlink \
 	/var/lib/netdata/www/lib /usr/share/netdata/www/lib 1.18.1~ netdata -- "$@"
 dpkg-maintscript-helper dir_to_symlink \
 	/var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"
+
+#DEBHELPER#

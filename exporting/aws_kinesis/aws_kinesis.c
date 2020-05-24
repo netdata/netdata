@@ -108,7 +108,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                 record_len = buffer_len - sent;
             } else {
                 record_len = KINESIS_RECORD_MAX - partition_key_len;
-                while (*(first_char + record_len) != '\n' && record_len)
+                while (record_len && *(first_char + record_len - 1) != '\n')
                     record_len--;
             }
             char error_message[ERROR_LINE_MAX + 1] = "";

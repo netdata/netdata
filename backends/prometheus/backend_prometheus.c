@@ -374,7 +374,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                 );
 
                             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s %s\n"
+                                buffer_sprintf(wb, "# TYPE %s_%s%s %s\n"
                                                , prefix
                                                , context
                                                , suffix
@@ -432,7 +432,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                 );
 
                             if(unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s%s %s\n"
+                                buffer_sprintf(wb, "# TYPE %s_%s_%s%s %s\n"
                                                , prefix
                                                , context
                                                , dimension
@@ -495,7 +495,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                 );
 
                             if (unlikely(output_options & BACKENDS_PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s%s gauge\n"
+                                buffer_sprintf(wb, "# TYPE %s_%s%s%s gauge\n"
                                                , prefix
                                                , context
                                                , units

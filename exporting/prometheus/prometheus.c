@@ -565,7 +565,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     t);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s %s\n", prefix, context, suffix, t);
+                                buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, t);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
@@ -624,7 +624,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(
-                                    wb, "# COMMENT TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, t);
+                                    wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, t);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
@@ -684,7 +684,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     (unsigned long long)last_time);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
+                                buffer_sprintf(wb, "# TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(

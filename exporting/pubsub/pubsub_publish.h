@@ -21,6 +21,7 @@ struct pubsub_specific_data {
 int pubsub_init(
     void *pubsub_specific_data_p, char *error_message, const char *destination, const char *credentials_file,
     const char *project_id, const char *topic_id);
+void pubsub_cleanup(void *pubsub_specific_data_p);
 
 int pubsub_add_message(void *pubsub_specific_data_p, char *data);
 
