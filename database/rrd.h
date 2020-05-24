@@ -782,7 +782,7 @@ struct rrdhost {
 
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
-    uuid_t  *host_uuid;                             // Global GUID for this host
+    uuid_t  host_uuid;                             // Global GUID for this host
 #endif
 
 #ifdef ENABLE_HTTPS

@@ -770,19 +770,15 @@ RRDSET *rrdset_create_custom(
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
 #ifdef ENABLE_DBENGINE
-    BUFFER *object = buffer_create(512);
-    buffer_sprintf(object, "%s/%s", host->machine_guid, st->id);
-    st->chart_uuid = callocz(1, sizeof(uuid_t));
-    if (unlikely(find_or_generate_guid((char *)buffer_tostring(object), st->chart_uuid))) {
-       errno = 0;
-       error("FAILED to generate GUID for %s", buffer_tostring(object));
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        st->chart_uuid = callocz(1, sizeof(uuid_t));
+        if (unlikely(find_or_generate_guid((void *) st, st->chart_uuid, GUID_TYPE_CHART))) {
+            errno = 0;
+            error("FAILED to generate GUID for %s", st->id);
+            freez(st->chart_uuid);
+            st->chart_uuid = NULL;
+        }
     }
-#ifdef NETDATA_INTERNAL_CHECKS
-        char uuid_s[36 + 1];
-        uuid_unparse(*st->chart_uuid, uuid_s);
-        info("Chart GUID [%s] on [%s]", uuid_s, (char *)buffer_tostring(object));
-#endif
-    buffer_free(object);
 #endif
 
     rrdhost_cleanup_obsolete_charts(host);
