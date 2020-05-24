@@ -211,6 +211,14 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
         }
 
+        int rc = rrddim_set_name(st, rd, name);
+        rc += rrddim_set_algorithm(st, rd, algorithm);
+        rc += rrddim_set_multiplier(st, rd, multiplier);
+        rc += rrddim_set_divisor(st, rd, divisor);
+        if (likely(!rc))
+            info("Dimension %s  (name, algorithm, multiplier and divisor) unchanged", rd->id);
+        else
+            rrdset_flag_set(st, RRDSET_FLAG_UPDATE_METADATA);
         rrdset_unlock(st);
         return rd;
     }
