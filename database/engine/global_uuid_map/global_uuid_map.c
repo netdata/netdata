@@ -69,7 +69,7 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
 
     *PValue = (Pvoid_t *) object;
 
-    PValue = JudyHSIns(&JGUID_object_map, (void *)object, (Word_t) object_type?(object_type * 16)+1:strlen(object+1)+2, PJE0);
+    PValue = JudyHSIns(&JGUID_object_map, (void *)object, (Word_t) object_type?(object_type * 16)+1:strlen((char *) object+1)+2, PJE0);
     if (PPJERR == PValue)
         fatal("JudyHSIns() fatal error.");
     if (*PValue == NULL) {
@@ -190,7 +190,7 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
         case GUID_TYPE_DIMENSION:
             if (unlikely(find_or_generate_guid((void *) ((RRDDIM *)object)->id, &temp_uuid, GUID_TYPE_CHAR)))
                 return 1;
-            target_object = malloc(49);
+            target_object = mallocz(49);
             target_object[0] = object_type;
             memcpy(target_object + 1, ((RRDDIM *)object)->rrdset->rrdhost->host_uuid, 16);
             memcpy(target_object + 17, ((RRDDIM *)object)->rrdset->chart_uuid, 16);
@@ -199,13 +199,13 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
         case GUID_TYPE_CHART:
             if (unlikely(find_or_generate_guid((void *) ((RRDSET *)object)->id, &temp_uuid, GUID_TYPE_CHAR)))
                 return 1;
-            target_object = malloc(33);
+            target_object = mallocz(33);
             target_object[0] = object_type;
             memcpy(target_object + 1, (((RRDSET *)object))->rrdhost->host_uuid, 16);
             memcpy(target_object + 17, temp_uuid, 16);
             break;
         case GUID_TYPE_CHAR:
-            target_object = malloc(strlen((char *) object)+2);
+            target_object = mallocz(strlen((char *) object)+2);
             target_object[0] = object_type;
             strcpy(target_object+1, (char *) object);
             break;
