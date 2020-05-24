@@ -7,8 +7,12 @@ struct circular_buffer *cbuffer_new(size_t initial, size_t max) {
     result->write = 0;
     result->read = 0;
     result->max_size = max;
-    netdata_mutex_init(&result->mutex);
     return result;
+}
+
+void cbuffer_free(struct circular_buffer *buf) {
+    freez(buf->data);
+    freez(buf);
 }
 
 static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
@@ -42,12 +46,10 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
     return 0;
 }
 
-int cbuffer_add(struct circular_buffer *buf, const char *d, size_t d_len) {
-    netdata_mutex_lock(&buf->mutex);
+int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len) {
     size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
     while (d_len + len >= buf->size) {
         if (cbuffer_realloc_unsafe(buf)) {
-            netdata_mutex_unlock(&buf->mutex);
             return 1;
         }
     }
@@ -62,18 +64,15 @@ int cbuffer_add(struct circular_buffer *buf, const char *d, size_t d_len) {
         memcpy(buf->data, d + top_part, d_len - top_part); 
         buf->write = d_len - top_part;
     }
-    netdata_mutex_unlock(&buf->mutex);
     return 0;
 }
 
 // Assume caller does not remove too many bytes (i.e. read will jump over write)
-void cbuffer_remove(struct circular_buffer *buf, size_t num) {
-    netdata_mutex_lock(&buf->mutex);
+void cbuffer_remove_unsafe(struct circular_buffer *buf, size_t num) {
     buf->read += num;
     // Assume num < size (i.e. caller cannot remove more bytes than are in the buffer)
     if (buf->read >= buf->size)
         buf->read -= buf->size;
-    netdata_mutex_unlock(&buf->mutex);
 }
 
 size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start) {
