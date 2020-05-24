@@ -585,7 +585,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 rrdpush_send_labels(state.host);
 
                 if (outstanding) {
-                    debug(D_STREAM, "STREAM: Sending data (current buffer chunk %zu bytes", outstanding);
+                    struct circular_buffer *cb = state.host->sender_buffer;
+                    debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
                     // BEGIN RRDPUSH LOCKED SESSION
 
@@ -599,7 +600,7 @@ void *rrdpush_sender_thread(void *ptr) {
                     debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
                     rrdpush_buffer_lock(state.host);
 
-                    debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", outstanding);
+                    debug(D_STREAM, "STREAM: Sending data chunk=%zu...", outstanding);
                     ssize_t ret;
 #ifdef ENABLE_HTTPS
                     SSL *conn = state.host->ssl.conn ;
