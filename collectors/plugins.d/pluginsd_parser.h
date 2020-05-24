@@ -8,16 +8,13 @@
 
 typedef struct parser_user_object {
     PARSER  *parser;
-
     RRDSET *st;
     RRDHOST *host;
     struct plugind *cd;
     int trust_durations;
-
     struct label *new_labels;
     size_t count;
     int enabled;
-    //PLUGINSD_ACTION  *plugins_action;
 } PARSER_USER_OBJECT;
 
 #endif //NETDATA_PLUGINSD_PARSER_H

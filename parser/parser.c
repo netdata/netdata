@@ -32,10 +32,6 @@ PARSER *parser_init(RRDHOST *host, void *user, void *input, PARSER_INPUT_TYPE fl
 {
     PARSER *parser;
 
-    // If no parsing input flags, assume SPLIT only
-    if (unlikely(!(flags & (PARSER_INPUT_SPLIT | PARSER_INPUT_ORIGINAL))))
-        flags |= PARSER_INPUT_SPLIT;
-
     parser = callocz(1, sizeof(*parser));
 
     if (unlikely(!parser))
@@ -285,6 +281,7 @@ inline int parser_action(PARSER *parser, char *input)
 
     if (unlikely(!parser))
         return 1;
+    parser->recover_location[0] = 0x0;
 
     // if not direct input check if we have reprocessed this
     if (unlikely(!input && parser->flags & PARSER_INPUT_PROCESSED))
@@ -301,7 +298,7 @@ inline int parser_action(PARSER *parser, char *input)
     if (unlikely(!find_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
         return 1;
 
-    if ((parser->flags & PARSER_INPUT_FULL) == PARSER_INPUT_FULL)
+    if ((parser->flags & PARSER_INPUT_ORIGINAL) == PARSER_INPUT_ORIGINAL)
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);

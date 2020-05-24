@@ -2,7 +2,6 @@
 
 #include "pluginsd_parser.h"
 
-
 /*
  * This is the action defined for the FLUSH command
  */
@@ -42,8 +41,8 @@ PARSER_RC pluginsd_begin_action(void *user, char *id, usec_t microseconds)
     ((PARSER_USER_OBJECT *) user)->st = st;
     return PARSER_RC_OK;
 
-    disable:
-    ((PARSER_USER_OBJECT *) user)->enabled = 0;
+disable:
+    ((PARSER_USER_OBJECT *)user)->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
@@ -310,7 +309,6 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
 
 PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
-//    RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
 
     char *type = words[1];
@@ -394,36 +392,6 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
              priority, update_every, chart_type, options);
     }
 
-//    st = rrdset_create(
-//        host, type, id, name, family, context, title, units, (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *) user)->cd->filename, module,
-//        priority, update_every, chart_type);
-//
-//    if (options && *options) {
-//        if (strstr(options, "obsolete"))
-//            rrdset_is_obsolete(st);
-//        else
-//            rrdset_isnot_obsolete(st);
-//
-//        if (strstr(options, "detail"))
-//            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-//        else
-//            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-//
-//        if (strstr(options, "hidden"))
-//            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
-//        else
-//            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
-//
-//        if (strstr(options, "store_first"))
-//            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
-//        else
-//            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-//    } else {
-//        rrdset_isnot_obsolete(st);
-//        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-//        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-//    }
-//    ((PARSER_USER_OBJECT *) user)->st = st;
     return PARSER_RC_OK;
 }
 
@@ -516,7 +484,6 @@ PARSER_RC pluginsd_flush(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     if (plugins_action->flush_action) {
         return plugins_action->flush_action(user);
     }
-    //((PARSER_USER_OBJECT *)user)->st = NULL;
     return PARSER_RC_OK;
 }
 
@@ -563,34 +530,7 @@ PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_act
             freez(store);
         return rc;
     }
-//
-//
-//    debug(D_PLUGINSD, "requested a LABEL CHANGE");
-//    char *store;
-//    if (!words[4])
-//        store = words[3];
-//    else {
-//        store = callocz(PLUGINSD_LINE_MAX + 1, sizeof(char));
-//        size_t remaining = PLUGINSD_LINE_MAX;
-//        char *move = store;
-//        int i = 3;
-//        while (i < PLUGINSD_MAX_WORDS) {
-//            size_t length = strlen(words[i]);
-//            if ((length + 1) >= remaining)
-//                break;
-//
-//            remaining -= (length + 1);
-//            memcpy(move, words[i], length);
-//            move += length;
-//            *move++ = ' ';
-//
-//            i++;
-//            if (!words[i])
-//                break;
-//        }
-//    }
 
-//    ((PARSER_USER_OBJECT *) user)->new_labels = add_label_to_list(((PARSER_USER_OBJECT *) user)->new_labels, words[1], store, strtol(words[2], NULL, 10));
     if (store != words[3])
         freez(store);
     return PARSER_RC_OK;
@@ -604,16 +544,6 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
         return plugins_action->overwrite_action(user);
     }
 
-//    debug(D_PLUGINSD, "requested a OVERWITE a variable");
-//    if (!host->labels) {
-//        host->labels = ((PARSER_USER_OBJECT *) user)->new_labels;
-//    } else {
-//        rrdhost_rdlock(host);
-//        replace_label_list(host, ((PARSER_USER_OBJECT *) user)->new_labels);
-//        rrdhost_unlock(host);
-//    }
-//
-//    ((PARSER_USER_OBJECT *) user)->new_labels = NULL;
     return PARSER_RC_OK;
 }
 
@@ -673,7 +603,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     cd->enabled = ((PARSER_USER_OBJECT *) user)->enabled;
     size_t count = ((PARSER_USER_OBJECT *) user)->count;
 
-    //freez(user->plugins_action);
     freez(user);
 
     if (likely(count)) {
