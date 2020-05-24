@@ -15,7 +15,7 @@ static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netda
     }
 
     char cmd[1024];
-    int length = sprintf(cmd, "-:kprobes/%c_netdata_%s_%s", ptr->type, ptr->name, father_pid);
+    int length = snprintf(cmd, 1023, "-:kprobes/%c_netdata_%s_%s", ptr->type, ptr->name, father_pid);
     int ret = 0;
     if (length > 0) {
         ssize_t written = write(fd, cmd, strlen(cmd));
@@ -193,7 +193,7 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
 
         //Try to load the default version
         snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
-        snprintf(lpath, 4096, pluginsdir, netdatasl);
+        snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
         libnetdata = dlopen(lpath, RTLD_LAZY);
         if (!libnetdata) {
             error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
@@ -234,28 +234,32 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
     return 0;
 }
 
-static int select_file(char *name, char *program, int length, int mode , char *kernel_string) {
+static int select_file(char *name, const char *program, size_t length, int mode , char *kernel_string) {
     int ret = -1;
     if (!mode)
-        ret = snprintf(name, (size_t)length, "rnetdata_ebpf_%s.%s.o", program, kernel_string);
+        ret = snprintf(name, length, "rnetdata_ebpf_%s.%s.o", program, kernel_string);
     else if(mode == 1)
-        ret = snprintf(name, (size_t)length, "dnetdata_ebpf_%s.%s.o", program, kernel_string);
+        ret = snprintf(name, length, "dnetdata_ebpf_%s.%s.o", program, kernel_string);
     else if(mode == 2)
-        ret = snprintf(name, (size_t)length, "pnetdata_ebpf_%s.%s.o", program, kernel_string);
+        ret = snprintf(name, length, "pnetdata_ebpf_%s.%s.o", program, kernel_string);
 
     return ret;
 }
 
-int ebpf_load_program(char *plugins_dir, int event_id, int mode , char *kernel_string, int (*load_bpf_file)(char *, int))
+int ebpf_load_program(char *plugins_dir,
+                      int event_id, int mode ,
+                      char *kernel_string,
+                      const char *name,
+                      int (*load_bpf_file)(char *, int))
 {
     char lpath[4096];
-    char name[128];
+    char lname[128];
 
-    int test = select_file(name, "program", 127);
+    int test = select_file(lname, name, (size_t)127, mode, kernel_string);
     if (test < 0 || test > 127)
         return -1;
 
-    snprintf(lpath, 4096, plugins_dir,  name, mode, kernel_string);
+    snprintf(lpath, 4096, "%s/%s", plugins_dir,  lname);
     if (load_bpf_file(lpath, event_id)) {
         error("[EBPF_PROCESS] Cannot load program: %s", lpath);
         return -1;

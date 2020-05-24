@@ -62,7 +62,7 @@ typedef struct ebpf_functions {
 
     int *map_fd = NULL;
 
-    char *kernel_string;
+    char kernel_string[64];
     uint32_t running_on_kernel;
     int isrh;
 } ebpf_functions_t;
@@ -73,6 +73,11 @@ extern int get_redhat_release();
 extern int has_condition_to_run(int version);
 extern char *ebpf_library_suffix(int version, int isrh);
 extern int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir);
-extern int int ebpf_load_program(char *plugins_dir, int event_id, int mode , char *kernel_string, int (*load_bpf_file)(char *, int));
+extern int ebpf_load_program(char *plugins_dir,
+                             int event_id,
+                             int mode,
+                             char *kernel_string,
+                             const char *name,
+                             int (*load_bpf_file)(char *, int));
 
 #endif
