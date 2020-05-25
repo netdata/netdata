@@ -43,7 +43,6 @@ static char *netdata_configured_log_dir = LOG_DIR;
 static int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
-static netdata_run_mode_t mode = MODE_ENTRY;
 struct config collector_config;
 int running_on_kernel = 0;
 char kernel_string[64];
@@ -77,8 +76,12 @@ ebpf_module_t ebpf_modules[] = {
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
 };
 
-
-static void int_exit(int sig)
+/**
+ * Close the collector gracefully
+ *
+ * @param sig is the signal number used to close the collector
+ */
+static void ebpf_exit(int sig)
 {
     int event_pid;
     close_ebpf_plugin = 1;
@@ -333,8 +336,7 @@ static void parse_args(int argc, char **argv)
                 break;
             }
             case 'r': {
-                mode = MODE_RETURN;
-                ebpf_set_thread_mode(mode);
+                ebpf_set_thread_mode(MODE_RETURN);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
 #endif
@@ -377,7 +379,7 @@ void fill_ebpf_functions(ebpf_functions_t *ef) {
  */
 static inline void how_to_load(char *ptr) {
     if (!strcasecmp(ptr, "return"))
-        mode = MODE_RETURN;
+        ebpf_set_thread_mode(MODE_RETURN);
 }
 
 /**
@@ -503,13 +505,13 @@ int main(int argc, char **argv)
         info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
     }
 
-    signal(SIGINT, int_exit);
-    signal(SIGTERM, int_exit);
+    signal(SIGINT, ebpf_exit);
+    signal(SIGTERM, ebpf_exit);
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
         error("[EBPF PROCESS] Cannot start the mutex.");
-        int_exit(7);
+        ebpf_exit(3);
     }
 
     pthread_attr_t attr;
@@ -528,7 +530,7 @@ int main(int argc, char **argv)
         if ( ( pthread_create(&thread[i], &attr, function_pointer[i], (void *) em) ) ) {
             error("[EBPF_PROCESS] Cannot create threads.");
             thread_finished++;
-            int_exit(8);
+            ebpf_exit(4);
         }
     }
 
@@ -536,12 +538,12 @@ int main(int argc, char **argv)
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot join threads.");
             thread_finished++;
-            int_exit(9);
+            ebpf_exit(5);
         }
     }
 
     thread_finished++;
-    int_exit(0);
+    ebpf_exit(0);
 
     return 0;
 }
