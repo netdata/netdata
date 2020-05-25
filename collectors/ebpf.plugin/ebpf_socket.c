@@ -121,11 +121,13 @@ void *ebpf_socket_thread(void *ptr)
     pthread_mutex_unlock(&lock);
 
     set_local_pointers(em);
-    ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, functions.load_bpf_file);
+    if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
+                      em->thread_name, functions.load_bpf_file) )
+        goto endsocket;
 
     socket_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
+endsocket:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

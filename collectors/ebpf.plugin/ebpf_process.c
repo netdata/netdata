@@ -641,14 +641,16 @@ void *ebpf_process_thread(void *ptr)
     pthread_mutex_unlock(&lock);
 
     set_local_pointers(em);
-    ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, functions.load_bpf_file);
+    if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
+                      em->thread_name, functions.load_bpf_file) )
+        goto endprocess;
 
     ebpf_global_labels(aggregated_data, publish_aggregated, dimension_names, id_names, NETDATA_MAX_MONITOR_VECTOR);
 
     ebpf_create_global_charts(em);
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
+endprocess:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
