@@ -12,6 +12,7 @@
 
 static ebpf_functions_t functions;
 
+#ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
  */
@@ -24,6 +25,7 @@ static int *map_fd = NULL;
 /**
  * End of the pointers
  */
+#endif
 
 /*****************************************************************
  *
@@ -82,6 +84,7 @@ static void ebpf_socket_cleanup(void *ptr)
  */
 static void set_local_pointers(ebpf_module_t *em) {
     (void)em;
+#ifndef STATIC
     bpf_map_lookup_elem = functions.bpf_map_lookup_elem;
     (void) bpf_map_lookup_elem;
 
@@ -90,6 +93,7 @@ static void set_local_pointers(ebpf_module_t *em) {
 
     map_fd = functions.map_fd;
     (void)map_fd;
+#endif
 }
 
 /*****************************************************************

@@ -23,6 +23,7 @@ static netdata_publish_syscall_t *publish_aggregated = NULL;
 
 static ebpf_functions_t functions;
 
+#ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
  */
@@ -34,6 +35,7 @@ static int *map_fd = NULL;
 /**
  * End of the pointers
  */
+ #endif
 
 /*****************************************************************
  *
@@ -598,9 +600,11 @@ static void change_syscalls() {
  * Set local function pointers, this function will never be compiled with static libraries
  */
 static void set_local_pointers(ebpf_module_t *em) {
+#ifndef STATIC
     bpf_map_lookup_elem = functions.bpf_map_lookup_elem;
 
     map_fd = functions.map_fd;
+#endif
 
     if (em->mode == MODE_ENTRY)
         change_collector_event();
