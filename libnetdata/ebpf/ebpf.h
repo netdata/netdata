@@ -50,7 +50,6 @@
 typedef struct netdata_ebpf_events {
     char type;
     char *name;
-
 } netdata_ebpf_events_t;
 
 typedef struct ebpf_functions {

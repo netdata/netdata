@@ -53,30 +53,34 @@ netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
-ebpf_module_t ebpf_modules[] = {
-    { .thread_name = "process", .enabled = 0, .start_routine = ebpf_process_thread, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
-    { .thread_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
-    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY },
+netdata_ebpf_events_t process_probes[] = {
+    { .type = 'r', .name = "vfs_write" },
+    { .type = 'r', .name = "vfs_writev" },
+    { .type = 'r', .name = "vfs_read" },
+    { .type = 'r', .name = "vfs_readv" },
+    { .type = 'r', .name = "do_sys_open" },
+    { .type = 'r', .name = "vfs_unlink" },
+    { .type = 'p', .name = "do_exit" },
+    { .type = 'p', .name = "release_task" },
+    { .type = 'r', .name = "_do_fork" },
+    { .type = 'r', .name = "__close_fd" },
+    { .type = 'r', .name = "__x64_sys_clone" },
+    { .type = 0, .name = NULL }
 };
 
-int event_pid = 0;
-netdata_ebpf_events_t process_probes[] = {
-        { .type = 'r', .name = "vfs_write" },
-        { .type = 'r', .name = "vfs_writev" },
-        { .type = 'r', .name = "vfs_read" },
-        { .type = 'r', .name = "vfs_readv" },
-        { .type = 'r', .name = "do_sys_open" },
-        { .type = 'r', .name = "vfs_unlink" },
-        { .type = 'p', .name = "do_exit" },
-        { .type = 'p', .name = "release_task" },
-        { .type = 'r', .name = "_do_fork" },
-        { .type = 'r', .name = "__close_fd" },
-        { .type = 'r', .name = "__x64_sys_clone" },
-        { .type = 0, .name = NULL }
+ebpf_module_t ebpf_modules[] = {
+    { .thread_name = "process", .enabled = 0, .start_routine = ebpf_process_thread, .update_time = 1,
+      .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
+    { .thread_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread, .update_time = 1,
+      .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
+    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
+      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
 };
+
 
 static void int_exit(int sig)
 {
+    int event_pid;
     close_ebpf_plugin = 1;
 
     //When both threads were not finished case I try to go in front this address, the collector will crash
@@ -84,36 +88,37 @@ static void int_exit(int sig)
         return;
     }
 
-    if (event_pid) {
-        int ret = fork();
-        if (ret < 0) //error
-            error("[EBPF PROCESS] Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
-        else if (!ret) { //child
-            int i;
-            for ( i=getdtablesize(); i>=0; --i)
-                close(i);
+    event_pid = getpid();
+    int ret = fork();
+    if (ret < 0) //error
+        error("[EBPF PROCESS] Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
+    else if (!ret) { //child
+        int i;
+        for ( i=getdtablesize(); i>=0; --i)
+            close(i);
 
-            int fd = open("/dev/null",O_RDWR, 0);
-            if (fd != -1) {
-                dup2 (fd, STDIN_FILENO);
-                dup2 (fd, STDOUT_FILENO);
-                dup2 (fd, STDERR_FILENO);
-            }
-
-            if (fd > 2)
-                close (fd);
-
-            int sid = setsid();
-            if(sid >= 0) {
-                sleep(1);
-                debug(D_EXIT, "Wait for father %d die", event_pid);
-                clean_kprobe_events(NULL, event_pid, process_probes);
-            } else {
-                error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
-            }
-        } else { //parent
-            exit(0);
+        int fd = open("/dev/null",O_RDWR, 0);
+        if (fd != -1) {
+            dup2 (fd, STDIN_FILENO);
+            dup2 (fd, STDOUT_FILENO);
+            dup2 (fd, STDERR_FILENO);
         }
+
+        if (fd > 2)
+            close (fd);
+
+        int sid = setsid();
+        if(sid >= 0) {
+            sleep(1);
+            debug(D_EXIT, "Wait for father %d die", event_pid);
+
+            for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
+                clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
+        } else {
+            error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
+        }
+    } else { //parent
+        exit(0);
     }
 
     exit(sig);

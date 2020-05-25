@@ -81,6 +81,7 @@ typedef struct ebpf_module {
     int global_charts;
     int apps_charts;
     netdata_run_mode_t mode;
+    netdata_ebpf_events_t *probes;
     uint32_t thread_id;
 } ebpf_module_t;
 
