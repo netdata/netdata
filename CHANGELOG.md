@@ -246,7 +246,6 @@
 - ACLK: Improved the agent "pop-corning" phase [\#8398](https://github.com/netdata/netdata/pull/8398) ([stelfrag](https://github.com/stelfrag))
 - Fix broken dependencies for Ubuntu 19.10 \(eoan\) [\#8397](https://github.com/netdata/netdata/pull/8397) ([prologic](https://github.com/prologic))
 - Update the update instructions with per-method details [\#8394](https://github.com/netdata/netdata/pull/8394) ([joelhans](https://github.com/joelhans))
-- Fix coverity scan [\#8388](https://github.com/netdata/netdata/pull/8388) ([prologic](https://github.com/prologic))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
