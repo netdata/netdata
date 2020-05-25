@@ -81,6 +81,7 @@ static void ebpf_socket_cleanup(void *ptr)
  * Set local function pointers, this function will never be compiled with static libraries
  */
 static void set_local_pointers(ebpf_module_t *em) {
+    (void)em;
     bpf_map_lookup_elem = functions.bpf_map_lookup_elem;
     (void) bpf_map_lookup_elem;
 
