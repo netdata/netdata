@@ -402,25 +402,46 @@ static inline void how_to_load(char *ptr) {
 static void set_collector_values() {
     struct section *sec = collector_config.first_section;
     int disable_apps = 0;
+    int enabled = 0;
     while(sec) {
+        struct config_option *values;
         if(!strcasecmp(sec->name, "global")) {
-            struct config_option *values = sec->values;
+            values = sec->values;
             while(values) {
-                if(!strcasecmp(values->name, "load"))
+                if (!strcasecmp(values->name, "load"))
                     how_to_load(values->value);
-                if(!strcasecmp(values->name, "disable apps"))
+                else if(!strcasecmp(values->name, "disable apps")) {
                     if (!strcasecmp(values->value, "yes")) {
                         ebpf_disable_apps();
                         disable_apps = 1;
                     }
-                if(!strcasecmp(values->name, "disable socket"))
-                    if (!strcasecmp(values->value, "yes"))
-                        ebpf_enable_chart(1, disable_apps);
+                }
 
+                values = values->next;
+            }
+        } else if(!strcasecmp(sec->name, "global")) {
+            values = sec->values;
+            while(values) {
+                if (!strcasecmp(values->name, "process")) {
+                    if (!strcasecmp(values->value, "yes")) {
+                        ebpf_enable_chart(0, disable_apps);
+                        enabled = 1;
+                    }
+                }
+                else if (!strcasecmp(values->name, "network viewer")) {
+                    if (!strcasecmp(values->value, "yes")) {
+                        ebpf_enable_chart(1, disable_apps);
+                        enabled = 1;
+                    }
+                }
                 values = values->next;
             }
         }
         sec = sec->next;
+    }
+
+    if (!enabled) {
+        ebpf_enable_all_charts(disable_apps);
     }
 }
 
