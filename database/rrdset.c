@@ -769,6 +769,17 @@ RRDSET *rrdset_create_custom(
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
+#ifdef ENABLE_DBENGINE
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        st->chart_uuid = callocz(1, sizeof(uuid_t));
+        if (unlikely(find_or_generate_guid((void *) st, st->chart_uuid, GUID_TYPE_CHART))) {
+            errno = 0;
+            error("FAILED to generate GUID for %s", st->id);
+            freez(st->chart_uuid);
+            st->chart_uuid = NULL;
+        }
+    }
+#endif
 
     rrdhost_cleanup_obsolete_charts(host);
 
