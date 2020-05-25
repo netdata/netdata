@@ -776,9 +776,8 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, RRDENG_FD_BUDGET_PER_INSTANCE);
     if (rrdeng_reserved_file_descriptors > max_open_files) {
-        error(
-            "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
-            (unsigned)rrdeng_reserved_file_descriptors, (unsigned)max_open_files);
+        error("Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
+              (unsigned)rrdeng_reserved_file_descriptors, (unsigned)max_open_files);
 
         rrd_stat_atomic_add(&global_fs_errors, 1);
         rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -824,11 +823,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-    error = metalog_init(ctx);
-    if(error) {
-        error("Failed to initialize metadata log file event loop.");
-        goto error_after_rrdeng_worker;
-    }
     return 0;
 
 error_after_rrdeng_worker:
@@ -861,7 +855,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     finalize_rrd_files(ctx);
-    metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
     if (ctx != &default_global_ctx) {
