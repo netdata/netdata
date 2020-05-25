@@ -598,10 +598,13 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_process_allocate_global_vectors();
 
+    pthread_mutex_lock(&lock);
     fill_ebpf_functions(&functions);
     if (ebpf_load_libraries(&functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
+        pthread_mutex_unlock(&lock);
         return NULL;
     }
+    pthread_mutex_unlock(&lock);
 
     set_local_pointers(em);
     ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,

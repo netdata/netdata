@@ -62,7 +62,7 @@ typedef struct ebpf_functions {
 
     int *map_fd;
 
-    char kernel_string[64];
+    char *kernel_string;
     uint32_t running_on_kernel;
     int isrh;
 } ebpf_functions_t;

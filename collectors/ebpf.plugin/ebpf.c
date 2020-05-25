@@ -35,13 +35,6 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 // ----------------------------------------------------------------------
-//Netdata eBPF library
-int (*load_bpf_file)(char *, int) = NULL;
-int (*set_bpf_perf_event)(int, int) = NULL;
-int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
-int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
-void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
-
 char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
@@ -367,6 +360,7 @@ static void parse_args(int argc, char **argv)
  */
 void fill_ebpf_functions(ebpf_functions_t *ef) {
     memset(ef, 0, sizeof(ebpf_functions_t));
+    ef->kernel_string = kernel_string;
     ef->running_on_kernel = running_on_kernel;
     ef->isrh = isrh;
 }
