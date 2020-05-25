@@ -56,12 +56,15 @@ int init_opentsdb_http_instance(struct instance *instance)
     struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
+
 #ifdef ENABLE_HTTPS
-    connector_specific_config->flags = NETDATA_SSL_START;
-    connector_specific_config->conn = NULL;
+    struct opentsdb_specific_data *connector_specific_data = callocz(1, sizeof(struct opentsdb_specific_data));
+    connector_specific_data->flags = NETDATA_SSL_START;
+    connector_specific_data->conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
     }
+    instance->connector_specific_data = connector_specific_data;
 #endif
 
     instance->start_batch_formatting = NULL;

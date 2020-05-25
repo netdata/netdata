@@ -18,4 +18,13 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
 int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *rd);
 int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd);
 
+struct opentsdb_specific_data {
+#ifdef ENABLE_HTTPS
+    SSL *conn; //SSL connection
+#else
+    void *conn;
+#endif
+    int flags; //The flags for SSL connection
+};
+
 #endif //NETDATA_EXPORTING_OPENTSDB_H
