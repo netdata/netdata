@@ -127,6 +127,15 @@ static void ebpf_exit(int sig)
     exit(sig);
 }
 
+/**
+ * Define labels used to generate charts
+ *
+ * @param is   structure with information about number of calls made for a function.
+ * @param pio  structure used to generate charts.
+ * @param dim  a pointer for the dimensions name
+ * @param name a pointer for the tensor with the name of the functions.
+ * @param end  the number of elements in the previous 4 arguments.
+ */
 void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end) {
     int i;
 
@@ -147,6 +156,11 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
     }
 }
 
+/**
+ * Define thread mode for all ebpf program.
+ *
+ * @param lmode  the mode that will be used for them.
+ */
 static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {

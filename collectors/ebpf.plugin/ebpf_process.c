@@ -102,12 +102,26 @@ static inline void write_begin_chart(char *family, char *name)
     (void)ret;
 }
 
+/**
+ * Write set command on standard output
+ *
+ * @param dim    the dimension name
+ * @param value  the value for the dimension
+ */
 static inline void write_chart_dimension(char *dim, long long value)
 {
     int ret = printf("SET %s = %lld\n", dim, value);
     (void)ret;
 }
 
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param name    the chart name
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ * @param end     the number of values that will be written on standard output
+ */
 static void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     write_begin_chart(family, name);
 
@@ -122,6 +136,14 @@ static void write_global_count_chart(char *name, char *family, netdata_publish_s
     printf("END\n");
 }
 
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param name    the chart name
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ * @param end     the number of values that will be written on standard output
+ */
 static void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     write_begin_chart(family, name);
 
@@ -136,6 +158,12 @@ static void write_global_err_chart(char *name, char *family, netdata_publish_sys
     printf("END\n");
 }
 
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ */
 static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
     write_begin_chart(family, NETDATA_VFS_IO_FILE_BYTES);
 
@@ -145,6 +173,12 @@ static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
     printf("END\n");
 }
 
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ */
 static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc) {
     write_begin_chart(family, NETDATA_PROCESS_STATUS_NAME);
 
