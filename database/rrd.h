@@ -311,6 +311,7 @@ struct rrddim_query_handle {
 struct rrddim_volatile {
 #ifdef ENABLE_DBENGINE
     uuid_t *rrdeng_uuid;                 // database engine metric UUID
+    uuid_t *metric_uuid;                 // global UUID for this metric (unique_across hosts)
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
@@ -458,8 +459,8 @@ struct rrdset {
 
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
-
-    size_t unused[5];
+    uuid_t *chart_uuid;                             // Store the global GUID for this chart
+    size_t unused[4];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
@@ -781,6 +782,7 @@ struct rrdhost {
 
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
+    uuid_t  host_uuid;                             // Global GUID for this host
 #endif
 
 #ifdef ENABLE_HTTPS

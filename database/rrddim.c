@@ -301,7 +301,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         else
             rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
-
     rd->memsize = size;
 
     strcpy(rd->magic, RRDDIMENSION_MAGIC);
@@ -350,15 +349,15 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state = mallocz(sizeof(*rd->state));
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        rd->state->collect_ops.init         = rrdeng_store_metric_init;
+        rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize     = rrdeng_store_metric_finalize;
-        rd->state->query_ops.init           = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric    = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished    = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize       = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time    = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time    = rrdeng_metric_oldest_time;
+        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
+        rd->state->query_ops.init = rrdeng_load_metric_init;
+        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
+        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
+        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
+        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
+        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
     } else {
         rd->state->collect_ops.init         = rrddim_collect_init;
