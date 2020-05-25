@@ -417,6 +417,54 @@ static void attempt_to_connect(struct sender_state *state)
     }
 }
 
+void attempt_to_send(struct sender_state *s, char *chunk, size_t outstanding) {
+    rrdpush_send_labels(s->host);
+
+    if (outstanding) {
+        struct circular_buffer *cb = s->host->sender->buffer;
+        debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
+
+        // TCP window is open and we have data to transmit.
+        netdata_thread_disable_cancelability();
+        netdata_mutex_lock(&s->host->sender->mutex);
+
+        ssize_t ret;
+#ifdef ENABLE_HTTPS
+        SSL *conn = s->host->ssl.conn ;
+        if(conn && !s->host->ssl.flags) {
+            ret = SSL_write(conn, chunk, outstanding);
+        } else {
+            ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
+        }
+#else
+        ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
+#endif
+        if (likely(ret > 0)) {
+            cbuffer_remove_unsafe(s->host->sender->buffer, ret);
+            s->sent_bytes_on_this_connection += ret;
+            s->sent_bytes += ret;
+            debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", s->host->hostname, s->connected_to, ret);
+            s->last_sent_t = now_monotonic_sec();
+        }
+        else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
+            debug(D_STREAM, "STREAM %s [send to %s]: unavailable aftering polling POLLOUT", s->host->hostname,
+                  s->connected_to);
+        else if (ret == -1) {
+            debug(D_STREAM, "STREAM: Send failed - closing socket...");
+            error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  s->host->hostname, s->connected_to, s->sent_bytes_on_this_connection);
+            rrdpush_sender_thread_close_socket(s->host);
+        }
+        else {
+            debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
+        }
+
+        netdata_mutex_unlock(&s->host->sender->mutex);
+        netdata_thread_enable_cancelability();
+    }
+    else {
+        debug(D_STREAM, "STREAM: we have sent the entire buffer, but we received POLLOUT...");
+    }
+}
 
 // TODO-GAPS Removed buffer lock because does not touch the buffer - check
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
@@ -494,25 +542,28 @@ void *rrdpush_sender_thread(void *ptr) {
         return NULL;
     }
 
-
-    struct pollfd fds[2], *ifd, *ofd;       // TODO: state or here??
-    nfds_t fdmax;
-
-    ifd = &fds[0];
-    ofd = &fds[1];
-
+    enum {
+        Collector,
+        Socket
+    };
+    struct pollfd fds[2];
+    fds[Collector].fd = s->host->rrdpush_sender_pipe[PIPE_READ];
+    fds[Collector].events = POLLIN;
 
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, s->host);
-
     for(; s->host->rrdpush_send_enabled && !netdata_exit ;) {
         // check for outstanding cancellation requests
         netdata_thread_testcancel();
 
-        // connection logic
+        // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
             attempt_to_connect(s);
             continue;
         }
+
+        // do we have something to send?
+
+
         if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout)) {
             error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", s->host->hostname, s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
             rrdpush_sender_thread_close_socket(s->host);
@@ -520,148 +571,66 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // Wait until buffer opens in the socket or a rrdset_done_push wakes us
-        ifd->fd = s->host->rrdpush_sender_pipe[PIPE_READ];
-        ifd->events = POLLIN;
-        ifd->revents = 0;
+        fds[Collector].revents = 0;
+        fds[Socket].revents = 0;
+        fds[Socket].fd = s->host->rrdpush_sender_socket;
 
-        ofd->fd = s->host->rrdpush_sender_socket;
-        ofd->revents = 0;
         char *chunk;
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, &chunk);
-        if(ofd->fd != -1 && outstanding) {
-            debug(D_STREAM, "STREAM: Requesting data output on streaming socket %d...", ofd->fd);
-            ofd->events = POLLOUT;
-            fdmax = 2;
+        if(outstanding) {
             s->send_attempts++;
+            fds[Socket].events = POLLIN | POLLOUT;
         }
         else {
-            debug(D_STREAM, "STREAM: Not requesting data output on streaming socket %d (nothing to send now)...", ofd->fd);
-            ofd->events = 0;
-            fdmax = 1;
+            fds[Socket].events = POLLIN;
         }
 
         debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer chunk %zu bytes)...", outstanding);
         if(unlikely(netdata_exit)) break;
-        int retval = poll(fds, fdmax, 1000);
+        int retval = poll(fds, 2, 1000);
         if(unlikely(netdata_exit)) break;
 
+        // Spurious wake-ups without error - loop again
+        if (retval == 0 || ((retval == -1) && (errno == EAGAIN || errno == EINTR)))
+            continue;
 
+        // Only errors from poll() are internal, but try restarting the connection
         if(unlikely(retval == -1)) {
-            debug(D_STREAM, "STREAM: poll() failed (current buffer chunk %zu bytes)...", outstanding);
-
-            if(errno == EAGAIN || errno == EINTR) {
-                debug(D_STREAM, "STREAM: poll() failed with EAGAIN or EINTR...");
-            }
-            else {
-                error("STREAM %s [send to %s]: failed to poll(). Closing socket.", s->host->hostname, s->connected_to);
-                rrdpush_sender_thread_close_socket(s->host);
-            }
-
+            error("STREAM %s [send to %s]: failed to poll(). Closing socket.", s->host->hostname, s->connected_to);
+            rrdpush_sender_thread_close_socket(s->host);
             continue;
         }
 
-        if(likely(retval)) {
-            if (ifd->revents & POLLIN || ifd->revents & POLLPRI) {
-                debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
+        // If the collector woke us up then empty the pipe to remove the signal
+        if (fds[Collector].revents & POLLIN || fds[Collector].revents & POLLPRI) {
+            debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
 
-                char buffer[1000 + 1];
-                if (read(s->host->rrdpush_sender_pipe[PIPE_READ], buffer, 1000) == -1)
-                    error("STREAM %s [send to %s]: cannot read from internal pipe.", s->host->hostname,
-                          s->connected_to);
-            }
-
-            if (ofd->revents & POLLOUT) {
-                rrdpush_send_labels(s->host);
-
-                if (outstanding) {
-                    struct circular_buffer *cb = s->host->sender->buffer;
-                    debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
-
-                    // BEGIN RRDPUSH LOCKED SESSION
-
-                    // during this session, data collectors
-                    // will not be able to append data to our buffer
-                    // but the socket is in non-blocking mode
-                    // so, we will not block at send()
-
-                    netdata_thread_disable_cancelability();
-
-                    debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
-                    netdata_mutex_lock(&s->host->sender->mutex);
-
-                    debug(D_STREAM, "STREAM: Sending data chunk=%zu...", outstanding);
-                    ssize_t ret;
-#ifdef ENABLE_HTTPS
-                    SSL *conn = s->host->ssl.conn ;
-                    if(conn && !s->host->ssl.flags) {
-                        ret = SSL_write(conn, chunk, outstanding);
-                    } else {
-                        ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
-                    }
-#else
-                    ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
-#endif
-                    if (unlikely(ret == -1)) {
-                        if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
-                            debug(D_STREAM, "STREAM: Send failed - closing socket...");
-                            error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.", s->host->hostname, s->connected_to, s->sent_bytes_on_this_connection);
-                            rrdpush_sender_thread_close_socket(s->host);
-                        }
-                        else {
-                            debug(D_STREAM, "STREAM: Send failed - will retry...");
-                        }
-                    }
-                    else if (likely(ret > 0)) {
-                        cbuffer_remove_unsafe(s->host->sender->buffer, ret);
-                        // DEBUG - dump the string to see it
-                        //char c = host->rrdpush_sender_buffer->buffer[begin + ret];
-                        //host->rrdpush_sender_buffer->buffer[begin + ret] = '\0';
-                        //debug(D_STREAM, "STREAM: sent from %zu to %zd:\n%s\n", begin, ret, &host->rrdpush_sender_buffer->buffer[begin]);
-                        //host->rrdpush_sender_buffer->buffer[begin + ret] = c;
-
-                        s->sent_bytes_on_this_connection += ret;
-                        s->sent_bytes += ret;
-
-                        debug(D_STREAM, "STREAM: Sent %zd bytes", ret);
-                        s->last_sent_t = now_monotonic_sec();
-                    }
-                    else {
-                        debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
-                    }
-
-                    debug(D_STREAM, "STREAM: Releasing exclusive lock on host...");
-                    netdata_mutex_unlock(&s->host->sender->mutex);
-
-                    netdata_thread_enable_cancelability();
-
-                    // END RRDPUSH LOCKED SESSION
-                }
-                else {
-                    debug(D_STREAM, "STREAM: we have sent the entire buffer, but we received POLLOUT...");
-                }
-            }
-
-            if(s->host->rrdpush_sender_socket != -1) {
-                char *error = NULL;
-
-                if (unlikely(ofd->revents & POLLERR))
-                    error = "socket reports errors (POLLERR)";
-
-                else if (unlikely(ofd->revents & POLLHUP))
-                    error = "connection closed by remote end (POLLHUP)";
-
-                else if (unlikely(ofd->revents & POLLNVAL))
-                    error = "connection is invalid (POLLNVAL)";
-
-                if(unlikely(error)) {
-                    debug(D_STREAM, "STREAM: %s - closing socket...", error);
-                    error("STREAM %s [send to %s]: %s - reopening socket - we have sent %zu bytes on this connection.", s->host->hostname, s->connected_to, error, s->sent_bytes_on_this_connection);
-                    rrdpush_sender_thread_close_socket(s->host);
-                }
-            }
+            char buffer[1000 + 1];
+            if (read(s->host->rrdpush_sender_pipe[PIPE_READ], buffer, 1000) == -1)
+                error("STREAM %s [send to %s]: cannot read from internal pipe.", s->host->hostname, s->connected_to);
         }
-        else {
-            debug(D_STREAM, "STREAM: poll() timed out.");
+
+        if (fds[Socket].revents & POLLIN)
+            debug(D_STREAM, "Data received on socket");
+
+        if (fds[Socket].revents & POLLOUT) {
+            attempt_to_send(s, chunk, outstanding);
+        }
+
+        // TODO-GAPS - why do we only check this on the socket, not the pipe?
+        if (outstanding) {
+            char *error = NULL;
+            if (unlikely(fds[Socket].revents & POLLERR))
+                error = "socket reports errors (POLLERR)";
+            else if (unlikely(fds[Socket].revents & POLLHUP))
+                error = "connection closed by remote end (POLLHUP)";
+            else if (unlikely(fds[Socket].revents & POLLNVAL))
+                error = "connection is invalid (POLLNVAL)";
+            if(unlikely(error)) {
+                error("STREAM %s [send to %s]: restart stream because %s - %zu bytes transmitted.", s->host->hostname,
+                      s->connected_to, error, s->sent_bytes_on_this_connection);
+                rrdpush_sender_thread_close_socket(s->host);
+            }
         }
 
         // TODO-GAPS Overflow will be detected when collector fails to write to buffer, check flag in this
