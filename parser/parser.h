@@ -16,21 +16,21 @@ typedef enum parser_rc {
 } PARSER_RC;
 
 typedef struct pluginsd_action {
-    PARSER_RC (*set_action)(void *user, char *variable, long long int value);
-    PARSER_RC (*begin_action)(void *user, char *chart_id, usec_t microseconds);
-    PARSER_RC (*end_action)(void *user);
+    PARSER_RC (*set_action)(void *user, RRDSET *st, RRDDIM *rd, long long int value);
+    PARSER_RC (*begin_action)(void *user, RRDSET *st, usec_t microseconds, int trust_durations);
+    PARSER_RC (*end_action)(void *user, RRDSET *st);
     PARSER_RC (*chart_action)
     (void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,
      char *module, int priority, int update_every, RRDSET_TYPE chart_type, char *options);
     PARSER_RC (*dimension_action)
-    (void *user, char *id, char *name, char *algorithm, long multiplier, long divisor, char *options,
+    (void *user, RRDSET *st, char *id, char *name, char *algorithm, long multiplier, long divisor, char *options,
      RRD_ALGORITHM algorithm_type);
 
-    PARSER_RC (*flush_action)(void *user);
+    PARSER_RC (*flush_action)(void *user, RRDSET *st);
     PARSER_RC (*disable_action)(void *user);
-    PARSER_RC (*variable_action)(void *user, int global, char *name, calculated_number *value);
+    PARSER_RC (*variable_action)(void *user, RRDHOST *host, RRDSET *st, char *name, int global, calculated_number value);
     PARSER_RC (*label_action)(void *user, char *key, char *value, LABEL_SOURCE source);
-    PARSER_RC (*overwrite_action)(void *user);
+    PARSER_RC (*overwrite_action)(void *user, RRDHOST *host, struct label *new_labels);
 } PLUGINSD_ACTION;
 
 typedef enum parser_input_type {
