@@ -63,6 +63,13 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     }
     rd->state->rrdeng_uuid = &page_index->id;
     handle->page_index = page_index;
+    rd->state->metric_uuid = callocz(1, sizeof(uuid_t));
+    if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION))) {
+        errno = 0;
+        error("FAILED to generate GUID for %s", rd->id);
+        freez(rd->state->metric_uuid);
+        rd->state->metric_uuid = NULL;
+    }
 }
 
 /* The page must be populated and referenced */

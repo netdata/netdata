@@ -86,7 +86,9 @@ void metalog_commit_update_chart(RRDSET *st)
 
     buffer_sprintf(buffer, "CONTEXT %s\n", host->machine_guid);
 
-    buffer_sprintf(buffer, "GUID %s\n", st->id); /* TODO: replace this with real GUID when available */
+    char uuid_str[37];
+    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+    buffer_sprintf(buffer, "GUID %s\n", uuid_str); /* TODO: replace this with real GUID when available */
 
     // properly set the name for the remote end to parse it
     char *name = "";
@@ -183,9 +185,11 @@ void metalog_commit_update_dimension(RRDDIM *rd)
     ctx = host->rrdeng_ctx->metalog_ctx;
     buffer = buffer_create(128); /* This will be freed after it has been committed to the metadata log buffer */
 
-    buffer_sprintf(buffer, "CONTEXT %s\n", st->id);
-
-    uuid_unparse_lower(*rd->state->rrdeng_uuid, uuid_str);
+    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+    buffer_sprintf(buffer, "CONTEXT %s\n", uuid_str);
+    // Activate random GUID
+    uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
+    //uuid_unparse_lower(*rd->state->rrdeng_uuid, uuid_str);
     buffer_sprintf(buffer, "GUID %s\n", uuid_str);
 
     buffer_sprintf(
