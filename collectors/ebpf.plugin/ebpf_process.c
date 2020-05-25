@@ -21,16 +21,16 @@ static netdata_idx_t *hash_values = NULL;
 static netdata_syscall_stat_t *aggregated_data = NULL;
 static netdata_publish_syscall_t *publish_aggregated = NULL;
 
-ebpf_functions_t functions;
+static ebpf_functions_t functions;
 
 /**
  * Pointers used when collector is dynamically linked
  */
 
 //Libbpf (It is necessary to have at least kernel 4.10)
-int (*bpf_map_lookup_elem)(int, const void *, void *);
+static int (*bpf_map_lookup_elem)(int, const void *, void *);
 
-int *map_fd = NULL;
+static int *map_fd = NULL;
 /**
  * End of the pointers
  */
