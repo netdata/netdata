@@ -149,7 +149,8 @@ void simple_connector_cleanup(struct instance *instance)
 {
     info("EXPORTING: cleaning up instance %s ...", instance->config.name);
 
-    // TODO free allocated resources
+    buffer_free(instance->buffer);
+    freez(instance->config.connector_specific_config);
 
     info("EXPORTING: instance %s exited", instance->config.name);
     instance->exited = 1;
@@ -218,7 +219,10 @@ void simple_connector_worker(void *instance_p)
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
 
-        if(unlikely(instance->engine->exit)) break;
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
+            break;
+        }
 
         if (likely(sock != -1)) {
             simple_connector_send_buffer(&sock, &failures, instance);
@@ -252,9 +256,14 @@ void simple_connector_worker(void *instance_p)
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        break;
+        return;
 #endif
     }
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
+        clean_prometheus_remote_write(instance);
+#endif
 
     simple_connector_cleanup(instance);
 }

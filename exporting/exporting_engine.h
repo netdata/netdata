@@ -192,6 +192,7 @@ struct engine {
     time_t now;
 
     int aws_sdk_initialized;
+    int protocol_buffers_initialized;
     int mongoc_initialized;
 
     struct instance *instance_root;
@@ -251,5 +252,12 @@ static inline void disable_instance(struct instance *instance)
 }
 
 #include "exporting/prometheus/prometheus.h"
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+#include "exporting/prometheus/remote_write/remote_write.h"
+#endif
+
+#if HAVE_KINESIS
+#include "exporting/aws_kinesis/aws_kinesis.h"
+#endif
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */

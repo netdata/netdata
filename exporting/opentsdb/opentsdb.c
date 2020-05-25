@@ -12,7 +12,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
@@ -53,7 +53,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 

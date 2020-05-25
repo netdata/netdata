@@ -3,6 +3,29 @@
 #include "aws_kinesis.h"
 
 /**
+ * Clean AWS Kinesis *
+ */
+void aws_kinesis_cleanup(struct instance *instance)
+{
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    kinesis_shutdown(instance->connector_specific_data);
+
+    freez(instance->connector_specific_data);
+
+    struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    if (connector_specific_config) {
+        freez(connector_specific_config->auth_key_id);
+        freez(connector_specific_config->secure_key);
+        freez(connector_specific_config->stream_name);
+
+        freez(connector_specific_config);
+    }
+
+    info("EXPORTING: instance %s exited", instance->config.name);
+    instance->exited = 1;
+}
+
+/**
  * Initialize AWS Kinesis connector instance
  *
  * @param instance an instance data structure.
@@ -68,12 +91,16 @@ void aws_kinesis_connector_worker(void *instance_p)
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct aws_kinesis_specific_data *connector_specific_data = instance->connector_specific_data;
 
-    while (!netdata_exit) {
+    while (!instance->engine->exit) {
         unsigned long long partition_key_seq = 0;
         struct stats *stats = &instance->stats;
 
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
+            break;
+        }
 
         // reset the monitoring chart counters
         stats->received_bytes =
@@ -155,7 +182,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                 stats->receptions++;
             }
 
-            if (unlikely(netdata_exit))
+            if (unlikely(instance->engine->exit))
                 break;
         }
 
@@ -172,7 +199,9 @@ void aws_kinesis_connector_worker(void *instance_p)
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        break;
+        return;
 #endif
     }
+
+    aws_kinesis_cleanup(instance);
 }
