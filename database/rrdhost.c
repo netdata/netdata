@@ -259,6 +259,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
             return host;
         }
+        uuid_parse(host->machine_guid, host->host_uuid);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
