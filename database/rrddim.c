@@ -215,10 +215,15 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_algorithm(st, rd, algorithm);
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
-        if (likely(!rc))
-            info("Dimension %s  (name, algorithm, multiplier and divisor) unchanged", rd->id);
-        else
-            rrdset_flag_set(st, RRDSET_FLAG_UPDATE_METADATA);
+        // DBENGINE available and activated?
+        if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+            if (unlikely(rc))
+                rrdset_flag_set(st, RRDSET_FLAG_UPDATE_METADATA);
+            else
+                info("Dimension %s (name, algorithm, multiplier and divisor) unchanged", rd->id);
+#endif
+        }
         rrdset_unlock(st);
         return rd;
     }

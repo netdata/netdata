@@ -535,6 +535,18 @@ RRDSET *rrdset_create_custom(
         else
             rrdset_set_name(st, id);
 
+        info("CHART request for updated metadata");
+        // name
+        // title
+        // family
+        // context
+        // charttype
+        // priority
+        // update_every
+        // options
+        // plugin
+        // module
+
         return st;
     }
 
