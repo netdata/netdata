@@ -260,5 +260,10 @@ void simple_connector_worker(void *instance_p)
 #endif
     }
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
+        clean_prometheus_remote_write(instance);
+#endif
+
     simple_connector_cleanup(instance);
 }
