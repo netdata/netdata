@@ -1663,7 +1663,7 @@ What to do now:
   3. Let us know. We may be able to help.
      Open a github issue with the above log, at:
 
-           https://github.com/firehol/netdata/issues
+           https://github.com/netdata/netdata/issues
 
 
 EOF
