@@ -5,7 +5,6 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     metadata_log \
-    global_uuid_map \
     $(NULL)
 
 dist_noinst_DATA = \
