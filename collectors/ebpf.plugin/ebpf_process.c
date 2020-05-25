@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <sys/time.h>
 #include <sys/resource.h>
 
 #include "ebpf.h"
@@ -522,6 +521,10 @@ static void ebpf_process_cleanup(void *ptr)
     freez(aggregated_data);
     freez(publish_aggregated);
     freez(hash_values);
+
+    if (functions.libnetdata) {
+        dlclose(functions.libnetdata);
+    }
 }
 
 /*****************************************************************

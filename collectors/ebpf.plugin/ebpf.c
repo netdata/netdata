@@ -36,29 +36,16 @@ void netdata_cleanup_and_exit(int ret) {
 
 // ----------------------------------------------------------------------
 //Netdata eBPF library
-void *libnetdata = NULL;
 int (*load_bpf_file)(char *, int) = NULL;
 int (*set_bpf_perf_event)(int, int) = NULL;
 int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
 int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
 void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
-int *map_fd = NULL;
-
-//Perf event variables
-static int pmu_fd[NETDATA_MAX_PROCESSOR];
-static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
-int page_cnt = 8;
 
 char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 static char *netdata_configured_log_dir = LOG_DIR;
-
-FILE *developer_log = NULL;
-
-//Global vectors
-static netdata_syscall_stat_t *aggregated_data = NULL;
-static netdata_publish_syscall_t *publish_aggregated = NULL;
 
 static int update_every = 1;
 static int thread_finished = 0;
@@ -95,14 +82,6 @@ netdata_ebpf_events_t process_probes[] = {
         { .type = 0, .name = NULL }
 };
 
-void open_developer_log() {
-    char filename[FILENAME_MAX+1];
-    int tot = sprintf(filename, "%s/%s",  netdata_configured_log_dir, NETDATA_DEVELOPER_LOG_FILE);
-
-    if(tot > 0)
-        developer_log = fopen(filename, "a");
-}
-
 static void int_exit(int sig)
 {
     close_ebpf_plugin = 1;
@@ -110,16 +89,6 @@ static void int_exit(int sig)
     //When both threads were not finished case I try to go in front this address, the collector will crash
     if (!thread_finished) {
         return;
-    }
-
-    if (libnetdata) {
-        dlclose(libnetdata);
-        libnetdata = NULL;
-    }
-
-    if (developer_log) {
-        fclose(developer_log);
-        developer_log = NULL;
     }
 
     if (event_pid) {
@@ -145,17 +114,12 @@ static void int_exit(int sig)
             if(sid >= 0) {
                 sleep(1);
                 debug(D_EXIT, "Wait for father %d die", event_pid);
-                clean_kprobe_events(developer_log, event_pid, process_probes);
+                clean_kprobe_events(NULL, event_pid, process_probes);
             } else {
                 error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
             }
         } else { //parent
             exit(0);
-        }
-
-        if (developer_log) {
-            fclose(developer_log);
-            developer_log = NULL;
         }
     }
 
@@ -485,8 +449,6 @@ void set_global_variables() {
     netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
     if(!netdata_configured_log_dir)
         netdata_configured_log_dir = LOG_DIR;
-
-    page_cnt *= (int)sysconf(_SC_NPROCESSORS_ONLN);
 
     ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {

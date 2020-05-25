@@ -109,8 +109,8 @@ extern int close_ebpf_plugin;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern char *ebpf_plugin_dir;
-extern char *kernel_string;
-extern netdata_ebpf_events_t *process_probes;
+extern char kernel_string[64];
+extern netdata_ebpf_events_t process_probes[];
 
 //Common functions
 extern void ebpf_global_labels(netdata_syscall_stat_t *is,

@@ -54,13 +54,13 @@ typedef struct netdata_ebpf_events {
 } netdata_ebpf_events_t;
 
 typedef struct ebpf_functions {
-    void *libnetdata = NULL;
-    int (*load_bpf_file)(char *, int) = NULL;
+    void *libnetdata;
+    int (*load_bpf_file)(char *, int);
     //Libbpf (It is necessary to have at least kernel 4.10)
     int (*bpf_map_lookup_elem)(int, const void *, void *);
     int (*bpf_map_delete_elem)(int fd, const void *key);
 
-    int *map_fd = NULL;
+    int *map_fd;
 
     char kernel_string[64];
     uint32_t running_on_kernel;
