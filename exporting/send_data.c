@@ -294,37 +294,38 @@ void simple_connector_worker(void *instance_p)
                     } else {
                         SSL_clear(connector_specific_data->conn);
                     }
-                }
 
-                if (connector_specific_data->conn) {
-                    if (SSL_set_fd(connector_specific_data->conn, sock) != 1) {
-                        error("Failed to set the socket to the SSL on socket fd %d.", sock);
-                        connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
-                    } else {
-                        connector_specific_data->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
-                        SSL_set_connect_state(connector_specific_data->conn);
-                        int err = SSL_connect(connector_specific_data->conn);
-                        if (err != 1) {
-                            err = SSL_get_error(connector_specific_data->conn, err);
-                            error("SSL cannot connect with the server:  %s ",
-                                  ERR_error_string((long)SSL_get_error(connector_specific_data->conn, err), NULL));
+                    if (connector_specific_data->conn) {
+                        if (SSL_set_fd(connector_specific_data->conn, sock) != 1) {
+                            error("Failed to set the socket to the SSL on socket fd %d.", sock);
                             connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
                         } else {
-                            info("Exporting established a SSL connection.");
+                            connector_specific_data->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                            SSL_set_connect_state(connector_specific_data->conn);
+                            int err = SSL_connect(connector_specific_data->conn);
+                            if (err != 1) {
+                                err = SSL_get_error(connector_specific_data->conn, err);
+                                error("SSL cannot connect with the server:  %s ",
+                                      ERR_error_string((long)SSL_get_error(connector_specific_data->conn, err), NULL));
+                                connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
+                            } else {
+                                info("Exporting established a SSL connection.");
 
-                            struct timeval tv;
-                            tv.tv_sec = timeout.tv_sec /4;
-                            tv.tv_usec = 0;
+                                struct timeval tv;
+                                tv.tv_sec = timeout.tv_sec /4;
+                                tv.tv_usec = 0;
 
-                            if (!tv.tv_sec)
-                                tv.tv_sec = 2;
+                                if (!tv.tv_sec)
+                                    tv.tv_sec = 2;
 
-                            if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)))
-                                error("Cannot set timeout to socket %d, this can block communication", sock);
+                                if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)))
+                                    error("Cannot set timeout to socket %d, this can block communication", sock);
 
+                            }
                         }
                     }
                 }
+
             }
 #endif
 
