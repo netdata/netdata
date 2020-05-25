@@ -105,6 +105,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+    parser \
     aclk \
     spawn \
     $(NULL)
@@ -325,6 +326,8 @@ MACOS_PLUGIN_FILES = \
 PLUGINSD_PLUGIN_FILES = \
     collectors/plugins.d/plugins_d.c \
     collectors/plugins.d/plugins_d.h \
+    collectors/plugins.d/pluginsd_parser.c \
+    collectors/plugins.d/pluginsd_parser.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
@@ -472,6 +475,11 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
+PARSER_FILES = \
+    parser/parser.c \
+    parser/parser.h \
+    $(NULL)
+
 ACLK_FILES = \
     aclk/aclk_common.c \
     aclk/aclk_common.h \
@@ -597,6 +605,7 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
+    $(PARSER_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)

@@ -1491,6 +1491,7 @@ AC_CONFIG_FILES([
     claim/Makefile
     aclk/Makefile
     spawn/Makefile
+    parser/Makefile
 ])
 AC_OUTPUT
 
