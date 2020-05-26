@@ -158,4 +158,8 @@ extern void fill_ebpf_functions(ebpf_functions_t *ef);
 # define EBPF_GLOBAL_SECTION "global"
 # define EBPF_PROGRAMS_SECTION "ebpf programs"
 
+//Common variables
+extern char *ebpf_user_config_dir;
+extern char *ebpf_stock_config_dir;
+
 #endif
