@@ -367,7 +367,8 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
     }
 
-    ebpf_global_labels(socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names, NETDATA_MAX_SOCKET_VECTOR);
+    ebpf_global_labels(socket_aggregated_data, socket_publish_aggregated, socket_dimension_names,
+                       socket_id_names, NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
     pthread_mutex_unlock(&lock);
