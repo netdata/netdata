@@ -100,6 +100,8 @@ typedef struct ebpf_module {
 # define NETDATA_KERNEL_V4_15 265984
 
 
+# define EBPF_MAX_MAPS 32
+
 
 //Threads
 extern void *ebpf_process_thread(void *ptr);

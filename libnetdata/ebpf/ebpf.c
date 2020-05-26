@@ -213,12 +213,6 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
         return -1;
     }
 
-    ef->map_fd =  dlsym(libnetdata, "map_fd");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
-        return -1;
-    }
-
     ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
     if ((err = dlerror()) != NULL) {
         error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
@@ -250,7 +244,8 @@ int ebpf_load_program(char *plugins_dir,
                       int event_id, int mode ,
                       char *kernel_string,
                       const char *name,
-                      int (*load_bpf_file)(char *, int))
+                      int *map_fd,
+                      int (*load_bpf_file)(int *, char *, int))
 {
     char lpath[4096];
     char lname[128];
@@ -260,7 +255,7 @@ int ebpf_load_program(char *plugins_dir,
         return -1;
 
     snprintf(lpath, 4096, "%s/%s", plugins_dir,  lname);
-    if (load_bpf_file(lpath, event_id)) {
+    if (load_bpf_file(map_fd, lpath, event_id)) {
         error("[EBPF_PROCESS] Cannot load program: %s", lpath);
         return -1;
     } else {

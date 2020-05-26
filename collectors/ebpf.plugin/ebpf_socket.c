@@ -287,6 +287,8 @@ static void ebpf_socket_cleanup(void *ptr)
     if (socket_functions.libnetdata) {
         dlclose(socket_functions.libnetdata);
     }
+
+    freez(socket_functions.map_fd);
 }
 
 /*****************************************************************
@@ -320,10 +322,8 @@ static void set_local_pointers(ebpf_module_t *em) {
     (void) bpf_map_lookup_elem;
     bpf_map_delete_elem = socket_functions.bpf_map_delete_elem;
     (void) bpf_map_delete_elem;
-
-    map_fd = socket_functions.map_fd;
-    (void)map_fd;
 #endif
+    map_fd = socket_functions.map_fd;
 
     if (em->mode == MODE_ENTRY) {
         change_collector_event();
@@ -362,7 +362,7 @@ void *ebpf_socket_thread(void *ptr)
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                          em->thread_name, socket_functions.load_bpf_file) ) {
+                          em->thread_name, socket_functions.map_fd, socket_functions.load_bpf_file) ) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }

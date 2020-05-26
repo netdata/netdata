@@ -572,6 +572,7 @@ void fill_ebpf_functions(ebpf_functions_t *ef) {
     memset(ef, 0, sizeof(ebpf_functions_t));
     ef->kernel_string = kernel_string;
     ef->running_on_kernel = running_on_kernel;
+    ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
     ef->isrh = isrh;
 }
 

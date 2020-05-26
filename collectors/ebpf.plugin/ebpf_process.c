@@ -401,6 +401,8 @@ static void ebpf_process_cleanup(void *ptr)
     if (process_functions.libnetdata) {
         dlclose(process_functions.libnetdata);
     }
+
+    freez(process_functions.map_fd);
 }
 
 /*****************************************************************
@@ -443,8 +445,9 @@ static void set_local_pointers(ebpf_module_t *em) {
 #ifndef STATIC
     bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
 
-    map_fd = process_functions.map_fd;
 #endif
+
+    map_fd = process_functions.map_fd;
 
     if (em->mode == MODE_ENTRY) {
         change_collector_event();
@@ -486,7 +489,7 @@ void *ebpf_process_thread(void *ptr)
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, process_functions.load_bpf_file) ) {
+                      em->thread_name, process_functions.map_fd, process_functions.load_bpf_file) ) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
