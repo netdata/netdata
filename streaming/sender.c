@@ -363,7 +363,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     }
     host->stream_version = version;
 
-    info("STREAM %s [send to %s]: established communication with a master using protocol version %u - ready to send metrics..."
+    info("STREAM %s [send to %s]: established communication with a master using protocol version %d - ready to send metrics..."
          , host->hostname
          , connected_to
          , version);
