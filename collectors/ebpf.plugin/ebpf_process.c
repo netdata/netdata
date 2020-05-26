@@ -89,91 +89,6 @@ static void ebpf_update_publish(netdata_publish_syscall_t *publish,
     pvc->zombie = (long)publish[5].ncall + (long)publish[6].ncall;
 }
 
-/**
- * Write begin command on standard output
- *
- * @param family the chart family name
- * @param name   the chart name
- */
-static inline void write_begin_chart(char *family, char *name)
-{
-    int ret = printf( "BEGIN %s.%s\n"
-        , family
-        , name);
-
-    (void)ret;
-}
-
-/**
- * Write set command on standard output
- *
- * @param dim    the dimension name
- * @param value  the value for the dimension
- */
-static inline void write_chart_dimension(char *dim, long long value)
-{
-    int ret = printf("SET %s = %lld\n", dim, value);
-    (void)ret;
-}
-
-/**
- * Call the necessary functions to create a chart.
- *
- * @param name    the chart name
- * @param family  the chart family
- * @param move    the pointer with the values that will be published
- * @param end     the number of values that will be written on standard output
- */
-static void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
-    write_begin_chart(family, name);
-
-    int i = 0;
-    while (move && i < end) {
-        write_chart_dimension(move->name, move->ncall);
-
-        move = move->next;
-        i++;
-    }
-
-    printf("END\n");
-}
-
-/**
- * Call the necessary functions to create a chart.
- *
- * @param name    the chart name
- * @param family  the chart family
- * @param move    the pointer with the values that will be published
- * @param end     the number of values that will be written on standard output
- */
-static void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
-    write_begin_chart(family, name);
-
-    int i = 0;
-    while (move && i < end) {
-        write_chart_dimension(move->name, move->nerr);
-
-        move = move->next;
-        i++;
-    }
-
-    printf("END\n");
-}
-
-/**
- * Call the necessary functions to create a chart.
- *
- * @param family  the chart family
- * @param move    the pointer with the values that will be published
- */
-static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
-    write_begin_chart(family, NETDATA_VFS_IO_FILE_BYTES);
-
-    write_chart_dimension(id_names[3], (long long) pvc->write);
-    write_chart_dimension(id_names[4], (long long) pvc->read);
-
-    printf("END\n");
-}
 
 /**
  * Call the necessary functions to create a chart.
@@ -229,7 +144,7 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
                                &publish_aggregated[NETDATA_PROCESS_START],
                                2);
 
-        write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
+        write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, id_names[3], id_names[4], &pvc);
     }
 }
 
@@ -317,85 +232,6 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  *  FUNCTIONS TO CREATE CHARTS
  *
  *****************************************************************/
-
-/**
- * Write chart cmd on standard output
- *
- * @param type  the chart type
- * @param id    the chart id
- * @param axis  the axis label
- * @param web   the group name used to attach the chart on dashaboard
- * @param order the chart order
- */
-static inline void ebpf_write_chart_cmd(char *type
-    , char *id
-    , char *axis
-    , char *web
-    , int order)
-{
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-        , type
-        , id
-        , axis
-        , web
-        , order);
-}
-
-/**
- * Write the dimension command on standard output
- *
- * @param n the dimension name
- * @param d the dimension information
- */
-static inline void ebpf_write_global_dimension(char *n, char *d)
-{
-    printf("DIMENSION %s %s absolute 1 1\n", n, d);
-}
-
-/**
- * Call ebpf_write_global_dimension to create the dimensions for a specific chart
- *
- * @param ptr a pointer to a structure of the type netdata_publish_syscall_t
- * @param end the number of dimensions for the structure ptr
- */
-static void ebpf_create_global_dimension(void *ptr, int end)
-{
-    netdata_publish_syscall_t *move = ptr;
-
-    int i = 0;
-    while (move && i < end) {
-        ebpf_write_global_dimension(move->name, move->dimension);
-
-        move = move->next;
-        i++;
-    }
-}
-
-/**
- *  Call write_chart_cmd to create the charts
- *
- * @param family the chart family
- * @param name   the chart name
- * @param axis   the axis label
- * @param web    the group name used to attach the chart on dashaboard
- * @param order  the order number of the specified chart
- * @param ncd    a pointer to a function called to create dimensions
- * @param move   a pointer for a structure that has the dimensions
- * @param end    number of dimensions for the chart created
- */
-static inline void ebpf_create_chart(char *family
-    , char *name
-    , char *axis
-    , char *web
-    , int order
-    , void (*ncd)(void *, int)
-    , void *move
-    , int end)
-{
-    ebpf_write_chart_cmd(family, name, axis, web, order);
-
-    ncd(move, end);
-}
 
 /**
  * Create IO chart
@@ -606,8 +442,9 @@ static void set_local_pointers(ebpf_module_t *em) {
     map_fd = functions.map_fd;
 #endif
 
-    if (em->mode == MODE_ENTRY)
+    if (em->mode == MODE_ENTRY) {
         change_collector_event();
+    }
 
     if (functions.isrh >= NETDATA_MINIMUM_RH_VERSION && functions.isrh < NETDATA_RH_8)
         change_syscalls();
@@ -631,23 +468,26 @@ static void set_local_pointers(ebpf_module_t *em) {
 void *ebpf_process_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
+    pthread_mutex_lock(&lock);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     ebpf_process_allocate_global_vectors();
 
-    pthread_mutex_lock(&lock);
     fill_ebpf_functions(&functions);
     if (ebpf_load_libraries(&functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         return NULL;
     }
-    pthread_mutex_unlock(&lock);
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, functions.load_bpf_file) )
+                      em->thread_name, functions.load_bpf_file) ) {
+        pthread_mutex_unlock(&lock);
         goto endprocess;
+    }
+
+    pthread_mutex_unlock(&lock);
 
     ebpf_global_labels(aggregated_data, publish_aggregated, dimension_names, id_names, NETDATA_MAX_MONITOR_VECTOR);
 

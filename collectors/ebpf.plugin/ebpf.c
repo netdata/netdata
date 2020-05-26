@@ -67,11 +67,22 @@ netdata_ebpf_events_t process_probes[] = {
     { .type = 0, .name = NULL }
 };
 
+netdata_ebpf_events_t socket_probes[] = {
+    { .type = 'r', .name = "tcp_sendmsg" },
+    { .type = 'p', .name = "tcp_cleanup_rbuf" },
+    { .type = 'p', .name = "tcp_close" },
+    { .type = 'p', .name = "udp_recvmsg" },
+    { .type = 'r', .name = "udp_recvmsg" },
+    { .type = 'r', .name = "udp_sendmsg" },
+    { .type = 'p', .name = "do_exit" },
+    { .type = 0, .name = NULL }
+};
+
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .enabled = 0, .start_routine = ebpf_process_thread, .update_time = 1,
       .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
     { .thread_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread, .update_time = 1,
-      .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
+      .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
 };
@@ -126,6 +137,184 @@ static void ebpf_exit(int sig)
 
     exit(sig);
 }
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CREATE CHARTS
+ *
+ *****************************************************************/
+
+/**
+ * Write begin command on standard output
+ *
+ * @param family the chart family name
+ * @param name   the chart name
+ */
+void write_begin_chart(char *family, char *name)
+{
+    int ret = printf( "BEGIN %s.%s\n"
+        , family
+        , name);
+
+    (void)ret;
+}
+
+/**
+ * Write set command on standard output
+ *
+ * @param dim    the dimension name
+ * @param value  the value for the dimension
+ */
+void write_chart_dimension(char *dim, long long value)
+{
+    int ret = printf("SET %s = %lld\n", dim, value);
+    (void)ret;
+}
+
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param name    the chart name
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ * @param end     the number of values that will be written on standard output
+ */
+void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+    write_begin_chart(family, name);
+
+    int i = 0;
+    while (move && i < end) {
+        write_chart_dimension(move->name, move->ncall);
+
+        move = move->next;
+        i++;
+    }
+
+    printf("END\n");
+}
+
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param name    the chart name
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ * @param end     the number of values that will be written on standard output
+ */
+void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+    write_begin_chart(family, name);
+
+    int i = 0;
+    while (move && i < end) {
+        write_chart_dimension(move->name, move->nerr);
+
+        move = move->next;
+        i++;
+    }
+
+    printf("END\n");
+}
+
+
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ */
+void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
+    write_begin_chart(family, chart);
+
+    write_chart_dimension(dwrite, (long long) pvc->write);
+    write_chart_dimension(dread, (long long) pvc->read);
+
+    printf("END\n");
+}
+
+/**
+ * Write chart cmd on standard output
+ *
+ * @param type  the chart type
+ * @param id    the chart id
+ * @param axis  the axis label
+ * @param web   the group name used to attach the chart on dashaboard
+ * @param order the chart order
+ */
+void ebpf_write_chart_cmd(char *type
+    , char *id
+    , char *axis
+    , char *web
+    , int order)
+{
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
+        , type
+        , id
+        , axis
+        , web
+        , order);
+}
+
+/**
+ * Write the dimension command on standard output
+ *
+ * @param n the dimension name
+ * @param d the dimension information
+ */
+void ebpf_write_global_dimension(char *n, char *d)
+{
+    printf("DIMENSION %s %s absolute 1 1\n", n, d);
+}
+
+/**
+ * Call ebpf_write_global_dimension to create the dimensions for a specific chart
+ *
+ * @param ptr a pointer to a structure of the type netdata_publish_syscall_t
+ * @param end the number of dimensions for the structure ptr
+ */
+void ebpf_create_global_dimension(void *ptr, int end)
+{
+    netdata_publish_syscall_t *move = ptr;
+
+    int i = 0;
+    while (move && i < end) {
+        ebpf_write_global_dimension(move->name, move->dimension);
+
+        move = move->next;
+        i++;
+    }
+}
+
+/**
+ *  Call write_chart_cmd to create the charts
+ *
+ * @param family the chart family
+ * @param name   the chart name
+ * @param axis   the axis label
+ * @param web    the group name used to attach the chart on dashaboard
+ * @param order  the order number of the specified chart
+ * @param ncd    a pointer to a function called to create dimensions
+ * @param move   a pointer for a structure that has the dimensions
+ * @param end    number of dimensions for the chart created
+ */
+void ebpf_create_chart(char *family
+    , char *name
+    , char *axis
+    , char *web
+    , int order
+    , void (*ncd)(void *, int)
+    , void *move
+    , int end)
+{
+    ebpf_write_chart_cmd(family, name, axis, web, order);
+
+    ncd(move, end);
+}
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO DEFINE OPTIONS
+ *
+ *****************************************************************/
 
 /**
  * Define labels used to generate charts

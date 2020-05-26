@@ -113,6 +113,7 @@ extern int running_on_kernel;
 extern char *ebpf_plugin_dir;
 extern char kernel_string[64];
 extern netdata_ebpf_events_t process_probes[];
+extern netdata_ebpf_events_t socket_probes[];
 
 //Common functions
 extern void ebpf_global_labels(netdata_syscall_stat_t *is,
@@ -120,6 +121,35 @@ extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                char **dim,
                                char **name,
                                int end);
+
+extern void ebpf_write_chart_cmd(char *type
+    , char *id
+    , char *axis
+    , char *web
+    , int order);
+
+extern void ebpf_write_global_dimension(char *n, char *d);
+
+extern void ebpf_create_global_dimension(void *ptr, int end);
+
+extern void ebpf_create_chart(char *family
+    , char *name
+    , char *axis
+    , char *web
+    , int order
+    , void (*ncd)(void *, int)
+    , void *move
+    , int end);
+
+extern void write_begin_chart(char *family, char *name);
+
+extern void write_chart_dimension(char *dim, long long value);
+
+extern void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
+
+extern void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
+
+void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 

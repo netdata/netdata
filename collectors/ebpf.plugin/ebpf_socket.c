@@ -3,6 +3,7 @@
 #include <sys/resource.h>
 
 #include "ebpf.h"
+#include "ebpf_socket.h"
 
 /*****************************************************************
  *
@@ -11,6 +12,14 @@
  *****************************************************************/
 
 static ebpf_functions_t functions;
+
+static netdata_idx_t *hash_values = NULL;
+static netdata_syscall_stat_t *aggregated_data = NULL;
+static netdata_publish_syscall_t *publish_aggregated = NULL;
+
+static char *dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent", "received" };
+static char *id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close", "udp_sendmsg",
+                                                     "udp_recvmsg" };
 
 #ifndef STATIC
 /**
@@ -26,6 +35,203 @@ static int *map_fd = NULL;
  * End of the pointers
  */
 #endif
+
+/*****************************************************************
+ *
+ *  PROCESS DATA AND SEND TO NETDATA
+ *
+ *****************************************************************/
+
+/**
+ * Update publish structure before to send data to Netdata.
+ *
+ * @param publish  the first output structure with independent dimensions
+ * @param tcp      structure to store IO from tcp sockets
+ * @param udp      structure to store IO from udp sockets
+ * @param input    the structure with the input data.
+ */
+static void ebpf_update_publish(netdata_publish_syscall_t *publish,
+                                netdata_publish_vfs_common_t *tcp,
+                                netdata_publish_vfs_common_t *udp,
+                                netdata_syscall_stat_t *input) {
+
+    netdata_publish_syscall_t *move = publish;
+    while(move) {
+        if(input->call != move->pcall) {
+            //This condition happens to avoid initial values with dimensions higher than normal values.
+            if(move->pcall) {
+                move->ncall = (input->call > move->pcall)?input->call - move->pcall: move->pcall - input->call;
+                move->nbyte = (input->bytes > move->pbyte)?input->bytes - move->pbyte: move->pbyte - input->bytes;
+                move->nerr = (input->ecall > move->nerr)?input->ecall - move->perr: move->perr - input->ecall;
+            } else {
+                move->ncall = 0;
+                move->nbyte = 0;
+                move->nerr = 0;
+            }
+
+            move->pcall = input->call;
+            move->pbyte = input->bytes;
+            move->perr = input->ecall;
+        } else {
+            move->ncall = 0;
+            move->nbyte = 0;
+            move->nerr = 0;
+        }
+
+        input = input->next;
+        move = move->next;
+    }
+
+    tcp->write = -((long)publish[0].nbyte);
+    tcp->read = (long)publish[1].nbyte;
+
+    udp->write = -((long)publish[3].nbyte);
+    udp->read = (long)publish[4].nbyte;
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param em the structure with thread information
+ */
+static void ebpf_process_send_data(ebpf_module_t *em) {
+    netdata_publish_vfs_common_t common_tcp;
+    netdata_publish_vfs_common_t common_udp;
+    ebpf_update_publish(publish_aggregated, &common_tcp, &common_udp, aggregated_data);
+
+    write_global_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
+    write_io_chart(NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, id_names[0], id_names[1], &common_tcp);
+    if (em->mode < MODE_ENTRY) {
+        write_global_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
+    }
+
+    write_global_count_chart(NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY,
+                             &publish_aggregated[NETDATA_UDP_START], 2);
+    write_io_chart(NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, id_names[0], id_names[1], &common_udp);
+    if (em->mode < MODE_ENTRY) {
+        write_global_err_chart(NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY,
+                               &publish_aggregated[NETDATA_UDP_START], 2);
+    }
+}
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CREATE CHARTS
+ *
+ *****************************************************************/
+
+/**
+ * Create global charts
+ *
+ * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static void ebpf_create_global_charts(ebpf_module_t *em) {
+    ebpf_create_chart(NETDATA_EBPF_FAMILY
+        , NETDATA_TCP_FUNCTION_COUNT
+        , "Calls"
+        , NETDATA_SOCKET_GROUP
+        , 950
+        , ebpf_create_global_dimension
+        , publish_aggregated
+        , 3);
+
+    ebpf_create_chart(NETDATA_EBPF_FAMILY
+        , NETDATA_TCP_FUNCTION_BYTES
+        , "bytes/s"
+        , NETDATA_SOCKET_GROUP
+        , 951
+        , ebpf_create_global_dimension
+        , publish_aggregated
+        , 3);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_chart(NETDATA_EBPF_FAMILY
+            , NETDATA_TCP_FUNCTION_ERROR
+            , "Calls"
+            , NETDATA_SOCKET_GROUP
+            , 952
+            , ebpf_create_global_dimension
+            , publish_aggregated
+            , 2);
+    }
+
+    ebpf_create_chart(NETDATA_EBPF_FAMILY
+        , NETDATA_UDP_FUNCTION_COUNT
+        , "Calls"
+        , NETDATA_SOCKET_GROUP
+        , 953
+        , ebpf_create_global_dimension
+        , &publish_aggregated[NETDATA_UDP_START]
+        , 2);
+
+    ebpf_create_chart(NETDATA_EBPF_FAMILY
+        , NETDATA_UDP_FUNCTION_BYTES
+        , "bytes/s"
+        , NETDATA_SOCKET_GROUP
+        , 954
+        , ebpf_create_global_dimension
+        , &publish_aggregated[NETDATA_UDP_START]
+        , 2);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_chart(NETDATA_EBPF_FAMILY
+            , NETDATA_UDP_FUNCTION_ERROR
+            , "Calls"
+            , NETDATA_SOCKET_GROUP
+            , 955
+            , ebpf_create_global_dimension
+            , &publish_aggregated[NETDATA_UDP_START]
+            , 2);
+    }
+}
+
+/*****************************************************************
+ *
+ *  READ INFORMATION FROM KERNEL RING
+ *
+ *****************************************************************/
+
+/**
+ * Read the hash table and store data to allocated vectors.
+ */
+static void read_hash_global_tables()
+{
+    uint64_t idx;
+    netdata_idx_t res[NETDATA_SOCKET_COUNTER];
+
+    netdata_idx_t *val = hash_values;
+    for (idx = 0; idx < NETDATA_SOCKET_COUNTER ; idx++) {
+        if (!bpf_map_lookup_elem(map_fd[4], &idx, val)) {
+            uint64_t total = 0;
+            int i;
+            int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+            for (i = 0; i < end; i++)
+                total += val[i];
+
+            res[idx] = total;
+        } else {
+            res[idx] = 0;
+        }
+    }
+
+    aggregated_data[0].call = res[NETDATA_KEY_CALLS_TCP_SENDMSG];
+    aggregated_data[1].call = res[NETDATA_KEY_CALLS_TCP_CLEANUP_RBUF];
+    aggregated_data[2].call = res[NETDATA_KEY_CALLS_TCP_CLOSE];
+    aggregated_data[3].call = res[NETDATA_KEY_CALLS_UDP_RECVMSG];
+    aggregated_data[4].call = res[NETDATA_KEY_CALLS_UDP_SENDMSG];
+
+    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_TCP_SENDMSG];
+    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_TCP_CLEANUP_RBUF];
+    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_UDP_RECVMSG];
+    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_UDP_SENDMSG];
+
+    aggregated_data[0].bytes = res[NETDATA_KEY_BYTES_TCP_SENDMSG];
+    aggregated_data[1].bytes = res[NETDATA_KEY_BYTES_TCP_CLEANUP_RBUF];
+    aggregated_data[3].bytes = res[NETDATA_KEY_BYTES_UDP_RECVMSG];
+    aggregated_data[4].bytes = res[NETDATA_KEY_BYTES_UDP_SENDMSG];
+}
 
 /*****************************************************************
  *
@@ -49,6 +255,9 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        read_hash_global_tables();
+        ebpf_process_send_data(em);
+
         fflush(stdout);
     }
 }
@@ -68,6 +277,10 @@ static void ebpf_socket_cleanup(void *ptr)
 {
     (void)ptr;
 
+    freez(aggregated_data);
+    freez(publish_aggregated);
+    freez(hash_values);
+
     if (functions.libnetdata) {
         dlclose(functions.libnetdata);
     }
@@ -80,20 +293,38 @@ static void ebpf_socket_cleanup(void *ptr)
  *****************************************************************/
 
 /**
+ * Allocate vectors used with this thread.
+ * We are not testing the return, because callocz does this and shutdown the software
+ * case it was not possible to allocate.
+ */
+void ebpf_socket_allocate_global_vectors() {
+    aggregated_data = callocz(NETDATA_MAX_SOCKET_VECTOR, sizeof(netdata_syscall_stat_t));
+    publish_aggregated = callocz(NETDATA_MAX_SOCKET_VECTOR, sizeof(netdata_publish_syscall_t));
+    hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
+}
+
+static void change_collector_event() {
+    socket_probes[0].type = 'p';
+    socket_probes[5].type = 'p';
+}
+
+/**
  * Set local function pointers, this function will never be compiled with static libraries
  */
 static void set_local_pointers(ebpf_module_t *em) {
-    (void)em;
 #ifndef STATIC
     bpf_map_lookup_elem = functions.bpf_map_lookup_elem;
     (void) bpf_map_lookup_elem;
-
     bpf_map_delete_elem = functions.bpf_map_delete_elem;
     (void) bpf_map_delete_elem;
 
     map_fd = functions.map_fd;
     (void)map_fd;
 #endif
+
+    if (em->mode == MODE_ENTRY) {
+        change_collector_event();
+    }
 }
 
 /*****************************************************************
@@ -115,21 +346,28 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
+    pthread_mutex_lock(&lock);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    pthread_mutex_lock(&lock);
+    ebpf_socket_allocate_global_vectors();
+
     fill_ebpf_functions(&functions);
     if (ebpf_load_libraries(&functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         return NULL;
     }
-    pthread_mutex_unlock(&lock);
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, functions.load_bpf_file) )
+                          em->thread_name, functions.load_bpf_file) ) {
+        pthread_mutex_unlock(&lock);
         goto endsocket;
+    }
+    pthread_mutex_unlock(&lock);
 
+    ebpf_global_labels(aggregated_data, publish_aggregated, dimension_names, id_names, NETDATA_MAX_SOCKET_VECTOR);
+
+    ebpf_create_global_charts(em);
     socket_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
 endsocket:
