@@ -37,8 +37,10 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     return 0;
 }
@@ -78,8 +80,10 @@ int init_opentsdb_http_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     return 0;
 }
