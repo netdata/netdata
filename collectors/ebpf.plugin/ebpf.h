@@ -145,9 +145,9 @@ extern void write_begin_chart(char *family, char *name);
 
 extern void write_chart_dimension(char *dim, long long value);
 
-extern void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
+extern void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
 
-extern void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
+extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
 
 void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
 

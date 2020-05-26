@@ -114,32 +114,32 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t pvc;
     ebpf_update_publish(publish_aggregated, &pvc, aggregated_data);
 
-    write_global_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
-    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
+    write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
+    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
                              NETDATA_EBPF_FAMILY,
                              &publish_aggregated[NETDATA_DEL_START],
                              1);
-    write_global_count_chart(NETDATA_VFS_FILE_IO_COUNT,
+    write_count_chart(NETDATA_VFS_FILE_IO_COUNT,
                              NETDATA_EBPF_FAMILY,
                              &publish_aggregated[NETDATA_IN_START_BYTE],
                              2);
-    write_global_count_chart(NETDATA_EXIT_SYSCALL,
+    write_count_chart(NETDATA_EXIT_SYSCALL,
                              NETDATA_EBPF_FAMILY,
                              &publish_aggregated[NETDATA_EXIT_START],
                              2);
-    write_global_count_chart(NETDATA_PROCESS_SYSCALL,
+    write_count_chart(NETDATA_PROCESS_SYSCALL,
                              NETDATA_EBPF_FAMILY,
                              &publish_aggregated[NETDATA_PROCESS_START],
                              2);
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
     if(em->mode < MODE_ENTRY) {
-        write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
-        write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT,
+        write_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
+        write_err_chart(NETDATA_VFS_FILE_ERR_COUNT,
                                NETDATA_EBPF_FAMILY,
                                &publish_aggregated[2],
                                NETDATA_VFS_ERRORS);
-        write_global_err_chart(NETDATA_PROCESS_ERROR_NAME,
+        write_err_chart(NETDATA_PROCESS_ERROR_NAME,
                                NETDATA_EBPF_FAMILY,
                                &publish_aggregated[NETDATA_PROCESS_START],
                                2);

@@ -179,7 +179,7 @@ void write_chart_dimension(char *dim, long long value)
  * @param move    the pointer with the values that will be published
  * @param end     the number of values that will be written on standard output
  */
-void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     write_begin_chart(family, name);
 
     int i = 0;
@@ -201,7 +201,7 @@ void write_global_count_chart(char *name, char *family, netdata_publish_syscall_
  * @param move    the pointer with the values that will be published
  * @param end     the number of values that will be written on standard output
  */
-void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     write_begin_chart(family, name);
 
     int i = 0;

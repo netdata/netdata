@@ -99,17 +99,17 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_publish(publish_aggregated, &common_tcp, &common_udp, aggregated_data);
 
-    write_global_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
+    write_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
     write_io_chart(NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, id_names[0], id_names[1], &common_tcp);
     if (em->mode < MODE_ENTRY) {
-        write_global_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
+        write_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
     }
 
-    write_global_count_chart(NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY,
+    write_count_chart(NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY,
                              &publish_aggregated[NETDATA_UDP_START], 2);
     write_io_chart(NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, id_names[0], id_names[1], &common_udp);
     if (em->mode < MODE_ENTRY) {
-        write_global_err_chart(NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY,
+        write_err_chart(NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY,
                                &publish_aggregated[NETDATA_UDP_START], 2);
     }
 }
