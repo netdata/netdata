@@ -543,6 +543,7 @@ require_cmd() {
 }
 
 declare -A pkg_find=(
+  ['gentoo']="sys-apps/findutils"
   ['fedora']="findutils"
   ['clearlinux']="findutils"
   ['default']="WARNING|"
@@ -593,6 +594,7 @@ declare -A pkg_automake=(
 
 # Required to build libwebsockets and libmosquitto on some systems.
 declare -A pkg_cmake=(
+  ['gentoo']="dev-util/cmake"
   ['clearlinux']="c-basic"
   ['default']="cmake"
 )
@@ -615,6 +617,7 @@ declare -A pkg_bridge_utils=(
 )
 
 declare -A pkg_chrony=(
+  ['gentoo']="net-misc/chrony"
   ['clearlinux']="time-server-basic"
   ['default']="chrony"
 )
@@ -626,10 +629,12 @@ declare -A pkg_curl=(
 )
 
 declare -A pkg_gzip=(
+  ['gentoo']="app-arch/gzip"
   ['default']="gzip"
 )
 
 declare -A pkg_tar=(
+  ['gentoo']="app-arch/tar"
   ['clearlinux']="os-core-update"
   ['default']="tar"
 )
@@ -651,6 +656,7 @@ declare -A pkg_gdb=(
 )
 
 declare -A pkg_iotop=(
+  ['gentoo']="sys-process/iotop"
   ['default']="iotop"
 )
 
@@ -725,7 +731,7 @@ declare -A pkg_lm_sensors=(
   ['arch']="lm_sensors"
   ['centos']="lm_sensors"
   ['debian']="lm-sensors"
-  ['gentoo']="sys-apps/lm_sensors"
+  ['gentoo']="sys-apps/lm-sensors"
   ['sabayon']="sys-apps/lm_sensors"
   ['rhel']="lm_sensors"
   ['suse']="sensors"
@@ -734,16 +740,19 @@ declare -A pkg_lm_sensors=(
 )
 
 declare -A pkg_logwatch=(
+  ['gentoo']="sys-apps/logwatch"
   ['clearlinux']="WARNING|"
   ['default']="logwatch"
 )
 
 declare -A pkg_lxc=(
+  ['gentoo']="app-emulation/lxc"
   ['clearlinux']="WARNING|"
   ['default']="lxc"
 )
 
 declare -A pkg_mailutils=(
+  ['gentoo']="net-mail/mailutils"
   ['clearlinux']="WARNING|"
   ['default']="mailutils"
 )
@@ -790,6 +799,7 @@ declare -A pkg_nodejs=(
 )
 
 declare -A pkg_postfix=(
+  ['gentoo']="mail-mta/postfix"
   ['default']="postfix"
 )
 
@@ -980,6 +990,7 @@ declare -A pkg_openssl=(
   ['ubuntu']="libssl-dev"
   ['suse']="libopenssl-devel"
   ['clearlinux']="devpkg-openssl"
+  ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['default']="openssl-devel"
 )
@@ -1013,10 +1024,12 @@ declare -A pkg_screen=(
 )
 
 declare -A pkg_sudo=(
+  ['gentoo']="app-admin/sudo"
   ['default']="sudo"
 )
 
 declare -A pkg_sysstat=(
+  ['gentoo']="app-admin/sysstat"
   ['default']="sysstat"
 )
 
