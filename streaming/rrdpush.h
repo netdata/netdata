@@ -9,7 +9,9 @@
 #include "daemon/common.h"
 
 #define CONNECTED_TO_SIZE 100
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3
+
+// #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3       Gap-filling
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)2
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
