@@ -54,6 +54,8 @@ struct sender_state {
     netdata_mutex_t mutex;    // Guard access to buffer / build
     struct circular_buffer *buffer;
     BUFFER *build;
+    char read_buffer[512];
+    int read_len;
 };
 
 extern unsigned int default_rrdpush_enabled;

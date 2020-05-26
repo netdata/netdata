@@ -464,6 +464,59 @@ void attempt_to_send(struct sender_state *s, char *chunk, size_t outstanding) {
     netdata_thread_enable_cancelability();
 }
 
+void attempt_read(struct sender_state *s) {
+int ret;
+#ifdef ENABLE_HTTPS
+    if (s->host->ssl.conn && !s->host->stream_ssl.flags) {
+        int desired = sizeof(s->read_buffer) - s->read_len - 1;
+        ret = SSL_read(s->host->ssl.conn, s->read_buffer, desired);
+        if (ret > 0 ) {
+            s->read_len += ret;
+            return;
+        }
+        int sslerrno = SSL_get_error(s->host->ssl.conn, desired);
+        if (sslerrno == SSL_ERROR_WANT_READ || sslerrno == SSL_ERROR_WANT_WRITE)
+            return;
+        u_long err;
+        char buf[256];
+        while ((err = ERR_get_error()) != 0) {
+            ERR_error_string_n(err, buf, sizeof(buf));
+            error("STREAM %s [send to %s] ssl error: %s", s->host->hostname, s->connected_to, buf);
+        }
+        error("Restarting connection");
+        rrdpush_sender_thread_close_socket(s->host);
+        return;
+    }
+#endif
+    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,
+               MSG_DONTWAIT);
+    if (ret>=0) {
+        s->read_len += ret;
+        return;
+    }
+    if (ret == EAGAIN || ret == EWOULDBLOCK || ret == EINTR)
+        return;
+    error("STREAM %s [send to %s]: error during read (%d). Restarting connection", s->host->hostname, s->connected_to,
+          ret);
+    rrdpush_sender_thread_close_socket(s->host);
+}
+
+// This is just a placeholder until the gap filling state machine is inserted
+void execute_commands(struct sender_state *s) {
+    char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
+    *end = 0;
+    while( start<end && (newline=strchr(start, '\n')) ) {
+        *newline = 0;
+        info("STREAM %s [send to %s] received command over connection: %s", s->host->hostname, s->connected_to, start);
+        start = newline+1;
+    }
+    if (start<end) {
+        memcpy( s->read_buffer, start, end-start);
+        s->read_len = end-start;
+    }
+}
+
+
 // TODO-GAPS Removed buffer lock because does not touch the buffer - check
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     RRDHOST *host = (RRDHOST *)ptr;
@@ -557,6 +610,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
             attempt_to_connect(s);
             s->overflow = 0;
+            s->read_len = 0;
             continue;
         }
 
@@ -606,8 +660,10 @@ void *rrdpush_sender_thread(void *ptr) {
                 error("STREAM %s [send to %s]: cannot read from internal pipe.", s->host->hostname, s->connected_to);
         }
 
+        // Read as much as possible to fill the buffer, split into full lines for execution.
         if (fds[Socket].revents & POLLIN)
-            debug(D_STREAM, "Data received on socket");
+            attempt_read(s);
+        execute_commands(s);
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
         if (outstanding && fds[Socket].revents & POLLOUT)
