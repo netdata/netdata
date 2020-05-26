@@ -699,6 +699,7 @@ declare -A pkg_libuuid_dev=(
   ['alpine']="util-linux-dev"
   ['arch']="util-linux"
   ['centos']="libuuid-devel"
+  ['clearlinux']="devpkg-util-linux"
   ['debian']="uuid-dev"
   ['gentoo']="sys-apps/util-linux"
   ['sabayon']="sys-apps/util-linux"
