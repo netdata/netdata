@@ -25,6 +25,7 @@ typedef enum exporting_options {
 
     EXPORTING_OPTION_SEND_CONFIGURED_LABELS = (1 << 3),
     EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
+    EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
     EXPORTING_OPTION_SEND_NAMES             = (1 << 16)
 } EXPORTING_OPTIONS;
@@ -252,6 +253,7 @@ static inline void disable_instance(struct instance *instance)
 }
 
 #include "exporting/prometheus/prometheus.h"
+#include "exporting/opentsdb/opentsdb.h"
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
 #include "exporting/prometheus/remote_write/remote_write.h"
 #endif

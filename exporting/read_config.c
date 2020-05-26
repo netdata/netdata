@@ -430,6 +430,12 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
 
+#ifdef ENABLE_HTTPS
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) {
+            tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
+        }
+#endif
+
 #ifdef NETDATA_INTERNAL_CHECKS
         info(
             "     Dest=[%s], upd=[%d], buffer=[%d] timeout=[%ld] options=[%u]",

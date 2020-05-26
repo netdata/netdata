@@ -45,6 +45,13 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         response = buffer_create(1);
 
     struct stats *stats = &instance->stats;
+#ifdef ENABLE_HTTPS
+    uint32_t options = (uint32_t)instance->config.options;
+    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+
+    if (options & EXPORTING_OPTION_USE_TLS)
+        ERR_clear_error();
+#endif
 
     errno = 0;
 
@@ -53,7 +60,41 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         buffer_need_bytes(response, 4096);
 
         ssize_t r;
+#ifdef ENABLE_HTTPS
+        if (options & EXPORTING_OPTION_USE_TLS &&
+            connector_specific_data->conn &&
+            connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            r = (ssize_t)SSL_read(connector_specific_data->conn,
+                                  &response->buffer[response->len],
+                                  (int) (response->size - response->len));
+
+            if (likely(r > 0)) {
+                // we received some data
+                response->len += r;
+                stats->received_bytes += r;
+                stats->receptions++;
+                continue;
+            } else {
+                int sslerrno = SSL_get_error(connector_specific_data->conn, (int) r);
+                u_long sslerr = ERR_get_error();
+                char buf[256];
+                switch (sslerrno) {
+                    case SSL_ERROR_WANT_READ:
+                    case SSL_ERROR_WANT_WRITE:
+                        goto endloop;
+                    default:
+                        ERR_error_string_n(sslerr, buf, sizeof(buf));
+                        error("SSL error (%s)",
+                              ERR_error_string((long)SSL_get_error(connector_specific_data->conn, (int)r), NULL));
+                        goto endloop;
+                }
+            }
+        } else {
+            r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+        }
+#else
         r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+#endif
         if (likely(r > 0)) {
             // we received some data
             response->len += r;
@@ -69,10 +110,14 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
                 error("EXPORTING: cannot receive data from '%s'.", instance->config.destination);
             }
         }
+
 #ifdef UNIT_TESTING
         break;
 #endif
     }
+#ifdef ENABLE_HTTPS
+endloop:
+#endif
 
     // if we received data, process them
     if (buffer_strlen(response))
@@ -96,6 +141,14 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
     flags += MSG_NOSIGNAL;
 #endif
 
+#ifdef ENABLE_HTTPS
+    uint32_t options = (uint32_t)instance->config.options;
+    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+
+    if (options & EXPORTING_OPTION_USE_TLS)
+        ERR_clear_error();
+#endif
+
     struct stats *stats = &instance->stats;
 
     int ret = 0;
@@ -104,8 +157,19 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     ssize_t written = -1;
 
-    if (!ret)
+    if (!ret) {
+#ifdef ENABLE_HTTPS
+        if (options & EXPORTING_OPTION_USE_TLS &&
+            connector_specific_data->conn &&
+            connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+            written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), len);
+        } else {
+            written = send(*sock, buffer_tostring(buffer), len, flags);
+        }
+#else
         written = send(*sock, buffer_tostring(buffer), len, flags);
+#endif
+    }
 
     if(written != -1 && (size_t)written == len) {
         // we sent the data successfully
@@ -167,6 +231,13 @@ void simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
 
+#ifdef ENABLE_HTTPS
+    uint32_t options = (uint32_t)instance->config.options;
+    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+
+    if (options & EXPORTING_OPTION_USE_TLS)
+        ERR_clear_error();
+#endif
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
     struct stats *stats = &instance->stats;
 
@@ -208,6 +279,56 @@ void simple_connector_worker(void *instance_p)
                 &reconnects,
                 NULL,
                 0);
+#ifdef ENABLE_HTTPS
+            if(sock != -1) {
+                if (netdata_opentsdb_ctx) {
+                    if ( sock_delnonblock(sock) < 0 )
+                        error("Exporting cannot remove the non-blocking flag from socket %d", sock);
+
+                    if (connector_specific_data->conn == NULL) {
+                        connector_specific_data->conn = SSL_new(netdata_opentsdb_ctx);
+                        if (connector_specific_data->conn == NULL) {
+                            error("Failed to allocate SSL structure to socket %d.", sock);
+                            connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
+                        }
+                    } else {
+                        SSL_clear(connector_specific_data->conn);
+                    }
+
+                    if (connector_specific_data->conn) {
+                        if (SSL_set_fd(connector_specific_data->conn, sock) != 1) {
+                            error("Failed to set the socket to the SSL on socket fd %d.", sock);
+                            connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
+                        } else {
+                            connector_specific_data->flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                            SSL_set_connect_state(connector_specific_data->conn);
+                            int err = SSL_connect(connector_specific_data->conn);
+                            if (err != 1) {
+                                err = SSL_get_error(connector_specific_data->conn, err);
+                                error("SSL cannot connect with the server:  %s ",
+                                      ERR_error_string((long)SSL_get_error(connector_specific_data->conn, err), NULL));
+                                connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
+                            } else {
+                                info("Exporting established a SSL connection.");
+
+                                struct timeval tv;
+                                tv.tv_sec = timeout.tv_sec /4;
+                                tv.tv_usec = 0;
+
+                                if (!tv.tv_sec)
+                                    tv.tv_sec = 2;
+
+                                if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)))
+                                    error("Cannot set timeout to socket %d, this can block communication", sock);
+
+                            }
+                        }
+                    }
+                }
+
+            }
+#endif
+
             stats->reconnects += reconnects;
         }
 
@@ -263,6 +384,13 @@ void simple_connector_worker(void *instance_p)
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
         clean_prometheus_remote_write(instance);
+#endif
+
+#ifdef ENABLE_HTTPS
+    if (options & EXPORTING_OPTION_USE_TLS) {
+        SSL_free(connector_specific_data->conn);
+        freez(instance->connector_specific_data);
+    }
 #endif
 
     simple_connector_cleanup(instance);
