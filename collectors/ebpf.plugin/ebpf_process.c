@@ -491,12 +491,11 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
-    pthread_mutex_unlock(&lock);
-
     ebpf_global_labels(process_aggregated_data, process_publish_aggregated, process_dimension_names,
                        process_id_names, NETDATA_MAX_MONITOR_VECTOR);
 
     ebpf_create_global_charts(em);
+    pthread_mutex_unlock(&lock);
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
 endprocess:

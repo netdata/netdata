@@ -366,11 +366,12 @@ void *ebpf_socket_thread(void *ptr)
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
-    pthread_mutex_unlock(&lock);
 
     ebpf_global_labels(socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names, NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
+    pthread_mutex_unlock(&lock);
+
     socket_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
 endsocket:
