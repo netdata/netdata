@@ -11,6 +11,11 @@
 # define MAX_COMPARE_NAME 100
 # define MAX_NAME 100
 
+struct pid_on_target {
+    int32_t pid;
+    struct pid_on_target *next;
+};
+
 // ----------------------------------------------------------------------------
 // target
 //
@@ -98,5 +103,7 @@ extern int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target
                                       struct target **apps_groups_root_target, const char *path, const char *file);
 
 extern void clean_apps_groups_target(struct target *apps_groups_root_target);
+
+extern size_t zero_all_targets(struct target *root);
 
 #endif

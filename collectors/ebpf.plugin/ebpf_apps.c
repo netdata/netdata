@@ -15,6 +15,89 @@
  *
  *****************************************************************/
 
+/**
+ * Reset the target values
+ *
+ * @param root the pointer to the chain that will be reseted.
+ *
+ * @return it returns the number of structures that was reseted.
+ */
+size_t zero_all_targets(struct target *root) {
+    struct target *w;
+    size_t count = 0;
+
+    for (w = root; w ; w = w->next) {
+        count++;
+
+        w->minflt = 0;
+        w->majflt = 0;
+        w->utime = 0;
+        w->stime = 0;
+        w->gtime = 0;
+        w->cminflt = 0;
+        w->cmajflt = 0;
+        w->cutime = 0;
+        w->cstime = 0;
+        w->cgtime = 0;
+        w->num_threads = 0;
+        // w->rss = 0;
+        w->processes = 0;
+
+        w->status_vmsize = 0;
+        w->status_vmrss = 0;
+        w->status_vmshared = 0;
+        w->status_rssfile = 0;
+        w->status_rssshmem = 0;
+        w->status_vmswap = 0;
+
+        w->io_logical_bytes_read = 0;
+        w->io_logical_bytes_written = 0;
+        // w->io_read_calls = 0;
+        // w->io_write_calls = 0;
+        w->io_storage_bytes_read = 0;
+        w->io_storage_bytes_written = 0;
+        // w->io_cancelled_write_bytes = 0;
+
+        // zero file counters
+        if(w->target_fds) {
+            memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
+            w->openfiles = 0;
+            w->openpipes = 0;
+            w->opensockets = 0;
+            w->openinotifies = 0;
+            w->openeventfds = 0;
+            w->opentimerfds = 0;
+            w->opensignalfds = 0;
+            w->openeventpolls = 0;
+            w->openother = 0;
+        }
+
+        w->collected_starttime = 0;
+        w->uptime_min = 0;
+        w->uptime_sum = 0;
+        w->uptime_max = 0;
+
+        if(unlikely(w->root_pid)) {
+            struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
+
+            while(pid_on_target) {
+                pid_on_target_to_free = pid_on_target;
+                pid_on_target = pid_on_target->next;
+                free(pid_on_target_to_free);
+            }
+
+            w->root_pid = NULL;
+        }
+    }
+
+    return count;
+}
+
+/**
+ * Clean the allocated structures
+ *
+ * @param apps_groups_root_target the pointer to be cleaned.
+ */
 void clean_apps_groups_target(struct target *apps_groups_root_target) {
     struct target *current_target;
     while (apps_groups_root_target) {
