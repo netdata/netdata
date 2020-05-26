@@ -11,17 +11,17 @@
  *
  *****************************************************************/
 
-static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write",
+static char *process_dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write",
                                                              "process", "task", "process", "thread" };
-static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write",
+static char *process_id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write",
                                                       "do_exit", "release_task", "_do_fork", "sys_clone" };
 static char *status[] = { "process", "zombie" };
 
-static netdata_idx_t *hash_values = NULL;
-static netdata_syscall_stat_t *aggregated_data = NULL;
-static netdata_publish_syscall_t *publish_aggregated = NULL;
+static netdata_idx_t *process_hash_values = NULL;
+static netdata_syscall_stat_t *process_aggregated_data = NULL;
+static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
-static ebpf_functions_t functions;
+static ebpf_functions_t process_functions;
 
 #ifndef STATIC
 /**
@@ -112,39 +112,40 @@ static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc) 
  */
 static void ebpf_process_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t pvc;
-    ebpf_update_publish(publish_aggregated, &pvc, aggregated_data);
+    ebpf_update_publish(process_publish_aggregated, &pvc, process_aggregated_data);
 
-    write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
+    write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
     write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
                              NETDATA_EBPF_FAMILY,
-                             &publish_aggregated[NETDATA_DEL_START],
+                             &process_publish_aggregated[NETDATA_DEL_START],
                              1);
     write_count_chart(NETDATA_VFS_FILE_IO_COUNT,
                              NETDATA_EBPF_FAMILY,
-                             &publish_aggregated[NETDATA_IN_START_BYTE],
+                             &process_publish_aggregated[NETDATA_IN_START_BYTE],
                              2);
     write_count_chart(NETDATA_EXIT_SYSCALL,
                              NETDATA_EBPF_FAMILY,
-                             &publish_aggregated[NETDATA_EXIT_START],
+                             &process_publish_aggregated[NETDATA_EXIT_START],
                              2);
     write_count_chart(NETDATA_PROCESS_SYSCALL,
                              NETDATA_EBPF_FAMILY,
-                             &publish_aggregated[NETDATA_PROCESS_START],
+                             &process_publish_aggregated[NETDATA_PROCESS_START],
                              2);
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
     if(em->mode < MODE_ENTRY) {
-        write_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
+        write_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
         write_err_chart(NETDATA_VFS_FILE_ERR_COUNT,
                                NETDATA_EBPF_FAMILY,
-                               &publish_aggregated[2],
+                               &process_publish_aggregated[2],
                                NETDATA_VFS_ERRORS);
         write_err_chart(NETDATA_PROCESS_ERROR_NAME,
                                NETDATA_EBPF_FAMILY,
-                               &publish_aggregated[NETDATA_PROCESS_START],
+                               &process_publish_aggregated[NETDATA_PROCESS_START],
                                2);
 
-        write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, id_names[3], id_names[4], &pvc);
+        write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3],
+                       process_id_names[4], &pvc);
     }
 }
 
@@ -162,7 +163,7 @@ static void read_hash_global_tables()
     uint64_t idx;
     netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
 
-    netdata_idx_t *val = hash_values;
+    netdata_idx_t *val = process_hash_values;
     for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
         if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
             uint64_t total = 0;
@@ -177,26 +178,26 @@ static void read_hash_global_tables()
         }
     }
 
-    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
-    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
-    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
-    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
-    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
-    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
-    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
-    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
-    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
+    process_aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
+    process_aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
+    process_aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
+    process_aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
+    process_aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
+    process_aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
+    process_aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
+    process_aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
+    process_aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
 
-    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
-    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
-    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
-    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
-    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
-    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
-    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
+    process_aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
+    process_aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
+    process_aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
+    process_aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
+    process_aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
+    process_aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
+    process_aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
 
-    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
-    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
+    process_aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
+    process_aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
 /*****************************************************************
@@ -250,8 +251,8 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
         , web
         , order);
 
-    printf("DIMENSION %s %s absolute 1 1\n", id_names[3], NETDATA_VFS_DIM_OUT_FILE_BYTES);
-    printf("DIMENSION %s %s absolute 1 1\n", id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
+    printf("DIMENSION %s %s absolute 1 1\n", process_id_names[3], NETDATA_VFS_DIM_OUT_FILE_BYTES);
+    printf("DIMENSION %s %s absolute 1 1\n", process_id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
 }
 
 /**
@@ -289,7 +290,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_FILE_GROUP
         , 970
         , ebpf_create_global_dimension
-        , publish_aggregated
+        , process_publish_aggregated
         , 2);
 
     if (em->mode < MODE_ENTRY) {
@@ -299,7 +300,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_FILE_GROUP
             , 971
             , ebpf_create_global_dimension
-            , publish_aggregated
+            , process_publish_aggregated
             , 2);
     }
 
@@ -309,7 +310,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_VFS_GROUP
         , 972
         , ebpf_create_global_dimension
-        , &publish_aggregated[NETDATA_DEL_START]
+        , &process_publish_aggregated[NETDATA_DEL_START]
         , 1);
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
@@ -318,7 +319,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_VFS_GROUP
         , 973
         , ebpf_create_global_dimension
-        , &publish_aggregated[NETDATA_IN_START_BYTE]
+        , &process_publish_aggregated[NETDATA_IN_START_BYTE]
         , 2);
 
     if (em->mode < MODE_ENTRY) {
@@ -334,7 +335,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_VFS_GROUP
             , 975
             , ebpf_create_global_dimension
-            , &publish_aggregated[2]
+            , &process_publish_aggregated[2]
             , NETDATA_VFS_ERRORS);
 
     }
@@ -345,7 +346,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_PROCESS_GROUP
         , 976
         , ebpf_create_global_dimension
-        , &publish_aggregated[NETDATA_PROCESS_START]
+        , &process_publish_aggregated[NETDATA_PROCESS_START]
         , 2);
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
@@ -354,7 +355,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_PROCESS_GROUP
         , 977
         , ebpf_create_global_dimension
-        , &publish_aggregated[NETDATA_EXIT_START]
+        , &process_publish_aggregated[NETDATA_EXIT_START]
         , 2);
 
     ebpf_process_status_chart(NETDATA_EBPF_FAMILY
@@ -370,7 +371,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_PROCESS_GROUP
             , 979
             , ebpf_create_global_dimension
-            , &publish_aggregated[NETDATA_PROCESS_START]
+            , &process_publish_aggregated[NETDATA_PROCESS_START]
             , 2);
     }
 
@@ -390,12 +391,12 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 static void ebpf_process_cleanup(void *ptr)
 {
     (void)ptr;
-    freez(aggregated_data);
-    freez(publish_aggregated);
-    freez(hash_values);
+    freez(process_aggregated_data);
+    freez(process_publish_aggregated);
+    freez(process_hash_values);
 
-    if (functions.libnetdata) {
-        dlclose(functions.libnetdata);
+    if (process_functions.libnetdata) {
+        dlclose(process_functions.libnetdata);
     }
 }
 
@@ -411,9 +412,9 @@ static void ebpf_process_cleanup(void *ptr)
  * case it was not possible to allocate.
  */
 void ebpf_process_allocate_global_vectors() {
-    aggregated_data = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_syscall_stat_t));
-    publish_aggregated = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_publish_syscall_t));
-    hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
+    process_aggregated_data = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_syscall_stat_t));
+    process_publish_aggregated = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_publish_syscall_t));
+    process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 }
 
 static void change_collector_event() {
@@ -428,7 +429,7 @@ static void change_collector_event() {
 
 static void change_syscalls() {
     static char *lfork = { "do_fork" };
-    id_names[7] = lfork;
+    process_id_names[7] = lfork;
     process_probes[8].name = lfork;
 }
 
@@ -437,16 +438,16 @@ static void change_syscalls() {
  */
 static void set_local_pointers(ebpf_module_t *em) {
 #ifndef STATIC
-    bpf_map_lookup_elem = functions.bpf_map_lookup_elem;
+    bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
 
-    map_fd = functions.map_fd;
+    map_fd = process_functions.map_fd;
 #endif
 
     if (em->mode == MODE_ENTRY) {
         change_collector_event();
     }
 
-    if (functions.isrh >= NETDATA_MINIMUM_RH_VERSION && functions.isrh < NETDATA_RH_8)
+    if (process_functions.isrh >= NETDATA_MINIMUM_RH_VERSION && process_functions.isrh < NETDATA_RH_8)
         change_syscalls();
 }
 
@@ -474,22 +475,23 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_process_allocate_global_vectors();
 
-    fill_ebpf_functions(&functions);
-    if (ebpf_load_libraries(&functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
+    fill_ebpf_functions(&process_functions);
+    if (ebpf_load_libraries(&process_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         return NULL;
     }
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, functions.load_bpf_file) ) {
+                      em->thread_name, process_functions.load_bpf_file) ) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_global_labels(aggregated_data, publish_aggregated, dimension_names, id_names, NETDATA_MAX_MONITOR_VECTOR);
+    ebpf_global_labels(process_aggregated_data, process_publish_aggregated, process_dimension_names,
+                       process_id_names, NETDATA_MAX_MONITOR_VECTOR);
 
     ebpf_create_global_charts(em);
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
