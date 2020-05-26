@@ -2,8 +2,110 @@
 
 #include "ebpf_apps.h"
 
+/**
+ * Find or create a new target
+ * there are targets that are just aggregated to other target (the second argument)
+ *
+ * @param id
+ * @param target
+ * @param name
+ *
+ * @return It returns the target on success and NULL otherwise
+ */
+struct target *ebpf_get_apps_groups_target(const char *id, struct target *target, const char *name) {
+    int tdebug = 0, thidden = target?target->hidden:0, ends_with = 0;
+    const char *nid = id;
 
+    // extract the options
+    while(nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
+        if(nid[0] == '-') thidden = 1;
+        if(nid[0] == '+') tdebug = 1;
+        if(nid[0] == '*') ends_with = 1;
+        nid++;
+    }
+    uint32_t hash = simple_hash(id);
 
+    // find if it already exists
+    struct target *w, *last = apps_groups_root_target;
+    for(w = apps_groups_root_target ; w ; w = w->next) {
+        if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
+            return w;
+
+        last = w;
+    }
+
+    // find an existing target
+    if(unlikely(!target)) {
+        while(*name == '-') {
+            if(*name == '-') thidden = 1;
+            name++;
+        }
+
+        for(target = apps_groups_root_target ; target != NULL ; target = target->next) {
+            if(!target->target && strcmp(name, target->name) == 0)
+                break;
+        }
+
+        if(unlikely(debug_enabled)) {
+            if(unlikely(target))
+                debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, target->id);
+            else
+                debug_log("NEW TARGET NAME '%s' on ID '%s'", name, id);
+        }
+    }
+
+    if(target && target->target)
+        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
+
+    w = callocz(sizeof(struct target), 1);
+    strncpyz(w->id, nid, MAX_NAME);
+    w->idhash = simple_hash(w->id);
+
+    if(unlikely(!target))
+        // copy the name
+        strncpyz(w->name, name, MAX_NAME);
+    else
+        // copy the id
+        strncpyz(w->name, nid, MAX_NAME);
+
+    strncpyz(w->compare, nid, MAX_COMPARE_NAME);
+    size_t len = strlen(w->compare);
+    if(w->compare[len - 1] == '*') {
+        w->compare[len - 1] = '\0';
+        w->starts_with = 1;
+    }
+    w->ends_with = ends_with;
+
+    if(w->starts_with && w->ends_with)
+        proc_pid_cmdline_is_needed = 1;
+
+    w->comparehash = simple_hash(w->compare);
+    w->comparelen = strlen(w->compare);
+
+    w->hidden = thidden;
+#ifdef NETDATA_INTERNAL_CHECKS
+    w->debug_enabled = tdebug;
+#else
+    if(tdebug)
+        fprintf(stderr, "apps.plugin has been compiled without debugging\n");
+#endif
+    w->target = target;
+
+    // append it, to maintain the order in apps_groups.conf
+    if(last) last->next = w;
+    else apps_groups_root_target = w;
+
+    return w;
+}
+
+/**
+ * Read the apps_groups.conf file
+ *
+ * @param path
+ * @param file
+ *
+ * @return It returns 0 on succcess and -1 otherwise
+ */
 int ebpf_read_apps_groups_conf(const char *path, const char *file)
 {
     char filename[FILENAME_MAX + 1];
@@ -13,13 +115,13 @@ int ebpf_read_apps_groups_conf(const char *path, const char *file)
     // ----------------------------------------
 
     procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
-    if(!ff) return 1;
+    if(!ff) return -1;
 
     procfile_set_quotes(ff, "'\"");
 
     ff = procfile_readall(ff);
     if(!ff)
-        return 1;
+        return -1;
 
     size_t line, lines = procfile_lines(ff);
 
@@ -43,7 +145,7 @@ int ebpf_read_apps_groups_conf(const char *path, const char *file)
             if(s == name) continue;
 
             // add this target
-            struct target *n = get_apps_groups_target(s, w, name);
+            struct target *n = ebpf_get_apps_groups_target(s, w, name);
             if(!n) {
                 error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
