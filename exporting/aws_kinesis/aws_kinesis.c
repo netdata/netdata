@@ -68,6 +68,11 @@ int init_aws_kinesis_instance(struct instance *instance)
     struct aws_kinesis_specific_data *connector_specific_data = callocz(1, sizeof(struct aws_kinesis_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
 
+    if (!strcmp(connector_specific_config->stream_name, "")) {
+        error("stream name is a mandatory Kinesis parameter but it is not configured");
+        return 1;
+    }
+
     kinesis_init(
         (void *)connector_specific_data,
         instance->config.destination,
