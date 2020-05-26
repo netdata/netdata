@@ -45,6 +45,7 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
 static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
 static cmd_status_t cmd_read_config_execute(char *args, char **message);
 static cmd_status_t cmd_write_config_execute(char *args, char **message);
+static cmd_status_t cmd_ping_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -56,7 +57,8 @@ static command_info_t command_info_array[] = {
         {"reload-claiming-state", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
         {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
         {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
-        {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL}
+        {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
+        {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -117,7 +119,9 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "fatal-agent\n"
              "    Log the state and halt the netdata agent.\n"
              "reload-claiming-state\n"
-             "    Reload agent claiming state from disk.\n",
+             "    Reload agent claiming state from disk.\n"
+             "ping\n"
+             "    Return with 'pong' if agent is alive.\n",
              MAX_COMMAND_LENGTH - 1);
     return CMD_STATUS_SUCCESS;
 }
@@ -293,6 +297,15 @@ static cmd_status_t cmd_write_config_execute(char *args, char **message)
     info("write-config conf_file=%s section=%s key=%s value=%s",conf_file, temp + offset + 1, temp + offset2 + 1,
          temp + offset3 + 1);
     freez(temp);
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_ping_execute(char *args, char **message)
+{
+    (void)args;
+
+    *message = strdupz("pong");
+
     return CMD_STATUS_SUCCESS;
 }
 
