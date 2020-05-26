@@ -615,15 +615,23 @@ static int rrdpush_receive(int fd
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "CONNECTED");
 
     cd.version = stream_version;
+    // Temporary test message to check the reception inside the sender - this will migrate to a proper state
+    // machine that handles replication per-chart as updates are received...
     if (stream_version > 2) {
-        info("STREAM %s [receive from [%s]:%s]: Checking for gaps...", host->hostname, client_ip, client_port);
-/*
+        char message[128];
+        sprintf(message,"REPLICATE dummy 0\n");
+        int ret;
 #ifdef ENABLE_HTTPS
-    if(send_timeout(ssl, fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+        SSL *conn = host->stream_ssl.conn ;
+        if(conn && !host->stream_ssl.flags) {
+            ret = SSL_write(conn, message, strlen(message));
+        } else {
+            ret = send(fd, message, strlen(message), MSG_DONTWAIT);
+        }
 #else
-    if(send_timeout(fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
+        ret = send(fd, message, strlen(message), MSG_DONTWAIT);
 #endif
-*/
+        info("STREAM %s [receive from [%s]:%s]: Checking for gaps... %d", host->hostname, client_ip, client_port, ret);
     }
     size_t count = pluginsd_process(host, &cd, fp, 1);
 
