@@ -297,7 +297,7 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     }
 
     // make sure we have the required variables
-    if (unlikely((!type || !*type || !id || !*id) && !have_action)) {
+    if (unlikely((!type || !*type || !id || !*id))) {
         error("requested a CHART, without a type.id, on host '%s'. Disabling it.", host->hostname);
         ((PARSER_USER_OBJECT *) user)->enabled = 0;
         return PARSER_RC_ERROR;
