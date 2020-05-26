@@ -296,7 +296,7 @@ inline int parser_action(PARSER *parser, char *input)
         input = parser->buffer;
 
     if (unlikely(!find_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
-        return 1;
+        return 0;
 
     if ((parser->flags & PARSER_INPUT_ORIGINAL) == PARSER_INPUT_ORIGINAL)
         pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
