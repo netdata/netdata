@@ -314,7 +314,6 @@ void rrdset_done_push(RRDSET *st) {
         host->rrdpush_sender_error_shown = 0;
     }
 
-    // TODO-GAPS Check above works, mutex only covers buffer state
     sender_start(host->sender);
 
     if(need_to_send_chart_definition(st))
@@ -334,7 +333,6 @@ void rrdpush_send_labels(RRDHOST *host) {
     if (!host->labels || !(host->labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
         return;
 
-    // TODO-GAPS Update mutex for new state
     sender_start(host->sender);
     rrdhost_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
