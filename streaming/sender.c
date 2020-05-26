@@ -517,7 +517,6 @@ void execute_commands(struct sender_state *s) {
 }
 
 
-// TODO-GAPS Removed buffer lock because does not touch the buffer - check
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     RRDHOST *host = (RRDHOST *)ptr;
 
@@ -583,9 +582,8 @@ void *rrdpush_sender_thread(void *ptr) {
     s->max_size = (size_t)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "buffer size bytes",
                                                   1024 * 1024);
     s->reconnect_delay = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
-    //remote_clock_resync_iterations = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations); TODO: REMOVING FOR SLEW / GAPFILLING
+    s->remote_clock_resync_iterations = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
 
-    // TODO-GAPS Integreate with new state
     // initialize rrdpush globals
     s->host->rrdpush_sender_connected = 0;
     if(pipe(s->host->rrdpush_sender_pipe) == -1) {
