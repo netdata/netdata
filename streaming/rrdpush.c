@@ -615,8 +615,15 @@ static int rrdpush_receive(int fd
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "CONNECTED");
 
     cd.version = stream_version;
-    if (stream_version >= 2) {
+    if (stream_version > 2) {
         info("STREAM %s [receive from [%s]:%s]: Checking for gaps...", host->hostname, client_ip, client_port);
+/*
+#ifdef ENABLE_HTTPS
+    if(send_timeout(ssl, fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+#else
+    if(send_timeout(fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
+#endif
+*/
     }
     size_t count = pluginsd_process(host, &cd, fp, 1);
 

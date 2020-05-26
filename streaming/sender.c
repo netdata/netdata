@@ -15,7 +15,9 @@ void sender_start(struct sender_state *s) {
 
 // Collector thread finishing a transmission
 void sender_commit(struct sender_state *s) {
-    cbuffer_add_unsafe(s->host->sender->buffer, buffer_tostring(s->host->sender->build), s->host->sender->build->len);
+    if(cbuffer_add_unsafe(s->host->sender->buffer, buffer_tostring(s->host->sender->build),
+       s->host->sender->build->len))
+        s->overflow = 1;
     buffer_flush(s->build);
     netdata_mutex_unlock(&s->mutex);
 }
@@ -327,12 +329,13 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     }
 
     http[received] = '\0';
+    debug(D_STREAM, "Response to sender from far end: %s", http);
     int answer = -1;
     char *version_start = strchr(http, '=');
-    uint32_t version;
+    int32_t version = -1;
     if(version_start) {
         version_start++;
-        version = (uint32_t)strtol(version_start, NULL, 10);
+        version = (int32_t)strtol(version_start, NULL, 10);
         answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
             rrdpush_set_flags_to_newest_stream(host);
@@ -353,7 +356,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         }
     }
 
-    if(answer != 0) {
+    if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -553,6 +556,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
             attempt_to_connect(s);
+            s->overflow = 0;
             continue;
         }
 
@@ -625,15 +629,13 @@ void *rrdpush_sender_thread(void *ptr) {
             }
         }
 
-        // TODO-GAPS Overflow will be detected when collector fails to write to buffer, check flag in this
-        //           loop and tear down for restart
-        /*// protection from overflow
-        if (buffer_strlen(s->host->rrdpush_sender_buffer) > s->max_size) {
-            debug(D_STREAM, "STREAM: Buffer is too big (%zu bytes), bigger than the max (%zu) - flushing it...", buffer_strlen(s->host->rrdpush_sender_buffer), s->max_size);
+        // protection from overflow
+        if (s->overflow) {
             errno = 0;
-            error("STREAM %s [send to %s]: too many data pending - buffer is %zu bytes long, %zu unsent - we have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", s->host->hostname, s->connected_to, s->host->rrdpush_sender_buffer->len, s->host->rrdpush_sender_buffer->len - s->begin, s->sent_bytes, s->sent_bytes_on_this_connection);
+            error("STREAM %s [send to %s]: buffer full (%zu-bytes) after %zu bytes. Restarting connection",
+                  s->host->hostname, s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
             rrdpush_sender_thread_close_socket(s->host);
-        }*/
+        }
     }
 
     netdata_thread_cleanup_pop(1);
