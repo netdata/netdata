@@ -256,7 +256,10 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         (void)dt;
 
         read_hash_global_tables();
+
+        pthread_mutex_lock(&lock);
         ebpf_process_send_data(em);
+        pthread_mutex_unlock(&lock);
 
         fflush(stdout);
     }
