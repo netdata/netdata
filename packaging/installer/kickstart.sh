@@ -165,9 +165,9 @@ download() {
   url="${1}"
   dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
   elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O - "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run wget -T 15 -O "${dest}" "${url}" || fatal "Cannot download ${url}"
   else
     fatal "I need curl or wget to proceed, but neither is available on this system."
   fi
