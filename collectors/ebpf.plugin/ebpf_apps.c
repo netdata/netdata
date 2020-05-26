@@ -2,6 +2,29 @@
 
 #include "ebpf_apps.h"
 
+/*****************************************************************
+ *
+ *  INTERNAL FUNCTIONS
+ *
+ *****************************************************************/
+
+
+/*****************************************************************
+ *
+ *  FUNCTIONS CALLED FROM COLLECTORS
+ *
+ *****************************************************************/
+
+void clean_apps_groups_target(struct target *apps_groups_root_target) {
+    struct target *current_target;
+    while (apps_groups_root_target) {
+        current_target = apps_groups_root_target;
+        apps_groups_root_target = current_target->target;
+
+        freez(current_target);
+    }
+}
+
 /**
  * Find or create a new target
  * there are targets that are just aggregated to other target (the second argument)
@@ -12,7 +35,8 @@
  *
  * @return It returns the target on success and NULL otherwise
  */
-struct target *ebpf_get_apps_groups_target(const char *id, struct target *target, const char *name) {
+struct target *get_apps_groups_target(struct target **apps_groups_root_target, const char *id,
+                                           struct target *target, const char *name) {
     int tdebug = 0, thidden = target?target->hidden:0, ends_with = 0;
     const char *nid = id;
 
@@ -26,8 +50,8 @@ struct target *ebpf_get_apps_groups_target(const char *id, struct target *target
     uint32_t hash = simple_hash(id);
 
     // find if it already exists
-    struct target *w, *last = apps_groups_root_target;
-    for(w = apps_groups_root_target ; w ; w = w->next) {
+    struct target *w, *last = *apps_groups_root_target;
+    for(w = *apps_groups_root_target ; w ; w = w->next) {
         if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
             return w;
 
@@ -41,16 +65,9 @@ struct target *ebpf_get_apps_groups_target(const char *id, struct target *target
             name++;
         }
 
-        for(target = apps_groups_root_target ; target != NULL ; target = target->next) {
+        for(target = *apps_groups_root_target ; target != NULL ; target = target->next) {
             if(!target->target && strcmp(name, target->name) == 0)
                 break;
-        }
-
-        if(unlikely(debug_enabled)) {
-            if(unlikely(target))
-                debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, target->id);
-            else
-                debug_log("NEW TARGET NAME '%s' on ID '%s'", name, id);
         }
     }
 
@@ -76,9 +93,6 @@ struct target *ebpf_get_apps_groups_target(const char *id, struct target *target
     }
     w->ends_with = ends_with;
 
-    if(w->starts_with && w->ends_with)
-        proc_pid_cmdline_is_needed = 1;
-
     w->comparehash = simple_hash(w->compare);
     w->comparelen = strlen(w->compare);
 
@@ -93,7 +107,7 @@ struct target *ebpf_get_apps_groups_target(const char *id, struct target *target
 
     // append it, to maintain the order in apps_groups.conf
     if(last) last->next = w;
-    else apps_groups_root_target = w;
+    else *apps_groups_root_target = w;
 
     return w;
 }
@@ -106,7 +120,8 @@ struct target *ebpf_get_apps_groups_target(const char *id, struct target *target
  *
  * @return It returns 0 on succcess and -1 otherwise
  */
-int ebpf_read_apps_groups_conf(const char *path, const char *file)
+int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target, struct target **apps_groups_root_target,
+                               const char *path, const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
@@ -125,35 +140,53 @@ int ebpf_read_apps_groups_conf(const char *path, const char *file)
 
     size_t line, lines = procfile_lines(ff);
 
-    for(line = 0; line < lines ;line++) {
+    for (line = 0; line < lines ;line++) {
         size_t word, words = procfile_linewords(ff, line);
         if(!words) continue;
 
         char *name = procfile_lineword(ff, line, 0);
-        if(!name || !*name) continue;
+        if (!name || !*name) continue;
 
         // find a possibly existing target
         struct target *w = NULL;
 
         // loop through all words, skipping the first one (the name)
-        for(word = 0; word < words ;word++) {
+        for (word = 0; word < words ;word++) {
             char *s = procfile_lineword(ff, line, word);
-            if(!s || !*s) continue;
-            if(*s == '#') break;
+            if (!s || !*s) continue;
+            if (*s == '#') break;
 
             // is this the first word? skip it
-            if(s == name) continue;
+            if (s == name) continue;
 
             // add this target
-            struct target *n = ebpf_get_apps_groups_target(s, w, name);
-            if(!n) {
+            struct target *n = get_apps_groups_target(apps_groups_root_target, s, w, name);
+            if (!n) {
                 error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
             }
 
             // just some optimization
             // to avoid searching for a target for each process
-            if(!w) w = n->target?n->target:n;
+            if (!w) w = n->target?n->target:n;
         }
     }
+
+    procfile_close(ff);
+
+    *apps_groups_default_target = get_apps_groups_target(apps_groups_root_target, "p+!o@w#e$i^r&7*5(-i)l-o_",
+                                                         NULL, "other"); // match nothing
+    if(!*apps_groups_default_target)
+        fatal("Cannot create default target");
+
+    struct target *ptr = *apps_groups_default_target;
+    if (ptr->target)
+        *apps_groups_default_target = ptr->target;
+    /*
+    // allow the user to override group 'other'
+    if(*apps_groups_default_target.target)
+        *apps_groups_default_target = *apps_groups_default_target.target;
+        */
+
+    return 0;
 }

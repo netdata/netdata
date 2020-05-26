@@ -29,6 +29,8 @@
 # include "../../libnetdata/ebpf/ebpf.h"
 # include "../../daemon/main.h"
 
+# include "ebpf_apps.h"
+
 typedef enum {
     MODE_RETURN = 0,    //This attaches kprobe when the function returns
     MODE_DEVMODE,       //This stores log given description about the errors raised
