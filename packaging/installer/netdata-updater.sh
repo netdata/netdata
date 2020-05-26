@@ -185,8 +185,8 @@ update() {
       do_not_start="--dont-start-it"
     fi
 
-    if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
-      env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
+    if [ -n "${NETDATA_SELECTED_DASHBOARD}" ] ; then
+        env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
     fi
 
     info "Re-installing netdata..."
@@ -209,14 +209,6 @@ logfile=
 tmpdir=
 
 trap cleanup EXIT
-
-# Random sleep to aileviate stampede effect of Agents upgrading
-# and disconnecting/reconnecting at the same time (or near to).
-# But only we're not a controlling terminal (tty)
-# Randomly sleep between 1s and 60m
-if [ ! -t 1 ]; then
-  sleep $(((RANDOM % 3600) + 1))s
-fi
 
 # Usually stored in /etc/netdata/.environment
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
