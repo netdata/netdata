@@ -98,6 +98,27 @@ volumes:
 
 Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
+## Health Checks
+
+Our Docker image provides integrated support for health checks through the standard Docker interfaces.
+
+You can control how the helath checks run by using the environment variable `NETDATA_HEALTH_CHECK` as follows:
+
+-   If left unset, the health check will attempt to access the
+    `/api/v1/info` endpoint of the agent.
+-   If set to the exact value 'cli', the health check
+    script will use `netdatacli ping` to determine if the agent is running
+    correctly or not. This is sufficient to ensure that Netdata did not
+    hang during startup, but does not provide a rigorous verification
+    that the daemon is collecting data or is otherwise usable.
+-   If set to anything else, the health check will treat the vaule as a
+    URL to check for a 200 status code on.
+
+In most cases, the default behavior of checking the `/api/v1/info`
+endpoint will be sufficient. If you are using a configuration which
+disables the web server or restricts access to certain API's, you will
+need to use a non-default configuration for health checks to work.
+
 ## Configure Agent containers
 
 You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. You should
