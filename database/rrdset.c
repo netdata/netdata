@@ -535,7 +535,10 @@ RRDSET *rrdset_create_custom(
         else
             rrdset_set_name(st, id);
 
-        info("CHART request for updated metadata");
+        info("CHART request for updated metadata [%s]", st->id);
+#ifdef ENABLE_DBENGINE
+        metalog_commit_update_chart(st);
+#endif
         // name
         // title
         // family
