@@ -46,6 +46,7 @@ size_t zero_all_targets(struct target *root) {
     for (w = root; w ; w = w->next) {
         count++;
 
+        /* These variables are not necessary for eBPF collector
         w->minflt = 0;
         w->majflt = 0;
         w->utime = 0;
@@ -93,6 +94,7 @@ size_t zero_all_targets(struct target *root) {
         w->uptime_min = 0;
         w->uptime_sum = 0;
         w->uptime_max = 0;
+         */
 
         if(unlikely(w->root_pid)) {
             struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
@@ -282,11 +284,6 @@ int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target, struc
     struct target *ptr = *apps_groups_default_target;
     if (ptr->target)
         *apps_groups_default_target = ptr->target;
-    /*
-    // allow the user to override group 'other'
-    if(*apps_groups_default_target.target)
-        *apps_groups_default_target = *apps_groups_default_target.target;
-        */
 
     return 0;
 }
