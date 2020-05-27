@@ -193,6 +193,9 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
+#ifndef HAVE_X509_VERIFY_PARAM_set1_host
+    i.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+#endif
 
     i.port = atoi(port);
     i.address = host;
