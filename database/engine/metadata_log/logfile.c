@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "metadatalog.h"
+#include "metalogpluginsd.h"
 
 void mlf_record_insert(struct metalog_record_info *record)
 {
@@ -126,14 +127,14 @@ void metadata_logfile_list_delete(struct metalog_instance *ctx, struct metadata_
 void generate_metadata_logfile_path(struct metadata_logfile *metalogfile, char *str, size_t maxlen)
 {
     (void) snprintf(str, maxlen, "%s/" METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL METALOG_EXTENSION,
-                    metalogfile->ctx->rrdeng_ctx->dbfiles_path, metalogfile->tier, metalogfile->fileno);
+                    metalogfile->ctx->rrdeng_ctx->dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
 }
 
-void metadata_logfile_init(struct metadata_logfile *metalogfile, struct metalog_instance *ctx, unsigned tier,
+void metadata_logfile_init(struct metadata_logfile *metalogfile, struct metalog_instance *ctx, unsigned starting_fileno,
                            unsigned fileno)
 {
-    assert(tier == 1);
-    metalogfile->tier = tier;
+    assert(starting_fileno == 0);
+    metalogfile->starting_fileno = starting_fileno;
     metalogfile->fileno = fileno;
     metalogfile->file = (uv_file)0;
     metalogfile->pos = 0;
@@ -226,7 +227,6 @@ int create_metadata_logfile(struct metadata_logfile *metalogfile)
     }
     (void) strncpy(superblock->magic_number, RRDENG_METALOG_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_METALOG_VER, RRDENG_VER_SZ);
-    superblock->tier = 1;
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
@@ -273,16 +273,164 @@ static int check_metadata_logfile_superblock(uv_file file)
     assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
-    if (strncmp(superblock->magic_number, RRDENG_METALOG_MAGIC, RRDENG_MAGIC_SZ) ||
-        strncmp(superblock->version, RRDENG_METALOG_VER, RRDENG_VER_SZ)) {
+    if (strncmp(superblock->magic_number, RRDENG_METALOG_MAGIC, RRDENG_MAGIC_SZ)) {
         error("File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
     }
-    error:
+    if (strncmp(superblock->version, RRDENG_METALOG_VER, RRDENG_VER_SZ)) {
+        error("File has unknown version \"%.*s\". Compatibility is not guaranteed.", RRDENG_VER_SZ,
+              superblock->version);
+    }
+error:
     free(superblock);
     return ret;
+}
+
+void replay_record(struct metadata_logfile *metalogfile, struct rrdeng_metalog_record_header *header, void *payload)
+{
+    struct metalog_instance *ctx = metalogfile->ctx;
+    char *line, *nextline, *record_end;
+    int ret;
+    struct metalog_pluginsd_state *state = ctx->metalog_parser_object->private;
+
+    info("RECORD contents: %.*s", (int)header->payload_length, (char *)payload);
+    record_end = (char *)payload + header->payload_length - 1;
+    *record_end = '\0';
+
+    for (line = payload ; line ; line = nextline) {
+        nextline = strchr(line, '\n');
+        if (nextline) {
+            *nextline++ = '\0';
+        }
+        ret = parser_action(ctx->metalog_parser_object->parser, line);
+        info("parser_action ret:%d", ret);
+        if (ret)
+            return; /* skip record due to error */
+    };
+}
+
+/* This function only works with buffered I/O */
+static inline int metalogfile_read(struct metadata_logfile *metalogfile, void *buf, size_t len, uint64_t offset)
+{
+    struct metalog_instance *ctx;
+    uv_file file;
+    uv_buf_t iov;
+    uv_fs_t req;
+    int ret;
+
+    ctx = metalogfile->ctx;
+    file = metalogfile->file;
+    iov = uv_buf_init(buf, len);
+    ret = uv_fs_read(NULL, &req, file, &iov, 1, offset, NULL);
+    if (unlikely(ret < 0 && ret != req.result)) {
+        fatal("uv_fs_read: %s", uv_strerror(ret));
+    }
+    if (req.result < 0) {
+        ++ctx->stats.io_errors;
+        rrd_stat_atomic_add(&global_io_errors, 1);
+        error("%s: uv_fs_read - %s - record at offset %"PRIu64"(%u) in metadata logfile %u-%u.", __func__,
+              uv_strerror((int)req.result), offset, (unsigned)len, metalogfile->starting_fileno, metalogfile->fileno);
+    }
+    uv_fs_req_cleanup(&req);
+    ctx->stats.io_read_bytes += len;
+    ++ctx->stats.io_read_requests;
+
+    return ret;
+}
+
+/* Return 0 on success */
+static int metadata_record_integrity_check(void *record)
+{
+    int ret;
+    uint32_t data_size;
+    struct rrdeng_metalog_record_header *header;
+    struct rrdeng_metalog_record_trailer *trailer;
+    uLong crc;
+
+    header = record;
+    data_size = header->header_length + header->payload_length;
+    trailer = record + data_size;
+
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, record, data_size);
+    ret = crc32cmp(trailer->checksum, crc);
+
+    return ret;
+}
+
+#define MAX_READ_BYTES (RRDENG_BLOCK_SIZE * 32) /* no record should be over 128KiB in this version */
+
+/*
+ * Iterates metadata log file records and creates database objects (host/chart/dimension)
+ * Returns the maximum record id it discovered.
+ */
+static uint64_t iterate_records(struct metadata_logfile *metalogfile)
+{
+    int ret;
+    uint32_t file_size, pos, size_bytes, bytes_remaining, record_size;
+    uint64_t max_id, id;
+    void *buf;
+    struct rrdeng_metalog_record_header *header;
+    struct metalog_instance *ctx = metalogfile->ctx;
+    const size_t min_header_size = offsetof(struct rrdeng_metalog_record_header, header_length) +
+                                   sizeof(header->header_length);
+
+    file_size = metalogfile->pos;
+
+    max_id = 1;
+    buf = mallocz(MAX_READ_BYTES);
+
+    for (pos = sizeof(struct rrdeng_metalog_sb) ; pos < file_size ; pos += record_size) {
+        bytes_remaining = file_size - pos;
+        if (bytes_remaining < min_header_size) {
+            error("%s: unexpected end of file in metadata logfile %u-%u.", __func__, metalogfile->starting_fileno,
+                  metalogfile->fileno);
+            break;
+        }
+        if (metalogfile_read(metalogfile, buf, min_header_size, pos) < 0)
+            break;
+        header = (struct rrdeng_metalog_record_header *)buf;
+        if (METALOG_STORE_PADDING == header->type) {
+            info("%s: Skipping padding in metadata logfile %u-%u.", __func__, metalogfile->starting_fileno,
+                 metalogfile->fileno);
+            record_size = ALIGN_BYTES_FLOOR(pos + RRDENG_BLOCK_SIZE) - pos;
+            continue;
+        }
+        if (metalogfile_read(metalogfile, buf + min_header_size, sizeof(*header) - min_header_size,
+                             pos + min_header_size) < 0)
+            break;
+        record_size = header->header_length + header->payload_length + sizeof(struct rrdeng_metalog_record_trailer);
+        if (header->header_length < min_header_size || record_size > bytes_remaining) {
+            error("%s: Corrupted record in metadata logfile %u-%u.", __func__, metalogfile->starting_fileno,
+                  metalogfile->fileno);
+            break;
+        }
+        if (record_size > MAX_READ_BYTES) {
+            error("%s: Record is too long (%u bytes) in metadata logfile %u-%u.", __func__, record_size,
+                  metalogfile->starting_fileno, metalogfile->fileno);
+            continue;
+        }
+        if (metalogfile_read(metalogfile, buf + sizeof(*header), record_size - sizeof(*header),
+                             pos + sizeof(*header)) < 0)
+            break;
+        if (metadata_record_integrity_check(buf)) {
+            error("%s: Record at offset %"PRIu32" was read from disk. CRC32 check: FAILED", __func__, pos);
+            continue;
+        }
+        debug(D_RRDENGINE, "%s: Record at offset %"PRIu32" was read from disk. CRC32 check: SUCCEEDED", __func__, pos);
+
+        replay_record(metalogfile, header, buf + header->header_length);
+        ret = 1;
+        if (!ret)
+            /* unknown transaction size, move on to the next block */
+            pos = ALIGN_BYTES_FLOOR(pos + RRDENG_BLOCK_SIZE);
+        max_id = MAX(max_id, id);
+    }
+
+    freez(buf);
+    return max_id;
 }
 
 int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile *metalogfile)
@@ -315,13 +463,13 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     metalogfile->file = file;
     metalogfile->pos = file_size;
 
-    //TODO: load state
+    max_id = iterate_records(metalogfile);
     //ctx->records_log.record_id = MAX(ctx->records_log.record_id, max_id + 1);
 
     info("Metadata log \"%s\" loaded (size:%"PRIu64").", path, file_size);
     return 0;
 
-    error:
+error:
     error = ret;
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
@@ -356,7 +504,7 @@ static int scan_metalog_files_cmp(const void *a, const void *b)
 static int scan_metalog_files(struct metalog_instance *ctx)
 {
     int ret;
-    unsigned tier, no, matched_files, i,failed_to_load;
+    unsigned starting_no, no, matched_files, i,failed_to_load;
     static uv_fs_t req;
     uv_dirent_t dent;
     struct metadata_logfile **metalogfiles, *metalogfile;
@@ -376,11 +524,11 @@ static int scan_metalog_files(struct metalog_instance *ctx)
     metalogfiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*metalogfiles));
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
         info("Scanning file \"%s/%s\"", dbfiles_path, dent.name);
-        ret = sscanf(dent.name, METALOG_PREFIX METALOG_FILE_NUMBER_SCAN_TMPL METALOG_EXTENSION, &tier, &no);
+        ret = sscanf(dent.name, METALOG_PREFIX METALOG_FILE_NUMBER_SCAN_TMPL METALOG_EXTENSION, &starting_no, &no);
         if (2 == ret) {
             info("Matched file \"%s/%s\"", dbfiles_path, dent.name);
             metalogfile = mallocz(sizeof(*metalogfile));
-            metadata_logfile_init(metalogfile, ctx, tier, no);
+            metadata_logfile_init(metalogfile, ctx, starting_no, no);
             metalogfiles[matched_files++] = metalogfile;
         }
     }
@@ -396,6 +544,48 @@ static int scan_metalog_files(struct metalog_instance *ctx)
     qsort(metalogfiles, matched_files, sizeof(*metalogfiles), scan_metalog_files_cmp);
     ctx->last_fileno = metalogfiles[matched_files - 1]->fileno;
 
+    struct plugind cd = {
+        .enabled = 1,
+        .update_every = 0,
+        .pid = 0,
+        .serial_failures = 0,
+        .successful_collections = 0,
+        .obsolete = 0,
+        .started_t = INVALID_TIME,
+        .next = NULL,
+        .version = 0,
+    };
+
+    struct metalog_pluginsd_state metalog_parser_state;
+    metalog_pluginsd_state_init(&metalog_parser_state, ctx);
+
+    PARSER_USER_OBJECT metalog_parser_object;
+    metalog_parser_object.enabled = cd.enabled;
+    metalog_parser_object.host = ctx->rrdeng_ctx->host;
+    metalog_parser_object.cd = &cd;
+    metalog_parser_object.trust_durations = 0;
+    metalog_parser_object.private = &metalog_parser_state;
+
+    PARSER *parser = parser_init(metalog_parser_object.host, &metalog_parser_object, NULL, PARSER_INPUT_SPLIT);
+    if (unlikely(!parser)) {
+        error("Failed to initialize metadata log parser.");
+        failed_to_load = matched_files;
+        goto after_failed_to_parse;
+    }
+    parser->plugins_action->dimension_action = &metalog_pluginsd_dimension_action;
+    parser->plugins_action->chart_action     = &metalog_pluginsd_chart_action;
+    parser->plugins_action->guid_action      = &metalog_pluginsd_guid_action;
+    parser->plugins_action->context_action   = &metalog_pluginsd_context_action;
+    parser->plugins_action->tombstone_action = &metalog_pluginsd_tombstone_action;
+
+    metalog_parser_object.parser = parser;
+    ctx->metalog_parser_object = &metalog_parser_object;
+
+    /*while (likely(!parser_next(parser))) {
+        if (unlikely(parser_action(parser,  NULL)))
+            break;
+    }*/
+
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         metalogfile = metalogfiles[i];
         ret = load_metadata_logfile(ctx, metalogfile);
@@ -407,6 +597,15 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         metadata_logfile_list_insert(ctx, metalogfile);
         ctx->disk_space += metalogfile->pos + metalogfile->pos;
     }
+    info("PARSER ended");
+
+    parser_destroy(parser);
+
+    size_t count = metalog_parser_object.count;
+
+    info("Parsing count=%u", (unsigned)count);
+after_failed_to_parse:
+
     freez(metalogfiles);
     if (failed_to_load) {
         error("%u metadata log files failed to load.", failed_to_load);
@@ -418,7 +617,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
 }
 
 /* Creates a datafile and a journalfile pair */
-int add_new_metadata_logfile(struct metalog_instance *ctx, unsigned tier, unsigned fileno)
+int add_new_metadata_logfile(struct metalog_instance *ctx, unsigned starting_fileno, unsigned fileno)
 {
     struct metadata_logfile *metalogfile;
     int ret;
@@ -426,7 +625,7 @@ int add_new_metadata_logfile(struct metalog_instance *ctx, unsigned tier, unsign
 
     info("Creating new metadata log file in path %s", ctx->rrdeng_ctx->dbfiles_path);
     metalogfile = mallocz(sizeof(*metalogfile));
-    metadata_logfile_init(metalogfile, ctx, tier, fileno);
+    metadata_logfile_init(metalogfile, ctx, starting_fileno, fileno);
     ret = create_metadata_logfile(metalogfile);
     if (!ret) {
         generate_metadata_logfile_path(metalogfile, path, sizeof(path));
@@ -453,7 +652,7 @@ int init_metalog_files(struct metalog_instance *ctx)
         return ret;
     } else if (0 == ret) {
         info("Metadata log files not found, creating in path \"%s\".", dbfiles_path);
-        ret = add_new_metadata_logfile(ctx, 1, 1);
+        ret = add_new_metadata_logfile(ctx, 0, 1);
         if (ret) {
             error("Failed to create metadata log file in path \"%s\".", dbfiles_path);
             return ret;

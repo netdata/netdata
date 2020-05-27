@@ -48,7 +48,6 @@ char *get_metalog_statistics(struct metalog_instance *ctx, char *str, size_t siz
 
 static void commit_record(struct metalog_worker_config* wc, struct metalog_record_io_descr *io_descr, uint8_t type)
 {
-    struct metalog_instance *ctx = wc->ctx;
     unsigned payload_length, size_bytes;
     void *buf, *mlf_payload;
     /* persistent structures */
@@ -64,7 +63,6 @@ static void commit_record(struct metalog_worker_config* wc, struct metalog_recor
     mlf_header = buf;
     mlf_header->type = type;
     mlf_header->header_length = sizeof(*mlf_header);
-    mlf_header->id = ctx->records_log.record_id++;
     mlf_header->payload_length = payload_length;
 
     mlf_payload = buf + sizeof(*mlf_header);
@@ -97,7 +95,7 @@ void metalog_test_quota(struct metalog_worker_config *wc)
     struct metadata_logfile *metalogfile;
     unsigned current_size, target_size;
     uint8_t out_of_space, only_one_metalogfile;
-    int ret, error;
+    int ret;
 
     out_of_space = 0;
     if (unlikely(ctx->disk_space > ctx->max_disk_space)) {

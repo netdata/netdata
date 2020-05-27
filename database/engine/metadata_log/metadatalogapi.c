@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define NETDATA_RRD_INTERNALS
+
 #include "metadatalog.h"
+
+static inline int metalog_is_initialized(struct metalog_instance *ctx)
+{
+    return ctx->rrdeng_ctx->metalog_ctx != NULL;
+}
 
 /* The buffer must not be empty */
 static void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum metalog_opcode opcode)
@@ -34,6 +41,8 @@ void metalog_commit_update_host(RRDHOST *host)
         return;
 
     ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
     buffer = buffer_create(4096); /* This will be freed after it has been committed to the metadata log buffer */
 
     rrdhost_rdlock(host);
@@ -80,6 +89,8 @@ void metalog_commit_update_chart(RRDSET *st)
         return;
 
     ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
     buffer = buffer_create(1024); /* This will be freed after it has been committed to the metadata log buffer */
 
     rrdset_rdlock(st);
@@ -161,6 +172,8 @@ void metalog_commit_delete_chart(RRDSET *st)
         return;
 
     ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
     buffer_sprintf(buffer, "CONTEXT %s\n", host->machine_guid);
@@ -183,6 +196,8 @@ void metalog_commit_update_dimension(RRDDIM *rd)
         return;
 
     ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
     buffer = buffer_create(128); /* This will be freed after it has been committed to the metadata log buffer */
 
     uuid_unparse_lower(*st->chart_uuid, uuid_str);
@@ -221,6 +236,8 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
         return;
 
     ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
     buffer_sprintf(buffer, "CONTEXT %s\n", st->id);
@@ -231,6 +248,89 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
     metalog_commit_creation_record(ctx, buffer);
 }
 
+RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_uuid)
+{
+    GUID_TYPE ret;
+    char chart_object[33], machine_guid_str[GUID_LEN + 1], chart_fullid[RRD_ID_LENGTH_MAX + 1];
+    uuid_t *machine_guid, *chart_char_guid;
+
+    ret = find_object_by_guid(chart_uuid, chart_object, 33);
+    assert(GUID_TYPE_CHART == ret);
+
+    machine_guid = (uuid_t *)chart_object;
+    uuid_unparse_lower(*machine_guid, machine_guid_str);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid_str, 0);
+    assert(host && host == ctx->rrdeng_ctx->host);
+
+    chart_char_guid = (uuid_t *)(chart_object + 16);
+
+    ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
+    assert(GUID_TYPE_CHAR == ret);
+    RRDSET *st = rrdset_find(host, chart_fullid);
+
+    return st;
+}
+
+RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
+{
+    GUID_TYPE ret;
+    char dim_object[49], chart_object[33], id_str[1024], chart_fullid[RRD_ID_LENGTH_MAX + 1];
+    uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
+
+    ret = find_object_by_guid(metric_uuid, dim_object, 49);
+    assert(GUID_TYPE_DIMENSION == ret);
+
+    machine_guid = (uuid_t *)dim_object;
+    uuid_unparse_lower(*machine_guid, id_str);
+    RRDHOST *host = rrdhost_find_by_guid(id_str, 0);
+    assert(host && host == ctx->rrdeng_ctx->host);
+
+    chart_guid = (uuid_t *)(dim_object + 16);
+    dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
+
+    ret = find_object_by_guid(dim_char_guid, id_str, 1024);
+    assert(GUID_TYPE_CHAR == ret);
+
+    ret = find_object_by_guid(chart_guid, chart_object, 33);
+    assert(GUID_TYPE_CHART == ret);
+    chart_char_guid = (uuid_t *)(chart_object + 16);
+
+    ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
+    assert(GUID_TYPE_CHAR == ret);
+    RRDSET *st = rrdset_find(host, chart_fullid);
+    assert(st);
+
+    RRDDIM *rd = rrddim_find(st, id_str);
+
+    return rd;
+}
+
+void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
+{
+    RRDDIM *rd;
+    RRDSET *st;
+    RRDHOST *host;
+    uint8_t empty_chart;
+
+    rd = metalog_get_dimension_from_uuid(ctx,metric_uuid);
+    assert(rd);
+    st = rd->rrdset;
+    host = st->rrdhost;
+
+    metalog_commit_delete_dimension(rd);
+
+    rrdset_wrlock(st);
+    rrddim_free_custom(st, rd, 0);
+    empty_chart = (NULL == st->dimensions);
+    rrdset_unlock(st);
+
+    if (empty_chart) {
+        rrdhost_wrlock(host);
+        rrdset_free(st);
+        rrdhost_unlock(host);
+    }
+}
+
 /*
  * Returns 0 on success, negative on error
  */
@@ -239,8 +339,7 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     struct metalog_instance *ctx;
     int error;
 
-    rrdeng_parent_ctx->metalog_ctx = ctx = callocz(1, sizeof(*ctx));
-
+    ctx = callocz(1, sizeof(*ctx));
     ctx->max_disk_space = 32 * 1048576LLU;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
@@ -261,13 +360,13 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
+    rrdeng_parent_ctx->metalog_ctx = ctx; /* notify dbengine that the metadata log has finished initializing */
     return 0;
 
 error_after_rrdeng_worker:
     finalize_metalog_files(ctx);
 error_after_init_rrd_files:
     freez(ctx);
-    rrdeng_parent_ctx->metalog_ctx = NULL;
     return UV_EIO;
 }
 

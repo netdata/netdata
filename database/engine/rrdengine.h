@@ -171,6 +171,7 @@ extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
 extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
 
 struct rrdengine_instance {
+    RRDHOST *host;
     struct metalog_instance *metalog_ctx;
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;

@@ -1716,7 +1716,7 @@ int aclk_send_info_metadata()
     debug(D_ACLK, "Metadata %s with info has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ", \n\t \"charts\" : ");
-    charts2json(localhost, local_buffer, 1);
+    charts2json(localhost, local_buffer, 1, 0);
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 

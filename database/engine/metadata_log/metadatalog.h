@@ -13,6 +13,7 @@
 
 /* Forward declerations */
 struct metalog_instance;
+struct parser_user_object;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
@@ -103,6 +104,7 @@ struct metalog_instance {
     struct completion metalog_completion;
     struct metadata_record_commit_log records_log;
     struct metadata_logfile_list metadata_logfiles;
+    struct parser_user_object *metalog_parser_object;
     uint64_t disk_space;
     uint64_t max_disk_space;
     unsigned last_fileno; /* newest index of metadata log file */
