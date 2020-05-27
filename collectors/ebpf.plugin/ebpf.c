@@ -598,7 +598,7 @@ static void set_collector_values() {
         if(!strcasecmp(sec->name, "global")) {
             values = sec->values;
             while(values) {
-                if (!strcasecmp(values->name, "load"))
+                if (!strcasecmp(values->name, "load") || !strcasecmp(values->name, "ebpf load mode"))
                     how_to_load(values->value);
                 else if(!strcasecmp(values->name, "disable apps")) {
                     if (!strcasecmp(values->value, "yes")) {

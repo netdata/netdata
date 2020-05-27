@@ -130,7 +130,7 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 
 The `[global]` section defines settings for the whole eBPF collector.
 
-#### load
+#### ebpf load mode (load)
 
 The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
 monitor, process, and display different kinds of information.
