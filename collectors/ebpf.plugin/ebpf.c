@@ -747,12 +747,10 @@ int main(int argc, char **argv)
     int i;
     int end = NETDATA_EBPF_PROCESS_THREADS;
 
-    void * (*function_pointer[])(void *) = { ebpf_process_thread, ebpf_socket_thread };
-
     for ( i = 0; i < end ; i++ ) {
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread_id = i;
-        if ( ( pthread_create(&thread[i], &attr, function_pointer[i], (void *) em) ) ) {
+        if ( ( pthread_create(&thread[i], &attr, ebpf_modules[i].start_routine, (void *) em) ) ) {
             error("[EBPF_PROCESS] Cannot create threads.");
             thread_finished++;
             ebpf_exit(4);
