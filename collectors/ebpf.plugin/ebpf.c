@@ -360,12 +360,12 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
 /**
  * Enable specific charts selected by user.
  *
- * @param em the structure that will be changed
- * @param disable_apps the status about the apps charts.
+ * @param em      the structure that will be changed
+ * @param enable the status about the apps charts.
  */
-static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int disable_apps) {
+static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int enable) {
     em->enabled = 1;
-    if (!disable_apps) {
+    if (!enable) {
         em->apps_charts = 1;
     }
     em->global_charts = 1;
@@ -387,13 +387,13 @@ static inline void ebpf_enable_all_charts(int apps) {
  * Enable the specified chart group
  *
  * @param enable         enable (1) or disable (0) chart
- * @param disable_apps   was the apps disabled?
+ * @param enable         enable apps?
  */
-static inline void ebpf_enable_chart(int enable, int disable_apps) {
+static inline void ebpf_enable_chart(int enable, int enable) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
         if (i == enable) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
+            ebpf_enable_specific_chart(&ebpf_modules[i], enable);
             break;
         }
     }
