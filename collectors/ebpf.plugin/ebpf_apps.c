@@ -16,6 +16,23 @@
  *****************************************************************/
 
 /**
+ * Am I running as Root
+ *
+ * Verify the user that is running the collector.
+ *
+ * @return It returns 1 for root and 0 otherwise.
+ */
+int am_i_running_as_root() {
+    uid_t uid = getuid(), euid = geteuid();
+
+    if(uid == 0 || euid == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
  * Reset the target values
  *
  * @param root the pointer to the chain that will be reseted.

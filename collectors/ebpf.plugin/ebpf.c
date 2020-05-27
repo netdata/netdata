@@ -737,6 +737,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if(!am_i_running_as_root()) {
+        error("ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
+              (unsigned int)getuid(), (unsigned int)geteuid()
+              );
+        return 1;
+    }
+
     //set name
     program_name = "ebpf.plugin";
 
