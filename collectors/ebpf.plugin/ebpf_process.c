@@ -484,7 +484,7 @@ void *ebpf_process_thread(void *ptr)
     fill_ebpf_functions(&process_functions);
     if (ebpf_load_libraries(&process_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
-        return NULL;
+        goto endprocess;
     }
 
     set_local_pointers(em);
