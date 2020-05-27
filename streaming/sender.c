@@ -383,15 +383,6 @@ static void attempt_to_connect(struct sender_state *state)
 {
     state->send_attempts = 0;
 
-    if(state->not_connected_loops == 0 && state->sent_bytes_on_this_connection > 0) {
-        // fast re-connection on first disconnect
-        sleep_usec(USEC_PER_MS * 500); // milliseconds
-    }
-    else {
-        // slow re-connection on repeating errors
-        sleep_usec(USEC_PER_SEC * state->reconnect_delay); // seconds
-    }
-
     if(rrdpush_sender_thread_connect_to_master(state->host, state->default_port, state->timeout,
                                      &state->reconnects_counter, state->connected_to, sizeof(state->connected_to)-1)) {
         state->last_sent_t = now_monotonic_sec();
@@ -417,6 +408,9 @@ static void attempt_to_connect(struct sender_state *state)
 
         // reset the number of bytes sent
         state->sent_bytes_on_this_connection = 0;
+
+        // slow re-connection on repeating errors
+        sleep_usec(USEC_PER_SEC * state->reconnect_delay); // seconds
     }
 }
 
