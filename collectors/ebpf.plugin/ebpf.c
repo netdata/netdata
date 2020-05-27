@@ -745,9 +745,8 @@ int main(int argc, char **argv)
     pthread_t thread[NETDATA_EBPF_PROCESS_THREADS];
 
     int i;
-    int end = NETDATA_EBPF_PROCESS_THREADS;
 
-    for ( i = 0; i < end ; i++ ) {
+    for ( i = 0; ebpf_modules[i].thread_name ; i++ ) {
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread_id = i;
         if ( ( pthread_create(&thread[i], &attr, ebpf_modules[i].start_routine, (void *) em) ) ) {
@@ -757,7 +756,7 @@ int main(int argc, char **argv)
         }
     }
 
-    for ( i = 0; i < end ; i++ ) {
+    for ( i = 0; ebpf_modules[i].thread_name ; i++ ) {
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[EBPF_PROCESS] Cannot join threads.");
             thread_finished++;
