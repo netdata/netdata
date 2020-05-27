@@ -79,9 +79,9 @@ netdata_ebpf_events_t socket_probes[] = {
 };
 
 ebpf_module_t ebpf_modules[] = {
-    { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
+    { .thread_name = "process", .config_name = "process", .enabled = 1, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
-    { .thread_name = "socket", .config_name = "network viewer", .enabled = 0, .start_routine = ebpf_socket_thread,
+    { .thread_name = "socket", .config_name = "network viewer", .enabled = 1, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
@@ -581,9 +581,33 @@ void fill_ebpf_functions(ebpf_functions_t *ef) {
  *
  * @param ptr the option given by users
  */
-static inline void how_to_load(char *ptr) {
+static inline void how_to_load(char *ptr)
+{
     if (!strcasecmp(ptr, "return"))
         ebpf_set_thread_mode(MODE_RETURN);
+    else if (!strcasecmp(ptr, "entry"))
+        ebpf_set_thread_mode(MODE_ENTRY);
+    else
+        error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
+}
+
+/**
+ * Parse disable apps option
+ *
+ * @param ptr the option given by users
+ *
+ * @return It returns 1 to disable the charts or 0 otherwise.
+ */
+static inline int parse_disable_apps(char *ptr)
+{
+    if (!strcasecmp(ptr, "yes")) {
+        ebpf_disable_apps();
+        return 1;
+    } else if (strcasecmp(ptr, "no")) {
+        error("The option %s for \"disable apps\" is not a valid option.", ptr);
+    }
+
+    return 0;
 }
 
 /**
@@ -601,10 +625,7 @@ static void read_collector_values() {
                 if (!strcasecmp(values->name, "load") || !strcasecmp(values->name, "ebpf load mode"))
                     how_to_load(values->value);
                 else if(!strcasecmp(values->name, "disable apps")) {
-                    if (!strcasecmp(values->value, "yes")) {
-                        ebpf_disable_apps();
-                        disable_apps = 1;
-                    }
+                    disable_apps = parse_disable_apps(values->value);
                 }
 
                 values = values->next;
