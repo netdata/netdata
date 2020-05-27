@@ -75,6 +75,7 @@ typedef struct netdata_error_report {
 
 typedef struct ebpf_module {
     const char *thread_name;
+    const char *config_name;
     int enabled;
     void *(*start_routine) (void *);
     int update_time;

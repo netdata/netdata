@@ -79,10 +79,10 @@ netdata_ebpf_events_t socket_probes[] = {
 };
 
 ebpf_module_t ebpf_modules[] = {
-    { .thread_name = "process", .enabled = 0, .start_routine = ebpf_process_thread, .update_time = 1,
-      .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
-    { .thread_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread, .update_time = 1,
-      .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
+    { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
+    { .thread_name = "socket", .config_name = "network viewer", .enabled = 0, .start_routine = ebpf_socket_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
 };
@@ -387,13 +387,13 @@ static inline void ebpf_enable_all_charts(int apps) {
  * Enable the specified chart group
  *
  * @param enable         enable (1) or disable (0) chart
- * @param enable         enable apps?
+ * @param keep_apps      should I keep apps charts?
  */
-static inline void ebpf_enable_chart(int enable, int enable) {
+static inline void ebpf_enable_chart(int enable, int keep_apps) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
         if (i == enable) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], enable);
+            ebpf_enable_specific_chart(&ebpf_modules[i], keep_apps);
             break;
         }
     }
@@ -612,13 +612,13 @@ static void set_collector_values() {
         } else if(!strcasecmp(sec->name, "global")) {
             values = sec->values;
             while(values) {
-                if (!strcasecmp(values->name, "process")) {
+                if (!strcasecmp(values->name, ebpf_modules[0].config_name)) {
                     if (!strcasecmp(values->value, "yes")) {
                         ebpf_enable_chart(0, disable_apps);
                         enabled = 1;
                     }
                 }
-                else if (!strcasecmp(values->name, "network viewer")) {
+                else if (!strcasecmp(values->name, ebpf_modules[1].config_name)) {
                     if (!strcasecmp(values->value, "yes")) {
                         ebpf_enable_chart(1, disable_apps);
                         enabled = 1;
