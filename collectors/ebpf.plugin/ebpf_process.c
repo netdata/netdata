@@ -196,8 +196,10 @@ static void read_hash_global_tables()
     process_aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
     process_aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
 
-    process_aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
-    process_aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
+    process_aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] +
+                                       (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
+    process_aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] +
+                                       (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
 /*****************************************************************
