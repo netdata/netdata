@@ -72,6 +72,9 @@ dist_noinst_DATA = \
     packaging/mosquitto.checksums \
     packaging/bundle-dashboard.sh \
     packaging/bundle-mosquitto.sh \
+    packaging/check-kernel-config.sh \
+    packaging/ebpf.checksums \
+    packaging/ebpf.version \
     packaging/bundle-lws.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
