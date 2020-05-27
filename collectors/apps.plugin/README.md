@@ -64,6 +64,23 @@ Each of these sections provides the same number of charts:
     -   Major Page Faults (i.e. swap activity)
 -   Network
     -   Sockets Open
+-   eBPF syscall    
+    -   Number of calls to open files.
+    -   Number of files closed.
+    -   Number of calls to delete files.
+    -   Number of calls to vfs_write.
+    -   Number of calls to vfs_read.
+    -   Number of bytes written trough vfs_write
+    -   Number of bytes read trough vfs_read
+    -   Number of process created trough do_fork
+    -   Number of threads created trough do_fork or __x86_64_sys_clone depending of kernel version
+    -   Number of times that a process called do_exit 
+    -   Number of calls to open files that returned errors.
+    -   Number of calls to close files that returned errors
+    -   Number of calls to read a file that returned error.
+    -   Number of calls to read a file that returned error.
+-   eBPF net
+    -   Number of bytes transmited per seconds.    
 
 The above are reported:
 
@@ -154,6 +171,11 @@ There are a few command line options you can pass to `apps.plugin`. The list of 
 [plugin:apps]
   command options = without-users without-groups
 ```
+
+### Integration with eBPF
+
+Since version 1.23, `apps.plugin` is integrated with `ebpf.plugins` to give more information 
+about the processes. If an eBPF chart is not shown, change your `ebpf.conf`.
 
 ## Permissions
 
