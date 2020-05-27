@@ -387,7 +387,7 @@ void simple_connector_worker(void *instance_p)
 #endif
 
 #ifdef ENABLE_HTTPS
-    if (options & EXPORTING_OPTION_USE_TLS) {
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&  options & EXPORTING_OPTION_USE_TLS) {
         SSL_free(connector_specific_data->conn);
         freez(instance->connector_specific_data);
     }
