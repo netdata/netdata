@@ -7,14 +7,15 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/
 # Database engine
 
 The Database Engine works like a traditional database. It dedicates a certain amount of RAM to data caching and
-indexing, while and the rest of the data resides compressed on disk. The number of history entries is not fixed in this
-case, but depends on the configured disk space and the effective compression ratio of the data stored.
+indexing, while and the rest of the data resides compressed on disk. Unlike other [database modes](/database/README.md),
+the amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
+ratio, not a fixed number of history entries.
 
-By using both RAM and disk space, the database engine allows you to store days, weeks, or months worth of per-second
-metrics data on your system.
+By using both RAM and disk space, the database engine allows for long-term storage of per-second metrics inside of the
+Agent itself.
 
-The database engine is the only [database mode](/database/README.md) that supports changing the data collection update
-frequency (`update_every`) without losing the metrics your Agent already gathered and stored.
+In addition, the database engine is the only database mode that supports changing the data collection update frequency
+(`update_every`) without losing the metrics your Agent already gathered and stored.
 
 ## Configuration
 
@@ -26,7 +27,7 @@ To use the database engine, open `netdata.conf` and set `memory mode` to `dbengi
 ```
 
 To configure the database engine, look for the `page cache size` and `dbengine disk space` settings in the `[global]`
-section of your `netdata.conf`. The Agent does not use the `history` setting when using the database engine.
+section of your `netdata.conf`. The Agent ignores the `history` setting when using the database engine.
 
 ```conf
 [global]
@@ -44,21 +45,22 @@ section for details.
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
 metric values and all related metadata describing them.
 
-[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
-correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
-slave nodes you have, how many metrics your Agent collects, and more.
+Use the  [**database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to correctly set
+`dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many slave nodes you
+have, how many metrics your Agent collects, and more.
 
 ### Streaming metrics to the database engine
 
 When streaming metrics, the Agent on the master node creates one instance of the database engine for itself, and another
-instance for every slave node it receives metrics from.
+instance for every slave node it receives metrics from. If you have four streaming nodes, you will have five instances
+in total (`1 master + 4 slaves = 5 instances`).
 
-The `page cache size` and `dbengine disk space` settings are _per instance_, and resources for all instances are
-allocated separately.
+The Agent allocates resources for each instance separately using the `dbengine disk space` setting. If `dbengine disk
+space` is set to the default `256`, each instance is given 256 MiB in disk space, which means the total disk space
+required to store all instances is, roughly, `256 MiB * 1 master * 4 slaves = 1280 MiB`. 
 
-For example, if you have four slave nodes and one master node, the master node will run five database engine instances
-in total. When `dbengine disk space` is set to the default `256`, the Agent allocates 256 MiB in disk space for each
-instance, which means the total disk space required to store all instances is, roughly, `5 * 256`.
+See the [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to help you correctly
+set `dbengine disk space` and undertand the toal disk space required based on your streaming setup.
 
 For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
 [streaming](/streaming/README.md).
@@ -166,8 +168,6 @@ and removed. The DB engine logic will try to maintain between 10 and 20 file pai
 
 The Database Engine uses direct I/O to avoid polluting the OS filesystem caches and does not generate excessive I/O
 traffic so as to create the minimum possible interference with other applications.
-
-
 
 ## Evaluation
 
