@@ -623,7 +623,7 @@ static void read_collector_values() {
         if(!strcasecmp(sec->name, "global")) {
             values = sec->values;
             while(values) {
-                if (!strcasecmp(values->name, "load") || !strcasecmp(values->name, "ebpf load mode"))
+                if (!strcasecmp(values->name, "ebpf load mode"))
                     how_to_load(values->value);
                 else if(!strcasecmp(values->name, "disable apps")) {
                     disable_apps = parse_disable_apps(values->value);
