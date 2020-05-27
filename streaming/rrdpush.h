@@ -39,7 +39,7 @@ typedef struct {
 struct sender_state {
     RRDHOST *host;
     pid_t task_id;
-    int overflow:1;
+    unsigned int overflow:1;
     int timeout, default_port;
     size_t max_size;
     usec_t reconnect_delay;

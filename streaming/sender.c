@@ -494,7 +494,7 @@ int ret;
         s->read_len += ret;
         return;
     }
-    if (ret == EAGAIN || ret == EWOULDBLOCK || ret == EINTR)
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
         return;
     error("STREAM %s [send to %s]: error during read (%d). Restarting connection", s->host->hostname, s->connected_to,
           ret);
