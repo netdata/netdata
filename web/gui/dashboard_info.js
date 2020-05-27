@@ -3049,6 +3049,26 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // eBPF
 
+    'ebpf.tcp_functions': {
+        info: 'TCP functions shows the number of calls for functions \'tcp_sendmsg\', \'tcp_cleanup_rbuf\' and \'tcp_close\' independent of the return to be success or fail.'
+    },
+
+    'ebpf.tcp_bandwidth': {
+        info: 'TCP functions shows the number of bytes sent and received for functions \'tcp_sendmsg\' and \'tcp_cleanup_rbuf\''
+    },
+
+    'ebpf.tcp_error': {
+        info: 'TCP functions shows the number of calls that returned negative values for functions \'tcp_sendmsg\' and \'tcp_cleanup_rbuf\' and \'tcp_close\'.'
+    },
+
+    'ebpf.udp_functions': {
+        info: 'UDP functions shows the number of calls for functions \'udp_sendmsg\' and \'udp_recvmsg\' independent of the return to be success or fail.'
+    },
+
+    'ebpf.udp_bandwidth': {
+        info: 'UDP functions shows the number of bytes sent and received for functions \'udp_sendmsg\' and \'udp_recvmsg\''
+    },
+
     'ebpf.file_descriptor': {
         info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function \'do_sys_open\', that is the common function called from open(2) and openat(2). The close dimension is attached to the function \'__close_fd\', that is called from system call close(2).'
     },
