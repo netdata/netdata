@@ -386,14 +386,14 @@ static inline void ebpf_enable_all_charts(int apps) {
 /**
  * Enable the specified chart group
  *
- * @param enable         enable (1) or disable (0) chart
- * @param keep_apps      should I keep apps charts?
+ * @param idx            the index of ebpf_modules that I am enabling
+ * @param disable_apps   should I keep apps charts?
  */
-static inline void ebpf_enable_chart(int enable, int keep_apps) {
+static inline void ebpf_enable_chart(int idx, int disable_apps) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
-        if (i == enable) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], keep_apps);
+        if (i == idx) {
+            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
             break;
         }
     }
