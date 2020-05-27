@@ -89,7 +89,6 @@ RUN \
         /var/lib/netdata \
         /var/log/netdata && \
     chown -R netdata:netdata /var/lib/netdata/cloud.d && \
-    chmod 0755 /health.sh && \
     chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
