@@ -79,9 +79,9 @@ netdata_ebpf_events_t socket_probes[] = {
 };
 
 ebpf_module_t ebpf_modules[] = {
-    { .thread_name = "process", .config_name = "process", .enabled = 1, .start_routine = ebpf_process_thread,
+    { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
-    { .thread_name = "socket", .config_name = "network viewer", .enabled = 1, .start_routine = ebpf_socket_thread,
+    { .thread_name = "socket", .config_name = "network viewer", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
@@ -617,6 +617,7 @@ static void read_collector_values() {
     struct section *sec = collector_config.first_section;
     int disable_apps = 0;
     int enabled = 0;
+
     while(sec) {
         struct config_option *values;
         if(!strcasecmp(sec->name, "global")) {
@@ -630,9 +631,10 @@ static void read_collector_values() {
 
                 values = values->next;
             }
-        } else if(!strcasecmp(sec->name, "global")) {
+        } else if(!strcasecmp(sec->name, "ebpf programs")) {
             values = sec->values;
             while(values) {
+                error("KILLME %s", values->name);
                 if (!strcasecmp(values->name, ebpf_modules[0].config_name)) {
                     if (!strcasecmp(values->value, "yes")) {
                         ebpf_enable_chart(0, disable_apps);
