@@ -102,7 +102,7 @@ Run `docker-compose up -d` in the same directory as the `docker-compose.yml` fil
 
 Our Docker image provides integrated support for health checks through the standard Docker interfaces.
 
-You can control how the helath checks run by using the environment variable `NETDATA_HEALTH_CHECK` as follows:
+You can control how the health checks run by using the environment variable `NETDATA_HEALTH_CHECK` as follows:
 
 -   If left unset, the health check will attempt to access the
     `/api/v1/info` endpoint of the agent.
