@@ -507,6 +507,19 @@ PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_a
 
 PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
+    // Check protocol version and parse differently
+    if (((PARSER_USER_OBJECT *) user)->cd->version >= 3) {
+        char *name = words[1];
+        char *value = words[2];
+        RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+        if (!name || !*name || !value || !*value) {
+            error("requested a LABEL on host '%s', without a variable name. Disabling it.", host->hostname);
+            ((PARSER_USER_OBJECT *)user)->enabled = 0;
+            return PARSER_RC_ERROR;
+        }
+        return plugins_action->label_action(user, name, value, 0);
+    }
+
     char *store;
     if (!words[4])
         store = words[3];
