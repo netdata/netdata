@@ -25,7 +25,7 @@ typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_UDP_SENDMSG,
     NETDATA_KEY_ERROR_UDP_SENDMSG,
     NETDATA_KEY_BYTES_UDP_SENDMSG
-};
+} ebpf_socket_index_t;
 
 # define NETDATA_SOCKET_GROUP "Socket"
 

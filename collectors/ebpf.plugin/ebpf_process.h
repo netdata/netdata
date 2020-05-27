@@ -66,6 +66,6 @@ typedef enum ebpf_process_index {
     NETDATA_KEY_ERROR_VFS_READV,
     NETDATA_KEY_BYTES_VFS_READV
 
-};
+} ebpf_process_index_t;
 
 # endif

@@ -623,7 +623,7 @@ static void read_collector_values() {
         if(!strcasecmp(sec->name, "global")) {
             values = sec->values;
             while(values) {
-                if (!strcasecmp(values->name, "ebpf load mode"))
+                if (!strcasecmp(values->name, "ebpf load mode") || !strcasecmp(values->name, "load"))
                     how_to_load(values->value);
                 else if(!strcasecmp(values->name, "disable apps")) {
                     disable_apps = parse_disable_apps(values->value);
@@ -765,7 +765,7 @@ int main(int argc, char **argv)
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_t thread[NETDATA_EBPF_PROCESS_THREADS];
+    pthread_t thread[sizeof(ebpf_modules)/sizeof(ebpf_module_t)];
 
     int i;
 

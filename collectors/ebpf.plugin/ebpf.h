@@ -16,8 +16,6 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
-# define NETDATA_EBPF_PROCESS_THREADS (uint32_t)2
-
 # include <fcntl.h>
 # include <ctype.h>
 # include <dirent.h>
