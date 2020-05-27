@@ -587,9 +587,9 @@ static inline void how_to_load(char *ptr) {
 }
 
 /**
- * Set collector values
+ * Read collector values
  */
-static void set_collector_values() {
+static void read_collector_values() {
     struct section *sec = collector_config.first_section;
     int disable_apps = 0;
     int enabled = 0;
@@ -650,7 +650,7 @@ static int load_collector_config(char *path) {
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return -1;
 
-    set_collector_values();
+    read_collector_values();
 
     return 0;
 }
