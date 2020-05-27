@@ -105,7 +105,7 @@ static void ebpf_exit(int sig)
     event_pid = getpid();
     int ret = fork();
     if (ret < 0) //error
-        error("[EBPF PROCESS] Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
+        error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
     else if (!ret) { //child
         int i;
         for ( i=getdtablesize(); i>=0; --i)
@@ -704,7 +704,7 @@ int main(int argc, char **argv)
 
     running_on_kernel =  get_kernel_version(kernel_string, 63);
     if(!has_condition_to_run(running_on_kernel)) {
-        error("[EBPF PROCESS] The current collector cannot run on this kernel.");
+        error("The current collector cannot run on this kernel.");
         return 1;
     }
 
@@ -720,14 +720,14 @@ int main(int argc, char **argv)
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        error("[EBPF PROCESS] setrlimit(RLIMIT_MEMLOCK)");
+        error("Setrlimit(RLIMIT_MEMLOCK)");
         return 2;
     }
 
     set_global_variables();
 
     if (load_collector_config(user_config_dir)) {
-        info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
+        info("Does not have a configuration file. It is starting with default options.");
     }
 
     signal(SIGINT, ebpf_exit);
@@ -735,7 +735,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
-        error("[EBPF PROCESS] Cannot start the mutex.");
+        error("Cannot start the mutex.");
         ebpf_exit(3);
     }
 
