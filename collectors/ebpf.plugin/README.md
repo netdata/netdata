@@ -136,8 +136,8 @@ The collector has two different eBPF programs. These programs monitor the same f
 monitor, process, and display different kinds of information.
 
 By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
-system, but also offer valuable information if you are developing or debugging software. The `load` option accepts the
-following values: ​
+system, but also offer valuable information if you are developing or debugging software. The `ebpf load mode` or `load`
+option accepts the following values: ​
 
 -   `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described
     in the sections above, and does not show charts related to errors.
