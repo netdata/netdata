@@ -7,14 +7,14 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/
 # Database engine
 
 The Database Engine works like a traditional database. It dedicates a certain amount of RAM to data caching and
-indexing, while and the rest of the data resides compressed on disk. Unlike other [database modes](/database/README.md),
-the amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
-ratio, not a fixed number of history entries.
+indexing, while the rest of the data resides compressed on disk. Unlike other [memory modes](/database/README.md), the
+amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
+ratio, not a fixed number of metrics collected.
 
 By using both RAM and disk space, the database engine allows for long-term storage of per-second metrics inside of the
 Agent itself.
 
-In addition, the database engine is the only database mode that supports changing the data collection update frequency
+In addition, the database engine is the only memory mode that supports changing the data collection update frequency
 (`update_every`) without losing the metrics your Agent already gathered and stored.
 
 ## Configuration
@@ -149,7 +149,9 @@ They are located under their host's cache directory in the directory `./dbengine
 location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames contain more recent metric data. The user
 can safely delete some pairs of files when Netdata is stopped to manually free up some space.
 
-_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
+_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._ You can also set up
+one or more [exporting connectors](/exporting/README.md) to send your Netdata metrics to other databases for long-term
+storage at lower granularity.
 
 ## Operation
 
