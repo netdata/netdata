@@ -102,7 +102,7 @@ Run `docker-compose up -d` in the same directory as the `docker-compose.yml` fil
 
 Our Docker image provides integrated support for health checks through the standard Docker interfaces.
 
-You can control how the health checks run by using the environment variable `NETDATA_HEALTH_CHECK` as follows:
+You can control how the health checks run by using the environment variable `NETDATA_HEALTHCHECK_TARGET` as follows:
 
 -   If left unset, the health check will attempt to access the
     `/api/v1/info` endpoint of the agent.
@@ -112,7 +112,9 @@ You can control how the health checks run by using the environment variable `NET
     hang during startup, but does not provide a rigorous verification
     that the daemon is collecting data or is otherwise usable.
 -   If set to anything else, the health check will treat the vaule as a
-    URL to check for a 200 status code on.
+    URL to check for a 200 status code on. In most cases, this should
+    start with `http://localhost:19999/` to check the agent running in
+    the container.
 
 In most cases, the default behavior of checking the `/api/v1/info`
 endpoint will be sufficient. If you are using a configuration which
