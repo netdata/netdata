@@ -524,6 +524,7 @@ RRDSET *rrdset_create_custom(
 
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if(st) {
+        int mark_rebuild = 0;
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
@@ -536,19 +537,91 @@ RRDSET *rrdset_create_custom(
             rrdset_set_name(st, id);
 
         info("CHART request for updated metadata [%s]", st->id);
+
+        if (unlikely(st->priority != priority)) {
+            st->priority = priority;
+            mark_rebuild = 1;
+        }
+
+        if (unlikely(st->update_every != update_every)) {
+            st->update_every = update_every;
+            mark_rebuild = 1;
+        }
+
+        if (plugin && st->plugin_name) {
+            if (unlikely(strcmp(plugin, st->plugin_name))) {
+                freez(st->plugin_name);
+                st->plugin_name = strdupz(plugin);
+                mark_rebuild = 1;
+            }
+        } else {
+            if (plugin != st->plugin_name) {
+                if (st->plugin_name)
+                    freez(st->plugin_name);
+                st->plugin_name = plugin ? strdupz(plugin) : NULL;
+                mark_rebuild = 1;
+            }
+        }
+
+        if (module && st->module_name) {
+            if (unlikely(strcmp(module, st->module_name))) {
+                freez(st->module_name);
+                st->module_name = strdupz(module);
+                mark_rebuild = 1;
+            }
+        } else {
+            if (module != st->module_name) {
+                if (st->module_name)
+                    freez(st->module_name);
+                st->module_name = module ? strdupz(module) : NULL;
+                mark_rebuild = 1;
+            }
+        }
+
+        char *new_title = config_get(st->config_section, "title", title);
+        json_fix_string(new_title);
+
+        if (unlikely(strcmp(st->title, title))) {
+            freez(st->title);
+            st->title = new_title;
+            mark_rebuild = 1;
+        }
+
+        RRDSET_TYPE new_chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
+        if (st->chart_type != new_chart_type) {
+            st->chart_type = new_chart_type;
+            mark_rebuild = 1;
+        }
+
+        char *new_family = config_get(st->config_section, "family", family?family:st->type);
+        json_fix_string(new_family);
+        if (unlikely((strcmp(st->family, new_family)))) {
+            freez(st->family);
+            st->family = new_family;
+            mark_rebuild = 1;
+        }
+
+        char *new_context = config_get(st->config_section, "context", context?context:st->id);
+        json_fix_string(new_context);
+        if (unlikely((strcmp(st->context, new_context)))) {
+            freez(st->context);
+            st->context = new_context;
+            st->hash_context = simple_hash(st->context);
+            mark_rebuild = 1;
+        }
+
 #ifdef ENABLE_DBENGINE
-        metalog_commit_update_chart(st);
+        if (mark_rebuild)
+            metalog_commit_update_chart(st);
 #endif
         // name
-        // title
+        // - title
         // family
         // context
         // charttype
-        // priority
-        // update_every
         // options
-        // plugin
-        // module
+        // - plugin
+        // - module
 
         return st;
     }
