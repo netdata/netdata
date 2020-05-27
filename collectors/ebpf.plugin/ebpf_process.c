@@ -417,10 +417,12 @@ static void ebpf_process_cleanup(void *ptr)
  * Allocate vectors used with this thread.
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
+ *
+ *  @param length is the length for the vectors used inside the collector.
  */
-void ebpf_process_allocate_global_vectors() {
-    process_aggregated_data = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_syscall_stat_t));
-    process_publish_aggregated = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_publish_syscall_t));
+static void ebpf_process_allocate_global_vectors(size_t length) {
+    process_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
+    process_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 }
 
@@ -481,7 +483,7 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    ebpf_process_allocate_global_vectors();
+    ebpf_process_allocate_global_vectors(NETDATA_MAX_MONITOR_VECTOR);
 
     fill_ebpf_functions(&process_functions);
     if (ebpf_load_libraries(&process_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
