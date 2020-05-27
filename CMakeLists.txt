@@ -487,6 +487,13 @@ set(MACOS_PLUGIN_FILES
 set(PLUGINSD_PLUGIN_FILES
         collectors/plugins.d/plugins_d.c
         collectors/plugins.d/plugins_d.h
+        collectors/plugins.d/pluginsd_parser.c
+        collectors/plugins.d/pluginsd_parser.h
+        )
+
+set(PARSER_PLUGIN_FILES
+        parser/parser.c
+        parser/parser.h
         )
 
 set(REGISTRY_PLUGIN_FILES
@@ -750,6 +757,7 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
+        ${PARSER_PLUGIN_FILES}
 )
 
 set(NETDATACLI_FILES
