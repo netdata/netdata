@@ -73,8 +73,8 @@ Each of these sections provides the same number of charts:
     -   Number of bytes written trough `vfs_write`
     -   Number of bytes read trough `vfs_read`
     -   Number of process created trough `do_fork`
-    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone` depending of kernel version
-    -   Number of times that a process called do_exit 
+    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version.
+    -   Number of times that a process called `do_exit`. 
     -   Number of calls to open files that returned errors.
     -   Number of calls to close files that returned errors
     -   Number of calls to read a file that returned error.
@@ -174,8 +174,7 @@ There are a few command line options you can pass to `apps.plugin`. The list of 
 
 ### Integration with eBPF
 
-Since version 1.23, `apps.plugin` is integrated with `ebpf.plugins` to give more information 
-about the processes. If an eBPF chart is not shown, change your `ebpf.conf`.
+If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your [`ebpf.conf`](/collectors/ebpf.plugin/README.md#ebpf-programs) file to ensure the eBPF program is enabled.
 
 ## Permissions
 
