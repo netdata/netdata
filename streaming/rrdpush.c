@@ -261,9 +261,13 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
+static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    if (s->version >= VERSION_GAP_FILLING)
+        buffer_sprintf(host->sender->build, " %ld\n", st->last_collected_time.tv_sec);
+    else
+        buffer_strcat(host->sender->build, "\n");
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -319,7 +323,7 @@ void rrdset_done_push(RRDSET *st) {
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
 
-    rrdpush_send_chart_metrics_nolock(st);
+    rrdpush_send_chart_metrics_nolock(st, host->sender);
 
     // signal the sender there are more data
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
