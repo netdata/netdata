@@ -1877,6 +1877,10 @@ netdataDashboard.context = {
         info: 'The usage space in each OSD.'
     },
 
+    'ceph.osd_size': {
+        info: "Each OSD's size"
+    },
+
     'ceph.apply_latency': {
         info: 'Time taken to flush an update in each OSD.'
     },

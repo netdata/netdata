@@ -1321,10 +1321,8 @@ should_install_ebpf() {
   fi
 
   # Check Kernel Config
-  if ! run "${INSTALLER_DIR}"/packaging/installer/check-kernel-config.sh; then
-    run_failed "Kernel unsupported or missing required config"
-    defer_error "Kernel unsupported or missing required config, not installing eBPF collector"
-    return 1
+  if ! run "${INSTALLER_DIR}"/packaging/check-kernel-config.sh; then
+    echo >&2 "Warning: Kernel unsupported or missing required config (eBPF may not work on your system)"
   fi
 
   return 0

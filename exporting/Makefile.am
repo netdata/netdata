@@ -23,3 +23,7 @@ dist_noinst_DATA = \
     TIMESCALE.md \
     WALKTHROUGH.md \
     $(NULL)
+
+dist_noinst_SCRIPTS = \
+    nc-exporting.sh \
+    $(NULL)

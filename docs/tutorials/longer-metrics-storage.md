@@ -11,8 +11,7 @@ long term?
 
 Many people think Netdata can only store about an hour's worth of real-time metrics, but that's simply not true any
 more. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of historical,
-per-second metrics without having to rely on a [backend](/backends/README.md) or [exporting
-connector](/exporting/README.md).
+per-second metrics without having to rely on an [exporting engine](/exporting/README.md).
 
 This tutorial gives two options for configuring Netdata to store more metrics. **We recommend the default [database
 engine](#using-the-database-engine)**, but you can stick with or switch to the round-robin database if you prefer.

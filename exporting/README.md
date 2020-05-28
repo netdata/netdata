@@ -1,5 +1,5 @@
 <!--
-title: "Export metrics to external databases (experimental)"
+title: "Export metrics to external databases"
 description: "With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/README.md
 -->

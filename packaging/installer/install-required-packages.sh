@@ -705,6 +705,7 @@ declare -A pkg_libuuid_dev=(
   ['alpine']="util-linux-dev"
   ['arch']="util-linux"
   ['centos']="libuuid-devel"
+  ['clearlinux']="devpkg-util-linux"
   ['debian']="uuid-dev"
   ['gentoo']="sys-apps/util-linux"
   ['sabayon']="sys-apps/util-linux"
@@ -1676,7 +1677,7 @@ What to do now:
   3. Let us know. We may be able to help.
      Open a github issue with the above log, at:
 
-           https://github.com/firehol/netdata/issues
+           https://github.com/netdata/netdata/issues
 
 
 EOF

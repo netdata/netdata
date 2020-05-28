@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 
 #include "../libnetdata.h"
 
@@ -14,7 +15,7 @@ static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netda
     }
 
     char cmd[1024];
-    int length = sprintf(cmd, "-:kprobes/%c_netdata_%s_%s", ptr->type, ptr->name, father_pid);
+    int length = snprintf(cmd, 1023, "-:kprobes/%c_netdata_%s_%s", ptr->type, ptr->name, father_pid);
     int ret = 0;
     if (length > 0) {
         ssize_t written = write(fd, cmd, strlen(cmd));
@@ -91,7 +92,7 @@ int get_kernel_version(char *out, int size) {
 
     fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
     if (fd > size)
-        error("[EBPF]: The buffer to store kernel version is not smaller than necessary.");
+        error("The buffer to store kernel version is not smaller than necessary.");
 
     return ((int)(str2l(major)*65536) + (int)(str2l(minor)*256) + (int)str2l(patch));
 }
@@ -167,4 +168,99 @@ char *ebpf_library_suffix(int version, int isrh) {
     }
 
     return NULL;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
+{
+    char *err = NULL;
+    char lpath[4096];
+    char netdatasl[128];
+    void *libnetdata;
+
+    snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
+    snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
+    libnetdata = dlopen(lpath, RTLD_LAZY);
+    if (!libnetdata) {
+        info("Cannot load library %s for the current kernel.", lpath);
+
+        //Update kernel
+        char *library = ebpf_library_suffix(ef->running_on_kernel, (ef->isrh < 0)?0:1);
+        size_t length = strlen(library);
+        strncpyz(ef->kernel_string, library, length);
+        ef->kernel_string[length] = '\0';
+
+        //Try to load the default version
+        snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
+        snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
+        libnetdata = dlopen(lpath, RTLD_LAZY);
+        if (!libnetdata) {
+            error("Cannot load %s default library.", lpath);
+            return -1;
+        } else {
+            info("Default shared library %s loaded with success.", lpath);
+            ef->libnetdata = libnetdata;
+        }
+    } else {
+        info("Current shared library %s loaded with success.", lpath);
+        ef->libnetdata = libnetdata;
+    }
+
+    ef->load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+    if ((err = dlerror()) != NULL) {
+        error("Cannot find load_bpf_file: %s", err);
+        return -1;
+    }
+
+    ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+    if ((err = dlerror()) != NULL) {
+        error("Cannot find bpf_map_lookup_elem: %s", err);
+        return -1;
+    }
+
+    ef->bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
+    if ((err = dlerror()) != NULL) {
+        error("Cannot find bpf_map_delete_elem: %s", err);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int select_file(char *name, const char *program, size_t length, int mode , char *kernel_string) {
+    int ret = -1;
+    if (!mode)
+        ret = snprintf(name, length, "rnetdata_ebpf_%s.%s.o", program, kernel_string);
+    else if(mode == 1)
+        ret = snprintf(name, length, "dnetdata_ebpf_%s.%s.o", program, kernel_string);
+    else if(mode == 2)
+        ret = snprintf(name, length, "pnetdata_ebpf_%s.%s.o", program, kernel_string);
+
+    return ret;
+}
+
+int ebpf_load_program(char *plugins_dir,
+                      int event_id, int mode ,
+                      char *kernel_string,
+                      const char *name,
+                      int *map_fd,
+                      int (*load_bpf_file)(int *, char *, int))
+{
+    char lpath[4096];
+    char lname[128];
+
+    int test = select_file(lname, name, (size_t)127, mode, kernel_string);
+    if (test < 0 || test > 127)
+        return -1;
+
+    snprintf(lpath, 4096, "%s/%s", plugins_dir,  lname);
+    if (load_bpf_file(map_fd, lpath, event_id)) {
+        error("Cannot load program: %s", lpath);
+        return -1;
+    } else {
+        info("The eBPF program %s was loaded with success.", name);
+    }
+
+    return 0;
 }
