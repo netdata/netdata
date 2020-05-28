@@ -557,6 +557,7 @@ static int rrdpush_receive(int fd
         info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", host->hostname, client_ip, client_port);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
+    debug(D_STREAM, "Initial response to %s: %s", client_ip, initial_response);
     #ifdef ENABLE_HTTPS
     host->stream_ssl.conn = ssl->conn;
     host->stream_ssl.flags = ssl->flags;

@@ -628,8 +628,9 @@ void *rrdpush_sender_thread(void *ptr) {
             fds[Socket].events = POLLIN;
         }
 
-        debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer chunk %zu bytes)...", outstanding);
         int retval = poll(fds, 2, 1000);
+        debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
+              fds[Collector].revents, fds[Socket].revents, outstanding);
         if(unlikely(netdata_exit)) break;
 
         // Spurious wake-ups without error - loop again
