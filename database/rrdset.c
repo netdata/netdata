@@ -402,7 +402,7 @@ void rrdset_save(RRDSET *st) {
     }
 }
 
-void rrdset_delete(RRDSET *st) {
+void rrdset_delete_custom(RRDSET *st, int db_rotated) {
     RRDDIM *rd;
 
     rrdset_check_rdlock(st);
@@ -425,7 +425,7 @@ void rrdset_delete(RRDSET *st) {
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
+    if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
         aclk_del_collector(st->rrdhost->hostname, st->plugin_name, st->module_name);
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
     }

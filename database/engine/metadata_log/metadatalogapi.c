@@ -178,7 +178,7 @@ void metalog_commit_delete_chart(RRDSET *st)
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
     uuid_unparse_lower(*st->chart_uuid, uuid_str);
-    buffer_sprintf(buffer, "TOMBSTONE %s\n", st->id);
+    buffer_sprintf(buffer, "TOMBSTONE %s\n", uuid_str);
 
     metalog_commit_creation_record(ctx, buffer);
 }
@@ -303,6 +303,7 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     return rd;
 }
 
+/* This function is called by dbengine rotation logic when the metric has no writers */
 void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
     RRDDIM *rd;
@@ -321,15 +322,18 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     st = rd->rrdset;
     host = st->rrdhost;
 
+    /* Since the metric has no writer it will not be commited to the metadata log by rrddim_free_custom().
+     * It must be commited explicitly before calling rrddim_free_custom(). */
     metalog_commit_delete_dimension(rd);
 
     rrdset_wrlock(st);
-    rrddim_free_custom(st, rd, 0);
+    rrddim_free_custom(st, rd, 1);
     empty_chart = (NULL == st->dimensions);
     rrdset_unlock(st);
 
     if (empty_chart) {
         rrdhost_wrlock(host);
+        rrdset_delete_custom(st, 1);
         rrdset_free(st);
         rrdhost_unlock(host);
     }

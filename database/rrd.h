@@ -1127,8 +1127,8 @@ extern avl_tree_lock rrdhost_root_index;
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section);
 
-#define rrddim_free(st, rd) rrddim_free_custom(st, rd, 1)
-extern void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int use_aclk);
+#define rrddim_free(st, rd) rrddim_free_custom(st, rd, 0)
+extern void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated);
 
 extern int rrddim_compare(void* a, void* b);
 extern int rrdset_compare(void* a, void* b);
@@ -1145,7 +1145,8 @@ extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
-extern void rrdset_delete(RRDSET *st);
+#define rrdset_delete(st) rrdset_delete_custom(st, 0)
+extern void rrdset_delete_custom(RRDSET *st, int db_rotated);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
