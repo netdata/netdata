@@ -312,7 +312,13 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     RRDHOST *host;
     uint8_t empty_chart;
 
-    rd = metalog_get_dimension_from_uuid(ctx,metric_uuid);
+    rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
+    if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
+        uuid_t multihost_uuid;
+
+        rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->host->machine_guid, metric_uuid, &multihost_uuid);
+        rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
+    }
     assert(rd);
     st = rd->rrdset;
     host = st->rrdhost;

@@ -421,7 +421,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         goto destroy;
     }
     --page_index->page_count;
-    if (!--page_index->writers && !page_index->page_count) {
+    if (!page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;
         if (metric_id) {
             memcpy(metric_id, page_index->id, sizeof(uuid_t));
