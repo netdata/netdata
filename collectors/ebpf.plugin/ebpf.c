@@ -529,14 +529,16 @@ static void read_collector_values() {
     int disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "process", 1);
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                             ebpf_modules[0].config_name, 1);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(0, disable_apps);
         started++;
     }
 
-    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", 1);
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                    ebpf_modules[1].config_name, 1);
     if (enabled) {
         ebpf_enable_chart(1, disable_apps);
         started++;
