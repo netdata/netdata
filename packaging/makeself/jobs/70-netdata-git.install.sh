@@ -16,6 +16,9 @@ fi
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
 export IS_NETDATA_STATIC_BINARY="yes"
 
+# Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
+export EBPF_LIBC="static"
+
 run ./netdata-installer.sh \
   --install "${NETDATA_INSTALL_PARENT}" \
   --dont-wait \
