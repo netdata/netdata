@@ -3050,27 +3050,27 @@ netdataDashboard.context = {
     // eBPF
 
     'ebpf.tcp_functions': {
-        info: 'TCP functions shows the number of calls for functions \'tcp_sendmsg\', \'tcp_cleanup_rbuf\' and \'tcp_close\' independent of the return to be success or fail.'
+        info: 'TCP functions shows the number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code> independent of the return to be success or fail.'
     },
 
     'ebpf.tcp_bandwidth': {
-        info: 'TCP functions shows the number of bytes sent and received for functions \'tcp_sendmsg\' and \'tcp_cleanup_rbuf\''
+        info: 'TCP functions shows the number of bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
     },
 
     'ebpf.tcp_error': {
-        info: 'TCP functions shows the number of calls that returned negative values for functions \'tcp_sendmsg\' and \'tcp_cleanup_rbuf\' and \'tcp_close\'.'
+        info: 'TCP functions shows the number of calls that returned negative values for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
     },
 
     'ebpf.udp_functions': {
-        info: 'UDP functions shows the number of calls for functions \'udp_sendmsg\' and \'udp_recvmsg\' independent of the return to be success or fail.'
+        info: 'UDP functions shows the number of calls for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code> independent of the return to be success or fail.'
     },
 
     'ebpf.udp_bandwidth': {
-        info: 'UDP functions shows the number of bytes sent and received for functions \'udp_sendmsg\' and \'udp_recvmsg\''
+        info: 'UDP functions shows the number of bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
     },
 
     'ebpf.file_descriptor': {
-        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function \'do_sys_open\', that is the common function called from open(2) and openat(2). The close dimension is attached to the function \'__close_fd\', that is called from system call close(2).'
+        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, that is the common function called from open(2) and openat(2). The close dimension is attached to the function <code>__close_fd</code>, that is called from system call close(2).'
     },
 
     'ebpf.file_error': {
@@ -3078,27 +3078,27 @@ netdataDashboard.context = {
     },
 
     'ebpf.deleted_objects': {
-        info: 'Deleted objects monitors calls to the function \'vfs_unlink\'. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
+        info: 'Deleted objects monitors calls to the function <code>vfs_unlink</code>. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
     },
 
     'ebpf.io': {
-        info: 'IO shows the number of calls for functions \'vfs_read\' and \'vfs_write\' independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
+        info: 'IO shows the number of calls for functions <code>vfs_read</code> and <code>vfs_write</code> independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
     },
 
     'ebpf.io_bytes': {
-        info: 'IO bytes shows the total of bytes read or written with success using the functions  \'vfs_read\' and \'vfs_write\'.'
+        info: 'IO bytes shows the total of bytes read or written with success using the functions  <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
     'ebpf.io_error': {
-        info: 'IO error shows the number of calls for \'vfs_read\' and \'vfs_write\' that did not have success.'
+        info: 'IO error shows the number of calls for <code>vfs_read</code> and <code>vfs_write</code> that did not have success.'
     },
 
     'ebpf.process_thread': {
-        info: 'Process thread counts the number of times that the function \'do_fork\' was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for \'sys_clone\' that has the flag \'CLONE_THREAD\' set.'
+        info: 'Process thread counts the number of times that the function <code>do_fork</code> was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
-        info: 'Exit count the number of calls for the functions responsible to close (\'do_exit\') and release(\'release_task\') tasks.'
+        info: 'Exit count the number of calls for the functions responsible to close (<code>do_exit</code>) and release(<code>release_task</code>) tasks.'
     },
 
     'ebpf.task_error': {
