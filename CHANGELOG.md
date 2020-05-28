@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- Fix missing ebpf packaging files from dist archive [\#9182](https://github.com/netdata/netdata/pull/9182) ([prologic](https://github.com/prologic))
+- cov\_358988: Remove coverity bug [\#9180](https://github.com/netdata/netdata/pull/9180) ([thiagoftsm](https://github.com/thiagoftsm))
+- Remove knatsakis and ncmans from CODEOWNERS for the agent. [\#9173](https://github.com/netdata/netdata/pull/9173) ([Ferroin](https://github.com/Ferroin))
 - Remove the experimental label from the exporting engine documentation [\#9171](https://github.com/netdata/netdata/pull/9171) ([vlvkobal](https://github.com/vlvkobal))
 - Revert "Introduce a random sleep in the Netdata updater" [\#9161](https://github.com/netdata/netdata/pull/9161) ([prologic](https://github.com/prologic))
 - Fixed bug in accepting empty lines in parser [\#9158](https://github.com/netdata/netdata/pull/9158) ([stelfrag](https://github.com/stelfrag))
 - Fixed coverity warning \(CID 358971\) [\#9157](https://github.com/netdata/netdata/pull/9157) ([stelfrag](https://github.com/stelfrag))
 - Update README.md [\#9151](https://github.com/netdata/netdata/pull/9151) ([stephenrauch](https://github.com/stephenrauch))
 - fix typo in step-03.md [\#9150](https://github.com/netdata/netdata/pull/9150) ([waybeforenow](https://github.com/waybeforenow))
+- Fix error \> emerge openssl-devel [\#9141](https://github.com/netdata/netdata/pull/9141) ([vsc55](https://github.com/vsc55))
 - Revert "Fix macOS builds building and linking against openssl" [\#9137](https://github.com/netdata/netdata/pull/9137) ([prologic](https://github.com/prologic))
 - Fix docs CI to handle absolute links between docs [\#9132](https://github.com/netdata/netdata/pull/9132) ([joelhans](https://github.com/joelhans))
 - Check update interval for exporting connector instance [\#9131](https://github.com/netdata/netdata/pull/9131) ([vlvkobal](https://github.com/vlvkobal))
@@ -241,11 +245,6 @@
 - Memory leak with labels on stream [\#8460](https://github.com/netdata/netdata/pull/8460) ([thiagoftsm](https://github.com/thiagoftsm))
 - Report ACLK Connection Failure [\#8456](https://github.com/netdata/netdata/pull/8456) ([underhood](https://github.com/underhood))
 - Fix syntax error in claiming script. [\#8452](https://github.com/netdata/netdata/pull/8452) ([mfundul](https://github.com/mfundul))
-- Improve installer output re newlines [\#8447](https://github.com/netdata/netdata/pull/8447) ([prologic](https://github.com/prologic))
-- Fix erroneous \n printed in uninstaller [\#8446](https://github.com/netdata/netdata/pull/8446) ([prologic](https://github.com/prologic))
-- Fixes support for uninstalling the eBPF collector in the uninstaller and fixes a minor bug [\#8444](https://github.com/netdata/netdata/pull/8444) ([prologic](https://github.com/prologic))
-- Fix the ACLK installation with the installer switch [\#8443](https://github.com/netdata/netdata/pull/8443) ([amoss](https://github.com/amoss))
-- Add high precision timer support for plugins such as idlejitter. [\#8441](https://github.com/netdata/netdata/pull/8441) ([mfundul](https://github.com/mfundul))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
