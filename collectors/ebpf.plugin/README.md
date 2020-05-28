@@ -197,7 +197,7 @@ sudo mount -t tracefs nodev /sys/kernel/tracing
 ```
 
 If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to
-mount these filesystems on startup.
+mount these filesystems on startup. More information can be found [here](https://www.kernel.org/doc/Documentation/trace/ftrace.txt).
 
 ## Performance
 
