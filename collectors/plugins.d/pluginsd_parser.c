@@ -20,9 +20,10 @@ PARSER_RC pluginsd_flush_action(void *user, RRDSET *st)
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations)
+PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, time_t remote_time, int trust_durations)
 {
     UNUSED(user);
+    info("Slew time: %ld", remote_time - st->last_collected_time.tv_sec);
     if (likely(st->counter_done)) {
         if (likely(microseconds)) {
             if (trust_durations)
@@ -218,6 +219,7 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
 {
     char *id = words[1];
     char *microseconds_txt = words[2];
+    char *remote_time_txt = words[3];
 
     RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
@@ -238,8 +240,13 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
     if (microseconds_txt && *microseconds_txt)
         microseconds = str2ull(microseconds_txt);
 
+    time_t remote_time = 0;
+    if (remote_time_txt && *remote_time_txt)
+        remote_time = str2ull(remote_time_txt);
+
     if (plugins_action->begin_action) {
-        return plugins_action->begin_action(user, st, microseconds, ((PARSER_USER_OBJECT *)user)->trust_durations);
+        return plugins_action->begin_action(user, st, microseconds, remote_time,
+                                            ((PARSER_USER_OBJECT *)user)->trust_durations);
     }
     return PARSER_RC_OK;
 disable:
