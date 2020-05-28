@@ -1493,3 +1493,18 @@ int alarm_compare_name(void *a, void *b) {
 
     return strcmp(in1->name,in2->name);
 }
+
+// Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
+// the last entry times as the metric updates, but let's see if it is a problem first.
+time_t rrdhost_last_entry_t(RRDHOST *h) {
+    rrdhost_rdlock(h);
+    RRDSET *st;
+    time_t result = 0;
+    rrdset_foreach_read(st, h) {
+        time_t st_last = rrdset_last_entry_t(st);
+        if (st_last > result)
+            result = st_last;
+    }
+    rrdhost_unlock(h);
+    return result;
+}

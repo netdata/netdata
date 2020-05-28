@@ -62,6 +62,28 @@ struct sender_state {
     int32_t version;
 };
 
+struct rrdpush_thread {
+    int fd;
+    char *key;
+    char *hostname;
+    char *registry_hostname;
+    char *machine_guid;
+    char *os;
+    char *timezone;
+    char *tags;
+    char *client_ip;
+    char *client_port;
+    char *program_name;
+    char *program_version;
+    struct rrdhost_system_info *system_info;
+    int update_every;
+    uint32_t stream_version;
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl ssl;
+#endif
+};
+
+
 extern unsigned int default_rrdpush_enabled;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
@@ -82,5 +104,6 @@ extern int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, ch
 extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
+extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 
 #endif //NETDATA_RRDPUSH_H
