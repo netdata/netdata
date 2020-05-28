@@ -351,12 +351,16 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
-    pthread_mutex_lock(&lock);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    fill_ebpf_functions(&socket_functions);
+
+    if (!em->enabled)
+        goto endsocket;
+
+    pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
 
-    fill_ebpf_functions(&socket_functions);
     if (ebpf_load_libraries(&socket_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         goto endsocket;

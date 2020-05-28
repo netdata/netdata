@@ -479,13 +479,16 @@ static void set_local_pointers(ebpf_module_t *em) {
 void *ebpf_process_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
-    pthread_mutex_lock(&lock);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    fill_ebpf_functions(&process_functions);
 
+    if (!em->enabled)
+        goto endprocess;
+
+    pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_MAX_MONITOR_VECTOR);
 
-    fill_ebpf_functions(&process_functions);
     if (ebpf_load_libraries(&process_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         goto endprocess;

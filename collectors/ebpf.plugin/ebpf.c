@@ -466,6 +466,137 @@ void ebpf_print_help() {
  *****************************************************************/
 
 /**
+ * Fill the ebpf_functions structure with default values
+ *
+ * @param ef the pointer to set default values
+ */
+void fill_ebpf_functions(ebpf_functions_t *ef) {
+    memset(ef, 0, sizeof(ebpf_functions_t));
+    ef->kernel_string = kernel_string;
+    ef->running_on_kernel = running_on_kernel;
+    ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
+    ef->isrh = isrh;
+}
+
+/**
+ * Define how to load the ebpf programs
+ *
+ * @param ptr the option given by users
+ */
+static inline void how_to_load(char *ptr)
+{
+    if (!strcasecmp(ptr, "return"))
+        ebpf_set_thread_mode(MODE_RETURN);
+    else if (!strcasecmp(ptr, "entry"))
+        ebpf_set_thread_mode(MODE_ENTRY);
+    else
+        error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
+}
+
+/**
+ * Parse disable apps option
+ *
+ * @param ptr the option given by users
+ *
+ * @return It returns 1 to disable the charts or 0 otherwise.
+ */
+static inline int parse_disable_apps(char *ptr)
+{
+    if (!strcasecmp(ptr, "yes")) {
+        ebpf_disable_apps();
+        return 1;
+    } else if (strcasecmp(ptr, "no")) {
+        error("The option %s for \"disable apps\" is not a valid option.", ptr);
+    }
+
+    return 0;
+}
+
+/**
+ * Read collector values
+ */
+static void read_collector_values() {
+    // Read global section
+    char *value;
+    if (appconfig_exists(&collector_config,  EBPF_GLOBAL_SECTION, "load")) //Backward compatibility
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load", "entry");
+    else
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
+
+    how_to_load(value);
+
+    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", "no");
+    int disable_apps = parse_disable_apps(value);
+
+    // Read ebpf programs section
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "process", 1);
+    int started = 0;
+    if (enabled) {
+        ebpf_enable_chart(0, disable_apps);
+        started++;
+    }
+
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", 1);
+    if (enabled) {
+        ebpf_enable_chart(1, disable_apps);
+        started++;
+    }
+
+    if (!started)
+        ebpf_enable_all_charts(disable_apps);
+
+}
+
+/**
+ * Load collector config
+ *
+ * @param path the path where the file ebpf.conf is stored.
+ *
+ * @return 0 on success and -1 otherwise.
+ */
+static int load_collector_config(char *path) {
+    char lpath[4096];
+
+    snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf" );
+
+    if (!appconfig_load(&collector_config, lpath, 0, NULL))
+        return -1;
+
+    read_collector_values();
+
+    return 0;
+}
+
+/**
+ * Set global variables reading environment variables
+ */
+void set_global_variables() {
+    //Get environment variables
+    ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+    if(!ebpf_plugin_dir)
+        ebpf_plugin_dir = PLUGINS_DIR;
+
+    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(!user_config_dir)
+        user_config_dir = CONFIG_DIR;
+
+    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(!stock_config_dir)
+        stock_config_dir = LIBCONFIG_DIR;
+
+    netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
+    if(!netdata_configured_log_dir)
+        netdata_configured_log_dir = LOG_DIR;
+
+    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {
+        ebpf_nprocs = NETDATA_MAX_PROCESSOR;
+    }
+
+    isrh = get_redhat_release();
+}
+
+/**
  * Parse arguments given from user.
  *
  * @param argc the number of arguments
@@ -558,6 +689,18 @@ static void parse_args(int argc, char **argv)
         update_every = freq;
     }
 
+    if (load_collector_config(user_config_dir)) {
+        error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
+              user_config_dir);
+        if (load_collector_config(stock_config_dir)) {
+            error("Does not have a stock file. It is starting with default options.");
+        } else {
+            enabled = 1;
+        }
+    } else {
+        enabled = 1;
+    }
+
     if (!enabled) {
         ebpf_enable_all_charts(disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -566,136 +709,6 @@ static void parse_args(int argc, char **argv)
     }
 }
 
-/**
- * Fill the ebpf_functions structure with default values
- *
- * @param ef the pointer to set default values
- */
-void fill_ebpf_functions(ebpf_functions_t *ef) {
-    memset(ef, 0, sizeof(ebpf_functions_t));
-    ef->kernel_string = kernel_string;
-    ef->running_on_kernel = running_on_kernel;
-    ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
-    ef->isrh = isrh;
-}
-
-/**
- * Define how to load the ebpf programs
- *
- * @param ptr the option given by users
- */
-static inline void how_to_load(char *ptr)
-{
-    if (!strcasecmp(ptr, "return"))
-        ebpf_set_thread_mode(MODE_RETURN);
-    else if (!strcasecmp(ptr, "entry"))
-        ebpf_set_thread_mode(MODE_ENTRY);
-    else
-        error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
-}
-
-/**
- * Parse disable apps option
- *
- * @param ptr the option given by users
- *
- * @return It returns 1 to disable the charts or 0 otherwise.
- */
-static inline int parse_disable_apps(char *ptr)
-{
-    if (!strcasecmp(ptr, "yes")) {
-        ebpf_disable_apps();
-        return 1;
-    } else if (strcasecmp(ptr, "no")) {
-        error("The option %s for \"disable apps\" is not a valid option.", ptr);
-    }
-
-    return 0;
-}
-
-/**
- * Read collector values
- */
-static void read_collector_values() {
-    // Read global section
-    char *value;
-    if (appconfig_exists(&collector_config,  EBPF_GLOBAL_SECTION, "load")) //Backward compatibility
-        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load", "entry");
-    else
-        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
-
-    how_to_load(value);
-
-    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", "no");
-    int disable_apps = parse_disable_apps(value);
-
-    // Read ebpf programs section
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "programs", 1);
-    int started = 0;
-    if (enabled) {
-        ebpf_enable_chart(0, disable_apps);
-        started++;
-    }
-
-    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", 1);
-    if (enabled) {
-        ebpf_enable_chart(1, disable_apps);
-        started++;
-    }
-
-    if (!started)
-        ebpf_enable_all_charts(disable_apps);
-
-}
-
-/**
- * Load collector config
- *
- * @param path the path where the file ebpf.conf is stored.
- *
- * @return 0 on success and -1 otherwise.
- */
-static int load_collector_config(char *path) {
-    char lpath[4096];
-
-    snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf" );
-
-    if (!appconfig_load(&collector_config, lpath, 0, NULL))
-        return -1;
-
-    read_collector_values();
-
-    return 0;
-}
-
-/**
- * Set global variables reading environment variables
- */
-void set_global_variables() {
-    //Get environment variables
-    ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
-    if(!ebpf_plugin_dir)
-        ebpf_plugin_dir = PLUGINS_DIR;
-
-    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if(!user_config_dir)
-        user_config_dir = CONFIG_DIR;
-
-    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if(!stock_config_dir)
-        stock_config_dir = LIBCONFIG_DIR;
-
-    netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if(!netdata_configured_log_dir)
-        netdata_configured_log_dir = LOG_DIR;
-
-    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {
-        ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-    }
-
-    isrh = get_redhat_release();
-}
 
 /*****************************************************************
  *
@@ -713,6 +726,7 @@ void set_global_variables() {
  */
 int main(int argc, char **argv)
 {
+    set_global_variables();
     parse_args(argc, argv);
 
     running_on_kernel =  get_kernel_version(kernel_string, 63);
@@ -737,17 +751,6 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    set_global_variables();
-
-    if (load_collector_config(user_config_dir)) {
-        error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
-             user_config_dir);
-        if (load_collector_config(stock_config_dir)) {
-            error("Does not have a stock file. It is starting with default options.");
-        }
-    }
-
-    /*
     signal(SIGINT, ebpf_exit);
     signal(SIGTERM, ebpf_exit);
 
@@ -784,7 +787,6 @@ int main(int argc, char **argv)
 
     thread_finished++;
     ebpf_exit(0);
-     */
 
     return 0;
 }
