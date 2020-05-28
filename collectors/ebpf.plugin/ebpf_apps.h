@@ -306,6 +306,55 @@ struct target {
     struct target *next;
 };
 
+// ----------------------------------------------------------------------------
+// Structures used to read information from kernel ring
+typedef struct ebpf_process_stat {
+    uint64_t pid_tgid;
+    uint32_t pid;
+
+    //Counter
+    uint32_t open_call;
+    uint32_t write_call;
+    uint32_t writev_call;
+    uint32_t read_call;
+    uint32_t readv_call;
+    uint32_t unlink_call;
+    uint32_t exit_call;
+    uint32_t release_call;
+    uint32_t fork_call;
+    uint32_t clone_call;
+    uint32_t close_call;
+
+    //Accumulator
+    uint64_t write_bytes;
+    uint64_t writev_bytes;
+    uint64_t readv_bytes;
+    uint64_t read_bytes;
+
+    //Counter
+    uint32_t open_err;
+    uint32_t write_err;
+    uint32_t writev_err;
+    uint32_t read_err;
+    uint32_t readv_err;
+    uint32_t unlink_err;
+    uint32_t fork_err;
+    uint32_t clone_err;
+    uint32_t close_err;
+} ebpf_process_stat_t;
+
+typedef struct ebpf_bandwidth {
+    uint64_t first;                 //First timestamp
+    uint64_t ct;                    //Last timestamp
+    uint64_t sent;                  //Bytes sent
+    uint64_t received;              //Bytes received
+    unsigned char removed;          //Remove the PID from table
+} ebpf_bandwidth_t;
+
+// ----------------------------------------------------------------------------
+// Exported Functions
+//
+
 extern int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
                                       struct target **apps_groups_root_target, const char *path, const char *file);
 
