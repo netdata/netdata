@@ -3091,7 +3091,7 @@ netdataDashboard.context = {
 
     'ebpf.io': {
         title : 'VFS IO',
-        info: 'IO shows the number of calls for functions <code>vfs_read</code> and <code>vfs_write</code>,  whether they return successfully or fail. Like the chart \'deleted_objects\', this chart will not show events if the file system uses other functions to store data on disk.'
+        info: 'IO shows the number of calls for functions <code>vfs_read</code> and <code>vfs_write</code>, whether they return successfully or fail. As with the chart \'deleted_objects\', this chart will not show events if the file system uses other functions to store data on disk.'
     },
 
     'ebpf.io_bytes': {
