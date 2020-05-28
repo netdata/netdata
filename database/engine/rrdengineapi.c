@@ -88,9 +88,9 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
         if (NULL == PValue) {
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &legacy_uuid, sizeof(uuid_t), PJE0);
+            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t), PJE0);
             assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(&legacy_uuid);
+            *PValue = page_index = create_page_index(rd->state->metric_uuid);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
