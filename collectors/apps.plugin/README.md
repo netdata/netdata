@@ -68,12 +68,12 @@ Each of these sections provides the same number of charts:
     -   Number of calls to open files.
     -   Number of files closed.
     -   Number of calls to delete files.
-    -   Number of calls to vfs_write.
-    -   Number of calls to vfs_read.
-    -   Number of bytes written trough vfs_write
-    -   Number of bytes read trough vfs_read
-    -   Number of process created trough do_fork
-    -   Number of threads created trough do_fork or __x86_64_sys_clone depending of kernel version
+    -   Number of calls to `vfs_write`.
+    -   Number of calls to `vfs_read`.
+    -   Number of bytes written trough `vfs_write`
+    -   Number of bytes read trough `vfs_read`
+    -   Number of process created trough `do_fork`
+    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone` depending of kernel version
     -   Number of times that a process called do_exit 
     -   Number of calls to open files that returned errors.
     -   Number of calls to close files that returned errors
