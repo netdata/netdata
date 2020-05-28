@@ -608,6 +608,10 @@ void *rrdpush_sender_thread(void *ptr) {
             attempt_to_connect(s);
             s->overflow = 0;
             s->read_len = 0;
+            time_t now = now_realtime_sec();
+            sender_start(s);
+            buffer_sprintf(s->build, "TIMESTAMP %ld", now);
+            sender_commit(s);
             continue;
         }
 

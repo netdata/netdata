@@ -33,6 +33,67 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     }
 }
 
+#include "../collectors/plugins.d/pluginsd_parser.h"
+
+PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(plugins_action);
+    char *remote_time_txt = words[1];
+    time_t remote_time = 0;
+    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
+    struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
+    if (remote_time_txt && *remote_time_txt) {
+        remote_time = str2ull(remote_time_txt);
+        time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
+        info("STREAM %s [%s]: Remote timestamp %ld. Previous %ld. Local %ld.", host->hostname, cd->cmd, remote_time, 
+             prev, now);
+        if (prev == 0)
+            info("First connection - no gap check");
+        else
+            info("Gap size = %ld-sec, Slew = %ld", now - prev, now - remote_time);
+        return PARSER_RC_OK;
+    }
+    return PARSER_RC_ERROR;
+}
+
+size_t streaming_parser(RRDHOST *host, struct plugind *cd, FILE *fp) {
+    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
+    ((PARSER_USER_OBJECT *) user)->enabled = cd->enabled;
+    ((PARSER_USER_OBJECT *) user)->host = host;
+    ((PARSER_USER_OBJECT *) user)->cd = cd;
+    ((PARSER_USER_OBJECT *) user)->trust_durations = 0;
+
+    PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT);
+    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
+
+    if (unlikely(!parser)) {
+        error("Failed to initialize parser");
+        cd->serial_failures++;
+        return 0;
+    }
+
+    parser->plugins_action->begin_action     = &pluginsd_begin_action;
+    parser->plugins_action->flush_action     = &pluginsd_flush_action;
+    parser->plugins_action->end_action       = &pluginsd_end_action;
+    parser->plugins_action->disable_action   = &pluginsd_disable_action;
+    parser->plugins_action->variable_action  = &pluginsd_variable_action;
+    parser->plugins_action->dimension_action = &pluginsd_dimension_action;
+    parser->plugins_action->label_action     = &pluginsd_label_action;
+    parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
+    parser->plugins_action->chart_action     = &pluginsd_chart_action;
+    parser->plugins_action->set_action       = &pluginsd_set_action;
+
+    user->parser = parser;
+
+    while (likely(!parser_next(parser))) {
+        if (unlikely(netdata_exit || parser_action(parser,  NULL)))
+            break;
+    }
+    info("PARSER ended");
+    return ((PARSER_USER_OBJECT *) user)->count;
+}
+
+
 static int rrdpush_receive(int fd
                            , const char *key
                            , const char *hostname
@@ -268,7 +329,8 @@ static int rrdpush_receive(int fd
         info("STREAM %s [receive from [%s]:%s]: Checking for gaps... %d", host->hostname, client_ip, client_port, ret);
     }
 
-    size_t count = pluginsd_process(host, &cd, fp, 1);
+    size_t count = streaming_parser(host, &cd, fp);
+    //size_t count = pluginsd_process(host, &cd, fp, 1);
 
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", host->hostname, client_ip, client_port, count);
