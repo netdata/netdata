@@ -132,7 +132,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_TCP_FUNCTION_COUNT
         , "Calls"
         , NETDATA_SOCKET_GROUP
-        , 950
+        , 21070
         , ebpf_create_global_dimension
         , socket_publish_aggregated
         , 3);
@@ -141,7 +141,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_TCP_FUNCTION_BYTES
         , "bytes/s"
         , NETDATA_SOCKET_GROUP
-        , 951
+        , 21071
         , ebpf_create_global_dimension
         , socket_publish_aggregated
         , 3);
@@ -151,7 +151,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_TCP_FUNCTION_ERROR
             , "Calls"
             , NETDATA_SOCKET_GROUP
-            , 952
+            , 21072
             , ebpf_create_global_dimension
             , socket_publish_aggregated
             , 2);
@@ -161,7 +161,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_UDP_FUNCTION_COUNT
         , "Calls"
         , NETDATA_SOCKET_GROUP
-        , 953
+        , 21073
         , ebpf_create_global_dimension
         , &socket_publish_aggregated[NETDATA_UDP_START]
         , 2);
@@ -170,7 +170,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_UDP_FUNCTION_BYTES
         , "bytes/s"
         , NETDATA_SOCKET_GROUP
-        , 954
+        , 21074
         , ebpf_create_global_dimension
         , &socket_publish_aggregated[NETDATA_UDP_START]
         , 2);
@@ -180,7 +180,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_UDP_FUNCTION_ERROR
             , "Calls"
             , NETDATA_SOCKET_GROUP
-            , 955
+            , 21075
             , ebpf_create_global_dimension
             , &socket_publish_aggregated[NETDATA_UDP_START]
             , 2);

@@ -293,7 +293,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_FILE_OPEN_CLOSE_COUNT
         , "Calls"
         , NETDATA_FILE_GROUP
-        , 970
+        , 21000
         , ebpf_create_global_dimension
         , process_publish_aggregated
         , 2);
@@ -303,7 +303,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_FILE_OPEN_ERR_COUNT
             , "Calls"
             , NETDATA_FILE_GROUP
-            , 971
+            , 21001
             , ebpf_create_global_dimension
             , process_publish_aggregated
             , 2);
@@ -313,7 +313,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_VFS_FILE_CLEAN_COUNT
         , "Calls"
         , NETDATA_VFS_GROUP
-        , 972
+        , 21002
         , ebpf_create_global_dimension
         , &process_publish_aggregated[NETDATA_DEL_START]
         , 1);
@@ -322,7 +322,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_VFS_FILE_IO_COUNT
         , "Calls"
         , NETDATA_VFS_GROUP
-        , 973
+        , 21003
         , ebpf_create_global_dimension
         , &process_publish_aggregated[NETDATA_IN_START_BYTE]
         , 2);
@@ -332,13 +332,13 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
             , NETDATA_VFS_IO_FILE_BYTES
             , "bytes/s"
             , NETDATA_VFS_GROUP
-            , 974);
+            , 21004);
 
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_ERR_COUNT
             , "Calls"
             , NETDATA_VFS_GROUP
-            , 975
+            , 21005
             , ebpf_create_global_dimension
             , &process_publish_aggregated[2]
             , NETDATA_VFS_ERRORS);
@@ -349,7 +349,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_PROCESS_SYSCALL
         , "Calls"
         , NETDATA_PROCESS_GROUP
-        , 976
+        , 21006
         , ebpf_create_global_dimension
         , &process_publish_aggregated[NETDATA_PROCESS_START]
         , 2);
@@ -358,7 +358,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_EXIT_SYSCALL
         , "Calls"
         , NETDATA_PROCESS_GROUP
-        , 977
+        , 21007
         , ebpf_create_global_dimension
         , &process_publish_aggregated[NETDATA_EXIT_START]
         , 2);
@@ -367,14 +367,14 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
         , NETDATA_PROCESS_STATUS_NAME
         , "Total"
         , NETDATA_PROCESS_GROUP
-        , 978);
+        , 21008);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_PROCESS_ERROR_NAME
             , "Calls"
             , NETDATA_PROCESS_GROUP
-            , 979
+            , 21009
             , ebpf_create_global_dimension
             , &process_publish_aggregated[NETDATA_PROCESS_START]
             , 2);
