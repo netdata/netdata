@@ -488,6 +488,7 @@ int ret;
         s->read_len += ret;
         return;
     }
+    debug(D_STREAM, "Socket was POLLIN, but req %zu bytes gave %d", sizeof(s->read_buffer) - s->read_len - 1, ret);
     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
         return;
     error("STREAM %s [send to %s]: error during read (%d). Restarting connection", s->host->hostname, s->connected_to,
