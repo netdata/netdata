@@ -278,7 +278,8 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
 
     ret = find_object_by_guid(metric_uuid, dim_object, 49);
-    assert(GUID_TYPE_DIMENSION == ret);
+    if (GUID_TYPE_DIMENSION != ret) /* not found */
+        return NULL;
 
     machine_guid = (uuid_t *)dim_object;
     uuid_unparse_lower(*machine_guid, id_str);
