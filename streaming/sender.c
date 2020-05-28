@@ -484,15 +484,18 @@ int ret;
 #endif
     ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,
                MSG_DONTWAIT);
-    if (ret>=0) {
+    if (ret>0) {
         s->read_len += ret;
         return;
     }
     debug(D_STREAM, "Socket was POLLIN, but req %zu bytes gave %d", sizeof(s->read_buffer) - s->read_len - 1, ret);
-    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+    if (ret<0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
         return;
-    error("STREAM %s [send to %s]: error during read (%d). Restarting connection", s->host->hostname, s->connected_to,
-          ret);
+    if (ret==0)
+        error("STREAM %s [send to %s]: connection closed by far end. Restarting connection", s->host->hostname, s->connected_to);
+    else
+        error("STREAM %s [send to %s]: error during read (%d). Restarting connection", s->host->hostname, s->connected_to,
+              ret);
     rrdpush_sender_thread_close_socket(s->host);
 }
 
@@ -636,8 +639,10 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // Spurious wake-ups without error - loop again
         if (retval == 0 || ((retval == -1) && (errno == EAGAIN || errno == EINTR)))
+        {
+            debug(D_STREAM, "Spurious wakeup");
             continue;
-
+        }
         // Only errors from poll() are internal, but try restarting the connection
         if(unlikely(retval == -1)) {
             error("STREAM %s [send to %s]: failed to poll(). Closing socket.", s->host->hostname, s->connected_to);
