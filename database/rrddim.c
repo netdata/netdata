@@ -219,7 +219,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
             if (unlikely(rc)) {
-                rrdset_flag_set(st, RRDSET_FLAG_UPDATE_METADATA);
                 metalog_commit_update_dimension(rd);
             }
 #endif
