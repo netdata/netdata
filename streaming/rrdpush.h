@@ -58,6 +58,7 @@ struct sender_state {
     BUFFER *build;
     char read_buffer[512];
     int read_len;
+    int32_t version;
 };
 
 extern unsigned int default_rrdpush_enabled;

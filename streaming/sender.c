@@ -145,7 +145,9 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
         freez(se->kernel_version);
 }
 
-static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout,
+    struct sender_state *s) {
+
     struct timeval tv = {
             .tv_sec = timeout,
             .tv_usec = 0
@@ -161,9 +163,9 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
             host->rrdpush_send_destination
             , default_port
             , &tv
-            , reconnects_counter
-            , connected_to
-            , connected_to_size
+            , &s->reconnects_counter
+            , s->connected_to
+            , sizeof(s->connected_to)-1
     );
 
     if(unlikely(host->rrdpush_sender_socket == -1)) {
@@ -171,7 +173,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         return 0;
     }
 
-    info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
+    info("STREAM %s [send to %s]: initializing communication...", host->hostname, s->connected_to);
 
 #ifdef ENABLE_HTTPS
     if( netdata_client_ctx ){
@@ -308,12 +310,12 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 #else
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
-        error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", host->hostname, connected_to);
+        error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
 
-    info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
+    info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, s->connected_to);
 
     ssize_t received;
 #ifdef ENABLE_HTTPS
@@ -323,7 +325,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     received = recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
     if(received == -1) {
 #endif
-        error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, connected_to);
+        error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
@@ -357,22 +359,22 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     }
 
     if(version == -1) {
-        error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, connected_to);
+        error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
-    host->stream_version = version;
+    s->version = version;
 
     info("STREAM %s [send to %s]: established communication with a master using protocol version %d - ready to send metrics..."
          , host->hostname
-         , connected_to
+         , s->connected_to
          , version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
+        error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, s->connected_to);
 
     if(sock_enlarge_out(host->rrdpush_sender_socket) < 0)
-        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", host->hostname, connected_to);
+        error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", host->hostname, s->connected_to);
 
     debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_sender_socket);
 
@@ -383,8 +385,7 @@ static void attempt_to_connect(struct sender_state *state)
 {
     state->send_attempts = 0;
 
-    if(rrdpush_sender_thread_connect_to_master(state->host, state->default_port, state->timeout,
-                                     &state->reconnects_counter, state->connected_to, sizeof(state->connected_to)-1)) {
+    if(rrdpush_sender_thread_connect_to_master(state->host, state->default_port, state->timeout, state)) {
         state->last_sent_t = now_monotonic_sec();
 
         // reset the buffer, to properly send charts and metrics
