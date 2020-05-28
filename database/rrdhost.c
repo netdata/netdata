@@ -413,8 +413,19 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
+        // TODO:update_every
+        // TODO: Metdata updated OK: hostname, registry_hostname, tags, os
         host->health_enabled = health_enabled;
         //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
+
+        rrdhost_system_info_free(host->system_info);
+        host->system_info = system_info;
+
+        rrdhost_init_os(host, os);
+        rrdhost_init_timezone(host, timezone);
+
+        freez(host->registry_hostname);
+        host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
         if(strcmp(host->hostname, hostname) != 0) {
             info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", host->hostname, hostname);

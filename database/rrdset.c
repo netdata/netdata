@@ -537,15 +537,11 @@ RRDSET *rrdset_create_custom(
             rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-            st = rrdset_find_on_create(host, fullid);
-            if (st)
-
-                if (unlikely(name))
-                    rrdset_set_name(st, name);
-                else
-                    rrdset_set_name(st, id);
-
-            info("CHART request for updated metadata [%s]", st->id);
+            const char *new_name = name ? name : id;
+            if (unlikely((st->name && !strcmp(st->name, new_name)) || !st->name)) {
+                mark_rebuild = 1;
+                rrdset_set_name(st, new_name);
+            }
 
             if (unlikely(st->priority != priority)) {
                 st->priority = priority;
@@ -623,8 +619,10 @@ RRDSET *rrdset_create_custom(
             rrdhost_unlock(host);
 
 #ifdef ENABLE_DBENGINE
-            if (mark_rebuild)
+            if (mark_rebuild) {
+                debug(D_METADATALOG,"CHART [%s] metadata updated", st->id);
                 metalog_commit_update_chart(st);
+            }
 #endif
              return st;
         }
