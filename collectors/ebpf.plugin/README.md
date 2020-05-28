@@ -51,7 +51,7 @@ and `close(2)`.
 
 #### File error
 
-This charts demonstrate the number of times some software tried and failed to open or close a file descriptor.
+This chart shows the number of times some software tried and failed to open or close a file descriptor.
 
 ### VFS
 
