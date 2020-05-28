@@ -145,10 +145,12 @@ accepts the following values: ​
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
     
-#### disable apps
+#### Integration with `apps.plugin`
 
-Since version 1.23 eBPF also displays information for each application running, if you want to disable these charts change
-the option `disable apps` to `no`.
+The eBPF collector also creates charts for each running application through an integration with the
+[`apps.plugin`](/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
+interact with the Linux kernel.
+If you want to disable these charts, change the setting `disable apps` to `no`.
 
 ```conf
 [global]
@@ -157,14 +159,12 @@ the option `disable apps` to `no`.
 
 ### `[ebpf programs]`
 
-This section lists all ebpf programs available on Netdata. By default, Netdata enables all eBPF programs. 
+The eBPF collector enables and runs the following eBPF programs by default:
 
-The following ebpf programs are available with Netdata:
-
--   `process`: This eBPF program creates charts that show information about process creation, VFS IO, files removed and 
-errors when the previous operations are executed (only in `return` mode).
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, it also brings
-the bandwidth consumed with these functions.
+-   `process`: This eBPF program creates charts that show information about process creation, VFS IO, and files removed.
+    When in `return` mode, it also creates charts showing errors when these operations are executed.
+-   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+    bandwidth consumed by each.
 
 ## Troubleshooting
 
@@ -229,7 +229,3 @@ Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the 
 nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.md), despite collecting and displaying
 much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
 your complex applications at any load.
-
-## Integration with Apps.plugin 
-
-Beginning with v1.23 of the Agent, `ebpf.plugin` integrates with [`apps.plugin`](/collectors/apps.plugin/README.md) to create charts that help you understand how applications interact with the Linux kernel.

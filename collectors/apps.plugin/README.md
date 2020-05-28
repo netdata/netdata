@@ -76,9 +76,9 @@ Each of these sections provides the same number of charts:
     -   Number of threads created trough `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version.
     -   Number of times that a process called `do_exit`. 
     -   Number of calls to open files that returned errors.
-    -   Number of calls to close files that returned errors
-    -   Number of calls to read a file that returned error.
-    -   Number of calls to read a file that returned error.
+    -   Number of calls to close files that returned errors.
+    -   Number of calls to read a file that returned errors.
+    -   Number of calls to read a file that returned errors.
 -   eBPF net
     -   Number of bytes transmited per seconds.    
 
