@@ -3051,7 +3051,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_functions': {
         title : 'TCP calls',
-        info: 'TCP functions shows the number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code> independent of the return to be success or fail.'
+        info: 'TCP functions shows the number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>, whether they return successfully or fail.'
     },
 
     'ebpf.tcp_bandwidth': {
@@ -3066,7 +3066,7 @@ netdataDashboard.context = {
 
     'ebpf.udp_functions': {
         title : 'UDP calls',
-        info: 'UDP functions shows the number of calls for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code> independent of the return to be success or fail.'
+        info: 'UDP functions shows the number of calls for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>, whether they return successfully or fail.'
     },
 
     'ebpf.udp_bandwidth': {
@@ -3076,7 +3076,7 @@ netdataDashboard.context = {
 
     'ebpf.file_descriptor': {
         title : 'File access',
-        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, that is the common function called from open(2) and openat(2). The close dimension is attached to the function <code>__close_fd</code>, that is called from system call close(2).'
+        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, which is the common function called from open(2) and openat(2). The close dimension is attached to the function <code>__close_fd</code>, which is called from system call close(2).'
     },
 
     'ebpf.file_error': {
@@ -3086,12 +3086,12 @@ netdataDashboard.context = {
 
     'ebpf.deleted_objects': {
         title : 'VFS remove',
-        info: 'Deleted objects monitors calls to the function <code>vfs_unlink</code>. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
+        info: 'Deleted objects monitors calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files.'
     },
 
     'ebpf.io': {
         title : 'VFS IO',
-        info: 'IO shows the number of calls for functions <code>vfs_read</code> and <code>vfs_write</code> independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
+        info: 'IO shows the number of calls for functions <code>vfs_read</code> and <code>vfs_write</code>,  whether they return successfully or fail. Like the chart \'deleted_objects\', this chart will not show events if the file system uses other functions to store data on disk.'
     },
 
     'ebpf.io_bytes': {
@@ -3101,17 +3101,17 @@ netdataDashboard.context = {
 
     'ebpf.io_error': {
         title : 'VFS IO error',
-        info: 'IO error shows the number of calls for <code>vfs_read</code> and <code>vfs_write</code> that did not have success.'
+        info: 'IO error shows the number of calls for <code>vfs_read</code> and <code>vfs_write</code> that returned an error.'
     },
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Process thread counts the number of times that the function <code>do_fork</code> was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Process thread counts the number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
         title : 'Exit monitoring',
-        info: 'Exit count the number of calls for the functions responsible to close (<code>do_exit</code>) and release(<code>release_task</code>) tasks.'
+        info: 'Exit count shows the number of calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'ebpf.task_error': {
