@@ -260,7 +260,11 @@ static int rrdpush_receive(int fd
 #else
         ret = send(fd, message, strlen(message), MSG_DONTWAIT);
 #endif
-        info("Previous last_entry on host is %ld", rrdhost_last_entry_t(host));
+        time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
+        if (prev == 0)
+            info("First connection - no gap check");
+        else
+            info("Checking for gaps %ld vs %ld = %ld-sec gap", now, prev, now-prev);
         info("STREAM %s [receive from [%s]:%s]: Checking for gaps... %d", host->hostname, client_ip, client_port, ret);
     }
 
