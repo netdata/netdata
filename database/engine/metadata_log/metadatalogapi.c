@@ -140,7 +140,7 @@ void metalog_commit_update_chart(RRDSET *st)
     rrddim_foreach_read(rd, st) {
         char uuid_str[37];
 
-        uuid_unparse_lower(*rd->state->rrdeng_uuid, uuid_str);
+        uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
         buffer_sprintf(buffer, "GUID %s\n", uuid_str);
 
         buffer_sprintf(
@@ -166,6 +166,7 @@ void metalog_commit_delete_chart(RRDSET *st)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDHOST *host = st->rrdhost;
+    char uuid_str[37];
 
     /* Metadata are only available with dbengine */
     if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
@@ -176,9 +177,8 @@ void metalog_commit_delete_chart(RRDSET *st)
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
-    buffer_sprintf(buffer, "CONTEXT %s\n", host->machine_guid);
-
-    buffer_sprintf(buffer, "TOMBSTONE %s\n", st->id); /* TODO: replace this with real GUID when available */
+    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+    buffer_sprintf(buffer, "TOMBSTONE %s\n", st->id);
 
     metalog_commit_creation_record(ctx, buffer);
 }
@@ -204,7 +204,6 @@ void metalog_commit_update_dimension(RRDDIM *rd)
     buffer_sprintf(buffer, "CONTEXT %s\n", uuid_str);
     // Activate random GUID
     uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
-    //uuid_unparse_lower(*rd->state->rrdeng_uuid, uuid_str);
     buffer_sprintf(buffer, "GUID %s\n", uuid_str);
 
     buffer_sprintf(
@@ -240,9 +239,7 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
-    buffer_sprintf(buffer, "CONTEXT %s\n", st->id);
-
-    uuid_unparse_lower(*rd->state->rrdeng_uuid, uuid_str);
+    uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
     buffer_sprintf(buffer, "TOMBSTONE %s\n", uuid_str);
 
     metalog_commit_creation_record(ctx, buffer);
