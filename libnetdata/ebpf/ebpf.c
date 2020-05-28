@@ -92,7 +92,7 @@ int get_kernel_version(char *out, int size) {
 
     fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
     if (fd > size)
-        error("[EBPF]: The buffer to store kernel version is not smaller than necessary.");
+        error("The buffer to store kernel version is not smaller than necessary.");
 
     return ((int)(str2l(major)*65536) + (int)(str2l(minor)*256) + (int)str2l(patch));
 }
@@ -183,7 +183,7 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
     snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
     libnetdata = dlopen(lpath, RTLD_LAZY);
     if (!libnetdata) {
-        info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
+        info("Cannot load library %s for the current kernel.", lpath);
 
         //Update kernel
         char *library = ebpf_library_suffix(ef->running_on_kernel, (ef->isrh < 0)?0:1);
@@ -196,32 +196,32 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
         snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
         libnetdata = dlopen(lpath, RTLD_LAZY);
         if (!libnetdata) {
-            error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
+            error("Cannot load %s default library.", lpath);
             return -1;
         } else {
-            info("[EBPF_PROCESS] Default shared library %s loaded with success.", lpath);
+            info("Default shared library %s loaded with success.", lpath);
             ef->libnetdata = libnetdata;
         }
     } else {
-        info("[EBPF_PROCESS] Current shared library %s loaded with success.", lpath);
+        info("Current shared library %s loaded with success.", lpath);
         ef->libnetdata = libnetdata;
     }
 
     ef->load_bpf_file = dlsym(libnetdata, "load_bpf_file");
     if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
+        error("Cannot find load_bpf_file: %s", err);
         return -1;
     }
 
     ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
     if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
+        error("Cannot find bpf_map_lookup_elem: %s", err);
         return -1;
     }
 
     ef->bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
     if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find bpf_map_delete_elem: %s", err);
+        error("Cannot find bpf_map_delete_elem: %s", err);
         return -1;
     }
 

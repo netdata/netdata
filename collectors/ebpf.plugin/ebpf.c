@@ -36,9 +36,9 @@ void netdata_cleanup_and_exit(int ret) {
 
 // ----------------------------------------------------------------------
 char *ebpf_plugin_dir = PLUGINS_DIR;
-static char *user_config_dir = CONFIG_DIR;
-static char *stock_config_dir = LIBCONFIG_DIR;
-static char *netdata_configured_log_dir = LOG_DIR;
+static char *ebpf_user_config_dir = CONFIG_DIR;
+static char *ebpf_stock_config_dir = LIBCONFIG_DIR;
+static char *ebpf_configured_log_dir = LOG_DIR;
 
 static int update_every = 1;
 static int thread_finished = 0;
@@ -576,17 +576,17 @@ void set_global_variables() {
     if(!ebpf_plugin_dir)
         ebpf_plugin_dir = PLUGINS_DIR;
 
-    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if(!user_config_dir)
-        user_config_dir = CONFIG_DIR;
+    ebpf_user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(!ebpf_user_config_dir)
+        ebpf_user_config_dir = CONFIG_DIR;
 
-    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if(!stock_config_dir)
-        stock_config_dir = LIBCONFIG_DIR;
+    ebpf_stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(!ebpf_stock_config_dir)
+        ebpf_stock_config_dir = LIBCONFIG_DIR;
 
-    netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if(!netdata_configured_log_dir)
-        netdata_configured_log_dir = LOG_DIR;
+    ebpf_configured_log_dir = getenv("NETDATA_LOG_DIR");
+    if(!ebpf_configured_log_dir)
+        ebpf_configured_log_dir = LOG_DIR;
 
     ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {
@@ -689,10 +689,10 @@ static void parse_args(int argc, char **argv)
         update_every = freq;
     }
 
-    if (load_collector_config(user_config_dir)) {
+    if (load_collector_config(ebpf_user_config_dir)) {
         error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
-              user_config_dir);
-        if (load_collector_config(stock_config_dir)) {
+              ebpf_user_config_dir);
+        if (load_collector_config(ebpf_stock_config_dir)) {
             error("Does not have a stock file. It is starting with default options.");
         } else {
             enabled = 1;
@@ -760,29 +760,25 @@ int main(int argc, char **argv)
         ebpf_exit(3);
     }
 
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_t thread[sizeof(ebpf_modules)/sizeof(ebpf_module_t)];
+    struct netdata_static_thread ebpf_threads[] = {
+        {"EBPF PROCESS",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[0].start_routine},
+        {"EBPF SOCKET",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[1].start_routine},
+        {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
+    };
 
     int i;
+    for (i = 0; ebpf_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &ebpf_threads[i];
+        st->thread = mallocz(sizeof(netdata_thread_t));
 
-    for ( i = 0; ebpf_modules[i].thread_name ; i++ ) {
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread_id = i;
-        if ( ( pthread_create(&thread[i], &attr, ebpf_modules[i].start_routine, (void *) em) ) ) {
-            error("[EBPF_PROCESS] Cannot create threads.");
-            thread_finished++;
-            ebpf_exit(4);
-        }
+        netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
     }
 
-    for ( i = 0; ebpf_modules[i].thread_name ; i++ ) {
-        if ( (pthread_join(thread[i], NULL) ) ) {
-            error("[EBPF_PROCESS] Cannot join threads.");
-            thread_finished++;
-            ebpf_exit(5);
-        }
+    for (i = 0; ebpf_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &ebpf_threads[i];
+        netdata_thread_join(*st->thread, NULL);
     }
 
     thread_finished++;

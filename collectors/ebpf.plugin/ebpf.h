@@ -27,6 +27,7 @@
 # include "../../libnetdata/clocks/clocks.h"
 # include "../../libnetdata/config/appconfig.h"
 # include "../../libnetdata/ebpf/ebpf.h"
+# include "../../daemon/main.h"
 
 typedef enum {
     MODE_RETURN = 0,    //This attaches kprobe when the function returns
