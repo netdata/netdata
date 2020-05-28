@@ -43,7 +43,10 @@ static char *netdata_configured_log_dir = LOG_DIR;
 static int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
-struct config collector_config;
+struct config collector_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
+                                    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                               .rwlock = AVL_LOCK_INITIALIZER } };
+
 int running_on_kernel = 0;
 char kernel_string[64];
 int ebpf_nprocs;
@@ -614,48 +617,35 @@ static inline int parse_disable_apps(char *ptr)
  * Read collector values
  */
 static void read_collector_values() {
-    struct section *sec = collector_config.first_section;
-    int disable_apps = 0;
-    int enabled = 0;
+    // Read global section
+    char *value;
+    if (appconfig_exists(&collector_config,  EBPF_GLOBAL_SECTION, "load")) //Backward compatibility
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load", "entry");
+    else
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
 
-    while(sec) {
-        struct config_option *values;
-        if(!strcasecmp(sec->name, "global")) {
-            values = sec->values;
-            while(values) {
-                if (!strcasecmp(values->name, "ebpf load mode") || !strcasecmp(values->name, "load"))
-                    how_to_load(values->value);
-                else if(!strcasecmp(values->name, "disable apps")) {
-                    disable_apps = parse_disable_apps(values->value);
-                }
+    how_to_load(value);
 
-                values = values->next;
-            }
-        } else if(!strcasecmp(sec->name, "ebpf programs")) {
-            values = sec->values;
-            while(values) {
-                error("KILLME %s", values->name);
-                if (!strcasecmp(values->name, ebpf_modules[0].config_name)) {
-                    if (!strcasecmp(values->value, "yes")) {
-                        ebpf_enable_chart(0, disable_apps);
-                        enabled = 1;
-                    }
-                }
-                else if (!strcasecmp(values->name, ebpf_modules[1].config_name)) {
-                    if (!strcasecmp(values->value, "yes")) {
-                        ebpf_enable_chart(1, disable_apps);
-                        enabled = 1;
-                    }
-                }
-                values = values->next;
-            }
-        }
-        sec = sec->next;
+    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", "no");
+    int disable_apps = parse_disable_apps(value);
+
+    // Read ebpf programs section
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "programs", 1);
+    int started = 0;
+    if (enabled) {
+        ebpf_enable_chart(0, disable_apps);
+        started++;
     }
 
-    if (!enabled) {
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", 1);
+    if (enabled) {
+        ebpf_enable_chart(1, disable_apps);
+        started++;
+    }
+
+    if (!started)
         ebpf_enable_all_charts(disable_apps);
-    }
+
 }
 
 /**
@@ -750,9 +740,14 @@ int main(int argc, char **argv)
     set_global_variables();
 
     if (load_collector_config(user_config_dir)) {
-        info("Does not have a configuration file. It is starting with default options.");
+        error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
+             user_config_dir);
+        if (load_collector_config(stock_config_dir)) {
+            error("Does not have a stock file. It is starting with default options.");
+        }
     }
 
+    /*
     signal(SIGINT, ebpf_exit);
     signal(SIGTERM, ebpf_exit);
 
@@ -789,6 +784,7 @@ int main(int argc, char **argv)
 
     thread_finished++;
     ebpf_exit(0);
+     */
 
     return 0;
 }

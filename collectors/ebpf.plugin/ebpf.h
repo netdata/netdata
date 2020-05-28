@@ -154,4 +154,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
+# define EBPF_GLOBAL_SECTION "global"
+# define EBPF_PROGRAMS_SECTION "ebpf programs"
+
 #endif
