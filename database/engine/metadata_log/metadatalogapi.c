@@ -248,16 +248,15 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
 RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_uuid)
 {
     GUID_TYPE ret;
-    char chart_object[33], machine_guid_str[GUID_LEN + 1], chart_fullid[RRD_ID_LENGTH_MAX + 1];
+    char chart_object[33], chart_fullid[RRD_ID_LENGTH_MAX + 1];
     uuid_t *machine_guid, *chart_char_guid;
 
     ret = find_object_by_guid(chart_uuid, chart_object, 33);
     assert(GUID_TYPE_CHART == ret);
 
     machine_guid = (uuid_t *)chart_object;
-    uuid_unparse_lower(*machine_guid, machine_guid_str);
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid_str, 0);
-    assert(host && host == ctx->rrdeng_ctx->host);
+    RRDHOST *host = ctx->rrdeng_ctx->host;
+    assert(!uuid_compare(host->host_uuid, *machine_guid));
 
     chart_char_guid = (uuid_t *)(chart_object + 16);
 
@@ -279,9 +278,8 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
         return NULL;
 
     machine_guid = (uuid_t *)dim_object;
-    uuid_unparse_lower(*machine_guid, id_str);
-    RRDHOST *host = rrdhost_find_by_guid(id_str, 0);
-    assert(host && host == ctx->rrdeng_ctx->host);
+    RRDHOST *host = ctx->rrdeng_ctx->host;
+    assert(!uuid_compare(host->host_uuid, *machine_guid));
 
     chart_guid = (uuid_t *)(dim_object + 16);
     dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
