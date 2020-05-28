@@ -12,6 +12,7 @@ static void clean_instance_config(struct instance_config *config)
     if(!config)
         return;
 
+    freez((void *)config->type_name);
     freez((void *)config->name);
     freez((void *)config->destination);
 
