@@ -64,6 +64,10 @@ Each of these sections provides the same number of charts:
     -   Major Page Faults (i.e. swap activity)
 -   Network
     -   Sockets Open
+    
+In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, 
+your dashboard will also show the following charts using low-level Linux metrics:
+    
 -   eBPF syscall    
     -   Number of calls to open files.
     -   Number of files closed.
