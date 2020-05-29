@@ -442,9 +442,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 }
 
 void *rrdpush_receiver_thread(void *ptr);
-int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url) {
-    (void)host;
-
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     info("clients wants to STREAM metrics.");
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
@@ -606,7 +604,27 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         netdata_mutex_unlock(&stream_rate_mutex);
     }
 
-    struct rrdpush_thread *rpt = callocz(1, sizeof(struct rrdpush_thread));
+    /*
+     * Quick path for rejecting multiple connections. Don't take any locks so that progress is made. The same
+     * condition will be checked again below, while holding the global and host writer locks. Any potential false
+     * positives will not cause harm. Data hazards with host deconstruction will be handled when reference counting
+     * is implemented.
+     */
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    if(host && host->receiver != NULL) {
+        log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, w->client_ip, w->client_port);
+        // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "This GUID is already streaming to this server");
+        return 409;
+    }
+
+    // TODO-GAPS: Rewrite the above test and guard this with a mutex
+    struct receiver_state *rpt = callocz(1, sizeof(*rpt));
+    if (host != NULL)
+        host->receiver = rpt;
+    rpt->host              = host;
     rpt->fd                = w->ifd;
     rpt->key               = strdupz(key);
     rpt->hostname          = strdupz(hostname);

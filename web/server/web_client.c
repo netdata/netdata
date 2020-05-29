@@ -1511,7 +1511,7 @@ void web_client_process_request(struct web_client *w) {
                         return;
                     }
 
-                    w->response.code = rrdpush_receiver_thread_spawn(localhost, w, w->decoded_url);
+                    w->response.code = rrdpush_receiver_thread_spawn(w, w->decoded_url);
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:

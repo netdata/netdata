@@ -19,7 +19,7 @@ typedef struct parser_user_object {
 
 PARSER_RC pluginsd_set_action(void *user, RRDSET *st, RRDDIM *rd, long long int value);
 PARSER_RC pluginsd_flush_action(void *user, RRDSET *st);
-PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, time_t remote_time, int trust_durations);
+PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations);
 PARSER_RC pluginsd_end_action(void *user, RRDSET *st);
 PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,
            char *module, int priority, int update_every, RRDSET_TYPE chart_type, char *options);

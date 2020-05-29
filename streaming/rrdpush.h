@@ -62,18 +62,19 @@ struct sender_state {
     int32_t version;
 };
 
-struct rrdpush_thread {
+struct receiver_state {
+    RRDHOST *host;
     int fd;
     char *key;
     char *hostname;
     char *registry_hostname;
     char *machine_guid;
     char *os;
-    char *timezone;
+    char *timezone;         // Unused?
     char *tags;
-    char *client_ip;
-    char *client_port;
-    char *program_name;
+    char *client_ip;        // Duplicated in pluginsd 
+    char *client_port;        // Duplicated in pluginsd 
+    char *program_name;        // Duplicated in pluginsd 
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
@@ -100,7 +101,7 @@ extern void rrdset_push_chart_definition_now(RRDSET *st);
 extern void *rrdpush_sender_thread(void *ptr);
 extern void rrdpush_send_labels(RRDHOST *host);
 
-extern int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url);
+extern int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
 extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
