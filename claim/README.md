@@ -186,6 +186,15 @@ might be having with the ACLK or claiming process.
 
 Use these keys and the information below to troubleshoot the ACLK.
 
+#### Claiming on older distributions (CentOS 6/7, Debian 8, Ubuntu 14.04)
+
+If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
+6/7, your Agent may not be able to connect to Cloud.
+
+You should either reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), or see the
+[known installation issues](/packaging/installer/README.md#failure-to-claim-connect-to-cloud) for an OpenSSL workaround
+that comes at the cost of decreased security.
+
 #### cloud-enabled is false
 
 If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cloud` option.
