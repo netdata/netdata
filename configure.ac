@@ -374,8 +374,16 @@ AC_CHECK_LIB(
 AC_CHECK_LIB(
     [crypto],
     [X509_VERIFY_PARAM_set1_host],
-    [AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [1], [X509_VERIFY_PARAM_set1_host])]
+    [ssl_host_validation="yes"],
+    [ssl_host_validation="no"]
 )
+
+if test "${ssl_host_validation}" = "no"; then
+    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [0], [ssl host validation])
+    AC_MSG_WARN([DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.])
+else
+    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [1], [ssl host validation])
+fi
 
 # -----------------------------------------------------------------------------
 # JSON-C library

@@ -193,7 +193,8 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
-#ifndef HAVE_X509_VERIFY_PARAM_set1_host
+#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 0
+#warning DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.
     i.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 #endif
 
