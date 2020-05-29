@@ -29,6 +29,7 @@ typedef enum ebpf_socket_idx {
 
 # define NETDATA_SOCKET_GROUP "Socket"
 
+//Global chart name
 # define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
 # define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
 # define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
@@ -36,5 +37,7 @@ typedef enum ebpf_socket_idx {
 # define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
 # define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
+// Charts created on Apps submenu
+# define NETDATA_NET_APPS_BANDWIDTH "bandwidth"
 
 #endif

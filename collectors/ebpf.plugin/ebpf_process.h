@@ -1,19 +1,23 @@
 #ifndef _NETDATA_EBPF_PROCESS_H_
 # define _NETDATA_EBPF_PROCESS_H_ 1
 
+//Groups used on Dashboard
 # define NETDATA_FILE_GROUP "File"
 # define NETDATA_VFS_GROUP "VFS"
 # define NETDATA_PROCESS_GROUP "Process"
 
+//Internal constants
 # define NETDATA_GLOBAL_VECTOR 24
 # define NETDATA_MAX_MONITOR_VECTOR 9
 # define NETDATA_VFS_ERRORS 3
 
+//Map index
 # define NETDATA_DEL_START 2
 # define NETDATA_IN_START_BYTE 3
 # define NETDATA_EXIT_START 5
 # define NETDATA_PROCESS_START 7
 
+// Global chart name
 # define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
 # define NETDATA_FILE_OPEN_ERR_COUNT "file_error"
 # define NETDATA_VFS_FILE_CLEAN_COUNT "deleted_objects"
@@ -28,6 +32,26 @@
 # define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
 # define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
+
+// Charts created on Apps submenu
+# define NETDATA_SYSCALL_APPS_FILE_OPEN "file_open"
+# define NETDATA_SYSCALL_APPS_FILE_CLOSED "file_closed"
+# define NETDATA_SYSCALL_APPS_FILE_DELETED "file_deleted"
+# define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS "vfs_write_call"
+# define NETDATA_SYSCALL_APPS_VFS_READ_CALLS "vfs_read_call"
+# define NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES "vfs_write_bytes"
+# define NETDATA_SYSCALL_APPS_VFS_READ_BYTES "vfs_read_bytes"
+# define NETDATA_SYSCALL_APPS_TASK_PROCESS "process_create"
+# define NETDATA_SYSCALL_APPS_TASK_THREAD "thread_create"
+# define NETDATA_SYSCALL_APPS_TASK_CLOSE "task_close"
+
+// Charts created on Apps submenu, if and only if, the return mode is active
+
+# define NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR "file_open_error"
+# define NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR "file_close_error"
+# define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR "vfs_write_error"
+# define NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR "vfs_read_error"
+
 
 //Index from kernel
 typedef enum ebpf_process_index {
