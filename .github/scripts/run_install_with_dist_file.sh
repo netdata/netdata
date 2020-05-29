@@ -31,7 +31,7 @@ docker run \
   -v "${PWD}:/netdata" \
   -w /netdata \
   "netdata/os-test:centos7" \
-  /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
+  /bin/bash -c "./netdata-installer.sh --dont-wait --require-cloud --install /tmp && echo \"Validating netdata instance is running\" && wget -O - 'http://127.0.0.1:19999/api/v1/info' | grep version"
 popd || exit 1
 
 echo "All Done!"
