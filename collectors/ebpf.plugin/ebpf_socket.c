@@ -11,15 +11,18 @@
  *
  *****************************************************************/
 
-static ebpf_functions_t socket_functions;
+static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent", "received" };
+static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close", "udp_sendmsg",
+                                                            "udp_recvmsg" };
 
 static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t *socket_aggregated_data = NULL;
 static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 
-static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent", "received" };
-static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close", "udp_sendmsg",
-                                                     "udp_recvmsg" };
+static ebpf_functions_t socket_functions;
+
+static pid_t ebpf_pid_max = 0;
+static ebpf_bandwidth_t **socket_bandwidth_stats = NULL;
 
 #ifndef STATIC
 /**
@@ -284,6 +287,8 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
 
+    freez(socket_bandwidth_stats);
+
     if (socket_functions.libnetdata) {
         dlclose(socket_functions.libnetdata);
     }
@@ -308,6 +313,9 @@ static void ebpf_socket_allocate_global_vectors(size_t length) {
     socket_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
     socket_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
+
+    ebpf_pid_max =  get_system_pid_max();
+    socket_bandwidth_stats = callocz(sizeof(ebpf_bandwidth_t *), (size_t)ebpf_pid_max);
 }
 
 static void change_collector_event() {

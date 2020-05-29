@@ -25,6 +25,9 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
 int ebpf_read_hash_table(void *ep, int fd, pid_t pid)
 #endif
 {
+    if (!ep)
+        return -1;
+
     if (!bpf_map_lookup_elem(fd, &pid, ep))
         return 0;
 

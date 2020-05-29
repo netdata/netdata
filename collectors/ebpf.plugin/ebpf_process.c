@@ -24,7 +24,7 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 static ebpf_functions_t process_functions;
 
 static pid_t ebpf_pid_max = 0;
-ebpf_process_stat_t **local_process_stats = NULL;
+static ebpf_process_stat_t **local_process_stats = NULL;
 
 #ifndef STATIC
 /**
@@ -399,6 +399,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 static void ebpf_process_cleanup(void *ptr)
 {
     (void)ptr;
+
     freez(process_aggregated_data);
     freez(process_publish_aggregated);
     freez(process_hash_values);
@@ -431,7 +432,7 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     ebpf_pid_max =  get_system_pid_max();
-    local_process_stats = callocz(sizeof(struct pid_stat *), (size_t)ebpf_pid_max);
+    local_process_stats = callocz(sizeof(ebpf_process_stat_t *), (size_t)ebpf_pid_max);
 }
 
 static void change_collector_event() {
