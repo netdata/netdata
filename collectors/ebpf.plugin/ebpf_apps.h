@@ -233,7 +233,6 @@ struct pid_on_target {
     struct pid_on_target *next;
 };
 
-
 struct target {
     char compare[MAX_COMPARE_NAME + 1];
     uint32_t comparehash;
@@ -348,6 +347,8 @@ typedef struct ebpf_process_stat {
 } ebpf_process_stat_t;
 
 typedef struct ebpf_bandwidth {
+    uint32_t pid;
+
     uint64_t first;                 //First timestamp
     uint64_t ct;                    //Last timestamp
     uint64_t sent;                  //Bytes sent
@@ -367,5 +368,21 @@ extern void clean_apps_groups_target(struct target *apps_groups_root_target);
 extern size_t zero_all_targets(struct target *root);
 
 extern int am_i_running_as_root();
+
+#ifndef STATIC
+extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
+                           int (*bpf_map_lookup_elem)(int, const void *, void *));
+
+extern size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd, ebpf_functions_t *ef,
+                                       struct pid_on_target *pids);
+
+extern size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd, ebpf_functions_t *ef, struct pid_on_target *pids);
+#else
+extern int ebpf_read_hash_table(void *ep, int fd, pid_t pid);
+
+extern size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids);
+
+size_t size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd,struct pid_on_target *pids);
+#endif
 
 #endif

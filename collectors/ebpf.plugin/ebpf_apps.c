@@ -4,10 +4,100 @@
 
 /*****************************************************************
  *
- *  INTERNAL FUNCTIONS
+ *  FUNCTIONS USED TO READ HASH TABLES
  *
  *****************************************************************/
 
+/**
+ * Read statistic hash table.
+ *
+ * @param ep                    the output structure.
+ * @param fd                    the file descriptor mapped from kernel ring.
+ * @param pid                   the index used to select the data.
+ * @param bpf_map_lookup_elem   a pointer for the function used to read data.
+ *
+ * @return It returns 0 when the data was copied and -1 otherwise
+ */
+#ifndef STATIC
+int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
+                           int (*bpf_map_lookup_elem)(int, const void *, void *))
+#else
+int ebpf_read_hash_table(void *ep, int fd, pid_t pid)
+#endif
+{
+    if (!bpf_map_lookup_elem(fd, &pid, ep))
+        return 0;
+
+    return -1;
+}
+
+/**
+ * Read processes statistic
+ *
+ * Read information from kernel ring to user ring.
+ *
+ * @param ep    the table with all process stats values.
+ * @param fd    the file descriptor mapped from kernel
+ * @param ef    a pointer for the functions mapped from dynamic library
+ * @param pids  the list of pids associated to a target.
+ *
+ * @return
+ */
+#ifndef STATIC
+size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd, ebpf_functions_t *ef, struct pid_on_target *pids)
+#else
+size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids)
+#endif
+{
+    size_t count = 0;
+    while(pids) {
+        uint32_t current_pid = pids->pid;
+#ifndef STATIC
+        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid, ef->bpf_map_lookup_elem))
+#else
+        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
+#endif
+            count++;
+
+        pids = pids->next;
+    }
+
+    return count;
+}
+
+/**
+ * Read socket statistic
+ *
+ * Read information from kernel ring to user ring.
+ *
+ * @param ep    the table with all process stats values.
+ * @param fd    the file descriptor mapped from kernel
+ * @param ef    a pointer for the functions mapped from dynamic library
+ * @param pids  the list of pids associated to a target.
+ *
+ * @return
+ */
+#ifndef STATIC
+size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd, ebpf_functions_t *ef, struct pid_on_target *pids)
+#else
+size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd,struct pid_on_target *pids)
+#endif
+{
+    size_t count = 0;
+    while(pids) {
+        uint32_t current_pid = pids->pid;
+#ifndef STATIC
+        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid, ef->bpf_map_lookup_elem))
+#else
+            if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
+#endif
+            count++;
+
+        pids = pids->next;
+    }
+
+    return count;
+}
 
 /*****************************************************************
  *
