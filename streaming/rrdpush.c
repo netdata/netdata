@@ -613,7 +613,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if(host && host->receiver != NULL) {
         log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
-        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, w->client_ip, w->client_port);
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection. (old connection used %ld", host->hostname, w->client_ip, w->client_port, now_realtime_sec()-host->receiver->last_msg_t);
         // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "This GUID is already streaming to this server");

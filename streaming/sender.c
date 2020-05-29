@@ -463,6 +463,7 @@ void attempt_read(struct sender_state *s) {
 int ret;
 #ifdef ENABLE_HTTPS
     if (s->host->ssl.conn && !s->host->stream_ssl.flags) {
+        ERR_clear_error();
         int desired = sizeof(s->read_buffer) - s->read_len - 1;
         ret = SSL_read(s->host->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
@@ -553,6 +554,7 @@ void sender_init(struct sender_state *s, RRDHOST *parent) {
     s->host = parent;
     s->buffer = cbuffer_new(1024, 1024*1024);
     s->build = buffer_create(1);
+    netdata_mutex_init(&s->mutex);
 }
 
 void *rrdpush_sender_thread(void *ptr) {

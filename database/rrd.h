@@ -719,6 +719,7 @@ struct rrdhost {
     time_t senders_disconnected_time;               // the time the last sender was disconnected
 
     struct receiver_state *receiver;
+    netdata_mutex_t receiver_lock;
 
     // ------------------------------------------------------------------------
     // health monitoring options

@@ -143,6 +143,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     // TODO-GAPS finish integrating state
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
+    netdata_mutex_init(&host->receiver_lock);
+
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;

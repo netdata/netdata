@@ -81,14 +81,65 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     return PARSER_RC_ERROR;
 }
 
-size_t streaming_parser(RRDHOST *host, struct plugind *cd, FILE *fp) {
-    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
-    ((PARSER_USER_OBJECT *) user)->enabled = cd->enabled;
-    ((PARSER_USER_OBJECT *) user)->host = host;
-    ((PARSER_USER_OBJECT *) user)->cd = cd;
-    ((PARSER_USER_OBJECT *) user)->trust_durations = 0;
+/* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
+ */
+static int receiver_read(struct receiver_state *r, FILE *fp) {
+#ifdef ENABLE_HTTPS
+    if (r->ssl.conn && !r->ssl.flags) {
+        ERR_clear_error();
+        int desired = sizeof(r->read_buffer) - r->read_len - 1;
+        int ret = SSL_read(r->ssl.conn, r->read_buffer, desired);
+        if (ret > 0 ) {
+            r->read_len += ret;
+            return 0;
+        }
+        // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
+        u_long err;
+        char buf[256];
+        while ((err = ERR_get_error()) != 0) {
+            ERR_error_string_n(err, buf, sizeof(buf));
+            error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
+        }
+        return 1;
+    }
+#endif
+    if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
+        return 1;
+    r->read_len = strlen(r->read_buffer);
+    return 0;
+}
 
-    PARSER *parser = parser_init(host, user, fp, PARSER_INPUT_SPLIT);
+/* Produce a full line if one exists, statefully return where we start next time.
+ * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
+ */
+static char *receiver_next_line(struct receiver_state *r, int *pos) {
+    int start = *pos, scan = *pos;
+    if (scan >= r->read_len) {
+        r->read_len = 0;
+        return NULL;
+    }
+    while (scan < r->read_len && r->read_buffer[scan] != '\n')
+        scan++;
+    if (scan < r->read_len && r->read_buffer[scan] == '\n') {
+        *pos = scan+1;
+        r->read_buffer[scan] = 0;
+        return &r->read_buffer[start];
+    }
+    memcpy(r->read_buffer, &r->read_buffer[start], r->read_len - start);
+    r->read_len -= start;
+    return NULL;
+}
+
+
+size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
+    PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
+    user->enabled = cd->enabled;
+    user->host = rpt->host;
+    user->opaque = rpt;
+    user->cd = cd;
+    user->trust_durations = 0;
+
+    PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
 
     if (unlikely(!parser)) {
@@ -110,10 +161,18 @@ size_t streaming_parser(RRDHOST *host, struct plugind *cd, FILE *fp) {
 
     user->parser = parser;
 
-    while (likely(!parser_next(parser))) {
-        if (unlikely(netdata_exit || parser_action(parser,  NULL)))
+    do {
+        if (receiver_read(rpt, fp))
             break;
+        int pos = 0;
+        char *line;
+        while ((line = receiver_next_line(rpt, &pos)))
+            if (unlikely(netdata_exit || parser_action(parser,  line)))
+                goto done;
+        rpt->last_msg_t = now_realtime_sec();
     }
+    while(!netdata_exit);
+done:
     info("PARSER ended");
     return ((PARSER_USER_OBJECT *) user)->count;
 }
@@ -311,7 +370,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     cd.version = rpt->stream_version;
 
 
-    size_t count = streaming_parser(rpt->host, &cd, fp);
+    size_t count = streaming_parser(rpt, &cd, fp);
     //size_t count = pluginsd_process(host, &cd, fp, 1);
 
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "DISCONNECTED");

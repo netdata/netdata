@@ -79,6 +79,9 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     int update_every;
     uint32_t stream_version;
+    time_t last_msg_t;
+    char read_buffer[512];
+    int read_len;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
