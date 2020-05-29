@@ -6,52 +6,28 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/database/engine/
 
 # Database engine
 
-The Database Engine works like a traditional database. There is some amount of RAM dedicated to data caching and
-indexing and the rest of the data reside compressed on disk. The number of history entries is not fixed in this case,
-but depends on the configured disk space and the effective compression ratio of the data stored. This is the **only
-mode** that supports changing the data collection update frequency (`update_every`) **without losing** the previously
-stored metrics.
+The Database Engine works like a traditional database. It dedicates a certain amount of RAM to data caching and
+indexing, while the rest of the data resides compressed on disk. Unlike other [memory modes](/database/README.md), the
+amount of historical metrics stored is based on the amount of disk space you allocate and the effective compression
+ratio, not a fixed number of metrics collected.
 
-## Files
+By using both RAM and disk space, the database engine allows for long-term storage of per-second metrics inside of the
+Agent itself.
 
-With the DB engine memory mode the metric data are stored in database files. These files are organized in pairs, the
-datafiles and their corresponding journalfiles, e.g.:
-
-```sh
-datafile-1-0000000001.ndf
-journalfile-1-0000000001.njf
-datafile-1-0000000002.ndf
-journalfile-1-0000000002.njf
-datafile-1-0000000003.ndf
-journalfile-1-0000000003.njf
-...
-```
-
-They are located under their host's cache directory in the directory `./dbengine` (e.g. for localhost the default
-location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames contain more recent metric data. The user
-can safely delete some pairs of files when Netdata is stopped to manually free up some space.
-
-_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
+In addition, the database engine is the only memory mode that supports changing the data collection update frequency
+(`update_every`) without losing the metrics your Agent already gathered and stored.
 
 ## Configuration
 
-There is one DB engine instance per Netdata host/node. That is, there is one `./dbengine` folder per node, and all
-charts of `dbengine` memory mode in such a host share the same storage space and DB engine instance memory state. You
-can select the memory mode for localhost by editing netdata.conf and setting:
+To use the database engine, open `netdata.conf` and set `memory mode` to `dbengine`.
 
 ```conf
 [global]
     memory mode = dbengine
 ```
 
-For setting the memory mode for the rest of the nodes you should look at
-[streaming](/streaming/README.md).
-
-The `history` configuration option is meaningless for `memory mode = dbengine` and is ignored for any metrics being
-stored in the DB engine.
-
-All DB engine instances, for localhost and all other streaming recipient nodes inherit their configuration from
-`netdata.conf`:
+To configure the database engine, look for the `page cache size` and `dbengine disk space` settings in the `[global]`
+section of your `netdata.conf`. The Agent ignores the `history` setting when using the database engine.
 
 ```conf
 [global]
@@ -60,38 +36,36 @@ All DB engine instances, for localhost and all other streaming recipient nodes i
 ```
 
 The above values are the default and minimum values for Page Cache size and DB engine disk space quota. Both numbers are
-in **MiB**. All DB engine instances will allocate the configured resources separately.
+in **MiB**.
 
-[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
-correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
-slave nodes you have, how many metrics your Agent collects, and more.
-
-The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching Netdata metric values
-themselves as far as queries are concerned. The total page cache size will be greater since data collection itself will
-consume additional memory as is described in the [Memory requirements](#memory-requirements) section.
+The `page cache size` option determines the amount of RAM in **MiB** dedicated to caching Netdata metric values. The
+actual page cache size will be slightly larger than this figure—see the [memory requirements](#memory-requirements)
+section for details.
 
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
 metric values and all related metadata describing them.
 
-## Operation
+Use the  [**database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to correctly set
+`dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many slave nodes you
+have, how many metrics your Agent collects, and more.
 
-The DB engine stores chart metric values in 4096-byte pages in memory. Each chart dimension gets its own page to store
-consecutive values generated from the data collectors. Those pages comprise the **Page Cache**.
+### Streaming metrics to the database engine
 
-When those pages fill up they are slowly compressed and flushed to disk. It can take `4096 / 4 = 1024 seconds = 17
-minutes`, for a chart dimension that is being collected every 1 second, to fill a page. Pages can be cut short when we
-stop Netdata or the DB engine instance so as to not lose the data. When we query the DB engine for data we trigger disk
-read I/O requests that fill the Page Cache with the requested pages and potentially evict cold (not recently used)
-pages. 
+When streaming metrics, the Agent on the master node creates one instance of the database engine for itself, and another
+instance for every slave node it receives metrics from. If you have four streaming nodes, you will have five instances
+in total (`1 master + 4 slaves = 5 instances`).
 
-When the disk quota is exceeded the oldest values are removed from the DB engine at real time, by automatically deleting
-the oldest datafile and journalfile pair. Any corresponding pages residing in the Page Cache will also be invalidated
-and removed. The DB engine logic will try to maintain between 10 and 20 file pairs at any point in time. 
+The Agent allocates resources for each instance separately using the `dbengine disk space` setting. If `dbengine disk
+space` is set to the default `256`, each instance is given 256 MiB in disk space, which means the total disk space
+required to store all instances is, roughly, `256 MiB * 1 master * 4 slaves = 1280 MiB`. 
 
-The Database Engine uses direct I/O to avoid polluting the OS filesystem caches and does not generate excessive I/O
-traffic so as to create the minimum possible interference with other applications.
+See the [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to help you correctly
+set `dbengine disk space` and undertand the toal disk space required based on your streaming setup.
 
-## Memory requirements
+For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
+[streaming](/streaming/README.md).
+
+### Memory requirements
 
 Using memory mode `dbengine` we can overcome most memory restrictions and store a dataset that is much larger than the
 available memory.
@@ -114,7 +88,7 @@ An important observation is that RAM usage depends on both the `page cache size`
 You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
 validate the memory requirements for your particular system(s) and configuration.
 
-## File descriptor requirements
+### File descriptor requirements
 
 The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming slave or master
 server). When configuring your system you should make sure there are at least 50 file descriptors available per
@@ -155,6 +129,47 @@ kern.maxfiles=65536
 ```
 
 You can apply the settings by running `sysctl -p` or by rebooting.
+
+## Files
+
+With the DB engine memory mode the metric data are stored in database files. These files are organized in pairs, the
+datafiles and their corresponding journalfiles, e.g.:
+
+```sh
+datafile-1-0000000001.ndf
+journalfile-1-0000000001.njf
+datafile-1-0000000002.ndf
+journalfile-1-0000000002.njf
+datafile-1-0000000003.ndf
+journalfile-1-0000000003.njf
+...
+```
+
+They are located under their host's cache directory in the directory `./dbengine` (e.g. for localhost the default
+location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames contain more recent metric data. The user
+can safely delete some pairs of files when Netdata is stopped to manually free up some space.
+
+_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._ You can also set up
+one or more [exporting connectors](/exporting/README.md) to send your Netdata metrics to other databases for long-term
+storage at lower granularity.
+
+## Operation
+
+The DB engine stores chart metric values in 4096-byte pages in memory. Each chart dimension gets its own page to store
+consecutive values generated from the data collectors. Those pages comprise the **Page Cache**.
+
+When those pages fill up they are slowly compressed and flushed to disk. It can take `4096 / 4 = 1024 seconds = 17
+minutes`, for a chart dimension that is being collected every 1 second, to fill a page. Pages can be cut short when we
+stop Netdata or the DB engine instance so as to not lose the data. When we query the DB engine for data we trigger disk
+read I/O requests that fill the Page Cache with the requested pages and potentially evict cold (not recently used)
+pages. 
+
+When the disk quota is exceeded the oldest values are removed from the DB engine at real time, by automatically deleting
+the oldest datafile and journalfile pair. Any corresponding pages residing in the Page Cache will also be invalidated
+and removed. The DB engine logic will try to maintain between 10 and 20 file pairs at any point in time. 
+
+The Database Engine uses direct I/O to avoid polluting the OS filesystem caches and does not generate excessive I/O
+traffic so as to create the minimum possible interference with other applications.
 
 ## Evaluation
 
