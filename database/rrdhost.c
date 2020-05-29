@@ -140,7 +140,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
 
-    // TODO-GAPS finish integrating state
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
     netdata_mutex_init(&host->receiver_lock);

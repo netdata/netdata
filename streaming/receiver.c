@@ -10,8 +10,11 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
 
-        // TODO-GAPS: proper locking and sync
-        rpt->host->receiver = NULL;
+        // Make sure that we detach this thread and don't kill a freshly arriving receiver
+        netdata_mutex_lock(&rpt->host->receiver_lock);
+        if (rpt->host->receiver == rpt)
+            rpt->host->receiver = NULL;
+        netdata_mutex_unlock(&rpt->host->receiver_lock);
 
         info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
@@ -167,7 +170,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         int pos = 0;
         char *line;
         while ((line = receiver_next_line(rpt, &pos)))
-            if (unlikely(netdata_exit || parser_action(parser,  line)))
+            if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
                 goto done;
         rpt->last_msg_t = now_realtime_sec();
     }
@@ -256,12 +259,17 @@ static int rrdpush_receive(struct receiver_state *rpt)
             return 1;
         }
 
-        // TODO-GAPS: if created the host then attach the receiver. Lock properly...
-        //            handle the failure case by aborting the thread
+        netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == NULL)
             rpt->host->receiver = rpt;
-        else
-            error("Collision in attaching receiver!");
+        else {
+            error("Multiple receivers connected for %s concurrently, cancelling this one...", rpt->machine_guid);
+            netdata_mutex_unlock(&rpt->host->receiver_lock);
+            close(rpt->fd);
+            log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "FAILED - BEATEN TO HOST CREATION");
+            return 1;
+        }
+        netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
 
 

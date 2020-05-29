@@ -85,6 +85,7 @@ struct receiver_state {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
+    unsigned int shutdown:1;
 };
 
 

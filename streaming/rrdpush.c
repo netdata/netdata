@@ -605,25 +605,42 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
 
     /*
-     * Quick path for rejecting multiple connections. Don't take any locks so that progress is made. The same
-     * condition will be checked again below, while holding the global and host writer locks. Any potential false
-     * positives will not cause harm. Data hazards with host deconstruction will be handled when reference counting
-     * is implemented.
+     * Quick path for rejecting multiple connections. The lock taken is fine-grained - it only protects the receiver
+     * pointer within the host (if a host exists). This protects against multiple concurrent web requests hitting
+     * separate threads within the web-server and landing here. The lock guards the thread-shutdown sequence that
+     * detaches the receiver from the host. If the host is being created (first time-access) then we also use the
+     * lock to prevent race-hazard (two threads try to create the host concurrently, one wins and the other does a
+     * lookup to the now-attached structure).
      */
+    struct receiver_state *rpt = callocz(1, sizeof(*rpt));
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
-    if(host && host->receiver != NULL) {
-        log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
-        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection. (old connection used %ld", host->hostname, w->client_ip, w->client_port, now_realtime_sec()-host->receiver->last_msg_t);
-        // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "This GUID is already streaming to this server");
-        return 409;
+    if (host) {
+        netdata_mutex_lock(&host->receiver_lock);
+        if (host->receiver != NULL) {
+            time_t age = now_realtime_sec() - host->receiver->last_msg_t;
+            if (age > 30) {
+                host->receiver->shutdown = 1;
+                host->receiver = NULL;      // Thread holds reference to structure
+                info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is dead (%ld sec), accepting new connection.", host->hostname, w->client_ip, w->client_port, age);
+            }
+            else {
+                netdata_mutex_unlock(&host->receiver_lock);
+                log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
+                                      "REJECTED - ALREADY CONNECTED");
+                info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is active (within last %ld sec), rejecting new connection.", host->hostname, w->client_ip, w->client_port, age);
+                // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
+                buffer_flush(w->response.data);
+                buffer_strcat(w->response.data, "This GUID is already streaming to this server");
+                freez(rpt);
+                return 409;
+            }
+        }
+        host->receiver = rpt;
+        netdata_mutex_unlock(&host->receiver_lock);
     }
 
-    // TODO-GAPS: Rewrite the above test and guard this with a mutex
-    struct receiver_state *rpt = callocz(1, sizeof(*rpt));
-    if (host != NULL)
-        host->receiver = rpt;
+    rpt->last_msg_t = now_realtime_sec();
+
     rpt->host              = host;
     rpt->fd                = w->ifd;
     rpt->key               = strdupz(key);
