@@ -10,17 +10,19 @@ if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
   export CFLAGS="-static -O3"
 else
   export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1"
-#    export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness"
 fi
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
 export IS_NETDATA_STATIC_BINARY="yes"
 
-run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
+# Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
+export EBPF_LIBC="static"
+
+run ./netdata-installer.sh \
+  --install "${NETDATA_INSTALL_PARENT}" \
   --dont-wait \
-  --dont-start-it \
-  "${NULL}"
+  --dont-start-it
 
 # Remove the netdata.conf file from the tree. It has hard-coded sensible defaults builtin.
 rm -f "${NETDATA_INSTALL_PARENT}/etc/netdata/netdata.conf"

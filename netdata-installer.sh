@@ -1355,7 +1355,7 @@ install_ebpf() {
   progress "Installing eBPF plugin"
 
   # Detect libc
-  libc="$(detect_libc)"
+  libc="${EBPF_LIBC:-"$(detect_libc)"}"
 
   EBPF_VERSION="$(cat packaging/ebpf.version)"
   EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
