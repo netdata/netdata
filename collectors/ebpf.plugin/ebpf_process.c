@@ -23,6 +23,9 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
 static ebpf_functions_t process_functions;
 
+static pid_t ebpf_pid_max = 0;
+ebpf_process_stat_t **local_process_stats = NULL;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
@@ -400,6 +403,8 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
+    freez(local_process_stats);
+
     if (process_functions.libnetdata) {
         dlclose(process_functions.libnetdata);
     }
@@ -424,6 +429,9 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     process_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
     process_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
+
+    ebpf_pid_max =  get_system_pid_max();
+    local_process_stats = callocz(sizeof(struct pid_stat *), (size_t)ebpf_pid_max);
 }
 
 static void change_collector_event() {
@@ -443,7 +451,7 @@ static void change_syscalls() {
 }
 
 /**
- * Set local function pointers, this function will never be compiled with static libraries
+ * Set local variables
  */
 static void set_local_pointers(ebpf_module_t *em) {
 #ifndef STATIC
