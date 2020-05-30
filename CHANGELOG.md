@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Add CI check for building against LibreSSL [\#9216](https://github.com/netdata/netdata/pull/9216) ([prologic](https://github.com/prologic))
 - Update eBPF to use kernel-collector version 0.4.0. [\#9212](https://github.com/netdata/netdata/pull/9212) ([Ferroin](https://github.com/Ferroin))
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
 - Clean type\_name in exporting connector instance configuration [\#9188](https://github.com/netdata/netdata/pull/9188) ([vlvkobal](https://github.com/vlvkobal))
@@ -13,6 +14,7 @@
 - Fix exporting unit tests [\#9183](https://github.com/netdata/netdata/pull/9183) ([vlvkobal](https://github.com/vlvkobal))
 - Fix missing ebpf packaging files from dist archive [\#9182](https://github.com/netdata/netdata/pull/9182) ([prologic](https://github.com/prologic))
 - cov\_358988: Remove coverity bug [\#9180](https://github.com/netdata/netdata/pull/9180) ([thiagoftsm](https://github.com/thiagoftsm))
+- Improve dbengine docs for streaming setups [\#9177](https://github.com/netdata/netdata/pull/9177) ([joelhans](https://github.com/joelhans))
 - Remove knatsakis and ncmans from CODEOWNERS for the agent. [\#9173](https://github.com/netdata/netdata/pull/9173) ([Ferroin](https://github.com/Ferroin))
 - Added health check functionality to our Docker images. [\#9172](https://github.com/netdata/netdata/pull/9172) ([Ferroin](https://github.com/Ferroin))
 - Remove the experimental label from the exporting engine documentation [\#9171](https://github.com/netdata/netdata/pull/9171) ([vlvkobal](https://github.com/vlvkobal))
@@ -36,6 +38,7 @@
 - Package: obsoletes conflicting EPEL packages \(\#6879 \#8784\) [\#9108](https://github.com/netdata/netdata/pull/9108) ([Saruspete](https://github.com/Saruspete))
 - Restore SIGCHLD signal handler after being replaced by libuv [\#9107](https://github.com/netdata/netdata/pull/9107) ([mfundul](https://github.com/mfundul))
 - Update eBPF documentation to reflect default enabled status [\#9105](https://github.com/netdata/netdata/pull/9105) ([joelhans](https://github.com/joelhans))
+- Add support for eBPF for Netdata static64 \(kickstart-static64.sh\) [\#9104](https://github.com/netdata/netdata/pull/9104) ([prologic](https://github.com/prologic))
 - Dynamic memory cleanup for MongoDB exporting connector [\#9103](https://github.com/netdata/netdata/pull/9103) ([vlvkobal](https://github.com/vlvkobal))
 - Prepare the main cleanup function for the exporting engine [\#9099](https://github.com/netdata/netdata/pull/9099) ([vlvkobal](https://github.com/vlvkobal))
 - Exporting cleanup [\#9098](https://github.com/netdata/netdata/pull/9098) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -193,7 +196,6 @@
 - charts.d/libreswan: fix sudo check [\#8569](https://github.com/netdata/netdata/pull/8569) ([ilyam8](https://github.com/ilyam8))
 - Docs: Change MacOS to macOS [\#8562](https://github.com/netdata/netdata/pull/8562) ([joelhans](https://github.com/joelhans))
 - Prometheus web api connector [\#8540](https://github.com/netdata/netdata/pull/8540) ([vlvkobal](https://github.com/vlvkobal))
-- Health Alarm to Dynatrace Event implementation [\#8476](https://github.com/netdata/netdata/pull/8476) ([illumine](https://github.com/illumine))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
@@ -242,13 +244,6 @@
 - Fix install-required-packages script to self-update apt [\#8491](https://github.com/netdata/netdata/pull/8491) ([prologic](https://github.com/prologic))
 - Relaxes SSL checks for testing [\#8489](https://github.com/netdata/netdata/pull/8489) ([underhood](https://github.com/underhood))
 - packaging/docker: add --build-arg CFLAGS support [\#8485](https://github.com/netdata/netdata/pull/8485) ([nicolasparada](https://github.com/nicolasparada))
-- installer: update go.d.plugin version to v0.18.0 [\#8477](https://github.com/netdata/netdata/pull/8477) ([ilyam8](https://github.com/ilyam8))
-- Installer creates claim.d but is run as root, patch to correct ownership [\#8475](https://github.com/netdata/netdata/pull/8475) ([amoss](https://github.com/amoss))
-- python.d.plugin: add prefix to the module name during loading source file [\#8474](https://github.com/netdata/netdata/pull/8474) ([ilyam8](https://github.com/ilyam8))
-- Added Docker build arg to pass extra options to installer. [\#8472](https://github.com/netdata/netdata/pull/8472) ([Ferroin](https://github.com/Ferroin))
-- Make mosq and LWS lib build fails more prominent [\#8470](https://github.com/netdata/netdata/pull/8470) ([underhood](https://github.com/underhood))
-- Fix our Debian/Ubuntu packages to actually package the SystemD Unit files we expect. [\#8468](https://github.com/netdata/netdata/pull/8468) ([prologic](https://github.com/prologic))
-- Adding the claiming script to the multi-stage whitelist [\#8465](https://github.com/netdata/netdata/pull/8465) ([amoss](https://github.com/amoss))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
