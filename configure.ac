@@ -371,6 +371,20 @@ AC_CHECK_LIB(
     [SSL_LIBS="-lcrypto -lssl"]
 )
 
+AC_CHECK_LIB(
+    [crypto],
+    [X509_VERIFY_PARAM_set1_host],
+    [ssl_host_validation="yes"],
+    [ssl_host_validation="no"]
+)
+
+if test "${ssl_host_validation}" = "no"; then
+    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [0], [ssl host validation])
+    AC_MSG_WARN([DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.])
+else
+    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [1], [ssl host validation])
+fi
+
 # -----------------------------------------------------------------------------
 # JSON-C library
 
@@ -586,7 +600,7 @@ if test "$enable_cloud" != "no"; then
     AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
     if test -f "externaldeps/mosquitto/libmosquitto.a"; then
         LIBS_BKP="${LIBS}"
-        LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS}"
+        LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS} ${LIBS_BKP}"
         AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/mosquitto/mosquitto.h"
                                          int main (int argc, char **argv) {
                                              int m,mm,r;
