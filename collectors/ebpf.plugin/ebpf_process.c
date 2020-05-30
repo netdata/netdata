@@ -23,15 +23,15 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
 static ebpf_functions_t process_functions;
 
+static int *map_fd = NULL;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
  */
 
 //Libbpf (It is necessary to have at least kernel 4.10)
-static int (*bpf_map_lookup_elem)(int, const void *, void *);
-
-static int *map_fd = NULL;
+static int (*bpf_map_lookup_elem)(int, const void *, void *) = NULL;
 /**
  * End of the pointers
  */
@@ -448,7 +448,6 @@ static void change_syscalls() {
 static void set_local_pointers(ebpf_module_t *em) {
 #ifndef STATIC
     bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
-
 #endif
 
     map_fd = process_functions.map_fd;
@@ -489,10 +488,12 @@ void *ebpf_process_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_MAX_MONITOR_VECTOR);
 
+#ifndef STATIC
     if (ebpf_load_libraries(&process_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
+#endif
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,

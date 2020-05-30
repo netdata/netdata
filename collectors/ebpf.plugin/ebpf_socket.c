@@ -21,16 +21,16 @@ static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "rece
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close", "udp_sendmsg",
                                                      "udp_recvmsg" };
 
+static int *map_fd = NULL;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
  */
 
 //Libbpf (It is necessary to have at least kernel 4.10)
-static int (*bpf_map_lookup_elem)(int, const void *, void *);
-static int (*bpf_map_delete_elem)(int fd, const void *key);
-
-static int *map_fd = NULL;
+static int (*bpf_map_lookup_elem)(int, const void *, void *) = NULL;
+static int (*bpf_map_delete_elem)(int fd, const void *key) = NULL;
 /**
  * End of the pointers
  */
@@ -361,10 +361,12 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
 
+#ifndef STATIC
     if (ebpf_load_libraries(&socket_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
+#endif
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
