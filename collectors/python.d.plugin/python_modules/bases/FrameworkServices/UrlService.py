@@ -119,22 +119,38 @@ class UrlService(SimpleService):
         Get raw data from http request
         :return: str
         """
+        _, data = self._get_raw_data_with_headers(url, manager, **kwargs)
+        return data
+
+    def _get_raw_data_with_headers(self, url=None, manager=None, **kwargs):
+        """
+        Get headers and raw data from http request
+        :return: str
+        """
         try:
-            status, data = self._get_raw_data_with_status(url, manager, **kwargs)
+            status, headers, data = self._get_raw_data_with_status_and_headers(url, manager, **kwargs)
         except Exception as error:
             self.error('Url: {url}. Error: {error}'.format(url=url or self.url, error=error))
-            return None
+            return None, None
 
         if status == 200:
-            return data
+            return headers, data
         else:
             self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=status))
-            return None
+            return None, None
 
-    def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
+  def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
         """
         Get status and response body content from http request. Does not catch exceptions
-        :return: int, str
+        :return: int, HTTPResponse, str
+        """
+        status, _, data = self._get_raw_data_with_status_and_headers(url, manager, retries, redirect, **kwargs)
+        return status, data
+
+    def _get_raw_data_with_status_and_headers(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
+        """
+        Get status, headers and response body content from http request. Does not catch exceptions
+        :return: int, HTTPResponse, str
         """
         url = url or self.url
         manager = manager or self._manager
@@ -155,8 +171,8 @@ class UrlService(SimpleService):
             **kwargs
         )
         if isinstance(response.data, str):
-            return response.status, response.data
-        return response.status, response.data.decode(errors='ignore')
+            return response.status, response.headers, response.data
+        return response.status, response.headers, response.data.decode(errors='ignore')
 
     def check(self):
         """
