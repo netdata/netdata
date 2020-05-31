@@ -139,7 +139,7 @@ class UrlService(SimpleService):
             self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=status))
             return None, None
 
-  def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
+    def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
         """
         Get status and response body content from http request. Does not catch exceptions
         :return: int, HTTPResponse, str
