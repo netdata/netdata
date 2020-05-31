@@ -157,11 +157,19 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
+void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root);
+
 # define EBPF_GLOBAL_SECTION "global"
 # define EBPF_PROGRAMS_SECTION "ebpf programs"
+
+# define EBPF_COMMON_DIMENSION_CALL "Calls"
+# define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
+# define EBPF_COMMON_DIMENSION_DIFFERENCE "Difference"
 
 //Common variables
 extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
+extern struct target *apps_groups_default_target;
+extern struct target *apps_groups_root_target;
 
 #endif

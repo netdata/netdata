@@ -133,7 +133,7 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
 static void ebpf_create_global_charts(ebpf_module_t *em) {
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_TCP_FUNCTION_COUNT
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_SOCKET_GROUP
         , 21070
         , ebpf_create_global_dimension
@@ -142,7 +142,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_TCP_FUNCTION_BYTES
-        , "bytes/s"
+        , EBPF_COMMON_DIMENSION_BYTESS
         , NETDATA_SOCKET_GROUP
         , 21071
         , ebpf_create_global_dimension
@@ -152,7 +152,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_TCP_FUNCTION_ERROR
-            , "Calls"
+            , EBPF_COMMON_DIMENSION_CALL
             , NETDATA_SOCKET_GROUP
             , 21072
             , ebpf_create_global_dimension
@@ -162,7 +162,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_UDP_FUNCTION_COUNT
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_SOCKET_GROUP
         , 21073
         , ebpf_create_global_dimension
@@ -171,7 +171,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_UDP_FUNCTION_BYTES
-        , "bytes/s"
+        , EBPF_COMMON_DIMENSION_BYTESS
         , NETDATA_SOCKET_GROUP
         , 21074
         , ebpf_create_global_dimension
@@ -181,13 +181,37 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_UDP_FUNCTION_ERROR
-            , "Calls"
+            , EBPF_COMMON_DIMENSION_CALL
             , NETDATA_SOCKET_GROUP
             , 21075
             , ebpf_create_global_dimension
             , &socket_publish_aggregated[NETDATA_UDP_START]
             , 2);
     }
+}
+
+/**
+ * Create apps charts
+ *
+ * Call ebpf_create_chart to create the charts on apps submenu.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static void ebpf_socket_create_apps_charts(ebpf_module_t *em)
+{
+    (void)em;
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
+                               EBPF_COMMON_DIMENSION_BYTESS,
+                               NETDATA_APPS_NET_GROUP,
+                               20080,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
+                               EBPF_COMMON_DIMENSION_BYTESS,
+                               NETDATA_APPS_NET_GROUP,
+                               20081,
+                               apps_groups_root_target);
+
 }
 
 /*****************************************************************
@@ -385,6 +409,9 @@ void *ebpf_socket_thread(void *ptr)
                        socket_id_names, NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
+    if (em->apps_charts)
+        ebpf_socket_create_apps_charts(em);
+
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_time*USEC_PER_SEC), em);

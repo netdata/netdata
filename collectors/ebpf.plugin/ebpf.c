@@ -5,6 +5,13 @@
 
 #include "ebpf.h"
 
+/*****************************************************************
+ *
+ *  FUNCTIONS USED BY NETDATA
+ *
+ *****************************************************************/
+
+
 // callback required by eval()
 int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
     (void)variable;
@@ -35,6 +42,12 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 // ----------------------------------------------------------------------
+/*****************************************************************
+ *
+ *  GLOBAL VARIABLES
+ *
+ *****************************************************************/
+
 char *ebpf_plugin_dir = PLUGINS_DIR;
 char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;
@@ -51,7 +64,6 @@ int running_on_kernel = 0;
 char kernel_string[64];
 int ebpf_nprocs;
 static int isrh;
-netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
@@ -89,6 +101,17 @@ ebpf_module_t ebpf_modules[] = {
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
 };
+
+//Link with apps.plugin
+struct target
+    *apps_groups_default_target = NULL, // the default target
+    *apps_groups_root_target = NULL;    // apps_groups.conf defined
+
+/*****************************************************************
+ *
+ *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
+ *
+ *****************************************************************/
 
 /**
  * Close the collector gracefully
@@ -313,6 +336,26 @@ void ebpf_create_chart(char *family
     ncd(move, end);
 }
 
+/**
+ * Create charts on apps submenu
+ *
+ * @param name   the chart name
+ * @param axis   the value displayed on vertical axis.
+ * @param web    Submenu that the chart will be attached on dashboard.
+ * @param order  the chart order
+ * @param root   structure used to create the dimensions.
+ */
+void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root)
+{
+    struct target *w;
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, name, axis, web, order);
+
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+}
+
 /*****************************************************************
  *
  *  FUNCTIONS TO DEFINE OPTIONS
@@ -514,8 +557,10 @@ static inline int parse_disable_apps(char *ptr)
 
 /**
  * Read collector values
+ *
+ * @param disable_apps variable to store information related to apps.
  */
-static void read_collector_values() {
+static void read_collector_values(int *disable_apps) {
     // Read global section
     char *value;
     if (appconfig_exists(&collector_config,  EBPF_GLOBAL_SECTION, "load")) //Backward compatibility
@@ -526,37 +571,38 @@ static void read_collector_values() {
     how_to_load(value);
 
     value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", "no");
-    int disable_apps = parse_disable_apps(value);
+    *disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
     uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                              ebpf_modules[0].config_name, 1);
     int started = 0;
     if (enabled) {
-        ebpf_enable_chart(0, disable_apps);
+        ebpf_enable_chart(0, *disable_apps);
         started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                     ebpf_modules[1].config_name, 1);
     if (enabled) {
-        ebpf_enable_chart(1, disable_apps);
+        ebpf_enable_chart(1, *disable_apps);
         started++;
     }
 
     if (!started)
-        ebpf_enable_all_charts(disable_apps);
+        ebpf_enable_all_charts(*disable_apps);
 
 }
 
 /**
  * Load collector config
  *
- * @param path the path where the file ebpf.conf is stored.
+ * @param path          the path where the file ebpf.conf is stored.
+ * @param disable_apps  variable to store the information about apps plugin status.
  *
  * @return 0 on success and -1 otherwise.
  */
-static int load_collector_config(char *path) {
+static int load_collector_config(char *path, int *disable_apps) {
     char lpath[4096];
 
     snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf" );
@@ -564,7 +610,7 @@ static int load_collector_config(char *path) {
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return -1;
 
-    read_collector_values();
+    read_collector_values(disable_apps);
 
     return 0;
 }
@@ -691,10 +737,10 @@ static void parse_args(int argc, char **argv)
         update_every = freq;
     }
 
-    if (load_collector_config(ebpf_user_config_dir)) {
+    if (load_collector_config(ebpf_user_config_dir, &disable_apps)) {
         error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
               ebpf_user_config_dir);
-        if (load_collector_config(ebpf_stock_config_dir)) {
+        if (load_collector_config(ebpf_stock_config_dir, &disable_apps)) {
             error("Does not have a stock file. It is starting with default options.");
         } else {
             enabled = 1;
@@ -709,6 +755,24 @@ static void parse_args(int argc, char **argv)
         info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
 #endif
     }
+
+    if (disable_apps)
+        return;
+
+    //Load apps_groups.conf
+    if (ebpf_read_apps_groups_conf(&apps_groups_default_target, &apps_groups_root_target,
+                                   ebpf_user_config_dir, "groups") ) {
+        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
+             ebpf_user_config_dir, ebpf_stock_config_dir);
+        if (ebpf_read_apps_groups_conf(&apps_groups_default_target, &apps_groups_root_target,
+                                       ebpf_stock_config_dir, "groups") ) {
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
+                  ebpf_stock_config_dir);
+            thread_finished++;
+            ebpf_exit(1);
+        }
+    } else
+        info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
 }
 
 
@@ -734,14 +798,14 @@ int main(int argc, char **argv)
     running_on_kernel =  get_kernel_version(kernel_string, 63);
     if(!has_condition_to_run(running_on_kernel)) {
         error("The current collector cannot run on this kernel.");
-        return 1;
+        return 2;
     }
 
     if(!am_i_running_as_root()) {
         error("ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
               (unsigned int)getuid(), (unsigned int)geteuid()
               );
-        return 1;
+        return 3;
     }
 
     //set name
@@ -757,7 +821,7 @@ int main(int argc, char **argv)
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("Setrlimit(RLIMIT_MEMLOCK)");
-        return 2;
+        return 4;
     }
 
     signal(SIGINT, ebpf_exit);
@@ -766,7 +830,7 @@ int main(int argc, char **argv)
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
         error("Cannot start the mutex.");
-        ebpf_exit(3);
+        ebpf_exit(5);
     }
 
     struct netdata_static_thread ebpf_threads[] = {

@@ -310,8 +310,8 @@ struct target *get_apps_groups_target(struct target **apps_groups_root_target, c
 /**
  * Read the apps_groups.conf file
  *
- * @param path
- * @param file
+ * @param path the directory to search apps_%s.conf
+ * @param file the word to complement the file name.
  *
  * @return It returns 0 on succcess and -1 otherwise
  */

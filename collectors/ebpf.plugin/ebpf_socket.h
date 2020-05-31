@@ -38,6 +38,7 @@ typedef enum ebpf_socket_idx {
 # define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
 // Charts created on Apps submenu
-# define NETDATA_NET_APPS_BANDWIDTH "bandwidth"
+# define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
+# define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
 
 #endif

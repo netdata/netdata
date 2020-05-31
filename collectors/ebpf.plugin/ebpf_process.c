@@ -291,10 +291,11 @@ static void ebpf_process_status_chart(char *family, char *name, char *axis, char
  *
  * @param em a pointer to the structure with the default values.
  */
-static void ebpf_create_global_charts(ebpf_module_t *em) {
+static void ebpf_create_global_charts(ebpf_module_t *em)
+{
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_FILE_OPEN_CLOSE_COUNT
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_FILE_GROUP
         , 21000
         , ebpf_create_global_dimension
@@ -304,7 +305,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_FILE_OPEN_ERR_COUNT
-            , "Calls"
+            , EBPF_COMMON_DIMENSION_CALL
             , NETDATA_FILE_GROUP
             , 21001
             , ebpf_create_global_dimension
@@ -314,7 +315,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_VFS_FILE_CLEAN_COUNT
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_VFS_GROUP
         , 21002
         , ebpf_create_global_dimension
@@ -323,7 +324,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_VFS_FILE_IO_COUNT
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_VFS_GROUP
         , 21003
         , ebpf_create_global_dimension
@@ -333,13 +334,13 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
     if (em->mode < MODE_ENTRY) {
         ebpf_create_io_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_IO_FILE_BYTES
-            , "bytes/s"
+            , EBPF_COMMON_DIMENSION_BYTESS
             , NETDATA_VFS_GROUP
             , 21004);
 
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_ERR_COUNT
-            , "Calls"
+            , EBPF_COMMON_DIMENSION_CALL
             , NETDATA_VFS_GROUP
             , 21005
             , ebpf_create_global_dimension
@@ -350,7 +351,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_PROCESS_SYSCALL
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_PROCESS_GROUP
         , 21006
         , ebpf_create_global_dimension
@@ -359,7 +360,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY
         , NETDATA_EXIT_SYSCALL
-        , "Calls"
+        , EBPF_COMMON_DIMENSION_CALL
         , NETDATA_PROCESS_GROUP
         , 21007
         , ebpf_create_global_dimension
@@ -368,20 +369,123 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
 
     ebpf_process_status_chart(NETDATA_EBPF_FAMILY
         , NETDATA_PROCESS_STATUS_NAME
-        , "Total"
+        , EBPF_COMMON_DIMENSION_DIFFERENCE
         , NETDATA_PROCESS_GROUP
         , 21008);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_PROCESS_ERROR_NAME
-            , "Calls"
+            , EBPF_COMMON_DIMENSION_CALL
             , NETDATA_PROCESS_GROUP
             , 21009
             , ebpf_create_global_dimension
             , &process_publish_aggregated[NETDATA_PROCESS_START]
             , 2);
     }
+
+}
+
+/**
+ * Create apps charts
+ *
+ * Call ebpf_create_chart to create the charts on apps submenu.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static void ebpf_process_create_apps_charts(ebpf_module_t *em)
+{
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20061,
+                               apps_groups_root_target);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   20062,
+                                   apps_groups_root_target);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20063,
+                               apps_groups_root_target);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   20064,
+                                   apps_groups_root_target);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20065,
+                               apps_groups_root_target);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   20066,
+                                   apps_groups_root_target);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20067,
+                               apps_groups_root_target);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   20068,
+                                   apps_groups_root_target);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20069,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
+                               EBPF_COMMON_DIMENSION_BYTESS,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20070,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
+                               EBPF_COMMON_DIMENSION_BYTESS,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20071,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20072,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20073,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20074,
+                               apps_groups_root_target);
 
 }
 
@@ -514,7 +618,11 @@ void *ebpf_process_thread(void *ptr)
                        process_id_names, NETDATA_MAX_MONITOR_VECTOR);
 
     ebpf_create_global_charts(em);
+    if (em->apps_charts)
+        ebpf_process_create_apps_charts(em);
+
     pthread_mutex_unlock(&lock);
+
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
 endprocess:

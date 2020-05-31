@@ -9,8 +9,8 @@
 # include "../../libnetdata/ebpf/ebpf.h"
 
 # define NETDATA_APPS_FAMILY "apps"
-# define NETDATA_APPS_SYSCALL_GROUP "syscall"
-# define NETDATA_APPS_NET_GROUP "net"
+# define NETDATA_APPS_SYSCALL_GROUP "ebpf syscall"
+# define NETDATA_APPS_NET_GROUP "ebpf net"
 
 # define MAX_COMPARE_NAME 100
 # define MAX_NAME 100
