@@ -9,6 +9,7 @@
 - Add CI check for building against LibreSSL [\#9216](https://github.com/netdata/netdata/pull/9216) ([prologic](https://github.com/prologic))
 - Update eBPF to use kernel-collector version 0.4.0. [\#9212](https://github.com/netdata/netdata/pull/9212) ([Ferroin](https://github.com/Ferroin))
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
+- fix compilation for older systems [\#9198](https://github.com/netdata/netdata/pull/9198) ([ktsaou](https://github.com/ktsaou))
 - Clean type\_name in exporting connector instance configuration [\#9188](https://github.com/netdata/netdata/pull/9188) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed cmake build affected by \#9074 [\#9186](https://github.com/netdata/netdata/pull/9186) ([stelfrag](https://github.com/stelfrag))
 - Fix exporting unit tests [\#9183](https://github.com/netdata/netdata/pull/9183) ([vlvkobal](https://github.com/vlvkobal))
