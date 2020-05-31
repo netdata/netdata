@@ -44,5 +44,22 @@ CPUSchedulingPolicy=idle
 # For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata (-20 highest to 19 lowest).
 #Nice=0
 
+# Capabilities
+CapabilityBoundingSet=CAP_DAC_OVERRIDE    # is required for freeipmi and slabinfo plugins
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH # is required for apps plugin
+CapabilityBoundingSet=CAP_FOWNER          # is required for freeipmi plugin
+CapabilityBoundingSet=CAP_SETPCAP         # is required for apps, perf and slabinfo plugins
+CapabilityBoundingSet=CAP_SYS_ADMIN       # is required for perf plugin
+CapabilityBoundingSet=CAP_SYS_PTRACE      # is required for apps plugin
+CapabilityBoundingSet=CAP_NET_RAW         # is required for fping app
+
+# Sandboxing
+ProtectSystem=full
+ProtectHome=read-only
+# PrivateTmp break netdatacli functionality. See - https://github.com/netdata/netdata/issues/7587
+#PrivateTmp=true
+ProtectControlGroups=true
+PrivateMounts=true
+
 [Install]
 WantedBy=multi-user.target
