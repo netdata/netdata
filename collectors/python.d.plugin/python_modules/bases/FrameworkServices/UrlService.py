@@ -120,21 +120,34 @@ class UrlService(SimpleService):
         :return: str
         """
         try:
-            status, data = self._get_raw_data_with_status(url, manager, **kwargs)
+            response = self._do_request(url, manager, **kwargs)
         except Exception as error:
             self.error('Url: {url}. Error: {error}'.format(url=url or self.url, error=error))
             return None
 
-        if status == 200:
-            return data
+        if response.status == 200:
+            if isinstance(response.data, str):
+                return response.data
+            return response.data.decode(errors='ignore')
         else:
-            self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=status))
+            self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=response.status))
             return None
 
     def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
         """
         Get status and response body content from http request. Does not catch exceptions
         :return: int, str
+        """
+        response = self._do_request(url, manager, retries, redirect, **kwargs)
+
+        if isinstance(response.data, str):
+            return response.status, response.data
+        return response.status, response.data.decode(errors='ignore')
+
+    def _do_request(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
+        """
+        Get response from http request. Does not catch exceptions
+        :return: HTTPResponse
         """
         url = url or self.url
         manager = manager or self._manager
@@ -154,9 +167,7 @@ class UrlService(SimpleService):
             redirect=redirect,
             **kwargs
         )
-        if isinstance(response.data, str):
-            return response.status, response.data
-        return response.status, response.data.decode(errors='ignore')
+        return response
 
     def check(self):
         """
