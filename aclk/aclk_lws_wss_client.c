@@ -322,6 +322,10 @@ int aclk_lws_wss_connect(char *host, int port)
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
+#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 0
+#warning DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.
+    i.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+#endif
     lws_client_connect_via_info(&i);
     return 0;
 }

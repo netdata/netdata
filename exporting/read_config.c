@@ -356,6 +356,12 @@ struct engine *read_exporting_config()
         char *data_source = exporter_get(instance_name, "data source", "average");
 
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
+        if (EXPORTING_OPTIONS_DATA_SOURCE(tmp_instance->config.options) != EXPORTING_SOURCE_DATA_AS_COLLECTED &&
+            tmp_instance->config.update_every % localhost->rrd_update_every)
+            info(
+                "The update interval %d for instance %s is not a multiple of the database update interval %d. "
+                "Metric values will deviate at different points in time.",
+                tmp_instance->config.update_every, tmp_instance->config.name, localhost->rrd_update_every);
 
         if (exporter_get_boolean(instance_name, "send configured labels", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
@@ -390,7 +396,8 @@ struct engine *read_exporting_config()
 
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
-            connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", "netdata"));
+            connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", ""));
+
             connector_specific_config->auth_key_id = strdupz(exporter_get(instance_name, "aws_access_key_id", ""));
             connector_specific_config->secure_key = strdupz(exporter_get(instance_name, "aws_secret_access_key", ""));
         }
@@ -422,6 +429,12 @@ struct engine *read_exporting_config()
         }
 
         tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
+
+#ifdef ENABLE_HTTPS
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) {
+            tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
+        }
+#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
         info(

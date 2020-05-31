@@ -40,7 +40,7 @@ gives you a ton of value at no cost:
 > View key metrics and active alarms at-a-glance, and then seamlessly dive into any of your distributed dashboards
 > without leaving Cloud's centralized interface.
 
-You can as made nodes and team members as you need, and as our free and open source Agent gets better with more
+You can add as many nodes and team members as you need, and as our free and open source Agent gets better with more
 features, new collectors for more applications, and improved UI, so will Cloud.
 
 ## Get started with Netdata Cloud

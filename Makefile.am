@@ -72,6 +72,9 @@ dist_noinst_DATA = \
     packaging/mosquitto.checksums \
     packaging/bundle-dashboard.sh \
     packaging/bundle-mosquitto.sh \
+    packaging/check-kernel-config.sh \
+    packaging/ebpf.checksums \
+    packaging/ebpf.version \
     packaging/bundle-lws.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
@@ -105,6 +108,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+    parser \
     aclk \
     spawn \
     $(NULL)
@@ -262,6 +266,10 @@ PERF_PLUGIN_FILES = \
 
 EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf.c \
+    collectors/ebpf.plugin/ebpf_process.c \
+    collectors/ebpf.plugin/ebpf_process.h \
+    collectors/ebpf.plugin/ebpf_socket.c \
+    collectors/ebpf.plugin/ebpf_socket.h \
     collectors/ebpf.plugin/ebpf.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
@@ -325,6 +333,8 @@ MACOS_PLUGIN_FILES = \
 PLUGINSD_PLUGIN_FILES = \
     collectors/plugins.d/plugins_d.c \
     collectors/plugins.d/plugins_d.h \
+    collectors/plugins.d/pluginsd_parser.c \
+    collectors/plugins.d/pluginsd_parser.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
@@ -472,6 +482,11 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
+PARSER_FILES = \
+    parser/parser.c \
+    parser/parser.h \
+    $(NULL)
+
 ACLK_FILES = \
     aclk/aclk_common.c \
     aclk/aclk_common.h \
@@ -597,6 +612,7 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
+    $(PARSER_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)

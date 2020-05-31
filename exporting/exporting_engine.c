@@ -5,6 +5,43 @@
 static struct engine *engine = NULL;
 
 /**
+ * Exporting Clean Engine
+ *
+ * Clean all variables allocated inside engine structure
+ *
+ * @param en a pointer to the strcuture that will be cleaned.
+ */
+static void exporting_clean_engine()
+{
+    if (!engine)
+        return;
+
+#if HAVE_KINESIS
+    if (engine->aws_sdk_initialized)
+        aws_sdk_shutdown();
+#endif
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if (engine->protocol_buffers_initialized)
+        protocol_buffers_shutdown();
+#endif
+
+    //Cleanup web api
+    prometheus_clean_server_root();
+
+    for (struct instance *instance = engine->instance_root; instance;) {
+        struct instance *current_instance = instance;
+        instance = instance->next;
+
+        clean_instance(current_instance);
+    }
+
+    freez((void *)engine->config.prefix);
+    freez((void *)engine->config.hostname);
+    freez(engine);
+}
+
+/**
  * Clean up the main exporting thread and all connector workers on Netdata exit
  *
  * @param ptr thread data.
@@ -48,18 +85,7 @@ static void exporting_main_cleanup(void *ptr)
         }
     }
 
-    for (struct instance *instance = engine->instance_root; instance;) {
-        struct instance *current_instance = instance;
-        instance = instance->next;
-        clean_instance(current_instance);
-    }
-
-    if (engine->config.prefix)
-        freez((void *)engine->config.prefix);
-    if (engine->config.hostname)
-        freez((void *)engine->config.hostname);
-    freez(engine);
-
+    exporting_clean_engine();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 

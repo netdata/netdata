@@ -35,409 +35,154 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 // ----------------------------------------------------------------------
-//Netdata eBPF library
-void *libnetdata = NULL;
-int (*load_bpf_file)(char *, int) = NULL;
-int (*set_bpf_perf_event)(int, int);
-int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
-int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
-void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
-int *map_fd = NULL;
-
-//Perf event variables
-static int pmu_fd[NETDATA_MAX_PROCESSOR];
-static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
-int page_cnt = 8;
-
-//Libbpf (It is necessary to have at least kernel 4.10)
-int (*bpf_map_lookup_elem)(int, const void *, void *);
-
-static char *plugin_dir = PLUGINS_DIR;
-static char *user_config_dir = CONFIG_DIR;
-static char *stock_config_dir = LIBCONFIG_DIR;
-static char *netdata_configured_log_dir = LOG_DIR;
-
-FILE *developer_log = NULL;
-
-//Global vectors
-netdata_syscall_stat_t *aggregated_data = NULL;
-netdata_publish_syscall_t *publish_aggregated = NULL;
+char *ebpf_plugin_dir = PLUGINS_DIR;
+static char *ebpf_user_config_dir = CONFIG_DIR;
+static char *ebpf_stock_config_dir = LIBCONFIG_DIR;
+static char *ebpf_configured_log_dir = LOG_DIR;
 
 static int update_every = 1;
 static int thread_finished = 0;
-static int close_plugin = 0;
-static netdata_run_mode_t mode = MODE_ENTRY;
-static int debug_log = 0;
-static int use_stdout = 0;
-struct config collector_config;
-static int mykernel = 0;
-static char kernel_string[64];
-static int nprocs;
+int close_ebpf_plugin = 0;
+struct config collector_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
+                                    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                               .rwlock = AVL_LOCK_INITIALIZER } };
+
+int running_on_kernel = 0;
+char kernel_string[64];
+int ebpf_nprocs;
 static int isrh;
 netdata_idx_t *hash_values;
 
 pthread_mutex_t lock;
 
-static struct ebpf_module {
-    const char *thread_name;
-    int enabled;
-    void (*start_routine) (void *);
-    int update_time;
-    int global_charts;
-    int apps_charts;
-    netdata_run_mode_t mode;
-} ebpf_modules[] = {
-    { .thread_name = "process", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
-    { .thread_name = "network_viewer", .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY },
-    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1, .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY },
+netdata_ebpf_events_t process_probes[] = {
+    { .type = 'r', .name = "vfs_write" },
+    { .type = 'r', .name = "vfs_writev" },
+    { .type = 'r', .name = "vfs_read" },
+    { .type = 'r', .name = "vfs_readv" },
+    { .type = 'r', .name = "do_sys_open" },
+    { .type = 'r', .name = "vfs_unlink" },
+    { .type = 'p', .name = "do_exit" },
+    { .type = 'p', .name = "release_task" },
+    { .type = 'r', .name = "_do_fork" },
+    { .type = 'r', .name = "__close_fd" },
+    { .type = 'r', .name = "__x64_sys_clone" },
+    { .type = 0, .name = NULL }
 };
 
-static char *dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "delete", "read", "write", "process", "task", "process", "thread" };
-static char *id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open", "__close_fd", "vfs_unlink", "vfs_read", "vfs_write", "do_exit", "release_task", "_do_fork", "sys_clone" };
-static char *status[] = { "process", "zombie" };
-
-int event_pid = 0;
-netdata_ebpf_events_t collector_events[] = {
-        { .type = 'r', .name = "vfs_write" },
-        { .type = 'r', .name = "vfs_writev" },
-        { .type = 'r', .name = "vfs_read" },
-        { .type = 'r', .name = "vfs_readv" },
-        { .type = 'r', .name = "do_sys_open" },
-        { .type = 'r', .name = "vfs_unlink" },
-        { .type = 'p', .name = "do_exit" },
-        { .type = 'p', .name = "release_task" },
-        { .type = 'r', .name = "_do_fork" },
-        { .type = 'r', .name = "__close_fd" },
-        { .type = 'r', .name = "__x64_sys_clone" },
-        { .type = 0, .name = NULL }
+netdata_ebpf_events_t socket_probes[] = {
+    { .type = 'r', .name = "tcp_sendmsg" },
+    { .type = 'p', .name = "tcp_cleanup_rbuf" },
+    { .type = 'p', .name = "tcp_close" },
+    { .type = 'p', .name = "udp_recvmsg" },
+    { .type = 'r', .name = "udp_recvmsg" },
+    { .type = 'r', .name = "udp_sendmsg" },
+    { .type = 'p', .name = "do_exit" },
+    { .type = 0, .name = NULL }
 };
 
-void open_developer_log() {
-    char filename[FILENAME_MAX+1];
-    int tot = sprintf(filename, "%s/%s",  netdata_configured_log_dir, NETDATA_DEVELOPER_LOG_FILE);
+ebpf_module_t ebpf_modules[] = {
+    { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
+    { .thread_name = "socket", .config_name = "network viewer", .enabled = 0, .start_routine = ebpf_socket_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
+    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
+      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
+};
 
-    if(tot > 0)
-        developer_log = fopen(filename, "a");
-}
-
-static int unmap_memory() {
-    int i;
-    int size = (int)sysconf(_SC_PAGESIZE)*(page_cnt + 1);
-    for ( i = 0 ; i < nprocs ; i++ ) {
-        if (perf_event_unmap(headers[i], size) < 0) {
-            fprintf(stderr,"[EBPF PROCESS] CANNOT unmap headers.\n");
-            return -1;
-        }
-
-        close(pmu_fd[i]);
-    }
-
-    return 0;
-}
-
-static void int_exit(int sig)
+/**
+ * Close the collector gracefully
+ *
+ * @param sig is the signal number used to close the collector
+ */
+static void ebpf_exit(int sig)
 {
-    close_plugin = 1;
+    int event_pid;
+    close_ebpf_plugin = 1;
 
     //When both threads were not finished case I try to go in front this address, the collector will crash
     if (!thread_finished) {
         return;
     }
 
-    if (aggregated_data) {
-        free(aggregated_data);
-        aggregated_data = NULL;
-    }
+    event_pid = getpid();
+    int ret = fork();
+    if (ret < 0) //error
+        error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
+    else if (!ret) { //child
+        int i;
+        for ( i=getdtablesize(); i>=0; --i)
+            close(i);
 
-    if (publish_aggregated) {
-        free(publish_aggregated);
-        publish_aggregated = NULL;
-    }
-
-    if(mode == MODE_DEVMODE && debug_log) {
-        unmap_memory();
-    }
-
-    if (libnetdata) {
-        dlclose(libnetdata);
-        libnetdata = NULL;
-    }
-
-    if (developer_log) {
-        fclose(developer_log);
-        developer_log = NULL;
-    }
-
-    if (hash_values) {
-        freez(hash_values);
-    }
-
-    if (event_pid) {
-        int ret = fork();
-        if (ret < 0) //error
-            error("[EBPF PROCESS] Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
-        else if (!ret) { //child
-            int i;
-            for ( i=getdtablesize(); i>=0; --i)
-                close(i);
-
-            int fd = open("/dev/null",O_RDWR, 0);
-            if (fd != -1) {
-                dup2 (fd, STDIN_FILENO);
-                dup2 (fd, STDOUT_FILENO);
-                dup2 (fd, STDERR_FILENO);
-            }
-
-            if (fd > 2)
-                close (fd);
-
-            int sid = setsid();
-            if(sid >= 0) {
-                sleep(1);
-                if(debug_log) {
-                    open_developer_log();
-                }
-                debug(D_EXIT, "Wait for father %d die", event_pid);
-                clean_kprobe_events(developer_log, event_pid, collector_events);
-            } else {
-                error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
-            }
-        } else { //parent
-            exit(0);
+        int fd = open("/dev/null",O_RDWR, 0);
+        if (fd != -1) {
+            dup2 (fd, STDIN_FILENO);
+            dup2 (fd, STDOUT_FILENO);
+            dup2 (fd, STDERR_FILENO);
         }
 
-        if (developer_log) {
-            fclose(developer_log);
-            developer_log = NULL;
+        if (fd > 2)
+            close (fd);
+
+        int sid = setsid();
+        if(sid >= 0) {
+            sleep(1);
+            debug(D_EXIT, "Wait for father %d die", event_pid);
+
+            for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
+                clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
+        } else {
+            error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
         }
+    } else { //parent
+        exit(0);
     }
 
     exit(sig);
 }
 
-static inline void netdata_write_chart_cmd(char *type
-                                    , char *id
-                                    , char *axis
-                                    , char *web
-                                    , int order)
-{
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-            , type
-            , id
-            , axis
-            , web
-            , order);
-}
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CREATE CHARTS
+ *
+ *****************************************************************/
 
-static void netdata_write_global_dimension(char *d, char *n)
-{
-    printf("DIMENSION %s %s absolute 1 1\n", d, n);
-}
-
-static void netdata_create_global_dimension(void *ptr, int end)
-{
-    netdata_publish_syscall_t *move = ptr;
-
-    int i = 0;
-    while (move && i < end) {
-        netdata_write_global_dimension(move->name, move->dimension);
-
-        move = move->next;
-        i++;
-    }
-}
-static inline void netdata_create_chart(char *family
-                                , char *name
-                                , char *axis
-                                , char *web
-                                , int order
-                                , void (*ncd)(void *, int)
-                                , void *move
-                                , int end)
-{
-    netdata_write_chart_cmd(family, name, axis, web, order);
-
-    ncd(move, end);
-}
-
-static void netdata_create_io_chart(char *family, char *name, char *axis, char *web, int order) {
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-            , family
-            , name
-            , axis
-            , web
-            , order);
-
-    printf("DIMENSION %s %s absolute 1 1\n", id_names[3], NETDATA_VFS_DIM_OUT_FILE_BYTES);
-    printf("DIMENSION %s %s absolute 1 1\n", id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
-}
-
-static void netdata_process_status_chart(char *family, char *name, char *axis, char *web, int order) {
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-            , family
-            , name
-            , axis
-            , web
-            , order);
-
-    printf("DIMENSION %s '' absolute 1 1\n", status[0]);
-    printf("DIMENSION %s '' absolute 1 1\n", status[1]);
-}
-
-static void netdata_global_charts_create() {
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_FILE_OPEN_CLOSE_COUNT
-            , "Calls"
-            , NETDATA_FILE_GROUP
-            , 970
-            , netdata_create_global_dimension
-            , publish_aggregated
-            , 2);
-
-    if(mode < MODE_ENTRY) {
-        netdata_create_chart(NETDATA_EBPF_FAMILY
-                , NETDATA_FILE_OPEN_ERR_COUNT
-                , "Calls"
-                , NETDATA_FILE_GROUP
-                , 971
-                , netdata_create_global_dimension
-                , publish_aggregated
-                , 2);
-    }
-
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_VFS_FILE_CLEAN_COUNT
-            , "Calls"
-            , NETDATA_VFS_GROUP
-            , 972
-            , netdata_create_global_dimension
-            , &publish_aggregated[NETDATA_DEL_START]
-            , 1);
-
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_VFS_FILE_IO_COUNT
-            , "Calls"
-            , NETDATA_VFS_GROUP
-            , 973
-            , netdata_create_global_dimension
-            , &publish_aggregated[NETDATA_IN_START_BYTE]
-            , 2);
-
-    if(mode < MODE_ENTRY) {
-        netdata_create_io_chart(NETDATA_EBPF_FAMILY
-                , NETDATA_VFS_IO_FILE_BYTES
-                , "bytes/s"
-                , NETDATA_VFS_GROUP
-                , 974);
-
-        netdata_create_chart(NETDATA_EBPF_FAMILY
-                , NETDATA_VFS_FILE_ERR_COUNT
-                , "Calls"
-                , NETDATA_VFS_GROUP
-                , 975
-                , netdata_create_global_dimension
-                , &publish_aggregated[2]
-                , NETDATA_VFS_ERRORS);
-
-    }
-
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_PROCESS_SYSCALL
-            , "Calls"
-            , NETDATA_PROCESS_GROUP
-            , 976
-            , netdata_create_global_dimension
-            , &publish_aggregated[NETDATA_PROCESS_START]
-            , 2);
-
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_EXIT_SYSCALL
-            , "Calls"
-            , NETDATA_PROCESS_GROUP
-            , 977
-            , netdata_create_global_dimension
-            , &publish_aggregated[NETDATA_EXIT_START]
-            , 2);
-
-    netdata_process_status_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_PROCESS_STATUS_NAME
-            , "Total"
-            , NETDATA_PROCESS_GROUP
-            , 978);
-
-    if(mode < MODE_ENTRY) {
-        netdata_create_chart(NETDATA_EBPF_FAMILY
-                , NETDATA_PROCESS_ERROR_NAME
-                , "Calls"
-                , NETDATA_PROCESS_GROUP
-                , 979
-                , netdata_create_global_dimension
-                , &publish_aggregated[NETDATA_PROCESS_START]
-                , 2);
-    }
-
-}
-
-
-static void netdata_create_charts() {
-    netdata_global_charts_create();
-}
-
-static void netdata_update_publish(netdata_publish_syscall_t *publish
-        , netdata_publish_vfs_common_t *pvc
-        , netdata_syscall_stat_t *input) {
-
-    netdata_publish_syscall_t *move = publish;
-    while(move) {
-        if(input->call != move->pcall) {
-            //This condition happens to avoid initial values with dimensions higher than normal values.
-            if(move->pcall) {
-                move->ncall = (input->call > move->pcall)?input->call - move->pcall: move->pcall - input->call;
-                move->nbyte = (input->bytes > move->pbyte)?input->bytes - move->pbyte: move->pbyte - input->bytes;
-                move->nerr = (input->ecall > move->nerr)?input->ecall - move->perr: move->perr - input->ecall;
-            } else {
-                move->ncall = 0;
-                move->nbyte = 0;
-                move->nerr = 0;
-            }
-
-            move->pcall = input->call;
-            move->pbyte = input->bytes;
-            move->perr = input->ecall;
-        } else {
-            move->ncall = 0;
-            move->nbyte = 0;
-            move->nerr = 0;
-        }
-
-        input = input->next;
-        move = move->next;
-    }
-
-    pvc->write = -((long)publish[2].nbyte);
-    pvc->read = (long)publish[3].nbyte;
-
-    pvc->running = (long)publish[7].ncall - (long)publish[8].ncall;
-    publish[6].ncall = -publish[6].ncall; // release
-    pvc->zombie = (long)publish[5].ncall + (long)publish[6].ncall;
-}
-
-static inline void write_begin_chart(char *family, char *name)
+/**
+ * Write begin command on standard output
+ *
+ * @param family the chart family name
+ * @param name   the chart name
+ */
+void write_begin_chart(char *family, char *name)
 {
     int ret = printf( "BEGIN %s.%s\n"
-            , family
-            , name);
+        , family
+        , name);
 
     (void)ret;
 }
 
-static inline void write_chart_dimension(char *dim, long long value)
+/**
+ * Write set command on standard output
+ *
+ * @param dim    the dimension name
+ * @param value  the value for the dimension
+ */
+void write_chart_dimension(char *dim, long long value)
 {
     int ret = printf("SET %s = %lld\n", dim, value);
     (void)ret;
 }
 
-static void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param name    the chart name
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ * @param end     the number of values that will be written on standard output
+ */
+void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     write_begin_chart(family, name);
 
     int i = 0;
@@ -451,7 +196,15 @@ static void write_global_count_chart(char *name, char *family, netdata_publish_s
     printf("END\n");
 }
 
-static void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param name    the chart name
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ * @param end     the number of values that will be written on standard output
+ */
+void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     write_begin_chart(family, name);
 
     int i = 0;
@@ -465,176 +218,129 @@ static void write_global_err_chart(char *name, char *family, netdata_publish_sys
     printf("END\n");
 }
 
-static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
-    write_begin_chart(family, NETDATA_VFS_IO_FILE_BYTES);
 
-    write_chart_dimension(id_names[3], (long long) pvc->write);
-    write_chart_dimension(id_names[4], (long long) pvc->read);
+/**
+ * Call the necessary functions to create a chart.
+ *
+ * @param family  the chart family
+ * @param move    the pointer with the values that will be published
+ */
+void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
+    write_begin_chart(family, chart);
 
-    printf("END\n");
-}
-
-static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc) {
-    write_begin_chart(family, NETDATA_PROCESS_STATUS_NAME);
-
-    write_chart_dimension(status[0], (long long) pvc->running);
-    write_chart_dimension(status[1], (long long) pvc->zombie);
+    write_chart_dimension(dwrite, (long long) pvc->write);
+    write_chart_dimension(dread, (long long) pvc->read);
 
     printf("END\n");
 }
 
-static void netdata_publish_data() {
-    netdata_publish_vfs_common_t pvc;
-    netdata_update_publish(publish_aggregated, &pvc, aggregated_data);
-
-    write_global_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
-    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_DEL_START], 1);
-    write_global_count_chart(NETDATA_VFS_FILE_IO_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 2);
-    write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], 2);
-    write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
-
-    write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
-    if(mode < MODE_ENTRY) {
-        write_global_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
-        write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[2], NETDATA_VFS_ERRORS);
-        write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
-
-        write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
-    }
-}
-
-void *process_publisher(void *ptr)
+/**
+ * Write chart cmd on standard output
+ *
+ * @param type  the chart type
+ * @param id    the chart id
+ * @param axis  the axis label
+ * @param web   the group name used to attach the chart on dashaboard
+ * @param order the chart order
+ */
+void ebpf_write_chart_cmd(char *type
+    , char *id
+    , char *axis
+    , char *web
+    , int order)
 {
-    (void)ptr;
-    netdata_create_charts();
-
-    usec_t step = update_every * USEC_PER_SEC;
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    while(!close_plugin) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-
-        pthread_mutex_lock(&lock);
-        netdata_publish_data();
-        pthread_mutex_unlock(&lock);
-
-        fflush(stdout);
-    }
-
-    return NULL;
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
+        , type
+        , id
+        , axis
+        , web
+        , order);
 }
 
-static void move_from_kernel2user_global() {
-    uint64_t idx;
-    netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
-
-    netdata_idx_t *val = hash_values;
-    for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
-        if(!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
-            uint64_t total = 0;
-            int i;
-            int end = (mykernel < NETDATA_KERNEL_V4_15)?1:nprocs;
-            for (i = 0; i < end; i++)
-                total += val[i];
-
-            res[idx] = total;
-        } else {
-            res[idx] = 0;
-        }
-    }
-
-    aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
-    aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
-    aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
-    aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
-    aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
-    aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
-    aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
-    aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
-    aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
-
-    aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
-    aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
-    aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
-    aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
-    aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
-    aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
-    aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
-
-    aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
-    aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
-}
-
-static void move_from_kernel2user()
+/**
+ * Write the dimension command on standard output
+ *
+ * @param n the dimension name
+ * @param d the dimension information
+ */
+void ebpf_write_global_dimension(char *n, char *d)
 {
-    move_from_kernel2user_global();
+    printf("DIMENSION %s %s absolute 1 1\n", n, d);
 }
 
-void *process_collector(void *ptr)
+/**
+ * Call ebpf_write_global_dimension to create the dimensions for a specific chart
+ *
+ * @param ptr a pointer to a structure of the type netdata_publish_syscall_t
+ * @param end the number of dimensions for the structure ptr
+ */
+void ebpf_create_global_dimension(void *ptr, int end)
 {
-    (void)ptr;
+    netdata_publish_syscall_t *move = ptr;
 
-    usec_t step = 778879ULL;
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    while(!close_plugin) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
+    int i = 0;
+    while (move && i < end) {
+        ebpf_write_global_dimension(move->name, move->dimension);
 
-        pthread_mutex_lock(&lock);
-        move_from_kernel2user();
-        pthread_mutex_unlock(&lock);
+        move = move->next;
+        i++;
     }
-
-    return NULL;
 }
 
-static int netdata_store_bpf(void *data, int size) {
-    (void)size;
-
-    if (close_plugin)
-        return 0;
-
-    if(!debug_log)
-        return -2; //LIBBPF_PERF_EVENT_CONT;
-
-    netdata_error_report_t *e = data;
-    fprintf(developer_log
-            ,"%llu %s %u: %s, %d\n"
-            , now_realtime_usec() ,e->comm, e->pid, dimension_names[e->type], e->err);
-    fflush(developer_log);
-
-    return -2; //LIBBPF_PERF_EVENT_CONT;
-}
-
-void *process_log(void *ptr)
+/**
+ *  Call write_chart_cmd to create the charts
+ *
+ * @param family the chart family
+ * @param name   the chart name
+ * @param axis   the axis label
+ * @param web    the group name used to attach the chart on dashaboard
+ * @param order  the order number of the specified chart
+ * @param ncd    a pointer to a function called to create dimensions
+ * @param move   a pointer for a structure that has the dimensions
+ * @param end    number of dimensions for the chart created
+ */
+void ebpf_create_chart(char *family
+    , char *name
+    , char *axis
+    , char *web
+    , int order
+    , void (*ncd)(void *, int)
+    , void *move
+    , int end)
 {
-    (void) ptr;
+    ebpf_write_chart_cmd(family, name, axis, web, order);
 
-    if (mode == MODE_DEVMODE && debug_log) {
-        netdata_perf_loop_multi(pmu_fd, headers, nprocs, &close_plugin, netdata_store_bpf, page_cnt);
-    }
-
-    return NULL;
+    ncd(move, end);
 }
 
-void set_global_labels() {
+/*****************************************************************
+ *
+ *  FUNCTIONS TO DEFINE OPTIONS
+ *
+ *****************************************************************/
+
+/**
+ * Define labels used to generate charts
+ *
+ * @param is   structure with information about number of calls made for a function.
+ * @param pio  structure used to generate charts.
+ * @param dim  a pointer for the dimensions name
+ * @param name a pointer for the tensor with the name of the functions.
+ * @param end  the number of elements in the previous 4 arguments.
+ */
+void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end) {
     int i;
 
-    netdata_syscall_stat_t *is = aggregated_data;
     netdata_syscall_stat_t *prev = NULL;
-
-    netdata_publish_syscall_t *pio = publish_aggregated;
     netdata_publish_syscall_t *publish_prev = NULL;
-    for (i = 0; i < NETDATA_MAX_MONITOR_VECTOR; i++) {
+    for (i = 0; i < end; i++) {
         if(prev) {
             prev->next = &is[i];
         }
         prev = &is[i];
 
-        pio[i].dimension = dimension_names[i];
-        pio[i].name = id_names[i];
+        pio[i].dimension = dim[i];
+        pio[i].name = name[i];
         if(publish_prev) {
             publish_prev->next = &pio[i];
         }
@@ -642,311 +348,11 @@ void set_global_labels() {
     }
 }
 
-int allocate_global_vectors() {
-    aggregated_data = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_syscall_stat_t));
-    if(!aggregated_data) {
-        return -1;
-    }
-
-    publish_aggregated = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_publish_syscall_t));
-    if(!publish_aggregated) {
-        return -1;
-    }
-
-    hash_values = callocz(nprocs, sizeof(netdata_idx_t));
-    if(!hash_values) {
-        return -1;
-    }
-
-    return 0;
-}
-
-static void build_complete_path(char *out, size_t length,char *path, char *filename) {
-    if(path){
-        snprintf(out, length, "%s/%s", path, filename);
-    } else {
-        snprintf(out, length, "%s", filename);
-    }
-}
-
-static int map_memory() {
-    int i;
-    for (i = 0; i < nprocs; i++) {
-        pmu_fd[i] = set_bpf_perf_event(i, 2);
-
-        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
-            return -1;
-        }
-    }
-    return 0;
-}
-
-static int ebpf_load_libraries()
-{
-    char *err = NULL;
-    char lpath[4096];
-    char netdatasl[128];
-    char *libbase = { "libnetdata_ebpf.so" };
-
-    snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
-    build_complete_path(lpath, 4096, plugin_dir, netdatasl);
-    libnetdata = dlopen(lpath, RTLD_LAZY);
-    if (!libnetdata) {
-        info("[EBPF_PROCESS] Cannot load library %s for the current kernel.", lpath);
-
-        //Update kernel
-        char *library = ebpf_library_suffix(mykernel, (isrh < 0)?0:1);
-        size_t length = strlen(library);
-        strncpyz(kernel_string, library, length);
-        kernel_string[length] = '\0';
-
-        //Try to load the default version
-        snprintf(netdatasl, 127, "%s.%s", libbase, kernel_string);
-        build_complete_path(lpath, 4096, plugin_dir, netdatasl);
-        libnetdata = dlopen(lpath, RTLD_LAZY);
-        if (!libnetdata) {
-            error("[EBPF_PROCESS] Cannot load %s default library.", lpath);
-            return -1;
-        } else {
-            info("[EBPF_PROCESS] Default shared library %s loaded with success.", lpath);
-        }
-    } else {
-        info("[EBPF_PROCESS] Current shared library %s loaded with success.", lpath);
-    }
-
-    load_bpf_file = dlsym(libnetdata, "load_bpf_file");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find load_bpf_file: %s", err);
-        return -1;
-    }
-
-    map_fd =  dlsym(libnetdata, "map_fd");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find map_fd: %s", err);
-        return -1;
-    }
-
-    bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
-    if ((err = dlerror()) != NULL) {
-        error("[EBPF_PROCESS] Cannot find bpf_map_lookup_elem: %s", err);
-        return -1;
-    }
-
-    if(mode == 1) {
-        set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
-        if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
-            return -1;
-        }
-
-        perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
-        if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
-            return -1;
-        }
-
-        perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
-        if ((err = dlerror()) != NULL) {
-            error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
-            return -1;
-        }
-
-        if(mode == MODE_DEVMODE) {
-            set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find set_bpf_perf_event: %s", err);
-                return -1;
-            }
-
-            perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_unmap: %s", err);
-                return -1;
-            }
-
-            perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find perf_event_mmap_header: %s", err);
-                return -1;
-            }
-
-            netdata_perf_loop_multi = dlsym(libnetdata, "netdata_perf_loop_multi");
-            if ((err = dlerror()) != NULL) {
-                error("[EBPF_PROCESS] Cannot find netdata_perf_loop_multi: %s", err);
-                return -1;
-            }
-        }
-    }
-
-    return 0;
-}
-
-int select_file(char *name, int length) {
-    int ret = -1;
-    if (!mode)
-        ret = snprintf(name, (size_t)length, "rnetdata_ebpf_process.%s.o", kernel_string);
-    else if(mode == 1)
-        ret = snprintf(name, (size_t)length, "dnetdata_ebpf_process.%s.o", kernel_string);
-    else if(mode == 2)
-        ret = snprintf(name, (size_t)length, "pnetdata_ebpf_process.%s.o", kernel_string);
-
-    return ret;
-}
-
-int process_load_ebpf()
-{
-    char lpath[4096];
-    char name[128];
-
-    int test = select_file(name, 127);
-    if (test < 0 || test > 127)
-        return -1;
-
-    build_complete_path(lpath, 4096, plugin_dir,  name);
-    event_pid = getpid();
-    if (load_bpf_file(lpath, event_pid)) {
-        error("[EBPF_PROCESS] Cannot load program: %s", lpath);
-        return -1;
-    } else {
-        info("[EBPF PROCESS]: The eBPF program %s was loaded with success.", name);
-    }
-
-    return 0;
-}
-
-void set_global_variables() {
-    //Get environment variables
-    plugin_dir = getenv("NETDATA_PLUGINS_DIR");
-    if(!plugin_dir)
-        plugin_dir = PLUGINS_DIR;
-
-    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if(!user_config_dir)
-        user_config_dir = CONFIG_DIR;
-
-    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if(!stock_config_dir)
-        stock_config_dir = LIBCONFIG_DIR;
-
-    netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if(!netdata_configured_log_dir)
-        netdata_configured_log_dir = LOG_DIR;
-
-    page_cnt *= (int)sysconf(_SC_NPROCESSORS_ONLN);
-
-    nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (nprocs > NETDATA_MAX_PROCESSOR) {
-        nprocs = NETDATA_MAX_PROCESSOR;
-    }
-
-    isrh = get_redhat_release();
-}
-
-static void change_collector_event() {
-    int i;
-    if (mykernel < NETDATA_KERNEL_V5_3)
-        collector_events[10].name = NULL;
-
-    for (i = 0; collector_events[i].name ; i++ ) {
-        collector_events[i].type = 'p';
-    }
-}
-
-static void change_syscalls() {
-    static char *lfork = { "do_fork" };
-    id_names[7] = lfork;
-    collector_events[8].name = lfork;
-}
-
-static inline void what_to_load(char *ptr) {
-    if (!strcasecmp(ptr, "return"))
-        mode = MODE_RETURN;
-    /*
-    else if (!strcasecmp(ptr, "dev"))
-        mode = 1;
-        */
-    else
-        change_collector_event();
-
-    if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
-        change_syscalls();
-}
-
-static inline void enable_debug(char *ptr) {
-    if (!strcasecmp(ptr, "yes"))
-        debug_log = 1;
-}
-
-static inline void set_log_file(char *ptr) {
-    if (!strcasecmp(ptr, "yes"))
-        use_stdout = 1;
-}
-
-static void set_global_values() {
-    struct section *sec = collector_config.first_section;
-    while(sec) {
-        if(!strcasecmp(sec->name, "global")) {
-            struct config_option *values = sec->values;
-            while(values) {
-                if(!strcasecmp(values->name, "load"))
-                    what_to_load(values->value);
-                else if(!strcasecmp(values->name, "debug log"))
-                    enable_debug(values->value);
-                else if(!strcasecmp(values->name, "use stdout"))
-                    set_log_file(values->value);
-
-                values = values->next;
-            }
-        }
-        sec = sec->next;
-    }
-}
-
-static int load_collector_file(char *path) {
-    char lpath[4096];
-
-    build_complete_path(lpath, 4096, path, "ebpf.conf" );
-
-    if (!appconfig_load(&collector_config, lpath, 0, NULL))
-        return 1;
-
-    set_global_values();
-
-    return 0;
-}
-
-static inline void ebpf_disable_apps() {
-    int i ;
-    for (i = 0 ;ebpf_modules[i].thread_name ; i++ ) {
-        ebpf_modules[i].apps_charts = 0;
-    }
-}
-
-static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int disable_apps) {
-    em->enabled = 1;
-    if (!disable_apps) {
-        em->apps_charts = 1;
-    }
-    em->global_charts = 1;
-}
-
-static inline void ebpf_enable_all_charts(int apps) {
-    int i ;
-    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
-        ebpf_enable_specific_chart(&ebpf_modules[i], apps);
-    }
-}
-
-static inline void ebpf_enable_chart(int enable, int disable_apps) {
-    int i ;
-    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
-        if (i == enable) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
-            break;
-        }
-    }
-}
-
+/**
+ * Define thread mode for all ebpf program.
+ *
+ * @param lmode  the mode that will be used for them.
+ */
 static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
     int i ;
     for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
@@ -954,6 +360,63 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
     }
 }
 
+/**
+ * Enable specific charts selected by user.
+ *
+ * @param em      the structure that will be changed
+ * @param enable the status about the apps charts.
+ */
+static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int enable) {
+    em->enabled = 1;
+    if (!enable) {
+        em->apps_charts = 1;
+    }
+    em->global_charts = 1;
+}
+
+/**
+ * Enable all charts
+ *
+ * @param apps what is the current status of apps
+ */
+static inline void ebpf_enable_all_charts(int apps) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_enable_specific_chart(&ebpf_modules[i], apps);
+    }
+}
+
+/**
+ * Enable the specified chart group
+ *
+ * @param idx            the index of ebpf_modules that I am enabling
+ * @param disable_apps   should I keep apps charts?
+ */
+static inline void ebpf_enable_chart(int idx, int disable_apps) {
+    int i ;
+    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+        if (i == idx) {
+            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
+            break;
+        }
+    }
+}
+
+/**
+ * Disable APPs
+ *
+ * Disable charts for apps loading only global charts.
+ */
+static inline void ebpf_disable_apps() {
+    int i ;
+    for (i = 0 ;ebpf_modules[i].thread_name ; i++ ) {
+        ebpf_modules[i].apps_charts = 0;
+    }
+}
+
+/**
+ * Print help on standard error for user knows how to use the collector.
+ */
 void ebpf_print_help() {
     const time_t t = time(NULL);
     struct tm ct;
@@ -996,6 +459,151 @@ void ebpf_print_help() {
     );
 }
 
+/*****************************************************************
+ *
+ *  AUXILIAR FUNCTIONS USED DURING INITIALIZATION
+ *
+ *****************************************************************/
+
+/**
+ * Fill the ebpf_functions structure with default values
+ *
+ * @param ef the pointer to set default values
+ */
+void fill_ebpf_functions(ebpf_functions_t *ef) {
+    memset(ef, 0, sizeof(ebpf_functions_t));
+    ef->kernel_string = kernel_string;
+    ef->running_on_kernel = running_on_kernel;
+    ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
+    ef->isrh = isrh;
+}
+
+/**
+ * Define how to load the ebpf programs
+ *
+ * @param ptr the option given by users
+ */
+static inline void how_to_load(char *ptr)
+{
+    if (!strcasecmp(ptr, "return"))
+        ebpf_set_thread_mode(MODE_RETURN);
+    else if (!strcasecmp(ptr, "entry"))
+        ebpf_set_thread_mode(MODE_ENTRY);
+    else
+        error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
+}
+
+/**
+ * Parse disable apps option
+ *
+ * @param ptr the option given by users
+ *
+ * @return It returns 1 to disable the charts or 0 otherwise.
+ */
+static inline int parse_disable_apps(char *ptr)
+{
+    if (!strcasecmp(ptr, "yes")) {
+        ebpf_disable_apps();
+        return 1;
+    } else if (strcasecmp(ptr, "no")) {
+        error("The option %s for \"disable apps\" is not a valid option.", ptr);
+    }
+
+    return 0;
+}
+
+/**
+ * Read collector values
+ */
+static void read_collector_values() {
+    // Read global section
+    char *value;
+    if (appconfig_exists(&collector_config,  EBPF_GLOBAL_SECTION, "load")) //Backward compatibility
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load", "entry");
+    else
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
+
+    how_to_load(value);
+
+    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", "no");
+    int disable_apps = parse_disable_apps(value);
+
+    // Read ebpf programs section
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                             ebpf_modules[0].config_name, 1);
+    int started = 0;
+    if (enabled) {
+        ebpf_enable_chart(0, disable_apps);
+        started++;
+    }
+
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                    ebpf_modules[1].config_name, 1);
+    if (enabled) {
+        ebpf_enable_chart(1, disable_apps);
+        started++;
+    }
+
+    if (!started)
+        ebpf_enable_all_charts(disable_apps);
+
+}
+
+/**
+ * Load collector config
+ *
+ * @param path the path where the file ebpf.conf is stored.
+ *
+ * @return 0 on success and -1 otherwise.
+ */
+static int load_collector_config(char *path) {
+    char lpath[4096];
+
+    snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf" );
+
+    if (!appconfig_load(&collector_config, lpath, 0, NULL))
+        return -1;
+
+    read_collector_values();
+
+    return 0;
+}
+
+/**
+ * Set global variables reading environment variables
+ */
+void set_global_variables() {
+    //Get environment variables
+    ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+    if(!ebpf_plugin_dir)
+        ebpf_plugin_dir = PLUGINS_DIR;
+
+    ebpf_user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(!ebpf_user_config_dir)
+        ebpf_user_config_dir = CONFIG_DIR;
+
+    ebpf_stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(!ebpf_stock_config_dir)
+        ebpf_stock_config_dir = LIBCONFIG_DIR;
+
+    ebpf_configured_log_dir = getenv("NETDATA_LOG_DIR");
+    if(!ebpf_configured_log_dir)
+        ebpf_configured_log_dir = LOG_DIR;
+
+    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (ebpf_nprocs > NETDATA_MAX_PROCESSOR) {
+        ebpf_nprocs = NETDATA_MAX_PROCESSOR;
+    }
+
+    isrh = get_redhat_release();
+}
+
+/**
+ * Parse arguments given from user.
+ *
+ * @param argc the number of arguments
+ * @param argv the pointer to the arguments
+ */
 static void parse_args(int argc, char **argv)
 {
     int enabled = 0;
@@ -1067,8 +675,7 @@ static void parse_args(int argc, char **argv)
                 break;
             }
             case 'r': {
-                mode = MODE_RETURN;
-                ebpf_set_thread_mode(mode);
+                ebpf_set_thread_mode(MODE_RETURN);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
 #endif
@@ -1084,6 +691,18 @@ static void parse_args(int argc, char **argv)
         update_every = freq;
     }
 
+    if (load_collector_config(ebpf_user_config_dir)) {
+        error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
+              ebpf_user_config_dir);
+        if (load_collector_config(ebpf_stock_config_dir)) {
+            error("Does not have a stock file. It is starting with default options.");
+        } else {
+            enabled = 1;
+        }
+    } else {
+        enabled = 1;
+    }
+
     if (!enabled) {
         ebpf_enable_all_charts(disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1092,13 +711,29 @@ static void parse_args(int argc, char **argv)
     }
 }
 
+
+/*****************************************************************
+ *
+ *  COLLECTOR ENTRY POINT
+ *
+ *****************************************************************/
+
+/**
+ * Entry point
+ *
+ * @param argc the number of arguments
+ * @param argv the pointer to the arguments
+ *
+ * @return it returns 0 on success and another integer otherwise
+ */
 int main(int argc, char **argv)
 {
+    set_global_variables();
     parse_args(argc, argv);
 
-    mykernel =  get_kernel_version(kernel_string, 63);
-    if(!has_condition_to_run(mykernel)) {
-        error("[EBPF PROCESS] The current collector cannot run on this kernel.");
+    running_on_kernel =  get_kernel_version(kernel_string, 63);
+    if(!has_condition_to_run(running_on_kernel)) {
+        error("The current collector cannot run on this kernel.");
         return 1;
     }
 
@@ -1114,87 +749,42 @@ int main(int argc, char **argv)
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        error("[EBPF PROCESS] setrlimit(RLIMIT_MEMLOCK)");
+        error("Setrlimit(RLIMIT_MEMLOCK)");
         return 2;
     }
 
-    set_global_variables();
-
-    if (load_collector_file(user_config_dir)) {
-        info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
-        change_collector_event();
-        if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
-            change_syscalls();
-    }
-
-    if(ebpf_load_libraries()) {
-        error("[EBPF_PROCESS] Cannot load library.");
-        thread_finished++;
-        int_exit(3);
-    }
-
-    signal(SIGINT, int_exit);
-    signal(SIGTERM, int_exit);
-
-    if (process_load_ebpf()) {
-        thread_finished++;
-        int_exit(4);
-    }
-
-    if(allocate_global_vectors()) {
-        thread_finished++;
-        error("[EBPF_PROCESS] Cannot allocate necessary vectors.");
-        int_exit(5);
-    }
-
-    if(mode == MODE_DEVMODE && debug_log) {
-        if(map_memory()) {
-            thread_finished++;
-            error("[EBPF_PROCESS] Cannot map memory used with perf events.");
-            int_exit(6);
-        }
-    }
-
-    set_global_labels();
-
-    if(debug_log) {
-        open_developer_log();
-    }
+    signal(SIGINT, ebpf_exit);
+    signal(SIGTERM, ebpf_exit);
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
-        error("[EBPF PROCESS] Cannot start the mutex.");
-        int_exit(7);
+        error("Cannot start the mutex.");
+        ebpf_exit(3);
     }
 
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_t thread[NETDATA_EBPF_PROCESS_THREADS];
+    struct netdata_static_thread ebpf_threads[] = {
+        {"EBPF PROCESS",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[0].start_routine},
+        {"EBPF SOCKET",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[1].start_routine},
+        {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
+    };
 
     int i;
-    int end = NETDATA_EBPF_PROCESS_THREADS;
+    for (i = 0; ebpf_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &ebpf_threads[i];
+        st->thread = mallocz(sizeof(netdata_thread_t));
 
-    void * (*function_pointer[])(void *) = {process_publisher, process_collector, process_log };
-
-    for ( i = 0; i < end ; i++ ) {
-        if ( ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) ) {
-            error("[EBPF_PROCESS] Cannot create threads.");
-            thread_finished++;
-            int_exit(8);
-        }
+        ebpf_module_t *em = &ebpf_modules[i];
+        em->thread_id = i;
+        netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
     }
 
-    for ( i = 0; i < end ; i++ ) {
-        if ( (pthread_join(thread[i], NULL) ) ) {
-            error("[EBPF_PROCESS] Cannot join threads.");
-            thread_finished++;
-            int_exit(9);
-        }
+    for (i = 0; ebpf_threads[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &ebpf_threads[i];
+        netdata_thread_join(*st->thread, NULL);
     }
 
     thread_finished++;
-    int_exit(0);
+    ebpf_exit(0);
 
     return 0;
 }

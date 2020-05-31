@@ -51,7 +51,7 @@ and `close(2)`.
 
 #### File error
 
-This charts demonstrate the number of times some software tried and failed to open or close a file descriptor.
+This chart shows the number of times some software tried and failed to open or close a file descriptor.
 
 ### VFS
 
@@ -130,14 +130,14 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 
 The `[global]` section defines settings for the whole eBPF collector.
 
-#### load
+#### ebpf load mode
 
 The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
 monitor, process, and display different kinds of information.
 
 By default, this plugin uses the `entry` mode. Changing this mode can create significant overhead on your operating
-system, but also offer valuable information if you are developing or debugging software. The `load` option accepts the
-following values: ​
+system, but also offer valuable information if you are developing or debugging software. The `ebpf load mode` option
+accepts the following values: ​
 
 -   `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described
     in the sections above, and does not show charts related to errors.

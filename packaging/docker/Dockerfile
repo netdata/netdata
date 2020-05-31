@@ -60,6 +60,7 @@ FROM netdata/base:${ARCH}
 # Copy files over
 RUN mkdir -p /opt/src
 COPY --from=builder /app /
+COPY packaging/docker/health.sh /health.sh
 
 # Configure system
 ARG NETDATA_UID=201
@@ -106,3 +107,5 @@ ENV NETDATA_PORT 19999
 EXPOSE $NETDATA_PORT
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
+
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /health.sh
