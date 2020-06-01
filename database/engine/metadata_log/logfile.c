@@ -595,7 +595,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
             break;
         }
         metadata_logfile_list_insert(ctx, metalogfile);
-        ctx->disk_space += metalogfile->pos + metalogfile->pos;
+        ctx->disk_space += metalogfile->pos;
     }
     info("PARSER ended");
 

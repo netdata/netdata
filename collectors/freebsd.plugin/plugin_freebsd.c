@@ -129,7 +129,7 @@ void *freebsd_main(void *ptr) {
             static RRDSET *st = NULL;
 
             if(unlikely(!st)) {
-                st = rrdset_find_bytype_localhost("netdata", "plugin_freebsd_modules");
+                st = rrdset_find_active_bytype_localhost("netdata", "plugin_freebsd_modules");
 
                 if(!st) {
                     st = rrdset_create_localhost(

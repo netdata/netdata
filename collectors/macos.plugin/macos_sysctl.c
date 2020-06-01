@@ -230,7 +230,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: system.load");
             } else {
 
-                st = rrdset_find_bytype_localhost("system", "load");
+                st = rrdset_find_active_bytype_localhost("system", "load");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "system"

@@ -110,7 +110,7 @@ void metalog_test_quota(struct metalog_worker_config *wc)
     if (unlikely(current_size >= target_size || (out_of_space && only_one_metalogfile))) {
         /* Finalize metadata log file and create a new one */
         //wal_flush_transaction_buffer(wc);
-        ret = add_new_metadata_logfile(ctx, 1, ctx->last_fileno + 1);
+        ret = add_new_metadata_logfile(ctx, 0, ctx->last_fileno + 1);
         if (likely(!ret)) {
             ++ctx->last_fileno;
         }
