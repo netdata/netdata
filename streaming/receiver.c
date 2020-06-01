@@ -135,6 +135,7 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
 
 
 size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
+    size_t result;
     PARSER_USER_OBJECT *user = callocz(1, sizeof(*user));
     user->enabled = cd->enabled;
     user->host = rpt->host;
@@ -148,6 +149,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
         cd->serial_failures++;
+        freez(user);
         return 0;
     }
 
@@ -176,8 +178,10 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     }
     while(!netdata_exit);
 done:
-    info("PARSER ended");
-    return ((PARSER_USER_OBJECT *) user)->count;
+    result= user->count;
+    freez(user);
+    parser_destroy(parser);
+    return result;
 }
 
 
