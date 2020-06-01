@@ -42,8 +42,8 @@ Sample:
 
 ```yaml
 local:
-  leases_path : '/var/lib/dhcp/dhcpd.leases'
-  pools :
+  leases_path: '/var/lib/dhcp/dhcpd.leases'
+  pools:
     office:         '192.168.2.0/24'
     wifi:           '192.168.3.0/24'
     192.168.4.0/24: '192.168.4.0/24'
