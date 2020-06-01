@@ -316,7 +316,10 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
         rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->host->machine_guid, metric_uuid, &multihost_uuid);
         rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
     }
-    assert(rd);
+    if(!rd) {
+        info("Rotated uknown archived metric.");
+        return;
+    }
     st = rd->rrdset;
     host = st->rrdhost;
 
