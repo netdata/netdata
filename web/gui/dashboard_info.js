@@ -3051,17 +3051,17 @@ netdataDashboard.context = {
 
     'ebpf.tcp_functions': {
         title : 'TCP calls',
-        info: 'TCP functions shows the number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>, whether they return successfully or fail.'
+        info: 'This chart shows the number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>, whether they return successfully or fail.'
     },
 
     'ebpf.tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'TCP functions shows the number of bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
+        info: 'TCP bandwidth shows the number of bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
     },
 
     'ebpf.tcp_error': {
         title : 'TCP errors',
-        info: 'TCP functions shows the number of calls that returned negative values for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+        info: 'It shows the number of calls that returned negative values for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
     },
 
     'ebpf.udp_functions': {
@@ -3071,7 +3071,7 @@ netdataDashboard.context = {
 
     'ebpf.udp_bandwidth': {
         title : 'UDP bandwidth',
-        info: 'UDP functions shows the number of bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
+        info: 'UDP bandwidth shows the number of bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
     },
 
     'ebpf.file_descriptor': {
