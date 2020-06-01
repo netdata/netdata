@@ -55,7 +55,7 @@ setup() {
 	export ENVIRONMENT_FILE="${ENV}"
 	# Run the updater, with the override so that it uses the local repo we have at hand
 	export NETDATA_LOCAL_TARBAL_OVERRIDE="${PWD}"
-	${INSTALLATION}/installation/usr/libexec/netdata/netdata-updater.sh --not-running-from-cron
+	${INSTALLATION}/netdata/usr/libexec/netdata/netdata-updater.sh --not-running-from-cron
 	! grep "new_installation" "${ENV}"
 }
 

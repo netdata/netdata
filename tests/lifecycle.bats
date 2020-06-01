@@ -50,7 +50,7 @@ setup() {
 
 @test "update netdata" {
 	export ENVIRONMENT_FILE="${ENV}"
-	${INSTALLATION}/installation/usr/libexec/netdata/netdata-updater.sh --not-running-from-cron
+	${INSTALLATION}/netdata/usr/libexec/netdata/netdata-updater.sh --not-running-from-cron
 	! grep "new_installation" "${ENV}"
 }
 
