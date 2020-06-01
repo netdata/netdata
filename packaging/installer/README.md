@@ -170,43 +170,19 @@ the community helps fix any bugs that might have been introduced in previous rel
 
 We are tracking a few issues related to installation and packaging.
 
-### Failure to claim/connect to Netdata Cloud
+### Older distributions (Ubuntu 14.04, Debian 8, CentOS 6) and OpenSSL
 
 If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
-6/7, your Agent may not be able to connect to Cloud due to an old version of OpenSSL that is incompatible with Netdata
-Cloud.
+6, your Agent may not be able to securely connect to Netdata Cloud due to an outdated version of OpenSSL. These old
+versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
+helps securely encrypt SSL connections.
 
-We recommend using the [static build installation](/packaging/installer/methods/kickstart-64.md) to avoid this issue.
-You can, however, use the workaround below.
+We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
+up-to-date version of OpenSSL with hostname validation enabled.
 
-#### OpenSSL workaround
-
-Instead of using the static build, you can also reconfigure OpenSSL to allow self-signed certificates and skip hostname
-checks.
-
-> ⚠️ Using this workaround disables security checks in OpenSSL and reduces the security of your system and its metrics.
-> Allowing self-signed certificates and skipping hostname checks could allow a hostile intermediary to collect your
-> node's metrics as it transits to Netdata Cloud.
-
-If you choose to proceed, you must export the `-DACLK_SSL_ALLOW_SELF_SIGNED` CFLAG before installation.
-
-```bash
-export CFLAGS="-DACLK_SSL_ALLOW_SELF_SIGNED"
-```
-
-Then install Netdata using your method of choice.
-
-#### Ubuntu 14.04 LTS
-
-To use the `CFLAGS` workaround on Ubuntu 14.04 LTS, you must first install `libuv1-dev` via a PPA:
-
-```bash
-add-apt-repository ppa:acooks/libwebsockets6
-apt-get update
-apt-get install libuv1-dev
-```
-
-Then proceed with the CFLAGS workaround described above.
+If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
+with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
+man-in-the-middle attacks.
 
 ### CentOS 6 and CentOS 8
 
@@ -218,7 +194,10 @@ PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer
 
 We've received reports from the community about issues with running the `kickstart.sh` script on systems that have both
 a distribution-installed version of OpenSSL and a manually-installed local version. The Agent's installer cannot handle
-both, and so you must remove one or the other to install the Agent.
+both.
+
+We recommend you install Netdata with the [static binary](/packaging/installer/methods/kickstart-64.md) to avoid the
+issue altogether. Or, you can manually remove one version of OpenSSL to remove the conflict.
 
 ### Clang compiler on Linux
 
