@@ -83,30 +83,26 @@ class DhcpdLeasesFile:
 
 
 class Pool:
-    def __init__(self, name, networks):
+    def __init__(self, name, network):
         self.id = re.sub(r'[:/.-]+', '_', name)
         self.name = name
 
-        self.networks = list()
-        for network_item in networks.split(" "):
-            self.networks.append( ipaddress.ip_network(address=u'%s' % network_item) )
+        networks = network.split(" ")
+        if len(networks) == 1:
+            self.networks = [ ipaddress.ip_network(address=u'%s' % network) ]
+        elif len(networks) == 2:
+            self.networks = list( ipaddress.summarize_address_range(ipaddress.IPv4Address(u'%s' % networks[0]), ipaddress.IPv4Address(u'%s' % networks[1])) )
+        else:
+            raise ValueError('Network syntaxis error!')
 
     def num_hosts(self):
-        num_addres = 0
-        for network_item in self.networks:
-            num_addres += network_item.num_addresses
-            if network_item.prefixlen <= 24:
-                num_addres -= 2
-
-        return num_addres
+        return sum([network.num_addresses for network in self.networks]) - 2
 
     def __contains__(self, item):
-        data_return = False
-        for network_item in self.networks:
-            data_return = item.address in network_item
-            if data_return:
-                break
-        return data_return
+        for network in self.networks:
+            if item.address in network:
+                return True
+        return False
 
 class Lease:
     def __init__(self, address, ends, state):
@@ -158,7 +154,7 @@ class Service(SimpleService):
 
         for pool in pools:
             try:
-                new_pool = Pool(name=pool, networks=pools[pool])
+                new_pool = Pool(name=pool, network=pools[pool])
             except ValueError as error:
                 self.error("'{pool}' was removed, error: {error}".format(pool=pools[pool], error=error))
             else:
