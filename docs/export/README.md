@@ -8,8 +8,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/export/READ
 
 One of Netdata's pillars is interoperability with other monitoring and visualization solutions. To this end, you can use
 the Agent's [exporting engine](/exporting/README.md) to send metrics to multiple external databases/services in
-parallel. Once your Netdata metrics are connected to other solutions, you can apply machine learning analysis or
-correlation with other tools, such as application tracing.
+parallel. Once you connect Netdata metrics to other solutions, you can apply machine learning analysis or correlation
+with other tools, such as application tracing.
 
 The exporting engine supports a number of connectors, including AWS Kinesis Data Streams, Graphite, JSON, MongoDB,
 OpenTSDB, Prometheus remote write, and more, via exporting **connectors**. These connectors help you seamlessly send
@@ -22,7 +22,7 @@ the [exporting reference guide](/exporting/README.md) for the full list.
 Let's cover the process of enabling an exporting connector, using the Graphite connector as an example. These steps can
 be applied to other connectors as well.
 
-> If you are migrating from the deprecated backens system, this quickstart will also help you update your configuration
+> If you are migrating from the deprecated backends system, this quickstart will also help you update your configuration
 > to the new format.
 
 Open the `exporting.conf` file with `edit-config`.
@@ -43,11 +43,11 @@ Enable the exporting engine by setting `enabled` to `yes`:
 
 ### Change how often the exporting engine sends metrics
 
-By default, the exporting engine only sends metrics to external databases every 10 seconds so as to not congest the
-destination with thousands of per-second metrics. 
+By default, the exporting engine only sends metrics to external databases every 10 seconds to avoid congesting the
+destination with thousands of per-second metrics.
 
-You can change this frequency for all connectors, based on how you use exported metrics or the resources you can
-allocate to long-term storage, with the with the `update every` setting.
+You can change this frequency for all connectors based on how you use exported metrics or the resources you can allocate
+to long-term storage. Use the `update every` setting to change the frequency in seconds.
 
 ```conf
 [exporting:global]
@@ -85,8 +85,8 @@ For details on all the configuration options, see the [exporting reference](/exp
 > counterpart. You should be able to copy your backends settings into `exporting.conf` to complete your migration. The
 > only setting that won't work is `host tags`&mdash;use [`host labels`](/docs/tutorials/using-host-labels.md) instead.
 
-When you're finished, restart your Agent to begin exporting to the destination of your choice. Because the Agent exports
-metrics as they're collected, you should start seeing data in your external database after only a few seconds.
+Restart your Agent to begin exporting to the destination of your choice. Because the Agent exports metrics as they're
+collected, you should start seeing data in your external database after only a few seconds.
 
 ## Exporting reference and related features
 
