@@ -612,6 +612,8 @@ void *rrdpush_sender_thread(void *ptr) {
             s->read_len = 0;
             time_t now = now_realtime_sec();
             sender_start(s);
+            s->buffer->read = 0;
+            s->buffer->write = 0;
             buffer_sprintf(s->build, "TIMESTAMP %ld", now);
             sender_commit(s);
             continue;

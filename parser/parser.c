@@ -288,7 +288,7 @@ inline int parser_action(PARSER *parser, char *input)
         else
             rc = PARSER_RC_ERROR;
 #ifdef NETDATA_INTERNAL_CHECKS
-        error("Unknown keyword [%s]", words[0]);
+        error("Unknown keyword [%s]", input);
 #endif
     }
     else {

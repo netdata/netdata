@@ -91,7 +91,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     if (r->ssl.conn && !r->ssl.flags) {
         ERR_clear_error();
         int desired = sizeof(r->read_buffer) - r->read_len - 1;
-        int ret = SSL_read(r->ssl.conn, r->read_buffer, desired);
+        int ret = SSL_read(r->ssl.conn, r->read_buffer + r->read_len, desired);
         if (ret > 0 ) {
             r->read_len += ret;
             return 0;
@@ -108,6 +108,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
 #endif
     if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
         return 1;
+    info("Receiver read_len %d -> %d", r->read_len, strlen(r->read_buffer));
     r->read_len = strlen(r->read_buffer);
     return 0;
 }
@@ -171,9 +172,10 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
             break;
         int pos = 0;
         char *line;
-        while ((line = receiver_next_line(rpt, &pos)))
+        while ((line = receiver_next_line(rpt, &pos))) {
             if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
                 goto done;
+        }
         rpt->last_msg_t = now_realtime_sec();
     }
     while(!netdata_exit);
