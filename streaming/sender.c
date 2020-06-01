@@ -607,13 +607,13 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->host->rrdpush_sender_socket == -1)) {
-            attempt_to_connect(s);
             s->overflow = 0;
             s->read_len = 0;
-            time_t now = now_realtime_sec();
-            sender_start(s);
             s->buffer->read = 0;
             s->buffer->write = 0;
+            attempt_to_connect(s);
+            time_t now = now_realtime_sec();
+            sender_start(s);
             buffer_sprintf(s->build, "TIMESTAMP %ld", now);
             sender_commit(s);
             continue;

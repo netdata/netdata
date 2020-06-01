@@ -108,7 +108,6 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
 #endif
     if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
         return 1;
-    info("Receiver read_len %d -> %d", r->read_len, strlen(r->read_buffer));
     r->read_len = strlen(r->read_buffer);
     return 0;
 }
