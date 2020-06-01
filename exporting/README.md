@@ -13,8 +13,8 @@ This guide contains comprehensive information about enabling, configuring, and m
 which allows you to send metrics to more than 20 external time series databases.
 
 To learn the basics of locating and editing health configuration files, read up on [how to export
-metrics](/docs/exporting/README.md), and follow the [exporting
-quickstart](/docs/exporting/README.md#exporting-quickstart).
+metrics](/docs/export/README.md), and follow the [exporting
+quickstart](/docs/export/README.md#exporting-quickstart).
 
 The exporting engine is an update for the former [backends](/backends/README.md), which is deprecated and will be
 deleted soon. It has a modular structure and supports metric exporting via multiple exporting connector instances at the
