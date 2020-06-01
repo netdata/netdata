@@ -7,8 +7,8 @@ sidebar_label: MongoDB
 
 # Export metrics to MongoDB
 
-You can use the MongoDB connector and the experimental [exporting engine](../README.md) to archive your agent's metrics
-to a MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
+You can use the MongoDB connector for the [exporting engine](/exporting/README.md) to archive your agent's metrics to a
+MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
 
 ## Prerequisites
 
@@ -18,8 +18,8 @@ from the source, which detects that the required library is now available.
 
 ## Configuration
 
-To enable data exporting to a MongoDB database, run `./edit-config exporting.conf`
-in the Netdata configuration directory and set the following options:
+To enable data exporting to a MongoDB database, run `./edit-config exporting.conf` in the Netdata configuration
+directory and set the following options:
 
 ```conf
 [mongodb:my_instance]
