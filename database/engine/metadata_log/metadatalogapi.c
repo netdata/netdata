@@ -317,7 +317,7 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
         rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
     }
     if(!rd) {
-        info("Rotated uknown archived metric.");
+        info("Rotated unknown archived metric.");
         return;
     }
     st = rd->rrdset;
