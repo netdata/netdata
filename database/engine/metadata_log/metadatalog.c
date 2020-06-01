@@ -10,6 +10,9 @@ static void sanity_check(void)
 
     /* Metadata log file super-block cannot be larger than RRDENG_BLOCK_SIZE */
     BUILD_BUG_ON(RRDENG_METALOG_SB_PADDING_SZ < 0);
+
+    /* Object duplication factor cannot be less than 1, or too close to 1 */
+    BUILD_BUG_ON(MAX_DUPLICATION_PERCENTAGE < 110);
 }
 
 char *get_metalog_statistics(struct metalog_instance *ctx, char *str, size_t size)
@@ -43,8 +46,28 @@ char *get_metalog_statistics(struct metalog_instance *ctx, char *str, size_t siz
     return str;
 }
 
+/* The buffer must not be empty */
+void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum metalog_opcode opcode, uuid_t *uuid,
+                           int compacting)
+{
+    struct metalog_cmd cmd;
+
+    assert(buffer_strlen(buffer));
+    assert(opcode == METALOG_COMMIT_CREATION_RECORD || opcode == METALOG_COMMIT_DELETION_RECORD);
+
+    cmd.opcode = opcode;
+    cmd.record_io_descr.buffer = buffer;
+    cmd.record_io_descr.compacting = compacting;
+    if (!uuid)
+        uuid_clear(cmd.record_io_descr.uuid);
+    else
+        uuid_copy(cmd.record_io_descr.uuid, *uuid);
+    metalog_enq_cmd(&ctx->worker_config, &cmd);
+}
+
 static void commit_record(struct metalog_worker_config* wc, struct metalog_record_io_descr *io_descr, uint8_t type)
 {
+    struct metalog_instance *ctx = wc->ctx;
     unsigned payload_length, size_bytes;
     void *buf, *mlf_payload;
     /* persistent structures */
@@ -55,7 +78,11 @@ static void commit_record(struct metalog_worker_config* wc, struct metalog_recor
     payload_length = buffer_strlen(io_descr->buffer);
     size_bytes = sizeof(*mlf_header) + payload_length + sizeof(*mlf_trailer);
 
-    buf = mlf_get_records_buffer(wc, size_bytes);
+    if (io_descr->compacting)
+        buf = mlf_get_records_buffer(wc, &ctx->compaction_state.records_log,
+                                     &ctx->compaction_state.new_metadata_logfiles, size_bytes);
+    else
+        buf = mlf_get_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles, size_bytes);
 
     mlf_header = buf;
     mlf_header->type = type;
@@ -75,9 +102,19 @@ static void commit_record(struct metalog_worker_config* wc, struct metalog_recor
 
 static void do_commit_record(struct metalog_worker_config* wc, uint8_t type, void *data)
 {
+    struct metalog_record_io_descr *io_descr = (struct metalog_record_io_descr *)data;
     switch (type) {
     case METALOG_CREATE_OBJECT:
-    case METALOG_DELETE_OBJECT:
+        if (!uuid_is_null(io_descr->uuid)) { /* It's a valid object */
+            struct metalog_record record;
+
+            uuid_copy(record.uuid, io_descr->uuid);
+            if (io_descr->compacting)
+                mlf_record_insert(wc->ctx->compaction_state.new_metadata_logfiles.last, &record);
+            else
+                mlf_record_insert(wc->ctx->metadata_logfiles.last, &record);
+        } /* fall through */
+        case METALOG_DELETE_OBJECT:
         commit_record(wc, (struct metalog_record_io_descr *)data, type);
         break;
     default:
@@ -86,47 +123,62 @@ static void do_commit_record(struct metalog_worker_config* wc, uint8_t type, voi
     }
 }
 
-void metalog_test_quota(struct metalog_worker_config *wc)
+/* Only crates a new metadata file and links it to the metadata log if the last one is non empty. */
+void metalog_try_link_new_metadata_logfile(struct metalog_worker_config *wc)
 {
     struct metalog_instance *ctx = wc->ctx;
     struct metadata_logfile *metalogfile;
-    unsigned current_size, target_size;
-    uint8_t out_of_space, only_one_metalogfile;
     int ret;
+    unsigned current_size;
 
-    out_of_space = 0;
-    if (unlikely(ctx->disk_space > ctx->max_disk_space)) {
-        out_of_space = 1;
-    }
     metalogfile = ctx->metadata_logfiles.last;
     current_size = metalogfile->pos;
-    target_size = ctx->max_disk_space / TARGET_METALOGFILES;
-    target_size = MIN(target_size, MAX_METALOGFILE_SIZE);
-    target_size = MAX(target_size, MIN_METALOGFILE_SIZE);
-    only_one_metalogfile = (metalogfile == ctx->metadata_logfiles.first) ? 1 : 0;
-    if (unlikely(current_size >= target_size || (out_of_space && only_one_metalogfile))) {
+    if (metalogfile->records.first) { /* it has records */
         /* Finalize metadata log file and create a new one */
-        //wal_flush_transaction_buffer(wc);
-        ret = add_new_metadata_logfile(ctx, 0, ctx->last_fileno + 1);
+        mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
+        ret = add_new_metadata_logfile(ctx, &ctx->metadata_logfiles, 0, ctx->last_fileno + 1);
         if (likely(!ret)) {
             ++ctx->last_fileno;
         }
     }
-    if (unlikely(out_of_space)) {
-        /* delete old data */
-        /* TODO: Implement */
+}
+
+void metalog_test_quota(struct metalog_worker_config *wc)
+{
+    struct metalog_instance *ctx = wc->ctx;
+    struct metadata_logfile *metalogfile;
+    unsigned current_size;
+    uint8_t only_one_metalogfile;
+    int ret;
+
+    metalogfile = ctx->metadata_logfiles.last;
+    current_size = metalogfile->pos;
+    if (unlikely(current_size >= MAX_METALOGFILE_SIZE)) {
+        metalog_try_link_new_metadata_logfile(wc);
+    }
+
+    metalogfile = ctx->metadata_logfiles.last;
+    only_one_metalogfile = (metalogfile == ctx->metadata_logfiles.first) ? 1 : 0;
+    info("records=%lu objects=%lu", (long unsigned)ctx->records_nr, (long unsigned)ctx->rrdeng_ctx->host->objects_nr);
+    if (unlikely(!only_one_metalogfile &&
+                 ctx->records_nr > (ctx->rrdeng_ctx->host->objects_nr * (uint64_t)MAX_DUPLICATION_PERCENTAGE) / 100)) {
+        metalog_do_compaction(wc);
     }
 }
 
 static inline int metalog_threads_alive(struct metalog_worker_config* wc)
 {
+    if (wc->cleanup_thread_compacting_files) {
+        return 1;
+    }
+
     return 0;
 }
 
 static void metalog_cleanup_finished_threads(struct metalog_worker_config *wc)
 {
     if (unlikely(wc->cleanup_thread_compacting_files)) {
-        /* TODO: cleanup compaction */
+        after_compact_old_records(wc);
         return;
     }
 }
@@ -201,6 +253,7 @@ static void async_cb(uv_async_t *handle)
 static void timer_cb(uv_timer_t* handle)
 {
     struct metalog_worker_config* wc = handle->data;
+    struct metalog_instance *ctx = wc->ctx;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
@@ -212,7 +265,7 @@ static void timer_cb(uv_timer_t* handle)
         debug(D_METADATALOG, "%s", get_metalog_statistics(wc->ctx, buf, sizeof(buf)));
     }
 #endif
-    mlf_flush_records_buffer(wc);
+    mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
@@ -293,7 +346,12 @@ void metalog_worker(void* arg)
             case METALOG_COMMIT_DELETION_RECORD:
                 do_commit_record(wc, METALOG_DELETE_OBJECT, &cmd.record_io_descr);
                 break;
-            default:
+            case METALOG_COMPACTION_FLUSH:
+                mlf_flush_records_buffer(wc, &ctx->compaction_state.records_log,
+                                         &ctx->compaction_state.new_metadata_logfiles);
+                complete(cmd.record_io_descr.completion);
+                break;
+                default:
                 debug(D_METADATALOG, "%s: default.", __func__);
                 break;
             }
@@ -312,7 +370,7 @@ void metalog_worker(void* arg)
     assert(0 == uv_timer_stop(&timer_req));
     uv_close((uv_handle_t *)&timer_req, NULL);
 
-    mlf_flush_records_buffer(wc);
+    mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
     uv_run(loop, UV_RUN_DEFAULT);
 
     info("Shutting down RRD metadata log loop complete.");

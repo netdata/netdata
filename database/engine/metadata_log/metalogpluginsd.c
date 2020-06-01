@@ -19,8 +19,6 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         host, type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
         chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid);
-    if (chart_uuid)
-        uuid_clear(state->uuid);
 
     if (options && *options) {
         if (strstr(options, "obsolete"))
@@ -65,8 +63,6 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 
     RRDDIM *rd = rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1,
                                    dim_uuid);
-    if (dim_uuid)
-        uuid_clear(state->uuid);
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
     if (options && *options) {

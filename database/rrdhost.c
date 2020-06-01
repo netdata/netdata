@@ -246,6 +246,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         uuid_parse(host->machine_guid, host->host_uuid);
+        host->objects_nr = 1;
+        host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 

@@ -10,6 +10,7 @@
 #include "metadatalogprotocol.h"
 #include "logfile.h"
 #include "metadatalogapi.h"
+#include "compaction.h"
 
 /* Forward declerations */
 struct metalog_instance;
@@ -20,6 +21,7 @@ struct parser_user_object;
 #define METALOG_FILE_NUMBER_SCAN_TMPL "%5u-%5u"
 #define METALOG_FILE_NUMBER_PRINT_TMPL "%5.5u-%5.5u"
 
+#define MAX_DUPLICATION_PERCENTAGE 150 /* the maximum duplication factor of objects in metadata log records */
 
 typedef enum {
     METALOG_STATUS_UNINITIALIZED = 0,
@@ -28,12 +30,11 @@ typedef enum {
 } metalog_state_t;
 
 struct metalog_record_io_descr {
-    uv_fs_t req;
-    uv_buf_t iov;
     BUFFER *buffer;
-    uint64_t pos;
-    unsigned bytes;
     struct completion *completion;
+    int compacting; /* When 0 append at the end of the metadata log file list.
+                       When 1 append to the temporary compaction metadata log file list. */
+    uuid_t uuid;
 };
 
 enum metalog_opcode {
@@ -43,6 +44,7 @@ enum metalog_opcode {
     METALOG_SHUTDOWN,
     METALOG_COMMIT_CREATION_RECORD,
     METALOG_COMMIT_DELETION_RECORD,
+    METALOG_COMPACTION_FLUSH,
 
     METALOG_MAX_OPCODE
 };
@@ -105,15 +107,20 @@ struct metalog_instance {
     struct metadata_record_commit_log records_log;
     struct metadata_logfile_list metadata_logfiles;
     struct parser_user_object *metalog_parser_object;
+    struct logfile_compaction_state compaction_state;
+    uint32_t current_compaction_id; /* Every compaction run increments this by 1 */
     uint64_t disk_space;
-    uint64_t max_disk_space;
+    unsigned long records_nr;
     unsigned last_fileno; /* newest index of metadata log file */
 
     struct metalog_statistics stats;
 };
 
-extern int init_metadata_logfiles(struct metalog_instance *ctx);
+extern void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum metalog_opcode opcode,
+                                  uuid_t *uuid, int compacting);
+    extern int init_metadata_logfiles(struct metalog_instance *ctx);
 extern void finalize_metadata_logfiles(struct metalog_instance *ctx);
+extern void metalog_try_link_new_metadata_logfile(struct metalog_worker_config *wc);
 extern void metalog_test_quota(struct metalog_worker_config *wc);
 extern void metalog_worker(void* arg);
 extern void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd);

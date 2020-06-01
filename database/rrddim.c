@@ -442,6 +442,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         aclk_update_chart(host, st->id, ACLK_CMD_CHART);
 #endif
 #ifdef ENABLE_DBENGINE
+    rrd_atomic_fetch_add(&st->rrdhost->objects_nr, 1);
     metalog_commit_update_dimension(rd);
 #endif
 
@@ -510,7 +511,9 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != rd->rrd_memory_mode))
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
-
+#ifdef ENABLE_DBENGINE
+    rrd_atomic_fetch_add(&st->rrdhost->objects_nr, -1);
+#endif
 }
 
 

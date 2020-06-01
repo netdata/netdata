@@ -8,41 +8,19 @@ static inline int metalog_is_initialized(struct metalog_instance *ctx)
     return ctx->rrdeng_ctx->metalog_ctx != NULL;
 }
 
-/* The buffer must not be empty */
-static void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum metalog_opcode opcode)
+static inline void metalog_commit_creation_record(struct metalog_instance *ctx, BUFFER *buffer, uuid_t *uuid)
 {
-    struct metalog_cmd cmd;
-
-    assert(buffer_strlen(buffer));
-    assert(opcode == METALOG_COMMIT_CREATION_RECORD || opcode == METALOG_COMMIT_DELETION_RECORD);
-
-    cmd.opcode = opcode;
-    cmd.record_io_descr.buffer = buffer;
-    metalog_enq_cmd(&ctx->worker_config, &cmd);
-}
-
-static inline void metalog_commit_creation_record(struct metalog_instance *ctx, BUFFER *buffer)
-{
-    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD);
+    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 0);
 }
 
 static inline void metalog_commit_deletion_record(struct metalog_instance *ctx, BUFFER *buffer)
 {
-    metalog_commit_record(ctx, buffer, METALOG_COMMIT_DELETION_RECORD);
+    metalog_commit_record(ctx, buffer, METALOG_COMMIT_DELETION_RECORD, NULL, 0);
 }
 
-void metalog_commit_update_host(RRDHOST *host)
+BUFFER *metalog_update_host_buffer(RRDHOST *host)
 {
-    struct metalog_instance *ctx;
     BUFFER *buffer;
-
-    /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx)
-        return;
-
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
-        return;
     buffer = buffer_create(4096); /* This will be freed after it has been committed to the metadata log buffer */
 
     rrdhost_rdlock(host);
@@ -75,22 +53,33 @@ void metalog_commit_update_host(RRDHOST *host)
     buffer_strcat(buffer, "OVERWRITE labels\n");
 
     rrdhost_unlock(host);
-    metalog_commit_creation_record(ctx, buffer);
+    return buffer;
 }
 
-void metalog_commit_update_chart(RRDSET *st)
+void metalog_commit_update_host(RRDHOST *host)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
-    RRDHOST *host = st->rrdhost;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (!host->rrdeng_ctx)
         return;
 
     ctx = host->rrdeng_ctx->metalog_ctx;
     if (!ctx) /* metadata log has not been initialized yet */
         return;
+
+    buffer = metalog_update_host_buffer(host);
+
+    metalog_commit_creation_record(ctx, buffer, &host->host_uuid);
+}
+
+/* compaction_id 0 means it was not called by compaction logic */
+BUFFER *metalog_update_chart_buffer(RRDSET *st, uint32_t compaction_id)
+{
+    BUFFER *buffer;
+    RRDHOST *host = st->rrdhost;
+
     buffer = buffer_create(1024); /* This will be freed after it has been committed to the metadata log buffer */
 
     rrdset_rdlock(st);
@@ -99,7 +88,7 @@ void metalog_commit_update_chart(RRDSET *st)
 
     char uuid_str[37];
     uuid_unparse_lower(*st->chart_uuid, uuid_str);
-    buffer_sprintf(buffer, "GUID %s\n", uuid_str); /* TODO: replace this with real GUID when available */
+    buffer_sprintf(buffer, "GUID %s\n", uuid_str);
 
     // properly set the name for the remote end to parse it
     char *name = "";
@@ -155,10 +144,32 @@ void metalog_commit_update_chart(RRDSET *st)
             , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
             , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
+        if (compaction_id && compaction_id > rd->state->compaction_id) {
+            /* No need to use this dimension again during this compaction cycle */
+            rd->state->compaction_id = compaction_id;
+        }
     }
     rrdset_unlock(st);
+    return buffer;
+}
 
-    metalog_commit_creation_record(ctx, buffer);
+void metalog_commit_update_chart(RRDSET *st)
+{
+    struct metalog_instance *ctx;
+    BUFFER *buffer;
+    RRDHOST *host = st->rrdhost;
+
+    /* Metadata are only available with dbengine */
+    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+        return;
+
+    ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
+
+    buffer = metalog_update_chart_buffer(st, 0);
+
+    metalog_commit_creation_record(ctx, buffer, st->chart_uuid);
 }
 
 void metalog_commit_delete_chart(RRDSET *st)
@@ -180,24 +191,15 @@ void metalog_commit_delete_chart(RRDSET *st)
     uuid_unparse_lower(*st->chart_uuid, uuid_str);
     buffer_sprintf(buffer, "TOMBSTONE %s\n", uuid_str);
 
-    metalog_commit_creation_record(ctx, buffer);
+    metalog_commit_deletion_record(ctx, buffer);
 }
 
-void metalog_commit_update_dimension(RRDDIM *rd)
+BUFFER *metalog_update_dimension_buffer(RRDDIM *rd)
 {
-    struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
     char uuid_str[37];
 
-    /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
-        return;
-
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
-        return;
     buffer = buffer_create(128); /* This will be freed after it has been committed to the metadata log buffer */
 
     uuid_unparse_lower(*st->chart_uuid, uuid_str);
@@ -218,8 +220,27 @@ void metalog_commit_update_dimension(RRDDIM *rd)
         , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
         , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
     );
+    return buffer;
+}
 
-    metalog_commit_creation_record(ctx, buffer);
+void metalog_commit_update_dimension(RRDDIM *rd)
+{
+    struct metalog_instance *ctx;
+    BUFFER *buffer;
+    RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
+
+    /* Metadata are only available with dbengine */
+    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+        return;
+
+    ctx = host->rrdeng_ctx->metalog_ctx;
+    if (!ctx) /* metadata log has not been initialized yet */
+        return;
+
+    buffer = metalog_update_dimension_buffer(rd);
+
+    metalog_commit_creation_record(ctx, buffer, rd->state->metric_uuid);
 }
 
 void metalog_commit_delete_dimension(RRDDIM *rd)
@@ -242,7 +263,7 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
     uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
     buffer_sprintf(buffer, "TOMBSTONE %s\n", uuid_str);
 
-    metalog_commit_creation_record(ctx, buffer);
+    metalog_commit_deletion_record(ctx, buffer);
 }
 
 RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_uuid)
@@ -349,12 +370,13 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     int error;
 
     ctx = callocz(1, sizeof(*ctx));
-    ctx->max_disk_space = 32 * 1048576LLU;
+    ctx->records_nr = 0;
+    ctx->current_compaction_id = 0;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->rrdeng_ctx = rrdeng_parent_ctx;
     ctx->worker_config.ctx = ctx;
-    init_metadata_record_log(ctx);
+    init_metadata_record_log(&ctx->records_log);
     error = init_metalog_files(ctx);
     if (error) {
         goto error_after_init_rrd_files;
