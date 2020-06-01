@@ -129,6 +129,8 @@ static void ebpf_exit(int sig)
         return;
     }
 
+    clean_apps_groups_target(apps_groups_root_target);
+
     event_pid = getpid();
     int ret = fork();
     if (ret < 0) //error
