@@ -181,7 +181,7 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
 
     snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
     snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
-    libnetdata = dlopen(lpath, RTLD_NOW);
+    libnetdata = dlopen(lpath, RTLD_NOW|RTLD_LOCAL);
     if (!libnetdata) {
         info("Cannot load library %s for the current kernel.", lpath);
 
