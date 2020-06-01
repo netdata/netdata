@@ -83,17 +83,30 @@ class DhcpdLeasesFile:
 
 
 class Pool:
-    def __init__(self, name, network):
+    def __init__(self, name, networks):
         self.id = re.sub(r'[:/.-]+', '_', name)
         self.name = name
-        self.network = ipaddress.ip_network(address=u'%s' % network)
+
+        self.networks = list()
+        for network_item in networks.split(" "):
+            self.networks.append( ipaddress.ip_network(address=u'%s' % network_item) )
 
     def num_hosts(self):
-        return self.network.num_addresses - 2
+        num_addres = 0
+        for network_item in self.networks:
+            num_addres += network_item.num_addresses
+            if network_item.prefixlen <= 24:
+                num_addres -= 2
+
+        return num_addres
 
     def __contains__(self, item):
-        return item.address in self.network
-
+        data_return = False
+        for network_item in self.networks:
+            data_return = item.address in network_item
+            if data_return:
+                break
+        return data_return
 
 class Lease:
     def __init__(self, address, ends, state):
@@ -145,7 +158,7 @@ class Service(SimpleService):
 
         for pool in pools:
             try:
-                new_pool = Pool(name=pool, network=pools[pool])
+                new_pool = Pool(name=pool, networks=pools[pool])
             except ValueError as error:
                 self.error("'{pool}' was removed, error: {error}".format(pool=pools[pool], error=error))
             else:

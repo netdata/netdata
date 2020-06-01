@@ -47,6 +47,7 @@ local:
     office:         '192.168.2.0/24'
     wifi:           '192.168.3.0/24'
     192.168.4.0/24: '192.168.4.0/24'
+    range:          '192.168.5.100/30 192.168.5.104/31'
 ```
 
 The module will not work If no configuration is given.
