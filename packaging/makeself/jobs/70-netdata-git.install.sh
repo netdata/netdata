@@ -25,7 +25,7 @@ run ./netdata-installer.sh \
   --dont-start-it
 
 # Remove the netdata.conf file from the tree. It has hard-coded sensible defaults builtin.
-rm -f "${NETDATA_INSTALL_PARENT}/etc/netdata/netdata.conf"
+run rm -f "${NETDATA_INSTALL_PATH}/etc/netdata/netdata.conf"
 
 # Ensure the netdata binary is in fact statically linked
 if run readelf -l "${NETDATA_INSTALL_PATH}"/bin/netdata | grep 'INTERP'; then
