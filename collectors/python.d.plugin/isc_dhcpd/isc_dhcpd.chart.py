@@ -91,7 +91,7 @@ class Pool:
         if len(networks) == 1:
             self.networks = [ ipaddress.ip_network(address=u'%s' % network) ]
         elif len(networks) == 2:
-            self.networks = list( ipaddress.summarize_address_range(ipaddress.IPv4Address(u'%s' % networks[0]), ipaddress.IPv4Address(u'%s' % networks[1])) )
+            self.networks = list( ipaddress.summarize_address_range(ipaddress.ip_address(u'%s' % networks[0]), ipaddress.ip_address(u'%s' % networks[1])) )
         else:
             raise ValueError('Network syntaxis error!')
 
