@@ -43,9 +43,11 @@ Enable the exporting engine by setting `enabled` to `yes`:
 
 ### Change how often the exporting engine sends metrics
 
-By default, the exporting engine sends metrics to the external database every 10 seconds. You may want more or less
-granularity based on how you plan on using the exported metrics or the resources/budget you have available for long-term
-storage. You can change this for all exporting connectors with the `update every` setting.
+By default, the exporting engine only sends metrics to external databases every 10 seconds so as to not congest the
+destination with thousands of per-second metrics. 
+
+You can change this frequency for all connectors, based on how you use exported metrics or the resources you can
+allocate to long-term storage, with the with the `update every` setting.
 
 ```conf
 [exporting:global]
@@ -54,9 +56,10 @@ storage. You can change this for all exporting connectors with the `update every
 
 ### Enable a connector (Graphite)
 
-Next, find the `[graphite:my_graphite_instance]` example section. You can use this (or the respective example for the
-connector you want to use) as a framework for your configration. Uncomment the section itself and replace
-`my_graphite_instance` with a name of your choice. Then set `enabled` to `yes` and uncomment the line.
+To enable the Graphite connector, find the `[graphite:my_graphite_instance]` example section in `exporting.conf`. You
+can use this (or the respective example for the connector you want to use) as a framework for your configration.
+Uncomment the section itself and replace `my_graphite_instance` with a name of your choice. Then set `enabled` to `yes`
+and uncomment the line.
 
 ```conf
 [graphite:my_graphite_instance]
@@ -73,14 +76,14 @@ connector you want to use) as a framework for your configration. Uncomment the s
     # send hosts matching = localhost *
 ```
 
-Next, edit and uncomment any other lines necessary to connect the exporting engine to your endpoint. The `destination`
-setting must be changed in most situations.
+Next, edit and uncomment any other lines necessary to connect the exporting engine to your endpoint. You must change the
+`destination` setting in most situations.
 
-For configuration details, see the [exporting reference](/exporting/README.md#configuration).
+For details on all the configuration options, see the [exporting reference](/exporting/README.md#configuration).
 
 > When migrating from backends, keep in kind that most settings for the exporting engine are identical to their backend
-> counterpart. You should be able to copy your backends settings into `exporting.conf` to complete the migration. The
-> only setting that won't work are `host tags`&mdash;use [`host labels`](/docs/tutorials/using-host-labels.md) instead.
+> counterpart. You should be able to copy your backends settings into `exporting.conf` to complete your migration. The
+> only setting that won't work is `host tags`&mdash;use [`host labels`](/docs/tutorials/using-host-labels.md) instead.
 
 When you're finished, restart your Agent to begin exporting to the destination of your choice. Because the Agent exports
 metrics as they're collected, you should start seeing data in your external database after only a few seconds.

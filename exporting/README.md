@@ -256,9 +256,10 @@ Options:
 > You can check how the host tags were parsed using the /api/v1/info API call. But, keep in mind that backends subsystem
 > is deprecated and will be deleted soon. Please move your existing tags to the `[host labels]` section.
 
-## Monitor the exporting engine
+## Exporting engine monitoring
 
-Netdata provides 5 charts:
+Netdata creates five charts in the dashboard, under the **Netdata Monitoring** section, to help you monitor the health
+and performance of the exporting engine itself:
 
 1.  **Buffered metrics**, the number of metrics Netdata added to the buffer for dispatching them to the
     external database server.
@@ -272,7 +273,7 @@ Netdata provides 5 charts:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
 
-## Receive 
+## Exporting engine alarms
 
 Netdata adds 3 alarms:
 
