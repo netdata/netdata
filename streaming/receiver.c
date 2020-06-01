@@ -347,16 +347,17 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 
     rrdhost_wrlock(rpt->host);
-    if(rpt->host->connected_senders > 0) {
+/* if(rpt->host->connected_senders > 0) {
         rrdhost_unlock(rpt->host);
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "REJECTED - ALREADY CONNECTED");
         info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
         fclose(fp);
         return 0;
     }
+*/
 
     rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_ORPHAN);
-    rpt->host->connected_senders++;
+//    rpt->host->connected_senders++;
     rpt->host->senders_disconnected_time = 0;
     rpt->host->labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
@@ -386,15 +387,17 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_wrlock(rpt->host);
     rpt->host->senders_disconnected_time = now_realtime_sec();
-    rpt->host->connected_senders--;
-    if(!rpt->host->connected_senders) {
+    //rpt->host->connected_senders--;
+    //if(!rpt->host->connected_senders) {
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             rpt->host->health_enabled = 0;
-    }
+    //}
     rrdhost_unlock(rpt->host);
 
-    if(rpt->host->connected_senders == 0)
+    // Don't lock host->receiver_lock, if there is a false positive then the new receiver will trigger a spawn when
+    // done_push gets called.
+    if (rpt->host->receiver == rpt)
         rrdpush_sender_thread_stop(rpt->host);
 
     // cleanup
