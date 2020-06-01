@@ -79,6 +79,7 @@ netdata_ebpf_events_t process_probes[] = {
     { .type = 'r', .name = "_do_fork" },
     { .type = 'r', .name = "__close_fd" },
     { .type = 'r', .name = "__x64_sys_clone" },
+    { .type = 'p', .name = "try_to_wake_up" },
     { .type = 0, .name = NULL }
 };
 

@@ -542,7 +542,7 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
 static void change_collector_event() {
     int i;
     if (running_on_kernel < NETDATA_KERNEL_V5_3)
-        process_probes[10].name = NULL;
+        process_probes[EBPF_SYS_CLONE_IDX].name = NULL;
 
     for (i = 0; process_probes[i].name ; i++ ) {
         process_probes[i].type = 'p';

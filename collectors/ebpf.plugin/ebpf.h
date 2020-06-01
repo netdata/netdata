@@ -101,7 +101,7 @@ typedef struct ebpf_module {
 # define NETDATA_KERNEL_V5_3 328448
 # define NETDATA_KERNEL_V4_15 265984
 
-
+# define EBPF_SYS_CLONE_IDX 11
 # define EBPF_MAX_MAPS 32
 
 
