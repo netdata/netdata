@@ -54,12 +54,8 @@ setup() {
 @test "update netdata using the new updater" {
 	export ENVIRONMENT_FILE="${ENV}"
 	# Run the updater, with the override so that it uses the local repo we have at hand
-	# Try to run the installed, if any, otherwise just run the one from the repo
 	export NETDATA_LOCAL_TARBAL_OVERRIDE="${PWD}"
-	# Disable random sleep / splay for netdata-updater to avoid sampede effect
-	# of many agents (dis|re)connecting too quickly all at onace to Netdata Cloud
-	unset RANDOM; export RANDOM=0
-	/etc/cron.daily/netdata-updater || ./packaging/installer/netdata-updater.sh
+	${INSTALLATION}/installation/usr/libexec/netdata/netdata-updater.sh --not-running-from-cron
 	! grep "new_installation" "${ENV}"
 }
 

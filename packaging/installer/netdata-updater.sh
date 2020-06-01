@@ -210,11 +210,20 @@ tmpdir=
 
 trap cleanup EXIT
 
+while [ -n "${1}" ]; do
+  if [ "${1}" = "--not-running-from-cron" ]; then
+    NETDATA_SPECIAL_NONINTERACTIVE=1
+    shift 1
+  else
+    break
+  fi
+done
+
 # Random sleep to aileviate stampede effect of Agents upgrading
 # and disconnecting/reconnecting at the same time (or near to).
 # But only we're not a controlling terminal (tty)
 # Randomly sleep between 1s and 60m
-if [ ! -t 1 ]; then
+if [ ! -t 1 ] && [ -z "${NETDATA_SPECIAL_NONINTERACTIVE}" ]; then
   sleep $(((RANDOM % 3600) + 1))s
 fi
 
