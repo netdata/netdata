@@ -273,7 +273,7 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     char dim_object[49], chart_object[33], id_str[1024], chart_fullid[RRD_ID_LENGTH_MAX + 1];
     uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
 
-    ret = find_object_by_guid(metric_uuid, dim_object, 49);
+    ret = find_object_by_guid(metric_uuid, dim_object, sizeof(dim_object));
     if (GUID_TYPE_DIMENSION != ret) /* not found */
         return NULL;
 
@@ -284,10 +284,10 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     chart_guid = (uuid_t *)(dim_object + 16);
     dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
 
-    ret = find_object_by_guid(dim_char_guid, id_str, 1024);
+    ret = find_object_by_guid(dim_char_guid, id_str, sizeof(id_str));
     assert(GUID_TYPE_CHAR == ret);
 
-    ret = find_object_by_guid(chart_guid, chart_object, 33);
+    ret = find_object_by_guid(chart_guid, chart_object, sizeof(chart_object));
     assert(GUID_TYPE_CHART == ret);
     chart_char_guid = (uuid_t *)(chart_object + 16);
 
