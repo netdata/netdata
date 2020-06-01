@@ -83,7 +83,8 @@ For details on all the configuration options, see the [exporting reference](/exp
 
 > When migrating from backends, keep in kind that most settings for the exporting engine are identical to their backend
 > counterpart. You should be able to copy your backends settings into `exporting.conf` to complete your migration. The
-> only setting that won't work is `host tags`&mdash;use [`host labels`](/docs/tutorials/using-host-labels.md) instead.
+> only setting that won't work is `host tags`. Instead, use [host labels](/docs/tutorials/using-host-labels.md) to tag
+> your exported metrics.
 
 Restart your Agent to begin exporting to the destination of your choice. Because the Agent exports metrics as they're
 collected, you should start seeing data in your external database after only a few seconds.
@@ -92,6 +93,7 @@ collected, you should start seeing data in your external database after only a f
 
 -   [Exporting reference guide](/exporting/README.md)
 -   [Backends (deprecated)](/backends/README.md)
+-   [Use host labels to organize systems, metrics, and alarms](/docs/tutorials/using-host-labels.md)
 -   [Database engine](/database/engine/README.md)
 -   [Change how long Netdata stores metrics (long-term storage)](/docs/tutorials/longer-metrics-storage.md)
 
