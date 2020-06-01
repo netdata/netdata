@@ -7,15 +7,15 @@
 
 #define RRDENG_METALOG_MAGIC "netdata-metadata-log"
 
-#define RRDENG_METALOG_VER "1"
+#define RRDENG_METALOG_VER (1)
 
-#define RRDENG_METALOG_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + RRDENG_VER_SZ))
+#define RRDENG_METALOG_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + sizeof(uint16_t)))
 /*
  * Metadata log persistent super-block
  */
 struct rrdeng_metalog_sb {
     char magic_number[RRDENG_MAGIC_SZ];
-    char version[RRDENG_VER_SZ];
+    uint16_t version;
     uint8_t padding[RRDENG_METALOG_SB_PADDING_SZ];
 } __attribute__ ((packed));
 

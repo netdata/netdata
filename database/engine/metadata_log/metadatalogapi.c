@@ -270,7 +270,7 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
 RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
     GUID_TYPE ret;
-    char dim_object[49], chart_object[33], id_str[1024], chart_fullid[RRD_ID_LENGTH_MAX + 1];
+    char dim_object[49], chart_object[33], id_str[PLUGINSD_LINE_MAX], chart_fullid[RRD_ID_LENGTH_MAX + 1];
     uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
 
     ret = find_object_by_guid(metric_uuid, dim_object, sizeof(dim_object));

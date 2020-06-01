@@ -226,7 +226,7 @@ int create_metadata_logfile(struct metadata_logfile *metalogfile)
         fatal("posix_memalign:%s", strerror(ret));
     }
     (void) strncpy(superblock->magic_number, RRDENG_METALOG_MAGIC, RRDENG_MAGIC_SZ);
-    (void) strncpy(superblock->version, RRDENG_METALOG_VER, RRDENG_VER_SZ);
+    superblock->version = RRDENG_METALOG_VER;
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
@@ -279,9 +279,8 @@ static int check_metadata_logfile_superblock(uv_file file)
     } else {
         ret = 0;
     }
-    if (strncmp(superblock->version, RRDENG_METALOG_VER, RRDENG_VER_SZ)) {
-        error("File has unknown version \"%.*s\". Compatibility is not guaranteed.", RRDENG_VER_SZ,
-              superblock->version);
+    if (superblock->version > RRDENG_METALOG_VER) {
+        error("File has unknown version %"PRIu16". Compatibility is not guaranteed.", superblock->version);
     }
 error:
     free(superblock);
@@ -572,6 +571,9 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         failed_to_load = matched_files;
         goto after_failed_to_parse;
     }
+    parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid);
+    parser_add_keyword(parser, PLUGINSD_KEYWORD_CONTEXT, pluginsd_context);
+    parser_add_keyword(parser, PLUGINSD_KEYWORD_TOMBSTONE, pluginsd_tombstone);
     parser->plugins_action->dimension_action = &metalog_pluginsd_dimension_action;
     parser->plugins_action->chart_action     = &metalog_pluginsd_chart_action;
     parser->plugins_action->guid_action      = &metalog_pluginsd_guid_action;

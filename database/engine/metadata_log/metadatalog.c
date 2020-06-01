@@ -8,9 +8,6 @@ static void sanity_check(void)
     /* Magic numbers must fit in the super-blocks */
     BUILD_BUG_ON(strlen(RRDENG_METALOG_MAGIC) > RRDENG_MAGIC_SZ);
 
-    /* Version strings must fit in the super-blocks */
-    BUILD_BUG_ON(strlen(RRDENG_METALOG_VER) > RRDENG_VER_SZ);
-
     /* Metadata log file super-block cannot be larger than RRDENG_BLOCK_SIZE */
     BUILD_BUG_ON(RRDENG_METALOG_SB_PADDING_SZ < 0);
 }
