@@ -4,7 +4,7 @@
 #define NETDATA_MQTT_H
 
 #ifdef ENABLE_ACLK
-#include "externaldeps/mosquitto/mosquitto.h"
+#include <mosquitto.h>
 #endif
 
 void _show_mqtt_info();

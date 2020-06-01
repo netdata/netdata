@@ -400,6 +400,26 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
+# mosquitto library
+
+PKG_CHECK_MODULES([MOSQUITTO],[mosquitto],AC_CHECK_LIB(
+    [mosquitto],
+    [mosquitto_external_callbacks_set],
+    [MOSQUITTO_LIBS="-lmosquitto"]))
+
+OPTIONAL_MOSQUITTO_LIBS="${MOSQUITTO_LIBS}"
+
+# -----------------------------------------------------------------------------
+# websockets library
+
+PKG_CHECK_MODULES([WEBSOCKETS],[websockets],AC_CHECK_LIB(
+    [websockets],
+    [lws_set_socks],
+    [WEBSOCKETS_LIBS="-lwebsockets"]))
+
+OPTIONAL_WEBSOCKETS_LIBS="${WEBSOCKETS_LIBS}"
+
+# -----------------------------------------------------------------------------
 # VFS plugin libs
 
 AC_CHECK_LIB(
@@ -477,7 +497,7 @@ if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
 	if test "${HAVE_libjson_c_a}" = "yes"; then
 		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
 		JSONC_LIBS="static"
-		OPTIONAL_JSONC_STATIC_CFLAGS="-I externaldeps/jsonc"
+		OPTIONAL_JSONC_CFLAGS="-I externaldeps/jsonc"
 	fi
 	AC_MSG_RESULT([${HAVE_libjson_c_a}])
 fi
@@ -597,40 +617,54 @@ if test "$enable_cloud" != "no"; then
         AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
     fi
 
-    AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
-    if test -f "externaldeps/mosquitto/libmosquitto.a"; then
-        LIBS_BKP="${LIBS}"
-        LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS} ${LIBS_BKP}"
-        AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/mosquitto/mosquitto.h"
-                                         int main (int argc, char **argv) {
-                                             int m,mm,r;
-                                             mosquitto_lib_version(&m, &mm, &r);
-                                         }]])],
-                                        [HAVE_libmosquitto_a="yes"],
-                                        [HAVE_libmosquitto_a="no"])
-        LIBS="${LIBS_BKP}"
-    else
-        HAVE_libmosquitto_a="no"
-        AC_DEFINE([ACLK_NO_LIBMOSQ], [1], [Libmosquitto.a was not found during build.])
-    fi
-    AC_MSG_RESULT([${HAVE_libmosquitto_a}])
+    if test -z "${MOSQUITTO_LIBS}"; then
+        AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
+        if test -f "externaldeps/mosquitto/libmosquitto.a"; then
+            LIBS_BKP="${LIBS}"
+            LIBS="externaldeps/mosquitto/libmosquitto.a ${OPTIONAL_SSL_LIBS}"
+            AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/mosquitto/mosquitto.h"
+                                             int main (int argc, char **argv) {
+                                                 int m,mm,r;
+                                                 mosquitto_lib_version(&m, &mm, &r);
+                                             }]])],
+                                            [HAVE_libmosquitto_a="yes"],
+                                            [HAVE_libmosquitto_a="no"])
+            LIBS="${LIBS_BKP}"
+        fi
 
-    AC_MSG_CHECKING([if libwebsockets static lib is present])
-    if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-        LWS_CFLAGS="-I externaldeps/libwebsockets/include"
-        HAVE_libwebsockets_a="yes"
-    else
-        HAVE_libwebsockets_a="no"
-        AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
+        if test "${HAVE_libmosquitto_a}" = "yes"; then
+            AC_DEFINE([LINK_STATIC_MOSQUITTO], [1], [static mosquitto should be used])
+            MOSQUITTO_LIBS="static"
+            OPTIONAL_MOSQUITTO_LIBS="externaldeps/mosquitto/libmosquitto.a"
+            OPTIONAL_MOSQUITTO_CFLAGS="-I externaldeps/mosquitto"
+        fi
+        AC_MSG_RESULT([${HAVE_libmosquitto_a}])
     fi
-    AC_MSG_RESULT([${HAVE_libwebsockets_a}])
+    AM_CONDITIONAL([LINK_STATIC_MOSQUITTO], [test "${MOSQUITTO_LIBS}" = "static"])
+
+
+    if test -z "${MOSQUITTO_LIBS}"; then
+        AC_MSG_CHECKING([if libwebsockets static lib is present])
+        if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
+            OPTIONAL_MOSQUITTO_LIBS="externaldeps/libwebsockets/libwebsockets.a"
+            OPTIONAL_WEBSOCKETS_CFLAGS="-I externaldeps/libwebsockets/include"
+            AC_DEFINE([LINK_STATIC_WEBSOCKETS], [1], [static websockets should be used])
+            WEBSOCKETS_LIBS="static"
+            HAVE_libwebsockets_a="yes"
+        else
+            HAVE_libwebsockets_a="no"
+            AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
+        fi
+        AC_MSG_RESULT([${HAVE_libwebsockets_a}])
+    fi
+    AM_CONDITIONAL([LINK_STATIC_WEBSOCKETS], [test "${WEBSOCKETS_LIBS}" = "static"])
 
     if test "${build_target}" = "linux" -a "${enable_cloud}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
             AC_MSG_ERROR([agent-cloud-link can't be built without libcap. Disable it by --disable-cloud or enable libcap])
         fi
         if test "${with_libcap}" = "yes"; then
-            LWS_CFLAGS+=" ${LIBCAP_CFLAGS}"
+            OPTIONAL_WEBSOCKETS_CFLAGS+=" ${LIBCAP_CFLAGS}"
         fi
     fi
 
@@ -642,7 +676,7 @@ if test "$enable_cloud" != "no"; then
         AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
+    if test "${enable_jsonc}" = "yes" -a -n "${MOSQUITTO_LIBS}" -a -n "${WEBSOCKETS_LIBS}" -a -n "${SSL_LIBS}"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
@@ -1324,7 +1358,8 @@ AC_SUBST([webdir])
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
-    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS}"
+    ${OPTIONAL_MONGOC_CFLAGS} ${OPTIONAL_WEBSOCKETS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} \
+    $(OPTIONAL_MOSQUITTO_CFLAGS)"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1348,6 +1383,8 @@ AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_EBPF_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
+AC_SUBST([OPTIONAL_MOSQUITTO_LIBS])
+AC_SUBST([OPTIONAL_WEBSOCKETS_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
