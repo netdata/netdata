@@ -172,7 +172,7 @@ int find_guid_by_object(char *object, uuid_t *uuid, GUID_TYPE object_type)
     return 0;
 }
 
-int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
+int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type, int replace_instead_of_generate)
 {
     char  *target_object;
     uuid_t temp_uuid;
@@ -180,7 +180,7 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
 
     switch (object_type) {
         case GUID_TYPE_DIMENSION:
-            if (unlikely(find_or_generate_guid((void *) ((RRDDIM *)object)->id, &temp_uuid, GUID_TYPE_CHAR)))
+            if (unlikely(find_or_generate_guid((void *) ((RRDDIM *)object)->id, &temp_uuid, GUID_TYPE_CHAR, 0)))
                 return 1;
             target_object = mallocz(49);
             target_object[0] = object_type;
@@ -189,7 +189,7 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
             memcpy(target_object + 33, temp_uuid, 16);
             break;
         case GUID_TYPE_CHART:
-            if (unlikely(find_or_generate_guid((void *) ((RRDSET *)object)->id, &temp_uuid, GUID_TYPE_CHAR)))
+            if (unlikely(find_or_generate_guid((void *) ((RRDSET *)object)->id, &temp_uuid, GUID_TYPE_CHAR, 0)))
                 return 1;
             target_object = mallocz(33);
             target_object[0] = object_type;
@@ -206,7 +206,8 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type)
     }
     rc = find_guid_by_object(target_object, uuid, object_type);
     if (rc) {
-        uuid_generate(*uuid);
+        if (!replace_instead_of_generate) /* else take *uuid as user input */
+            uuid_generate(*uuid);
         uv_rwlock_wrlock(&global_lock);
         int rc = guid_store_nolock(uuid, target_object, object_type);
         uv_rwlock_wrunlock(&global_lock);

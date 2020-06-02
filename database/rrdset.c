@@ -260,7 +260,7 @@ void rrdset_reset(RRDSET *st) {
         rd->collections_counter = 0;
         // memset(rd->values, 0, rd->entries * sizeof(storage_number));
 #ifdef ENABLE_DBENGINE
-        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode) {
+        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             rrdeng_store_metric_flush_current_page(rd);
         }
 #endif
@@ -402,7 +402,7 @@ void rrdset_save(RRDSET *st) {
     }
 }
 
-void rrdset_delete(RRDSET *st) {
+void rrdset_delete_custom(RRDSET *st, int db_rotated) {
     RRDDIM *rd;
 
     rrdset_check_rdlock(st);
@@ -425,13 +425,10 @@ void rrdset_delete(RRDSET *st) {
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
+    if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
         aclk_del_collector(st->rrdhost->hostname, st->plugin_name, st->module_name);
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
     }
-#endif
-#ifdef ENABLE_DBENGINE
-    metalog_commit_delete_chart(st); /* TODO: move this to dbengine rotation when GUID lookup is available */
 #endif
 
 }
@@ -484,6 +481,8 @@ RRDSET *rrdset_create_custom(
         , RRDSET_TYPE chart_type
         , RRD_MEMORY_MODE memory_mode
         , long history_entries
+        , int is_archived
+        , uuid_t *chart_uuid
 ) {
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
@@ -523,6 +522,9 @@ RRDSET *rrdset_create_custom(
     if(st) {
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+        }
 
         if(unlikely(name))
             rrdset_set_name(st, name);
@@ -539,6 +541,9 @@ RRDSET *rrdset_create_custom(
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+        }
         return st;
     }
 
@@ -668,6 +673,8 @@ RRDSET *rrdset_create_custom(
         else
             st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
+    if (is_archived)
+        rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
 
     st->plugin_name = plugin?strdupz(plugin):NULL;
     st->module_name = module?strdupz(module):NULL;
@@ -771,12 +778,20 @@ RRDSET *rrdset_create_custom(
     rrdcalctemplate_link_matching(st);
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        int replace_instead_of_generate = 0;
+
         st->chart_uuid = callocz(1, sizeof(uuid_t));
-        if (unlikely(find_or_generate_guid((void *) st, st->chart_uuid, GUID_TYPE_CHART))) {
+        if (NULL != chart_uuid) {
+            replace_instead_of_generate = 1;
+            uuid_copy(*st->chart_uuid, *chart_uuid);
+        }
+        if (unlikely(
+                find_or_generate_guid((void *) st, st->chart_uuid, GUID_TYPE_CHART, replace_instead_of_generate))) {
             errno = 0;
             error("FAILED to generate GUID for %s", st->id);
             freez(st->chart_uuid);
             st->chart_uuid = NULL;
+            assert(0);
         }
     }
 #endif
@@ -1025,6 +1040,9 @@ static inline size_t rrdset_done_interpolate(
         last_ut = next_store_ut;
 
         rrddim_foreach_read(rd, st) {
+            if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
+                continue;
+
             calculated_number new_value;
 
             switch(rd->algorithm) {
@@ -1393,6 +1411,8 @@ void rrdset_done(RRDSET *st) {
     int dimensions = 0;
     st->collected_total = 0;
     rrddim_foreach_read(rd, st) {
+        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
+            continue;
         dimensions++;
         if(likely(rd->updated))
             st->collected_total += rd->collected_value;
@@ -1404,6 +1424,8 @@ void rrdset_done(RRDSET *st) {
     // based on the collected figures only
     // at this stage we do not interpolate anything
     rrddim_foreach_read(rd, st) {
+        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
+            continue;
 
         if(unlikely(!rd->updated)) {
             rd->calculated_value = 0;
@@ -1649,6 +1671,8 @@ void rrdset_done(RRDSET *st) {
     st->last_collected_total  = st->collected_total;
 
     rrddim_foreach_read(rd, st) {
+        if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
+            continue;
         if(unlikely(!rd->updated))
             continue;
 
@@ -1711,7 +1735,7 @@ void rrdset_done(RRDSET *st) {
     // find if there are any obsolete dimensions
     time_t now = now_realtime_sec();
 
-    if(unlikely(rrddim_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
         rrddim_foreach_read(rd, st)
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
                 break;
@@ -1733,6 +1757,21 @@ void rrdset_done(RRDSET *st) {
                             error("Cannot delete dimension file '%s'", rd->cache_filename);
                     }
 
+#ifdef ENABLE_DBENGINE
+                    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+                        rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
+                        rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
+                        /* only a collector can mark a chart as obsolete, so we must remove the reference */
+                        uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
+                        if (can_delete_metric) {
+                            /* This metric has no data and no references */
+                            metalog_commit_delete_dimension(rd);
+                        } else {
+                            /* Do not delete this dimension */
+                            continue;
+                        }
+                    }
+#endif
                     if(unlikely(!last)) {
                         rrddim_free(st, rd);
                         rd = st->dimensions;

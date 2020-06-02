@@ -32,8 +32,8 @@ struct metalog_records {
 
 /* only one event loop is supported for now */
 struct metadata_logfile {
-    unsigned tier;
-    unsigned fileno;
+    unsigned fileno; /* Starts at 1 */
+    unsigned starting_fileno; /* 0 for normal files, staring number during compaction */
     uv_file file;
     uint64_t pos;
     struct metalog_instance *ctx;

@@ -81,7 +81,7 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype_localhost("system", "softnet_stat");
+    st = rrdset_find_active_bytype_localhost("system", "softnet_stat");
     if(unlikely(!st)) {
         st = rrdset_create_localhost(
                 "system"
@@ -114,7 +114,7 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
             char id[50+1];
             snprintfz(id, 50, "cpu%zu_softnet_stat", l);
 
-            st = rrdset_find_bytype_localhost("cpu", id);
+            st = rrdset_find_active_bytype_localhost("cpu", id);
             if(unlikely(!st)) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%zu softnet_stat", l);

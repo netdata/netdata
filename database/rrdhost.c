@@ -245,6 +245,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
+        uuid_parse(host->machine_guid, host->host_uuid);
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
@@ -253,7 +254,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         if(ret != 0 && errno != EEXIST)
             error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
         else
-            ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+            ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
         if(ret) {
             error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
                   host->hostname, host->machine_guid, host->cache_dir);
@@ -263,7 +264,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
             return host;
         }
-        uuid_parse(host->machine_guid, host->host_uuid);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
@@ -1323,7 +1323,17 @@ restart_after_removal:
                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
         )) {
-
+#ifdef ENABLE_DBENGINE
+            if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+                rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
+                rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+                if (st->dimensions) {
+                    /* If the chart still has dimensions don't delete it from the metadata log */
+                    continue;
+                }
+                metalog_commit_delete_chart(st);
+            }
+#endif
             rrdset_rdlock(st);
 
             if(rrdhost_delete_obsolete_charts)

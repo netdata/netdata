@@ -383,17 +383,26 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
     return 0;
 }
 
-/*
- * Callers of this function need to make sure they're not deleting the same descriptor concurrently
+/**
+ * Deletes a page from the database.
+ * Callers of this function need to make sure they're not deleting the same descriptor concurrently.
+ * @param ctx is the database instance.
+ * @param descr is the page descriptor.
+ * @param remove_dirty must be non-zero if the page to be deleted is dirty.
+ * @param is_exclusive_holder must be non-zero if the caller holds an exclusive page reference.
+ * @param metric_id is set to the metric the page belongs to, if it's safe to delete the metric and metric_id is not
+ *        NULL. Otherwise, metric_id is not set.
+ * @return 1 if it's safe to delete the metric, 0 otherwise.
  */
-void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty,
-                         uint8_t is_exclusive_holder)
+uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty,
+                         uint8_t is_exclusive_holder, uuid_t *metric_id)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct page_cache_descr *pg_cache_descr = NULL;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index;
     int ret;
+    uint8_t can_delete_metric = 0;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
@@ -403,14 +412,22 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
 
     uv_rwlock_wrlock(&page_index->lock);
     ret = JudyLDel(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
-    uv_rwlock_wrunlock(&page_index->lock);
     if (unlikely(0 == ret)) {
+        uv_rwlock_wrunlock(&page_index->lock);
         error("Page under deletion was not in index.");
         if (unlikely(debug_flags & D_RRDENGINE)) {
             print_page_descr(descr);
         }
         goto destroy;
     }
+    --page_index->page_count;
+    if (!page_index->writers && !page_index->page_count) {
+        can_delete_metric = 1;
+        if (metric_id) {
+            memcpy(metric_id, page_index->id, sizeof(uuid_t));
+        }
+    }
+    uv_rwlock_wrunlock(&page_index->lock);
     assert(1 == ret);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
@@ -459,6 +476,8 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
 destroy:
     freez(descr);
     pg_cache_update_metric_times(page_index);
+
+    return can_delete_metric;
 }
 
 static inline int is_page_in_time_range(struct rrdeng_page_descr *descr, usec_t start_time, usec_t end_time)
@@ -588,6 +607,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     uv_rwlock_wrlock(&page_index->lock);
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
     *PValue = descr;
+    ++page_index->page_count;
     pg_cache_add_new_metric_time(page_index, descr);
     uv_rwlock_wrunlock(&page_index->lock);
 
@@ -1032,6 +1052,8 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
     page_index->oldest_time = INVALID_TIME;
     page_index->latest_time = INVALID_TIME;
     page_index->prev = NULL;
+    page_index->page_count = 0;
+    page_index->writers = 0;
 
     return page_index;
 }

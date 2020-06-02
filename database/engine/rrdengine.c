@@ -304,7 +304,7 @@ static void invalidate_oldest_committed(void *arg)
 
             goto out;
         }
-        pg_cache_punch_hole(ctx, descr, 1, 1);
+        pg_cache_punch_hole(ctx, descr, 1, 1, NULL);
 
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
@@ -630,6 +630,8 @@ static void delete_old_data(void *arg)
     struct extent_info *extent, *next;
     struct rrdeng_page_descr *descr;
     unsigned count, i;
+    uint8_t can_delete_metric;
+    uuid_t metric_id;
 
     /* Safe to use since it will be deleted after we are done */
     datafile = ctx->datafiles.first;
@@ -638,7 +640,14 @@ static void delete_old_data(void *arg)
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            pg_cache_punch_hole(ctx, descr, 0, 0);
+            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
+            if (unlikely(can_delete_metric && ctx->metalog_ctx)) {
+                /*
+                 * If the metric is empty, has no active writers and if the metadata log has been initialized then
+                 * attempt to delete the corresponding netdata dimension.
+                 */
+                metalog_delete_dimension_by_uuid(ctx->metalog_ctx, &metric_id);
+            }
         }
         next = extent->next;
         freez(extent);
@@ -799,14 +808,16 @@ void async_cb(uv_async_t *handle)
 void timer_cb(uv_timer_t* handle)
 {
     struct rrdengine_worker_config* wc = handle->data;
+    struct rrdengine_instance *ctx = wc->ctx;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
+    if (unlikely(!ctx->metalog_ctx))
+        return; /* Wait for the metadata log to initialize */
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
-        struct rrdengine_instance *ctx = wc->ctx;
         struct page_cache *pg_cache = &ctx->pg_cache;
         unsigned long total_bytes, bytes_written, nr_committed_pages, bytes_to_write = 0, producers, low_watermark,
                       high_watermark;
@@ -998,7 +1009,7 @@ void rrdengine_main(void)
     struct rrdengine_instance *ctx;
 
     sanity_check();
-    ret = rrdeng_init(&ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
+    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
     if (ret) {
         exit(ret);
     }
