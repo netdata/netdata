@@ -505,12 +505,33 @@ int ret;
     rrdpush_sender_thread_close_socket(s->host);
 }
 
+void execute_replicate(struct sender_state *s, long start_t, long end_t) {
+    time_t now = now_realtime_sec();
+    info("REPLICATE: %ld - %ld @ %ld", start_t, end_t, now);
+}
+
 // This is just a placeholder until the gap filling state machine is inserted
 void execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
+        if (!strncmp(start, "REPLICATE ", 10)) {
+            char *next;
+            long start_t = strtol(start+10, &next, 10);
+            if (*next == ' ') {
+                char *after;
+                long end_t = strtol(next+1, &after, 10);
+                if (after == newline) {
+                    execute_replicate(s, start_t, end_t);
+                    start = after+1;
+                    continue;
+                }
+            }
+            error("Malformed command on streaming link: %s", start);
+            start = newline+1;
+            continue;
+        }
         info("STREAM %s [send to %s] received command over connection: %s", s->host->hostname, s->connected_to, start);
         start = newline+1;
     }
