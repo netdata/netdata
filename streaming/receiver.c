@@ -78,7 +78,8 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
 #else
         ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
 #endif
-        // TODO-GAPS Partial write? Send failure?
+        if (ret != (int)strlen(message))
+            error("Failed to send initial timestamp - gaps may appear in charts");
         return PARSER_RC_OK;
     }
     return PARSER_RC_ERROR;
@@ -225,7 +226,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
-    rpt->tags = appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
+    rpt->tags = (char*)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
     if(rpt->tags && !*rpt->tags) rpt->tags = NULL;
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
