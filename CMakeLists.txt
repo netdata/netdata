@@ -563,6 +563,10 @@ set(RRD_PLUGIN_FILES
         database/engine/metadata_log/logfile.h
         database/engine/metadata_log/logfile.c
         database/engine/metadata_log/metadatalogprotocol.h
+        database/engine/metadata_log/metalogpluginsd.c
+        database/engine/metadata_log/metalogpluginsd.h
+        database/engine/global_uuid_map/global_uuid_map.c
+        database/engine/global_uuid_map/global_uuid_map.h
         )
 
 set(WEB_PLUGIN_FILES

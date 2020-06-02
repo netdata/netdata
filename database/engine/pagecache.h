@@ -85,6 +85,8 @@ struct pg_cache_page_index {
      * TODO: examine if we want to support better granularity than seconds
      */
     Pvoid_t JudyL_array;
+    Word_t page_count;
+    unsigned short writers;
     uv_rwlock_t lock;
 
     /*
@@ -163,8 +165,8 @@ extern void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
 extern void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 extern void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
                             struct rrdeng_page_descr *descr);
-extern void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty,
-                                uint8_t is_exclusive_holder);
+extern uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
+                                   uint8_t remove_dirty, uint8_t is_exclusive_holder, uuid_t *metric_id);
 extern usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
                                             usec_t start_time, usec_t end_time);
 extern void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,

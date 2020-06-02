@@ -7,16 +7,15 @@
 
 #define RRDENG_METALOG_MAGIC "netdata-metadata-log"
 
-#define RRDENG_METALOG_VER "1"
+#define RRDENG_METALOG_VER (1)
 
-#define RRDENG_METALOG_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + RRDENG_VER_SZ + sizeof(uint8_t)))
+#define RRDENG_METALOG_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + sizeof(uint16_t)))
 /*
  * Metadata log persistent super-block
  */
 struct rrdeng_metalog_sb {
     char magic_number[RRDENG_MAGIC_SZ];
-    char version[RRDENG_VER_SZ];
-    uint8_t tier;
+    uint16_t version;
     uint8_t padding[RRDENG_METALOG_SB_PADDING_SZ];
 } __attribute__ ((packed));
 
@@ -32,12 +31,16 @@ struct rrdeng_metalog_sb {
  * Metadata log record header
  */
 struct rrdeng_metalog_record_header {
-    /* when set to STORE_PADDING jump to start of next block */
+    /* when set to METALOG_STORE_PADDING jump to start of next block */
     uint8_t type;
 
-    uint32_t header_length;
-    uint64_t id;
-    uint16_t payload_length;
+    uint16_t header_length;
+    uint32_t payload_length;
+    /******************************************************
+     * No fields above this point can ever change.        *
+     ******************************************************
+     * All fields below this point are subject to change. *
+     ******************************************************/
 } __attribute__ ((packed));
 
 /*

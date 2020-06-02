@@ -55,7 +55,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 error("DISABLED: system.cpu");
             } else {
 
-                st = rrdset_find_bytype_localhost("system", "cpu");
+                st = rrdset_find_active_bytype_localhost("system", "cpu");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "system"
