@@ -1,12 +1,12 @@
 #ifndef _NETDATA_EBPF_APPS_H
 # define _NETDATA_EBPF_APPS_H 1
 
-# include "../../libnetdata/threads/threads.h"
-# include "../../libnetdata/locks/locks.h"
-# include "../../libnetdata/avl/avl.h"
-# include "../../libnetdata/clocks/clocks.h"
-# include "../../libnetdata/config/appconfig.h"
-# include "../../libnetdata/ebpf/ebpf.h"
+# include "libnetdata/threads/threads.h"
+# include "libnetdata/locks/locks.h"
+# include "libnetdata/avl/avl.h"
+# include "libnetdata/clocks/clocks.h"
+# include "libnetdata/config/appconfig.h"
+# include "libnetdata/ebpf/ebpf.h"
 
 # define NETDATA_APPS_FAMILY "apps"
 # define NETDATA_APPS_SYSCALL_GROUP "ebpf syscall"
@@ -87,16 +87,99 @@ struct pid_fd {
 #endif
 };
 
+struct target {
+    char compare[MAX_COMPARE_NAME + 1];
+    uint32_t comparehash;
+    size_t comparelen;
+
+    char id[MAX_NAME + 1];
+    uint32_t idhash;
+
+    char name[MAX_NAME + 1];
+
+    uid_t uid;
+    gid_t gid;
+
+    /* These variables are not necessary for eBPF collector
+    kernel_uint_t minflt;
+    kernel_uint_t cminflt;
+    kernel_uint_t majflt;
+    kernel_uint_t cmajflt;
+    kernel_uint_t utime;
+    kernel_uint_t stime;
+    kernel_uint_t gtime;
+    kernel_uint_t cutime;
+    kernel_uint_t cstime;
+    kernel_uint_t cgtime;
+    kernel_uint_t num_threads;
+    // kernel_uint_t rss;
+
+    kernel_uint_t status_vmsize;
+    kernel_uint_t status_vmrss;
+    kernel_uint_t status_vmshared;
+    kernel_uint_t status_rssfile;
+    kernel_uint_t status_rssshmem;
+    kernel_uint_t status_vmswap;
+
+    kernel_uint_t io_logical_bytes_read;
+    kernel_uint_t io_logical_bytes_written;
+    // kernel_uint_t io_read_calls;
+    // kernel_uint_t io_write_calls;
+    kernel_uint_t io_storage_bytes_read;
+    kernel_uint_t io_storage_bytes_written;
+    // kernel_uint_t io_cancelled_write_bytes;
+
+    int *target_fds;
+    int target_fds_size;
+
+    kernel_uint_t openfiles;
+    kernel_uint_t openpipes;
+    kernel_uint_t opensockets;
+    kernel_uint_t openinotifies;
+    kernel_uint_t openeventfds;
+    kernel_uint_t opentimerfds;
+    kernel_uint_t opensignalfds;
+    kernel_uint_t openeventpolls;
+    kernel_uint_t openother;
+    */
+
+    kernel_uint_t starttime;
+    kernel_uint_t collected_starttime;
+
+    /*
+    kernel_uint_t uptime_min;
+    kernel_uint_t uptime_sum;
+    kernel_uint_t uptime_max;
+    */
+
+    unsigned int processes; // how many processes have been merged to this
+    int exposed;            // if set, we have sent this to netdata
+    int hidden;             // if set, we set the hidden flag on the dimension
+    int debug_enabled;
+    int ends_with;
+    int starts_with;        // if set, the compare string matches only the
+                            // beginning of the command
+
+    struct pid_on_target *root_pid; // list of aggregated pids for target debugging
+
+    struct target *target;  // the one that will be reported to netdata
+    struct target *next;
+};
+
+extern struct target *apps_groups_default_target;
+extern struct target *apps_groups_root_target;
+
 struct pid_stat {
     int32_t pid;
     char comm[MAX_COMPARE_NAME + 1];
     char *cmdline;
 
-    /* These variables are not necessary for eBPF collector
     uint32_t log_thrown;
 
     // char state;
     int32_t ppid;
+
+    /* These variables are not necessary for eBPF collector
     // int32_t pgrp;
     // int32_t session;
     // int32_t tty_nr;
@@ -184,6 +267,7 @@ struct pid_stat {
 
     struct pid_fd *fds;             // array of fds it uses
     size_t fds_size;                   // the size of the fds array
+    */
 
     int children_count;             // number of processes directly referencing this
     unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
@@ -193,6 +277,7 @@ struct pid_stat {
     unsigned char read:1;           // 1 when we have already read this process for this iteration
 
     int sortlist;                   // higher numbers = top on the process tree
+
     // each process gets a unique number
 
     struct target *target;          // app_groups.conf targets
@@ -201,6 +286,7 @@ struct pid_stat {
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
+    /*
 
     usec_t io_collected_usec;
     usec_t last_io_collected_usec;
@@ -208,7 +294,7 @@ struct pid_stat {
     kernel_uint_t uptime;
 
     char *fds_dirname;              // the full directory name in /proc/PID/fd
-     */
+    */
 
     char *stat_filename;
     char *status_filename;
@@ -231,82 +317,6 @@ struct pid_stat {
 struct pid_on_target {
     int32_t pid;
     struct pid_on_target *next;
-};
-
-struct target {
-    char compare[MAX_COMPARE_NAME + 1];
-    uint32_t comparehash;
-    size_t comparelen;
-
-    char id[MAX_NAME + 1];
-    uint32_t idhash;
-
-    char name[MAX_NAME + 1];
-
-    uid_t uid;
-    gid_t gid;
-
-    /* These variables are not necessary for eBPF collector
-    kernel_uint_t minflt;
-    kernel_uint_t cminflt;
-    kernel_uint_t majflt;
-    kernel_uint_t cmajflt;
-    kernel_uint_t utime;
-    kernel_uint_t stime;
-    kernel_uint_t gtime;
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-    kernel_uint_t cgtime;
-    kernel_uint_t num_threads;
-    // kernel_uint_t rss;
-
-    kernel_uint_t status_vmsize;
-    kernel_uint_t status_vmrss;
-    kernel_uint_t status_vmshared;
-    kernel_uint_t status_rssfile;
-    kernel_uint_t status_rssshmem;
-    kernel_uint_t status_vmswap;
-
-    kernel_uint_t io_logical_bytes_read;
-    kernel_uint_t io_logical_bytes_written;
-    // kernel_uint_t io_read_calls;
-    // kernel_uint_t io_write_calls;
-    kernel_uint_t io_storage_bytes_read;
-    kernel_uint_t io_storage_bytes_written;
-    // kernel_uint_t io_cancelled_write_bytes;
-
-    int *target_fds;
-    int target_fds_size;
-
-    kernel_uint_t openfiles;
-    kernel_uint_t openpipes;
-    kernel_uint_t opensockets;
-    kernel_uint_t openinotifies;
-    kernel_uint_t openeventfds;
-    kernel_uint_t opentimerfds;
-    kernel_uint_t opensignalfds;
-    kernel_uint_t openeventpolls;
-    kernel_uint_t openother;
-
-    kernel_uint_t starttime;
-    kernel_uint_t collected_starttime;
-    kernel_uint_t uptime_min;
-    kernel_uint_t uptime_sum;
-    kernel_uint_t uptime_max;
-                            */
-
-    unsigned int processes; // how many processes have been merged to this
-    int exposed;            // if set, we have sent this to netdata
-    int hidden;             // if set, we set the hidden flag on the dimension
-    int debug_enabled;
-    int ends_with;
-    int starts_with;        // if set, the compare string matches only the
-                            // beginning of the command
-
-    struct pid_on_target *root_pid; // list of aggregated pids for target debugging
-
-    struct target *target;  // the one that will be reported to netdata
-    struct target *next;
 };
 
 // ----------------------------------------------------------------------------
@@ -368,6 +378,10 @@ extern void clean_apps_groups_target(struct target *apps_groups_root_target);
 extern size_t zero_all_targets(struct target *root);
 
 extern int am_i_running_as_root();
+
+int collect_data_for_all_processes(
+    int (*bpf_map_get_next_key)(int, const void *, void *), int (*bpf_map_lookup_elem)(int, const void *, void *),
+    int tbl_pid_stats_fd);
 
 #ifndef STATIC
 extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,

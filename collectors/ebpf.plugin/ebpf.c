@@ -104,9 +104,9 @@ ebpf_module_t ebpf_modules[] = {
 };
 
 //Link with apps.plugin
-struct target
-    *apps_groups_default_target = NULL, // the default target
-    *apps_groups_root_target = NULL;    // apps_groups.conf defined
+// struct target
+//     *apps_groups_default_target = NULL, // the default target
+//     *apps_groups_root_target = NULL;    // apps_groups.conf defined
 
 /*****************************************************************
  *
