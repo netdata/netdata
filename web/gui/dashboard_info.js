@@ -3051,77 +3051,77 @@ netdataDashboard.context = {
 
     'ebpf.tcp_functions': {
         title : 'TCP calls',
-        info: 'This chart shows the number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>, whether they return successfully or fail.'
+        info: 'Number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>, whether they return successfully or fail.'
     },
 
     'ebpf.tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'TCP bandwidth shows the number of bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
+        info: 'Number of bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
     },
 
     'ebpf.tcp_error': {
         title : 'TCP errors',
-        info: 'It shows the number of calls that returned negative values for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+        info: 'Number of calls that returned negative values for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
     },
 
     'ebpf.udp_functions': {
         title : 'UDP calls',
-        info: 'UDP functions shows the number of calls for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>, whether they return successfully or fail.'
+        info: 'Number of calls for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>, whether they return successfully or fail.'
     },
 
     'ebpf.udp_bandwidth': {
         title : 'UDP bandwidth',
-        info: 'UDP bandwidth shows the number of bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
+        info: 'Number of bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
     },
 
     'ebpf.file_descriptor': {
         title : 'File access',
-        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, which is the common function called from open(2) and openat(2). The close dimension is attached to the function <code>__close_fd</code>, which is called from system call close(2).'
+        info: 'Number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, which is the common function called from open(2) and openat(2). The close dimension is attached to the function <code>__close_fd</code>, which is called from system call close(2).'
     },
 
     'ebpf.file_error': {
         title : 'File access error',
-        info: 'File error shows the number of calls that returned an error when called per period.'
+        info: 'Number of calls that returned an error when called per period.'
     },
 
     'ebpf.deleted_objects': {
         title : 'VFS remove',
-        info: 'Deleted objects monitors calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files.'
+        info: 'Number of calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files.'
     },
 
     'ebpf.io': {
         title : 'VFS IO',
-        info: 'IO shows the number of calls for functions <code>vfs_read</code> and <code>vfs_write</code>, whether they return successfully or fail. As with the chart \'deleted_objects\', this chart will not show events if the file system uses other functions to store data on disk.'
+        info: 'Number of calls for functions <code>vfs_read</code> and <code>vfs_write</code>, whether they return successfully or fail. As with the chart \'deleted_objects\', this chart will not show events if the file system uses other functions to store data on disk.'
     },
 
     'ebpf.io_bytes': {
         title : 'VFS bytes written',
-        info: 'IO bytes shows the total of bytes read or written with success using the functions  <code>vfs_read</code> and <code>vfs_write</code>.'
+        info: 'Total of bytes read or written with success using the functions  <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
     'ebpf.io_error': {
         title : 'VFS IO error',
-        info: 'IO error shows the number of calls for <code>vfs_read</code> and <code>vfs_write</code> that returned an error.'
+        info: 'Number of calls for <code>vfs_read</code> and <code>vfs_write</code> that returned an error.'
     },
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Process thread counts the number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
         title : 'Exit monitoring',
-        info: 'Exit count shows the number of calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
+        info: 'Number of calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'ebpf.task_error': {
         title : 'Task error',
-        info: 'Task error count the number of errors to create a new process or thread.'
+        info: 'Number of errors to create a new process or thread.'
     },
 
     'ebpf.process_status': {
         title : 'Task status',
-        info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
+        info: 'Difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
     },
 
     // ------------------------------------------------------------------------
