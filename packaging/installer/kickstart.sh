@@ -13,7 +13,11 @@
 #  --dont-wait                do not prompt for user input
 #  --non-interactive          do not prompt for user input
 #  --no-updates               do not install script for daily updates
-#  --local-files   set the full path of the desired tarball to run install with
+#  --local-files              set the full path of the desired tarball to run install with
+#
+# Environment options:
+#
+#  NETDATA_TARBALL_BASEURL    set the base url for downloading the dist tarball
 #
 # This script will:
 #
@@ -28,6 +32,9 @@
 
 # External files
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+
+# Netdata Tarball Base URL (defaults to our Google Storage Bucket)
+[ -z "$NETDATA_TARBALL_BASEURL" ] && NETDATA_TARBALL_BASEURL=https://storage.googleapis.com/netdata-nightlies
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -158,9 +165,9 @@ download() {
   url="${1}"
   dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
   elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O - "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run wget -T 15 -O "${dest}" "${url}" || fatal "Cannot download ${url}"
   else
     fatal "I need curl or wget to proceed, but neither is available on this system."
   fi
@@ -175,13 +182,12 @@ set_tarball_urls() {
   if [ "$1" = "stable" ]; then
     local latest
     # Simple version
-    # latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+    export NETDATA_TARBALL_URL="$NETDATA_TARBALL_BASEURL/netdata-latest.tar.gz"
+    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_TARBALL_BASEURL/sha256sums.txt"
   fi
 }
 

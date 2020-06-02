@@ -73,28 +73,8 @@ else
   source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
-download_tarball() {
-  url="${1}"
-  dest="${2}"
-  name="${3}"
-  opt="${4}"
-
-  if command -v curl > /dev/null 2>&1; then
-    run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O - "${url}" > "${dest}"
-  else
-    echo >&2
-    echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
-    echo >&2 "Either add packages or disable it by issuing '--disable-${opt}' in the installer"
-    echo >&2
-
-    run_failed "I need curl or wget to proceed, but neither is available on this system."
-  fi
-}
-
 download_go() {
-  download_tarball "${1}" "${2}" "go.d plugin" "go"
+  download_file "${1}" "${2}" "go.d plugin" "go"
 }
 
 # make sure we save all commands we run

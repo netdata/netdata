@@ -95,11 +95,33 @@ progress() {
 get() {
   url="${1}"
   if command -v curl > /dev/null 2>&1; then
-    curl -sSL -o - --connect-timeout 10 --retry 3 "${url}"
+    curl -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}"
   else
     fatal "I need curl or wget to proceed, but neither is available on this system."
+  fi
+}
+
+download_file() {
+  url="${1}"
+  dest="${2}"
+  name="${3}"
+  opt="${4}"
+
+  if command -v curl > /dev/null 2>&1; then
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
+  elif command -v wget > /dev/null 2>&1; then
+    run wget -T 15 -O "${dest}" "${url}"
+  else
+    echo >&2
+    echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
+    if [ -n "$opt" ]; then
+      echo >&2 "Either add packages or disable it by issuing '--disable-${opt}' in the installer"
+    fi
+    echo >&2
+
+    run_failed "I need curl or wget to proceed, but neither is available on this system."
   fi
 }
 
@@ -114,7 +136,7 @@ fetch_and_verify() {
   local override=${5}
 
   if [ -z "${override}" ]; then
-    get "${url}" > "${tmp}/${base_name}"
+    download_file "${url}" "${tmp}/${base_name}" "${component}"
   else
     progress "Using provided ${component} archive ${override}"
     run cp "${override}" "${tmp}/${base_name}"
