@@ -25,6 +25,8 @@ static ebpf_functions_t process_functions;
 
 static pid_t ebpf_pid_max = 0;
 static ebpf_process_stat_t **local_process_stats = NULL;
+static pid_t *pid_index;
+static int pids_running;
 
 #ifndef STATIC
 /**
@@ -227,9 +229,14 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         (void)dt;
 
         read_hash_global_tables();
-        collect_data_for_all_processes(process_functions.bpf_map_get_next_key,
-                                       process_functions.bpf_map_lookup_elem,
-                                       map_fd[0]);
+        pids_running = collect_data_for_all_processes(local_process_stats,
+                                                      pid_index,
+                                                      process_functions.bpf_map_get_next_key,
+                                                      process_functions.bpf_map_lookup_elem,
+                                                      map_fd[0]);
+        if (pids_running > 0){
+            //add statistic calculation for the process here.
+        }
 
         if (em->enabled) {
             pthread_mutex_lock(&lock);
@@ -501,6 +508,18 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em)
  *****************************************************************/
 
 /**
+ * Clean the allocated process stat structure
+ */
+static void clean_process_stat()
+{
+    int i;
+    for (i = 0 ; i < pids_running ; i++) {
+        ebpf_process_stat_t *w = local_process_stats[pid_index[i]];
+        freez(w);
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -513,7 +532,9 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
+    clean_process_stat();
     freez(local_process_stats);
+    freez(pid_index);
 
     if (process_functions.libnetdata) {
         dlclose(process_functions.libnetdata);
@@ -541,7 +562,8 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     ebpf_pid_max =  get_system_pid_max();
-    local_process_stats = callocz(sizeof(ebpf_process_stat_t *), (size_t)ebpf_pid_max);
+    local_process_stats = callocz((size_t)ebpf_pid_max, sizeof(ebpf_process_stat_t *));
+    pid_index = callocz((size_t)ebpf_pid_max, sizeof(pid_t));
 }
 
 static void change_collector_event() {

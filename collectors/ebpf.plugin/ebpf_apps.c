@@ -35,77 +35,6 @@ int ebpf_read_hash_table(void *ep, int fd, pid_t pid)
 }
 
 /**
- * Read processes statistic
- *
- * Read information from kernel ring to user ring.
- *
- * @param ep    the table with all process stats values.
- * @param fd    the file descriptor mapped from kernel
- * @param ef    a pointer for the functions mapped from dynamic library
- * @param pids  the list of pids associated to a target.
- *
- * @return it returns the number of PID reads
- */
-#ifndef STATIC
-size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,
-                                                    ebpf_functions_t *ef, struct pid_on_target *pids)
-#else
-size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids)
-#endif
-{
-    size_t count = 0;
-    while (pids) {
-        uint32_t current_pid = pids->pid;
-#ifndef STATIC
-        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid, ef->bpf_map_lookup_elem))
-#else
-        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
-#endif
-            count++;
-
-        pids = pids->next;
-    }
-
-    return count;
-}
-
-/**
- * Read process statistic using hash table
- *
- * @param out                   the output tensor that will receive the information.
- * @param fd                    the file descriptor that has the data
- * @param bpf_map_lookup_elem   a pointer for the function to read the data
- * @param bpf_map_get_next_key  a pointer fo the function to read the index.
- */
-#ifndef STATIC
-size_t read_process_statistic_using_hash_table(ebpf_process_stat_t **out, int fd,
-                                               int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                               int (*bpf_map_get_next_key)(int, const void *, void *))
-#else
-size_t read_process_statistic_using_hash_table(ebpf_process_stat_t **out, int fd)
-#endif
-{
-    size_t count = 0;
-    uint32_t key =0;
-    uint32_t next_key = 0;
-
-    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        ebpf_process_stat_t *eps = out[next_key];
-        if (!eps) {
-            eps = callocz(1, sizeof(ebpf_process_stat_t));
-            out[next_key] = eps;
-        }
-#ifndef STATIC
-        ebpf_read_hash_table(eps, fd, next_key, bpf_map_lookup_elem);
-#else
-        ebpf_read_hash_table(eps, fd, next_key);
-#endif
-    }
-
-    return count;
-}
-
-/**
  * Read socket statistic
  *
  * Read information from kernel ring to user ring.
@@ -956,19 +885,34 @@ static void cleanup_exited_pids(void) {
     }
 }
 
-int collect_data_for_all_processes(
-    int (*bpf_map_get_next_key)(int, const void *, void *), int (*bpf_map_lookup_elem)(int, const void *, void *),
-    int tbl_pid_stats_fd)
+#ifndef STATIC
+int collect_data_for_all_processes(ebpf_process_stat_t **out,
+                                   pid_t *index,
+                                   int (*bpf_map_get_next_key)(int, const void *, void *),
+                                   int (*bpf_map_lookup_elem)(int, const void *, void *),
+                                   int tbl_pid_stats_fd)
+#else
+int collect_data_for_all_processes(ebpf_process_stat_t **out,
+                                   pid_t *index,
+                                   int tbl_pid_stats_fd)
+#endif
 {
     uint32_t key = 0, next_key;
     int counter = 0;
-    ebpf_process_stat_t value;
 
     while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, &value)) {
+        ebpf_process_stat_t *w = out[next_key];
+        if (!w) {
+            w = callocz(1, sizeof(ebpf_process_stat_t));
+            out[next_key] = w;
+        }
+
+        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, w)) {
+            index[counter] = next_key;
             counter++;
             //collect_data_for_pid(next_key, NULL);
         }
+
         key = next_key;
     }
 
@@ -1040,5 +984,5 @@ int collect_data_for_all_processes(
 
     cleanup_exited_pids();
 
-    return 0;
+    return counter;
 }

@@ -379,10 +379,6 @@ extern size_t zero_all_targets(struct target *root);
 
 extern int am_i_running_as_root();
 
-extern int collect_data_for_all_processes(
-    int (*bpf_map_get_next_key)(int, const void *, void *), int (*bpf_map_lookup_elem)(int, const void *, void *),
-    int tbl_pid_stats_fd);
-
 #ifndef STATIC
 extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
                            int (*bpf_map_lookup_elem)(int, const void *, void *));
@@ -393,21 +389,21 @@ extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t *
 extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,
                                                            ebpf_functions_t *ef, struct pid_on_target *pids);
 
-extern size_t read_process_statistic_using_hash_table(ebpf_process_stat_t **out, int fd,
-                                                      int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                                      int (*bpf_map_get_next_key)(int, const void *, void *));
+extern int collect_data_for_all_processes(ebpf_process_stat_t **out,
+                                          pid_t *index,
+                                          int (*bpf_map_get_next_key)(int, const void *, void *),
+                                          int (*bpf_map_lookup_elem)(int, const void *, void *),
+                                          int tbl_pid_stats_fd);
 
-extern size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd,
-                                                      int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                                      int (*bpf_map_get_next_key)(int, const void *, void *));
 #else
 extern int ebpf_read_hash_table(void *ep, int fd, pid_t pid);
 
 extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids);
 
-size_t size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,struct pid_on_target *pids);
+extern int collect_data_for_all_processes(ebpf_process_stat_t **out,
+                                          pid_t *index,
+                                          int tbl_pid_stats_fd);
 
-size_t read_process_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd);
 #endif
 
 #endif
