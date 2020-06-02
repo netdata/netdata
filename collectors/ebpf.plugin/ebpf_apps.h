@@ -379,7 +379,7 @@ extern size_t zero_all_targets(struct target *root);
 
 extern int am_i_running_as_root();
 
-int collect_data_for_all_processes(
+extern int collect_data_for_all_processes(
     int (*bpf_map_get_next_key)(int, const void *, void *), int (*bpf_map_lookup_elem)(int, const void *, void *),
     int tbl_pid_stats_fd);
 

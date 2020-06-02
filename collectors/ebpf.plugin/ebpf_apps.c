@@ -960,16 +960,19 @@ int collect_data_for_all_processes(
     int (*bpf_map_get_next_key)(int, const void *, void *), int (*bpf_map_lookup_elem)(int, const void *, void *),
     int tbl_pid_stats_fd)
 {
-    pid_t key, next_key;
-    ebpf_process_stat_t *value = NULL;
+    uint32_t key = 0, next_key;
+    int counter = 0;
+    ebpf_process_stat_t value;
 
     while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, value)) {
-            if (value)
-                collect_data_for_pid(next_key, NULL);
+        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, &value)) {
+            counter++;
+            //collect_data_for_pid(next_key, NULL);
         }
-        next_key = key;
+        key = next_key;
     }
+
+    return counter;
 
     link_all_processes_to_their_parents();
 

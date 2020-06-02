@@ -227,10 +227,15 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         (void)dt;
 
         read_hash_global_tables();
+        collect_data_for_all_processes(process_functions.bpf_map_get_next_key,
+                                       process_functions.bpf_map_lookup_elem,
+                                       map_fd[0]);
 
-        pthread_mutex_lock(&lock);
-        ebpf_process_send_data(em);
-        pthread_mutex_unlock(&lock);
+        if (em->enabled) {
+            pthread_mutex_lock(&lock);
+            ebpf_process_send_data(em);
+            pthread_mutex_unlock(&lock);
+        }
 
         fflush(stdout);
     }
@@ -596,9 +601,6 @@ void *ebpf_process_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_functions(&process_functions);
 
-    if (!em->enabled)
-        goto endprocess;
-
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_MAX_MONITOR_VECTOR);
 
@@ -617,9 +619,11 @@ void *ebpf_process_thread(void *ptr)
     ebpf_global_labels(process_aggregated_data, process_publish_aggregated, process_dimension_names,
                        process_id_names, NETDATA_MAX_MONITOR_VECTOR);
 
-    ebpf_create_global_charts(em);
-    if (em->apps_charts)
-        ebpf_process_create_apps_charts(em);
+    if (em->enabled) {
+        ebpf_create_global_charts(em);
+        if (em->apps_charts)
+            ebpf_process_create_apps_charts(em);
+    }
 
     pthread_mutex_unlock(&lock);
 
