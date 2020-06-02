@@ -88,12 +88,12 @@ class Pool:
         self.name = name
 
         self.networks = list()
-        for network_item in network.split(" "):
-            range_ip = network_item.split("-")
+        for network in network.split(" "):
+            range_ip = network.split("-")
             if len(range_ip) == 1:
                 self.networks.append({
                     'type': 'network',
-                    'list': ipaddress.ip_network(address=u'%s' % network_item)
+                    'list': ipaddress.ip_network(address=u'%s' % network)
                 })
             elif len(range_ip) == 2:
                 self.networks.append({
