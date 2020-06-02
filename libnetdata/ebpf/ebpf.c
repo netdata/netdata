@@ -225,6 +225,12 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
         return -1;
     }
 
+    ef->bpf_map_get_next_key = dlsym(libnetdata, "bpf_map_get_next_key");
+    if ((err = dlerror()) != NULL) {
+        error("Cannot find bpf_map_delete_elem: %s", err);
+        return -1;
+    }
+
     return 0;
 }
 

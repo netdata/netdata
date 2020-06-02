@@ -58,6 +58,7 @@ typedef struct ebpf_functions {
     //Libbpf (It is necessary to have at least kernel 4.10)
     int (*bpf_map_lookup_elem)(int, const void *, void *);
     int (*bpf_map_delete_elem)(int fd, const void *key);
+    int (*bpf_map_get_next_key)(int fd, const void *key, void *next_key);
 
     int *map_fd;
 

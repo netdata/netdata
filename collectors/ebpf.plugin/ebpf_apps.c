@@ -44,16 +44,17 @@ int ebpf_read_hash_table(void *ep, int fd, pid_t pid)
  * @param ef    a pointer for the functions mapped from dynamic library
  * @param pids  the list of pids associated to a target.
  *
- * @return
+ * @return it returns the number of PID reads
  */
 #ifndef STATIC
-size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd, ebpf_functions_t *ef, struct pid_on_target *pids)
+size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,
+                                                    ebpf_functions_t *ef, struct pid_on_target *pids)
 #else
-size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids)
+size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids)
 #endif
 {
     size_t count = 0;
-    while(pids) {
+    while (pids) {
         uint32_t current_pid = pids->pid;
 #ifndef STATIC
         if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid, ef->bpf_map_lookup_elem))
@@ -63,6 +64,42 @@ size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd,struct pid_on_t
             count++;
 
         pids = pids->next;
+    }
+
+    return count;
+}
+
+/**
+ * Read process statistic using hash table
+ *
+ * @param out                   the output tensor that will receive the information.
+ * @param fd                    the file descriptor that has the data
+ * @param bpf_map_lookup_elem   a pointer for the function to read the data
+ * @param bpf_map_get_next_key  a pointer fo the function to read the index.
+ */
+#ifndef STATIC
+size_t read_process_statistic_using_hash_table(ebpf_process_stat_t **out, int fd,
+                                               int (*bpf_map_lookup_elem)(int, const void *, void *),
+                                               int (*bpf_map_get_next_key)(int, const void *, void *))
+#else
+size_t read_process_statistic_using_hash_table(ebpf_process_stat_t **out, int fd)
+#endif
+{
+    size_t count = 0;
+    uint32_t key =0;
+    uint32_t next_key = 0;
+
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        ebpf_process_stat_t *eps = out[next_key];
+        if (!eps) {
+            eps = callocz(1, sizeof(ebpf_process_stat_t));
+            out[next_key] = eps;
+        }
+#ifndef STATIC
+        ebpf_read_hash_table(eps, fd, next_key, bpf_map_lookup_elem);
+#else
+        ebpf_read_hash_table(eps, fd, next_key);
+#endif
     }
 
     return count;
@@ -81,9 +118,10 @@ size_t read_processes_statistic(ebpf_process_stat_t **ep, int fd,struct pid_on_t
  * @return
  */
 #ifndef STATIC
-size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd, ebpf_functions_t *ef, struct pid_on_target *pids)
+size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,
+                                                    ebpf_functions_t *ef, struct pid_on_target *pids)
 #else
-size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd,struct pid_on_target *pids)
+size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,struct pid_on_target *pids)
 #endif
 {
     size_t count = 0;
@@ -97,6 +135,42 @@ size_t read_bandwidth_statistic(ebpf_bandwidth_t **ep, int fd,struct pid_on_targ
             count++;
 
         pids = pids->next;
+    }
+
+    return count;
+}
+
+/**
+ * Read bandwidth statistic using hash table
+ *
+ * @param out                   the output tensor that will receive the information.
+ * @param fd                    the file descriptor that has the data
+ * @param bpf_map_lookup_elem   a pointer for the function to read the data
+ * @param bpf_map_get_next_key  a pointer fo the function to read the index.
+ */
+#ifndef STATIC
+size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd,
+                                               int (*bpf_map_lookup_elem)(int, const void *, void *),
+                                               int (*bpf_map_get_next_key)(int, const void *, void *))
+#else
+size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd)
+#endif
+{
+    size_t count = 0;
+    uint32_t key =0;
+    uint32_t next_key = 0;
+
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        ebpf_bandwidth_t *eps = out[next_key];
+        if (!eps) {
+            eps = callocz(1, sizeof(ebpf_process_stat_t));
+            out[next_key] = eps;
+        }
+#ifndef STATIC
+        ebpf_read_hash_table(eps, fd, next_key, bpf_map_lookup_elem);
+#else
+        ebpf_read_hash_table(eps, fd, next_key);
+#endif
     }
 
     return count;
