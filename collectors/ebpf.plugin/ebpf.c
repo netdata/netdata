@@ -658,7 +658,6 @@ static void parse_args(int argc, char **argv)
     int enabled = 0;
     int disable_apps = 0;
     int freq = 0;
-    int c;
     int option_index = 0;
     static struct option long_options[] = {
         {"help",     no_argument,    0,  'h' },
@@ -679,7 +678,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        c = getopt_long(argc, argv, "hvganpr",long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvganpr",long_options, &option_index);
         if (c == -1)
             break;
 
