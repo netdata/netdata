@@ -87,21 +87,54 @@ class Pool:
         self.id = re.sub(r'[:/.-]+', '_', name)
         self.name = name
 
-        networks = network.split(" ")
-        if len(networks) == 1:
-            self.networks = [ ipaddress.ip_network(address=u'%s' % network) ]
-        elif len(networks) == 2:
-            self.networks = list( ipaddress.summarize_address_range(ipaddress.ip_address(u'%s' % networks[0]), ipaddress.ip_address(u'%s' % networks[1])) )
-        else:
-            raise ValueError('Network syntaxis error!')
+        self.networks = list()
+        for network_item in network.split(" "):
+            range_ip = network_item.split("-")
+            if len(range_ip) == 1:
+                self.networks.append({
+                    'type': 'network',
+                    'list': ipaddress.ip_network(address=u'%s' % network_item)
+                })
+            elif len(range_ip) == 2:
+                self.networks.append({
+                    'type': 'range',
+                    'list': list(
+                                ipaddress.summarize_address_range(
+                                    ipaddress.ip_address(u'%s' % range_ip[0]), 
+                                    ipaddress.ip_address(u'%s' % range_ip[1])
+                                )
+                            )
+                })
+            else:
+                raise ValueError('Network syntaxis error!')
+
+    def _get_networks_by_type(self, type_network):
+        filter_network = filter(lambda network: network.get("type") == type_network, self.networks)
+        data_return = list()
+        if type_network == "range":
+            for network in filter_network:
+                data_return = data_return + network.get('list')
+            
+        elif type_network == "network":
+            data_return = list( network.get('list') for network in filter_network )
+        
+        elif type_network == "all":
+            data_return += self._get_networks_by_type("network")
+            data_return += self._get_networks_by_type("range")
+
+        return data_return
 
     def num_hosts(self):
-        return sum([network.num_addresses for network in self.networks]) - 2
+        data_return = 0
+        data_return += sum([network.num_addresses - 2 for network in self._get_networks_by_type("network")])
+        data_return += sum([network.num_addresses for network in self._get_networks_by_type("range")])
+        return data_return
 
     def __contains__(self, item):
-        for network in self.networks:
+        for network in self._get_networks_by_type("all"):
             if item.address in network:
                 return True
+
         return False
 
 class Lease:

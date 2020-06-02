@@ -45,9 +45,9 @@ local:
   leases_path: '/var/lib/dhcp/dhcpd.leases'
   pools:
     office:         '192.168.2.0/24'
-    wifi:           '192.168.3.0/24'
+    wifi:           '192.168.3.10-192.168.3.20'
     192.168.4.0/24: '192.168.4.0/24'
-    range:          '192.168.5.99 192.168.5.151'
+    wifi-guest:     '192.168.5.0/24 192.168.6.10-192.168.6.20'
 ```
 
 The module will not work If no configuration is given.
