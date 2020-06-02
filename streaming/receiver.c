@@ -277,9 +277,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
         netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
 
+    int ssl = 0;
+#ifdef ENABLE_HTTPS
+    if (rpt->ssl.conn != NULL)
+        ssl = 1;
+#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s, tags '%s'"
+    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port
@@ -289,6 +294,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
          , (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
+         , ssl ? " SSL," : ""
          , rpt->host->tags?rpt->host->tags:""
     );
 #endif // NETDATA_INTERNAL_CHECKS
