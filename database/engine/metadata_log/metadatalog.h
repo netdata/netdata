@@ -109,7 +109,7 @@ struct metalog_instance {
     struct parser_user_object *metalog_parser_object;
     struct logfile_compaction_state compaction_state;
     uint32_t current_compaction_id; /* Every compaction run increments this by 1 */
-    uint64_t disk_space;
+    unsigned long disk_space;
     unsigned long records_nr;
     unsigned last_fileno; /* newest index of metadata log file */
 

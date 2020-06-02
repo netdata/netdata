@@ -18,6 +18,8 @@ struct logfile_compaction_state {
     uint8_t throttle; /* set non-zero to throttle compaction */
 };
 
+extern int compaction_failure_recovery(struct metalog_instance *ctx, struct metadata_logfile **metalogfiles,
+                                       unsigned *matched_files);
 extern void metalog_do_compaction(struct metalog_worker_config *wc);
 extern void after_compact_old_records(struct metalog_worker_config* wc);
 

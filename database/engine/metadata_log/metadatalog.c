@@ -129,10 +129,8 @@ void metalog_try_link_new_metadata_logfile(struct metalog_worker_config *wc)
     struct metalog_instance *ctx = wc->ctx;
     struct metadata_logfile *metalogfile;
     int ret;
-    unsigned current_size;
 
     metalogfile = ctx->metadata_logfiles.last;
-    current_size = metalogfile->pos;
     if (metalogfile->records.first) { /* it has records */
         /* Finalize metadata log file and create a new one */
         mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
@@ -149,7 +147,6 @@ void metalog_test_quota(struct metalog_worker_config *wc)
     struct metadata_logfile *metalogfile;
     unsigned current_size;
     uint8_t only_one_metalogfile;
-    int ret;
 
     metalogfile = ctx->metadata_logfiles.last;
     current_size = metalogfile->pos;

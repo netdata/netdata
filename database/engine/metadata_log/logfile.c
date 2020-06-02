@@ -30,7 +30,7 @@ void mlf_record_insert(struct metadata_logfile *metalogfile, struct metalog_reco
 
         mlf_record_block_insert(metalogfile, record_block);
     }
-    ++ctx->records_nr; /* FIXME: racy */
+    rrd_atomic_fetch_add(&ctx->records_nr, 1);
 }
 
 struct metalog_record *mlf_record_get_first(struct metadata_logfile *metalogfile)
@@ -120,7 +120,7 @@ void mlf_flush_records_buffer(struct metalog_worker_config *wc, struct metadata_
                       metalogfile->pos, flush_records_buffer_cb);
     assert (-1 != ret);
     metalogfile->pos += size;
-    ctx->disk_space += size;
+    rrd_atomic_fetch_add(&ctx->disk_space, size);
     records_log->buf = NULL;
     ctx->stats.io_write_bytes += size;
     ++ctx->stats.io_write_requests;
@@ -129,7 +129,6 @@ void mlf_flush_records_buffer(struct metalog_worker_config *wc, struct metadata_
 void *mlf_get_records_buffer(struct metalog_worker_config *wc, struct metadata_record_commit_log *records_log,
                              struct metadata_logfile_list *metadata_logfiles, unsigned size)
 {
-    struct metalog_instance *ctx = wc->ctx;
     int ret;
     unsigned buf_pos, buf_size;
 
@@ -241,6 +240,26 @@ int close_metadata_logfile(struct metadata_logfile *metalogfile)
     ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
     if (ret < 0) {
         error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
+    return ret;
+}
+
+int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
+{
+    struct metalog_instance *ctx = metalogfile->ctx;
+    uv_fs_t req;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
+
+    ret = uv_fs_unlink(NULL, &req, path, NULL);
+    if (ret < 0) {
+        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -448,13 +467,10 @@ static int metadata_record_integrity_check(void *record)
 
 /*
  * Iterates metadata log file records and creates database objects (host/chart/dimension)
- * Returns the maximum record id it discovered.
  */
-static uint64_t iterate_records(struct metadata_logfile *metalogfile)
+static void iterate_records(struct metadata_logfile *metalogfile)
 {
-    int ret;
-    uint32_t file_size, pos, size_bytes, bytes_remaining, record_size;
-    uint64_t max_id, id;
+    uint32_t file_size, pos, bytes_remaining, record_size;
     void *buf;
     struct rrdeng_metalog_record_header *header;
     struct metalog_instance *ctx = metalogfile->ctx;
@@ -464,7 +480,6 @@ static uint64_t iterate_records(struct metadata_logfile *metalogfile)
 
     file_size = metalogfile->pos;
 
-    max_id = 1;
     buf = mallocz(MAX_READ_BYTES);
 
     for (pos = sizeof(struct rrdeng_metalog_sb) ; pos < file_size ; pos += record_size) {
@@ -514,11 +529,9 @@ static uint64_t iterate_records(struct metadata_logfile *metalogfile)
             mlf_record_insert(metalogfile, &record);
             uuid_clear(state->uuid); /* Clear state for parsing of next record */
         }
-        max_id = MAX(max_id, id);
     }
 
     freez(buf);
-    return max_id;
 }
 
 int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile *metalogfile)
@@ -526,7 +539,7 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     uv_fs_t req;
     uv_file file;
     int ret, fd, error;
-    uint64_t file_size, max_id;
+    uint64_t file_size;
     char path[RRDENG_PATH_MAX];
 
     generate_metadata_logfile_path(metalogfile, path, sizeof(path));
@@ -551,8 +564,7 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     metalogfile->file = file;
     metalogfile->pos = file_size;
 
-    max_id = iterate_records(metalogfile);
-    //ctx->records_log.record_id = MAX(ctx->records_log.record_id, max_id + 1);
+    iterate_records(metalogfile);
 
     info("Metadata log \"%s\" loaded (size:%"PRIu64").", path, file_size);
     return 0;
@@ -592,7 +604,7 @@ static int scan_metalog_files_cmp(const void *a, const void *b)
 static int scan_metalog_files(struct metalog_instance *ctx)
 {
     int ret;
-    unsigned starting_no, no, matched_files, i,failed_to_load;
+    unsigned starting_no, no, matched_files, i, failed_to_load;
     static uv_fs_t req;
     uv_dirent_t dent;
     struct metadata_logfile **metalogfiles, *metalogfile;
@@ -630,6 +642,14 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         error("Warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
     }
     qsort(metalogfiles, matched_files, sizeof(*metalogfiles), scan_metalog_files_cmp);
+    ret = compaction_failure_recovery(ctx, metalogfiles, &matched_files);
+    if (ret) { /* If the files are corrupted fail */
+        for (i = 0 ; i < matched_files ; ++i) {
+            freez(metalogfiles[i]);
+        }
+        freez(metalogfiles);
+        return UV_EINVAL;
+    }
     ctx->last_fileno = metalogfiles[matched_files - 1]->fileno;
 
     struct plugind cd = {
@@ -681,7 +701,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
             break;
         }
         metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
-        ctx->disk_space += metalogfile->pos;
+        rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
     }
     info("PARSER ended");
 
@@ -722,7 +742,7 @@ int add_new_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfi
         return ret;
     }
     metadata_logfile_list_insert(logfile_list, metalogfile);
-    ctx->disk_space += metalogfile->pos;
+    rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
 
     return 0;
 }

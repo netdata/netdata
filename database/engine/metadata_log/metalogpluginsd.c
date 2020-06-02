@@ -9,7 +9,6 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
                                         int update_every, RRDSET_TYPE chart_type, char *options)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
     RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     uuid_t *chart_uuid;
@@ -54,7 +53,6 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
                                             long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
     UNUSED(user);
     UNUSED(algorithm);
     uuid_t *dim_uuid;
@@ -85,7 +83,6 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
 
     uuid_copy(state->uuid, *uuid);
 
