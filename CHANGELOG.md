@@ -16,6 +16,7 @@
 - Fix missing ebpf packaging files from dist archive [\#9182](https://github.com/netdata/netdata/pull/9182) ([prologic](https://github.com/prologic))
 - cov\_358988: Remove coverity bug [\#9180](https://github.com/netdata/netdata/pull/9180) ([thiagoftsm](https://github.com/thiagoftsm))
 - Improve dbengine docs for streaming setups [\#9177](https://github.com/netdata/netdata/pull/9177) ([joelhans](https://github.com/joelhans))
+- Really prevent overwriting netdata.conf on static installs. [\#9174](https://github.com/netdata/netdata/pull/9174) ([Ferroin](https://github.com/Ferroin))
 - Remove knatsakis and ncmans from CODEOWNERS for the agent. [\#9173](https://github.com/netdata/netdata/pull/9173) ([Ferroin](https://github.com/Ferroin))
 - Added health check functionality to our Docker images. [\#9172](https://github.com/netdata/netdata/pull/9172) ([Ferroin](https://github.com/Ferroin))
 - Remove the experimental label from the exporting engine documentation [\#9171](https://github.com/netdata/netdata/pull/9171) ([vlvkobal](https://github.com/vlvkobal))
@@ -240,11 +241,6 @@
 - Cleans up cloud config files \[agent\_cloud\_link\] -\> \[cloud\] [\#8501](https://github.com/netdata/netdata/pull/8501) ([underhood](https://github.com/underhood))
 - Enhanced ACLK header payload to include timestamp-offset-usec [\#8499](https://github.com/netdata/netdata/pull/8499) ([stelfrag](https://github.com/stelfrag))
 - Improved ACLK  [\#8498](https://github.com/netdata/netdata/pull/8498) ([stelfrag](https://github.com/stelfrag))
-- Fix openSUSE 15.1 RPM Package Buidls [\#8494](https://github.com/netdata/netdata/pull/8494) ([prologic](https://github.com/prologic))
-- python.d/SimpleService: fix module name [\#8492](https://github.com/netdata/netdata/pull/8492) ([ilyam8](https://github.com/ilyam8))
-- Fix install-required-packages script to self-update apt [\#8491](https://github.com/netdata/netdata/pull/8491) ([prologic](https://github.com/prologic))
-- Relaxes SSL checks for testing [\#8489](https://github.com/netdata/netdata/pull/8489) ([underhood](https://github.com/underhood))
-- packaging/docker: add --build-arg CFLAGS support [\#8485](https://github.com/netdata/netdata/pull/8485) ([nicolasparada](https://github.com/nicolasparada))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
