@@ -23,12 +23,14 @@ Let's cover the process of enabling an exporting connector, using the Graphite c
 be applied to other connectors as well.
 
 > If you are migrating from the deprecated backends system, this quickstart will also help you update your configuration
-> to the new format.
+> to the new format. For the most part, the configurations are identical, but there are two exceptions. First,
+> `exporting.conf` uses a new `[<type>:<name>]` format for defining connector instances. Second, the `host tags` setting
+> is deprecated. Instead, use [host labels](/docs/tutorials/using-host-labels.md) to tag exported metrics.
 
 Open the `exporting.conf` file with `edit-config`.
 
 ```bash
-cd /etc/netdata   # Replace this path with your Netdata config directory, if different as found in the steps above
+cd /etc/netdata   # Replace this path with your Netdata config directory
 sudo ./edit-config exporting.conf
 ```
 
@@ -58,6 +60,9 @@ to long-term storage. Use the `update every` setting to change the frequency in 
 
 To enable the Graphite connector, find the `[graphite:my_graphite_instance]` example section in `exporting.conf`. You
 can use this (or the respective example for the connector you want to use) as a framework for your configration.
+
+`[graphite:my_graphite_instance]` is an example of the new `[<type>:<name>]` format for defining connector instances.
+
 Uncomment the section itself and replace `my_graphite_instance` with a name of your choice. Then set `enabled` to `yes`
 and uncomment the line.
 
@@ -76,15 +81,11 @@ and uncomment the line.
     # send hosts matching = localhost *
 ```
 
-Next, edit and uncomment any other lines necessary to connect the exporting engine to your endpoint. You must change the
-`destination` setting in most situations.
+Next, edit and uncomment any other lines necessary to connect the exporting engine to your endpoint. If migrating from
+backends, port your settings over and uncomment any lines you change. You must edit the `destination` setting in most
+situations.
 
 For details on all the configuration options, see the [exporting reference](/exporting/README.md#configuration).
-
-> When migrating from backends, keep in kind that most settings for the exporting engine are identical to their backend
-> counterpart. You should be able to copy your backends settings into `exporting.conf` to complete your migration. The
-> only setting that won't work is `host tags`. Instead, use [host labels](/docs/tutorials/using-host-labels.md) to tag
-> your exported metrics.
 
 Restart your Agent to begin exporting to the destination of your choice. Because the Agent exports metrics as they're
 collected, you should start seeing data in your external database after only a few seconds.
