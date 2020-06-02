@@ -396,20 +396,17 @@ static int rrdpush_receive(struct receiver_state *rpt)
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->host->hostname, rpt->client_ip, rpt->client_port, count);
 
-    rrdhost_wrlock(rpt->host);
-    rpt->host->senders_disconnected_time = now_realtime_sec();
-    //rpt->host->connected_senders--;
-    //if(!rpt->host->connected_senders) {
+    netdata_mutex_lock(&rpt->host->receiver_lock);
+    if (rpt->host->receiver == rpt) {
+        rrdhost_wrlock(rpt->host);
+        rpt->host->senders_disconnected_time = now_realtime_sec();
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             rpt->host->health_enabled = 0;
-    //}
-    rrdhost_unlock(rpt->host);
-
-    // Don't lock host->receiver_lock, if there is a false positive then the new receiver will trigger a spawn when
-    // done_push gets called.
-    if (rpt->host->receiver == rpt)
+        rrdhost_unlock(rpt->host);
         rrdpush_sender_thread_stop(rpt->host);
+    }
+    netdata_mutex_unlock(&rpt->host->receiver_lock);
 
     // cleanup
     fclose(fp);
