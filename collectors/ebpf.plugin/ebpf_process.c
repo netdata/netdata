@@ -26,8 +26,6 @@ static ebpf_functions_t process_functions;
 static ebpf_process_stat_t **local_process_stats = NULL;
 static ebpf_process_publish_apps_t **current_apps_data = NULL;
 static ebpf_process_publish_apps_t **prev_apps_data = NULL;
-static pid_t *pid_index;
-static int pids_running;
 
 #ifndef STATIC
 /**
@@ -102,7 +100,8 @@ static void ebpf_update_global_publish(netdata_publish_syscall_t *publish,
  * @param prev Previous values read from memory.
  * @param first was it allocated now?
  */
-static void ebpf_update_apps_publish(ebpf_process_publish_apps_t *curr, ebpf_process_publish_apps_t *prev,int first)
+static void ebpf_process_update_apps_publish(ebpf_process_publish_apps_t *curr,
+                                             ebpf_process_publish_apps_t *prev,int first)
 {
     if (first)
         return;
@@ -238,7 +237,7 @@ static void read_hash_global_tables()
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void ebpf_update_apps_data()
+static void ebpf_process_update_apps_data()
 {
     int i;
     for ( i = 0 ; i < pids_running ; i++) {
@@ -284,7 +283,7 @@ static void ebpf_update_apps_data()
         cad->bytes_read = (uint64_t)ps->read_bytes +
                                            (uint64_t)ps->readv_bytes;
 
-        ebpf_update_apps_publish(cad, pad, status);
+        ebpf_process_update_apps_publish(cad, pad, status);
     }
 }
 
@@ -564,6 +563,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 {
     heartbeat_t hb;
     heartbeat_init(&hb);
+    int enabled = em->enabled;
+    int apps_enabled = em->apps_charts;
     while(!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -575,11 +576,11 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                                                       process_functions.bpf_map_lookup_elem,
                                                       map_fd[0]);
 
-        if (em->enabled) {
+        if (enabled) {
             int publish_apps = 0;
-            if (pids_running > 0 && em->apps_charts){
+            if (pids_running > 0 && apps_enabled){
                 publish_apps = 1;
-                ebpf_update_apps_data();
+                ebpf_process_update_apps_data();
             }
 
             pthread_mutex_lock(&lock);
@@ -627,7 +628,6 @@ static void ebpf_process_cleanup(void *ptr)
 
     clean_process_stat();
     freez(local_process_stats);
-    freez(pid_index);
 
     if (process_functions.libnetdata) {
         dlclose(process_functions.libnetdata);
@@ -659,7 +659,6 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     local_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
     current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
     prev_apps_data = callocz(length, sizeof(ebpf_process_publish_apps_t *));
-    pid_index = callocz((size_t)pid_max, sizeof(pid_t));
 }
 
 static void change_collector_event() {

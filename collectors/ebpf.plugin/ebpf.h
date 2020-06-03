@@ -169,5 +169,6 @@ void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, st
 //Common variables
 extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
-
+extern pid_t *pid_index;
+extern int pids_running;
 #endif

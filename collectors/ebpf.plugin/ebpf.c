@@ -104,9 +104,8 @@ ebpf_module_t ebpf_modules[] = {
 };
 
 //Link with apps.plugin
-// struct target
-//     *apps_groups_default_target = NULL, // the default target
-//     *apps_groups_root_target = NULL;    // apps_groups.conf defined
+pid_t *pid_index;
+int pids_running;
 
 /*****************************************************************
  *
@@ -130,6 +129,8 @@ static void ebpf_exit(int sig)
     }
 
     clean_apps_groups_target(apps_groups_root_target);
+
+    freez(pid_index);
 
     event_pid = getpid();
     int ret = fork();
@@ -516,7 +517,8 @@ void ebpf_print_help() {
  */
 static void ebpf_allocate_common_vectors()
 {
-    all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
+    all_pids = callocz((size_t) pid_max, sizeof(struct pid_stat *));
+    pid_index = callocz((size_t)pid_max, sizeof(pid_t));
 }
 
 /**
