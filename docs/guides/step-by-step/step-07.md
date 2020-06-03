@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step
 Welcome to the seventh step of the Netdata guide!
 
 This step of the guide aims to get you more familiar with the features of the dashboard not previously mentioned in
-[step 2](/docs/step-by-step/step-02.md).
+[step 2](/docs/guides/step-by-step/step-02.md).
 
 ## What you'll learn in this step
 

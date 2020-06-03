@@ -96,7 +96,7 @@ section and give it the value of `1`.
 ```
 
 Restart Netdata with `service restart netdata` or the [appropriate
-alternative](../getting-started.md#start-stop-and-restart-netdata) for your system.
+alternative](/docs/getting-started.md#start-stop-and-restart-netdata) for your system.
 
 Now, open up your browser and navigate to `http://HOST:19999/netdata.conf`. You'll see that Netdata has recognized
 that our fake option isn't valid and added a notice that Netdata will ignore it.

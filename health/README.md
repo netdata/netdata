@@ -27,9 +27,9 @@ Every infrastructure is different, so we're not interested in mandating how you 
 monitoring features. Instead, these guides should give you the details you need to tweak alarms to your heart's
 content.
 
-[Stopping notifications for individual alarms](/docs/guides/montior/stop-notifications-alarms.md)
+[Stopping notifications for individual alarms](/docs/guides/monitor/stop-notifications-alarms.md)
 
-[Use dimension templates to create dynamic alarms](/docs/guides/montior/dimension-templates.md)
+[Use dimension templates to create dynamic alarms](/docs/guides/monitor/dimension-templates.md)
 
 ## Related features
 

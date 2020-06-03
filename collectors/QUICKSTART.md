@@ -105,7 +105,7 @@ Most collectors are enabled and will auto-detect their app/service without manua
 restart Netdata to trigger the auto-detection process.
 
 To restart Netdata on most systems, use `service netdata restart`. For other systems, see the [other restart
-methods](/docs/getting-started.md#start-stop-and-restart-netdata).
+methods](/docs/guides/getting-started.md#start-stop-and-restart-netdata).
 
 Open Netdata's dashboard in your browser, or refresh the page if you already have it open. You should now see a new
 entry in the menu and new interactive charts!
@@ -115,7 +115,7 @@ entry in the menu and new interactive charts!
 Collector not working? Learn about collector troubleshooting in our [collector
 reference](REFERENCE.md#troubleshoot-a-collector).
 
-View our [collectors guides](/collectors/README.md#tutorials) to get specific instructions on enabling new and
+View our [collectors guides](/collectors/README.md#guides) to get specific instructions on enabling new and
 popular collectors.
 
 Finally, learn more advanced collector features, such as disabling plugins or developing a custom collector, in our

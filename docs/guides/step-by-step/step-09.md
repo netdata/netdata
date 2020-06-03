@@ -76,8 +76,8 @@ You can archive all the metrics collected by Netdata to **external databases**. 
 include Graphite, OpenTSDB, Prometheus, AWS Kinesis Data Streams, Google Cloud Pub/Sub, MongoDB, and the list is always
 growing.
 
-As we said in [step 1](/docs/step-by-step/step-01.md), we have only complimentary systems, not competitors! We're happy
-to support these archiving methods and are always working to improve them.
+As we said in [step 1](/docs/guides/step-by-step/step-01.md), we have only complimentary systems, not competitors! We're
+happy to support these archiving methods and are always working to improve them.
 
 A lot of Netdata users archive their metrics to one of these databases for long-term storage or further analysis. Since
 Netdata collects so many metrics every second, they can quickly overload small devices or even big servers that are
@@ -158,4 +158,4 @@ metrics to MongoDB for long-term storage.
 In the last step of this step-by-step guide, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
 our Netdata dashboard.
 
-[Next: Set up a proxy &rarr;](step-10.md)
+[Next: Set up a proxy &rarr;](/docs/guides/step-by-step/step-10.md)
