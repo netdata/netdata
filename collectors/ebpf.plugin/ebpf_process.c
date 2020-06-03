@@ -238,7 +238,7 @@ static void read_hash_global_tables()
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void update_aggregated_data()
+static void ebpf_update_apps_data()
 {
     int i;
     for ( i = 0 ; i < pids_running ; i++) {
@@ -579,7 +579,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
             int publish_apps = 0;
             if (pids_running > 0 && em->apps_charts){
                 publish_apps = 1;
-                update_aggregated_data();
+                ebpf_update_apps_data();
             }
 
             pthread_mutex_lock(&lock);
