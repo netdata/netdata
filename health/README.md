@@ -25,27 +25,21 @@ and the needs of your infrastructure, are your only limits.
 
 [<FiCode /> Configuration reference](/health/REFERENCE.md)
 
-[<FiBook /> Tutorials](#tutorials)
+[<FiBook /> Guides](#guides)
 
 </DocsSteps>
 
-## Tutorials
+## Guides
 
 Every infrastructure is different, so we're not interested in mandating how you should configure Netdata's health
-monitoring features. Instead, these tutorials should give you the details you need to tweak alarms to your heart's
+monitoring features. Instead, these guides should give you the details you need to tweak alarms to your heart's
 content.
-
-<DocsTutorials>
-<div>
 
 ### Health entities
 
 [Stopping notifications for individual alarms](/health/tutorials/stop-notifications-alarms.md)
 
 [Use dimension templates to create dynamic alarms](/health/tutorials/dimension-templates.md)
-
-</div>
-</DocsTutorials>
 
 ## Related features
 

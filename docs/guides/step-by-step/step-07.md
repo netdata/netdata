@@ -1,9 +1,7 @@
 <!--
----
 title: "Step 7. Netdata's dashboard in depth"
 date: 2020-05-04
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-07.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-07.md
 -->
 
 # Step 7. Netdata's dashboard in depth
@@ -103,7 +101,7 @@ restore your real-time dashboard for your machine.
 
 ## What's next?
 
-In this step of the Netdata tutorial, you learned how to:
+In this step of the Netdata guide, you learned how to:
 
 -   Change the dashboard's settings
 -   Check if there's an update to Netdata

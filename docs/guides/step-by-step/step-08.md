@@ -1,13 +1,11 @@
 <!--
----
 title: "Step 8. Build your first custom dashboard"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-08.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-08.md
 -->
 
 # Step 8. Build your first custom dashboard
 
-In previous steps of the tutorial, you have learned how several sections of the Netdata dashboard worked. 
+In previous steps of the guide, you have learned how several sections of the Netdata dashboard worked. 
 
 This step will show you how to set up a custom dashboard to fit your unique needs. If nothing else, Netdata is really,
 really flexible. 🤸

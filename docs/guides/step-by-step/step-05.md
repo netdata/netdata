@@ -1,13 +1,11 @@
 <!--
----
 title: "Step 5. Health monitoring alarms and notifications"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-05.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-05.md
 -->
 
 # Step 5. Health monitoring alarms and notifications
 
-In the fifth step of the Netdata tutorial, we're introducing you to one of our core features: **health monitoring**.
+In the fifth step of the Netdata guide, we're introducing you to one of our core features: **health monitoring**.
 
 To accurately monitor the health of your systems and applications, you need to know _immediately_ when there's something
 strange going on. Netdata's alarm and notification systems are essential to keeping you informed. 

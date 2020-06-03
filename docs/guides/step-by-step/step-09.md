@@ -1,8 +1,6 @@
 <!--
----
 title: "Step 9. Long-term metrics storage"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-09.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-09.md
 -->
 
 # Step 9. Long-term metrics storage
@@ -33,7 +31,7 @@ Let's get started!
 ## Tweak the database engine's settings
 
 If you're using Netdata v1.18.0 or higher, and you haven't changed your `memory mode` settings before following this
-tutorial, your Netdata agent is already using the database engine.
+guide, your Netdata agent is already using the database engine.
 
 Let's look at your `netdata.conf` file again. Under the `[global]` section, you'll find three connected options.
 
@@ -157,7 +155,7 @@ documentation](/exporting/README.md).
 You're getting close to the end! In this step, you learned how to make the most of the database engine, or archive
 metrics to MongoDB for long-term storage.
 
-In the last step of this step-by-step tutorial, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
+In the last step of this step-by-step guide, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
 our Netdata dashboard.
 
 [Next: Set up a proxy &rarr;](step-10.md)

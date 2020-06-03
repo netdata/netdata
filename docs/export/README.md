@@ -25,7 +25,7 @@ be applied to other connectors as well.
 > If you are migrating from the deprecated backends system, this quickstart will also help you update your configuration
 > to the new format. For the most part, the configurations are identical, but there are two exceptions. First,
 > `exporting.conf` uses a new `[<type>:<name>]` format for defining connector instances. Second, the `host tags` setting
-> is deprecated. Instead, use [host labels](/docs/tutorials/using-host-labels.md) to tag exported metrics.
+> is deprecated. Instead, use [host labels](/docs/guides/using-host-labels.md) to tag exported metrics.
 
 Open the `exporting.conf` file with `edit-config`.
 
@@ -94,8 +94,8 @@ collected, you should start seeing data in your external database after only a f
 
 -   [Exporting reference guide](/exporting/README.md)
 -   [Backends (deprecated)](/backends/README.md)
--   [Use host labels to organize systems, metrics, and alarms](/docs/tutorials/using-host-labels.md)
+-   [Use host labels to organize systems, metrics, and alarms](/docs/guides/using-host-labels.md)
 -   [Database engine](/database/engine/README.md)
--   [Change how long Netdata stores metrics (long-term storage)](/docs/tutorials/longer-metrics-storage.md)
+-   [Change how long Netdata stores metrics (long-term storage)](/docs/guides/longer-metrics-storage.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fexporting%2FREADME.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

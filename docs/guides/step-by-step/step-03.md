@@ -1,9 +1,7 @@
 <!--
----
 title: "Step 3. Monitor more than one system with Netdata"
 date: 2020-05-01
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-03.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-03.md
 -->
 
 # Step 3. Monitor more than one system with Netdata
@@ -52,7 +50,7 @@ Or, if you're feeling confident, dive right in.
 
 <p><a href="https://app.netdata.cloud" className="button button--lg">Sign in to Cloud</a></p>
 
-When you finish that guide, circle back to this step in the tutorial to learn how to use the Visited Nodes feature on
+When you finish that guide, circle back to this step in the guide to learn how to use the Visited Nodes feature on
 top of Cloud's centralized web interface.
 
 ## Navigate between dashboards with Visited Nodes

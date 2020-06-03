@@ -23,7 +23,7 @@ same time. You can have different update intervals and filters configured for ev
 The exporting engine has its own configuration file `exporting.conf`. Configuration is almost similar to
 [backends](/backends/README.md#configuration). The most important difference is that type of a connector should be
 specified in a section name before a colon and an instance name after the colon. Also, you can't use `host tags`
-anymore. Set your labels using the [`[host labels]`](/docs/tutorials/using-host-labels.md) section in `netdata.conf`.
+anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in `netdata.conf`.
 
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
