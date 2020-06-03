@@ -936,8 +936,10 @@ static inline void del_pid_entry(pid_t pid) {
 
 /**
  * Remove PIDs when they are not running more.
+ *
+ * @param out is the structure where PIDs are stored.
  */
-static void cleanup_exited_pids(void) {
+static void cleanup_exited_pids(ebpf_process_stat_t **out) {
     struct pid_stat *p = NULL;
 
     for(p = root_of_pids; p ;) {
@@ -948,6 +950,12 @@ static void cleanup_exited_pids(void) {
             pid_t r = p->pid;
             p = p->next;
             del_pid_entry(r);
+
+            ebpf_process_stat_t *w = out[r];
+            if (w) {
+                freez(w);
+                out[r] = NULL;
+            }
         }
         else {
             if(unlikely(p->keep)) p->keeploops++;
@@ -1069,7 +1077,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     post_aggregate_targets(groups_root_target);
     */
 
-    cleanup_exited_pids();
+    cleanup_exited_pids(out);
 
     return counter;
 }
