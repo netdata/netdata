@@ -56,5 +56,6 @@ extern int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *db
                        unsigned disk_space_mb);
 
 extern int rrdeng_exit(struct rrdengine_instance *ctx);
+extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

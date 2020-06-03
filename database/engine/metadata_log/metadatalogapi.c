@@ -374,6 +374,7 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     ctx = callocz(1, sizeof(*ctx));
     ctx->records_nr = 0;
     ctx->current_compaction_id = 0;
+    ctx->quiesce = NO_QUIESCE;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->rrdeng_ctx = rrdeng_parent_ctx;
@@ -423,4 +424,21 @@ int metalog_exit(struct metalog_instance *ctx)
     freez(ctx);
 
     return 0;
+}
+
+void metalog_prepare_exit(struct metalog_instance *ctx)
+{
+    struct metalog_cmd cmd;
+
+    if (NULL == ctx) {
+        return;
+    }
+
+    init_completion(&ctx->metalog_completion);
+    cmd.opcode = METALOG_QUIESCE;
+    metalog_enq_cmd(&ctx->worker_config, &cmd);
+
+    /* wait for metadata log to quiesce */
+    wait_for_completion(&ctx->metalog_completion);
+    destroy_completion(&ctx->metalog_completion);
 }

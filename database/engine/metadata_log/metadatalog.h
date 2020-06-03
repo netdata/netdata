@@ -45,6 +45,7 @@ enum metalog_opcode {
     METALOG_COMMIT_CREATION_RECORD,
     METALOG_COMMIT_DELETION_RECORD,
     METALOG_COMPACTION_FLUSH,
+    METALOG_QUIESCE,
 
     METALOG_MAX_OPCODE
 };
@@ -112,6 +113,12 @@ struct metalog_instance {
     unsigned long disk_space;
     unsigned long records_nr;
     unsigned last_fileno; /* newest index of metadata log file */
+
+    uint8_t quiesce; /*
+                      * 0 initial state when all operations function normally
+                      * 1 set it before shutting down the instance, quiesce long running operations
+                      * 2 is set after all threads have finished running
+                      */
 
     struct metalog_statistics stats;
 };

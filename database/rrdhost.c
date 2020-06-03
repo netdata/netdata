@@ -621,6 +621,9 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // release its children resources
 
+#ifdef ENABLE_DBENGINE
+    rrdeng_prepare_exit(host->rrdeng_ctx);
+#endif
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
 

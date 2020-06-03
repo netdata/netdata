@@ -158,7 +158,8 @@ void metalog_test_quota(struct metalog_worker_config *wc)
     only_one_metalogfile = (metalogfile == ctx->metadata_logfiles.first) ? 1 : 0;
     info("records=%lu objects=%lu", (long unsigned)ctx->records_nr, (long unsigned)ctx->rrdeng_ctx->host->objects_nr);
     if (unlikely(!only_one_metalogfile &&
-                 ctx->records_nr > (ctx->rrdeng_ctx->host->objects_nr * (uint64_t)MAX_DUPLICATION_PERCENTAGE) / 100)) {
+                 ctx->records_nr > (ctx->rrdeng_ctx->host->objects_nr * (uint64_t)MAX_DUPLICATION_PERCENTAGE) / 100) &&
+                NO_QUIESCE == ctx->quiesce) {
         metalog_do_compaction(wc);
     }
 }
@@ -174,9 +175,14 @@ static inline int metalog_threads_alive(struct metalog_worker_config* wc)
 
 static void metalog_cleanup_finished_threads(struct metalog_worker_config *wc)
 {
+    struct metalog_instance *ctx = wc->ctx;
+
     if (unlikely(wc->cleanup_thread_compacting_files)) {
         after_compact_old_records(wc);
-        return;
+    }
+    if (unlikely(SET_QUIESCE == ctx->quiesce && !metalog_threads_alive(wc))) {
+        ctx->quiesce = QUIESCED;
+        complete(&ctx->metalog_completion);
     }
 }
 
@@ -337,6 +343,16 @@ void metalog_worker(void* arg)
             case METALOG_SHUTDOWN:
                 shutdown = 1;
                 break;
+            case METALOG_QUIESCE:
+                ctx->quiesce = SET_QUIESCE;
+                assert(0 == uv_timer_stop(&timer_req));
+                uv_close((uv_handle_t *)&timer_req, NULL);
+                mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
+                if (!metalog_threads_alive(wc)) {
+                    ctx->quiesce = QUIESCED;
+                    complete(&ctx->metalog_completion);
+                }
+                break;
             case METALOG_COMMIT_CREATION_RECORD:
                 do_commit_record(wc, METALOG_CREATE_OBJECT, &cmd.record_io_descr);
                 break;
@@ -364,8 +380,6 @@ void metalog_worker(void* arg)
      * an issue in the future.
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
-    assert(0 == uv_timer_stop(&timer_req));
-    uv_close((uv_handle_t *)&timer_req, NULL);
 
     mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
     uv_run(loop, UV_RUN_DEFAULT);

@@ -889,6 +889,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->dbfiles_path[sizeof(ctx->dbfiles_path) - 1] = '\0';
     ctx->drop_metrics_under_page_cache_pressure = rrdeng_drop_metrics_under_page_cache_pressure;
     ctx->metric_API_max_producers = 0;
+    ctx->quiesce = NO_QUIESCE;
     ctx->metalog_ctx = NULL; /* only set this after the metadata log has finished initializing */
     ctx->host = host;
 
@@ -956,3 +957,23 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }
+
+void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
+{
+    struct rrdeng_cmd cmd;
+
+    if (NULL == ctx) {
+        return;
+    }
+
+    init_completion(&ctx->rrdengine_completion);
+    cmd.opcode = RRDENG_QUIESCE;
+    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+
+    /* wait for dbengine to quiesce */
+    wait_for_completion(&ctx->rrdengine_completion);
+    destroy_completion(&ctx->rrdengine_completion);
+
+    metalog_prepare_exit(ctx->metalog_ctx);
+}
+
