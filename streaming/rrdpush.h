@@ -81,6 +81,7 @@ struct receiver_state {
     int update_every;
     uint32_t stream_version;
     time_t last_msg_t;
+    time_t gap_start, gap_end;
     char read_buffer[512];
     int read_len;
 #ifdef ENABLE_HTTPS

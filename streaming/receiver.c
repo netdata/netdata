@@ -51,13 +51,15 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "../collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugins_action)
 {
+    PARSER_USER_OBJECT *user = user_v;
     UNUSED(plugins_action);
     char *remote_time_txt = words[1];
     time_t remote_time = 0;
-    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
-    struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
+    RRDHOST *host = user->host;
+    struct plugind *cd = user->cd;
+    struct receiver_state *rpt = user->opaque;
     if (cd->version < VERSION_GAP_FILLING ) {
         error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", host->hostname, cd->cmd,
                cd->version);
@@ -67,6 +69,8 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
         remote_time = str2ull(remote_time_txt);
         time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
         time_t gap = 0;
+        rpt->gap_start = 0;
+        rpt->gap_end = 0;
         if (prev == 0)
             info("STREAM %s from %s: Initial connection (no gap to check), remote=%ld local=%ld slew=%ld",
                  host->hostname, cd->cmd, remote_time, now, now-remote_time);
@@ -75,8 +79,10 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
             info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
                  host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
             if (gap > 0) {
+                rpt->gap_start = remote_time - gap;
+                rpt->gap_end = remote_time;
                 char message[128];
-                sprintf(message,"REPLICATE %ld %ld\n", remote_time - gap, remote_time);
+                sprintf(message,"REPLICATE %ld %ld\n", rpt->gap_start, rpt->gap_end);
                 int ret;
 #ifdef ENABLE_HTTPS
                 SSL *conn = host->stream_ssl.conn ;
@@ -97,15 +103,64 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC streaming_rep_begin(char **words, void *user, PLUGINSD_ACTION *plugins_action) {
+PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    struct receiver_state *rpt = user->opaque;
+    UNUSED(plugins_action);
+    char *id = words[1];
+    char *start_txt = words[2];
+    char *end_txt = words[3];
+    time_t start_t, end_t;
+    if (!id || !start_txt || !end_txt)
+        goto disable;
+
+    RRDSET *st = NULL;
+    st = rrdset_find(user->host, id);
+    if (unlikely(!st))
+        goto disable;
+    user->st = st;
+
+    start_t = str2ull(start_txt);
+    end_t = str2ull(end_txt);
+
+    if (start_t != rpt->gap_start || end_t != rpt->gap_end) {
+        error("Unexpected gap times %ld %ld (expecting %ld %ld)", start_t, end_t, rpt->gap_start, rpt->gap_end);
+        goto disable;
+    }
+
+    return PARSER_RC_OK;
+disable:
+    error("Gap replication failed - Invalid REPBEGIN %s %s %s on host %s. Disabling it.", words[1], words[2], words[3], 
+          user->host->hostname);
+    user->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
-PARSER_RC streaming_rep_end(char **words, void *user, PLUGINSD_ACTION *plugins_action) {
-    return PARSER_RC_ERROR;
+PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    UNUSED(plugins_action);
+    UNUSED(words);
+    user->st = NULL;
+    return PARSER_RC_OK;
 }
 
-PARSER_RC streaming_rep_dim(char **words, void *user, PLUGINSD_ACTION *plugins_action) {
+PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    UNUSED(plugins_action);
+    char *id = words[1];
+    char *time_txt = words[2];
+    char *value_txt = words[3];
+
+    if (!id || !time_txt || !value_txt)
+        goto disable;
+
+    info("Replicating %s / %s : %s = %s", user->st->id, words[1], words[2], words[3]);
+
+    return PARSER_RC_OK;
+disable:
+    error("Gap replication failed - Invalid REPDIM %s %s %s on host %s. Disabling it.", words[1], words[2], words[3], 
+          user->host->hostname);
+    user->enabled = 0;
     return PARSER_RC_ERROR;
 }
 

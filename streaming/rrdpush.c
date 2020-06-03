@@ -302,7 +302,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t end_t)
     UNUSED(s);
     RRDDIM *rd;
     struct rrddim_query_handle handle;
-    buffer_sprintf(s->build, "REPBEGIN %s %zu %ld ", st->id, st->gap_sent, end_t);
+    buffer_sprintf(s->build, "REPBEGIN %s %zu %ld\n", st->id, st->gap_sent, end_t);
     rrddim_foreach_read(rd, st) {
         if (rd->updated && rd->exposed) {
             time_t sample_t = (time_t)st->gap_sent;
@@ -317,7 +317,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t end_t)
             st->gap_sent = end_t;
         }
     }
-    buffer_sprintf(s->build, "REPEND");
+    buffer_sprintf(s->build, "REPEND\n");
 }
 
 void rrdset_done_push(RRDSET *st) {
