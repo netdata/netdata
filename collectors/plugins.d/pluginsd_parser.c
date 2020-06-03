@@ -183,6 +183,9 @@ PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new
 PARSER_RC pluginsd_guid_action(void *user, uuid_t *uuid)
 {
     uuid_copy(((PARSER_USER_OBJECT *) user)->guid, *uuid);
+    char uuid_str[37];
+    uuid_unparse_lower(*uuid, uuid_str);
+    info("RECEIVED GUID [%s]", uuid_str);
     return PARSER_RC_OK;
 }
 
