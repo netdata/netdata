@@ -494,6 +494,8 @@ PARSER_FILES = \
 ACLK_FILES = \
     aclk/aclk_common.c \
     aclk/aclk_common.h \
+    aclk/aclk_stats.c \
+    aclk/aclk_stats.h
     $(NULL)
 
 if ENABLE_ACLK
