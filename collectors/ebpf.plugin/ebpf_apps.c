@@ -442,23 +442,7 @@ static size_t
 #define PID_LOG_FDS     0x00000008
 #define PID_LOG_STAT    0x00000010
 
-static int debug_enabled = 0;
-/**
- * Internal function used to write debug messages.
- *
- * @param fmt   the format to create the message.
- * @param ...   the arguments to fill the format.
- */
-static inline void debug_log_int(const char *fmt, ... ) {
-    va_list args;
-
-    fprintf( stderr, "apps.plugin: ");
-    va_start( args, fmt );
-    vfprintf( stderr, fmt, args );
-    va_end( args );
-
-    fputc('\n', stderr);
-}
+int debug_enabled = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
 

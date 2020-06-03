@@ -171,4 +171,6 @@ extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
 extern pid_t *pid_index;
 extern int pids_running;
+extern int debug_enabled;
+
 #endif

@@ -168,6 +168,8 @@ struct target {
 
 extern struct target *apps_groups_default_target;
 extern struct target *apps_groups_root_target;
+extern struct target *users_root_target;
+extern struct target *groups_root_target;
 
 struct pid_stat {
     int32_t pid;
@@ -365,6 +367,23 @@ typedef struct ebpf_bandwidth {
     uint64_t received;              //Bytes received
     unsigned char removed;          //Remove the PID from table
 } ebpf_bandwidth_t;
+
+/**
+ * Internal function used to write debug messages.
+ *
+ * @param fmt   the format to create the message.
+ * @param ...   the arguments to fill the format.
+ */
+static inline void debug_log_int(const char *fmt, ... ) {
+    va_list args;
+
+    fprintf( stderr, "apps.plugin: ");
+    va_start( args, fmt );
+    vfprintf( stderr, fmt, args );
+    va_end( args );
+
+    fputc('\n', stderr);
+}
 
 // ----------------------------------------------------------------------------
 // Exported variabled and functions

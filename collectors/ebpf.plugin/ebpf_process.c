@@ -444,42 +444,67 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  *
  * @param em a pointer to the structure with the default values.
  */
-static void ebpf_process_create_apps_charts(ebpf_module_t *em)
+static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root, const char *type, const char *title)
 {
-    return;
+    struct target *w;
+    int newly_added = 0;
+
+    for(w = root ; w ; w = w->next) {
+        if (w->target) continue;
+
+        if(unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+            struct pid_on_target *pid_on_target;
+
+            fprintf(stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes, (w->processes == 1)?"":"es");
+
+            for(pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
+                fprintf(stderr, " %d", pid_on_target->pid);
+            }
+
+            fputc('\n', stderr);
+        }
+
+        if (!w->exposed && w->processes) {
+            newly_added++;
+            w->exposed = 1;
+            if (debug_enabled || w->debug_enabled)
+                debug_log_int("%s just added - regenerating charts.", w->name);
+        }
+    }
+
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20061,
-                               apps_groups_root_target);
+                               root);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20062,
-                                   apps_groups_root_target);
+                                   root);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20063,
-                               apps_groups_root_target);
+                               root);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20064,
-                                   apps_groups_root_target);
+                                   root);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20065,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
                                EBPF_COMMON_DIMENSION_CALL,
@@ -492,58 +517,58 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em)
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20067,
-                                   apps_groups_root_target);
+                                   root);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20068,
-                               apps_groups_root_target);
+                               root);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20069,
-                                   apps_groups_root_target);
+                                   root);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20070,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20071,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20072,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20073,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20074,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20075,
-                               apps_groups_root_target);
+                               root);
 
 }
 
@@ -738,6 +763,11 @@ void *ebpf_process_thread(void *ptr)
 
     if (em->enabled) {
         ebpf_create_global_charts(em);
+        if (em->apps_charts) {
+            ebpf_process_create_apps_charts(em, apps_groups_root_target, "apps", "Apps");
+            ebpf_process_create_apps_charts(em, users_root_target, "users", "Users");
+            ebpf_process_create_apps_charts(em, groups_root_target, "groups", "User Groups");
+        }
     }
 
     pthread_mutex_unlock(&lock);
