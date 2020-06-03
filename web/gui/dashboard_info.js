@@ -3051,32 +3051,32 @@ netdataDashboard.context = {
 
     'ebpf.tcp_functions': {
         title : 'TCP calls',
-        info: 'Number of calls for functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>, whether they return successfully or fail.'
+        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code.'
     },
 
     'ebpf.tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'Number of bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
+        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
     },
 
     'ebpf.tcp_error': {
         title : 'TCP errors',
-        info: 'Number of calls that returned negative values for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
     },
 
     'ebpf.udp_functions': {
         title : 'UDP calls',
-        info: 'Number of calls for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>, whether they return successfully or fail.'
+        info: 'Successful or failed calls to  functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
     },
 
     'ebpf.udp_bandwidth': {
         title : 'UDP bandwidth',
-        info: 'Number of bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
+        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
     },
 
     'ebpf.file_descriptor': {
         title : 'File access',
-        info: 'Number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, which is the common function called from'+
+        info: 'Calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, which is the common function called from'+
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
             ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
@@ -3085,17 +3085,21 @@ netdataDashboard.context = {
 
     'ebpf.file_error': {
         title : 'File access error',
-        info: 'Number of calls that returned an error when called per period.'
+        info: 'Failed calls to the kernel internal function <code>do_sys_open</code>, which is the common function called from'+
+            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
+            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
+            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'ebpf.deleted_objects': {
         title : 'VFS remove',
-        info: 'Number of calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files.'
+        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
     },
 
     'ebpf.io': {
         title : 'VFS IO',
-        info: 'Number of calls for functions <code>vfs_read</code> and <code>vfs_write</code>, whether they return successfully or fail. As with the chart \'deleted_objects\', this chart will not show events if the file system uses other functions to store data on disk.'
+        info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'ebpf.io_bytes': {
@@ -3105,7 +3109,7 @@ netdataDashboard.context = {
 
     'ebpf.io_error': {
         title : 'VFS IO error',
-        info: 'Number of calls for <code>vfs_read</code> and <code>vfs_write</code> that returned an error.'
+        info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
     'ebpf.process_thread': {
@@ -3115,7 +3119,7 @@ netdataDashboard.context = {
 
     'ebpf.exit': {
         title : 'Exit monitoring',
-        info: 'Number of calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
+        info: 'Calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'ebpf.task_error': {
