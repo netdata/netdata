@@ -75,6 +75,7 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
             default:
                 return 1;
         }
+        freez(existing_object);
     }
 
     *PValue = (Pvoid_t *) object;
