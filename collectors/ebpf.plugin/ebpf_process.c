@@ -27,6 +27,9 @@ static ebpf_process_stat_t **local_process_stats = NULL;
 static ebpf_process_publish_apps_t **current_apps_data = NULL;
 static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
+pthread_mutex_t collect_data_mutex;
+pthread_cond_t collect_data_cond_var;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
@@ -608,6 +611,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                 ebpf_process_update_apps_data();
             }
 
+            pthread_cond_broadcast(&collect_data_cond_var);
+
             pthread_mutex_lock(&lock);
             ebpf_process_send_data(em);
             if (publish_apps) {
@@ -769,6 +774,10 @@ void *ebpf_process_thread(void *ptr)
     }
 
     pthread_mutex_unlock(&lock);
+
+    pthread_mutex_init(&collect_data_mutex, NULL);
+    if (pthread_cond_init(&collect_data_cond_var, NULL))
+        goto endprocess;
 
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 

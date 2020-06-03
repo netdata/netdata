@@ -119,6 +119,9 @@ extern char kernel_string[64];
 extern netdata_ebpf_events_t process_probes[];
 extern netdata_ebpf_events_t socket_probes[];
 
+extern pthread_mutex_t collect_data_mutex;
+extern pthread_cond_t collect_data_cond_var;
+
 //Common functions
 extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                netdata_publish_syscall_t *pio,

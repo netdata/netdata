@@ -341,6 +341,10 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (apps_enabled)
             ebpf_socket_update_apps_data();
 
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+        pthread_mutex_unlock(&collect_data_mutex);
+
         pthread_mutex_lock(&lock);
         ebpf_process_send_data(em);
         if (apps_enabled)
