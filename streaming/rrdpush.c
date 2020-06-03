@@ -297,6 +297,31 @@ void rrdset_push_chart_definition_now(RRDSET *st) {
     rrdset_unlock(st);
 }
 
+void sender_fill_gap(struct sender_state *s, RRDSET *st, time_t end_t)
+{
+    UNUSED(s);
+    RRDDIM *rd;
+    struct rrddim_query_handle handle;
+    rrddim_foreach_read(rd, st) {
+        if (rd->updated && rd->exposed) {
+            time_t sample_t = (time_t)st->gap_sent;
+            time_t ignore;
+            rd->state->query_ops.init(rd, &handle, sample_t, end_t);
+            while (sample_t <= end_t) {
+                storage_number n = rd->state->query_ops.next_metric(&handle, &ignore);
+                info("Retreiving %s %ld = " STORAGE_NUMBER_FORMAT, rd->name, sample_t, n);
+                sample_t += rd->update_every;
+            }
+            st->gap_sent = end_t;
+            /*buffer_sprintf(host->sender->build
+                           , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
+                           , rd->id
+                           , rd->collected_value
+        );*/
+        }
+    }
+}
+
 void rrdset_done_push(RRDSET *st) {
     if(unlikely(!should_send_chart_matching(st)))
         return;
@@ -321,10 +346,10 @@ void rrdset_done_push(RRDSET *st) {
     sender_start(host->sender);
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
-    if (host->sender->gap_begin != 0 && st->gap_sent < host->sender->gap_end) {
+    if (host->sender->gap_start != 0 && st->gap_sent < host->sender->gap_end) {
         if (st->gap_sent == 0)
-            st->gap_sent = host->sender->gap_begin;
-        sender_fill_gap(host->sender, st);
+            st->gap_sent = host->sender->gap_start;
+        sender_fill_gap(host->sender, st, (time_t)host->sender->gap_end);
     }
     else
         rrdpush_send_chart_metrics_nolock(st, host->sender);

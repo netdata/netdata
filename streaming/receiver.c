@@ -74,22 +74,24 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
             gap = now - prev;
             info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
                  host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
-            char message[128];
-            sprintf(message,"REPLICATE %ld %ld\n", remote_time - gap, remote_time);
-            int ret;
-    #ifdef ENABLE_HTTPS
-            SSL *conn = host->stream_ssl.conn ;
-            if(conn && !host->stream_ssl.flags) {
-                ret = SSL_write(conn, message, strlen(message));
-            } else {
+            if (gap > 0) {
+                char message[128];
+                sprintf(message,"REPLICATE %ld %ld\n", remote_time - gap, remote_time);
+                int ret;
+#ifdef ENABLE_HTTPS
+                SSL *conn = host->stream_ssl.conn ;
+                if(conn && !host->stream_ssl.flags) {
+                    ret = SSL_write(conn, message, strlen(message));
+                } else {
+                    ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+                }
+#else
                 ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+#endif
+                if (ret != (int)strlen(message))
+                    error("Failed to send initial timestamp - gaps may appear in charts");
             }
-    #else
-            ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-    #endif
         }
-        if (ret != (int)strlen(message))
-            error("Failed to send initial timestamp - gaps may appear in charts");
         return PARSER_RC_OK;
     }
     return PARSER_RC_ERROR;
