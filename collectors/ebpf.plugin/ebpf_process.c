@@ -611,7 +611,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
             pthread_mutex_lock(&lock);
             ebpf_process_send_data(em);
             if (publish_apps) {
-                ebpf_process_create_apps_charts(em);
+                ebpf_process_create_apps_charts(em, apps_groups_root_target);
             }
             pthread_mutex_unlock(&lock);
         }
