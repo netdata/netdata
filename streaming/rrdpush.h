@@ -45,7 +45,6 @@ struct sender_state {
     size_t max_size;
     usec_t reconnect_delay;
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
-    size_t begin;
     size_t reconnects_counter;
     size_t sent_bytes;
     size_t sent_bytes_on_this_connection;
@@ -60,6 +59,7 @@ struct sender_state {
     char read_buffer[512];
     int read_len;
     int32_t version;
+    size_t gap_start, gap_end;                  // time_t has platform issues, needs to be size_t to match RRDSET
 };
 
 struct receiver_state {

@@ -88,6 +88,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         st->upstream_resync_time = 0;
+        st->gap_sent = 0;
 
         rrdset_rdlock(st);
 
@@ -390,20 +391,17 @@ static void attempt_to_connect(struct sender_state *state)
     if(rrdpush_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
         state->last_sent_t = now_monotonic_sec();
 
-        // reset the buffer, to properly send charts and metrics
+        // reset the buffer (and the chart states), to properly send charts and metrics
         rrdpush_sender_thread_data_flush(state->host);
 
         // send from the beginning
-        state->begin = 0;
-
-        // make sure the next reconnection will be immediate
-        state->not_connected_loops = 0;
-
-        // reset the bytes we have sent for this session
-        state->sent_bytes_on_this_connection = 0;
-
-        // let the data collection threads know we are ready
-        state->host->rrdpush_sender_connected = 1;
+        netdata_mutex_lock(&state->mutex);
+        state->gap_start = 0;
+        state->gap_end = 0;
+        state->host->rrdpush_sender_connected = 1; // let the data collection threads know we are ready
+        state->not_connected_loops = 0; // make sure the next reconnection will be immediate
+        state->sent_bytes_on_this_connection = 0; // reset the bytes we have sent for this session
+        netdata_mutex_unlock(&state->mutex);
     }
     else {
         // increase the failed connections counter
@@ -508,6 +506,8 @@ int ret;
 void execute_replicate(struct sender_state *s, long start_t, long end_t) {
     time_t now = now_realtime_sec();
     info("REPLICATE: %ld - %ld @ %ld", start_t, end_t, now);
+    s->gap_start = (size_t)start_t;
+    s->gap_end = (size_t)end_t;
 }
 
 // This is just a placeholder until the gap filling state machine is inserted

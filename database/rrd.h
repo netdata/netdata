@@ -486,7 +486,8 @@ struct rrdset {
     size_t compaction_id;                           // The last metadata log compaction procedure that has processed
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-    size_t unused[2];
+    size_t gap_sent;                                // how much of a gap has been filled on this chart
+    size_t unused[1];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 

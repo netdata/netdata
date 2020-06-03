@@ -319,11 +319,15 @@ void rrdset_done_push(RRDSET *st) {
     }
 
     sender_start(host->sender);
-
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
-
-    rrdpush_send_chart_metrics_nolock(st, host->sender);
+    if (host->sender->gap_begin != 0 && st->gap_sent < host->sender->gap_end) {
+        if (st->gap_sent == 0)
+            st->gap_sent = host->sender->gap_begin;
+        sender_fill_gap(host->sender, st);
+    }
+    else
+        rrdpush_send_chart_metrics_nolock(st, host->sender);
 
     // signal the sender there are more data
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
@@ -409,11 +413,9 @@ void log_stream_connection(const char *client_ip, const char *client_port, const
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     netdata_mutex_lock(&host->sender->mutex);
-
     if(!host->rrdpush_sender_spawn) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", host->hostname);
-
         if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host->sender))
             error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
         else
