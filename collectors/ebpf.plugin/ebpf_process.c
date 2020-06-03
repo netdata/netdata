@@ -248,15 +248,15 @@ static void ebpf_process_update_apps_data()
 
         ebpf_process_publish_apps_t *cad = current_apps_data[current_pid];
         ebpf_process_publish_apps_t *pad = prev_apps_data[current_pid];
-        int status;
+        int lstatus;
         if (!cad) {
             cad = callocz(2, sizeof(netdata_syscall_stat_t));
             current_apps_data[current_pid] = &cad[0];
             prev_apps_data[current_pid] = &cad[1];
-            status = 1;
+            lstatus = 1;
         } else {
             memcpy(pad, cad, sizeof(netdata_syscall_stat_t));
-            status = 0;
+            lstatus = 0;
         }
 
         //Read data
@@ -283,7 +283,7 @@ static void ebpf_process_update_apps_data()
         cad->bytes_read = (uint64_t)ps->read_bytes +
                                            (uint64_t)ps->readv_bytes;
 
-        ebpf_process_update_apps_publish(cad, pad, status);
+        ebpf_process_update_apps_publish(cad, pad, lstatus);
     }
 }
 
