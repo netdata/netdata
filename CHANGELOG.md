@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Add new exporting "home base" document [\#9246](https://github.com/netdata/netdata/pull/9246) ([joelhans](https://github.com/joelhans))
 - Add CI check for building against LibreSSL [\#9216](https://github.com/netdata/netdata/pull/9216) ([prologic](https://github.com/prologic))
 - Update eBPF to use kernel-collector version 0.4.0. [\#9212](https://github.com/netdata/netdata/pull/9212) ([Ferroin](https://github.com/Ferroin))
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
@@ -20,6 +21,7 @@
 - Remove knatsakis and ncmans from CODEOWNERS for the agent. [\#9173](https://github.com/netdata/netdata/pull/9173) ([Ferroin](https://github.com/Ferroin))
 - Added health check functionality to our Docker images. [\#9172](https://github.com/netdata/netdata/pull/9172) ([Ferroin](https://github.com/Ferroin))
 - Remove the experimental label from the exporting engine documentation [\#9171](https://github.com/netdata/netdata/pull/9171) ([vlvkobal](https://github.com/vlvkobal))
+- Fix reliability of kickstart/kickstart-static64 with checksums sometimes failing [\#9165](https://github.com/netdata/netdata/pull/9165) ([prologic](https://github.com/prologic))
 - Revert "Introduce a random sleep in the Netdata updater" [\#9161](https://github.com/netdata/netdata/pull/9161) ([prologic](https://github.com/prologic))
 - Fixed bug in accepting empty lines in parser [\#9158](https://github.com/netdata/netdata/pull/9158) ([stelfrag](https://github.com/stelfrag))
 - Fixed coverity warning \(CID 358971\) [\#9157](https://github.com/netdata/netdata/pull/9157) ([stelfrag](https://github.com/stelfrag))
@@ -237,10 +239,6 @@
 - Remove stackscale demo link and clean up page [\#8509](https://github.com/netdata/netdata/pull/8509) ([joelhans](https://github.com/joelhans))
 - Fix auto updates for static installs \(kickstart\_static64.sh\) [\#8507](https://github.com/netdata/netdata/pull/8507) ([prologic](https://github.com/prologic))
 - Extend TLS Support [\#8505](https://github.com/netdata/netdata/pull/8505) ([thiagoftsm](https://github.com/thiagoftsm))
-- Adds install-fake-charts.d.sh to gitignore [\#8502](https://github.com/netdata/netdata/pull/8502) ([underhood](https://github.com/underhood))
-- Cleans up cloud config files \[agent\_cloud\_link\] -\> \[cloud\] [\#8501](https://github.com/netdata/netdata/pull/8501) ([underhood](https://github.com/underhood))
-- Enhanced ACLK header payload to include timestamp-offset-usec [\#8499](https://github.com/netdata/netdata/pull/8499) ([stelfrag](https://github.com/stelfrag))
-- Improved ACLK  [\#8498](https://github.com/netdata/netdata/pull/8498) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
