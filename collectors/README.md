@@ -30,7 +30,7 @@ guide](/collectors/QUICKSTART.md).
 
 [Collectors configuration reference](/collectors/REFERENCE.md)
 
-## Guides
+## Tutorials
 
 [Monitor Nginx or Apache web server log files with Netdata](/docs/guides/collect-apache-nginx-web-logs.md)
 
