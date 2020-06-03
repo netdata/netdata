@@ -444,7 +444,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  *
  * @param em a pointer to the structure with the default values.
  */
-static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root, const char *type, const char *title)
+static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
     struct target *w;
     int newly_added = 0;
@@ -764,9 +764,7 @@ void *ebpf_process_thread(void *ptr)
     if (em->enabled) {
         ebpf_create_global_charts(em);
         if (em->apps_charts) {
-            ebpf_process_create_apps_charts(em, apps_groups_root_target, "apps", "Apps");
-            ebpf_process_create_apps_charts(em, users_root_target, "users", "Users");
-            ebpf_process_create_apps_charts(em, groups_root_target, "groups", "User Groups");
+            ebpf_process_create_apps_charts(em, apps_groups_root_target);
         }
     }
 
