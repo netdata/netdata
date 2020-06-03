@@ -200,8 +200,8 @@ Everything is the same with [badges](../web/api/badges/). In short:
 
 -   `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
-     have spaces in their names). This accepts Netdata simple patterns *(with rules separated by 
-     `,` or `|` instead of space)* and the `match-ids` and `match-names` options affect the searches
+     have spaces in their names). This accepts Netdata simple patterns _(with `words` separated by
+     `,` or `|` instead of spaces)_ and the `match-ids` and `match-names` options affect the searches
      for dimensions.
 
 -   `foreach DIMENSIONS` is optional, will always be the last parameter, and uses the same `,`/`|`
