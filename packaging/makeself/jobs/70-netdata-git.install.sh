@@ -18,6 +18,7 @@ export IS_NETDATA_STATIC_BINARY="yes"
 
 # Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
 export EBPF_LIBC="static"
+export PKG_CONFIG_PATH="/opnessl/lib/pkgconfig"
 
 run ./netdata-installer.sh \
   --install "${NETDATA_INSTALL_PARENT}" \

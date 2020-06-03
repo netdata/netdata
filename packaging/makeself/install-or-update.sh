@@ -248,6 +248,24 @@ fi
 
 # -----------------------------------------------------------------------------
 
+echo "Configure TLS certificate paths"
+if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] ; then
+  echo "Preserving existing user configuration for TLS"
+else
+  if [ -d /etc/pki/tls ] ; then
+    echo "Using /etc/pki/tls for TLS configuration and certificates"
+    ln -sf /etc/pki/tls /opt/netdata/etc/ssl
+  elif [ -d /etc/ssl ] ; then
+    echo "Using /etc/ssl for TLS configuration and certificates"
+    ln -sf /etc/ssl /opt/netdata/etc/ssl
+  else
+    echo "Using bundled TLS configuration and certificates"
+    ln -sf /opt/netdata/share/ssl /opt/netdata/etc/ssl
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+
 echo "Save install options"
 grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >> "${NETDATA_PREFIX}/etc/netdata/.environment"
 sed -i "s/REINSTALL_OPTIONS=\".*\"/REINSTALL_OPTIONS=\"${REINSTALL_OPTIONS}\"/" "${NETDATA_PREFIX}/etc/netdata/.environment"
