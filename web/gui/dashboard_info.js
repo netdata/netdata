@@ -3125,7 +3125,7 @@ netdataDashboard.context = {
 
     'ebpf.process_status': {
         title : 'Task status',
-        info: 'Difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
+        info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
     },
 
     // ------------------------------------------------------------------------
