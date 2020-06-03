@@ -8,6 +8,7 @@ fetch "curl-curl-7_60_0" "https://github.com/curl/curl/archive/curl-7_60_0.tar.g
 
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
+export PKG_CONFIG_PATH="/opnessl/lib/pkgconfig"
 
 run ./buildconf
 
