@@ -552,7 +552,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         .obsolete = 0,
         .started_t = INVALID_TIME,
         .next = NULL,
-        .version = 0,
+        .version = 9999,
     };
 
     struct metalog_pluginsd_state metalog_parser_state;
