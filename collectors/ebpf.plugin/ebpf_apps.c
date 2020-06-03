@@ -738,6 +738,9 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     return 1;
 }
 
+/**
+ * Fill link list of parents with children PIDs
+ */
 static inline void link_all_processes_to_their_parents(void) {
     struct pid_stat *p, *pp;
 
@@ -769,6 +772,9 @@ static inline void link_all_processes_to_their_parents(void) {
     }
 }
 
+/**
+ * Aggregate PIDs to targets.
+ */
 static void apply_apps_groups_targets_inheritance(void) {
     struct pid_stat *p = NULL;
 
@@ -877,6 +883,11 @@ static void apply_apps_groups_targets_inheritance(void) {
     debug_log("apply_apps_groups_targets_inheritance() made %d loops on the process tree", loops);
 }
 
+/**
+ * Update target timestamp.
+ *
+ * @param root the targets that will be updated.
+ */
 static inline void post_aggregate_targets(struct target *root) {
     struct target *w;
     for (w = root; w ; w = w->next) {
@@ -890,6 +901,11 @@ static inline void post_aggregate_targets(struct target *root) {
     }
 }
 
+/**
+ * Remove PID from the link list.
+ *
+ * @param pid the PID that will be removed.
+ */
 static inline void del_pid_entry(pid_t pid) {
     struct pid_stat *p = all_pids[pid];
 
@@ -917,6 +933,9 @@ static inline void del_pid_entry(pid_t pid) {
     all_pids_count--;
 }
 
+/**
+ * Remove PIDs when they are not running more.
+ */
 static void cleanup_exited_pids(void) {
     struct pid_stat *p = NULL;
 
@@ -980,14 +999,15 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
         key = next_key;
     }
 
-    return counter;
-
     link_all_processes_to_their_parents();
 
     apply_apps_groups_targets_inheritance();
 
+    /* These lines are not necessary for ebpf plugin
     zero_all_targets(users_root_target);
     zero_all_targets(groups_root_target);
+     */
+
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // // this has to be done, before the cleanup
@@ -1043,8 +1063,10 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     // }
 
     post_aggregate_targets(apps_groups_root_target);
+    /* These lines are not necessary for ebpf plugin
     post_aggregate_targets(users_root_target);
     post_aggregate_targets(groups_root_target);
+    */
 
     cleanup_exited_pids();
 
