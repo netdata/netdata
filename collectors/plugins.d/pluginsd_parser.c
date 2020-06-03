@@ -49,9 +49,7 @@ PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, ch
 {
     RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
     uuid_t  *guid = &((PARSER_USER_OBJECT *)user)->guid;
-
 
     st = rrdset_create_custom(
         host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type,
@@ -183,9 +181,6 @@ PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new
 PARSER_RC pluginsd_guid_action(void *user, uuid_t *uuid)
 {
     uuid_copy(((PARSER_USER_OBJECT *) user)->guid, *uuid);
-    char uuid_str[37];
-    uuid_unparse_lower(*uuid, uuid_str);
-    info("RECEIVED GUID [%s]", uuid_str);
     return PARSER_RC_OK;
 }
 
@@ -711,7 +706,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
     parser->plugins_action->chart_action     = &pluginsd_chart_action;
     parser->plugins_action->set_action       = &pluginsd_set_action;
-    parser->plugins_action->guid_action      = &pluginsd_guid_action;
     user->parser = parser;
 
     while (likely(!parser_next(parser))) {

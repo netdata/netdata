@@ -34,6 +34,8 @@ extern PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, cha
                                            long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type);
 extern PARSER_RC pluginsd_label_action(void *user, char *key, char *value, LABEL_SOURCE source);
 extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new_labels);
+extern PARSER_RC pluginsd_guid_action(void *user, uuid_t *uuid);
+
 
 
 #endif //NETDATA_PLUGINSD_PARSER_H

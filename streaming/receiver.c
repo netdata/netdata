@@ -154,6 +154,8 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         return 0;
     }
 
+    if (unlikely(!parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid)))
+        error("Failed to register the GUID keyword");
     parser->plugins_action->begin_action     = &pluginsd_begin_action;
     parser->plugins_action->flush_action     = &pluginsd_flush_action;
     parser->plugins_action->end_action       = &pluginsd_end_action;
@@ -164,6 +166,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
     parser->plugins_action->chart_action     = &pluginsd_chart_action;
     parser->plugins_action->set_action       = &pluginsd_set_action;
+    parser->plugins_action->guid_action      = &pluginsd_guid_action;
 
     user->parser = parser;
 
