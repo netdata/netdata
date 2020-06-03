@@ -55,17 +55,16 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 2.  [Our userbase](#user-base) - Enterprises we help monitor and our userbase
 3.  [Quickstart](#quickstart) - How to try it now on your systems
 4.  [Why Netdata](#why-netdata) - Why people love Netdata and how it compares with other solutions
-5.  [News](#news) - The latest news about Netdata
-6.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
-7.  [Infographic](#infographic) - Everything about Netdata in a single graphic
-8.  [Features](#features) - How you'll use Netdata on your systems
-9.  [Visualization](#visualization) - Learn about visual anomaly detection
-10. [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
-11. [Documentation](#documentation) - Read the documentation
-12. [Community](#community) - Discuss Netdata with others and get support
-13. [License](#license) - Check Netdata's licencing
-14. [Is it any good?](#is-it-any-good) - Yes.
-15. [Is it awesome?](#is-it-awesome) - Yes.
+5.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
+6.  [Infographic](#infographic) - Everything about Netdata in a single graphic
+7.  [Features](#features) - How you'll use Netdata on your systems
+8.  [Visualization](#visualization) - Learn about visual anomaly detection
+9.  [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
+10. [Documentation](#documentation) - Read the documentation
+11. [Community](#community) - Discuss Netdata with others and get support
+12. [License](#license) - Check Netdata's licencing
+13. [Is it any good?](#is-it-any-good) - Yes.
+14. [Is it awesome?](#is-it-awesome) - Yes.
 
 ## What does it look like?
 
@@ -224,12 +223,12 @@ This is how it works:
 
 | Function    | Description                                                                                                                                                                                                                                                    | Documentation                                       |
 | :---------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------- |
-| **Collect** | Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. | [`collectors`](/collectors/README.md)                |
-| **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](/database/README.md)                    |
-| **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](/health/README.md)                        |
-| **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](/streaming/README.md)                  |
-| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`backends`](/backends/README.md)                    |
-| **Query**   | Multiple independent workers are attached to the [internal web server](/web/server/README.md), servicing API requests, including [data queries](/web/api/queries/README.md).                                                                                     | [`web/api`](/web/api/README.md)                      |
+| **Collect** | Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. | [`collectors`](/collectors/README.md)               |
+| **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](/database/README.md)                   |
+| **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](/health/README.md)                       |
+| **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](/streaming/README.md)                 |
+| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`exporting`](/docs/export/README.md)               |
+| **Query**   | Multiple independent workers are attached to the [internal web server](/web/server/README.md), servicing API requests, including [data queries](/web/api/queries/README.md).                                                                                   | [`web/api`](/web/api/README.md)                     |
 
 The result is a highly efficient, low-latency system, supporting multiple readers and one writer on each metric.
 
@@ -375,7 +374,7 @@ Here is a quick list of notable documents:
 | [`collectors`](/collectors/README.md)                 | Information about data collection plugins.                                                                            |
 | [`health`](/health/README.md)                         | How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods. |
 | [`streaming`](/streaming/README.md)                   | How to build hierarchies of Netdata servers, by streaming metrics between them.                                       |
-| [`backends`](/backends/README.md)                     | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
+| [`exporting`](/docs/export/README.md)                 | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
 | [`web/api`](/web/api/README.md)                       | Learn how to query the Netdata API and the queries it supports.                                                       |
 | [`web/api/badges`](/web/api/badges/README.md)         | Learn how to generate badges (SVG images) from live data.                                                             |
 | [`web/gui/custom`](/web/gui/custom/README.md)         | Learn how to create custom Netdata dashboards.                                                                        |
