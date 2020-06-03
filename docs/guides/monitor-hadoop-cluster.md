@@ -1,8 +1,6 @@
 <!--
----
 title: "Monitor a Hadoop cluster with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor-hadoop-cluster.md
----
 -->
 
 # Monitor a Hadoop cluster with Netdata
@@ -25,8 +23,8 @@ alternative, like the guide available from
 
 For more specifics on the collection modules used in this guide, read the respective pages in our documentation:
 
--   [HDFS](/collectors/go.d.plugin/modules/hdfs/README.md)
--   [Zookeeper](/collectors/go.d.plugin/modules/zookeeper/README.md)
+-   [HDFS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/hdfs)
+-   [Zookeeper](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/zookeeper)
 
 ## Set up your HDFS and Zookeeper installations
 

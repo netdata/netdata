@@ -1,8 +1,6 @@
 <!--
----
 title: "Monitor Nginx or Apache web server log files with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/collect-apache-nginx-web-logs.md
----
 -->
 
 # Monitor Nginx or Apache web server log files with Netdata
@@ -22,8 +20,8 @@ You can now use the [LTSV log format](http://ltsv.org/), track TLS and cipher us
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](https://blog.netdata.cloud/posts/release-1.19/).
 
-The [go.d plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) is currently compatible with
-[Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
+The [go.d plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) is currently compatible
+with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
 constantly write to into real-time insights into your infrastructure.
@@ -160,4 +158,4 @@ into powerful real-time tools for keeping your servers happy.
 Don't forget to give GitHub user [Wing924](https://github.com/Wing924) a big 👍 for his hard work in starting up the Go
 refactoring effort.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fweb-log-collector&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fcollect-apache-nginx-web-logs&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

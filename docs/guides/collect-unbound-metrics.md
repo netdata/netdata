@@ -1,9 +1,7 @@
 <!--
----
 title: "Monitor Unbound DNS servers with Netdata"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/collect-unbound-metrics.md
----
 -->
 
 # Monitor Unbound DNS servers with Netdata
