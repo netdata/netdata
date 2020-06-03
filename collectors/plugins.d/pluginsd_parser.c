@@ -566,6 +566,10 @@ PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_actio
     char *uuid_str = words[1];
     uuid_t uuid;
 
+    // Support only for version 3 and up
+    if (((PARSER_USER_OBJECT *) user)->cd->version < 3)
+        return PARSER_RC_OK;
+
     if (unlikely(!uuid_str)) {
         error("requested a GUID, without a uuid.");
         return PARSER_RC_ERROR;
