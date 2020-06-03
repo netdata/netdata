@@ -561,13 +561,20 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
     return PARSER_RC_OK;
 }
 
+
+#ifdef ENABLE_DBENGINE
 PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
     char *uuid_str = words[1];
     uuid_t uuid;
 
-    // Support only for version 3 and up
-    if (((PARSER_USER_OBJECT *) user)->cd->version < 3)
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+
+    if (host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+        return PARSER_RC_OK;
+    }
+
+    if (((PARSER_USER_OBJECT *) user)->cd->version < VERSION_GUID)
         return PARSER_RC_OK;
 
     if (unlikely(!uuid_str)) {
@@ -586,6 +593,15 @@ PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_actio
 
     return PARSER_RC_OK;
 }
+#else
+PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(words);
+    UNUSED(user);
+    UNUSED(plugins_action);
+    return PARSER_RC_OK;
+}
+#endif
 
 PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
