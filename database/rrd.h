@@ -29,6 +29,7 @@ struct pg_cache_page_index;
 #include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
+#include "../streaming/rrdpush.h"
 
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
@@ -692,6 +693,7 @@ struct rrdhost {
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
+    struct sender_state *sender;
     volatile unsigned int rrdpush_sender_spawn:1;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
 
@@ -703,13 +705,10 @@ struct rrdhost {
 
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
-    // metrics may be collected asynchronously
-    // these synchronize all the threads willing the write to our sending buffer
-    netdata_mutex_t rrdpush_sender_buffer_mutex;    // exclusive access to rrdpush_sender_buffer
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
-    BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
+    //BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
 
-    uint32_t stream_version;                             //Set the current version of the stream.
+    //uint32_t stream_version;                             //Set the current version of the stream.
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush
@@ -718,6 +717,9 @@ struct rrdhost {
                                                     // host, this is the counter of connected clients
 
     time_t senders_disconnected_time;               // the time the last sender was disconnected
+
+    struct receiver_state *receiver;
+    netdata_mutex_t receiver_lock;
 
     // ------------------------------------------------------------------------
     // health monitoring options
@@ -973,6 +975,8 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
         return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
     }
 }
+
+time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // get the last slot updated in the round robin database
 #define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))

@@ -139,6 +139,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->disk_space_mb       = default_rrdeng_disk_quota_mb;
 #endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
+
+    host->sender = mallocz(sizeof(*host->sender));
+    sender_init(host->sender, host);
+    netdata_mutex_init(&host->receiver_lock);
+
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
@@ -148,7 +153,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
 
-    host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;
+    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
     host->ssl.flags = NETDATA_SSL_START;
@@ -156,7 +161,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
 
-    netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels_rwlock);
 
@@ -407,7 +411,7 @@ RRDHOST *rrdhost_find_or_create(
     }
     else {
         host->health_enabled = health_enabled;
-        host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;
+        //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 
         if(strcmp(host->hostname, hostname) != 0) {
             info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", host->hostname, hostname);
@@ -455,7 +459,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t n
     if(host != protected
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && !host->connected_senders
+       && host->receiver
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
         return 1;
@@ -601,8 +605,13 @@ void rrdhost_free(RRDHOST *host) {
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
-    // stop a possibly running thread
-    rrdpush_sender_thread_stop(host);
+    // ------------------------------------------------------------------------
+    // clean up the sender
+    rrdpush_sender_thread_stop(host); // stop a possibly running thread
+    cbuffer_free(host->sender->buffer);
+    buffer_free(host->sender->build);
+    freez(host->sender);
+    host->sender = NULL;
 
     rrdhost_wrlock(host);   // lock this RRDHOST
 
@@ -667,6 +676,8 @@ void rrdhost_free(RRDHOST *host) {
         if(h) h->next = host->next;
         else error("Request to free RRDHOST '%s': cannot find it", host->hostname);
     }
+
+
 
     // ------------------------------------------------------------------------
     // free it
@@ -1193,11 +1204,12 @@ void reload_host_labels()
     health_label_log_save(localhost);
     rrdhost_unlock(localhost);
 
+/*  TODO-GAPS - fix this so that it looks properly at the state and version of the sender
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
         localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         rrdpush_send_labels(localhost);
     }
-
+*/
     health_reload();
 }
 
@@ -1283,7 +1295,7 @@ void rrdhost_cleanup_all(void) {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if(host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS) && !host->connected_senders)
+        if(host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS) && !host->receiver)
             rrdhost_delete_charts(host);
         else
             rrdhost_cleanup_charts(host);
@@ -1481,4 +1493,19 @@ int alarm_compare_name(void *a, void *b) {
     else if(in1->hash > in2->hash) return 1;
 
     return strcmp(in1->name,in2->name);
+}
+
+// Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
+// the last entry times as the metric updates, but let's see if it is a problem first.
+time_t rrdhost_last_entry_t(RRDHOST *h) {
+    rrdhost_rdlock(h);
+    RRDSET *st;
+    time_t result = 0;
+    rrdset_foreach_read(st, h) {
+        time_t st_last = rrdset_last_entry_t(st);
+        if (st_last > result)
+            result = st_last;
+    }
+    rrdhost_unlock(h);
+    return result;
 }

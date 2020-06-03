@@ -239,7 +239,8 @@ PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_act
         microseconds = str2ull(microseconds_txt);
 
     if (plugins_action->begin_action) {
-        return plugins_action->begin_action(user, st, microseconds, ((PARSER_USER_OBJECT *)user)->trust_durations);
+        return plugins_action->begin_action(user, st, microseconds,
+                                            ((PARSER_USER_OBJECT *)user)->trust_durations);
     }
     return PARSER_RC_OK;
 disable:

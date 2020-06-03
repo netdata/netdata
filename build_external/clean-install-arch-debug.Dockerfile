@@ -52,7 +52,11 @@ RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
 
-RUN rm /var/lib/netdata/registry/netdata.public.unique.id
+RUN printf >/opt/netdata/source/gdb_batch '\
+set args -D \n\
+handle SIG32 nostop \n\
+run \n\
+bt'
 
-CMD ["/usr/sbin/valgrind", "--leak-check=full", "/usr/sbin/netdata", "-D"]
-   
+#CMD ["/usr/sbin/valgrind", "--leak-check=full", "/usr/sbin/netdata", "-D"]
+CMD ["/usr/bin/gdb", "-x", "/opt/netdata/source/gdb_batch", "/usr/sbin/netdata"]

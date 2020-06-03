@@ -209,42 +209,10 @@ int parser_next(PARSER *parser)
         return 0;
     }
 
-#ifdef ENABLE_HTTPS
-    int normalread = 1;
-    if (netdata_srv_ctx) {
-        if (parser->host->stream_ssl.conn && !parser->host->stream_ssl.flags) {
-            tmp = parser->buffer;
-            if (!parser->bytesleft) {
-                parser->readfrom = parser->tmpbuffer;
-                parser->bytesleft =
-                    pluginsd_update_buffer(parser->readfrom, parser->host->stream_ssl.conn);
-                if (parser->bytesleft <= 0) {
-                    return 1;
-                }
-            }
-
-            parser->readfrom = pluginsd_get_from_buffer(
-                parser->buffer, &parser->bytesleft, parser->readfrom,
-                parser->host->stream_ssl.conn, parser->tmpbuffer);
-
-            if (!parser->readfrom)
-                tmp = NULL;
-
-            normalread = 0;
-        }
-    }
-    if (normalread) {
-        if (unlikely(parser->read_function))
-            tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->input);
-        else
-            tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->input);
-    }
-#else
     if (unlikely(parser->read_function))
         tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->input);
     else
         tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->input);
-#endif
 
     if (unlikely(!tmp)) {
         if (unlikely(parser->eof_function)) {
@@ -320,7 +288,7 @@ inline int parser_action(PARSER *parser, char *input)
         else
             rc = PARSER_RC_ERROR;
 #ifdef NETDATA_INTERNAL_CHECKS
-        error("Unknown keyword [%s]", words[0]);
+        error("Unknown keyword [%s]", input);
 #endif
     }
     else {
