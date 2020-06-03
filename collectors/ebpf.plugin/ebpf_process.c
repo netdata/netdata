@@ -23,7 +23,6 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
 static ebpf_functions_t process_functions;
 
-static pid_t ebpf_pid_max = 0;
 static ebpf_process_stat_t **local_process_stats = NULL;
 static pid_t *pid_index;
 static int pids_running;
@@ -561,9 +560,8 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     process_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    ebpf_pid_max =  get_system_pid_max();
-    local_process_stats = callocz((size_t)ebpf_pid_max, sizeof(ebpf_process_stat_t *));
-    pid_index = callocz((size_t)ebpf_pid_max, sizeof(pid_t));
+    local_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
+    pid_index = callocz((size_t)pid_max, sizeof(pid_t));
 }
 
 static void change_collector_event() {

@@ -367,8 +367,10 @@ typedef struct ebpf_bandwidth {
 } ebpf_bandwidth_t;
 
 // ----------------------------------------------------------------------------
-// Exported Functions
+// Exported variabled and functions
 //
+extern struct pid_stat **all_pids;
+
 
 extern int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
                                       struct target **apps_groups_root_target, const char *path, const char *file);

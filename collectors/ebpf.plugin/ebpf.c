@@ -512,6 +512,14 @@ void ebpf_print_help() {
  *****************************************************************/
 
 /**
+ * Allocate the vectors used for all threads.
+ */
+static void ebpf_allocate_common_vectors()
+{
+    all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
+}
+
+/**
  * Fill the ebpf_functions structure with default values
  *
  * @param ef the pointer to set default values
@@ -645,6 +653,7 @@ void set_global_variables() {
     }
 
     isrh = get_redhat_release();
+    pid_max =  get_system_pid_max();
 }
 
 /**
@@ -834,6 +843,8 @@ int main(int argc, char **argv)
         error("Cannot start the mutex.");
         ebpf_exit(5);
     }
+
+    ebpf_allocate_common_vectors();
 
     struct netdata_static_thread ebpf_threads[] = {
         {"EBPF PROCESS",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[0].start_routine},

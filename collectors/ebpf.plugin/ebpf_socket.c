@@ -21,7 +21,6 @@ static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 
 static ebpf_functions_t socket_functions;
 
-static pid_t ebpf_pid_max = 0;
 static ebpf_bandwidth_t **socket_bandwidth_stats = NULL;
 
 #ifndef STATIC
@@ -338,8 +337,7 @@ static void ebpf_socket_allocate_global_vectors(size_t length) {
     socket_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    ebpf_pid_max =  get_system_pid_max();
-    socket_bandwidth_stats = callocz(sizeof(ebpf_bandwidth_t *), (size_t)ebpf_pid_max);
+    socket_bandwidth_stats = callocz(sizeof(ebpf_bandwidth_t *), (size_t)pid_max);
 }
 
 static void change_collector_event() {

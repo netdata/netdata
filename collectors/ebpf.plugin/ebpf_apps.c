@@ -395,10 +395,9 @@ int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target, struc
 #define MAX_NAME 100
 #define MAX_CMDLINE 16384
 
-static struct pid_stat
-        *root_of_pids = NULL,   // global list of all processes running
-        **all_pids = NULL;      // to avoid allocations, we pre-allocate the
-                                // the entire pid space.
+struct pid_stat **all_pids = NULL; // to avoid allocations, we pre-allocate the
+                                   // the entire pid space.
+static struct pid_stat  *root_of_pids = NULL;   // global list of all processes running
 
 static size_t
         all_pids_count = 0;     // the number of processes running
@@ -443,6 +442,12 @@ static size_t
 #define PID_LOG_STAT    0x00000010
 
 static int debug_enabled = 0;
+/**
+ * Internal function used to write debug messages.
+ *
+ * @param fmt   the format to create the message.
+ * @param ...   the arguments to fill the format.
+ */
 static inline void debug_log_int(const char *fmt, ... ) {
     va_list args;
 
@@ -465,6 +470,17 @@ static inline void debug_log_dummy(void) {}
 
 #endif
 
+/**
+ * Managed log
+ *
+ * Store log information if it is necessary.
+ *
+ * @param p         the pid stat structure
+ * @param log       the log id
+ * @param status    the return from a function.
+ *
+ * @return It returns the status value.
+ */
 static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     if(unlikely(!status)) {
         // error("command failed log %u, errno %d", log, errno);
@@ -508,6 +524,15 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     return status;
 }
 
+/**
+ * Get PID entry
+ *
+ * Get or allocate the PID entry for the specifid pid.
+ *
+ * @param pid the pid to search the data.
+ *
+ * @return It returns the pid entry structure
+ */
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
     if(unlikely(all_pids[pid]))
         return all_pids[pid];
@@ -528,6 +553,11 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     return p;
 }
 
+/**
+ * Assigna the PID to a target.
+ *
+ * @param p the pid_stat structure to assign for a target.
+ */
 static inline void assign_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
@@ -564,6 +594,13 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
 // ----------------------------------------------------------------------------
 // update pids from proc
 
+/**
+ * Read cmd line from /proc/PID/cmdline
+ *
+ * @param p  the pid_stat_structure.
+ *
+ * @return It returns 1 on success and 0 otherwise.
+ */
 static inline int read_proc_pid_cmdline(struct pid_stat *p) {
     static char cmdline[MAX_CMDLINE + 1];
 
@@ -600,6 +637,13 @@ cleanup:
     return 0;
 }
 
+/**
+ * Read information from /proc/PID/stat and /proc/PID/cmdline
+ * Assign target to pid
+ *
+ * @param p the pid stat structure to store the data.
+ * @param ptr an useless argument.
+ */
 static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     (void)ptr;
 
@@ -655,6 +699,14 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     return 0;
 }
 
+/**
+ * Collect data for PID
+ *
+ * @param pid the current pid that we are working
+ * @param ptr a NULL value
+ *
+ * @return It returns 1 on succcess and 0 otherwise
+ */
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(pid < 0 || pid > pid_max)) {
         error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
@@ -885,6 +937,18 @@ static void cleanup_exited_pids(void) {
     }
 }
 
+/**
+ * Collect data for all process
+ *
+ * Read data from hash table and store it in appropriate vectors.
+ * It also creates the link between targets and PIDs.
+ *
+ * @param out                   the output vector where we store data read from hash table.
+ * @param index                 the vector to store the indexes read.
+ * @param bpf_map_get_next_key  A pointer to the function used to get the indexes
+ * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
+ * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
+ */
 #ifndef STATIC
 int collect_data_for_all_processes(ebpf_process_stat_t **out,
                                    pid_t *index,
@@ -910,7 +974,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
         if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, w)) {
             index[counter] = next_key;
             counter++;
-            //collect_data_for_pid(next_key, NULL);
+            collect_data_for_pid(next_key, NULL);
         }
 
         key = next_key;
