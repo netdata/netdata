@@ -24,6 +24,8 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 static ebpf_functions_t process_functions;
 
 static ebpf_process_stat_t **local_process_stats = NULL;
+static ebpf_process_publish_apps_t **current_apps_data = NULL;
+static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 static pid_t *pid_index;
 static int pids_running;
 
@@ -54,7 +56,7 @@ static int *map_fd = NULL;
  * @param pvc      the second output structure with correlated dimensions
  * @param input    the structure with the input data.
  */
-static void ebpf_update_publish(netdata_publish_syscall_t *publish,
+static void ebpf_update_global_publish(netdata_publish_syscall_t *publish,
                                    netdata_publish_vfs_common_t *pvc,
                                    netdata_syscall_stat_t *input) {
 
@@ -93,6 +95,33 @@ static void ebpf_update_publish(netdata_publish_syscall_t *publish,
     pvc->zombie = (long)publish[5].ncall + (long)publish[6].ncall;
 }
 
+/**
+ * Update apps dimension to publish.
+ *
+ * @param curr Last values read from memory.
+ * @param prev Previous values read from memory.
+ * @param first was it allocated now?
+ */
+static void ebpf_update_apps_publish(ebpf_process_publish_apps_t *curr, ebpf_process_publish_apps_t *prev,int first)
+{
+    if (first)
+        return;
+
+    curr->publish_open         = curr->call_sys_open - prev->call_sys_open;
+    curr->publish_closed       = curr->call_close_fd - prev->call_close_fd;
+    curr->publish_deleted      = curr->call_vfs_unlink - prev->call_vfs_unlink;
+    curr->publish_write_call   = curr->call_write - prev->call_write;
+    curr->publish_write_bytes  = curr->bytes_written - prev->bytes_written;
+    curr->publish_read_call    = curr->call_read - prev->call_read;
+    curr->publish_read_bytes   = curr->bytes_read - prev->bytes_read;
+    curr->publish_process       = curr->call_do_fork - prev->call_do_fork;
+    curr->publish_thread       = curr->call_sys_clone - prev->call_sys_clone;
+    curr->publish_task         = curr->call_release_task - prev->call_release_task;
+    curr->publish_open_error   = curr->ecall_sys_open - prev->ecall_sys_open;
+    curr->publish_close_error  = curr->ecall_close_fd - prev->ecall_close_fd;
+    curr->publish_write_error  = curr->ecall_write - prev->ecall_write;
+    curr->publish_read_error   = curr->ecall_read - prev->ecall_read;
+}
 
 /**
  * Call the necessary functions to create a chart.
@@ -116,7 +145,7 @@ static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc) 
  */
 static void ebpf_process_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t pvc;
-    ebpf_update_publish(process_publish_aggregated, &pvc, process_aggregated_data);
+    ebpf_update_global_publish(process_publish_aggregated, &pvc, process_aggregated_data);
 
     write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
     write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
@@ -206,44 +235,56 @@ static void read_hash_global_tables()
                                        (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
-/*****************************************************************
- *
- *  FUNCTIONS WITH THE MAIN LOOP
- *
- *****************************************************************/
-
-
 /**
- * Main loop for this collector.
- *
- * @param step the number of microseconds used with heart beat
- * @param em   the structure with thread information
+ * Read the hash table and store data to allocated vectors.
  */
-static void process_collector(usec_t step, ebpf_module_t *em)
+static void update_aggregated_data()
 {
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    while(!close_ebpf_plugin) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
+    int i;
+    for ( i = 0 ; i < pids_running ; i++) {
+        pid_t current_pid = pid_index[i];
+        ebpf_process_stat_t *ps = local_process_stats[current_pid];
+        if (!ps)
+            continue;
 
-        read_hash_global_tables();
-        pids_running = collect_data_for_all_processes(local_process_stats,
-                                                      pid_index,
-                                                      process_functions.bpf_map_get_next_key,
-                                                      process_functions.bpf_map_lookup_elem,
-                                                      map_fd[0]);
-        if (pids_running > 0){
-            //add statistic calculation for the process here.
+        ebpf_process_publish_apps_t *cad = current_apps_data[current_pid];
+        ebpf_process_publish_apps_t *pad = prev_apps_data[current_pid];
+        int status;
+        if (!cad) {
+            cad = callocz(2, sizeof(netdata_syscall_stat_t));
+            current_apps_data[current_pid] = &cad[0];
+            prev_apps_data[current_pid] = &cad[1];
+            status = 1;
+        } else {
+            memcpy(pad, cad, sizeof(netdata_syscall_stat_t));
+            status = 0;
         }
 
-        if (em->enabled) {
-            pthread_mutex_lock(&lock);
-            ebpf_process_send_data(em);
-            pthread_mutex_unlock(&lock);
-        }
+        //Read data
+        cad->call_sys_open = ps->open_call;
+        cad->call_close_fd = ps->close_call;
+        cad->call_vfs_unlink = ps->unlink_call;
+        cad->call_read = ps->read_call + ps->readv_call;
+        cad->call_write = ps->write_call + ps->writev_call;
+        cad->call_do_exit = ps->exit_call;
+        cad->call_release_task = ps->release_call;
+        cad->call_do_fork = ps->fork_call;
+        cad->call_sys_clone = ps->clone_call;
 
-        fflush(stdout);
+        cad->ecall_sys_open = ps->open_err;
+        cad->ecall_close_fd = ps->close_err;
+        cad->ecall_vfs_unlink = ps->unlink_err;
+        cad->ecall_read = ps->read_err + ps->readv_err;
+        cad->ecall_write = ps->write_err + ps->writev_err;
+        cad->ecall_do_fork = ps->fork_err;
+        cad->ecall_sys_clone = ps->clone_err;
+
+        cad->bytes_written = (uint64_t)ps->write_bytes +
+                                           (uint64_t)ps->write_bytes;
+        cad->bytes_read = (uint64_t)ps->read_bytes +
+                                           (uint64_t)ps->readv_bytes;
+
+        ebpf_update_apps_publish(cad, pad, status);
     }
 }
 
@@ -406,6 +447,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 static void ebpf_process_create_apps_charts(ebpf_module_t *em)
 {
+    return;
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
@@ -434,70 +476,122 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em)
                                    apps_groups_root_target);
     }
 
-    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20065,
+                               apps_groups_root_target);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_SYSCALL_GROUP,
+                               20066,
                                apps_groups_root_target);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
-                                   20066,
+                                   20067,
                                    apps_groups_root_target);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20067,
+                               20068,
                                apps_groups_root_target);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
-                                   20068,
+                                   20069,
                                    apps_groups_root_target);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20069,
+                               20070,
                                apps_groups_root_target);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20070,
+                               20071,
                                apps_groups_root_target);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20071,
+                               20072,
                                apps_groups_root_target);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20072,
+                               20073,
                                apps_groups_root_target);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20073,
+                               20074,
                                apps_groups_root_target);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
-                               20074,
+                               20075,
                                apps_groups_root_target);
 
+}
+
+/*****************************************************************
+ *
+ *  FUNCTIONS WITH THE MAIN LOOP
+ *
+ *****************************************************************/
+
+/**
+ * Main loop for this collector.
+ *
+ * @param step the number of microseconds used with heart beat
+ * @param em   the structure with thread information
+ */
+static void process_collector(usec_t step, ebpf_module_t *em)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while(!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        read_hash_global_tables();
+        pids_running = collect_data_for_all_processes(local_process_stats,
+                                                      pid_index,
+                                                      process_functions.bpf_map_get_next_key,
+                                                      process_functions.bpf_map_lookup_elem,
+                                                      map_fd[0]);
+
+        if (em->enabled) {
+            int publish_apps = 0;
+            if (pids_running > 0 && em->apps_charts){
+                publish_apps = 1;
+                update_aggregated_data();
+            }
+
+            pthread_mutex_lock(&lock);
+            ebpf_process_send_data(em);
+            if (publish_apps) {
+                ebpf_process_create_apps_charts(em);
+            }
+            pthread_mutex_unlock(&lock);
+        }
+
+        fflush(stdout);
+    }
 }
 
 /*****************************************************************
@@ -540,6 +634,8 @@ static void ebpf_process_cleanup(void *ptr)
     }
 
     freez(process_functions.map_fd);
+    freez(current_apps_data);
+    freez(prev_apps_data);
 }
 
 /*****************************************************************
@@ -561,6 +657,8 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     local_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
+    current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
+    prev_apps_data = callocz(length, sizeof(ebpf_process_publish_apps_t *));
     pid_index = callocz((size_t)pid_max, sizeof(pid_t));
 }
 
@@ -641,8 +739,6 @@ void *ebpf_process_thread(void *ptr)
 
     if (em->enabled) {
         ebpf_create_global_charts(em);
-        if (em->apps_charts)
-            ebpf_process_create_apps_charts(em);
     }
 
     pthread_mutex_unlock(&lock);

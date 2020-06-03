@@ -92,4 +92,45 @@ typedef enum ebpf_process_index {
 
 } ebpf_process_index_t;
 
+typedef struct ebpf_process_publish_apps {
+    //Number of calls during the last read
+    uint64_t call_sys_open;
+    uint64_t call_close_fd;
+    uint64_t call_vfs_unlink;
+    uint64_t call_read;
+    uint64_t call_write;
+    uint64_t call_do_exit;
+    uint64_t call_release_task;
+    uint64_t call_do_fork;
+    uint64_t call_sys_clone;
+
+    //Number of errors during the last read
+    uint64_t ecall_sys_open;
+    uint64_t ecall_close_fd;
+    uint64_t ecall_vfs_unlink;
+    uint64_t ecall_read;
+    uint64_t ecall_write;
+    uint64_t ecall_do_fork;
+    uint64_t ecall_sys_clone;
+
+    //Number of bytes during the last read
+    uint64_t bytes_written;
+    uint64_t bytes_read;
+
+    //Dimensions sent to chart
+    uint64_t publish_open ;
+    uint64_t publish_closed ;
+    uint64_t publish_deleted ;
+    uint64_t publish_write_call ;
+    uint64_t publish_write_bytes ;
+    uint64_t publish_read_call ;
+    uint64_t publish_read_bytes ;
+    uint64_t publish_process;
+    uint64_t publish_thread ;
+    uint64_t publish_task ;
+    uint64_t publish_open_error ;
+    uint64_t publish_close_error ;
+    uint64_t publish_write_error ;
+    uint64_t publish_read_error ;
+}ebpf_process_publish_apps_t;
 # endif
