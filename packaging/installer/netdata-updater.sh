@@ -213,6 +213,23 @@ tmpdir=
 
 trap cleanup EXIT
 
+while [ -n "${1}" ]; do
+  if [ "${1}" = "--not-running-from-cron" ]; then
+    NETDATA_NOT_RUNNING_FROM_CRON=1
+    shift 1
+  else
+    break
+  fi
+done
+
+# Random sleep to aileviate stampede effect of Agents upgrading
+# and disconnecting/reconnecting at the same time (or near to).
+# But only we're not a controlling terminal (tty)
+# Randomly sleep between 1s and 60m
+if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
+  sleep $(((RANDOM % 3600) + 1))s
+fi
+
 # Usually stored in /etc/netdata/.environment
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
