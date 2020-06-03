@@ -76,6 +76,11 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
                  host->hostname, cd->cmd, remote_time, now, now-remote_time);
         else {
             gap = now - prev;
+            if (gap < 0) {
+                info("STREAM %s from %s: Clock error! last_entry %ld -> %ld secs in future. Cannot detect gaps",
+                     host->hostname, cd->cmd, prev, now - prev);
+                return PARSER_RC_OK;
+            }
             info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
                  host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
             if (gap > 0) {
