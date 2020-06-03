@@ -297,11 +297,12 @@ void rrdset_push_chart_definition_now(RRDSET *st) {
     rrdset_unlock(st);
 }
 
-void sender_fill_gap(struct sender_state *s, RRDSET *st, time_t end_t)
+void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t end_t)
 {
     UNUSED(s);
     RRDDIM *rd;
     struct rrddim_query_handle handle;
+    buffer_sprintf(s->build, "REPBEGIN %s %zu %ld ", st->id, st->gap_sent, end_t);
     rrddim_foreach_read(rd, st) {
         if (rd->updated && rd->exposed) {
             time_t sample_t = (time_t)st->gap_sent;
@@ -309,17 +310,14 @@ void sender_fill_gap(struct sender_state *s, RRDSET *st, time_t end_t)
             rd->state->query_ops.init(rd, &handle, sample_t, end_t);
             while (sample_t <= end_t) {
                 storage_number n = rd->state->query_ops.next_metric(&handle, &ignore);
-                info("Retreiving %s %ld = " STORAGE_NUMBER_FORMAT, rd->name, sample_t, n);
+                buffer_sprintf(s->build, "REPDIM %s %ld " STORAGE_NUMBER_FORMAT "\n", rd->name, sample_t, n);
+                // Technically rd->update_every could differ from st->update_every, but it does not.
                 sample_t += rd->update_every;
             }
             st->gap_sent = end_t;
-            /*buffer_sprintf(host->sender->build
-                           , "SET \"%s\" = " COLLECTED_NUMBER_FORMAT "\n"
-                           , rd->id
-                           , rd->collected_value
-        );*/
         }
     }
+    buffer_sprintf(s->build, "REPEND");
 }
 
 void rrdset_done_push(RRDSET *st) {
@@ -349,9 +347,9 @@ void rrdset_done_push(RRDSET *st) {
     if (host->sender->gap_start != 0 && st->gap_sent < host->sender->gap_end) {
         if (st->gap_sent == 0)
             st->gap_sent = host->sender->gap_start;
-        sender_fill_gap(host->sender, st, (time_t)host->sender->gap_end);
+        sender_fill_gap_nolock(host->sender, st, (time_t)host->sender->gap_end);
     }
-    else
+    if (host->sender->gap_start == 0 || st->gap_sent >= host->sender->gap_end)
         rrdpush_send_chart_metrics_nolock(st, host->sender);
 
     // signal the sender there are more data

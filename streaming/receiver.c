@@ -97,6 +97,18 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     return PARSER_RC_ERROR;
 }
 
+PARSER_RC streaming_rep_begin(char **words, void *user, PLUGINSD_ACTION *plugins_action) {
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC streaming_rep_end(char **words, void *user, PLUGINSD_ACTION *plugins_action) {
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC streaming_rep_dim(char **words, void *user, PLUGINSD_ACTION *plugins_action) {
+    return PARSER_RC_ERROR;
+}
+
 /* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
  */
 static int receiver_read(struct receiver_state *r, FILE *fp) {
@@ -158,6 +170,9 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
+    parser_add_keyword(parser, "REPBEGIN", streaming_rep_begin);
+    parser_add_keyword(parser, "REPDIM", streaming_rep_dim);
+    parser_add_keyword(parser, "REPEND", streaming_rep_end);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
