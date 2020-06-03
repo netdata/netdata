@@ -37,7 +37,7 @@ Netdata is **fast** and **efficient**, designed to permanently run on all system
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **macOS**, along with
 other systems derived from them, such as **Kubernetes** and **Docker**.
 
-Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing
+Netdata is not hosted by the CNCF but is the fourth most starred open-source project in the [Cloud Native Computing
 Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
 ---
@@ -78,7 +78,8 @@ action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98
 > wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive,
 > **real-time**, and optimized to get the work done!
 
-Want to see Netdata live? Check out any of our [live demos](https://www.netdata.cloud/#live-demo).
+Want to try Netdata before you install? See our [live
+demo](https://london.my-netdata.io/default.html#menu_system_submenu_cpu;theme=slate;help=true).
 
 ## User base
 

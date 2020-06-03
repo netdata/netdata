@@ -7,16 +7,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/registry/README.
 
 # Registry
 
-The Netdata registry implements the node menu on the top left corner of the Netdata dashboards and enables the Netdata
-cloud features, such as the node view. The node menu lists the Netdata servers you have visited. The node view offers a
-lot of additional features on top of the menu, [with many more to
-come](https://blog.netdata.cloud/posts/netdata-cloud-announcement/). To enable the global Netdata registry and the cloud
-features, you need to Sign In to Netdata cloud. By signing in, you opt in to let the registry receive and store the
-information described [here](#what-data-does-the-registry-store). You can still get the node menu, but not the cloud
-features, if you [run your own registry](#run-your-own-registry).
-
-## Why?
-
 Netdata provides distributed monitoring.
 
 Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before
@@ -48,9 +38,7 @@ have installed**, i.e. the URLs our Netdata servers are listening.
 To solve this, Netdata utilizes a **central registry**. This registry, together with certain browser features, allow
 Netdata to provide unified cross-server dashboards. For example, when you jump from server to server using the node
 menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts,
-etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view. Netdata cloud
-has a roadmap to [offer many more features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) over and above
-the simple node menu.
+etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view.
 
 ## What data does the registry store?
 
@@ -90,8 +78,7 @@ Your Netdata servers do not talk to the registry. This is a UML diagram of its o
 ## Which is the default registry?
 
 `https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to
-both HTTP and HTTPS requests but the default is HTTPS. `https://netdata.cloud` is the additional registry endpoint, that
-enables [the cloud features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/). It only accepts HTTPS.
+both HTTP and HTTPS requests but the default is HTTPS.
 
 ### Can this registry handle the global load of Netdata installations?
 

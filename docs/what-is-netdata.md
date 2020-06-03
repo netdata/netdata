@@ -37,7 +37,7 @@ Netdata is **fast** and **efficient**, designed to permanently run on all system
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **macOS**, along with
 other systems derived from them, such as **Kubernetes** and **Docker**.
 
-Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing
+Netdata is not hosted by the CNCF but is the fourth most starred open-source project in the [Cloud Native Computing
 Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
 ---
@@ -55,16 +55,17 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 2.  [Our userbase](#user-base) - Enterprises we help monitor and our userbase
 3.  [Quickstart](#quickstart) - How to try it now on your systems
 4.  [Why Netdata](#why-netdata) - Why people love Netdata and how it compares with other solutions
-5.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
-6.  [Infographic](#infographic) - Everything about Netdata in a single graphic
-7.  [Features](#features) - How you'll use Netdata on your systems
-8.  [Visualization](#visualization) - Learn about visual anomaly detection
-9.  [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
-10. [Documentation](#documentation) - Read the documentation
-11. [Community](#community) - Discuss Netdata with others and get support
-12. [License](#license) - Check Netdata's licencing
-13. [Is it any good?](#is-it-any-good) - Yes.
-14. [Is it awesome?](#is-it-awesome) - Yes.
+5.  [News](#news) - The latest news about Netdata
+6.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
+7.  [Infographic](#infographic) - Everything about Netdata in a single graphic
+8.  [Features](#features) - How you'll use Netdata on your systems
+9.  [Visualization](#visualization) - Learn about visual anomaly detection
+10. [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
+11. [Documentation](#documentation) - Read the documentation
+12. [Community](#community) - Discuss Netdata with others and get support
+13. [License](#license) - Check Netdata's licencing
+14. [Is it any good?](#is-it-any-good) - Yes.
+15. [Is it awesome?](#is-it-awesome) - Yes.
 
 ## What does it look like?
 
@@ -77,7 +78,8 @@ action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98
 > wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive,
 > **real-time**, and optimized to get the work done!
 
-Want to see Netdata live? Check out any of our [live demos](https://www.netdata.cloud/#live-demo).
+Want to try Netdata before you install? See our [live
+demo](https://london.my-netdata.io/default.html#menu_system_submenu_cpu;theme=slate;help=true).
 
 ## User base
 
@@ -155,11 +157,14 @@ To try Netdata in a Docker container, run this:
 ```sh
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
@@ -223,7 +228,7 @@ This is how it works:
 | **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](/database/README.md)                    |
 | **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](/health/README.md)                        |
 | **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](/streaming/README.md)                  |
-| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to external time-series databases.                                                                                                                                               | [`exporting`](/exporting/README.md)                    |
+| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`backends`](/backends/README.md)                    |
 | **Query**   | Multiple independent workers are attached to the [internal web server](/web/server/README.md), servicing API requests, including [data queries](/web/api/queries/README.md).                                                                                     | [`web/api`](/web/api/README.md)                      |
 
 The result is a highly efficient, low-latency system, supporting multiple readers and one writer on each metric.
@@ -279,10 +284,10 @@ This is what you should expect from Netdata:
 ### Integrations
 
 -   **Time-series databases** - Netdata can archive its metrics to **Graphite**, **OpenTSDB**, **Prometheus**, **AWS
-    Kinesis**, **Google Cloud Pub/Sub**, **MongoDB**, **JSON document DBs**, in the same or lower resolution (lower: to
-    prevent it from congesting these servers due to the amount of data collected). Netdata also supports **Prometheus
-    remote write API**, which allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**,
-    **PostgreSQL/TimescaleDB**, **Splunk**, **VictoriaMetrics** and a lot of other [storage
+    Kinesis**, **MongoDB**, **JSON document DBs**, in the same or lower resolution (lower: to prevent it from congesting
+    these servers due to the amount of data collected). Netdata also supports **Prometheus remote write API**, which
+    allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**, **PostgreSQL/TimescaleDB**,
+    **Splunk**, **VictoriaMetrics** and a lot of other [storage
     providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
 
 ## Visualization
@@ -303,7 +308,7 @@ To improve clarity on charts, Netdata dashboards present **positive** values for
 `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
 ![Screenshot showing positive and negative
-values](https://user-images.githubusercontent.com/1153921/80838078-03f1c200-8bad-11ea-834a-a0085b39adb6.png)
+values](https://user-images.githubusercontent.com/1153921/81870401-9d649080-952a-11ea-80e3-4a7b480252ee.gif)
 
 _Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is
 negative._
@@ -357,7 +362,7 @@ write a collector for your custom application using our [plugin API](/collectors
 
 ## Documentation
 
-The Netdata documentation is at <https://learn.netdata.cloud>, but you can also find each page inside of Netdata's
+The Netdata documentation is at <https://docs.netdata.cloud>, but you can also find each page inside of Netdata's
 repository itself in Markdown (`.md`) files. You can find all our documentation by navigating the repository.
 
 Here is a quick list of notable documents:
@@ -370,7 +375,7 @@ Here is a quick list of notable documents:
 | [`collectors`](/collectors/README.md)                 | Information about data collection plugins.                                                                            |
 | [`health`](/health/README.md)                         | How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods. |
 | [`streaming`](/streaming/README.md)                   | How to build hierarchies of Netdata servers, by streaming metrics between them.                                       |
-| [`exporting`](/exporting/README.md)                   | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
+| [`backends`](/backends/README.md)                     | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
 | [`web/api`](/web/api/README.md)                       | Learn how to query the Netdata API and the queries it supports.                                                       |
 | [`web/api/badges`](/web/api/badges/README.md)         | Learn how to generate badges (SVG images) from live data.                                                             |
 | [`web/gui/custom`](/web/gui/custom/README.md)         | Learn how to create custom Netdata dashboards.                                                                        |
@@ -394,7 +399,7 @@ You can also find Netdata on:
 
 ## License
 
-Netdata is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE).
+Netdata is [GPLv3+](/LICENSE).
 
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](/REDISTRIBUTED.md).
 
