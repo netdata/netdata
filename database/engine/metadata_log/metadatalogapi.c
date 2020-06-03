@@ -355,7 +355,9 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
 
     if (empty_chart) {
         rrdhost_wrlock(host);
+        rrdset_rdlock(st);
         rrdset_delete_custom(st, 1);
+        rrdset_unlock(st);
         rrdset_free(st);
         rrdhost_unlock(host);
     }
