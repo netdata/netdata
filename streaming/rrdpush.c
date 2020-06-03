@@ -203,6 +203,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         }
     }
 
+    if (host->sender->version > VERSION_GUID && st->chart_uuid) {
+        char uuid_str[37];
+        uuid_unparse_lower(*st->chart_uuid, uuid_str);
+        buffer_sprintf(host->sender->build,"GUID %s\n", uuid_str);
+    }
     // send the chart
     buffer_sprintf(
             host->sender->build
@@ -227,6 +232,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // send the dimensions
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
+        if (host->sender->version > VERSION_GUID && rd->state->metric_uuid) {
+            char uuid_str[37];
+            uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
+            buffer_sprintf(host->sender->build,"GUID %s\n", uuid_str);
+        }
         buffer_sprintf(
                 host->sender->build
                 , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
