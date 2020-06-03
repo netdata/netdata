@@ -21,7 +21,6 @@ static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 
 static ebpf_functions_t socket_functions;
 
-static ebpf_bandwidth_t **socket_bandwidth_stats = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 
@@ -371,8 +370,6 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    freez(socket_bandwidth_stats);
-
     if (socket_functions.libnetdata) {
         dlclose(socket_functions.libnetdata);
     }
@@ -400,7 +397,6 @@ static void ebpf_socket_allocate_global_vectors(size_t length) {
     socket_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    socket_bandwidth_stats = callocz((size_t)pid_max, sizeof(ebpf_bandwidth_t *));
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
 }
