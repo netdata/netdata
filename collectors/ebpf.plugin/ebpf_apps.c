@@ -950,6 +950,40 @@ static void cleanup_exited_pids(ebpf_process_stat_t **out) {
 }
 
 /**
+ * Read proc filesystem for the first time.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int read_proc_filesystem()
+{
+    char dirname[FILENAME_MAX + 1];
+
+    snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
+    DIR *dir = opendir(dirname);
+    if(!dir) return -1;
+
+    struct dirent *de = NULL;
+
+    while((de = readdir(dir))) {
+        char *endptr = de->d_name;
+
+        if(unlikely(de->d_type != DT_DIR || de->d_name[0] < '0' || de->d_name[0] > '9'))
+            continue;
+
+        pid_t pid = (pid_t) strtoul(de->d_name, &endptr, 10);
+
+        // make sure we read a valid number
+        if(unlikely(endptr == de->d_name || *endptr != '\0'))
+            continue;
+
+        collect_data_for_pid(pid, NULL);
+    }
+    closedir(dir);
+
+    return 0;
+}
+
+/**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
@@ -975,6 +1009,11 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
 {
     uint32_t key = 0, next_key;
     int counter = 0;
+
+    if (read_proc_filesystem()) {
+        error("Cannot read proc file system.");
+        return 0;
+    }
 
     while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
         ebpf_process_stat_t *w = out[next_key];
