@@ -17,17 +17,9 @@ operates like a health watchdog for your services and applications.
 You can even run statistical algorithms against the metrics you've collected to power complex lookups. Your imagination,
 and the needs of your infrastructure, are your only limits.
 
-**Take the next steps with health monitoring:**
+[Quickstart](/health/QUICKSTART.md)
 
-<DocsSteps>
-
-[<FiPlay /> Quickstart](/health/QUICKSTART.md)
-
-[<FiCode /> Configuration reference](/health/REFERENCE.md)
-
-[<FiBook /> Guides](#guides)
-
-</DocsSteps>
+[Configuration reference](/health/REFERENCE.md)
 
 ## Guides
 
@@ -35,11 +27,9 @@ Every infrastructure is different, so we're not interested in mandating how you 
 monitoring features. Instead, these guides should give you the details you need to tweak alarms to your heart's
 content.
 
-### Health entities
+[Stopping notifications for individual alarms](/docs/guides/montior/stop-notifications-alarms.md)
 
-[Stopping notifications for individual alarms](/health/tutorials/stop-notifications-alarms.md)
-
-[Use dimension templates to create dynamic alarms](/health/tutorials/dimension-templates.md)
+[Use dimension templates to create dynamic alarms](/docs/guides/montior/dimension-templates.md)
 
 ## Related features
 
