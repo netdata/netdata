@@ -9,9 +9,8 @@ version="$(cat "$(dirname "${0}")/../openssl.version")"
 export LDFLAGS='-static'
 export PKG_CONFIG="pkg-config --static"
 
-run git clone git://git.openssl.org/openssl.git "${NETDATA_MAKESELF_PATH}/tmp/openssl"
+run git clone --branch "${version}" --single-branch git://git.openssl.org/openssl.git "${NETDATA_MAKESELF_PATH}/tmp/openssl"
 cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
-run git checkout "${version}"
 
 run ./config no-shared no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
 run make -j "$(nproc)"
