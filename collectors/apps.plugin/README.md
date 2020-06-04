@@ -65,7 +65,7 @@ Each of these sections provides the same number of charts:
 -   Network
     -   Sockets Open
     
-In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, your dashboard will also show s
+In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, your dashboard will also shows
 an additional [list](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) of charts using low-level Linux metrics.    
     
 The above are reported:
