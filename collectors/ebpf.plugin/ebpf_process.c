@@ -253,7 +253,7 @@ static void ebpf_process_update_apps_data()
         ebpf_process_publish_apps_t *pad = prev_apps_data[current_pid];
         int lstatus;
         if (!cad) {
-            cad = callocz(2, sizeof(netdata_syscall_stat_t));
+            cad = callocz(2, sizeof(ebpf_process_publish_apps_t));
             current_apps_data[current_pid] = &cad[0];
             prev_apps_data[current_pid] = &cad[1];
             lstatus = 1;
@@ -693,7 +693,7 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
 
     local_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
     current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
-    prev_apps_data = callocz(length, sizeof(ebpf_process_publish_apps_t *));
+    prev_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
 }
 
 static void change_collector_event() {

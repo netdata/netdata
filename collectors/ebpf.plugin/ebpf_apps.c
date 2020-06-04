@@ -685,7 +685,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
             netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET",
             p->stat_collected_usec - p->last_stat_collected_usec);
 
-    return 0;
+    return 1;
 }
 
 /**
