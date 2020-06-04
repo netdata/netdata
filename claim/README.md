@@ -189,6 +189,20 @@ might be having with the ACLK or claiming process.
 
 Use these keys and the information below to troubleshoot the ACLK.
 
+#### Claiming on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
+
+If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
+6, your Agent may not be able to securely connect to Netdata Cloud due to an outdated version of OpenSSL. These old
+versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
+helps securely encrypt SSL connections.
+
+We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
+up-to-date version of OpenSSL with hostname validation enabled.
+
+If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
+with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
+man-in-the-middle attacks.
+
 #### cloud-enabled is false
 
 If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cloud` option.

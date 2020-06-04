@@ -165,3 +165,42 @@ the community helps fix any bugs that might have been introduced in previous rel
 -   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
     installation
 -   Retain more control over the Netdata version you use
+
+## Installation notes and known issues
+
+We are tracking a few issues related to installation and packaging.
+
+### Older distributions (Ubuntu 14.04, Debian 8, CentOS 6) and OpenSSL
+
+If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
+6, your Agent may not be able to securely connect to Netdata Cloud due to an outdated version of OpenSSL. These old
+versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
+helps securely encrypt SSL connections.
+
+We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
+up-to-date version of OpenSSL with hostname validation enabled.
+
+If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
+with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
+man-in-the-middle attacks.
+
+### CentOS 6 and CentOS 8
+
+To install the Agent on certain CentOS and RHEL systems, you must enable non-default repositories, such as EPEL or
+PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos-rehel-6-x) and
+[CentOS 8](/packaging/installer/methods/manual.md#centos-rehel-8-x) sections for more information.
+
+### Multiple versions of OpenSSL
+
+We've received reports from the community about issues with running the `kickstart.sh` script on systems that have both
+a distribution-installed version of OpenSSL and a manually-installed local version. The Agent's installer cannot handle
+both.
+
+We recommend you install Netdata with the [static binary](/packaging/installer/methods/kickstart-64.md) to avoid the
+issue altogether. Or, you can manually remove one version of OpenSSL to remove the conflict.
+
+### Clang compiler on Linux
+
+Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
+section on `nonrepresentable section on output`
+errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
