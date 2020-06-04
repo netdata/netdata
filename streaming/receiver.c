@@ -156,10 +156,27 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     char *time_txt = words[2];
     char *value_txt = words[3];
 
+    if (user->st == NULL) {
+        error("Received RRDDIM out of sequence");
+        goto disable;
+    }
+
     if (!id || !time_txt || !value_txt)
         goto disable;
 
-    info("Replicating %s / %s : %s = %s", user->st->id, words[1], words[2], words[3]);
+    // Remote clock or local clock with slew estimate?
+    usec_t timestamp = str2ull(time_txt);
+    storage_number value = str2ull(value_txt);
+
+    RRDDIM *rd = rrddim_find(user->st, id);
+    time_t st_last = rrdset_last_entry_t(user->st);
+    if (rd == NULL) {
+        error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
+        return PARSER_RC_OK;
+    }
+
+    info("Replicating %s / %s : %llu = " STORAGE_NUMBER_FORMAT " chart last %ld", user->st->id, words[1], timestamp, value, st_last);
+    rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
 
     return PARSER_RC_OK;
 disable:

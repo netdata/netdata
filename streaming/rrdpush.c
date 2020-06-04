@@ -310,7 +310,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t end_t)
             rd->state->query_ops.init(rd, &handle, sample_t, end_t);
             while (sample_t <= end_t) {
                 storage_number n = rd->state->query_ops.next_metric(&handle, &ignore);
-                buffer_sprintf(s->build, "REPDIM %s %ld " STORAGE_NUMBER_FORMAT "\n", rd->name, sample_t, n);
+                buffer_sprintf(s->build, "REPDIM \"%s\" %ld " STORAGE_NUMBER_FORMAT "\n", rd->name, sample_t, n);
                 // Technically rd->update_every could differ from st->update_every, but it does not.
                 sample_t += rd->update_every;
             }
