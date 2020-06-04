@@ -126,6 +126,8 @@ static void ebpf_process_update_apps_publish(ebpf_process_publish_apps_t *curr,
     curr->publish_close_error  = curr->ecall_close_fd - prev->ecall_close_fd;
     curr->publish_write_error  = curr->ecall_write - prev->ecall_write;
     curr->publish_read_error   = curr->ecall_read - prev->ecall_read;
+
+    error("KILLME PUAP Open = %lu ; Write = %lu ; Read = %lu", curr->publish_open, curr->publish_write_call, curr->publish_read_call);
 }
 
 /**
@@ -418,7 +420,7 @@ static void ebpf_process_update_apps_data()
 {
     int i;
     for ( i = 0 ; i < pids_running ; i++) {
-        pid_t current_pid = pid_index[i];
+        uint32_t current_pid = pid_index[i];
         ebpf_process_stat_t *ps = local_process_stats[current_pid];
         if (!ps)
             continue;
@@ -429,10 +431,11 @@ static void ebpf_process_update_apps_data()
         if (!cad) {
             cad = callocz(2, sizeof(ebpf_process_publish_apps_t));
             current_apps_data[current_pid] = &cad[0];
-            prev_apps_data[current_pid] = &cad[1];
+            pad = &cad[1];
+            prev_apps_data[current_pid] = pad;
             lstatus = 1;
         } else {
-            memcpy(pad, cad, sizeof(netdata_syscall_stat_t));
+            memcpy(pad, cad, sizeof(ebpf_process_publish_apps_t));
             lstatus = 0;
         }
 
@@ -460,6 +463,7 @@ static void ebpf_process_update_apps_data()
         cad->bytes_read = (uint64_t)ps->read_bytes +
                                            (uint64_t)ps->readv_bytes;
 
+        error("KILLME PUAD (%u): status = %d  Open = %lu, %lu ; Write = %lu, %lu ; Read = %lu, %lu", current_pid, lstatus, pad->call_sys_open, cad->call_sys_open, pad->call_write, cad->call_write, pad->call_read, cad->call_read);
         ebpf_process_update_apps_publish(cad, pad, lstatus);
     }
 }

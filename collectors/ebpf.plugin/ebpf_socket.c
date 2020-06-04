@@ -361,7 +361,8 @@ static void ebpf_socket_update_apps_data()
         if (!curr) {
             curr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
             socket_bandwidth_curr[current_pid] = &curr[0];
-            socket_bandwidth_prev[current_pid] = &curr[1];
+            prev = &curr[1];
+            socket_bandwidth_prev[current_pid] = prev;
             status = 1;
         } else {
             memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));

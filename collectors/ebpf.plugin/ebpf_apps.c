@@ -572,6 +572,8 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
             if(w->target) p->target = w->target;
             else p->target = w;
 
+            error("KILLME ASSIGN %u : %s", (unsigned int)p->pid, w->name);
+
             if(debug_enabled || (p->target && p->target->debug_enabled))
                 debug_log_int("%s linked to target %s", p->comm, p->target->name);
 
@@ -1110,6 +1112,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
 
         if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, w)) {
             index[counter] = next_key;
+            error("KILLME (%u, %u): Open = %u ; Write = %u ; Read = %u", w->pid, next_key, w->open_call, w->write_call + w->writev_call, w->readv_call + w->read_call);
             counter++;
             collect_data_for_pid(next_key, NULL);
         }

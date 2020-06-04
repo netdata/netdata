@@ -193,7 +193,6 @@ extern int debug_enabled;
 //Common functions
 extern void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root);
 extern int socket_apps_enabled;
-extern int apps_dimension_filled;
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 
 #endif
