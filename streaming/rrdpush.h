@@ -52,9 +52,9 @@ struct sender_state {
     size_t send_attempts;
     time_t last_sent_t;
     size_t not_connected_loops;
-    // metrics may be collected asynchronously
-    // these synchronize all the threads willing the write to our sending buffer
-    netdata_mutex_t mutex;    // Guard access to buffer / build
+    // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
+    // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
+    netdata_mutex_t mutex;
     struct circular_buffer *buffer;
     BUFFER *build;
     char read_buffer[512];

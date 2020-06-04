@@ -410,7 +410,7 @@ void log_stream_connection(const char *client_ip, const char *client_port, const
 
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
-    rrdhost_wrlock(host);
+    netdata_mutex_lock(&host->sender->mutex);
 
     if(!host->rrdpush_sender_spawn) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
@@ -421,8 +421,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         else
             host->rrdpush_sender_spawn = 1;
     }
-
-    rrdhost_unlock(host);
+    netdata_mutex_unlock(&host->sender->mutex);
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {
