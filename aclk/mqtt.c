@@ -42,13 +42,16 @@ void publish_callback(struct mosquitto *mosq, void *obj, int rc)
     diff /= 1000;
 
     info("Publish_callback: mid=%d latency=%" PRId64 "ms", rc, diff);
-    ACLK_STATS_LOCK;
-    if (aclk_metrics_per_sample.latency_max < diff)
-        aclk_metrics_per_sample.latency_max = diff;
 
-    aclk_metrics_per_sample.latency_total += diff;
-    aclk_metrics_per_sample.latency_count++;
-    ACLK_STATS_UNLOCK;
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        if (aclk_metrics_per_sample.latency_max < diff)
+            aclk_metrics_per_sample.latency_max = diff;
+
+        aclk_metrics_per_sample.latency_total += diff;
+        aclk_metrics_per_sample.latency_count++;
+        ACLK_STATS_UNLOCK;
+    }
 #endif
     return;
 }

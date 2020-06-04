@@ -13,6 +13,8 @@ netdata_mutex_t aclk_stats_mutex;
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
 #define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
 
+int aclk_stats_enabled;
+
 // preserve between samples
 struct aclk_metrics {
     volatile uint8_t online;

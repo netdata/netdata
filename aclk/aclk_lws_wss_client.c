@@ -439,9 +439,11 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 int n = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
                 if (n>=0) {
                     data->written += n;
-                    ACLK_STATS_LOCK;
-                    aclk_metrics_per_sample.write_q_consumed += n;
-                    ACLK_STATS_UNLOCK;
+                    if (aclk_stats_enabled) {
+                        ACLK_STATS_LOCK;
+                        aclk_metrics_per_sample.write_q_consumed += n;
+                        ACLK_STATS_UNLOCK;
+                    }
                 }
                 //error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
                 if (data->written == data->data_size)
@@ -460,9 +462,11 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             if (!received_data_to_ringbuff(engine_instance->read_ringbuffer, in, len))
                 retval = 1;
             aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);
-            ACLK_STATS_LOCK;
-            aclk_metrics_per_sample.read_q_added += len;
-            ACLK_STATS_UNLOCK;
+            if (aclk_stats_enabled) {
+                ACLK_STATS_LOCK;
+                aclk_metrics_per_sample.read_q_added += len;
+                ACLK_STATS_UNLOCK;
+            }
 
             // to future myself -> do not call this while read lock is active as it will eventually
             // want to acquire same lock later in aclk_lws_wss_client_read() function
@@ -532,9 +536,11 @@ int aclk_lws_wss_client_write(void *buf, size_t count)
         lws_wss_packet_buffer_append(&engine_instance->write_buffer_head, lws_wss_packet_buffer_new(buf, count));
         aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
 
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.write_q_added += count;
-        ACLK_STATS_UNLOCK;
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.write_q_added += count;
+            ACLK_STATS_UNLOCK;
+        }
 
         lws_callback_on_writable(engine_instance->lws_wsi);
         return count;
@@ -561,9 +567,11 @@ int aclk_lws_wss_client_read(void *buf, size_t count)
     if (data_to_be_read == readable_byte_count)
         engine_instance->data_to_read = 0;
 
-    ACLK_STATS_LOCK;
-    aclk_metrics_per_sample.read_q_consumed += data_to_be_read;
-    ACLK_STATS_UNLOCK;
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.read_q_consumed += data_to_be_read;
+        ACLK_STATS_UNLOCK;
+    }
 
 abort:
     aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);

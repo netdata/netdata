@@ -325,9 +325,11 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         aclk_queue.count--;
     }
 
-    ACLK_STATS_LOCK;
-    aclk_metrics_per_sample.queries_queued++;
-    ACLK_STATS_UNLOCK;
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.queries_queued++;
+        ACLK_STATS_UNLOCK;
+    }
 
     new_query = callocz(1, sizeof(struct aclk_query));
     new_query->cmd = aclk_cmd;
@@ -899,9 +901,11 @@ int aclk_process_query()
 
     aclk_query_free(this_query);
 
-    ACLK_STATS_LOCK;
-    aclk_metrics_per_sample.queries_dispatched++;
-    ACLK_STATS_UNLOCK;
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.queries_dispatched++;
+        ACLK_STATS_UNLOCK;
+    }
 
     return 1;
 }
@@ -1393,7 +1397,8 @@ void *aclk_main(void *ptr)
         }
     }
 
-    if (true) { //TODO:underhood;pr-block:make configurable
+    aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", 1);
+    if (aclk_stats_enabled) {
         stats_thread = callocz(1, sizeof(struct netdata_static_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));
         netdata_thread_create(
@@ -1521,9 +1526,12 @@ exited:
 
     aclk_main_cleanup(ptr);
 
-    netdata_thread_join(*stats_thread->thread, NULL);
-    freez(stats_thread->thread);
-    freez(stats_thread);
+    if(aclk_stats_enabled) {
+        netdata_thread_join(*stats_thread->thread, NULL);
+        freez(stats_thread->thread);
+        freez(stats_thread);
+    }
+
     return NULL;
 }
 
@@ -1929,9 +1937,11 @@ int aclk_handle_cloud_request(char *payload)
         .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
     };
 
-    ACLK_STATS_LOCK;
-    aclk_metrics_per_sample.cloud_req_recvd++;
-    ACLK_STATS_UNLOCK;
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.cloud_req_recvd++;
+        ACLK_STATS_UNLOCK;
+    }
 
     if (unlikely(agent_state == AGENT_INITIALIZING)) {
         debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
@@ -1969,9 +1979,12 @@ int aclk_handle_cloud_request(char *payload)
         if (cloud_to_agent.callback_topic)
             freez(cloud_to_agent.callback_topic);
 
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.cloud_req_err++;
-        ACLK_STATS_UNLOCK;
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.cloud_req_err++;
+            ACLK_STATS_UNLOCK;
+        }
+
         return 1;
     }
 

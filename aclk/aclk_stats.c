@@ -2,6 +2,8 @@
 
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
+int aclk_stats_enabled;
+
 struct aclk_metrics aclk_metrics = {
     .online = 0,
 };
@@ -179,6 +181,9 @@ void *aclk_stats_main_thread(void *ptr)
 }
 
 void aclk_stats_upd_online(int online) {
+    if(!aclk_stats_enabled)
+        return;
+
     ACLK_STATS_LOCK;
     aclk_metrics.online = online;
 
