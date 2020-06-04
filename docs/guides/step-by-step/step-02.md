@@ -1,9 +1,7 @@
 <!--
----
 title: "Step 2. Get to know Netdata's dashboard"
 date: 2020-05-04
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-02.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-02.md
 -->
 
 # Step 2. Get to know Netdata's dashboard
@@ -39,7 +37,7 @@ of your Agent. If you're unsure, try `http://localhost:19999` first. Hit **Enter
 ![Animated GIF of navigating to the
 dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
 
-> From here on out in this tutorial, we'll refer to the address you use to view your dashboard as `NODE`. Be sure to
+> From here on out in this guide, we'll refer to the address you use to view your dashboard as `NODE`. Be sure to
 > replace it with either `localhost`, the IP address, or the hostname of your system.
 
 ## Explore available charts using menus
@@ -189,13 +187,13 @@ often Netdata should be calculating these metrics to see if the alarm should rem
 The `execute` field tells Netdata how to notify you about this alarm, and the `source` field lets you know where you can
 find the configuration file, if you'd like to edit its configuration.
 
-We'll cover alarm configuration in more detail later in the tutorial, so don't worry about it too much for now! Right
+We'll cover alarm configuration in more detail later in the guide, so don't worry about it too much for now! Right
 now, it's most important that you understand how to see alarms, and parse their details, if and when they appear on your
 system.
 
 ## What's next?
 
-In this step of the Netdata tutorial, you learned how to:
+In this step of the Netdata guide, you learned how to:
 
 -   Visit the dashboard
 -   Explore available charts (using the right-side menu)
@@ -206,3 +204,5 @@ In this step of the Netdata tutorial, you learned how to:
 Next, you'll learn how to monitor multiple nodes through the dashboard.
 
 [Next: Monitor more than one system with Netdata →](step-03.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-02&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

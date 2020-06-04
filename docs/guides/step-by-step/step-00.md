@@ -1,32 +1,30 @@
 <!--
----
-title: "The step-by-step Netdata tutorial"
+title: "The step-by-step Netdata guide"
 date: 2020-03-31
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-00.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-00.md
 -->
 
-# The step-by-step Netdata tutorial
+# The step-by-step Netdata guide
 
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.
 
 Because Netdata is entirely open-source software, you can use it free of charge, whether you want to monitor one or ten
 thousand systems! All our code is hosted on [GitHub](https://github.com/netdata/netdata).
 
-This tutorial is designed to help you understand what Netdata is, what it's capable of, and how it'll help you make
+This guide is designed to help you understand what Netdata is, what it's capable of, and how it'll help you make
 faster and more informed decisions about the health and performance of your systems and applications. If you're
 completely new to Netdata, or have never tried health monitoring/performance troubleshooting systems before, this
-tutorial is perfect for you.
+guide is perfect for you.
 
 If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can jump
 straight into code and configurations with our [getting started guide](/docs/getting-started.md).
 
-> This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
+> This guide contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
 > other supported operating systems, like FreeBSD and macOS, but we can't make any guarantees.
 
 ## Where to go if you need help
 
-No matter where you are in this Netdata tutorial, if you need help, head over to our [GitHub
+No matter where you are in this Netdata guide, if you need help, head over to our [GitHub
 repository](https://github.com/netdata/netdata/). That's where we collect questions from users, help fix their bugs, and
 point people toward documentation that explains what they're having trouble with.
 
@@ -34,7 +32,7 @@ Click on the **issues** tab to see all the conversations we're having with Netda
 previously-written advice for your specific problem, and if you don't see any results, hit the **New issue** button to
 send us a question.
 
-Or, if that's too complicated, feel free to send this tutorial's author [an email](mailto:joel@netdata.cloud).
+Or, if that's too complicated, feel free to send this guide's author [an email](mailto:joel@netdata.cloud).
 
 ## Before we get started
 
@@ -113,3 +111,5 @@ MongoDB, TimescaleDB, and others.
 [Step 10. Set up a proxy](step-10.md)
 
 Run Netdata behind an Nginx proxy to improve performance, and enable TLS/HTTPS for better security.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-00&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

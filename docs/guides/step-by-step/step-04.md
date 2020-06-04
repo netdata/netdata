@@ -1,14 +1,12 @@
 <!--
----
 title: "Step 4. The basics of configuring Netdata"
 date: 2020-03-31
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-04.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-04.md
 -->
 
 # Step 4. The basics of configuring Netdata
 
-Welcome to the fourth step of the Netdata tutorial.
+Welcome to the fourth step of the Netdata guide.
 
 Since the beginning, we've covered the building blocks of Netdata, dashboard basics, and how you can monitor many
 individual systems using many distributed Netdata agents.
@@ -47,7 +45,7 @@ In the system represented by the screenshot, the line reads: `config directory =
 > For more details on where your Netdata config directory is, take a look at our [installation
 > instructions](/packaging/installer/README.md).
 
-For the rest of this tutorial, we'll assume you're editing files or running scripts from _within_ your **Netdata
+For the rest of this guide, we'll assume you're editing files or running scripts from _within_ your **Netdata
 configuration directory**.
 
 ## Use edit-config to open `netdata.conf`
@@ -98,7 +96,7 @@ section and give it the value of `1`.
 ```
 
 Restart Netdata with `service restart netdata` or the [appropriate
-alternative](../getting-started.md#start-stop-and-restart-netdata) for your system.
+alternative](/docs/getting-started.md#start-stop-and-restart-netdata) for your system.
 
 Now, open up your browser and navigate to `http://HOST:19999/netdata.conf`. You'll see that Netdata has recognized
 that our fake option isn't valid and added a notice that Netdata will ignore it.
@@ -126,8 +124,8 @@ Once you're done, restart Netdata and refresh the dashboard. Say hello to your r
 netdata.conf](https://user-images.githubusercontent.com/1153921/80994808-1c065300-8df2-11ea-81af-d28dc3ba27c8.gif)
 
 Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon
-configuration](/daemon/config/README.md), or hop into our popular tutorial on [increasing long-term metrics
-storage](/docs/tutorials/longer-metrics-storage.md).
+configuration](/daemon/config/README.md), or hop into our popular guide on [increasing long-term metrics
+storage](/docs/guides/longer-metrics-storage.md).
 
 ## What's next?
 
@@ -135,10 +133,12 @@ At this point, you should be comfortable with getting to your Netdata directory,
 seeing your changes reflected in the dashboard.
 
 Netdata has many more configuration files that you might want to change, but we'll cover those in the following steps of
-this tutorial.
+this guide.
 
 In the next step, we're going to cover one of Netdata's core functions: monitoring the health of your systems via alarms
 and notifications. You'll learn how to disable alarms, create new ones, and push notifications to the system of your
 choosing.
 
 [Next: Health monitoring alarms and notifications &rarr;](step-05.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-04&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

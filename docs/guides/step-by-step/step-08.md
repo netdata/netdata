@@ -1,13 +1,11 @@
 <!--
----
 title: "Step 8. Build your first custom dashboard"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-08.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-08.md
 -->
 
 # Step 8. Build your first custom dashboard
 
-In previous steps of the tutorial, you have learned how several sections of the Netdata dashboard worked. 
+In previous steps of the guide, you have learned how several sections of the Netdata dashboard worked. 
 
 This step will show you how to set up a custom dashboard to fit your unique needs. If nothing else, Netdata is really,
 really flexible. 🤸
@@ -147,8 +145,8 @@ charts on a single page.
 ### The chart unique ID (required)
 
 You need to specify the unique ID of a chart to show it on your custom dashboard. If you forgot how to find the unique
-ID, head back over to [step 2](/docs/step-by-step/step-02.md#understand-charts-dimensions-families-and-contexts) for a
-re-introduction.
+ID, head back over to [step 2](/docs/guides/step-by-step/step-02.md#understand-charts-dimensions-families-and-contexts)
+for a re-introduction.
 
 You can then put this unique ID into a `<div>` element with the `data-netdata` attribute. Put this in the `<body>` of
 your custom dashboard file beneath the helpful comment.
@@ -392,4 +390,6 @@ from multiple Netdata agents, and choose which dimensions a given chart shows.
 
 Next, you'll learn how to store long-term historical metrics in Netdata!
 
-[Next: Long-term metrics storage &rarr;](/docs/step-by-step/step-09.md)
+[Next: Long-term metrics storage &rarr;](/docs/guides/step-by-step/step-09.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-08&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

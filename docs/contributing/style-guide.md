@@ -330,7 +330,7 @@ of the Agent repository (`/`). Links should also always end with the filename of
 Avoid relative links or traversing up directories using `../`.
 
 For example, if you want to link to our installation guide, you should link to `/packaging/installer/README.md`. To
-reference the guide for increasing metrics storage, use `/docs/tutorials/longer-metrics-storage.md`.
+reference the guide for increasing metrics storage, use `/docs/guides/longer-metrics-storage.md`.
 
 ### References to UI elements
 

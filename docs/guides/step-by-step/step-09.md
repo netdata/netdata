@@ -1,8 +1,6 @@
 <!--
----
 title: "Step 9. Long-term metrics storage"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-09.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-09.md
 -->
 
 # Step 9. Long-term metrics storage
@@ -33,7 +31,7 @@ Let's get started!
 ## Tweak the database engine's settings
 
 If you're using Netdata v1.18.0 or higher, and you haven't changed your `memory mode` settings before following this
-tutorial, your Netdata agent is already using the database engine.
+guide, your Netdata agent is already using the database engine.
 
 Let's look at your `netdata.conf` file again. Under the `[global]` section, you'll find three connected options.
 
@@ -78,8 +76,8 @@ You can archive all the metrics collected by Netdata to **external databases**. 
 include Graphite, OpenTSDB, Prometheus, AWS Kinesis Data Streams, Google Cloud Pub/Sub, MongoDB, and the list is always
 growing.
 
-As we said in [step 1](/docs/step-by-step/step-01.md), we have only complimentary systems, not competitors! We're happy
-to support these archiving methods and are always working to improve them.
+As we said in [step 1](/docs/guides/step-by-step/step-01.md), we have only complimentary systems, not competitors! We're
+happy to support these archiving methods and are always working to improve them.
 
 A lot of Netdata users archive their metrics to one of these databases for long-term storage or further analysis. Since
 Netdata collects so many metrics every second, they can quickly overload small devices or even big servers that are
@@ -157,7 +155,9 @@ documentation](/exporting/README.md).
 You're getting close to the end! In this step, you learned how to make the most of the database engine, or archive
 metrics to MongoDB for long-term storage.
 
-In the last step of this step-by-step tutorial, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
+In the last step of this step-by-step guide, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
 our Netdata dashboard.
 
-[Next: Set up a proxy &rarr;](step-10.md)
+[Next: Set up a proxy &rarr;](/docs/guides/step-by-step/step-10.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-09&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

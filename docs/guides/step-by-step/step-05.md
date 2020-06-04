@@ -1,13 +1,11 @@
 <!--
----
 title: "Step 5. Health monitoring alarms and notifications"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-05.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-05.md
 -->
 
 # Step 5. Health monitoring alarms and notifications
 
-In the fifth step of the Netdata tutorial, we're introducing you to one of our core features: **health monitoring**.
+In the fifth step of the Netdata guide, we're introducing you to one of our core features: **health monitoring**.
 
 To accurately monitor the health of your systems and applications, you need to know _immediately_ when there's something
 strange going on. Netdata's alarm and notification systems are essential to keeping you informed. 
@@ -345,3 +343,5 @@ Next up, we're going to cover how Netdata collects its metrics, and how you can 
 from hundreds of services with almost no configuration on your part. Onward!
 
 [Next: Collect metrics from more services and apps &rarr;](step-06.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-05&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

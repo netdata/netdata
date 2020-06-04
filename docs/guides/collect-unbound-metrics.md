@@ -1,9 +1,7 @@
 <!--
----
 title: "Monitor Unbound DNS servers with Netdata"
 date: 2020-03-31
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/collect-unbound-metrics.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/collect-unbound-metrics.md
 -->
 
 # Monitor Unbound DNS servers with Netdata
@@ -16,7 +14,7 @@ Unbound runs on FreeBSD, OpenBSD, NetBSD, macOS, Linux, and Windows, and support
 queries and answers are all encrypted with TLS. In theory, that should reduce the risk of eavesdropping or
 man-in-the-middle attacks when communicating to DNS servers.
 
-This tutorial will show you how to collect dozens of essential metrics from your Unbound servers with minimal
+This guide will show you how to collect dozens of essential metrics from your Unbound servers with minimal
 configuration.
 
 ## Set up your Unbound installation
@@ -137,4 +135,4 @@ for improvement or refinement based on real-world use cases. Feel free to [file 
 issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) with your
 thoughts.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Ftutorials%2Funbound-metrics&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Funbound-metrics&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

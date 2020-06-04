@@ -1,8 +1,6 @@
 <!--
----
 title: "Step 1. Netdata's building blocks"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-01.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-01.md
 -->
 
 # Step 1. Netdata's building blocks
@@ -40,7 +38,7 @@ Let's get started!
 ## Netdata's core features
 
 Netdata has only been around for a few years, but it's a complex piece of software. Here are just some of the features
-we'll cover throughout this tutorial.
+we'll cover throughout this guide.
 
 -   A sophisticated **dashboard**, which we'll cover in [step 2](step-02.md). The real-time, highly-granular dashboard,
     with hundreds of charts, is your main source of information about the health and performance of your systems/
@@ -154,3 +152,5 @@ We think it's imperative you understand why we built Netdata the way we did. But
 get right into that dashboard you've heard so much about.
 
 [Next: Get to know Netdata's dashboard &rarr;](step-02.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-01&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

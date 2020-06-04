@@ -1,8 +1,6 @@
 <!--
----
 title: "Monitor CockroachDB metrics with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/tutorials/monitor-cockroachdb.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor-cockroachdb.md
 -->
 
 # Monitor CockroachDB metrics with Netdata
@@ -134,3 +132,5 @@ Also, be sure to check out these useful resources:
     docs](https://www.cockroachlabs.com/docs/stable/monitoring-and-alerting.html#prometheus-endpoint)
 -   [Monitor CockroachDB with
     Prometheus](https://www.cockroachlabs.com/docs/stable/monitor-cockroachdb-with-prometheus.html)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor-cockroachdb&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

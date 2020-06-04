@@ -1,8 +1,6 @@
 <!--
----
 title: "Step 6. Collect metrics from more services and apps"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-06.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/docs/step-by-step/step-06.md
 -->
 
 # Step 6. Collect metrics from more services and apps
@@ -39,7 +37,7 @@ are organized and manged by plugins. **Internal** plugins collect system metrics
 non-system metrics, and **orchestrator** plugins group individal collectors together based on the programming language
 they were built in.
 
-These modules are primarily written in [Go](/collectors/go.d.plugin/README.md) (`go.d`) and
+These modules are primarily written in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/) (`go.d`) and
 [Python](/collectors/python.d.plugin/README.md), although some use [Bash](/collectors/charts.d.plugin/README.md)
 (`charts.d`) or [Node.js](/collectors/node.d.plugin/README.md) (`node.d`).
 
@@ -120,3 +118,5 @@ Now that you've learned the fundamentals behind configuring data sources for aut
 the dashboard to learn more about some of its more advanced features.
 
 [Next: Netdata's dashboard in depth &rarr;](step-07.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-06&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -1,7 +1,7 @@
 <!--
 ---
 title: "Use dimension templates to create dynamic alarms"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/tutorials/dimension-templates.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/health/dimension-templates.md
 ---
 -->
 
@@ -11,22 +11,22 @@ Your ability to monitor the health of your systems and applications relies on yo
 the best set of alarms for your particular needs.
 
 In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of writing [alarm
-entities](../REFERENCE.md#health-entity-reference) for charts with many dimensions.
+entities](/health/REFERENCE.md#health-entity-reference) for charts with many dimensions.
 
 Dimension templates can condense many individual entities into one—no more copy-pasting one entity and changing the
 `alarm`/`template` and `lookup` lines for each dimension you'd like to monitor.
 
 They are, however, an advanced health monitoring feature. For more basic instructions on creating your first alarm,
-check out our [health monitoring documentation](../README.md), which also includes
-[examples](../REFERENCE.md#example-alarms).
+check out our [health monitoring documentation](/health/README.md), which also includes
+[examples](/health/REFERENCE.md#example-alarms).
 
 ## The fundamentals of `foreach`
 
 Our dimension templates update creates a new `foreach` parameter to the existing [`lookup`
-line](../REFERENCE.md#alarm-line-lookup). This is where the magic happens.
+line](/health/REFERENCE.md#alarm-line-lookup). This is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
-them with a comma (`,`) or a pipe (`|`). You can also use a [Netdata simple pattern](../../libnetdata/simple_pattern/README.md)
+them with a comma (`,`) or a pipe (`|`). You can also use a [Netdata simple pattern](/libnetdata/simple_pattern/README.md)
 to create many alarms with a regex-like syntax.
 
 The `foreach` parameter _has_ to be the last parameter in your `lookup` line, and if you have both `of` and `foreach` in
@@ -97,7 +97,7 @@ Let's look at some other examples of how `foreach` works so you can best apply i
 In the last example, we used `foreach system,user,nice` to create three distinct alarms using dimension templates. But
 what if you want to quickly create alarms for _all_ the dimensions of a given chart? 
 
-Use a [simple pattern](../../libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
+Use a [simple pattern](/libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
 (`*`).
 
 Instead of monitoring system CPU usage, let's monitor per-application CPU usage using the `apps.cpu` chart. Passing a
@@ -116,11 +116,11 @@ This entity will now create alarms for every dimension in the `apps.cpu` chart. 
 10 or more dimensions, using the wildcard ensures you catch every CPU-hogging process.
 
 To learn more about how to use simple patterns with dimension templates, see our [simple patterns
-documentation](../../libnetdata/simple_pattern/README.md).
+documentation](/libnetdata/simple_pattern/README.md).
 
 ## Using `foreach` with alarm templates
 
-Dimension templates also work with [alarm templates](../REFERENCE.md#alarm-line-alarm-or-template). Alarm
+Dimension templates also work with [alarm templates](/health/REFERENCE.md#alarm-line-alarm-or-template). Alarm
 templates help you create alarms for all the charts with a given context—for example, all the cores of your system's
 CPU.
 
@@ -173,6 +173,6 @@ alarms that will help you better monitor the health of your systems.
 Or, at the very least, simplify your configuration files.
 
 For information about other advanced features in Netdata's health monitoring toolkit, check out our [health
-documentation](../../health/). And if you have some cool alarms you built using dimension templates, 
+documentation](/health/README.md). And if you have some cool alarms you built using dimension templates, 
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Ftutorials%2dimension-templates&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2dimension-templates&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

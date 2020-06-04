@@ -1,8 +1,6 @@
 <!--
----
 title: "Step 10. Set up a proxy"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-step/step-10.md
----
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-10.md
 -->
 
 # Step 10. Set up a proxy
@@ -10,15 +8,15 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/step-by-ste
 You're almost through! At this point, you should be pretty familiar with now Netdata works and how to configure it to
 your liking.
 
-In this step of the tutorial, we're going to add a proxy in front of Netdata. We're doing this for both improved
+In this step of the guide, we're going to add a proxy in front of Netdata. We're doing this for both improved
 performance and security, so we highly recommend following these steps. Doubly so if you installed Netdata on a
 publicly-accessible remote server.
 
 > ❗ If you installed Netdata on the machine you're currently using (e.g. on `localhost`), and have been accessing
-> Netdata at `http://localhost:19999`, you can skip this step of the tutorial. In most cases, there is no benefit to
+> Netdata at `http://localhost:19999`, you can skip this step of the guide. In most cases, there is no benefit to
 > setting up a proxy for a service running locally.
 
-> ❗❗ This tutorial requires more advanced administration skills than previous parts. If you're still working on your
+> ❗❗ This guide requires more advanced administration skills than previous parts. If you're still working on your
 > Linux administration skills, and would rather get back to Netdata, you might want to [skip this
 > step](step-99.md) for now and return to it later.
 
@@ -41,7 +39,7 @@ large enters your system through the proxy, which then routes it to the service.
 A proxy is often used to enable encrypted HTTPS connections with your browser, but they're also useful for load
 balancing, performance, and password-protection.
 
-We'll use [Nginx](https://nginx.org/en/) for this step of the tutorial, but you can also use
+We'll use [Nginx](https://nginx.org/en/) for this step of the guide, but you can also use
 [Caddy](https://caddyserver.com/) as a simple proxy if you prefer.
 
 ## Required before you start
@@ -54,7 +52,7 @@ You need three things to run a proxy using Nginx:
 
 ### Nginx and Certbot
 
-This step of the tutorial assumes you can install Nginx on your system. Here are the easiest methods to do so on Debian,
+This step of the guide assumes you can install Nginx on your system. Here are the easiest methods to do so on Debian,
 Ubuntu, Fedora, and CentOS systems.
 
 ```bash
@@ -223,8 +221,10 @@ If you want to configure your Nginx proxy further, check out the following:
 -   [High-performance Netdata](/docs/high-performance-netdata.md)
 -   [Enabling TLS on Netdata's dashboard](/web/server/README.md#enabling-tls-support)
 
-And... you're _almost_ done with the Netdata tutorial.
+And... you're _almost_ done with the Netdata guide.
 
 For some celebratory emoji and a clap on the back, head on over to our final step.
 
 [Next: The end. &rarr;](step-99.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fstep-by-step%2Fstep-10&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
