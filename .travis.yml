@@ -161,10 +161,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
 
       # Fedora runs
-    - name: Run netdata lifecycle, on Fedora 30
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh && break; done'
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
-
     - name: Run netdata lifecycle, on Fedora 31
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
@@ -331,14 +327,6 @@ jobs:
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Fedora 30"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="30" BUILD_STRING="fedora/30"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
