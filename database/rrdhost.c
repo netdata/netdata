@@ -413,8 +413,6 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
-        // TODO:update_every
-        // TODO: Metdata updated OK: hostname, registry_hostname, tags, os
         host->health_enabled = health_enabled;
         //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 
@@ -460,6 +458,11 @@ RRDHOST *rrdhost_find_or_create(
 
         // update host tags
         rrdhost_init_tags(host, tags);
+#ifdef ENABLE_DBENGINE
+        if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            metalog_commit_update_host(host);
+        }
+#endif
     }
 
     rrdhost_cleanup_orphan_hosts_nolock(host);
