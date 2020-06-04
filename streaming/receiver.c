@@ -154,6 +154,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         return 0;
     }
 
+    uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
     if (unlikely(!parser_add_keyword(parser, PLUGINSD_KEYWORD_GUID, pluginsd_guid)))
         error("Failed to register the GUID keyword");
     parser->plugins_action->begin_action     = &pluginsd_begin_action;

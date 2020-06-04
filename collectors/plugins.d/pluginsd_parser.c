@@ -51,13 +51,15 @@ PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, ch
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     uuid_t  *guid = &((PARSER_USER_OBJECT *)user)->guid;
 
+    int is_guid_null = uuid_is_null(*guid);
     st = rrdset_create_custom(
         host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type,
         host->rrd_memory_mode, host->rrd_history_entries, 0,
-        uuid_is_null(*guid) ? NULL : guid);
+        is_guid_null ? NULL : guid);
 
 #ifdef ENABLE_DBENGINE
-    uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
+    if (likely(!is_guid_null))
+        uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
 #endif
 
     if (options && *options) {
@@ -130,11 +132,14 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
     UNUSED(algorithm);
 
     uuid_t  *guid = &((PARSER_USER_OBJECT *)user)->guid;
+    int is_guid_null = uuid_is_null(*guid);
 
     RRDDIM *rd = rrddim_add_custom(
-        st, id, name, multiplier, divisor, algorithm_type, st->rrd_memory_mode, 0, uuid_is_null(*guid) ? NULL : guid);
+        st, id, name, multiplier, divisor, algorithm_type, st->rrd_memory_mode, 0,
+        is_guid_null ? NULL : guid);
 #ifdef ENABLE_DBENGINE
-    uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
+    if (likely(!is_guid_null))
+        uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
 #endif
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
@@ -696,6 +701,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         return 0;
     }
 
+    uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
     parser->plugins_action->begin_action     = &pluginsd_begin_action;
     parser->plugins_action->flush_action     = &pluginsd_flush_action;
     parser->plugins_action->end_action       = &pluginsd_end_action;
