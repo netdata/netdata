@@ -1089,6 +1089,13 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     uint32_t key = 0, next_key;
     int counter = 0;
 
+    if(all_pids_count) {
+        struct pid_stat *p = NULL;
+        for(p = root_of_pids; p ; p = p->next) {
+            p->updated = 0;
+        }
+    }
+
     if (read_proc_filesystem()) {
         error("Cannot read proc file system.");
         return 0;
