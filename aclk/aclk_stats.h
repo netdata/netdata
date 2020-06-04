@@ -8,20 +8,20 @@
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
-netdata_mutex_t aclk_stats_mutex;
+extern netdata_mutex_t aclk_stats_mutex;
 
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
 #define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
 
-int aclk_stats_enabled;
+extern int aclk_stats_enabled;
 
 // preserve between samples
 struct aclk_metrics {
     volatile uint8_t online;
-} aclk_metrics;
+};
 
 // reset to 0 on every sample
-struct aclk_metrics_per_sample {
+extern struct aclk_metrics_per_sample {
     /* in the unlikely event of ACLK disconnecting
        and reconnecting under 1 sampling rate
        we want to make sure we record the disconnection

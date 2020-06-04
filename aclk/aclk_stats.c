@@ -8,6 +8,8 @@ struct aclk_metrics aclk_metrics = {
     .online = 0,
 };
 
+struct aclk_metrics_per_sample aclk_metrics_per_sample;
+
 static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struct aclk_metrics *permanent)
 {
     static RRDSET *st_aclkstats = NULL;
