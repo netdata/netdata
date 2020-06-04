@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix frontmatter in circular\_buffer README [\#9262](https://github.com/netdata/netdata/pull/9262) ([joelhans](https://github.com/joelhans))
+- Fixes documentation ambiguity leading into issue \#8239 [\#9255](https://github.com/netdata/netdata/pull/9255) ([underhood](https://github.com/underhood))
 - Add new exporting "home base" document [\#9246](https://github.com/netdata/netdata/pull/9246) ([joelhans](https://github.com/joelhans))
+- Add a random offset to the update script when running non-interactively. [\#9245](https://github.com/netdata/netdata/pull/9245) ([Ferroin](https://github.com/Ferroin))
 - Add CI check for building against LibreSSL [\#9216](https://github.com/netdata/netdata/pull/9216) ([prologic](https://github.com/prologic))
+- Gap-detection and slew [\#9214](https://github.com/netdata/netdata/pull/9214) ([amoss](https://github.com/amoss))
 - Update eBPF to use kernel-collector version 0.4.0. [\#9212](https://github.com/netdata/netdata/pull/9212) ([Ferroin](https://github.com/Ferroin))
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
 - fix compilation for older systems [\#9198](https://github.com/netdata/netdata/pull/9198) ([ktsaou](https://github.com/ktsaou))
@@ -235,10 +239,6 @@
 - charts.d.plugin: add keepalive to global\_update [\#8529](https://github.com/netdata/netdata/pull/8529) ([ilyam8](https://github.com/ilyam8))
 - github/workflow: add ACLK to the labeler config [\#8521](https://github.com/netdata/netdata/pull/8521) ([ilyam8](https://github.com/ilyam8))
 - The 4th flag [\#8519](https://github.com/netdata/netdata/pull/8519) ([amoss](https://github.com/amoss))
-- Claiming issues [\#8516](https://github.com/netdata/netdata/pull/8516) ([amoss](https://github.com/amoss))
-- Remove stackscale demo link and clean up page [\#8509](https://github.com/netdata/netdata/pull/8509) ([joelhans](https://github.com/joelhans))
-- Fix auto updates for static installs \(kickstart\_static64.sh\) [\#8507](https://github.com/netdata/netdata/pull/8507) ([prologic](https://github.com/prologic))
-- Extend TLS Support [\#8505](https://github.com/netdata/netdata/pull/8505) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
