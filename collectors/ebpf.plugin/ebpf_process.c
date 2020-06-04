@@ -467,8 +467,10 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
             fputc('\n', stderr);
         }
 
+        error("KILLME NEWLY ADDED %d %u", w->exposed, w->processes);
         if (!w->exposed && w->processes) {
             newly_added++;
+            error("KILLME NEWLY ADDED %d", newly_added);
             w->exposed = 1;
             if (debug_enabled || w->debug_enabled)
                 debug_log_int("%s just added - regenerating charts.", w->name);
@@ -616,6 +618,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
             pthread_mutex_lock(&lock);
             ebpf_process_send_data(em);
             if (publish_apps) {
+                error("KILLME APPS");
                 ebpf_process_create_apps_charts(em, apps_groups_root_target);
             }
             pthread_mutex_unlock(&lock);
@@ -768,9 +771,6 @@ void *ebpf_process_thread(void *ptr)
 
     if (em->enabled) {
         ebpf_create_global_charts(em);
-        if (em->apps_charts) {
-            ebpf_process_create_apps_charts(em, apps_groups_root_target);
-        }
     }
 
     pthread_mutex_unlock(&lock);

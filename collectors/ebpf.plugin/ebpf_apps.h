@@ -181,7 +181,6 @@ struct pid_stat {
     // char state;
     int32_t ppid;
 
-    /* These variables are not necessary for eBPF collector
     // int32_t pgrp;
     // int32_t session;
     // int32_t tty_nr;
@@ -269,7 +268,6 @@ struct pid_stat {
 
     struct pid_fd *fds;             // array of fds it uses
     size_t fds_size;                   // the size of the fds array
-    */
 
     int children_count;             // number of processes directly referencing this
     unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
@@ -288,7 +286,6 @@ struct pid_stat {
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
-    /*
 
     usec_t io_collected_usec;
     usec_t last_io_collected_usec;
@@ -296,7 +293,6 @@ struct pid_stat {
     kernel_uint_t uptime;
 
     char *fds_dirname;              // the full directory name in /proc/PID/fd
-    */
 
     char *stat_filename;
     char *status_filename;

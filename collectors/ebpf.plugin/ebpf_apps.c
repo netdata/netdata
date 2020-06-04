@@ -272,7 +272,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id,
     if(target && target->target)
         fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
 
-    w = callocz(sizeof(struct target), 1);
+    w = callocz(1, sizeof(struct target));
     strncpyz(w->id, nid, MAX_NAME);
     w->idhash = simple_hash(w->id);
 
@@ -522,7 +522,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     if(unlikely(all_pids[pid]))
         return all_pids[pid];
 
-    struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
+    struct pid_stat *p = callocz(1, sizeof(struct pid_stat));
 
     if(likely(root_of_pids))
         root_of_pids->prev = p;
@@ -539,7 +539,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
 }
 
 /**
- * Assigna the PID to a target.
+ * Assign the PID to a target.
  *
  * @param p the pid_stat structure to assign for a target.
  */
@@ -699,6 +699,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     }
 
     struct pid_stat *p = get_pid_entry(pid);
+    error("KILLME ENTRY %d: %p", pid, p);
     if(unlikely(!p || p->read)) return 0;
     p->read = 1;
 
@@ -706,15 +707,20 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         // there is no reason to proceed if we cannot get its status
         return 0;
 
+    error("KILLME LOG %d: %d", pid, p->ppid);
+
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
         error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
+    /*
     if(unlikely(debug_enabled && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
         debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
+    */
 
+    error("KILLME UPDATED");
     // mark it as updated
     p->updated = 1;
     p->keep = 0;
@@ -984,6 +990,79 @@ static int read_proc_filesystem()
 }
 
 /**
+ * Aggregated PID on target
+ *
+ * @param w the target output
+ * @param p the pid with information to update
+ * @param o never used
+ */
+static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o)
+{
+    (void)o;
+
+    if(unlikely(!p->updated)) {
+        // the process is not running
+        return;
+    }
+
+    if(unlikely(!w)) {
+        error("pid %d %s was left without a target!", p->pid, p->comm);
+        return;
+    }
+
+    /*
+    w->cutime  += p->cutime;
+    w->cstime  += p->cstime;
+    w->cgtime  += p->cgtime;
+    w->cminflt += p->cminflt;
+    w->cmajflt += p->cmajflt;
+
+    w->utime  += p->utime;
+    w->stime  += p->stime;
+    w->gtime  += p->gtime;
+    w->minflt += p->minflt;
+    w->majflt += p->majflt;
+
+    // w->rss += p->rss;
+
+    w->status_vmsize   += p->status_vmsize;
+    w->status_vmrss    += p->status_vmrss;
+    w->status_vmshared += p->status_vmshared;
+    w->status_rssfile  += p->status_rssfile;
+    w->status_rssshmem += p->status_rssshmem;
+    w->status_vmswap   += p->status_vmswap;
+
+    w->io_logical_bytes_read    += p->io_logical_bytes_read;
+    w->io_logical_bytes_written += p->io_logical_bytes_written;
+    // w->io_read_calls            += p->io_read_calls;
+    // w->io_write_calls           += p->io_write_calls;
+    w->io_storage_bytes_read    += p->io_storage_bytes_read;
+    w->io_storage_bytes_written += p->io_storage_bytes_written;
+    // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+     */
+
+    w->processes++;
+    error("KILLME HERE %u", w->processes);
+    /*
+    w->num_threads += p->num_threads;
+
+    if(!w->collected_starttime || p->collected_starttime < w->collected_starttime) w->collected_starttime = p->collected_starttime;
+    if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
+    w->uptime_sum += p->uptime;
+    if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
+
+    if(unlikely(debug_enabled || w->debug_enabled)) {
+        //debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+        struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
+        pid_on_target->pid = p->pid;
+        pid_on_target->next = w->root_pid;
+        w->root_pid = pid_on_target;
+    }
+    */
+}
+
+/**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
@@ -1042,17 +1121,17 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
 
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
-    // // this has to be done, before the cleanup
-    // struct pid_stat *p = NULL;
+    // this has to be done, before the cleanup
+    struct pid_stat *p = NULL;
     // struct target *w = NULL, *o = NULL;
 
     // // concentrate everything on the targets
-    // for(p = root_of_pids; p ; p = p->next) {
+    for(p = root_of_pids; p ; p = p->next) {
 
-    //     // --------------------------------------------------------------------
-    //     // apps_groups target
+    // --------------------------------------------------------------------
+    // apps_groups target
 
-    //     aggregate_pid_on_target(p->target, p, NULL);
+         aggregate_pid_on_target(p->target, p, NULL);
 
 
     //     // --------------------------------------------------------------------
@@ -1092,7 +1171,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
 
     //     if(enable_file_charts)
     //         aggregate_pid_fds_on_targets(p);
-    // }
+    }
 
     post_aggregate_targets(apps_groups_root_target);
     /* These lines are not necessary for ebpf plugin
