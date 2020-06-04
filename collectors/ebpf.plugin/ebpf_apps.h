@@ -187,6 +187,7 @@ struct pid_stat {
     // int32_t tpgid;
     // uint64_t flags;
 
+    /*
     // these are raw values collected
     kernel_uint_t minflt_raw;
     kernel_uint_t cminflt_raw;
@@ -265,6 +266,7 @@ struct pid_stat {
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
     // kernel_uint_t io_cancelled_write_bytes;
+     */
 
     struct pid_fd *fds;             // array of fds it uses
     size_t fds_size;                   // the size of the fds array

@@ -24,6 +24,8 @@ static ebpf_functions_t socket_functions;
 static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 
+int socket_apps_enabled = 0;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
@@ -214,22 +216,20 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
  *
  * @param em a pointer to the structure with the default values.
  */
-static void ebpf_socket_create_apps_charts(ebpf_module_t *em)
+void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
     (void)em;
-    return;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20080,
-                               apps_groups_root_target);
+                               root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20081,
-                               apps_groups_root_target);
-
+                               root);
 }
 
 /*****************************************************************
@@ -332,13 +332,12 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    int apps_enabled = em->apps_charts;
     while(!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         read_hash_global_tables();
-        if (apps_enabled)
+        if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
         pthread_mutex_lock(&collect_data_mutex);
@@ -347,8 +346,6 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
         ebpf_process_send_data(em);
-        if (apps_enabled)
-            ebpf_socket_create_apps_charts(em);
         pthread_mutex_unlock(&lock);
 
         fflush(stdout);
@@ -447,6 +444,7 @@ void *ebpf_socket_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    socket_apps_enabled = em->apps_charts;
     fill_ebpf_functions(&socket_functions);
 
     if (!em->enabled)

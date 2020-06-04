@@ -467,15 +467,15 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
             fputc('\n', stderr);
         }
 
-        error("KILLME NEWLY ADDED %d %u", w->exposed, w->processes);
         if (!w->exposed && w->processes) {
             newly_added++;
-            error("KILLME NEWLY ADDED %d", newly_added);
             w->exposed = 1;
             if (debug_enabled || w->debug_enabled)
                 debug_log_int("%s just added - regenerating charts.", w->name);
         }
     }
+
+    if (!newly_added) return;
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                EBPF_COMMON_DIMENSION_CALL,
@@ -575,6 +575,9 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                20075,
                                root);
 
+
+    if (socket_apps_enabled)
+        ebpf_socket_create_apps_charts(NULL, root);
 }
 
 /*****************************************************************
@@ -618,7 +621,6 @@ static void process_collector(usec_t step, ebpf_module_t *em)
             pthread_mutex_lock(&lock);
             ebpf_process_send_data(em);
             if (publish_apps) {
-                error("KILLME APPS");
                 ebpf_process_create_apps_charts(em, apps_groups_root_target);
             }
             pthread_mutex_unlock(&lock);

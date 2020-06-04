@@ -27,6 +27,7 @@
 # include "libnetdata/clocks/clocks.h"
 # include "libnetdata/config/appconfig.h"
 # include "libnetdata/ebpf/ebpf.h"
+# include "libnetdata/procfile/procfile.h"
 # include "daemon/main.h"
 
 # include "ebpf_apps.h"
@@ -175,5 +176,10 @@ extern char *ebpf_stock_config_dir;
 extern pid_t *pid_index;
 extern int pids_running;
 extern int debug_enabled;
+
+//Socket functions and variables
+//Common functions
+extern void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root);
+extern int socket_apps_enabled;
 
 #endif

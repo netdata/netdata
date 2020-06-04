@@ -2,6 +2,13 @@
 
 #include "ebpf_apps.h"
 
+// ----------------------------------------------------------------------------
+// internal flags
+// handled in code (automatically set)
+
+static int
+    proc_pid_cmdline_is_needed = 0; // 1 when we need to read /proc/cmdline
+
 /*****************************************************************
  *
  *  FUNCTIONS USED TO READ HASH TABLES
@@ -291,6 +298,9 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id,
     }
     w->ends_with = ends_with;
 
+    if(w->starts_with && w->ends_with)
+        proc_pid_cmdline_is_needed = 1;
+
     w->comparehash = simple_hash(w->compare);
     w->comparelen = strlen(w->compare);
 
@@ -412,12 +422,6 @@ struct target
 size_t
         apps_groups_targets_count = 0;       // # of apps_groups.conf targets
 
-// ----------------------------------------------------------------------------
-// internal flags
-// handled in code (automatically set)
-
-static int
-        proc_pid_cmdline_is_needed = 0; // 1 when we need to read /proc/cmdline
 
 // ----------------------------------------------------------------------------
 // internal counters
@@ -699,7 +703,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     }
 
     struct pid_stat *p = get_pid_entry(pid);
-    error("KILLME ENTRY %d: %p", pid, p);
     if(unlikely(!p || p->read)) return 0;
     p->read = 1;
 
@@ -707,7 +710,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         // there is no reason to proceed if we cannot get its status
         return 0;
 
-    error("KILLME LOG %d: %d", pid, p->ppid);
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
@@ -720,7 +722,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
     */
 
-    error("KILLME UPDATED");
     // mark it as updated
     p->updated = 1;
     p->keep = 0;
@@ -1042,7 +1043,6 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
      */
 
     w->processes++;
-    error("KILLME HERE %u", w->processes);
     /*
     w->num_threads += p->num_threads;
 
