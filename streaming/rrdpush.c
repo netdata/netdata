@@ -368,12 +368,10 @@ void rrdpush_send_labels(RRDHOST *host) {
 // rrdpush sender thread
 
 // Either the receiver lost the connection or the host is being destroyed.
-// Don't lock the sender buffer - doesn't affect consistency in either case.
-// TODO-GAPS During the host destruction sequence we should make sure the disconnect happens early enough to lock
-//           out collectors hitting the sender. Locking the mutex means there may be waiting threads when we free.
+// The sender mutex guards thread creation, any spurious data is wiped on reconnection.
 void rrdpush_sender_thread_stop(RRDHOST *host) {
-    rrdhost_wrlock(host);
 
+    netdata_mutex_lock(&host->sender->mutex);
     netdata_thread_t thr = 0;
 
     if(host->rrdpush_sender_spawn) {
@@ -390,7 +388,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
         netdata_thread_cancel(host->rrdpush_sender_thread);
     }
 
-    rrdhost_unlock(host);
+    netdata_mutex_unlock(&host->sender->mutex);
 
     if(thr != 0) {
         info("STREAM %s [send]: waiting for the sending thread to stop...", host->hostname);
