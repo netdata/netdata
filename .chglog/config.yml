@@ -10,12 +10,18 @@ options:
       Type:
         - Add
         - Fix
+        - Remove
         - Update
+        - Refactor
         - Document
+        - Deprecate
   commit_groups:
     title_maps:
-      Add: Features
-      Update: Updates
+      Add: New Features
+      Remove: Deprecation / Removals
+      Deprecate: Deprecation / Removals
+      Update: Updates and Improvements
+      Refactor: Updates and Improvements
       Fix: Bug Fixes
       Document: Documentation
   header:
