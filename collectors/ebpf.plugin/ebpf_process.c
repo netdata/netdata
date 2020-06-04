@@ -196,7 +196,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
 {
     struct target *w;
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_OPEN);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
@@ -204,7 +204,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed && w->processes))
                 write_chart_dimension(w->name, 0);
@@ -212,7 +212,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_CLOSED);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
@@ -220,7 +220,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed && w->processes))
                 write_chart_dimension(w->name, 0);
@@ -228,14 +228,14 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_DELETED);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
@@ -243,7 +243,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed && w->processes))
                 write_chart_dimension(w->name, 0);
@@ -251,7 +251,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
@@ -259,7 +259,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed && w->processes))
                 write_chart_dimension(w->name, 0);
@@ -267,42 +267,42 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_TASK_PROCESS);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_TASK_THREAD);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_TASK_CLOSE);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
             write_chart_dimension(w->name, 0);
