@@ -58,7 +58,7 @@ PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, ch
         is_guid_null ? NULL : guid);
 
 #ifdef ENABLE_DBENGINE
-    if (likely(!is_guid_null))
+    if (!is_guid_null)
         uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
 #endif
 
@@ -138,7 +138,7 @@ PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, char *name
         st, id, name, multiplier, divisor, algorithm_type, st->rrd_memory_mode, 0,
         is_guid_null ? NULL : guid);
 #ifdef ENABLE_DBENGINE
-    if (likely(!is_guid_null))
+    if (!is_guid_null)
         uuid_clear(((PARSER_USER_OBJECT *) user)->guid);
 #endif
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
