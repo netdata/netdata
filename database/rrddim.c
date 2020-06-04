@@ -218,6 +218,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         // DBENGINE available and activated?
 #ifdef ENABLE_DBENGINE
         if (likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && unlikely(rc)) {
+            debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             metalog_commit_update_dimension(rd);
         }
 #endif
