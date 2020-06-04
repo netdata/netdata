@@ -862,11 +862,6 @@ int main(int argc, char **argv)
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread_id = i;
         netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
-
-        //The next two lines were added to ensure that the first thread has enough time to initialize the targets
-        //we should find a better option for this.
-        if (!i)
-            sleep(1);
     }
 
     for (i = 0; ebpf_threads[i].name != NULL ; i++) {
