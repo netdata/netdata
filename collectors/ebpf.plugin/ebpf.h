@@ -88,6 +88,16 @@ typedef struct ebpf_module {
     uint32_t thread_id;
 } ebpf_module_t;
 
+// Copied from musl header
+//
+#ifndef offsetof
+# if __GNUC__ > 3
+#  define offsetof(type, member) __builtin_offsetof(type, member)
+# else
+#  define offsetof(type, member) ((size_t)( (char *)&(((type *)0)->member) - (char *)0 ))
+# endif
+#endif
+
 //Chart defintions
 # define NETDATA_EBPF_FAMILY "ebpf"
 
@@ -157,11 +167,11 @@ extern void write_count_chart(char *name, char *family, netdata_publish_syscall_
 
 extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
 
-void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
+extern void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
-void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root);
+extern void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root);
 
 extern void write_end_chart();
 
@@ -183,5 +193,7 @@ extern int debug_enabled;
 //Common functions
 extern void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root);
 extern int socket_apps_enabled;
+extern int apps_dimension_filled;
+extern collected_number get_value_from_structure(char *basis, size_t offset);
 
 #endif

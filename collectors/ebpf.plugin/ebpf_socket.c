@@ -25,6 +25,7 @@ static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 
 int socket_apps_enabled = 0;
+static int socket_apps_created = 0;
 
 #ifndef STATIC
 /**
@@ -137,6 +138,31 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
 }
 
 /**
+ * Sum values for pid
+ *
+ * @param root the structure with all available PIDs
+ *
+ * @param offset the address that we are reading
+ *
+ * @return it returns the sum of all PIDs
+ */
+long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t offset)
+{
+    long long ret = 0;
+    while (root) {
+        int32_t pid = root->pid;
+        ebpf_socket_publish_apps_t *w = socket_bandwidth_curr[pid];
+        if (w) {
+            ret += get_value_from_structure((char *)w, offset);
+        }
+
+        root = root->next;
+    }
+
+    return ret;
+}
+
+/**
  * Send data to Netdata calling auxiliar functions.
  *
  * @param em   the structure with thread information
@@ -145,19 +171,27 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
 void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 {
     (void)em;
+    if (!socket_apps_created)
+        return;
+
     struct target *w;
+    collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            write_chart_dimension(w->name, 0);
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_sent));
+            write_chart_dimension(w->name, value);
+        }
     }
     write_end_chart();
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            write_chart_dimension(w->name, 0);
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_recv));
+            write_chart_dimension(w->name, value);
+        }
     }
     write_end_chart();
 }
@@ -256,6 +290,8 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                NETDATA_APPS_NET_GROUP,
                                20081,
                                root);
+
+    socket_apps_created = 1;
 }
 
 /*****************************************************************
@@ -473,7 +509,6 @@ void *ebpf_socket_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    socket_apps_enabled = em->apps_charts;
     fill_ebpf_functions(&socket_functions);
 
     if (!em->enabled)

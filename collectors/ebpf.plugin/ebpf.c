@@ -174,6 +174,21 @@ static void ebpf_exit(int sig)
  *
  *****************************************************************/
 
+
+/**
+ * Get a value from a structure.
+ *
+ * @param basis  it is the first address of the structure
+ * @param offset it is the offset of the data you want to access.
+ * @return
+ */
+collected_number get_value_from_structure(char *basis, size_t offset)
+{
+    collected_number *value =  (collected_number *)(basis + offset);
+
+    return (collected_number)*value;
+}
+
 /**
  * Write begin command on standard output
  *
@@ -605,6 +620,7 @@ static void read_collector_values(int *disable_apps) {
                                     ebpf_modules[1].config_name, 1);
     if (enabled) {
         ebpf_enable_chart(1, *disable_apps);
+        socket_apps_enabled = 1;
         started++;
     }
 
