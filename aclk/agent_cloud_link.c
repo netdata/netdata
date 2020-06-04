@@ -1397,7 +1397,7 @@ void *aclk_main(void *ptr)
         stats_thread = callocz(1, sizeof(struct netdata_static_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));
         netdata_thread_create(
-            stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_DEFAULT, aclk_stats_main_thread,
+            stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
             stats_thread);
     }
 
@@ -1520,6 +1520,10 @@ exited:
         RSA_free(aclk_private_key);
 
     aclk_main_cleanup(ptr);
+
+    netdata_thread_join(*stats_thread->thread, NULL);
+    freez(stats_thread->thread);
+    freez(stats_thread);
     return NULL;
 }
 

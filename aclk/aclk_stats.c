@@ -151,6 +151,7 @@ void *aclk_stats_main_thread(void *ptr)
     struct aclk_metrics permanent;
 
     while (!netdata_exit) {
+        netdata_thread_testcancel();
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
 
