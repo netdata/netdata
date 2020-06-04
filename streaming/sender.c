@@ -520,7 +520,7 @@ void execute_commands(struct sender_state *s) {
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     RRDHOST *host = (RRDHOST *)ptr;
 
-    rrdhost_wrlock(host);
+    netdata_mutex_lock(&host->sender->mutex);
 
     info("STREAM %s [send]: sending thread cleans up...", host->hostname);
 
@@ -546,7 +546,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     info("STREAM %s [send]: sending thread now exits.", host->hostname);
 
-    rrdhost_unlock(host);
+    netdata_mutex_unlock(&host->sender->mutex);
 }
 
 void sender_init(struct sender_state *s, RRDHOST *parent) {

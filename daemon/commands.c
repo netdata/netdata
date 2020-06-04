@@ -673,7 +673,7 @@ void commands_init(void)
 
     info("Initializing command server.");
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        uv_mutex_init(&command_lock_array[i]);
+        assert(0 == uv_mutex_init(&command_lock_array[i]));
     }
     assert(0 == uv_rwlock_init(&exclusive_rwlock));
 
