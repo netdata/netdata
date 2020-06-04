@@ -136,6 +136,32 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
     }
 }
 
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param em   the structure with thread information
+ * @param root the target list.
+ */
+void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
+{
+    (void)em;
+    struct target *w;
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+}
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CREATE CHARTS
@@ -346,6 +372,9 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
         ebpf_process_send_data(em);
+        if (socket_apps_enabled)
+            ebpf_socket_send_apps_data(em, apps_groups_root_target);
+
         pthread_mutex_unlock(&lock);
 
         fflush(stdout);
