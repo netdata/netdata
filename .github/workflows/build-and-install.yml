@@ -24,9 +24,9 @@ jobs:
       matrix:
         distro:
           - 'alpine:edge'
+          - 'alpine:3.12'
           - 'alpine:3.11'
           - 'alpine:3.10'
-          - 'alpine:3.9'
           - 'archlinux:latest'
           - 'centos:8'
           - 'centos:7'
@@ -50,13 +50,13 @@ jobs:
           - distro: 'alpine:edge'
             pre: 'apk add -U bash'
             rmjsonc: 'apk del json-c-dev'
+          - distro: 'alpine:3.12'
+            pre: 'apk add -U bash'
+            rmjsonc: 'apk del json-c-dev'
           - distro: 'alpine:3.11'
             pre: 'apk add -U bash'
             rmjsonc: 'apk del json-c-dev'
           - distro: 'alpine:3.10'
-            pre: 'apk add -U bash'
-            rmjsonc: 'apk del json-c-dev'
-          - distro: 'alpine:3.9'
             pre: 'apk add -U bash'
             rmjsonc: 'apk del json-c-dev'
 
