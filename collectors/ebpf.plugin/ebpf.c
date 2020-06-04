@@ -182,11 +182,17 @@ static void ebpf_exit(int sig)
  */
 void write_begin_chart(char *family, char *name)
 {
-    int ret = printf( "BEGIN %s.%s\n"
-        , family
-        , name);
+    printf( "BEGIN %s.%s\n"
+           , family
+           , name);
+}
 
-    (void)ret;
+/**
+ * Write END command on stdout.
+ */
+inline void write_end_chart()
+{
+    printf("END\n");
 }
 
 /**
@@ -220,7 +226,7 @@ void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move
         i++;
     }
 
-    printf("END\n");
+    write_end_chart();
 }
 
 /**
@@ -242,7 +248,7 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
         i++;
     }
 
-    printf("END\n");
+    write_end_chart();
 }
 
 
@@ -258,7 +264,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
     write_chart_dimension(dwrite, (long long) pvc->write);
     write_chart_dimension(dread, (long long) pvc->read);
 
-    printf("END\n");
+    write_end_chart();
 }
 
 /**

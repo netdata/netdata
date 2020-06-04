@@ -163,6 +163,8 @@ extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
 void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root);
 
+extern void write_end_chart();
+
 # define EBPF_GLOBAL_SECTION "global"
 # define EBPF_PROGRAMS_SECTION "ebpf programs"
 

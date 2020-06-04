@@ -30,6 +30,8 @@ static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 pthread_mutex_t collect_data_mutex;
 pthread_cond_t collect_data_cond_var;
 
+int process_apps_enabled = 0;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
@@ -137,7 +139,7 @@ static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc) 
     write_chart_dimension(status[0], (long long) pvc->running);
     write_chart_dimension(status[1], (long long) pvc->zombie);
 
-    printf("END\n");
+    write_end_chart();
 }
 
 /**
@@ -182,6 +184,130 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
         write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3],
                        process_id_names[4], &pvc);
     }
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param em   the structure with thread information
+ * @param root the target list.
+ */
+void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
+{
+    struct target *w;
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_OPEN);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                write_chart_dimension(w->name, 0);
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_CLOSED);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                write_chart_dimension(w->name, 0);
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_FILE_DELETED);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                write_chart_dimension(w->name, 0);
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                write_chart_dimension(w->name, 0);
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_TASK_PROCESS);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_TASK_THREAD);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_SYSCALL_GROUP, NETDATA_SYSCALL_APPS_TASK_CLOSE);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            write_chart_dimension(w->name, 0);
+    }
+    write_end_chart();
 }
 
 /*****************************************************************
@@ -445,7 +571,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
- * @param em a pointer to the structure with the default values.
+ * @param em   a pointer to the structure with the default values.
+ * @param root a pointer for the targets.
  */
 static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
@@ -575,7 +702,6 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                20075,
                                root);
 
-
     if (socket_apps_enabled)
         ebpf_socket_create_apps_charts(NULL, root);
 }
@@ -596,7 +722,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 {
     heartbeat_t hb;
     heartbeat_init(&hb);
-    int enabled = em->enabled;
+    int enabled = process_apps_enabled;
     int apps_enabled = em->apps_charts;
     while(!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -610,18 +736,19 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                                                       map_fd[0]);
 
         if (enabled) {
+            pthread_cond_broadcast(&collect_data_cond_var);
+
             int publish_apps = 0;
             if (pids_running > 0 && apps_enabled){
                 publish_apps = 1;
                 ebpf_process_update_apps_data();
             }
 
-            pthread_cond_broadcast(&collect_data_cond_var);
-
             pthread_mutex_lock(&lock);
             ebpf_process_send_data(em);
             if (publish_apps) {
                 ebpf_process_create_apps_charts(em, apps_groups_root_target);
+                ebpf_process_send_apps_data(em, apps_groups_root_target);
             }
             pthread_mutex_unlock(&lock);
         }
@@ -751,6 +878,7 @@ void *ebpf_process_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    process_apps_enabled = em->enabled;
     fill_ebpf_functions(&process_functions);
 
     pthread_mutex_lock(&lock);
@@ -771,7 +899,7 @@ void *ebpf_process_thread(void *ptr)
     ebpf_global_labels(process_aggregated_data, process_publish_aggregated, process_dimension_names,
                        process_id_names, NETDATA_MAX_MONITOR_VECTOR);
 
-    if (em->enabled) {
+    if (process_apps_enabled) {
         ebpf_create_global_charts(em);
     }
 
