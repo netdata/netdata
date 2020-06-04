@@ -216,13 +216,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
         // DBENGINE available and activated?
-        if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-            if (unlikely(rc)) {
-                metalog_commit_update_dimension(rd);
-            }
-#endif
+        if (likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && unlikely(rc)) {
+            metalog_commit_update_dimension(rd);
         }
+#endif
         rrdset_unlock(st);
         return rd;
     }
