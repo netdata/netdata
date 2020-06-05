@@ -186,7 +186,7 @@ collected_number get_value_from_structure(char *basis, size_t offset)
 {
     collected_number *value =  (collected_number *)(basis + offset);
 
-    return (collected_number)*value;
+    return (collected_number)llabs(*value);
 }
 
 /**
