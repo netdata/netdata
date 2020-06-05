@@ -862,6 +862,26 @@ extern RRDHOST *rrdhost_find_or_create(
         , struct rrdhost_system_info *system_info
 );
 
+extern void rrdhost_update(RRDHOST *host
+    , const char *hostname
+    , const char *registry_hostname
+    , const char *guid
+    , const char *os
+    , const char *timezone
+    , const char *tags
+    , const char *program_name
+    , const char *program_version
+    , int update_every
+    , long history
+    , RRD_MEMORY_MODE mode
+    , unsigned int health_enabled
+    , unsigned int rrdpush_enabled
+    , char *rrdpush_destination
+    , char *rrdpush_api_key
+    , char *rrdpush_send_charts_matching
+    , struct rrdhost_system_info *system_info
+);
+
 extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
