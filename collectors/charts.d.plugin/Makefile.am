@@ -48,3 +48,4 @@ include libreswan/Makefile.inc
 include nut/Makefile.inc
 include opensips/Makefile.inc
 include sensors/Makefile.inc
+include zfsdstat/Makefile.inc

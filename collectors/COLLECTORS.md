@@ -74,6 +74,7 @@ collector—we may be looking for contributions from users such as yourself!
 | [nut](charts.d.plugin/nut/README.md)             | `UPS Servers`                           | Polls the status using `upsc` tool.                                                                          |
 | [opensips](charts.d.plugin/opensips/README.md)   | [`OpenSIPS`](https://www.opensips.org/) | Collects server health and performance metrics using the `opensipsctl` tool.                                 |
 | [sensors](charts.d.plugin/sensors/README.md)     | `Linux Machines Sensors`                | reads system sensors information (temperature, voltage, electric current, power, etc.) from `/sys/devices/`. |
+| [zfsdstat](charts.d.plugin/zfsdstat/README.md)     | `ZFS on Linux Datasets`                | reads dataset statistics (IOPS Bandwidth, unlinks) from `/proc/spl/kstat/zfs/`. |
 
 ### Go (`go.d`)
 

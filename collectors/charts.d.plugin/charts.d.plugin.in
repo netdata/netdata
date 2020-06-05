@@ -402,6 +402,7 @@ declare -A charts_enable_keyword=(
 	['sensors']="force"
 	['squid']="force"
 	['tomcat']="force"
+  ['zfsdstat']="force"
 )
 
 declare -A obsolete_charts=(
