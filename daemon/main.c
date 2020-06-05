@@ -5,6 +5,10 @@
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
+char *run_as_user = NULL;
+int config_loaded = 0;
+int dont_fork = 0;
+
 struct config netdata_config = {
         .first_section = NULL,
         .last_section = NULL,
@@ -263,19 +267,18 @@ void cancel_main_threads() {
 
 struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
-    { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
-    { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
-    { 'd', "Fork. Run in the background.",                NULL,          "run in the background"},
-    { 'h', "Display this help message.",                  NULL,          NULL},
-    { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
-    { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
-    { 'p', "API/Web port to use.",                        "port",        "19999"},
-    { 's', "Prefix for /proc and /sys (for containers).", "path",        "no prefix"},
-    { 't', "The internal clock of netdata.",              "seconds",     "1"},
-    { 'u', "Run as user.",                                "username",    "netdata"},
-    { 'v', "Print netdata version and exit.",             NULL,          NULL},
-    { 'V', "Print netdata version and exit.",             NULL,          NULL},
-    { 'W', "See Advanced options below.",                 "options",     NULL},
+    { 'c', "config", "Configuration file to load.", "filename", CONFIG_DIR "/" CONFIG_FILENAME },
+    { 'D', "no-fork", "Do not fork. Run in the foreground.", NULL, "run in the background" },
+    { 'd', "daemon", "Fork. Run in the background.", NULL, "run in the background" },
+    { 'h', "help", "Display this help message.", NULL, NULL },
+    { 'P', "pid-file", "File to save a pid while running.", "filename", "do not save pid to a file" },
+    { 'i', "interface", "The IP address to listen to.", "IP", "all IP addresses IPv4 and IPv6" },
+    { 'p', "port", "API/Web port to use.", "port", "19999" },
+    { 's', "prefix", "Prefix for /proc and /sys (for containers).", "path", "no prefix" },
+    { 't', "internal-clock", "The internal clock of netdata.", "seconds", "1" },
+    { 'u', "user", "Run as user.", "username", "netdata" },
+    { 'v', "version", "Print netdata version and exit.", NULL, NULL },
+    { 'W', "set-options", "See Advanced options below.", "options", NULL },
 };
 
 int help(int exitcode) {
@@ -328,7 +331,7 @@ int help(int exitcode) {
 
     // Output options description.
     for( i = 0; i < num_opts; i++ ) {
-        fprintf(stream, "  -%c %-*s  %s", option_definitions[i].val, max_len_arg, option_definitions[i].arg_name ? option_definitions[i].arg_name : "", option_definitions[i].description);
+        fprintf(stream, "  -%c/--%s %-*s  %s", option_definitions[i].val, option_definitions[i].long_name, max_len_arg, option_definitions[i].arg_name ? option_definitions[i].arg_name : "", option_definitions[i].description);
         if(option_definitions[i].default_value) {
             fprintf(stream, "\n   %c %-*s  Default: %s\n", ' ', max_len_arg, "", option_definitions[i].default_value);
         } else {
@@ -866,367 +869,346 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
+/**
+ * Parse command-line arguments (supporting both long and short forms)
+ *
+ * @param argc the number of arguments
+ * @param argv the pointer to the arguments
+ */
+static void parse_args(int argc, char **argv)
+{
+    int c;
+    int option_index = 0;
+    static struct option long_options[] = { { "help", no_argument, 0, 'h' },
+                                            { "version", no_argument, 0, 'v' },
+                                            { "config", required_argument, 0, 'c' },
+                                            { "daemon", no_argument, 0, 'd' },
+                                            { "no-fork", no_argument, 0, 'D' },
+                                            { "interface", required_argument, 0, 'i' },
+                                            { "port", required_argument, 0, 'p' },
+                                            { "pid-file", required_argument, 0, 'P' },
+                                            { "prefix", required_argument, 0, 's' },
+                                            { "internal-clock", required_argument, 0, 't' },
+                                            { "user", required_argument, 0, 'u' },
+                                            { "set-option", required_argument, 0, 'W' },
+                                            { 0, 0, 0, 0 } };
+
+    while (1) {
+        c = getopt_long(argc, argv, "hvcdDipPstuW", long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+            case 'c':
+                if(load_netdata_conf(optarg, 1) != 1) {
+                    error("Cannot load configuration file %s.", optarg);
+                    exit(1);
+                }
+                else {
+                    debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
+                    post_conf_load(&run_as_user);
+                    load_cloud_conf(1);
+                    config_loaded = 1;
+                }
+                break;
+            case 'D':
+                dont_fork = 1;
+                break;
+            case 'd':
+                dont_fork = 0;
+                break;
+            case 'h':
+                exit(help(0));
+            case 'i':
+                config_set(CONFIG_SECTION_WEB, "bind to", optarg);
+                break;
+            case 'P':
+                strncpy(pidfile, optarg, FILENAME_MAX);
+                pidfile[FILENAME_MAX] = '\0';
+                break;
+            case 'p':
+                config_set(CONFIG_SECTION_GLOBAL, "default port", optarg);
+                break;
+            case 's':
+                config_set(CONFIG_SECTION_GLOBAL, "host access prefix", optarg);
+                break;
+            case 't':
+                config_set(CONFIG_SECTION_GLOBAL, "update every", optarg);
+                break;
+            case 'u':
+                config_set(CONFIG_SECTION_GLOBAL, "run as user", optarg);
+                break;
+            case 'v':
+            case 'V':
+                printf("%s %s\n", program_name, program_version);
+                exit(0);
+            case 'W':
+                {
+                    char* stacksize_string = "stacksize=";
+                    char* debug_flags_string = "debug_flags=";
+                    char* claim_string = "claim";
+#ifdef ENABLE_DBENGINE
+                    char* createdataset_string = "createdataset=";
+                    char* stresstest_string = "stresstest=";
+#endif
+
+                    if(strcmp(optarg, "unittest") == 0) {
+                        if(unit_test_buffer()) exit(1);
+                        if(unit_test_str2ld()) exit(1);
+                        // No call to load the config file on this code-path
+                        post_conf_load(&run_as_user);
+                        get_netdata_configured_variables();
+                        default_rrd_update_every = 1;
+                        default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+                        default_health_enabled = 0;
+                        if(rrd_init("unittest", NULL)) {
+                            fprintf(stderr, "rrd_init failed for unittest\n");
+                            exit(1);
+                        }
+                        default_rrdpush_enabled = 0;
+                        if(run_all_mockup_tests()) exit(1);
+                        if(unit_test_storage()) exit(1);
+#ifdef ENABLE_DBENGINE
+                        if(test_dbengine()) exit(1);
+#endif
+                        fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
+                        exit(0);
+                    }
+#ifdef ENABLE_DBENGINE
+                    else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
+                        optarg += strlen(createdataset_string);
+                        unsigned history_seconds = strtoul(optarg, NULL, 0);
+                        generate_dbengine_dataset(history_seconds);
+                        exit(0);
+                    }
+                    else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
+                        char *endptr;
+                        unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
+                        page_cache_mb = 0, disk_space_mb = 0;
+
+                        optarg += strlen(stresstest_string);
+                        test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
+                        if (',' == *endptr)
+                            dset_charts = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                        if (',' == *endptr)
+                            query_threads = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                        if (',' == *endptr)
+                            ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                        if (',' == *endptr)
+                            page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                        if (',' == *endptr)
+                            disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+
+                        dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
+                                             page_cache_mb, disk_space_mb);
+                        exit(0);
+                    }
+#endif
+                    else if(strcmp(optarg, "simple-pattern") == 0) {
+                        if(optind + 2 > argc) {
+                            fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
+                                    " Checks if 'pattern' matches the given 'string'.\n"
+                                    " - 'pattern' can be one or more space separated words.\n"
+                                    " - each 'word' can contain one or more asterisks.\n"
+                                    " - words starting with '!' give negative matches.\n"
+                                    " - words are processed left to right\n"
+                                    "\n"
+                                    "Examples:\n"
+                                    "\n"
+                                    " > match all veth interfaces, except veth0:\n"
+                                    "\n"
+                                    "   -W simple-pattern '!veth0 veth*' 'veth12'\n"
+                                    "\n"
+                                    "\n"
+                                    " > match all *.ext files directly in /path/:\n"
+                                    "   (this will not match *.ext files in a subdir of /path/)\n"
+                                    "\n"
+                                    "   -W simple-pattern '!/path/*/*.ext /path/*.ext' '/path/test.ext'\n"
+                                    "\n"
+                            );
+                            exit(1);
+                        }
+
+                        const char *heystack = argv[optind];
+                        const char *needle = argv[optind + 1];
+                        size_t len = strlen(needle) + 1;
+                        char wildcarded[len];
+
+                        SIMPLE_PATTERN *p = simple_pattern_create(heystack, NULL, SIMPLE_PATTERN_EXACT);
+                        int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
+                        simple_pattern_free(p);
+
+                        if(ret) {
+                            fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                            exit(0);
+                        }
+                        else {
+                            fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                            exit(1);
+                        }
+                    }
+                    else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
+                        optarg += strlen(stacksize_string);
+                        config_set(CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
+                    }
+                    else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
+                        optarg += strlen(debug_flags_string);
+                        config_set(CONFIG_SECTION_GLOBAL, "debug flags",  optarg);
+                        debug_flags = strtoull(optarg, NULL, 0);
+                    }
+                    else if(strcmp(optarg, "set") == 0) {
+                        if(optind + 3 > argc) {
+                            fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
+                                    " Overwrites settings of netdata.conf.\n"
+                                    "\n"
+                                    " These options interact with: -c netdata.conf\n"
+                                    " If -c netdata.conf is given on the command line,\n"
+                                    " before -W set... the user may overwrite command\n"
+                                    " line parameters at netdata.conf\n"
+                                    " If -c netdata.conf is given after (or missing)\n"
+                                    " -W set... the user cannot overwrite the command line\n"
+                                    " parameters."
+                                    "\n"
+                            );
+                            exit(1);
+                        }
+                        const char *section = argv[optind];
+                        const char *key = argv[optind + 1];
+                        const char *value = argv[optind + 2];
+                        optind += 3;
+
+                        // set this one as the default
+                        // only if it is not already set in the config file
+                        // so the caller can use -c netdata.conf before or
+                        // after this parameter to prevent or allow overwriting
+                        // variables at netdata.conf
+                        config_set_default(section, key,  value);
+
+                        // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                    }
+                    else if(strcmp(optarg, "set2") == 0) {
+                        if(optind + 4 > argc) {
+                            fprintf(stderr, "%s", "\nUSAGE: -W set 'conf_file' 'section' 'key' 'value'\n\n"
+                                    " Overwrites settings of netdata.conf or cloud.conf\n"
+                                    "\n"
+                                    " These options interact with: -c netdata.conf\n"
+                                    " If -c netdata.conf is given on the command line,\n"
+                                    " before -W set... the user may overwrite command\n"
+                                    " line parameters at netdata.conf\n"
+                                    " If -c netdata.conf is given after (or missing)\n"
+                                    " -W set... the user cannot overwrite the command line\n"
+                                    " parameters."
+                                    " conf_file can be \"cloud\" or \"netdata\".\n"
+                                    "\n"
+                            );
+                            exit(1);
+                        }
+                        const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
+                        struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+                        const char *section = argv[optind + 1];
+                        const char *key = argv[optind + 2];
+                        const char *value = argv[optind + 3];
+                        optind += 4;
+
+                        // set this one as the default
+                        // only if it is not already set in the config file
+                        // so the caller can use -c netdata.conf before or
+                        // after this parameter to prevent or allow overwriting
+                        // variables at netdata.conf
+                        appconfig_set_default(tmp_config, section, key,  value);
+
+                        // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                    }
+                    else if(strcmp(optarg, "get") == 0) {
+                        if(optind + 3 > argc) {
+                            fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
+                                    " Prints settings of netdata.conf.\n"
+                                    "\n"
+                                    " These options interact with: -c netdata.conf\n"
+                                    " -c netdata.conf has to be given before -W get.\n"
+                                    "\n"
+                            );
+                            exit(1);
+                        }
+
+                        if(!config_loaded) {
+                            fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
+                            load_netdata_conf(NULL, 0);
+                            post_conf_load(&run_as_user);
+                        }
+
+                        get_netdata_configured_variables();
+
+                        const char *section = argv[optind];
+                        const char *key = argv[optind + 1];
+                        const char *def = argv[optind + 2];
+                        const char *value = config_get(section, key, def);
+                        printf("%s\n", value);
+                        exit(0);
+                    }
+                    else if(strcmp(optarg, "get2") == 0) {
+                        if(optind + 4 > argc) {
+                            fprintf(stderr, "%s", "\nUSAGE: -W get2 'conf_file' 'section' 'key' 'value'\n\n"
+                                    " Prints settings of netdata.conf or cloud.conf\n"
+                                    "\n"
+                                    " These options interact with: -c netdata.conf\n"
+                                    " -c netdata.conf has to be given before -W get2.\n"
+                                    " conf_file can be \"cloud\" or \"netdata\".\n"
+                                    "\n"
+                            );
+                            exit(1);
+                        }
+
+                        if(!config_loaded) {
+                            fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
+                            load_netdata_conf(NULL, 0);
+                            post_conf_load(&run_as_user);
+                            load_cloud_conf(1);
+                        }
+
+                        get_netdata_configured_variables();
+
+                        const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
+                        struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
+                        const char *section = argv[optind + 1];
+                        const char *key = argv[optind + 2];
+                        const char *def = argv[optind + 3];
+                        const char *value = appconfig_get(tmp_config, section, key, def);
+                        printf("%s\n", value);
+                        exit(0);
+                    }
+                    else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
+                        /* will trigger a claiming attempt when the agent is initialized */
+                        claiming_pending_arguments = optarg + strlen(claim_string);
+                    }
+                    else {
+                        fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
+                        exit(help(1));
+                    }
+                }
+                break;
+
+            default: /* ? */
+                fprintf(stderr, "Unknown parameter '%c'\n", c);
+                exit(help(1));
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     int i;
-    int config_loaded = 0;
-    int dont_fork = 0;
     size_t default_stacksize;
-    char *user = NULL;
-
 
     netdata_ready=0;
     // set the name for logging
     program_name = "netdata";
 
-    // parse depercated options
-    // TODO: Remove this block with the next major release.
-    {
-        i = 1;
-        while(i < argc) {
-            if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
-                strncpyz(pidfile, argv[i+1], FILENAME_MAX);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
-                dont_fork = 1;
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "host access prefix", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -s instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "history", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- This option will be removed with V2.*.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else i++;
-        }
-    }
+    parse_args(argc, argv);
+
     if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
         // don't run netdata, this is the spawn server
         spawn_server();
         exit(0);
-    }
-
-    // parse options
-    {
-        int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
-        char optstring[(num_opts * 2) + 1];
-
-        int string_i = 0;
-        for( i = 0; i < num_opts; i++ ) {
-            optstring[string_i] = option_definitions[i].val;
-            string_i++;
-            if(option_definitions[i].arg_name) {
-                optstring[string_i] = ':';
-                string_i++;
-            }
-        }
-        // terminate optstring
-        optstring[string_i] ='\0';
-        optstring[(num_opts *2)] ='\0';
-
-        int opt;
-        while( (opt = getopt(argc, argv, optstring)) != -1 ) {
-            switch(opt) {
-                case 'c':
-                    if(load_netdata_conf(optarg, 1) != 1) {
-                        error("Cannot load configuration file %s.", optarg);
-                        return 1;
-                    }
-                    else {
-                        debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
-                        post_conf_load(&user);
-                        load_cloud_conf(1);
-                        config_loaded = 1;
-                    }
-                    break;
-                case 'D':
-                    dont_fork = 1;
-                    break;
-                case 'd':
-                    dont_fork = 0;
-                    break;
-                case 'h':
-                    return help(0);
-                case 'i':
-                    config_set(CONFIG_SECTION_WEB, "bind to", optarg);
-                    break;
-                case 'P':
-                    strncpy(pidfile, optarg, FILENAME_MAX);
-                    pidfile[FILENAME_MAX] = '\0';
-                    break;
-                case 'p':
-                    config_set(CONFIG_SECTION_GLOBAL, "default port", optarg);
-                    break;
-                case 's':
-                    config_set(CONFIG_SECTION_GLOBAL, "host access prefix", optarg);
-                    break;
-                case 't':
-                    config_set(CONFIG_SECTION_GLOBAL, "update every", optarg);
-                    break;
-                case 'u':
-                    config_set(CONFIG_SECTION_GLOBAL, "run as user", optarg);
-                    break;
-                case 'v':
-                case 'V':
-                    printf("%s %s\n", program_name, program_version);
-                    return 0;
-                case 'W':
-                    {
-                        char* stacksize_string = "stacksize=";
-                        char* debug_flags_string = "debug_flags=";
-                        char* claim_string = "claim";
-#ifdef ENABLE_DBENGINE
-                        char* createdataset_string = "createdataset=";
-                        char* stresstest_string = "stresstest=";
-#endif
-
-                        if(strcmp(optarg, "unittest") == 0) {
-                            if(unit_test_buffer()) return 1;
-                            if(unit_test_str2ld()) return 1;
-                            // No call to load the config file on this code-path
-                            post_conf_load(&user);
-                            get_netdata_configured_variables();
-                            default_rrd_update_every = 1;
-                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-                            default_health_enabled = 0;
-                            if(rrd_init("unittest", NULL)) {
-                                fprintf(stderr, "rrd_init failed for unittest\n");
-                                return 1;
-                            }
-                            default_rrdpush_enabled = 0;
-                            if(run_all_mockup_tests()) return 1;
-                            if(unit_test_storage()) return 1;
-#ifdef ENABLE_DBENGINE
-                            if(test_dbengine()) return 1;
-#endif
-                            fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
-                            return 0;
-                        }
-#ifdef ENABLE_DBENGINE
-                        else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
-                            optarg += strlen(createdataset_string);
-                            unsigned history_seconds = strtoul(optarg, NULL, 0);
-                            generate_dbengine_dataset(history_seconds);
-                            return 0;
-                        }
-                        else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
-                            char *endptr;
-                            unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
-                            page_cache_mb = 0, disk_space_mb = 0;
-
-                            optarg += strlen(stresstest_string);
-                            test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
-                            if (',' == *endptr)
-                                dset_charts = (unsigned)strtoul(endptr + 1, &endptr, 0);
-                            if (',' == *endptr)
-                                query_threads = (unsigned)strtoul(endptr + 1, &endptr, 0);
-                            if (',' == *endptr)
-                                ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
-                            if (',' == *endptr)
-                                page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
-                            if (',' == *endptr)
-                                disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
-
-                            dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
-                                                 page_cache_mb, disk_space_mb);
-                            return 0;
-                        }
-#endif
-                        else if(strcmp(optarg, "simple-pattern") == 0) {
-                            if(optind + 2 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
-                                        " Checks if 'pattern' matches the given 'string'.\n"
-                                        " - 'pattern' can be one or more space separated words.\n"
-                                        " - each 'word' can contain one or more asterisks.\n"
-                                        " - words starting with '!' give negative matches.\n"
-                                        " - words are processed left to right\n"
-                                        "\n"
-                                        "Examples:\n"
-                                        "\n"
-                                        " > match all veth interfaces, except veth0:\n"
-                                        "\n"
-                                        "   -W simple-pattern '!veth0 veth*' 'veth12'\n"
-                                        "\n"
-                                        "\n"
-                                        " > match all *.ext files directly in /path/:\n"
-                                        "   (this will not match *.ext files in a subdir of /path/)\n"
-                                        "\n"
-                                        "   -W simple-pattern '!/path/*/*.ext /path/*.ext' '/path/test.ext'\n"
-                                        "\n"
-                                );
-                                return 1;
-                            }
-
-                            const char *heystack = argv[optind];
-                            const char *needle = argv[optind + 1];
-                            size_t len = strlen(needle) + 1;
-                            char wildcarded[len];
-
-                            SIMPLE_PATTERN *p = simple_pattern_create(heystack, NULL, SIMPLE_PATTERN_EXACT);
-                            int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
-                            simple_pattern_free(p);
-
-                            if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
-                                return 0;
-                            }
-                            else {
-                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
-                                return 1;
-                            }
-                        }
-                        else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
-                            optarg += strlen(stacksize_string);
-                            config_set(CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
-                        }
-                        else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
-                            optarg += strlen(debug_flags_string);
-                            config_set(CONFIG_SECTION_GLOBAL, "debug flags",  optarg);
-                            debug_flags = strtoull(optarg, NULL, 0);
-                        }
-                        else if(strcmp(optarg, "set") == 0) {
-                            if(optind + 3 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
-                                        " Overwrites settings of netdata.conf.\n"
-                                        "\n"
-                                        " These options interact with: -c netdata.conf\n"
-                                        " If -c netdata.conf is given on the command line,\n"
-                                        " before -W set... the user may overwrite command\n"
-                                        " line parameters at netdata.conf\n"
-                                        " If -c netdata.conf is given after (or missing)\n"
-                                        " -W set... the user cannot overwrite the command line\n"
-                                        " parameters."
-                                        "\n"
-                                );
-                                return 1;
-                            }
-                            const char *section = argv[optind];
-                            const char *key = argv[optind + 1];
-                            const char *value = argv[optind + 2];
-                            optind += 3;
-
-                            // set this one as the default
-                            // only if it is not already set in the config file
-                            // so the caller can use -c netdata.conf before or
-                            // after this parameter to prevent or allow overwriting
-                            // variables at netdata.conf
-                            config_set_default(section, key,  value);
-
-                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
-                        }
-                        else if(strcmp(optarg, "set2") == 0) {
-                            if(optind + 4 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W set 'conf_file' 'section' 'key' 'value'\n\n"
-                                        " Overwrites settings of netdata.conf or cloud.conf\n"
-                                        "\n"
-                                        " These options interact with: -c netdata.conf\n"
-                                        " If -c netdata.conf is given on the command line,\n"
-                                        " before -W set... the user may overwrite command\n"
-                                        " line parameters at netdata.conf\n"
-                                        " If -c netdata.conf is given after (or missing)\n"
-                                        " -W set... the user cannot overwrite the command line\n"
-                                        " parameters."
-                                        " conf_file can be \"cloud\" or \"netdata\".\n"
-                                        "\n"
-                                );
-                                return 1;
-                            }
-                            const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
-                            struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
-                            const char *section = argv[optind + 1];
-                            const char *key = argv[optind + 2];
-                            const char *value = argv[optind + 3];
-                            optind += 4;
-
-                            // set this one as the default
-                            // only if it is not already set in the config file
-                            // so the caller can use -c netdata.conf before or
-                            // after this parameter to prevent or allow overwriting
-                            // variables at netdata.conf
-                            appconfig_set_default(tmp_config, section, key,  value);
-
-                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
-                        }
-                        else if(strcmp(optarg, "get") == 0) {
-                            if(optind + 3 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
-                                        " Prints settings of netdata.conf.\n"
-                                        "\n"
-                                        " These options interact with: -c netdata.conf\n"
-                                        " -c netdata.conf has to be given before -W get.\n"
-                                        "\n"
-                                );
-                                return 1;
-                            }
-
-                            if(!config_loaded) {
-                                fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0);
-                                post_conf_load(&user);
-                            }
-
-                            get_netdata_configured_variables();
-
-                            const char *section = argv[optind];
-                            const char *key = argv[optind + 1];
-                            const char *def = argv[optind + 2];
-                            const char *value = config_get(section, key, def);
-                            printf("%s\n", value);
-                            return 0;
-                        }
-                        else if(strcmp(optarg, "get2") == 0) {
-                            if(optind + 4 > argc) {
-                                fprintf(stderr, "%s", "\nUSAGE: -W get2 'conf_file' 'section' 'key' 'value'\n\n"
-                                        " Prints settings of netdata.conf or cloud.conf\n"
-                                        "\n"
-                                        " These options interact with: -c netdata.conf\n"
-                                        " -c netdata.conf has to be given before -W get2.\n"
-                                        " conf_file can be \"cloud\" or \"netdata\".\n"
-                                        "\n"
-                                );
-                                return 1;
-                            }
-
-                            if(!config_loaded) {
-                                fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0);
-                                post_conf_load(&user);
-                                load_cloud_conf(1);
-                            }
-
-                            get_netdata_configured_variables();
-
-                            const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
-                            struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
-                            const char *section = argv[optind + 1];
-                            const char *key = argv[optind + 2];
-                            const char *def = argv[optind + 3];
-                            const char *value = appconfig_get(tmp_config, section, key, def);
-                            printf("%s\n", value);
-                            return 0;
-                        }
-                        else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
-                            /* will trigger a claiming attempt when the agent is initialized */
-                            claiming_pending_arguments = optarg + strlen(claim_string);
-                        }
-                        else {
-                            fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
-                            return help(1);
-                        }
-                    }
-                    break;
-
-                default: /* ? */
-                    fprintf(stderr, "Unknown parameter '%c'\n", opt);
-                    return help(1);
-            }
-        }
     }
 
 #ifdef _SC_OPEN_MAX
@@ -1242,7 +1224,7 @@ int main(int argc, char **argv) {
     if(!config_loaded)
     {
         load_netdata_conf(NULL, 0);
-        post_conf_load(&user);
+        post_conf_load(&run_as_user);
         load_cloud_conf(0);
     }
 
@@ -1370,7 +1352,7 @@ int main(int argc, char **argv) {
         info("resources control: allowed file descriptors: soft = %zu, max = %zu", (size_t)rlimit_nofile.rlim_cur, (size_t)rlimit_nofile.rlim_max);
 
     // fork, switch user, create pid file, set process priority
-    if(become_daemon(dont_fork, user) == -1)
+    if(become_daemon(dont_fork, run_as_user) == -1)
         fatal("Cannot daemonize myself.");
 
     info("netdata started on pid %d.", getpid());

@@ -17,6 +17,8 @@ extern struct config netdata_config;
 struct option_def {
     /** The option character */
     const char val;
+    /** The long option string */
+    const char *long_name;
     /** The name of the long option. */
     const char *description;
     /** Short descripton what the option does */
