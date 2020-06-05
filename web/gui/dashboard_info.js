@@ -1085,6 +1085,70 @@ netdataDashboard.context = {
         info: 'Carried over process group uptime since the Netdata restart. The period of time within which at least one process in the group was running.'
     },
 
+    'apps.file_open': {
+        height: 2.0
+    },
+
+    'apps.file_open_error': {
+        height: 2.0
+    },
+
+    'apps.file_closed': {
+        height: 2.0
+    },
+
+    'apps.file_close_error': {
+        height: 2.0
+    },
+
+    'apps.file_deleted': {
+        height: 2.0
+    },
+
+    'apps.vfs_write_call': {
+        height: 2.0
+    },
+
+    'apps.vfs_write_error': {
+        height: 2.0
+    },
+
+    'apps.vfs_read_call': {
+        height: 2.0
+    },
+
+    'apps.vfs_read_error': {
+        height: 2.0
+    },
+
+    'apps.vfs_write_bytes': {
+        height: 2.0
+    },
+
+    'apps.vfs_read_bytes': {
+        height: 2.0
+    },
+
+    'apps.process_create': {
+        height: 2.0
+    },
+
+    'apps.thread_create': {
+        height: 2.0
+    },
+
+    'apps.task_close': {
+        height: 2.0
+    },
+
+    'apps.bandwidth_sent': {
+        height: 2.0
+    },
+
+    'apps.bandwidth_recv': {
+        height: 2.0
+    },
+
     // ------------------------------------------------------------------------
     // USERS
 
