@@ -86,8 +86,8 @@ If you haven't already, enable the exporting engine by setting `enabled` to `yes
 ```
 
 Next, configure the connector. Find the `[graphite:my_graphite_instance]` example section and uncomment the line.
-Replace `my_graphite_instance` with a name of your choice&mdash;let's go with `[graphite:netdata]`. Finally, set
-`enabled` to `yes` and uncomment the line. Your configuration should now look like this:
+Replace `my_graphite_instance` with a name of your choice. Let's go with `[graphite:netdata]`. Set `enabled` to `yes`
+and uncomment the line. Your configuration should now look like this:
 
 ```conf
 [graphite:netdata]
@@ -104,9 +104,9 @@ Replace `my_graphite_instance` with a name of your choice&mdash;let's go with `[
     # send hosts matching = localhost *
 ```
 
-Finally, set the `destination` setting to `localhost:2003`. By default, the Docker image for Graphite listens on port
-`2003` for incoming metrics. If you installed Graphite a different way, or tweaked the `docker run` command, you may
-need to change the port accordingly.
+Set the `destination` setting to `localhost:2003`. By default, the Docker image for Graphite listens on port `2003` for
+incoming metrics. If you installed Graphite a different way, or tweaked the `docker run` command, you may need to change
+the port accordingly.
 
 ```conf
 [graphite:netdata]
