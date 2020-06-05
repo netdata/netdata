@@ -342,37 +342,60 @@ static void read_hash_global_tables()
 }
 
 /**
+ * Fill publish apps when necessary.
+ *
+ * @param current_pid  the PID that I am updating
+ * @param eb           the structure with data read from memory.
+ */
+void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
+{
+    ebpf_socket_publish_apps_t *curr= socket_bandwidth_curr[current_pid];
+    ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
+    int status;
+    if (!curr) {
+        curr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
+        socket_bandwidth_curr[current_pid] = &curr[0];
+        prev = &curr[1];
+        socket_bandwidth_prev[current_pid] = prev;
+        status = 1;
+    } else {
+        memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
+        status = 0;
+    }
+
+    curr->sent = eb->sent;
+    curr->received = eb->received;
+
+    ebpf_socket_update_apps_publish(curr, prev, status);
+}
+
+/**
  *  Update the apps data reading information from the hash table
  */
 static void ebpf_socket_update_apps_data()
 {
     int i;
     int fd = map_fd[0];
+    ebpf_bandwidth_t eb;
+    uint32_t current_pid;
     for (i = 0 ; i < pids_running ; i++) {
-        pid_t current_pid = pid_index[i];
-        ebpf_bandwidth_t eb;
+        current_pid = pid_index[i];
 
         if (bpf_map_lookup_elem(fd, &current_pid, &eb))
             continue;
 
-        ebpf_socket_publish_apps_t *curr= socket_bandwidth_curr[current_pid];
-        ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
-        int status;
-        if (!curr) {
-            curr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
-            socket_bandwidth_curr[current_pid] = &curr[0];
-            prev = &curr[1];
-            socket_bandwidth_prev[current_pid] = prev;
-            status = 1;
-        } else {
-            memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
-            status = 0;
-        }
+        error("KILLME SOCKET INDEX: %u", current_pid);
+        ebpf_socket_fill_publish_apps(current_pid, &eb);
+    }
 
-        curr->sent = eb.sent;
-        curr->received = eb.received;
+    struct pid_stat *p = NULL;
+    for (p = root_of_pids; p ; p = p->next) {
+        current_pid = p->pid;
+        if (bpf_map_lookup_elem(fd, &current_pid, &eb))
+            continue;
 
-        ebpf_socket_update_apps_publish(curr, prev, status);
+        error("KILLME SOCKET ROOT: %u", current_pid);
+        ebpf_socket_fill_publish_apps(current_pid, &eb);
     }
 }
 
@@ -400,11 +423,13 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         (void)dt;
 
         read_hash_global_tables();
-        if (socket_apps_enabled)
-            ebpf_socket_update_apps_data();
 
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+
+        if (socket_apps_enabled)
+            ebpf_socket_update_apps_data();
+
         pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&lock);
