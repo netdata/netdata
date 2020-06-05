@@ -144,6 +144,48 @@ accepts the following values: ​
 -   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
+    
+#### Integration with `apps.plugin`
+
+The eBPF collector also creates charts for each running application through an integration with the
+[`apps.plugin`](/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
+interact with the Linux kernel.
+
+When the integration is enabled, your dashboard will also show the following charts using low-level Linux metrics:
+    
+-   eBPF syscall    
+    -   Number of calls to open files.
+    -   Number of files closed.
+    -   Number of calls to delete files.
+    -   Number of calls to `vfs_write`.
+    -   Number of calls to `vfs_read`.
+    -   Number of bytes written trough `vfs_write`
+    -   Number of bytes read trough `vfs_read`
+    -   Number of process created trough `do_fork`
+    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version.
+    -   Number of times that a process called `do_exit`. 
+    -   Number of calls to open files that returned errors.
+    -   Number of calls to close files that returned errors.
+    -   Number of calls to read a file that returned errors.
+    -   Number of calls to read a file that returned errors.
+-   eBPF net
+    -   Number of bytes transmited per seconds.   
+
+If you want to disable these charts, change the setting `disable apps` to `no`.
+
+```conf
+[global]
+   disable apps = no
+```
+
+### `[ebpf programs]`
+
+The eBPF collector enables and runs the following eBPF programs by default:
+
+-   `process`: This eBPF program creates charts that show information about process creation, VFS IO, and files removed.
+    When in `return` mode, it also creates charts showing errors when these operations are executed.
+-   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+    bandwidth consumed by each.
 
 ## Troubleshooting
 
