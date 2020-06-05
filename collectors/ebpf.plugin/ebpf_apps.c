@@ -1091,14 +1091,8 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     uint32_t key = 0, next_key;
     int counter = 0;
 
-    if(all_pids_count) {
-        struct pid_stat *p = NULL;
-        for(p = root_of_pids; p ; p = p->next) {
-            p->updated = 0;
-        }
-    }
-
-    read_proc_filesystem();
+    if(!all_pids_count)
+        read_proc_filesystem();
 
     while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
         ebpf_process_stat_t *w = out[next_key];
