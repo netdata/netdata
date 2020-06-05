@@ -7,18 +7,18 @@ image: /img/seo/guides/export/export-netdata-metrics-graphite.png
 # Export and visualize Netdata metrics in Graphite
 
 Collecting metrics is an essential part of monitoring any application, service, or infrastructure, but it's not the
-final step for any developer, sysadmin, SRE, or DevOps engineer who's keeping an eye on things. To be able to take
-meaningful action on these metrics, you may need to develop a stack of monitoring tools that work in parallel to help
-you diagnose anomalies and discover root causes faster.
+final step for any developer, sysadmin, SRE, or DevOps engineer who's keeping an eye on things. To take meaningful
+action on these metrics, you may need to develop a stack of monitoring tools that work in parallel to help you diagnose
+anomalies and discover root causes faster.
 
-Netdata is designed with interoperability in mind. The Agent collects thousands of metrics every second, and then what
+We designed Netdata with interoperability in mind. The Agent collects thousands of metrics every second, and then what
 you do with them is up to you. You can [store metrics in the database engine](/docs/guides/longer-metrics-storage.md),
-or you can send them to another time series database for long-term storage or further analysis using Netdata's
-[exporting engine](/docs/export/README.md).
+or send them to another time series database for long-term storage or further analysis using Netdata's [exporting
+engine](/docs/export/README.md).
 
 In this guide, we'll show you how to export Netdata metrics to [Graphite](https://graphiteapp.org/) for long-term
 storage and further analysis. Graphite is a free open-source software (FOSS) tool that collects graphs numeric
-time-series data, such as all the metrics collected by the Netdata Agent itself. By using Netdata and Graphite together,
+time-series data, such as all the metrics collected by the Netdata Agent itself. Using Netdata and Graphite together,
 you get more visibility into the health and performance of your entire infrastructure.
 
 ![A custom dashboard in Grafana with Netdata
@@ -123,8 +123,8 @@ appropriate method for your system, to spin up the exporting engine.
 Head back to the Graphite interface again, then click on the **Dashboard** link to get started with Netdata's exported
 metrics. You can also navigate directly to `http://NODE/dashboard`.
 
-Right off the bat, let's switch the interface to help you understand what Netdata metrics are now exported to Graphite.
-Click on **Dashboard** and **Configure UI**, then choose the **Tree** option. Refresh your browser to change the UI.
+Let's switch the interface to help you understand which metrics Netdata is exporting to Graphite. Click on **Dashboard**
+and **Configure UI**, then choose the **Tree** option. Refresh your browser to change the UI.
 
 ![Change the Graphite
 UI](https://user-images.githubusercontent.com/1153921/83798697-77c63500-a659-11ea-8ed5-5e274953c871.png)
@@ -132,7 +132,7 @@ UI](https://user-images.githubusercontent.com/1153921/83798697-77c63500-a659-11e
 You should now see a tree of available contexts, including one that matches the hostname of the Agent exporting metrics.
 In this example, the Agent's hostname is `arcturus`.
 
-Let's add some system CPU charts so you can montior the long-term health of your system. Click through the tree to find
+Let's add some system CPU charts so you can monitor the long-term health of your system. Click through the tree to find
 **hostname → system → cpu** metrics, then click on the **user** context. A chart with metrics from that context appears
 in the dashboard. Add a few other system CPU charts to flesh things out.
 
@@ -142,11 +142,11 @@ to merge** dialog appears. Release to merge the charts.
 ![Merging charts in
 Graphite](https://user-images.githubusercontent.com/1153921/83817628-1bbfd880-a67a-11ea-81bc-05efc639b6ce.png)
 
-Finally, save your dashboard. Click **Dashboard** then **Save As**, then choose a name. Your dashboard is now saved.
+Finally, save your dashboard. Click **Dashboard**, then **Save As**, then choose a name. Your dashboard is now saved.
 
 Of course, this is just the beginning of the customization you can do with Graphite. You can change the time range,
-share your dashboard with others, or use the composer to fully customize the size and appearance of specific charts.
-Learn more about adding, modifying, and combining graphs in the [Graphite
+share your dashboard with others, or use the composer to customize the size and appearance of specific charts. Learn
+more about adding, modifying, and combining graphs in the [Graphite
 docs](https://graphite.readthedocs.io/en/latest/dashboard.html).
 
 ## Monitor the exporting engine
@@ -156,8 +156,8 @@ As soon as the exporting engine begins, Netdata begins reporting metrics about t
 ![Graphs for monitoring the exporting
 engine](https://user-images.githubusercontent.com/1153921/83800787-e5c02b80-a65c-11ea-865a-c447d2ce4cbb.png)
 
-You can use these charts to verify that your metrics are properly being sent to the Graphite destination. For a truly
-circular experience, you can even add these exporting charts to your Graphite dashboard!
+You can use these charts to verify that Netdata is properly exporting metrics to Graphite. You can even add these
+exporting charts to your Graphite dashboard!
 
 ### Add exporting charts to Netdata Cloud
 
