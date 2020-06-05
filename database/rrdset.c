@@ -579,15 +579,16 @@ RRDSET *rrdset_create_custom(
                 }
             }
 
-            char *new_title = config_get(st->config_section, "title", title);
-            json_fix_string(new_title);
-
-            if (unlikely(strcmp(st->title, new_title))) {
-                freez(st->title);
-                st->title = new_title;
-                mark_rebuild = 1;
-            } else
-                freez(new_title);
+            char *new_title = title ? strdupz(title) : NULL;
+            if (new_title) {
+                json_fix_string(new_title);
+                if (unlikely(strcmp(st->title, new_title))) {
+                    freez(st->title);
+                    st->title = new_title;
+                    mark_rebuild = 1;
+                } else
+                    freez(new_title);
+            }
 
             RRDSET_TYPE new_chart_type =
                 rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
@@ -596,29 +597,33 @@ RRDSET *rrdset_create_custom(
                 mark_rebuild = 1;
             }
 
-            char *new_family = config_get(st->config_section, "family", family ? family : st->type);
-            json_fix_string(new_family);
-            if (unlikely((strcmp(st->family, new_family)))) {
-                freez(st->family);
-                st->family = new_family;
-                mark_rebuild = 1;
-            } else
-                freez(new_family);
+            char *new_family = family ? strdup(family): NULL;
+            if (new_family) {
+                json_fix_string(new_family);
+                if (unlikely((strcmp(st->family, new_family)))) {
+                    freez(st->family);
+                    st->family = new_family;
+                    mark_rebuild = 1;
+                } else
+                    freez(new_family);
+            }
 
-            char *new_context = config_get(st->config_section, "context", context ? context : st->id);
-            json_fix_string(new_context);
-            if (unlikely((strcmp(st->context, new_context)))) {
-                freez(st->context);
-                st->context = new_context;
-                st->hash_context = simple_hash(st->context);
-                mark_rebuild = 1;
-            } else
-                freez(new_context);
+            char *new_context = context ? strdup(context) : NULL;
+            if (new_context) {
+                json_fix_string(new_context);
+                if (unlikely((strcmp(st->context, new_context)))) {
+                    freez(st->context);
+                    st->context = new_context;
+                    st->hash_context = simple_hash(st->context);
+                    mark_rebuild = 1;
+                } else
+                    freez(new_context);
+            }
 
             rrdhost_unlock(host);
 
 #ifdef ENABLE_DBENGINE
-            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && mark_rebuild) {
+            if (is_archived == 0 && st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && mark_rebuild) {
                 debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
                 metalog_commit_update_chart(st);
             }
