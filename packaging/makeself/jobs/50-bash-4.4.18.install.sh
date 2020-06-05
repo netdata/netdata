@@ -6,6 +6,8 @@
 
 fetch "bash-4.4.18" "http://ftp.gnu.org/gnu/bash/bash-4.4.18.tar.gz"
 
+export PKG_CONFIG_PATH="/opnessl/lib/pkgconfig"
+
 run ./configure \
   --prefix="${NETDATA_INSTALL_PATH}" \
   --without-bash-malloc \

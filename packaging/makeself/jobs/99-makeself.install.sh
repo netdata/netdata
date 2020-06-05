@@ -53,6 +53,11 @@ EOF
 run chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 
 # -----------------------------------------------------------------------------
+# copy the SSL/TLS configuration and certificates from the build system
+
+run cp -a /etc/ssl "${NETDATA_INSTALL_PATH}/share/ssl"
+
+# -----------------------------------------------------------------------------
 # remove the links to allow untaring the archive
 
 run rm "${NETDATA_INSTALL_PATH}/sbin" \
