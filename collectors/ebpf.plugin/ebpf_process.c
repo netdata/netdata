@@ -126,8 +126,6 @@ static void ebpf_process_update_apps_publish(ebpf_process_publish_apps_t *curr,
     curr->publish_close_error  = curr->ecall_close_fd - prev->ecall_close_fd;
     curr->publish_write_error  = curr->ecall_write - prev->ecall_write;
     curr->publish_read_error   = curr->ecall_read - prev->ecall_read;
-
-    error("KILLME PUAP Open = %lu ; Write = %lu ; Read = %lu", curr->publish_open, curr->publish_write_call, curr->publish_read_call);
 }
 
 /**
@@ -205,7 +203,6 @@ long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t of
         int32_t pid = root->pid;
         ebpf_process_publish_apps_t *w = current_apps_data[pid];
         if (w) {
-            error("KILLME PSVFP %d, %lu, %lu", pid, w->publish_open, offset);
             ret += get_value_from_structure((char *)w, offset);
         }
 
@@ -229,7 +226,6 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            error("KILLME PSAD %s: %d, %d, %u, %p", w->name, (int)unlikely(w->exposed && w->processes), w->exposed, w->processes, w->root_pid);
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_open));
             write_chart_dimension(w->name, value);
         }
@@ -465,7 +461,6 @@ static void ebpf_process_update_apps_data()
         cad->bytes_read = (uint64_t)ps->read_bytes +
                                            (uint64_t)ps->readv_bytes;
 
-        error("KILLME PUAD (%u): status = %d  Open = %lu, %lu ; Write = %lu, %lu ; Read = %lu, %lu", current_pid, lstatus, pad->call_sys_open, cad->call_sys_open, pad->call_write, cad->call_write, pad->call_read, cad->call_read);
         ebpf_process_update_apps_publish(cad, pad, lstatus);
     }
 }
@@ -656,7 +651,6 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
         }
     }
 
-    error("KILLME PCAC %d", newly_added);
     if (!newly_added) return;
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
