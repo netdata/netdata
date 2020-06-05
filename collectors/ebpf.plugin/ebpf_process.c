@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <sys/resource.h>
-#include <lzma.h>
 
 #include "ebpf.h"
 #include "ebpf_process.h"

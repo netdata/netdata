@@ -415,18 +415,15 @@ static void ebpf_socket_update_apps_data()
 static void socket_collector(usec_t step, ebpf_module_t *em)
 {
     (void)em;
+    (void)step;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     while(!close_ebpf_plugin) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-
-        read_hash_global_tables();
-
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
+        read_hash_global_tables();
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
