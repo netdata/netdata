@@ -51,6 +51,42 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "../collectors/plugins.d/pluginsd_parser.h"
 
+// Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
+// the last entry times as the metric updates, but let's see if it is a problem first.
+time_t rrdhost_last_entry_t(RRDHOST *h) {
+    rrdhost_rdlock(h);
+    RRDSET *st;
+    time_t now = now_realtime_sec();
+    time_t result = now;
+    rrdset_foreach_read(st, h) {
+        RRDDIM *rd;
+        netdata_rwlock_rdlock(&st->rrdset_rwlock);
+        rrddim_foreach_read(rd, st) {
+            time_t last_update_t, last_collect_t;
+            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+                last_update_t = rd->state->query_ops.latest_time(rd);
+            else
+                last_update_t = st->last_updated.tv_sec;
+            last_collect_t = rd->last_collected_time.tv_sec;
+            if (last_collect_t > 0) {
+                info("Dimension %s / %s - now %ld updated %ld collected %ld result %ld gap %ld", st->name, rd->id, now, last_update_t, last_collect_t, result, now - last_collect_t);
+                if (last_collect_t < result)
+                    result = last_collect_t;
+            }
+        }
+        netdata_rwlock_unlock(&st->rrdset_rwlock);
+        /*if (st_last > now)
+            info("Skipping %s -> future update! %ld is %ld ahead", st->name, st_last-now);
+        else {
+            info("Chart %s last %ld global %ld gap=%ld", st->name, st_last, result, now-st_last);
+            if (st_last < result)
+                result = st_last;
+        }*/
+    }
+    rrdhost_unlock(h);
+    return result;
+}
+
 PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugins_action)
 {
     PARSER_USER_OBJECT *user = user_v;
@@ -144,10 +180,26 @@ disable:
 PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
     PARSER_USER_OBJECT *user = user_v;
     UNUSED(plugins_action);
-    UNUSED(words);
+    char *num_points_txt = words[1];
+    if (!num_points_txt)
+        goto disable;
+    usec_t num_points = str2ull(num_points_txt);
+    struct receiver_state *rpt = user->opaque;
+    user->st->last_updated.tv_sec = rpt->gap_end;
+    user->st->last_updated.tv_usec = 0;
+    user->st->counter += num_points;
+    user->st->current_entry += num_points;
+    if (user->st->current_entry >= user->st->entries)
+        user->st->current_entry -= user->st->entries;
     user->st = NULL;
+    info("Replication completed %zu points", num_points);
     return PARSER_RC_OK;
+disable:
+    error("Gap replication failed - Invalid REPEND %s on host %s. Disabling it.", words[1], user->host->hostname);
+    user->enabled = 0;
+    return PARSER_RC_ERROR;
 }
+
 
 PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
     PARSER_USER_OBJECT *user = user_v;
@@ -177,6 +229,8 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
 
     info("Replicating %s / %s : %llu = " STORAGE_NUMBER_FORMAT " chart last %ld", user->st->id, words[1], timestamp, value, st_last);
     rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+    rd->last_collected_time.tv_sec = timestamp;
+    rd->last_collected_time.tv_usec = timestamp;
 
     return PARSER_RC_OK;
 disable:
@@ -277,6 +331,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         int pos = 0;
         char *line;
         while ((line = receiver_next_line(rpt, &pos))) {
+            info("%s received %s", rpt->host->hostname, line);
             if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
                 goto done;
         }

@@ -314,10 +314,13 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t end_t)
                 // Technically rd->update_every could differ from st->update_every, but it does not.
                 sample_t += rd->update_every;
             }
-            st->gap_sent = end_t;
         }
     }
-    buffer_sprintf(s->build, "REPEND\n");
+    if (((end_t - st->gap_sent) % st->update_every) == 0)
+        buffer_sprintf(s->build, "REPEND %ld\n", (end_t - st->gap_sent) / st->update_every + 1);
+    else
+        buffer_sprintf(s->build, "REPEND %ld\n", (end_t - st->gap_sent) / st->update_every);
+    st->gap_sent = end_t;
 }
 
 void rrdset_done_push(RRDSET *st) {

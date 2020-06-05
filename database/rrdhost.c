@@ -1694,19 +1694,3 @@ int alarm_compare_name(void *a, void *b) {
     return strcmp(in1->name,in2->name);
 }
 
-// Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
-// the last entry times as the metric updates, but let's see if it is a problem first.
-time_t rrdhost_last_entry_t(RRDHOST *h) {
-    rrdhost_rdlock(h);
-    RRDSET *st;
-    time_t now = now_realtime_sec();
-    time_t result = 0;
-    rrdset_foreach_read(st, h) {
-        time_t st_last = rrdset_last_entry_t(st);
-        info("Chart %s last %ld global %ld gap=%ld", st->name, st_last, result, now-st_last);
-        if (st_last > result)
-            result = st_last;
-    }
-    rrdhost_unlock(h);
-    return result;
-}
