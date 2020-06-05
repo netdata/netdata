@@ -646,6 +646,9 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     int set_quotes = (!ff)?1:0;
 
+    struct stat statbuf;
+    if (stat(p->stat_filename, &statbuf)) return 0;
+
     ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(unlikely(!ff)) return 0;
 
