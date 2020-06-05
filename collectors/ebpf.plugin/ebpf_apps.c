@@ -963,13 +963,13 @@ static void cleanup_exited_pids(ebpf_process_stat_t **out) {
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-static int read_proc_filesystem()
+static inline void read_proc_filesystem()
 {
     char dirname[FILENAME_MAX + 1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     DIR *dir = opendir(dirname);
-    if(!dir) return -1;
+    if(!dir) return;
 
     struct dirent *de = NULL;
 
@@ -988,8 +988,6 @@ static int read_proc_filesystem()
         collect_data_for_pid(pid, NULL);
     }
     closedir(dir);
-
-    return 0;
 }
 
 /**
@@ -1045,6 +1043,10 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
      */
 
     w->processes++;
+    struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
+    pid_on_target->pid = p->pid;
+    pid_on_target->next = w->root_pid;
+    w->root_pid = pid_on_target;
     /*
     w->num_threads += p->num_threads;
 
@@ -1098,10 +1100,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
         }
     }
 
-    if (read_proc_filesystem()) {
-        error("Cannot read proc file system.");
-        return 0;
-    }
+    read_proc_filesystem();
 
     while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
         ebpf_process_stat_t *w = out[next_key];
@@ -1112,7 +1111,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
 
         if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, w)) {
             index[counter] = next_key;
-            error("KILLME (%u, %u): Open = %u ; Write = %u ; Read = %u", w->pid, next_key, w->open_call, w->write_call + w->writev_call, w->readv_call + w->read_call);
+            error("KILLME DFAP (%u, %u): Open = %u ; Write = %u ; Read = %u", w->pid, next_key, w->open_call, w->write_call + w->writev_call, w->readv_call + w->read_call);
             counter++;
             collect_data_for_pid(next_key, NULL);
         }

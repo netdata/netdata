@@ -205,6 +205,7 @@ long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t of
         int32_t pid = root->pid;
         ebpf_process_publish_apps_t *w = current_apps_data[pid];
         if (w) {
+            error("KILLME PSVFP %d, %lu, %lu", pid, w->publish_open, offset);
             ret += get_value_from_structure((char *)w, offset);
         }
 
@@ -228,6 +229,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
+            error("KILLME PSAD %s: %d, %d, %u, %p", w->name, (int)unlikely(w->exposed && w->processes), w->exposed, w->processes, w->root_pid);
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_open));
             write_chart_dimension(w->name, value);
         }
@@ -654,6 +656,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
         }
     }
 
+    error("KILLME PCAC %d", newly_added);
     if (!newly_added) return;
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
