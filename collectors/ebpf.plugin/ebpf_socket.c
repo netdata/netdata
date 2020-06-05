@@ -35,6 +35,7 @@ static int socket_apps_created = 0;
 //Libbpf (It is necessary to have at least kernel 4.10)
 static int (*bpf_map_lookup_elem)(int, const void *, void *);
 static int (*bpf_map_delete_elem)(int fd, const void *key);
+int (*bpf_map_get_next_key)(int, const void *, void *);
 
 static int *map_fd = NULL;
 /**
@@ -351,22 +352,22 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr= socket_bandwidth_curr[current_pid];
     ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
-    int status;
+    int lstatus;
     if (!curr) {
         curr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
         socket_bandwidth_curr[current_pid] = &curr[0];
         prev = &curr[1];
         socket_bandwidth_prev[current_pid] = prev;
-        status = 1;
+        lstatus = 1;
     } else {
         memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
-        status = 0;
+        lstatus = 0;
     }
 
     curr->sent = eb->sent;
     curr->received = eb->received;
 
-    ebpf_socket_update_apps_publish(curr, prev, status);
+    ebpf_socket_update_apps_publish(curr, prev, lstatus);
 }
 
 /**
@@ -374,27 +375,26 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
  */
 static void ebpf_socket_update_apps_data()
 {
-    int i;
     int fd = map_fd[0];
     ebpf_bandwidth_t eb;
-    uint32_t current_pid;
-    for (i = 0 ; i < pids_running ; i++) {
-        current_pid = pid_index[i];
+    uint32_t key = 0, next_key;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
 
-        if (bpf_map_lookup_elem(fd, &current_pid, &eb))
+        if (bpf_map_lookup_elem(fd, &next_key, &eb))
             continue;
 
-        error("KILLME SOCKET INDEX: %u", current_pid);
-        ebpf_socket_fill_publish_apps(current_pid, &eb);
+        ebpf_socket_fill_publish_apps(next_key, &eb);
+
+        key = next_key;
     }
 
     struct pid_stat *p = NULL;
+    uint32_t current_pid;
     for (p = root_of_pids; p ; p = p->next) {
         current_pid = p->pid;
         if (bpf_map_lookup_elem(fd, &current_pid, &eb))
             continue;
 
-        error("KILLME SOCKET ROOT: %u", current_pid);
         ebpf_socket_fill_publish_apps(current_pid, &eb);
     }
 }
@@ -430,12 +430,12 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
-        pthread_mutex_unlock(&collect_data_mutex);
-
         pthread_mutex_lock(&lock);
         ebpf_process_send_data(em);
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
+
+        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_unlock(&lock);
 
@@ -507,6 +507,8 @@ static void set_local_pointers(ebpf_module_t *em) {
     (void) bpf_map_lookup_elem;
     bpf_map_delete_elem = socket_functions.bpf_map_delete_elem;
     (void) bpf_map_delete_elem;
+
+    bpf_map_get_next_key = socket_functions.bpf_map_get_next_key;
 #endif
     map_fd = socket_functions.map_fd;
 
