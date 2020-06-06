@@ -1722,7 +1722,7 @@ send_matrix() {
 	[ "${SEND_MATRIX}" != "YES" ] && return 1
 	[ -z "${MATRIX_ACCESSTOKEN}" ] && return 1
 
-        accesstoken="${MATRIX_ACCESSTOKEN}"
+	accesstoken="${MATRIX_ACCESSTOKEN}"
 
 	case "${status}" in
 	WARNING) emoji="⚠️" ;;
@@ -1732,15 +1732,15 @@ send_matrix() {
 	esac
 
 	for room in ${rooms}; do
-        	webhook="$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken"
+		webhook="$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken"
 		payload="$(
         cat <<EOF
         {
-            "msgtype": "m.notice",
-            "format": "org.matrix.custom.html",
+		"msgtype": "m.notice",
+		"format": "org.matrix.custom.html",
 			"formatted_body": "${emoji} ${host} ${status_message} - <b>${name//_/ }</b><br>${chart} (${family})<br><a href=\"${goto_url}\">${alarm}</a><br><i>${info}</i>",
 			"body": "${emoji} ${host} ${status_message} - ${name//_/ } ${chart} (${family}) ${goto_url} ${alarm} ${info}"
-        }
+	}
 EOF
 		)"
 
