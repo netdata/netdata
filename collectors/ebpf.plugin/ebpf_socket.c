@@ -102,10 +102,9 @@ static void ebpf_update_global_publish(netdata_publish_syscall_t *publish,
  *
  * @param curr   Last values read from memory.
  * @param prev   Previous values read from memory.
- * @param first   was it allocated now?
  */
 static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr,
-                                            ebpf_socket_publish_apps_t *prev, int first)
+                                            ebpf_socket_publish_apps_t *prev)
 {
     curr->publish_recv = curr->received - prev->received;
     curr->publish_sent = curr->sent - prev->sent;
@@ -350,24 +349,20 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr= socket_bandwidth_curr[current_pid];
     ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
-    int lstatus;
     if (!curr) {
         ebpf_socket_publish_apps_t *ptr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
         curr = &ptr[0];
         socket_bandwidth_curr[current_pid] = curr;
         prev = &ptr[1];
         socket_bandwidth_prev[current_pid] = prev;
-        lstatus = 1;
     } else {
         memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
-        lstatus = 0;
     }
 
     curr->sent = eb->sent;
     curr->received = eb->received;
 
-    lstatus = (int)current_pid;
-    ebpf_socket_update_apps_publish(curr, prev, lstatus);
+    ebpf_socket_update_apps_publish(curr, prev);
 }
 
 void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
