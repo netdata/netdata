@@ -17,7 +17,7 @@ typedef enum parser_rc {
 
 typedef struct pluginsd_action {
     PARSER_RC (*set_action)(void *user, RRDSET *st, RRDDIM *rd, long long int value);
-    PARSER_RC (*begin_action)(void *user, RRDSET *st, usec_t microseconds, int trust_durations);
+    PARSER_RC (*begin_action)(void *user, RRDSET *st, usec_t microseconds, usec_t remote_clock);
     PARSER_RC (*end_action)(void *user, RRDSET *st);
     PARSER_RC (*chart_action)
     (void *user, char *type, char *id, char *name, char *family, char *context, char *title, char *units, char *plugin,

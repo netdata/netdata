@@ -640,7 +640,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if (s->version >= VERSION_GAP_FILLING) {
                 time_t now = now_realtime_sec();
                 sender_start(s);
-                buffer_sprintf(s->build, "TIMESTAMP %ld", now);
+                buffer_sprintf(s->build, "TIMESTAMP %ld\n", now);
                 sender_commit(s);
             }
             continue;

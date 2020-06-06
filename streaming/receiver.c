@@ -119,7 +119,7 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
             }
             info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
                  host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
-            if (gap > 0) {
+/*            if (gap > 0) {
                 rpt->gap_start = remote_time - gap;
                 rpt->gap_end = remote_time;
                 char message[128];
@@ -137,11 +137,28 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
 #endif
                 if (ret != (int)strlen(message))
                     error("Failed to send initial timestamp - gaps may appear in charts");
-            }
+            }*/
         }
         return PARSER_RC_OK;
     }
     return PARSER_RC_ERROR;
+}
+
+// The RRDSET_FLAGs are not meant for stateful updates as they are not thread-safe. This code assumes that
+// the streaming receiver is the only thread writing updates into the chart.
+PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
+    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
+        return PARSER_RC_OK;
+    if (remote_clock - expected_t > st->update_every * 2)
+    {
+        info("Gap in chart: remote=%ld vs %ld", remote_clock, expected_t);
+        rrdset_flag_set(st, RRDSET_FLAG_REPLICATING);
+    }
+    else {
+        info("Within expected window: remote=%ld vs %ld", remote_clock, expected_t);
+        pluginsd_begin_action(user_v, st, microseconds, remote_clock);
+    }
 }
 
 PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
@@ -312,7 +329,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         return 0;
     }
 
-    parser->plugins_action->begin_action     = &pluginsd_begin_action;
+    parser->plugins_action->begin_action     = &streaming_begin_action;
     parser->plugins_action->flush_action     = &pluginsd_flush_action;
     parser->plugins_action->end_action       = &pluginsd_end_action;
     parser->plugins_action->disable_action   = &pluginsd_disable_action;

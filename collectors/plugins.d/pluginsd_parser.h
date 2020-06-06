@@ -21,7 +21,7 @@ typedef struct parser_user_object {
 
 extern PARSER_RC pluginsd_set_action(void *user, RRDSET *st, RRDDIM *rd, long long int value);
 extern PARSER_RC pluginsd_flush_action(void *user, RRDSET *st);
-extern PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, int trust_durations);
+extern PARSER_RC pluginsd_begin_action(void *user, RRDSET *st, usec_t microseconds, usec_t remote_clock);
 extern PARSER_RC pluginsd_end_action(void *user, RRDSET *st);
 extern PARSER_RC pluginsd_chart_action(void *user, char *type, char *id, char *name, char *family, char *context,
                                        char *title, char *units, char *plugin, char *module, int priority,
@@ -33,6 +33,5 @@ extern PARSER_RC pluginsd_dimension_action(void *user, RRDSET *st, char *id, cha
                                            long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type);
 extern PARSER_RC pluginsd_label_action(void *user, char *key, char *value, LABEL_SOURCE source);
 extern PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new_labels);
-
 
 #endif //NETDATA_PLUGINSD_PARSER_H
