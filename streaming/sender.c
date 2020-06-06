@@ -535,11 +535,14 @@ void execute_commands(struct sender_state *s) {
             continue;
         }
         start = newline+1;
+        error("Unrecognised command received, skipping to position %d", start - s->read_buffer);
     }
     if (start<end) {
         memcpy( s->read_buffer, start, end-start);
         s->read_len = end-start;
     }
+    else
+        s->read_len = 0;
 }
 
 
