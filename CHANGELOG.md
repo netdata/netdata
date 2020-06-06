@@ -9,6 +9,7 @@
 - Fix Coverity defects 359164, 359165 and 358989. [\#9268](https://github.com/netdata/netdata/pull/9268) ([amoss](https://github.com/amoss))
 - Move/refactor docs to accomodate new Guides section on Learn [\#9266](https://github.com/netdata/netdata/pull/9266) ([joelhans](https://github.com/joelhans))
 - Cleanup of main README and registry doc [\#9265](https://github.com/netdata/netdata/pull/9265) ([joelhans](https://github.com/joelhans))
+- Fixed handling of OpenSSL on CentOS/RHEL by bundling a static copy and selecting a configuration directory at install time. [\#9263](https://github.com/netdata/netdata/pull/9263) ([Ferroin](https://github.com/Ferroin))
 - Fix frontmatter in circular\_buffer README [\#9262](https://github.com/netdata/netdata/pull/9262) ([joelhans](https://github.com/joelhans))
 - Fixes documentation ambiguity leading into issue \#8239 [\#9255](https://github.com/netdata/netdata/pull/9255) ([underhood](https://github.com/underhood))
 - Add new exporting "home base" document [\#9246](https://github.com/netdata/netdata/pull/9246) ([joelhans](https://github.com/joelhans))
@@ -16,7 +17,9 @@
 - Add CI check for building against LibreSSL [\#9216](https://github.com/netdata/netdata/pull/9216) ([prologic](https://github.com/prologic))
 - Gap-detection and slew [\#9214](https://github.com/netdata/netdata/pull/9214) ([amoss](https://github.com/amoss))
 - Update eBPF to use kernel-collector version 0.4.0. [\#9212](https://github.com/netdata/netdata/pull/9212) ([Ferroin](https://github.com/Ferroin))
+- Add link to kernel docs for ftrace [\#9211](https://github.com/netdata/netdata/pull/9211) ([Steve8291](https://github.com/Steve8291))
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
+- Update apps.plugin documentation and dashboard.info [\#9199](https://github.com/netdata/netdata/pull/9199) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix compilation for older systems [\#9198](https://github.com/netdata/netdata/pull/9198) ([ktsaou](https://github.com/ktsaou))
 - Clean type\_name in exporting connector instance configuration [\#9188](https://github.com/netdata/netdata/pull/9188) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed cmake build affected by \#9074 [\#9186](https://github.com/netdata/netdata/pull/9186) ([stelfrag](https://github.com/stelfrag))
@@ -107,6 +110,7 @@
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
 - Docs: Update contributing guidelines [\#8781](https://github.com/netdata/netdata/pull/8781) ([joelhans](https://github.com/joelhans))
 - Sort alphabetically and automatic scroll [\#8762](https://github.com/netdata/netdata/pull/8762) ([tnyeanderson](https://github.com/tnyeanderson))
+- single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
 - Correctly track last num vcpus in xenstat\_plugin [\#8720](https://github.com/netdata/netdata/pull/8720) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 - Typo. [\#8703](https://github.com/netdata/netdata/pull/8703) ([cherouvim](https://github.com/cherouvim))
 - install and enable eBPF Plugin by default [\#8665](https://github.com/netdata/netdata/pull/8665) ([Ferroin](https://github.com/Ferroin))
@@ -239,7 +243,6 @@
 - github/workflow: add python.d configuration files to the yaml-files [\#8541](https://github.com/netdata/netdata/pull/8541) ([ilyam8](https://github.com/ilyam8))
 - Write the failure reason during ACLK challenge / response [\#8538](https://github.com/netdata/netdata/pull/8538) ([stelfrag](https://github.com/stelfrag))
 - fix minimist vulnerability [\#8537](https://github.com/netdata/netdata/pull/8537) ([jacekkolasa](https://github.com/jacekkolasa))
-- charts.d.plugin: add keepalive to global\_update [\#8529](https://github.com/netdata/netdata/pull/8529) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
