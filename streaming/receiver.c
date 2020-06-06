@@ -144,21 +144,63 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
     return PARSER_RC_ERROR;
 }
 
+// TODO-GAPS: we can't drop the message here, with the chart in replication mode it will kill the
+//            link. Probably ened to put a proper poll() / buffer in the parser main loop....
+void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) {
+    char message[RRD_ID_LENGTH_MAX+60];
+    sprintf(message,"REPLICATE %s %ld %ld\n", st_id, start, end);
+    int ret;
+    info("Replicate command: %s",message);
+#ifdef ENABLE_HTTPS
+    SSL *conn = host->stream_ssl.conn ;
+    if(conn && !host->stream_ssl.flags) {
+        ret = SSL_write(conn, message, strlen(message));
+    } else {
+        ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+    }
+#else
+    ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+#endif
+    if (ret != (int)strlen(message))
+        error("Failed to send replication request for %s!", st_id);
+}
+
 // The RRDSET_FLAGs are not meant for stateful updates as they are not thread-safe. This code assumes that
 // the streaming receiver is the only thread writing updates into the chart.
 PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
-    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    PARSER_USER_OBJECT *user = user_v;
     if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
         return PARSER_RC_OK;
-    if (remote_clock - expected_t > st->update_every * 2)
+    if (st->last_updated.tv_sec == 0)
+        return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
+    time_t now = now_realtime_sec();
+    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    // There are two cases to drop into replication mode:
+    //   - the data is old, this is probably a stale buffer that arrived as part of a reconnection
+    //   - the data contains a gap, either the connection dropped or this node restarted
+    if ((remote_clock - expected_t > st->update_every * 2) ||
+       (now - remote_clock > st->update_every*2))
     {
         info("Gap in chart: remote=%ld vs %ld", remote_clock, expected_t);
         rrdset_flag_set(st, RRDSET_FLAG_REPLICATING);
+        send_replication_req(user->host, st->id, expected_t, now);
     }
     else {
         info("Within expected window: remote=%ld vs %ld", remote_clock, expected_t);
-        pluginsd_begin_action(user_v, st, microseconds, remote_clock);
+        return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     }
+}
+
+PARSER_RC streaming_set_action(void *user_v, RRDSET *st, RRDDIM *rd, long long int value) {
+    if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
+        return PARSER_RC_OK;
+    return pluginsd_set_action(user_v, st, rd, value);
+}
+
+PARSER_RC streaming_end_action(void *user_v, RRDSET *st) {
+    if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
+        return PARSER_RC_OK;
+    return pluginsd_end_action(user_v, st);
 }
 
 PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
@@ -330,15 +372,15 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     }
 
     parser->plugins_action->begin_action     = &streaming_begin_action;
+    parser->plugins_action->set_action       = &streaming_set_action;
+    parser->plugins_action->end_action       = &streaming_end_action;
     parser->plugins_action->flush_action     = &pluginsd_flush_action;
-    parser->plugins_action->end_action       = &pluginsd_end_action;
     parser->plugins_action->disable_action   = &pluginsd_disable_action;
     parser->plugins_action->variable_action  = &pluginsd_variable_action;
     parser->plugins_action->dimension_action = &pluginsd_dimension_action;
     parser->plugins_action->label_action     = &pluginsd_label_action;
     parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
     parser->plugins_action->chart_action     = &pluginsd_chart_action;
-    parser->plugins_action->set_action       = &pluginsd_set_action;
 
     user->parser = parser;
 

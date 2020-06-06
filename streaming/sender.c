@@ -514,6 +514,7 @@ void execute_replicate(struct sender_state *s, long start_t, long end_t) {
 void execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
+    info("STREAM %s [send to %s] received command over connection: %s", s->host->hostname, s->connected_to, start);
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
         if (!strncmp(start, "REPLICATE ", 10)) {
@@ -532,7 +533,6 @@ void execute_commands(struct sender_state *s) {
             start = newline+1;
             continue;
         }
-        info("STREAM %s [send to %s] received command over connection: %s", s->host->hostname, s->connected_to, start);
         start = newline+1;
     }
     if (start<end) {
