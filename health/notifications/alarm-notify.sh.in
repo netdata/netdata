@@ -1734,8 +1734,8 @@ send_matrix() {
 	for room in ${rooms}; do
 		webhook="$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken"
 		payload="$(
-        cat <<EOF
-        {
+	cat <<EOF
+	{
 		"msgtype": "m.notice",
 		"format": "org.matrix.custom.html",
 			"formatted_body": "${emoji} ${host} ${status_message} - <b>${name//_/ }</b><br>${chart} (${family})<br><a href=\"${goto_url}\">${alarm}</a><br><i>${info}</i>",
