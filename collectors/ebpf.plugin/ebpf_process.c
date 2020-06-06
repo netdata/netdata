@@ -27,9 +27,6 @@ static ebpf_process_stat_t **local_process_stats = NULL;
 static ebpf_process_publish_apps_t **current_apps_data = NULL;
 static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
-pthread_mutex_t collect_data_mutex;
-pthread_cond_t collect_data_cond_var;
-
 int process_apps_enabled = 0;
 
 #ifndef STATIC
@@ -426,9 +423,10 @@ static void ebpf_process_update_apps_data()
         ebpf_process_publish_apps_t *pad = prev_apps_data[current_pid];
         int lstatus;
         if (!cad) {
-            cad = callocz(2, sizeof(ebpf_process_publish_apps_t));
-            current_apps_data[current_pid] = &cad[0];
-            pad = &cad[1];
+            ebpf_process_publish_apps_t *ptr = callocz(2, sizeof(ebpf_process_publish_apps_t));
+            cad = &ptr[0];
+            current_apps_data[current_pid] = cad;
+            pad = &ptr[1];
             prev_apps_data[current_pid] = pad;
             lstatus = 1;
         } else {
@@ -771,15 +769,18 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         (void)dt;
 
         read_hash_global_tables();
+
+        pthread_mutex_lock(&collect_data_mutex);
         pids_running = collect_data_for_all_processes(local_process_stats,
                                                       pid_index,
                                                       process_functions.bpf_map_get_next_key,
                                                       process_functions.bpf_map_lookup_elem,
                                                       map_fd[0]);
 
-        if (enabled) {
-            pthread_cond_broadcast(&collect_data_cond_var);
+        pthread_cond_broadcast(&collect_data_cond_var);
+        pthread_mutex_unlock(&collect_data_mutex);
 
+        if (enabled) {
             int publish_apps = 0;
             if (pids_running > 0 && apps_enabled){
                 publish_apps = 1;
@@ -947,10 +948,6 @@ void *ebpf_process_thread(void *ptr)
     }
 
     pthread_mutex_unlock(&lock);
-
-    pthread_mutex_init(&collect_data_mutex, NULL);
-    if (pthread_cond_init(&collect_data_cond_var, NULL))
-        goto endprocess;
 
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 

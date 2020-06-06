@@ -66,6 +66,8 @@ int ebpf_nprocs;
 static int isrh;
 
 pthread_mutex_t lock;
+pthread_mutex_t collect_data_mutex;
+pthread_cond_t collect_data_cond_var;
 
 netdata_ebpf_events_t process_probes[] = {
     { .type = 'r', .name = "vfs_write" },
@@ -534,6 +536,36 @@ void ebpf_print_help() {
  *****************************************************************/
 
 /**
+ * Start Ptherad Variable
+ *
+ * This function starts all pthread variables.
+ *
+ * @return It returns 0 on success and -1.
+ */
+int ebpf_start_pthread_variables()
+{
+    if (pthread_mutex_init(&lock, NULL)) {
+        thread_finished++;
+        error("Cannot start mutex to control overall charts.");
+        return -1;
+    }
+
+    if (pthread_mutex_init(&collect_data_mutex, NULL)) {
+        thread_finished++;
+        error("Cannot start mutex to control Apps charts.");
+        return -1;
+    }
+
+    if (pthread_cond_init(&collect_data_cond_var, NULL)) {
+        thread_finished++;
+        error("Cannot start conditional variable to control Apps charts.");
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
  * Allocate the vectors used for all threads.
  */
 static void ebpf_allocate_common_vectors()
@@ -862,9 +894,9 @@ int main(int argc, char **argv)
     signal(SIGINT, ebpf_exit);
     signal(SIGTERM, ebpf_exit);
 
-    if (pthread_mutex_init(&lock, NULL)) {
+    if (ebpf_start_pthread_variables()) {
         thread_finished++;
-        error("Cannot start the mutex.");
+        error("Cannot start mutex to control overall charts.");
         ebpf_exit(5);
     }
 
