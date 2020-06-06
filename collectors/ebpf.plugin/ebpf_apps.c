@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+
+#include "ebpf.h"
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
@@ -1068,6 +1070,52 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 }
 
 /**
+ * Sum process stat values read from the memory.
+ *
+ * @param out   the structure to store data
+ * @param in    values read from the memory.
+ */
+void ebpf_sum_process_stat(ebpf_process_stat_t *out, ebpf_process_stat_t *in)
+{
+    //Reset values to do sum
+    memset(out, 0, sizeof(ebpf_process_stat_t));
+
+    int i;
+    int end = (running_on_kernel >= NETDATA_KERNEL_V4_15)?ebpf_nprocs:1;
+
+    for (i = 0; i < end ; i++) {
+        out->open_call += in[i].open_call;
+        out->write_call += in[i].write_call;
+        out->writev_call += in[i].writev_call;
+        out->read_call += in[i].read_call;
+        out->readv_call += in[i].readv_call;
+        out->unlink_call += in[i].unlink_call;
+        out->exit_call += in[i].exit_call;
+        out->release_call += in[i].release_call;
+        out->fork_call += in[i].fork_call;
+        out->clone_call += in[i].clone_call;
+        out->close_call += in[i].close_call;
+
+        //Accumulator
+        out->write_bytes += in[i].write_bytes;
+        out->writev_bytes += in[i].writev_bytes;
+        out->readv_bytes += in[i].readv_bytes;
+        out->read_bytes += in[i].read_bytes;
+
+        //Counter
+        out->open_err += in[i].open_err;
+        out->write_err += in[i].write_err;
+        out->writev_err += in[i].writev_err;
+        out->read_err += in[i].read_err;
+        out->readv_err += in[i].readv_err;
+        out->unlink_err += in[i].unlink_err;
+        out->fork_err += in[i].fork_err;
+        out->clone_err += in[i].clone_err;
+        out->close_err += in[i].close_err;
+    }
+}
+
+/**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
@@ -1100,11 +1148,13 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
         ebpf_process_stat_t *w = out[next_key];
         if (!w) {
-            w = callocz(1, sizeof(ebpf_process_stat_t));
+            w = mallocz(sizeof(ebpf_process_stat_t));
             out[next_key] = w;
         }
 
-        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, w)) {
+        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, global_process_stat)) {
+            ebpf_sum_process_stat(w, global_process_stat);
+
             index[counter] = next_key;
             counter++;
             collect_data_for_pid(next_key, NULL);

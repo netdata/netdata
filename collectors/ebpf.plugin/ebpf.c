@@ -108,6 +108,7 @@ ebpf_module_t ebpf_modules[] = {
 //Link with apps.plugin
 pid_t *pid_index;
 int pids_running;
+ebpf_process_stat_t *global_process_stat = NULL;
 
 /*****************************************************************
  *
@@ -133,6 +134,7 @@ static void ebpf_exit(int sig)
     clean_apps_groups_target(apps_groups_root_target);
 
     freez(pid_index);
+    freez(global_process_stat);
 
     event_pid = getpid();
     int ret = fork();
@@ -572,6 +574,7 @@ static void ebpf_allocate_common_vectors()
 {
     all_pids = callocz((size_t) pid_max, sizeof(struct pid_stat *));
     pid_index = callocz((size_t)pid_max, sizeof(pid_t));
+    global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
 }
 
 /**

@@ -195,5 +195,6 @@ extern void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *roo
 extern int socket_apps_enabled;
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern struct pid_stat  *root_of_pids;
+extern ebpf_process_stat_t *global_process_stat;
 
 #endif
