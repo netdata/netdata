@@ -23,6 +23,7 @@ static ebpf_functions_t socket_functions;
 
 static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
+static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 int socket_apps_enabled = 0;
 static int socket_apps_created = 0;
@@ -106,15 +107,8 @@ static void ebpf_update_global_publish(netdata_publish_syscall_t *publish,
 static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr,
                                             ebpf_socket_publish_apps_t *prev, int first)
 {
-    /*
-    if(first)
-        return;
-        */
-
     curr->publish_recv = curr->received - prev->received;
     curr->publish_sent = curr->sent - prev->sent;
-
-    error("KILLME 3 SUAP %d: Sent %lu - %lu = %lu Recv %lu - %lu = %lu", first, curr->sent, prev->sent,curr->publish_sent, curr->received, prev->received,curr->publish_recv);
 }
 
 /**
@@ -158,7 +152,6 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
         int32_t pid = root->pid;
         ebpf_socket_publish_apps_t *w = socket_bandwidth_curr[pid];
         if (w) {
-            error("KILLME 4: %lu %p ", offset, w);
             ret += get_value_from_structure((char *)w, offset);
         }
 
@@ -187,7 +180,6 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_sent));
-            error("KILLME SENT 5: %s %lld %p", w->name, value, w->root_pid);
             write_chart_dimension(w->name, value);
         }
     }
@@ -197,7 +189,6 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_recv));
-            error("KILLME RECV 6: %s %lld %p", w->name, value, w->root_pid);
             write_chart_dimension(w->name, value);
         }
     }
@@ -375,9 +366,19 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     curr->sent = eb->sent;
     curr->received = eb->received;
 
-    error("KILLME 2: SFPA Pid = %u Status = %d Sent = %lu Received = %lu ( Sent = %lu Received = %lu)", current_pid, lstatus, curr->sent, curr->received, prev->sent, prev->received);
     lstatus = (int)current_pid;
     ebpf_socket_update_apps_publish(curr, prev, lstatus);
+}
+
+void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
+{
+    int i, end = ebpf_nprocs;
+    ebpf_bandwidth_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        ebpf_bandwidth_t *move = &out[i];
+        total->sent += move->sent;
+        total->received += move->received;
+    }
 }
 
 /**
@@ -386,27 +387,19 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 static void ebpf_socket_update_apps_data()
 {
     int fd = map_fd[0];
-    ebpf_bandwidth_t eb;
+    ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key = 0, next_key;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
 
-        if (bpf_map_lookup_elem(fd, &next_key, &eb))
+        if (bpf_map_lookup_elem(fd, &next_key, eb))
             continue;
 
-        error("KILLME SUAD 1: PID = %u Sent = %lu , Received =%lu", next_key, eb.sent, eb.received);
-        ebpf_socket_fill_publish_apps(next_key, &eb);
+        if (running_on_kernel >= NETDATA_KERNEL_V4_15)
+            ebpf_socket_bandwidth_accumulator(eb);
+
+        ebpf_socket_fill_publish_apps(next_key, eb);
 
         key = next_key;
-    }
-
-    struct pid_stat *p = NULL;
-    uint32_t current_pid;
-    for (p = root_of_pids; p ; p = p->next) {
-        current_pid = p->pid;
-        if (bpf_map_lookup_elem(fd, &current_pid, &eb))
-            continue;
-
-        ebpf_socket_fill_publish_apps(current_pid, &eb);
     }
 }
 
@@ -477,6 +470,7 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_functions.map_fd);
     freez(socket_bandwidth_curr);
     freez(socket_bandwidth_prev);
+    freez(bandwidth_vector);
 }
 
 /*****************************************************************
@@ -499,6 +493,7 @@ static void ebpf_socket_allocate_global_vectors(size_t length) {
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
+    bandwidth_vector = callocz((size_t) ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 }
 
 static void change_collector_event() {
@@ -573,7 +568,6 @@ void *ebpf_socket_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    error("KILLME 0: STARTING SOCKET");
     socket_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
 endsocket:
