@@ -344,22 +344,30 @@ void rrdset_done_push(RRDSET *st) {
         host->rrdpush_sender_error_shown = 0;
     }
 
+    unsigned int replicating;
+    netdata_mutex_lock(&st->shared_flags_lock);
+    replicating = st->sflag_replicating;
+    netdata_mutex_unlock(&st->shared_flags_lock);
     sender_start(host->sender);
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
-    if (host->sender->gap_start != 0 && st->gap_sent < host->sender->gap_end) {
+    if (replicating) {
+        debug(D_STREAM, "Not sending collector new data - chart %s in replication mode", st->name);
+    }
+    else {
+        rrdpush_send_chart_metrics_nolock(st, host->sender);
+        // signal the sender there are more data
+        if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+            error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+    }
+    sender_commit(host->sender);
+    /*if (host->sender->gap_start != 0 && st->gap_sent < host->sender->gap_end) {
         if (st->gap_sent == 0)
             st->gap_sent = host->sender->gap_start;
         sender_fill_gap_nolock(host->sender, st, (time_t)host->sender->gap_end);
     }
     if (host->sender->gap_start == 0 || st->gap_sent >= host->sender->gap_end)
-        rrdpush_send_chart_metrics_nolock(st, host->sender);
-
-    // signal the sender there are more data
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
-
-    sender_commit(host->sender);
+    */
 }
 
 // labels

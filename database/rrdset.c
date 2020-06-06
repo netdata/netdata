@@ -892,6 +892,8 @@ RRDSET *rrdset_create_custom(
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
+    netdata_mutex_init(&st->shared_flags_lock);
+    st->sflag_replicating = 0;  // Assume we are not in replication mode until the far end requests it
 
     if(name && *name && rrdset_set_name(st, name))
         // we did set the name

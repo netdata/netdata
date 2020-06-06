@@ -533,6 +533,11 @@ struct rrdset {
     avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
 
+    // -------------------------------------------------------------------------
+    // it should be safe to extend this structure with volatile fields that are wiped on load
+    netdata_mutex_t shared_flags_lock;
+    unsigned int sflag_replicating:1;               // if this chart is being replicated by an upstream receiver
+
 };
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))

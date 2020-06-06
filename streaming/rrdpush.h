@@ -59,7 +59,6 @@ struct sender_state {
     char read_buffer[512];
     int read_len;
     int32_t version;
-    size_t gap_start, gap_end;                  // time_t has platform issues, needs to be size_t to match RRDSET
 };
 
 struct receiver_state {

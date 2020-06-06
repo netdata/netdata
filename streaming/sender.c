@@ -396,8 +396,8 @@ static void attempt_to_connect(struct sender_state *state)
 
         // send from the beginning
         netdata_mutex_lock(&state->mutex);
-        state->gap_start = 0;
-        state->gap_end = 0;
+        /*state->gap_start = 0;
+        state->gap_end = 0;*/
         state->host->rrdpush_sender_connected = 1; // let the data collection threads know we are ready
         state->not_connected_loops = 0; // make sure the next reconnection will be immediate
         state->sent_bytes_on_this_connection = 0; // reset the bytes we have sent for this session
@@ -503,11 +503,19 @@ int ret;
     rrdpush_sender_thread_close_socket(s->host);
 }
 
-void execute_replicate(struct sender_state *s, long start_t, long end_t) {
+void execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
     time_t now = now_realtime_sec();
     info("REPLICATE: %ld - %ld @ %ld", start_t, end_t, now);
-    s->gap_start = (size_t)start_t;
-    s->gap_end = (size_t)end_t;
+    RRDSET *st = rrdset_find(s->host, st_id);
+    if (!st)
+        error("Cannot replicate chart %s - not found!", st_id);
+    else {
+        // Use the chart shared flags (thread-safe) to tell the collector that replication is requested
+        netdata_mutex_lock(&st->shared_flags_lock);
+        st->sflag_replicating = 1;
+        st->gap_sent = (size_t)start_t;
+        netdata_mutex_unlock(&st->shared_flags_lock);
+    }
 }
 
 // This is just a placeholder until the gap filling state machine is inserted
@@ -519,15 +527,18 @@ void execute_commands(struct sender_state *s) {
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
         if (!strncmp(start, "REPLICATE ", 10)) {
-            char *next;
-            long start_t = strtol(start+10, &next, 10);
-            if (*next == ' ') {
-                char *after;
-                long end_t = strtol(next+1, &after, 10);
-                if (after == newline) {
-                    execute_replicate(s, start_t, end_t);
-                    start = after+1;
-                    continue;
+            char *next = strchr(start+10, ' ');
+            if (next) {
+                *next = 0;
+                long start_t = strtol(next+1, &next, 10);
+                if (*next == ' ') {
+                    char *after;
+                    long end_t = strtol(next+1, &after, 10);
+                    if (after == newline) {
+                        execute_replicate(s, start+10, start_t, end_t);
+                        start = after+1;
+                        continue;
+                    }
                 }
             }
             error("Malformed command on streaming link: %s", start);
