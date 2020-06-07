@@ -165,14 +165,19 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
         error("Failed to send replication request for %s!", st_id);
 }
 
-// The RRDSET_FLAGs are not meant for stateful updates as they are not thread-safe. This code assumes that
-// the streaming receiver is the only thread writing updates into the chart.
+// On the receiver side this is the only thread that will access the shared flags - but take the locks anyway
+// as contention will be low and it guards against future updates.
 PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
     PARSER_USER_OBJECT *user = user_v;
-    if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
+    netdata_mutex_lock(&st->shared_flags_lock);
+    if (st->sflag_replicating) {
+        netdata_mutex_unlock(&st->shared_flags_lock);
         return PARSER_RC_OK;
-    if (st->last_updated.tv_sec == 0)
+    }
+    if (st->last_updated.tv_sec == 0) {
+        netdata_mutex_unlock(&st->shared_flags_lock);
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
+    }
     time_t now = now_realtime_sec();
     time_t expected_t = st->last_updated.tv_sec + st->update_every;
     time_t remote_t = (time_t)remote_clock;
@@ -183,23 +188,32 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
        (now - remote_t > st->update_every*2))
     {
         info("Gap in chart: remote=%ld vs %ld", remote_t, expected_t);
-        rrdset_flag_set(st, RRDSET_FLAG_REPLICATING);
+        st->sflag_replicating = 1;
+        netdata_mutex_unlock(&st->shared_flags_lock);
         send_replication_req(user->host, st->id, expected_t, now);
+        return PARSER_RC_OK;
     }
     else {
+        netdata_mutex_unlock(&st->shared_flags_lock);
         info("Within expected window: remote=%ld vs %ld", remote_t, expected_t);
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     }
 }
 
 PARSER_RC streaming_set_action(void *user_v, RRDSET *st, RRDDIM *rd, long long int value) {
-    if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
+    netdata_mutex_lock(&st->shared_flags_lock);
+    int replicating = st->sflag_replicating;
+    netdata_mutex_unlock(&st->shared_flags_lock);
+    if (replicating)
         return PARSER_RC_OK;
     return pluginsd_set_action(user_v, st, rd, value);
 }
 
 PARSER_RC streaming_end_action(void *user_v, RRDSET *st) {
-    if (rrdset_flag_check(st, RRDSET_FLAG_REPLICATING))
+    netdata_mutex_lock(&st->shared_flags_lock);
+    int replicating = st->sflag_replicating;
+    netdata_mutex_unlock(&st->shared_flags_lock);
+    if (replicating)
         return PARSER_RC_OK;
     return pluginsd_end_action(user_v, st);
 }
@@ -243,7 +257,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     char *num_points_txt = words[1];
     if (!num_points_txt)
         goto disable;
-    usec_t num_points = str2ull(num_points_txt);
+    size_t num_points = str2ull(num_points_txt);
     struct receiver_state *rpt = user->opaque;
     user->st->last_updated.tv_sec = rpt->gap_end;
     user->st->last_updated.tv_usec = 0;
