@@ -647,15 +647,14 @@ static void read_collector_values(int *disable_apps) {
                                              ebpf_modules[0].config_name, 1);
     int started = 0;
     if (enabled) {
-        ebpf_enable_chart(0, *disable_apps);
+        ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
         started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                     ebpf_modules[1].config_name, 1);
     if (enabled) {
-        ebpf_enable_chart(1, *disable_apps);
-        socket_apps_enabled = 1;
+        ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
         started++;
     }
 
@@ -776,7 +775,7 @@ static void parse_args(int argc, char **argv)
             }
             case 'n': {
                 enabled = 1;
-                ebpf_enable_chart(1, disable_apps);
+                ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"NET\" charts, because it was started with the option \"--net\" or \"-n\".");
 #endif
@@ -784,7 +783,7 @@ static void parse_args(int argc, char **argv)
             }
             case 'p': {
                 enabled = 1;
-                ebpf_enable_chart(0, disable_apps);
+                ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"--process\" or \"-p\".");
 #endif

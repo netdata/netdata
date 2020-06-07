@@ -25,7 +25,6 @@ static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
-int socket_apps_enabled = 0;
 static int socket_apps_created = 0;
 
 #ifndef STATIC
@@ -418,6 +417,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
+    int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled;
     while(!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);

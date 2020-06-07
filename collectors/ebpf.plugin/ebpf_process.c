@@ -742,7 +742,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                20074,
                                root);
 
-    if (socket_apps_enabled)
+    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)
         ebpf_socket_create_apps_charts(NULL, root);
 }
 
