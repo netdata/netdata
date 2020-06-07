@@ -265,9 +265,29 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         goto disable;
     size_t num_points = str2ull(num_points_txt);
     struct receiver_state *rpt = user->opaque;
-    user->st->last_updated.tv_sec = rpt->gap_end;
+    /* if we need to really rescan instead of calculating the collected / updated below...
+        netdata_rwlock_rdlock(&st->rrdset_rwlock);
+        rrddim_foreach_read(rd, st) {
+            time_t last_update_t, last_collect_t;
+            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+                last_update_t = rd->state->query_ops.latest_time(rd);
+            else
+                last_update_t = st->last_updated.tv_sec;
+            last_collect_t = rd->last_collected_time.tv_sec;
+            if (last_collect_t > 0) {
+                info("Dimension %s / %s - now %ld updated %ld collected %ld result %ld gap %ld", st->name, rd->id, now, last_update_t, last_collect_t, result, now - last_collect_t);
+                if (last_collect_t < result)
+                    result = last_collect_t;
+            }
+        }
+        netdata_rwlock_unlock(&st->rrdset_rwlock);
+    */
+    user->st->last_collected_time.tv_sec += num_points * user->st->update_every;
+    user->st->last_collected_time.tv_usec = 0;
+    user->st->last_updated.tv_sec += num_points * user->st->update_every;
     user->st->last_updated.tv_usec = 0;
     user->st->counter += num_points;
+    user->st->counter_done += num_points;
     user->st->current_entry += num_points;
     if (user->st->current_entry >= user->st->entries)
         user->st->current_entry -= user->st->entries;
