@@ -538,6 +538,9 @@ RRDSET *rrdset_create_custom(
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if (st) {
         int mark_rebuild = 0;
+        netdata_mutex_lock(&st->shared_flags_lock);
+        st->sflag_replicating = 0;  // Resetting chart definition on reconnect, assume not in replication mode
+        netdata_mutex_unlock(&st->shared_flags_lock);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {

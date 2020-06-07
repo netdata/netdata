@@ -720,7 +720,8 @@ void *rrdpush_sender_thread(void *ptr) {
         // Not holding the sender buffer lock while the commands are read or executed.
         if (fds[Socket].revents & POLLIN)
             attempt_read(s);
-        execute_commands(s);
+        if (s->read_len>0)
+            execute_commands(s);
 
         // If we have data and have seen the TCP window open then try to close it by a transmission. We hold the
         // sender buffer lock during the transmission.
