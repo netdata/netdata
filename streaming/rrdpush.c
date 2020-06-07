@@ -351,7 +351,7 @@ void rrdset_done_push(RRDSET *st) {
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
     if (st->sflag_replicating) {
-        debug(D_STREAM, "Not sending collector new data - chart %s in replication mode from", st->name, st->gap_sent);
+        debug(D_STREAM, "Not sending collector new data - chart %s in replication mode from %ld", st->name, (long)st->gap_sent);
         sender_fill_gap_nolock(host->sender, st);
         st->sflag_replicating = 0;
     }

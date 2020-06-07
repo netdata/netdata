@@ -175,18 +175,19 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     time_t now = now_realtime_sec();
     time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    time_t remote_t = (time_t)remote_clock;
     // There are two cases to drop into replication mode:
     //   - the data is old, this is probably a stale buffer that arrived as part of a reconnection
     //   - the data contains a gap, either the connection dropped or this node restarted
-    if ((remote_clock - expected_t > st->update_every * 2) ||
-       (now - remote_clock > st->update_every*2))
+    if ((remote_t - expected_t > st->update_every * 2) ||
+       (now - remote_t > st->update_every*2))
     {
-        info("Gap in chart: remote=%ld vs %ld", remote_clock, expected_t);
+        info("Gap in chart: remote=%ld vs %ld", remote_t, expected_t);
         rrdset_flag_set(st, RRDSET_FLAG_REPLICATING);
         send_replication_req(user->host, st->id, expected_t, now);
     }
     else {
-        info("Within expected window: remote=%ld vs %ld", remote_clock, expected_t);
+        info("Within expected window: remote=%ld vs %ld", remote_t, expected_t);
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     }
 }
