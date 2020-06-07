@@ -355,12 +355,10 @@ void rrdset_done_push(RRDSET *st) {
         sender_fill_gap_nolock(host->sender, st);
         st->sflag_replicating = 0;
     }
-    else {
         rrdpush_send_chart_metrics_nolock(st, host->sender);
         // signal the sender there are more data
         if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
             error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
-    }
     netdata_mutex_unlock(&st->shared_flags_lock);
     sender_commit(host->sender);
     // ----- Release order: state flags lock, sender buffer lock -----------
