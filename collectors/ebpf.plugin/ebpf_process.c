@@ -27,7 +27,7 @@ static ebpf_process_stat_t **local_process_stats = NULL;
 static ebpf_process_publish_apps_t **current_apps_data = NULL;
 static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
-int process_apps_enabled = 0;
+int process_enabled = 0;
 
 #ifndef STATIC
 /**
@@ -613,7 +613,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 }
 
 /**
- * Create apps charts
+ * Create process apps charts
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
@@ -622,34 +622,6 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
-    struct target *w;
-    int newly_added = 0;
-
-    for(w = root ; w ; w = w->next) {
-        if (w->target) continue;
-
-        if(unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
-            struct pid_on_target *pid_on_target;
-
-            fprintf(stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes, (w->processes == 1)?"":"es");
-
-            for(pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
-                fprintf(stderr, " %d", pid_on_target->pid);
-            }
-
-            fputc('\n', stderr);
-        }
-
-        if (!w->exposed && w->processes) {
-            newly_added++;
-            w->exposed = 1;
-            if (debug_enabled || w->debug_enabled)
-                debug_log_int("%s just added - regenerating charts.", w->name);
-        }
-    }
-
-    if (!newly_added) return;
-
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
@@ -741,8 +713,53 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                NETDATA_APPS_SYSCALL_GROUP,
                                20074,
                                root);
+}
 
-    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)
+/**
+ * Create apps charts
+ *
+ * Call ebpf_create_chart to create the charts on apps submenu.
+ *
+ * @param em   a pointer to the structure with the default values.
+ * @param root a pointer for the targets.
+ */
+static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
+{
+    struct target *w;
+    int newly_added = 0;
+    static time_t last_update = 0;
+
+    for(w = root ; w ; w = w->next) {
+        if (w->target) continue;
+
+        if(unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+            struct pid_on_target *pid_on_target;
+
+            fprintf(stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes, (w->processes == 1)?"":"es");
+
+            for(pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
+                fprintf(stderr, " %d", pid_on_target->pid);
+            }
+
+            fputc('\n', stderr);
+        }
+
+        if (!w->exposed && w->processes) {
+            newly_added++;
+            w->exposed = 1;
+            if (debug_enabled || w->debug_enabled)
+                debug_log_int("%s just added - regenerating charts.", w->name);
+        }
+    }
+
+    //time was added to be sure dimensions will be created.
+    if (!newly_added || (time(NULL) - last_update) < 5) return;
+    last_update = time(NULL);
+
+    if (ebpf_modules[EBPF_MODULE_PROCESS_IDX].apps_charts)
+        ebpf_process_create_apps_charts(em, root);
+
+    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts)
         ebpf_socket_create_apps_charts(NULL, root);
 }
 
@@ -762,7 +779,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 {
     heartbeat_t hb;
     heartbeat_init(&hb);
-    int enabled = process_apps_enabled;
+    int enabled = process_enabled;
     int apps_enabled = em->apps_charts;
     while(!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -777,6 +794,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                                                       process_functions.bpf_map_lookup_elem,
                                                       map_fd[0]);
 
+        ebpf_create_apps_charts(em, apps_groups_root_target);
+
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -790,7 +809,6 @@ static void process_collector(usec_t step, ebpf_module_t *em)
             pthread_mutex_lock(&lock);
             ebpf_process_send_data(em);
             if (publish_apps) {
-                ebpf_process_create_apps_charts(em, apps_groups_root_target);
                 ebpf_process_send_apps_data(em, apps_groups_root_target);
             }
             pthread_mutex_unlock(&lock);
@@ -922,7 +940,7 @@ void *ebpf_process_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    process_apps_enabled = em->enabled;
+    process_enabled = em->enabled;
     fill_ebpf_functions(&process_functions);
 
     pthread_mutex_lock(&lock);
@@ -943,7 +961,7 @@ void *ebpf_process_thread(void *ptr)
     ebpf_global_labels(process_aggregated_data, process_publish_aggregated, process_dimension_names,
                        process_id_names, NETDATA_MAX_MONITOR_VECTOR);
 
-    if (process_apps_enabled) {
+    if (process_enabled) {
         ebpf_create_global_charts(em);
     }
 
