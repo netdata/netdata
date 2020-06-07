@@ -171,6 +171,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     PARSER_USER_OBJECT *user = user_v;
     netdata_mutex_lock(&st->shared_flags_lock);
     if (st->sflag_replicating) {
+        info("Ignoring data stream for %s @ %llu during replication", st->name, remote_clock);
         netdata_mutex_unlock(&st->shared_flags_lock);
         return PARSER_RC_OK;
     }
@@ -234,14 +235,19 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     if (unlikely(!st))
         goto disable;
     user->st = st;
+    netdata_mutex_lock(&st->shared_flags_lock);
+    int replicating = st->sflag_replicating;
+    netdata_mutex_unlock(&st->shared_flags_lock);
+    if (!replicating) {
+        error("Received REPBEGIN on %s - but chart is not replicating!", st->name);
+        return PARSER_RC_ERROR;
+    }
 
     start_t = str2ull(start_txt);
     end_t = str2ull(end_txt);
 
-    if (start_t != rpt->gap_start || end_t != rpt->gap_end) {
-        error("Unexpected gap times %ld %ld (expecting %ld %ld)", start_t, end_t, rpt->gap_start, rpt->gap_end);
-        goto disable;
-    }
+    time_t now = now_realtime_sec();
+    info("REPBEGIN %s %ld..%d against current gap %ld..%ld", st->name, start_t, end_t, st->last_updated.tv_sec, now);
 
     return PARSER_RC_OK;
 disable:
@@ -265,8 +271,12 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     user->st->current_entry += num_points;
     if (user->st->current_entry >= user->st->entries)
         user->st->current_entry -= user->st->entries;
-    user->st = NULL;
     info("Replication completed %zu points", num_points);
+    netdata_mutex_lock(&user->st->shared_flags_lock);
+    user->st->sflag_replicating = 0;
+    netdata_mutex_unlock(&user->st->shared_flags_lock);
+    user->st = NULL;
+    // TODO - Add another cycle if this took to long to reach the current time
     return PARSER_RC_OK;
 disable:
     error("Gap replication failed - Invalid REPEND %s on host %s. Disabling it.", words[1], user->host->hostname);
