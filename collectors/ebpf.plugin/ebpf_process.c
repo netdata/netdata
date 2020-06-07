@@ -779,8 +779,9 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 {
     heartbeat_t hb;
     heartbeat_init(&hb);
-    int enabled = process_enabled;
+    int publish_global = em->global_charts;
     int apps_enabled = em->apps_charts;
+    int pid_fd = map_fd[0];
     while(!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -792,27 +793,28 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                                                       pid_index,
                                                       process_functions.bpf_map_get_next_key,
                                                       process_functions.bpf_map_lookup_elem,
-                                                      map_fd[0]);
+                                                      pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
 
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
-        if (enabled) {
-            int publish_apps = 0;
-            if (pids_running > 0 && apps_enabled){
-                publish_apps = 1;
-                ebpf_process_update_apps_data();
-            }
-
-            pthread_mutex_lock(&lock);
-            ebpf_process_send_data(em);
-            if (publish_apps) {
-                ebpf_process_send_apps_data(em, apps_groups_root_target);
-            }
-            pthread_mutex_unlock(&lock);
+        int publish_apps = 0;
+        if (apps_enabled && pids_running > 0){
+            publish_apps = 1;
+            ebpf_process_update_apps_data();
         }
+
+        pthread_mutex_lock(&lock);
+        if (publish_global) {
+            ebpf_process_send_data(em);
+        }
+
+        if (publish_apps) {
+            ebpf_process_send_apps_data(em, apps_groups_root_target);
+        }
+        pthread_mutex_unlock(&lock);
 
         fflush(stdout);
     }

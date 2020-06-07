@@ -417,17 +417,22 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled;
+    int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
+    int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
     while(!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
-        read_hash_global_tables();
+        if (socket_global_enabled)
+            read_hash_global_tables();
+
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
         pthread_mutex_lock(&lock);
-        ebpf_process_send_data(em);
+        if (socket_global_enabled)
+            ebpf_process_send_data(em);
+
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
