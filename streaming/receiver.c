@@ -119,7 +119,7 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
             }
             info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
                  host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
-            if (gap > 0) {
+ /*           if (gap > 0) {
                 rpt->gap_start = remote_time - gap;
                 rpt->gap_end = remote_time;
                 char message[128];
@@ -137,7 +137,7 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
 #endif
                 if (ret != (int)strlen(message))
                     error("Failed to send initial timestamp - gaps may appear in charts");
-            }
+            }*/
         }
         return PARSER_RC_OK;
     }

@@ -511,6 +511,7 @@ void execute_replicate(struct sender_state *s, char *st_id, long start_t, long e
         error("Cannot replicate chart %s - not found!", st_id);
     else {
         // Use the chart shared flags (thread-safe) to tell the collector that replication is requested
+        // The sender buffer lock is not held at this point.
         netdata_mutex_lock(&st->shared_flags_lock);
         st->sflag_replicating = 1;
         st->gap_sent = (size_t)start_t;
@@ -546,7 +547,7 @@ void execute_commands(struct sender_state *s) {
             continue;
         }
         start = newline+1;
-        error("Unrecognised command received, skipping to position %d", start - s->read_buffer);
+        error("Unrecognised command received, skipping to position %ld", start - s->read_buffer);
     }
     if (start<end) {
         memcpy( s->read_buffer, start, end-start);
@@ -673,6 +674,8 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].revents = 0;
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
+        // Hold the buffer lock while we check if it is non-empty. The other thread adds data but only this
+        // thread removes it so the non-empty condition is valid after we release the lock.
         netdata_mutex_lock(&s->mutex);
         char *chunk;
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, &chunk);
@@ -714,11 +717,13 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // Read as much as possible to fill the buffer, split into full lines for execution.
+        // Not holding the sender buffer lock while the commands are read or executed.
         if (fds[Socket].revents & POLLIN)
             attempt_read(s);
         execute_commands(s);
 
-        // If we have data and have seen the TCP window open then try to close it by a transmission.
+        // If we have data and have seen the TCP window open then try to close it by a transmission. We hold the
+        // sender buffer lock during the transmission.
         if (outstanding && fds[Socket].revents & POLLOUT)
             attempt_to_send(s);
 
