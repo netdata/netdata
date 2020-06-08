@@ -52,51 +52,55 @@
 // Hardware Counters
 //
 
-// List of implemented hardware vendors
+// IMPORTANT: These are vendor-specific fields.
+//  If you want to add a new vendor, search this for for 'VENDORS:' keyword and
+//  add your definition as 'VENDOR-<key>:' where <key> if the string part that
+//  is shown in /sys/class/infiniband/<key>X_Y
+//  EG: for Mellanox, shown as mlx0_1, it's 'mlx'
+//      for Intel, shown as hfi1_1, it's 'hfi'
+
+
+// VENDORS: List of implemented hardware vendors
 #define FOREACH_HWCOUNTER_NAME(GEN, ...) \
 	GEN(mlx, __VA_ARGS__)
 
-// HW Counters for Mellanox ConnectX Devices
+// VENDOR-MLX: HW Counters for Mellanox ConnectX Devices
 #define FOREACH_HWCOUNTER_MLX(GEN, ...) \
 	FOREACH_HWCOUNTER_MLX_PACKETS(GEN, __VA_ARGS__) \
 	FOREACH_HWCOUNTER_MLX_ERRORS(GEN, __VA_ARGS__)
 
 #define FOREACH_HWCOUNTER_MLX_PACKETS(GEN, ...) \
-	GEN(np_cnp_sent,                 packets, "RoCEv2 Congestion sent",  1, __VA_ARGS__) \
-	GEN(np_ecn_marked_roce_packets,  packets, "RoCEv2 Congestion rcvd", -1, __VA_ARGS__) \
-	GEN(rp_cnp_handled,              packets, "IB Congestion handled",   1, __VA_ARGS__) \
-	GEN(rx_atomic_requests,          packets, "ATOMIC req. rcvd",        1, __VA_ARGS__) \
-	GEN(rx_dct_connect,              packets, "Connection req. rcvd",    1, __VA_ARGS__) \
-	GEN(rx_read_requests,            packets, "Read req. rcvd",          1, __VA_ARGS__) \
-	GEN(rx_write_requests,           packets, "Write req. rcvd",         1, __VA_ARGS__) \
-	GEN(roce_adp_retrans,            packets, "RoCE retrans adaptive",   1, __VA_ARGS__) \
-	GEN(roce_adp_retrans_to,         packets, "RoCE retrans timeout",    1, __VA_ARGS__) \
-	GEN(roce_slow_restart,           packets, "RoCE slow restart",       1, __VA_ARGS__) \
-	GEN(roce_slow_restart_cnps,      packets, "RoCE slow restart congestion",  1, __VA_ARGS__) \
-	GEN(roce_slow_restart_trans,     packets, "RoCE slow restart count", 1, __VA_ARGS__)
+	GEN(np_cnp_sent,                 hwpackets, "RoCEv2 Congestion sent",  1, __VA_ARGS__) \
+	GEN(np_ecn_marked_roce_packets,  hwpackets, "RoCEv2 Congestion rcvd", -1, __VA_ARGS__) \
+	GEN(rp_cnp_handled,              hwpackets, "IB Congestion handled",   1, __VA_ARGS__) \
+	GEN(rx_atomic_requests,          hwpackets, "ATOMIC req. rcvd",        1, __VA_ARGS__) \
+	GEN(rx_dct_connect,              hwpackets, "Connection req. rcvd",    1, __VA_ARGS__) \
+	GEN(rx_read_requests,            hwpackets, "Read req. rcvd",          1, __VA_ARGS__) \
+	GEN(rx_write_requests,           hwpackets, "Write req. rcvd",         1, __VA_ARGS__) \
+	GEN(roce_adp_retrans,            hwpackets, "RoCE retrans adaptive",   1, __VA_ARGS__) \
+	GEN(roce_adp_retrans_to,         hwpackets, "RoCE retrans timeout",    1, __VA_ARGS__) \
+	GEN(roce_slow_restart,           hwpackets, "RoCE slow restart",       1, __VA_ARGS__) \
+	GEN(roce_slow_restart_cnps,      hwpackets, "RoCE slow restart congestion",  1, __VA_ARGS__) \
+	GEN(roce_slow_restart_trans,     hwpackets, "RoCE slow restart count", 1, __VA_ARGS__)
 
 #define FOREACH_HWCOUNTER_MLX_ERRORS(GEN, ...) \
-	GEN(duplicate_request,           errors, "Duplicated packets",   -1, __VA_ARGS__) \
-	GEN(implied_nak_seq_err,         errors, "Pkt Seq Num gap",       1, __VA_ARGS__) \
-	GEN(local_ack_timeout_err,       errors, "Ack timer expired",     1, __VA_ARGS__) \
-	GEN(out_of_buffer,               errors, "Drop missing buffer",   1, __VA_ARGS__) \
-	GEN(out_of_sequence,             errors, "Drop out of sequence",  1, __VA_ARGS__) \
-	GEN(packet_seq_err,              errors, "NAK sequence rcvd",     1, __VA_ARGS__) \
-	GEN(req_cqe_error,               errors, "CQE err Req",           1, __VA_ARGS__) \
-	GEN(resp_cqe_error,              errors, "CQE err Resp",          1, __VA_ARGS__) \
-	GEN(req_cqe_flush_error,         errors, "CQE Flushed err Req",   1, __VA_ARGS__) \
-	GEN(resp_cqe_flush_error,        errors, "CQE Flushed err Resp",  1, __VA_ARGS__) \
-	GEN(req_remote_access_errors,    errors, "Remote access err Req", 1, __VA_ARGS__) \
-	GEN(resp_remote_access_errors,   errors, "Remote access err Resp",1, __VA_ARGS__) \
-	GEN(req_remote_invalid_request,  errors, "Remote invalid req",    1, __VA_ARGS__) \
-	GEN(resp_local_length_error,     errors, "Local length err Resp", 1, __VA_ARGS__) \
-	GEN(rnr_nak_retry_err,           errors, "RNR NAK Packets",       1, __VA_ARGS__) \
-	GEN(rp_cnp_ignored,              errors, "CNP Pkts ignored",      1, __VA_ARGS__) \
-	GEN(rx_icrc_encapsulated,        errors, "RoCE ICRC Errors",      1, __VA_ARGS__)
-
-
-// HW Counters for Intel Omnipath devices
-// #define FOREACH_HWCOUNTER_HFI_ERRORS(GEN, ...) \
+	GEN(duplicate_request,           hwerrors, "Duplicated packets",   -1, __VA_ARGS__) \
+	GEN(implied_nak_seq_err,         hwerrors, "Pkt Seq Num gap",       1, __VA_ARGS__) \
+	GEN(local_ack_timeout_err,       hwerrors, "Ack timer expired",     1, __VA_ARGS__) \
+	GEN(out_of_buffer,               hwerrors, "Drop missing buffer",   1, __VA_ARGS__) \
+	GEN(out_of_sequence,             hwerrors, "Drop out of sequence",  1, __VA_ARGS__) \
+	GEN(packet_seq_err,              hwerrors, "NAK sequence rcvd",     1, __VA_ARGS__) \
+	GEN(req_cqe_error,               hwerrors, "CQE err Req",           1, __VA_ARGS__) \
+	GEN(resp_cqe_error,              hwerrors, "CQE err Resp",          1, __VA_ARGS__) \
+	GEN(req_cqe_flush_error,         hwerrors, "CQE Flushed err Req",   1, __VA_ARGS__) \
+	GEN(resp_cqe_flush_error,        hwerrors, "CQE Flushed err Resp",  1, __VA_ARGS__) \
+	GEN(req_remote_access_errors,    hwerrors, "Remote access err Req", 1, __VA_ARGS__) \
+	GEN(resp_remote_access_errors,   hwerrors, "Remote access err Resp",1, __VA_ARGS__) \
+	GEN(req_remote_invalid_request,  hwerrors, "Remote invalid req",    1, __VA_ARGS__) \
+	GEN(resp_local_length_error,     hwerrors, "Local length err Resp", 1, __VA_ARGS__) \
+	GEN(rnr_nak_retry_err,           hwerrors, "RNR NAK Packets",       1, __VA_ARGS__) \
+	GEN(rp_cnp_ignored,              hwerrors, "CNP Pkts ignored",      1, __VA_ARGS__) \
+	GEN(rx_icrc_encapsulated,        hwerrors, "RoCE ICRC Errors",      1, __VA_ARGS__)
 
 
 
@@ -105,8 +109,14 @@
 #define GEN_RRD_DIM_ADD(NAME,GRP,DESC,DIR, PORT, ...) \
 	PORT->rd_##NAME = rrddim_add(PORT->st_##GRP, DESC, NULL, DIR, 1, RRD_ALGORITHM_INCREMENTAL);
 
+#define GEN_RRD_DIM_ADD_HW(NAME,GRP,DESC,DIR, PORT,HW, ...) \
+	HW->rd_##NAME = rrddim_add(PORT->st_##GRP, DESC, NULL, DIR, 1, RRD_ALGORITHM_INCREMENTAL);
+
 #define GEN_RRD_DIM_SETP(NAME,GRP,DESC,DIR, PORT, ...) \
 	rrddim_set_by_pointer(PORT->st_##GRP, PORT->rd_##NAME, (collected_number)PORT->NAME);
+
+#define GEN_RRD_DIM_SETP_HW(NAME,GRP,DESC,DIR, PORT,HW, ...) \
+	rrddim_set_by_pointer(PORT->st_##GRP, HW->rd_##NAME, (collected_number)HW->NAME);
 
 
 // https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters
@@ -150,9 +160,11 @@ static struct ibport {
 	// Will generate 2 elements for each counter:
 	// - uint64_t to store the value
 	// - char*    to store the filename path
+	// - RRDDIM*  to store the RRD Dimension
 	#define GEN_DEF_COUNTER(NAME, ...) \
 		uint64_t  NAME; \
-		char      *file_##NAME;
+		char      *file_##NAME; \
+		RRDDIM    *rd_##NAME;
 	FOREACH_COUNTER(GEN_DEF_COUNTER)
 
 	// Vendor specific hwcounters from /$device/ports/$portid/hwcounters
@@ -161,8 +173,9 @@ static struct ibport {
 		struct ibporthw_##VENDOR *hwcounters_##VENDOR;
 	FOREACH_HWCOUNTER_NAME(GEN_DEF_HWCOUNTER_PTR)
 
-	// Function pointer to the "infiniband_parse_hwcounter_<vendor>" function
-	void (*parse_hwcounters)(struct ibport *);
+	// Function pointer to the "infiniband_hwcounters_parse_<vendor>" function
+	void (*hwcounters_parse)(struct ibport *);
+	void (*hwcounters_dorrd)(struct ibport *);
 
 
 	// charts and dim
@@ -172,22 +185,18 @@ static struct ibport {
 	RRDSET *st_hwpackets;
 	RRDSET *st_hwerrors;
 
-	#define GEN_DEF_RRD_DIM(NAME, ...)       RRDDIM   *rd_##NAME;
-	FOREACH_COUNTER(GEN_DEF_RRD_DIM)
-
 	usec_t speed_last_collected_usec;
 
 	struct ibport *next;
 } *ibport_root = NULL, *ibport_last_used = NULL;
 
 
-//
-// Vendor specific
-//
 
+// VENDORS: reading / calculation functions
 #define GEN_DEF_HWCOUNTER(NAME, ...) \
 	uint64_t  NAME; \
-	char      *file_##NAME;
+	char      *file_##NAME; \
+	RRDDIM    *rd_##NAME;
 
 #define GEN_DO_HWCOUNTER_READ(NAME,GRP,DESC,DIR,PORT,HW, ...) \
 	if (HW->file_##NAME) { \
@@ -197,12 +206,11 @@ static struct ibport {
 		} \
 	}
 
-
-// Mellanox
+// VENDOR-MLX: Mellanox
 struct ibporthw_mlx {
 	FOREACH_HWCOUNTER_MLX(GEN_DEF_HWCOUNTER)
 };
-void infiniband_parse_hwcounters_mlx(struct ibport *port) {
+void infiniband_hwcounters_parse_mlx(struct ibport *port) {
 	if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {
 		FOREACH_HWCOUNTER_MLX_ERRORS(GEN_DO_HWCOUNTER_READ, port, port->hwcounters_mlx)
 	}
@@ -210,8 +218,16 @@ void infiniband_parse_hwcounters_mlx(struct ibport *port) {
 		FOREACH_HWCOUNTER_MLX_PACKETS(GEN_DO_HWCOUNTER_READ, port, port->hwcounters_mlx)
 	}
 }
-
-
+void infiniband_hwcounters_dorrd_mlx(struct ibport *port) {
+	if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {
+		FOREACH_HWCOUNTER_MLX_ERRORS(GEN_RRD_DIM_SETP_HW, port, port->hwcounters_mlx)
+		rrdset_done(port->st_hwerrors);
+	}
+	if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
+		FOREACH_HWCOUNTER_MLX_PACKETS(GEN_RRD_DIM_SETP_HW, port, port->hwcounters_mlx)
+		rrdset_done(port->st_hwpackets);
+	}
+}
 
 
 // ----------------------------------------------------------------------------
@@ -389,22 +405,24 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 						p->do_hwpackets = config_get_boolean_ondemand(buffer, "hwpackets", do_hwpackets);
 						p->do_hwerrors  = config_get_boolean_ondemand(buffer, "hwerrors",  do_hwerrors);
 
+						// VENDORS: Set your own 
 
-						// VENDOR: Mellanox
+						// Allocate the chars to the filenames
+						#define GEN_DO_HWCOUNTER_NAME(NAME,GRP,DESC,DIR,PORT,HW, ...) \
+							HW->file_##NAME = callocz(1, strlen(PORT->hwcounters_path) + sizeof(#NAME) +3); \
+							strcat(HW->file_##NAME, PORT->hwcounters_path); \
+							strcat(HW->file_##NAME, "/"#NAME);
+
+						// VENDOR-MLX: Mellanox
 						if (strncmp(dev_dent->d_name, "mlx", 3) == 0) {
-
 							// Allocate the vendor specific struct
 							p->hwcounters_mlx = callocz(1, sizeof(struct ibporthw_mlx));
 
-							// Allocate the chars to the filenames
-							#define GEN_DO_HWCOUNTER_NAME(NAME,GRP,DESC,DIR,PORT,HW, ...) \
-								HW->file_##NAME = callocz(1, strlen(PORT->hwcounters_path) + sizeof(#NAME) +3); \
-								strcat(HW->file_##NAME, PORT->hwcounters_path); \
-								strcat(HW->file_##NAME, "/"#NAME);
 							FOREACH_HWCOUNTER_MLX(GEN_DO_HWCOUNTER_NAME, p, p->hwcounters_mlx)
 
 							// Set the function pointer for hwcounter parsing
-							p->parse_hwcounters = &infiniband_parse_hwcounters_mlx;
+							p->hwcounters_parse  = &infiniband_hwcounters_parse_mlx;
+							p->hwcounters_dorrd = &infiniband_hwcounters_dorrd_mlx;
 						}
 
 						// VENDOR: Unknown
@@ -427,26 +445,25 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 	struct ibport *port;
 	for (port = ibport_root; port ; port = port->next) {
 
-		// Read each counter
+		//
+		// Read values from system to struct
+		//
+
+		//  counter from file and place it in ibport struct
 		#define GEN_DO_COUNTER_READ(NAME,GRP,DESC,DIR,PORT, ...) \
-			if (PORT->do_##GRP != CONFIG_BOOLEAN_NO && PORT->file_##NAME) { \
+			if (PORT->file_##NAME) { \
 				if (read_single_number_file(PORT->file_##NAME, (unsigned long long *) &PORT->NAME)) { \
 					error("cannot read iface '%s' counter '"#NAME"'", PORT->name); \
 					PORT->file_##NAME = NULL; \
 				} \
 			}
-		FOREACH_COUNTER(GEN_DO_COUNTER_READ, port)
-
-
-		// Call the function for parsing hwcounters
-		if (port->parse_hwcounters) {
-			(*port->parse_hwcounters)(port);
-		}
-
-
 
 		// Update charts
 		if (port->do_bytes != CONFIG_BOOLEAN_NO) {
+
+			// Read values from sysfs
+			FOREACH_COUNTER_BYTES(GEN_DO_COUNTER_READ, port)
+
 			// First creation of RRD Set (charts)
 			if(unlikely(!port->st_bytes)) {
 				port->st_bytes = rrdset_create_localhost(
@@ -463,19 +480,23 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					, update_every
 					, RRDSET_TYPE_AREA
 				);
-
+				// Create Dimensions
 				rrdset_flag_set(port->st_bytes, RRDSET_FLAG_DETAIL);
 				FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD, port)
-
 			}
 			else
 				rrdset_next(port->st_bytes);
 
+			// Link read values to dimensions
 			FOREACH_COUNTER_BYTES(GEN_RRD_DIM_SETP, port)
 			rrdset_done(port->st_bytes);
 		}
 
 		if (port->do_packets != CONFIG_BOOLEAN_NO) {
+
+			// Read values from sysfs
+			FOREACH_COUNTER_PACKETS(GEN_DO_COUNTER_READ, port)
+
 			// First creation of RRD Set (charts)
 			if(unlikely(!port->st_packets)) {
 				port->st_packets = rrdset_create_localhost(
@@ -492,18 +513,23 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					, update_every
 					, RRDSET_TYPE_AREA
 				);
-
+				// Create Dimensions
 				rrdset_flag_set(port->st_packets, RRDSET_FLAG_DETAIL);
 				FOREACH_COUNTER_PACKETS(GEN_RRD_DIM_ADD, port)
 			}
 			else
 				rrdset_next(port->st_packets);
 
+			// Link read values to dimensions
 			FOREACH_COUNTER_PACKETS(GEN_RRD_DIM_SETP, port)
 			rrdset_done(port->st_packets);
 		}
 
 		if (port->do_errors != CONFIG_BOOLEAN_NO) {
+
+			// Read values from sysfs
+			FOREACH_COUNTER_ERRORS(GEN_DO_COUNTER_READ, port)
+
 			// First creation of RRD Set (charts)
 			if(unlikely(!port->st_errors)) {
 				port->st_errors = rrdset_create_localhost(
@@ -520,21 +546,109 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					, update_every
 					, RRDSET_TYPE_LINE
 				);
-
+				// Create Dimensions
 				rrdset_flag_set(port->st_errors, RRDSET_FLAG_DETAIL);
 				FOREACH_COUNTER_ERRORS(GEN_RRD_DIM_ADD, port)
 			}
 			else
 				rrdset_next(port->st_errors);
 
+			// Link read values to dimensions
 			FOREACH_COUNTER_ERRORS(GEN_RRD_DIM_SETP, port)
 			rrdset_done(port->st_errors);
 		}
 
-		// TODO: Add logic for hwcounters
 
+		//
+		// HW Counters
+		//
+
+		// Call the function for parsing and setting hwcounters
+		if (port->hwcounters_parse && port->hwcounters_dorrd) {
+
+			// Read all values (done by vendor-specific function)
+			(*port->hwcounters_parse)(port);
+
+			if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {
+
+				// First creation of RRD Set (charts)
+				if(unlikely(!port->st_hwerrors)) {
+					port->st_hwerrors = rrdset_create_localhost(
+						port->chart_type_hwerrors
+						, port->chart_id_hwerrors
+						, NULL
+						, port->chart_family
+						, "ib.hwerrors"
+						, "errors"
+						, "errors/s"
+						, PLUGIN_PROC_NAME
+						, PLUGIN_PROC_MODULE_INFINIBAND_NAME
+						, port->priority + 1
+						, update_every
+						, RRDSET_TYPE_LINE
+					);
+
+					rrdset_flag_set(port->st_hwerrors, RRDSET_FLAG_DETAIL);
+
+					// VENDORS: Set your selection
+
+					// VENDOR: Mellanox
+					if (strncmp(port->name, "mlx", 3) == 0) {
+						FOREACH_HWCOUNTER_MLX_ERRORS(GEN_RRD_DIM_ADD_HW, port, port->hwcounters_mlx)
+					}
+
+					// Unknown vendor, should not happen
+					else {
+						error("Unmanaged vendor for '%s', do_hwerrors should have been set to no. Please report this bug", port->name);
+						port->do_hwerrors = CONFIG_BOOLEAN_NO;
+					}
+				}
+				else
+					rrdset_next(port->st_hwerrors);
+			}
+
+
+			if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
+				// First creation of RRD Set (charts)
+				if(unlikely(!port->st_hwpackets)) {
+					port->st_hwpackets = rrdset_create_localhost(
+						port->chart_type_hwpackets
+						, port->chart_id_hwpackets
+						, NULL
+						, port->chart_family
+						, "ib.hwpackets"
+						, "packets"
+						, "packets/s"
+						, PLUGIN_PROC_NAME
+						, PLUGIN_PROC_MODULE_INFINIBAND_NAME
+						, port->priority + 1
+						, update_every
+						, RRDSET_TYPE_LINE
+					);
+
+					rrdset_flag_set(port->st_hwpackets, RRDSET_FLAG_DETAIL);
+
+					// VENDORS: Set your selection
+
+					// VENDOR: Mellanox
+					if (strncmp(port->name, "mlx", 3) == 0) {
+						FOREACH_HWCOUNTER_MLX_PACKETS(GEN_RRD_DIM_ADD_HW, port, port->hwcounters_mlx)
+					}
+
+					// Unknown vendor, should not happen
+					else {
+						error("Unmanaged vendor for '%s', do_hwpackets should have been set to no. Please report this bug", port->name);
+						port->do_hwpackets = CONFIG_BOOLEAN_NO;
+					}
+				}
+				else
+					rrdset_next(port->st_hwpackets);
+			}
+
+			// Update values to rrd (done by vendor-specific function)
+			(*port->hwcounters_dorrd)(port);
+		}
 	}
-
 
 	return 0;
 }
