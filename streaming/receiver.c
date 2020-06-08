@@ -305,20 +305,22 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     PARSER_USER_OBJECT *user = user_v;
     UNUSED(plugins_action);
     char *id = words[1];
-    char *time_txt = words[2];
-    char *value_txt = words[3];
+    char *idx_txt = words[2];
+    char *time_txt = words[3];
+    char *value_txt = words[4];
 
     if (user->st == NULL) {
         error("Received RRDDIM out of sequence");
         goto disable;
     }
 
-    if (!id || !time_txt || !value_txt)
+    if (!id || !idx_txt || !time_txt || !value_txt)
         goto disable;
 
     // Remote clock or local clock with slew estimate?
     usec_t timestamp = str2ull(time_txt);
     storage_number value = str2ull(value_txt);
+    size_t idx = str2ul(idx_txt);
 
     RRDDIM *rd = rrddim_find(user->st, id);
     time_t st_last = rrdset_last_entry_t(user->st);
@@ -327,7 +329,10 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         return PARSER_RC_OK;
     }
 
-    rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+    if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+    else
+        rd->values[(rd->rrdset->current_entry + idx) % rd->entries] = value;
     rd->last_collected_time.tv_sec = timestamp;
     rd->last_collected_time.tv_usec = timestamp;
 

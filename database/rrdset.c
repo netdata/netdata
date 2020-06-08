@@ -1522,8 +1522,7 @@ void rrdset_done(RRDSET *st) {
     last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
-    // TODO-GAPS - need to replace this with a replication request
-    if(unlikely(!st->counter_done)) {
+    if(unlikely(!st->counter_done) && st->rrdhost == localhost) {
         // if we have not collected metrics this session (st->counter_done == 0)
         // and we have collected metrics for this chart in the past (st->counter != 0)
         // fill the gap (the chart has been just loaded from disk)
