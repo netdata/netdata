@@ -298,7 +298,7 @@ With this configuration, the `CApath` option tells Netdata to search for trusted
 
 #### Expected behaviors
 
-With the introduction of TLS/SSL, the receiver/transmitter communication behaves as shown in the table below, depending on the following configurations:
+With the introduction of TLS/SSL, the receiver-transmitter communication behaves as shown in the table below, depending on the following configurations:
 
 -   **Receiver TLS (Yes/No)**: Whether the `[web]` section in `netdata.conf` has `ssl key` and `ssl certificate`.
 -   **Receiver port TLS (-/force/optional)**: Depends on whether the `[web]` section `bind to` contains a `^SSL=force` or `^SSL=optional` directive on the port(s) used for streaming.

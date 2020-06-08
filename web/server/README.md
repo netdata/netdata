@@ -84,7 +84,7 @@ To enable TLS, provide the path to your certificate and private key in the `[web
 	ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
-Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a receiver/transmitter connection, only the receiver needs these settings.
+Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a receiver-transmitter connection, only the receiver needs these settings.
 
 For test purposes, you can generate self-signed certificates with the following command:
 

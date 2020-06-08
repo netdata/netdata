@@ -357,7 +357,7 @@ For more information check Prometheus documentation.
 
 ### Streaming data from upstream hosts
 
-The `format=prometheus` parameter only exports the host's Netdata metrics. If you are using the receiver/transmitter
+The `format=prometheus` parameter only exports the host's Netdata metrics. If you are using the receiver-transmitter
 functionality of Netdata this ignores any upstream hosts - so you should consider using the below in your
 **prometheus.yml**:
 

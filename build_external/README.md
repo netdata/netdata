@@ -13,7 +13,7 @@ decoupled. This allows:
 
 -   Cross-compilation (e.g. linux development from macOS)
 -   Cross-distro (e.g. using CentOS user-land while developing on Debian)
--   Multi-host scenarios (e.g. receiver/transmitter configurations)
+-   Multi-host scenarios (e.g. receiver-transmitter configurations)
 -   Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
 
 The advantage of these scenarios is that they allow **reproducible** builds and testing
@@ -98,10 +98,10 @@ Note: it is possible to run multiple copies of the agent using the `--scale` opt
 Distro=debian Version=10 docker-compose -f projects/only-agent/docker-compose.yml up --scale agent=3
 ```
 
-3. A simple receiver/transmitter scenario
+3. A simple receiver-transmitter scenario
 
 ```bash
-# Need to call clean-install on the configs used in the receiver/transmitter containers
+# Need to call clean-install on the configs used in the receiver-transmitter containers
 docker-compose -f master-slaves/docker-compose.yml up --scale agent_slave1=2
 ```
 
