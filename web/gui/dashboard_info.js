@@ -3051,12 +3051,12 @@ netdataDashboard.context = {
 
     'ebpf.tcp_functions': {
         title : 'TCP calls',
-        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code.'
+        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
     },
 
     'ebpf.tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>'
+        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>.'
     },
 
     'ebpf.tcp_error': {
@@ -3071,7 +3071,7 @@ netdataDashboard.context = {
 
     'ebpf.udp_bandwidth': {
         title : 'UDP bandwidth',
-        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>'
+        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
     },
 
     'ebpf.file_descriptor': {
