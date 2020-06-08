@@ -167,7 +167,7 @@ static struct ibport {
 		RRDDIM    *rd_##NAME;
 	FOREACH_COUNTER(GEN_DEF_COUNTER)
 
-	// Vendor specific hwcounters from /$device/ports/$portid/hwcounters
+	// Vendor specific hwcounters from /$device/ports/$portid/hw_counters
 	// We will generate one struct pointer per vendor to avoid future casting
 	#define GEN_DEF_HWCOUNTER_PTR(VENDOR, ...) \
 		struct ibporthw_##VENDOR *hwcounters_##VENDOR;
@@ -268,11 +268,21 @@ static struct ibport *get_ibport(const char *dev, const char *port) {
 	p->chart_type_hwpackets = strdupz("infiniband_hwc_packets");
 	p->chart_type_hwerrors  = strdupz("infiniband_hwc_errors");
 
-	p->chart_id_bytes     = strdupz(p->name);
-	p->chart_id_packets   = strdupz(p->name);
-	p->chart_id_errors    = strdupz(p->name);
-	p->chart_id_hwpackets = strdupz(p->name);
-	p->chart_id_hwerrors  = strdupz(p->name);
+	char buffer[RRD_ID_LENGTH_MAX + 1];
+	snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cntbytes_%s", p->name);
+	p->chart_id_bytes     = strdupz(buffer);
+
+	snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cntpackets_%s", p->name);
+	p->chart_id_packets   = strdupz(buffer);
+
+	snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cnterrors_%s", p->name);
+	p->chart_id_errors    = strdupz(buffer);
+
+	snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_hwcntpackets_%s", p->name);
+	p->chart_id_hwpackets = strdupz(buffer);
+
+	snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_hwcnterrors_%s", p->name);
+	p->chart_id_hwerrors  = strdupz(buffer);
 
 	p->chart_family        = strdupz(p->name);
 	p->priority            = NETDATA_CHART_PRIO_INFINIBAND;
@@ -361,7 +371,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 
 				// Nearly same with hardware counters
 				char hwcounters_dirname[FILENAME_MAX +1];
-				snprintfz(hwcounters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "hwcounters");
+				snprintfz(hwcounters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "hw_counters");
 				DIR *hwcounters_dir = opendir(hwcounters_dirname);
 
 				// Get new ibport
@@ -467,7 +477,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 			// First creation of RRD Set (charts)
 			if(unlikely(!port->st_bytes)) {
 				port->st_bytes = rrdset_create_localhost(
-					port->chart_type_bytes
+					"Infiniband"
 					, port->chart_id_bytes
 					, NULL
 					, port->chart_family
@@ -500,7 +510,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 			// First creation of RRD Set (charts)
 			if(unlikely(!port->st_packets)) {
 				port->st_packets = rrdset_create_localhost(
-					port->chart_type_packets
+					"Infiniband"
 					, port->chart_id_packets
 					, NULL
 					, port->chart_family
@@ -533,7 +543,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 			// First creation of RRD Set (charts)
 			if(unlikely(!port->st_errors)) {
 				port->st_errors = rrdset_create_localhost(
-					port->chart_type_errors
+					"Infiniband"
 					, port->chart_id_errors
 					, NULL
 					, port->chart_family
@@ -574,7 +584,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 				// First creation of RRD Set (charts)
 				if(unlikely(!port->st_hwerrors)) {
 					port->st_hwerrors = rrdset_create_localhost(
-						port->chart_type_hwerrors
+						"Infiniband"
 						, port->chart_id_hwerrors
 						, NULL
 						, port->chart_family
@@ -612,7 +622,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 				// First creation of RRD Set (charts)
 				if(unlikely(!port->st_hwpackets)) {
 					port->st_hwpackets = rrdset_create_localhost(
-						port->chart_type_hwpackets
+						"Infiniband"
 						, port->chart_id_hwpackets
 						, NULL
 						, port->chart_family
