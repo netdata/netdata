@@ -102,7 +102,7 @@ function k8s_get_name() {
 			if kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces >/dev/null 2>&1; then
 				#shellcheck disable=SC2086
 				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' | 
-				jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)") | 
+				jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)")' | 
 				grep "$id" | 
 				cut -d' ' -f1 
 				)"
