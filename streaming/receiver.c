@@ -69,7 +69,6 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
                 last_update_t = st->last_updated.tv_sec;
             last_collect_t = rd->last_collected_time.tv_sec;
             if (last_collect_t > 0) {
-                info("Dimension %s / %s - now %ld updated %ld collected %ld result %ld gap %ld", st->name, rd->id, now, last_update_t, last_collect_t, result, now - last_collect_t);
                 if (last_collect_t < result)
                     result = last_collect_t;
             }
@@ -150,7 +149,7 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
     char message[RRD_ID_LENGTH_MAX+60];
     sprintf(message,"REPLICATE %s %ld %ld\n", st_id, start, end);
     int ret;
-    info("Replicate command: %s",message);
+    debug(D_STREAM, "Replicate command: %s",message);
 #ifdef ENABLE_HTTPS
     SSL *conn = host->stream_ssl.conn ;
     if(conn && !host->stream_ssl.flags) {
@@ -171,7 +170,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     PARSER_USER_OBJECT *user = user_v;
     netdata_mutex_lock(&st->shared_flags_lock);
     if (st->sflag_replicating) {
-        info("Ignoring data stream for %s @ %llu during replication", st->name, remote_clock);
+        debug(D_STREAM, "Ignoring data stream for %s @ %llu during replication", st->name, remote_clock);
         netdata_mutex_unlock(&st->shared_flags_lock);
         return PARSER_RC_OK;
     }
@@ -196,7 +195,6 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     }
     else {
         netdata_mutex_unlock(&st->shared_flags_lock);
-        info("Within expected window: remote=%ld vs %ld", remote_t, expected_t);
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     }
 }
@@ -247,7 +245,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     end_t = str2ull(end_txt);
 
     time_t now = now_realtime_sec();
-    info("REPBEGIN %s %ld..%d against current gap %ld..%ld", st->name, start_t, end_t, st->last_updated.tv_sec, now);
+    debug(D_STREAM, "REPBEGIN %s %ld..%d against current gap %ld..%ld", st->name, start_t, end_t, st->last_updated.tv_sec, now);
 
     return PARSER_RC_OK;
 disable:
@@ -291,7 +289,6 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     user->st->current_entry += num_points;
     if (user->st->current_entry >= user->st->entries)
         user->st->current_entry -= user->st->entries;
-    info("Replication completed %zu points", num_points);
     netdata_mutex_lock(&user->st->shared_flags_lock);
     user->st->sflag_replicating = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
@@ -331,7 +328,6 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         return PARSER_RC_OK;
     }
 
-    info("Replicating %s / %s : %llu = " STORAGE_NUMBER_FORMAT " chart last %ld", user->st->id, words[1], timestamp, value, st_last);
     rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
     rd->last_collected_time.tv_sec = timestamp;
     rd->last_collected_time.tv_usec = timestamp;
@@ -435,7 +431,6 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         int pos = 0;
         char *line;
         while ((line = receiver_next_line(rpt, &pos))) {
-            info("%s received %s", rpt->host->hostname, line);
             if (unlikely(netdata_exit || rpt->shutdown || parser_action(parser,  line)))
                 goto done;
         }
