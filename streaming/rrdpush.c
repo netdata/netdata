@@ -352,7 +352,7 @@ void rrdset_done_push(RRDSET *st) {
         rrdpush_send_chart_definition_nolock(st);
     if (st->sflag_replicating) {
         debug(D_STREAM, "Not sending collector new data - chart %s in replication mode from %ld", st->name, (long)st->gap_sent);
-        if (st->gap_sent == 0) {
+        if (st->gap_sent == 0) 
             error("Invalid replication request - cannot replicate from time 0 on %s", st->name);
         else
             sender_fill_gap_nolock(host->sender, st);

@@ -293,7 +293,6 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     user->st->sflag_replicating = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
     user->st = NULL;
-    // TODO - Add another cycle if this took to long to reach the current time
     return PARSER_RC_OK;
 disable:
     error("Gap replication failed - Invalid REPEND %s on host %s. Disabling it.", words[1], user->host->hostname);
