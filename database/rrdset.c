@@ -881,8 +881,12 @@ RRDSET *rrdset_create_custom(
     st->green = NAN;
     st->red = NAN;
 
-    st->last_collected_time.tv_sec = 0;
-    st->last_collected_time.tv_usec = 0;
+    // Preserve loaded last collection times so that data can be replicated from sender
+    if (host == localhost) {
+        st->last_collected_time.tv_sec = 0;
+        st->last_collected_time.tv_usec = 0;
+    }
+    info("create_custom host=%s chart=%s last_collect=%ld", host->hostname, st->id, st->last_updated.tv_sec);
     st->counter_done = 0;
     st->rrddim_page_alignment = 0;
 

@@ -352,14 +352,17 @@ void rrdset_done_push(RRDSET *st) {
         rrdpush_send_chart_definition_nolock(st);
     if (st->sflag_replicating) {
         debug(D_STREAM, "Not sending collector new data - chart %s in replication mode from %ld", st->name, (long)st->gap_sent);
-        sender_fill_gap_nolock(host->sender, st);
+        if (st->gap_sent == 0) {
+            error("Invalid replication request - cannot replicate from time 0 on %s", st->name);
+        else
+            sender_fill_gap_nolock(host->sender, st);
         st->sflag_replicating = 0;
     }
-        rrdpush_send_chart_metrics_nolock(st, host->sender);
-        // signal the sender there are more data
-        if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-            error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
     netdata_mutex_unlock(&st->shared_flags_lock);
+    rrdpush_send_chart_metrics_nolock(st, host->sender);
+    // signal the sender there are more data
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
     sender_commit(host->sender);
     // ----- Release order: state flags lock, sender buffer lock -----------
 
