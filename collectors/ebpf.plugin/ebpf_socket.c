@@ -366,7 +366,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 
 void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
 {
-    int i, end = ebpf_nprocs;
+    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15)?ebpf_nprocs:1;
     ebpf_bandwidth_t *total = &out[0];
     for (i = 1; i < end; i++) {
         ebpf_bandwidth_t *move = &out[i];
@@ -388,10 +388,12 @@ static void ebpf_socket_update_apps_data()
         if (bpf_map_lookup_elem(fd, &next_key, eb))
             continue;
 
-        if (running_on_kernel >= NETDATA_KERNEL_V4_15)
-            ebpf_socket_bandwidth_accumulator(eb);
+        ebpf_socket_bandwidth_accumulator(eb);
 
         ebpf_socket_fill_publish_apps(next_key, eb);
+
+        if (eb[0].removed)
+            bpf_map_delete_elem(fd, &next_key);
 
         key = next_key;
     }

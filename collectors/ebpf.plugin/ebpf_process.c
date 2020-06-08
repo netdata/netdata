@@ -727,7 +727,6 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
     struct target *w;
     int newly_added = 0;
-    static time_t last_update = 0;
 
     for(w = root ; w ; w = w->next) {
         if (w->target) continue;
@@ -752,9 +751,9 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
         }
     }
 
-    //time was added to be sure dimensions will be created.
-    if (!newly_added || (time(NULL) - last_update) < 5) return;
-    last_update = time(NULL);
+    /* This was commented, because some charts were not correctly updated.
+    if (!newly_added) return;
+     */
 
     if (ebpf_modules[EBPF_MODULE_PROCESS_IDX].apps_charts)
         ebpf_process_create_apps_charts(em, root);
