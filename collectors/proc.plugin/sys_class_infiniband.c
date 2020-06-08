@@ -305,7 +305,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 	(void)dt;
 	static SIMPLE_PATTERN *disabled_list = NULL;
 	static int initialized = 0;
-	static int enable_new_ports = -1;
+	static int enable_new_ports = -1, enable_only_active = CONFIG_BOOLEAN_YES;
 	static int do_bytes = -1, do_packets = -1, do_errors = -1, do_hwpackets = -1, do_hwerrors= -1;
 	static char *sys_class_infiniband_dirname = NULL;
 
@@ -329,6 +329,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 		if(dt_to_refresh_speed < 0) dt_to_refresh_speed = 0;
 
 		enable_new_ports = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "Monitor ports going online during runtime", CONFIG_BOOLEAN_AUTO);
+		enable_only_active = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "Monitor only ports being active", CONFIG_BOOLEAN_AUTO);
 	}
 
 
@@ -384,15 +385,29 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 				if (!p->configured) {
 					p->configured = 1;
 
+					char buffer[FILENAME_MAX + 1];
+
 					p->counters_path = strdupz(counters_dirname);
 					p->hwcounters_path = strdupz(hwcounters_dirname);
 
+					// Enable filtering
 					p->enabled = enable_new_ports;
+
+					// Check port state
+					if (enable_only_active) {
+						snprintfz(buffer, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "state");
+						unsigned long long active;
+						// File is "1: DOWN" or "4: ACTIVE", but str2ull will stop on first non-decimal char
+						read_single_number_file(buffer, &active);
+
+						// Want "IB_PORT_ACTIVE" == "4", as defined by drivers/infiniband/core/sysfs.c::state_show()
+						if (active != 4)
+							p->enabled = 0;
+					}
 
 					if (p->enabled)
 						p->enabled = !simple_pattern_matches(disabled_list, p->name);
 
-					char buffer[FILENAME_MAX + 1];
 					snprintfz(buffer, FILENAME_MAX, "plugin:proc:/sys/class/infiniband:%s", p->name);
 
 					// Standard counters
@@ -454,6 +469,9 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 	// Update all ports values
 	struct ibport *port;
 	for (port = ibport_root; port ; port = port->next) {
+
+		if (!port->enabled)
+			continue;
 
 		//
 		// Read values from system to struct
