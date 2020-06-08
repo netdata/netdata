@@ -187,7 +187,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     if ((remote_t - expected_t > st->update_every * 2) ||
        (now - remote_t > st->update_every*2))
     {
-        info("Gap in chart: remote=%ld vs %ld", remote_t, expected_t);
+        info("Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t, expected_t, now);
         st->sflag_replicating = 1;
         netdata_mutex_unlock(&st->shared_flags_lock);
         send_replication_req(user->host, st->id, expected_t, now);
