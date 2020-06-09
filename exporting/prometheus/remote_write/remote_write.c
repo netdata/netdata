@@ -35,6 +35,7 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
         "POST %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Accept: */*\r\n"
+        "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: %zu\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
         connector_specific_config->remote_write_path,
