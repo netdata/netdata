@@ -546,8 +546,8 @@ void ebpf_print_help() {
  */
 int ebpf_start_pthread_variables()
 {
-    pthread_mutex_init(&lock, NULL));
-    pthread_mutex_init(&collect_data_mutex, NULL));
+    pthread_mutex_init(&lock, NULL);
+    pthread_mutex_init(&collect_data_mutex, NULL);
 
     if (pthread_cond_init(&collect_data_cond_var, NULL)) {
         thread_finished++;

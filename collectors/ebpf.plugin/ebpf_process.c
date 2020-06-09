@@ -751,9 +751,7 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
         }
     }
 
-    /* This was commented, because some charts were not correctly updated.
     if (!newly_added) return;
-     */
 
     if (ebpf_modules[EBPF_MODULE_PROCESS_IDX].apps_charts)
         ebpf_process_create_apps_charts(em, root);
