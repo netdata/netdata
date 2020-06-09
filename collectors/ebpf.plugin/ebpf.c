@@ -546,17 +546,8 @@ void ebpf_print_help() {
  */
 int ebpf_start_pthread_variables()
 {
-    if (pthread_mutex_init(&lock, NULL)) {
-        thread_finished++;
-        error("Cannot start mutex to control overall charts.");
-        return -1;
-    }
-
-    if (pthread_mutex_init(&collect_data_mutex, NULL)) {
-        thread_finished++;
-        error("Cannot start mutex to control Apps charts.");
-        return -1;
-    }
+    pthread_mutex_init(&lock, NULL));
+    pthread_mutex_init(&collect_data_mutex, NULL));
 
     if (pthread_cond_init(&collect_data_cond_var, NULL)) {
         thread_finished++;
