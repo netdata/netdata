@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- minor copy edits [\#9298](https://github.com/netdata/netdata/pull/9298) ([MeganBishopMoore](https://github.com/MeganBishopMoore))
+- Fix crash in \#9291 [\#9297](https://github.com/netdata/netdata/pull/9297) ([amoss](https://github.com/amoss))
+- Add frontmatter to Matrix notifications doc [\#9295](https://github.com/netdata/netdata/pull/9295) ([joelhans](https://github.com/joelhans))
+- installer: update go.d.plugin version to v0.19.0 [\#9294](https://github.com/netdata/netdata/pull/9294) ([ilyam8](https://github.com/ilyam8))
+- dashboard\_info.js: ebpf: fix close code block [\#9293](https://github.com/netdata/netdata/pull/9293) ([ilyam8](https://github.com/ilyam8))
 - Fix Coverity defects 359164, 359165 and 358989. [\#9268](https://github.com/netdata/netdata/pull/9268) ([amoss](https://github.com/amoss))
 - Move/refactor docs to accomodate new Guides section on Learn [\#9266](https://github.com/netdata/netdata/pull/9266) ([joelhans](https://github.com/joelhans))
 - Cleanup of main README and registry doc [\#9265](https://github.com/netdata/netdata/pull/9265) ([joelhans](https://github.com/joelhans))
@@ -21,6 +26,7 @@
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
 - Update apps.plugin documentation and dashboard.info [\#9199](https://github.com/netdata/netdata/pull/9199) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix compilation for older systems [\#9198](https://github.com/netdata/netdata/pull/9198) ([ktsaou](https://github.com/ktsaou))
+- Support for matrix notifications [\#9196](https://github.com/netdata/netdata/pull/9196) ([okias](https://github.com/okias))
 - Clean type\_name in exporting connector instance configuration [\#9188](https://github.com/netdata/netdata/pull/9188) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed cmake build affected by \#9074 [\#9186](https://github.com/netdata/netdata/pull/9186) ([stelfrag](https://github.com/stelfrag))
 - Fix exporting unit tests [\#9183](https://github.com/netdata/netdata/pull/9183) ([vlvkobal](https://github.com/vlvkobal))
@@ -117,7 +123,6 @@
 - Update synology.md [\#8658](https://github.com/netdata/netdata/pull/8658) ([thenktor](https://github.com/thenktor))
 - Ceph: Added OSD size collection [\#8649](https://github.com/netdata/netdata/pull/8649) ([elelayan](https://github.com/elelayan))
 - Update freebsd.md [\#8643](https://github.com/netdata/netdata/pull/8643) ([thenktor](https://github.com/thenktor))
-- Update pfsense.md [\#8544](https://github.com/netdata/netdata/pull/8544) ([electropup42](https://github.com/electropup42))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
@@ -210,7 +215,6 @@
 - Remove an automatic restart of the apps.plugin [\#8592](https://github.com/netdata/netdata/pull/8592) ([vlvkobal](https://github.com/vlvkobal))
 - charts.d/libreswan: fix sudo check [\#8569](https://github.com/netdata/netdata/pull/8569) ([ilyam8](https://github.com/ilyam8))
 - Docs: Change MacOS to macOS [\#8562](https://github.com/netdata/netdata/pull/8562) ([joelhans](https://github.com/joelhans))
-- Prometheus web api connector [\#8540](https://github.com/netdata/netdata/pull/8540) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
@@ -238,11 +242,6 @@
 - github/workflow: remove duplicate key \(`line-length`\) from the yamlli… [\#8551](https://github.com/netdata/netdata/pull/8551) ([ilyam8](https://github.com/ilyam8))
 - apache: fix `bytespersec` chart context [\#8550](https://github.com/netdata/netdata/pull/8550) ([ilyam8](https://github.com/ilyam8))
 - Add missing override for Ubuntu eoan [\#8547](https://github.com/netdata/netdata/pull/8547) ([prologic](https://github.com/prologic))
-- Switching over to soft feature flag [\#8545](https://github.com/netdata/netdata/pull/8545) ([amoss](https://github.com/amoss))
-- github/workflow:  increase yamllint line length 80=\>120 [\#8542](https://github.com/netdata/netdata/pull/8542) ([ilyam8](https://github.com/ilyam8))
-- github/workflow: add python.d configuration files to the yaml-files [\#8541](https://github.com/netdata/netdata/pull/8541) ([ilyam8](https://github.com/ilyam8))
-- Write the failure reason during ACLK challenge / response [\#8538](https://github.com/netdata/netdata/pull/8538) ([stelfrag](https://github.com/stelfrag))
-- fix minimist vulnerability [\#8537](https://github.com/netdata/netdata/pull/8537) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
