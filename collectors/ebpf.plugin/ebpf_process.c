@@ -646,13 +646,13 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
         , &process_publish_aggregated[NETDATA_IN_START_BYTE]
         , 2);
 
-    if (em->mode < MODE_ENTRY) {
-        ebpf_create_io_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_VFS_IO_FILE_BYTES
-            , EBPF_COMMON_DIMENSION_BYTESS
-            , NETDATA_VFS_GROUP
-            , 21004);
+    ebpf_create_io_chart(NETDATA_EBPF_FAMILY
+        , NETDATA_VFS_IO_FILE_BYTES
+        , EBPF_COMMON_DIMENSION_BYTESS
+        , NETDATA_VFS_GROUP
+        , 21004);
 
+    if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_ERR_COUNT
             , EBPF_COMMON_DIMENSION_CALL
