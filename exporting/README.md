@@ -38,8 +38,11 @@ X seconds (though, it can send them per second if you need it to).
     -   **graphite** (`plaintext interface`, used by **Graphite**, **InfluxDB**, **KairosDB**, **Blueflood**,
         **ElasticSearch** via logstash tcp input and the graphite codec, etc)
 
-        metrics are sent to the database server as `prefix.hostname.chart.dimension`. `prefix` is configured below,
+        Metrics are sent to the database server as `prefix.hostname.chart.dimension`. `prefix` is configured below,
         `hostname` is the hostname of the machine (can also be configured).
+
+        Learn more in our guide to [export and visualize Netdata metrics in
+        Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
 
     -   **opentsdb** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc)
 
