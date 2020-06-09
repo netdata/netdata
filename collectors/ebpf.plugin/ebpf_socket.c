@@ -460,7 +460,6 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 static void ebpf_socket_cleanup(void *ptr)
 {
     (void)ptr;
-
     freez(socket_aggregated_data);
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
@@ -473,6 +472,8 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_bandwidth_curr);
     freez(socket_bandwidth_prev);
     freez(bandwidth_vector);
+
+    ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
 }
 
 /*****************************************************************

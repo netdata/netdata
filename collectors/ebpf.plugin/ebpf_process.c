@@ -412,7 +412,7 @@ static void read_hash_global_tables()
  */
 static void ebpf_process_update_apps_data()
 {
-    int i;
+    size_t i;
     for ( i = 0 ; i < pids_running ; i++) {
         uint32_t current_pid = pid_index[i];
         ebpf_process_stat_t *ps = local_process_stats[current_pid];
@@ -769,6 +769,38 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
  *****************************************************************/
 
 /**
+ * Shutdown collector when necessary
+ *
+ * This function verifies the number of PIDs read from hash table and compare with the number
+ * of PIDs got from /proc.
+ *
+ * @param prev the previous timestamp.
+ *
+ * @return it returns the last timestamp stored to do math.
+ */
+static time_t ebpf_process_shutdown_collector_when_necessary(time_t prev)
+{
+    if (!prev) {
+        prev = time(NULL);
+        return prev;
+    }
+
+    time_t current = time(NULL);
+    size_t expected = all_pids_count * 7/10;
+    if (pids_running < expected) {
+        time_t timestamp_difference =  current - prev;
+        if (timestamp_difference >= EBPF_MAX_SYNCHRONIZATION_TIME) {
+            close_ebpf_plugin = 1;
+            error("ebpf.plugin is losing many probes, plugin will be restarted.");
+        }
+    } else {
+        prev = current;
+    }
+
+    return prev;
+}
+
+/**
  * Main loop for this collector.
  *
  * @param step the number of microseconds used with heart beat
@@ -781,7 +813,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
     int publish_global = em->global_charts;
     int apps_enabled = em->apps_charts;
     int pid_fd = map_fd[0];
-    while(!close_ebpf_plugin) {
+    time_t last_update = 0;
+    while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -795,6 +828,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                                                       pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
+        last_update = ebpf_process_shutdown_collector_when_necessary(last_update);
 
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -830,7 +864,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  */
 static void clean_process_stat()
 {
-    int i;
+    size_t i;
     for (i = 0 ; i < pids_running ; i++) {
         ebpf_process_stat_t *w = local_process_stats[pid_index[i]];
         freez(w);
@@ -928,6 +962,34 @@ static void set_local_pointers(ebpf_module_t *em) {
  *****************************************************************/
 
 /**
+ *
+ */
+static void wait_for_all_threads_die()
+{
+    ebpf_modules[EBPF_MODULE_PROCESS_IDX].enabled = 0;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    int max = 10;
+    int i;
+    for (i = 0; i < max ; i++) {
+        heartbeat_next(&hb, 200000);
+
+        size_t j, counter = 0, compare = 0;
+        for (j = 0; ebpf_modules[j].thread_name; j++) {
+            if (!ebpf_modules[j].enabled)
+                counter++;
+
+            compare++;
+        }
+
+        if (counter == compare)
+            break;
+    }
+}
+
+/**
  * Process thread
  *
  * Thread used to generate process charts.
@@ -971,6 +1033,7 @@ void *ebpf_process_thread(void *ptr)
     process_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
 
 endprocess:
+    wait_for_all_threads_die();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

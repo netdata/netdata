@@ -412,7 +412,7 @@ struct pid_stat **all_pids = NULL; // to avoid allocations, we pre-allocate the
                                    // the entire pid space.
 struct pid_stat  *root_of_pids = NULL;   // global list of all processes running
 
-static size_t
+size_t
         all_pids_count = 0;     // the number of processes running
 
 struct target

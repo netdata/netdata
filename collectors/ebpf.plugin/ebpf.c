@@ -107,7 +107,7 @@ ebpf_module_t ebpf_modules[] = {
 
 //Link with apps.plugin
 pid_t *pid_index;
-int pids_running;
+size_t pids_running;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 /*****************************************************************
