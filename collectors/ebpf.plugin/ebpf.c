@@ -241,19 +241,28 @@ void write_chart_dimension(char *dim, long long value)
  * @param family  the chart family
  * @param move    the pointer with the values that will be published
  * @param end     the number of values that will be written on standard output
+ *
+ * @return It returns a variable tha maps the charts that did not have zero values.
  */
-void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+uint32_t write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end) {
     write_begin_chart(family, name);
 
-    int i = 0;
+    uint32_t flags = 0;
+    uint32_t i = 0;
     while (move && i < end) {
-        write_chart_dimension(move->name, move->ncall);
+        long long value = move->ncall;
+        write_chart_dimension(move->name, value);
+
+        if (value > 0)
+            flags |= 1<<i;
 
         move = move->next;
         i++;
     }
 
     write_end_chart();
+
+    return flags;
 }
 
 /**
@@ -284,14 +293,26 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
  *
  * @param family  the chart family
  * @param move    the pointer with the values that will be published
+ *
+ * @return It returns a variable tha maps the charts that did not have zero values.
  */
-void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
+uint32_t write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
     write_begin_chart(family, chart);
 
-    write_chart_dimension(dwrite, (long long) pvc->write);
-    write_chart_dimension(dread, (long long) pvc->read);
+    uint32_t flags = 0;
+    long long value = pvc->write;
+    write_chart_dimension(dwrite, (long long) value);
+    if (value > 0)
+        flags |= 1;
+
+    value = pvc->read;
+    write_chart_dimension(dread, (long long) value);
+    if (value > 0)
+        flags |= 2;
 
     write_end_chart();
+
+    return  flags;
 }
 
 /**

@@ -29,6 +29,28 @@ static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
 int process_enabled = 0;
 
+struct ebpf_process_monitor
+{
+    uint32_t global_open;
+    uint32_t apps_open;
+    uint32_t global_close;
+    uint32_t apps_close;
+    uint32_t global_delete;
+    uint32_t apps_delete;
+    uint32_t global_write_call;
+    uint32_t apps_write_call;
+    uint32_t global_write_bytes;
+    uint32_t apps_write_bytes;
+    uint32_t global_read_call;
+    uint32_t apps_read_call;
+    uint32_t global_read_bytes;
+    uint32_t apps_read_bytes;
+    uint32_t global_process;
+    uint32_t apps_process;
+    uint32_t global_thread;
+    uint32_t apps_task;
+} calls_monitoring;
+
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
@@ -148,23 +170,41 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t pvc;
     ebpf_update_global_publish(process_publish_aggregated, &pvc, process_aggregated_data);
 
-    write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
-    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
-                             NETDATA_EBPF_FAMILY,
-                             &process_publish_aggregated[NETDATA_DEL_START],
-                             1);
-    write_count_chart(NETDATA_VFS_FILE_IO_COUNT,
-                             NETDATA_EBPF_FAMILY,
-                             &process_publish_aggregated[NETDATA_IN_START_BYTE],
-                             2);
+    uint32_t ret;
+    ret = write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
+    if (ret & 1)
+        calls_monitoring.global_open = 1;
+    if (ret & 2)
+        calls_monitoring.global_close = 1;
+
+    ret = write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
+                            NETDATA_EBPF_FAMILY,
+                            &process_publish_aggregated[NETDATA_DEL_START],
+                            1);
+    if (ret & 1)
+        calls_monitoring.global_delete = 1;
+
+    ret = write_count_chart(NETDATA_VFS_FILE_IO_COUNT,
+                            NETDATA_EBPF_FAMILY,
+                            &process_publish_aggregated[NETDATA_IN_START_BYTE],
+                            2);
+    if (ret & 1)
+        calls_monitoring.global_write_call = 1;
+    if (ret & 2)
+        calls_monitoring.global_read_call = 1;
+
     write_count_chart(NETDATA_EXIT_SYSCALL,
-                             NETDATA_EBPF_FAMILY,
-                             &process_publish_aggregated[NETDATA_EXIT_START],
-                             2);
-    write_count_chart(NETDATA_PROCESS_SYSCALL,
-                             NETDATA_EBPF_FAMILY,
-                             &process_publish_aggregated[NETDATA_PROCESS_START],
-                             2);
+                            NETDATA_EBPF_FAMILY,
+                            &process_publish_aggregated[NETDATA_EXIT_START],
+                            2);
+    ret = write_count_chart(NETDATA_PROCESS_SYSCALL,
+                      NETDATA_EBPF_FAMILY,
+                      &process_publish_aggregated[NETDATA_PROCESS_START],
+                      2);
+    if (ret & 1)
+        calls_monitoring.global_process = 1;
+    if (ret & 2)
+        calls_monitoring.global_thread = 1;
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
     if(em->mode < MODE_ENTRY) {
@@ -177,10 +217,14 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
                                NETDATA_EBPF_FAMILY,
                                &process_publish_aggregated[NETDATA_PROCESS_START],
                                2);
-
-        write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3],
-                       process_id_names[4], &pvc);
     }
+
+    ret = write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3],
+                         process_id_names[4], &pvc);
+    if (ret & 1)
+        calls_monitoring.global_write_bytes = 1;
+    if (ret & 2)
+        calls_monitoring.global_read_bytes = 1;
 }
 
 /**
@@ -219,14 +263,19 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     struct target *w;
     collected_number value;
 
+    uint32_t counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_open));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_open = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
@@ -239,14 +288,19 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_closed));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_close = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
@@ -259,23 +313,33 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_deleted));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_delete = counter;
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_write_call));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_write_call = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
@@ -288,14 +352,19 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_read_call));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_read_call = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
@@ -308,41 +377,61 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_write_bytes));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_write_bytes = counter;
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_read_bytes));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_read_bytes = counter;
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_process));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_process = counter;
 
+    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_thread));
+            if (value > 0)
+                counter++;
+
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+    calls_monitoring.apps_task = counter;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE);
     for (w = root; w ; w = w->next) {

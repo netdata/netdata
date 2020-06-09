@@ -114,7 +114,7 @@ static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr,
  *
  * @param em the structure with thread information
  */
-static void ebpf_process_send_data(ebpf_module_t *em) {
+static void ebpf_socket_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t common_tcp;
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
@@ -433,7 +433,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
-            ebpf_process_send_data(em);
+            ebpf_socket_send_data(em);
 
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
