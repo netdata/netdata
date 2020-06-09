@@ -11,6 +11,7 @@ struct metalog_pluginsd_state {
     struct metalog_instance *ctx;
     uuid_t uuid;
     uint8_t skip_record; /* skip this record due to errors in parsing */
+    struct metadata_logfile *metalogfile; /* current metadata log file being replayed */
 };
 
 extern void metalog_pluginsd_state_init(struct metalog_pluginsd_state *state, struct metalog_instance *ctx);

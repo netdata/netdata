@@ -111,7 +111,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
                     buffer = metalog_update_dimension_buffer(rd);
                     metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
                 } else {
-                    info("Chart has already been compacted, ignoring record.");
+                    info("Dimension has already been compacted, ignoring record.");
                 }
             } else {
                 info("Ignoring nonexistent dimension metadata record.");
@@ -142,7 +142,6 @@ static int compact_metadata_logfile_records(struct metalog_instance *ctx, struct
     struct logfile_compaction_state *compaction_state;
     struct metalog_record *record;
     struct metalog_record_block *record_block, *prev_record_block;
-    struct metadata_logfile *newmetalogfile;
     int ret;
     unsigned iterated_records;
 #define METADATA_LOG_RECORD_BATCH 128 /* Flush I/O and check sizes whenever this many records have been iterated */
@@ -151,7 +150,6 @@ static int compact_metadata_logfile_records(struct metalog_instance *ctx, struct
          ctx->rrdeng_ctx->dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
 
     compaction_state = &ctx->compaction_state;
-    newmetalogfile = compaction_state->new_metadata_logfiles.last;
     record_block = prev_record_block = NULL;
     iterated_records = 0;
     for (record = mlf_record_get_first(metalogfile) ; record != NULL ; record = mlf_record_get_next(metalogfile)) {
@@ -169,7 +167,6 @@ static int compact_metadata_logfile_records(struct metalog_instance *ctx, struct
                 (void)sleep_usec(10000); /* 10 msec throttle compaction */
             }
             compaction_test_quota(wc);
-            newmetalogfile = compaction_state->new_metadata_logfiles.last;
         }
     }
     if (prev_record_block) { /* Deallocate iterated record blocks */

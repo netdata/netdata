@@ -479,6 +479,7 @@ static void iterate_records(struct metadata_logfile *metalogfile)
                                    sizeof(header->header_length);
 
     file_size = metalogfile->pos;
+    state->metalogfile = metalogfile;
 
     buf = mallocz(MAX_READ_BYTES);
 

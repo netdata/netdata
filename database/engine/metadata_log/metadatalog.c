@@ -123,7 +123,7 @@ static void do_commit_record(struct metalog_worker_config* wc, uint8_t type, voi
     }
 }
 
-/* Only crates a new metadata file and links it to the metadata log if the last one is non empty. */
+/* Only creates a new metadata file and links it to the metadata log if the last one is non empty. */
 void metalog_try_link_new_metadata_logfile(struct metalog_worker_config *wc)
 {
     struct metalog_instance *ctx = wc->ctx;
