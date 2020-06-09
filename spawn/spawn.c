@@ -196,10 +196,19 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
     int ret;
 #define SPAWN_SERVER_DESCRIPTORS (3)
     uv_stdio_container_t stdio[SPAWN_SERVER_DESCRIPTORS];
+    struct passwd *passwd = NULL;
+    char *user = NULL;
+
+    passwd = getpwuid(getuid());
+    user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
 
     exepath_size = sizeof(exepath);
     ret = uv_exepath(exepath, &exepath_size);
-    assert(ret == 0);
+    if (0 != ret) {
+        error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
+              uv_strerror(ret));
+        fatal("Cannot start netdata without the spawn server.");
+    }
 
     exepath[exepath_size] = '\0';
     args[0] = exepath;
@@ -221,7 +230,11 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
     stdio[2].data.fd = 2 /* UV_STDERR_FD */;
 
     ret = uv_spawn(loop, process, &options); /* execute the netdata binary again as the netdata user */
-    assert(ret == 0);
+    if (0 != ret) {
+        error("uv_spawn (process: \"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
+              uv_strerror(ret));
+        fatal("Cannot start netdata without the spawn server.");
+    }
 
     return ret;
 }
