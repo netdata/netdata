@@ -828,11 +828,11 @@ static void process_collector(usec_t step, ebpf_module_t *em)
                                                       pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
-        last_update = ebpf_process_shutdown_collector_when_necessary(last_update);
 
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
+        last_update = ebpf_process_shutdown_collector_when_necessary(last_update);
         int publish_apps = 0;
         if (apps_enabled && pids_running > 0){
             publish_apps = 1;
