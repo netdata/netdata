@@ -106,16 +106,19 @@
 
 
 // Common definitions used more than once
-#define GEN_RRD_DIM_ADD(NAME,GRP,DESC,DIR, PORT, ...) \
-	PORT->rd_##NAME = rrddim_add(PORT->st_##GRP, DESC, NULL, DIR, 1, RRD_ALGORITHM_INCREMENTAL);
+#define GEN_RRD_DIM_ADD(NAME,GRP,DESC,DIR, PORT) \
+	GEN_RRD_DIM_ADD_CUSTOM(NAME,GRP,DESC,DIR, PORT, 1, 1, RRD_ALGORITHM_INCREMENTAL)
 
-#define GEN_RRD_DIM_ADD_HW(NAME,GRP,DESC,DIR, PORT,HW, ...) \
+#define GEN_RRD_DIM_ADD_CUSTOM(NAME,GRP,DESC,DIR, PORT,MULT,DIV,ALGO) \
+	PORT->rd_##NAME = rrddim_add(PORT->st_##GRP, DESC, NULL, DIR*MULT, DIV, ALGO);
+
+#define GEN_RRD_DIM_ADD_HW(NAME,GRP,DESC,DIR, PORT,HW) \
 	HW->rd_##NAME = rrddim_add(PORT->st_##GRP, DESC, NULL, DIR, 1, RRD_ALGORITHM_INCREMENTAL);
 
-#define GEN_RRD_DIM_SETP(NAME,GRP,DESC,DIR, PORT, ...) \
+#define GEN_RRD_DIM_SETP(NAME,GRP,DESC,DIR, PORT) \
 	rrddim_set_by_pointer(PORT->st_##GRP, PORT->rd_##NAME, (collected_number)PORT->NAME);
 
-#define GEN_RRD_DIM_SETP_HW(NAME,GRP,DESC,DIR, PORT,HW, ...) \
+#define GEN_RRD_DIM_SETP_HW(NAME,GRP,DESC,DIR, PORT,HW) \
 	rrddim_set_by_pointer(PORT->st_##GRP, HW->rd_##NAME, (collected_number)HW->NAME);
 
 
@@ -153,6 +156,11 @@ static struct ibport {
 	const char *chart_family;
 
 	unsigned long priority;
+
+	// Port details using drivers/infiniband/core/sysfs.c :: rate_show()
+	RRDDIM *rd_speed;
+	uint64_t speed;
+	uint64_t width;
 
 	// Stats from /$device/ports/$portid/counters
 	// as drivers/infiniband/hw/qib/qib_verbs.h
@@ -305,7 +313,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 	(void)dt;
 	static SIMPLE_PATTERN *disabled_list = NULL;
 	static int initialized = 0;
-	static int enable_new_ports = -1, enable_only_active = CONFIG_BOOLEAN_YES;
+	static int enable_new_ports = -1, enable_only_active = CONFIG_BOOLEAN_YES, enable_link_speed = CONFIG_BOOLEAN_YES;
 	static int do_bytes = -1, do_packets = -1, do_errors = -1, do_hwpackets = -1, do_hwerrors= -1;
 	static char *sys_class_infiniband_dirname = NULL;
 
@@ -330,6 +338,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 
 		enable_new_ports = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "Monitor ports going online during runtime", CONFIG_BOOLEAN_AUTO);
 		enable_only_active = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "Monitor only ports being active", CONFIG_BOOLEAN_AUTO);
+		enable_link_speed = config_get_boolean(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "Monitor link speed", CONFIG_BOOLEAN_YES);
 	}
 
 
@@ -362,6 +371,8 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 				if (!strcmp(port_dent->d_name, "..") || !strcmp(port_dent->d_name, "."))
 					continue;
 
+				char buffer[FILENAME_MAX + 1];
+
 				// Check if counters are availablea (mandatory)
 				// /sys/class/infiniband/<device>/ports/<port>/counters
 				char counters_dirname[FILENAME_MAX +1];
@@ -385,7 +396,6 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 				if (!p->configured) {
 					p->configured = 1;
 
-					char buffer[FILENAME_MAX + 1];
 
 					p->counters_path = strdupz(counters_dirname);
 					p->hwcounters_path = strdupz(hwcounters_dirname);
@@ -456,8 +466,26 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 							p->do_hwerrors  = CONFIG_BOOLEAN_NO;
 						}
 					}
-
 				}
+
+				// Check / Update the link speed & width frm "rate" file
+				// Sample output: "100 Gb/sec (4X EDR)"
+				snprintfz(buffer, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "rate");
+				char buffer_rate[65];
+				if (read_file(buffer, buffer_rate, 64)) {
+					error("Unable to read '%s'", buffer);
+					p->width = 1;
+				}
+				else {
+					char *buffer_width = strstr(buffer_rate, "(");
+					buffer_width++;
+					// str2ull will stop on first non-decimal value
+					p->speed = str2ull(buffer_rate);
+					p->width = str2ull(buffer_width);
+				}
+
+
+
 			}
 			closedir(ports_dir);
 		}
@@ -500,8 +528,8 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					, NULL
 					, port->chart_family
 					, "ib.bytes"
-					, "Bytes"
-					, "Bytes/s"
+					, "Bandwidth usage"
+					, "kilobits/s"
 					, PLUGIN_PROC_NAME
 					, PLUGIN_PROC_MODULE_INFINIBAND_NAME
 					, port->priority + 1
@@ -510,13 +538,24 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 				);
 				// Create Dimensions
 				rrdset_flag_set(port->st_bytes, RRDSET_FLAG_DETAIL);
-				FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD, port)
+				// On this chart, we want to have a KB/s so the dashboard will autoscale it
+				// The reported values are also per-lane, so we must multiply it by the width
+				FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
+				if (enable_link_speed) {
+					// We also add a link speed (in Gb/s)
+					GEN_RRD_DIM_ADD_CUSTOM(speed, bytes, "Link Speed", 1, port, 1000000, 1, RRD_ALGORITHM_ABSOLUTE)
+				}
 			}
 			else
 				rrdset_next(port->st_bytes);
 
 			// Link read values to dimensions
 			FOREACH_COUNTER_BYTES(GEN_RRD_DIM_SETP, port)
+			if (enable_link_speed) {
+				// And the link speed
+				GEN_RRD_DIM_SETP(speed, bytes, "Link Speed", 1, port)
+			}
+
 			rrdset_done(port->st_bytes);
 		}
 
@@ -533,11 +572,11 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					, NULL
 					, port->chart_family
 					, "ib.packets"
-					, "Packets"
-					, "Packets/s"
+					, "Packets Statistics"
+					, "packets/s"
 					, PLUGIN_PROC_NAME
 					, PLUGIN_PROC_MODULE_INFINIBAND_NAME
-					, port->priority + 1
+					, port->priority + 2
 					, update_every
 					, RRDSET_TYPE_AREA
 				);
@@ -566,11 +605,11 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					, NULL
 					, port->chart_family
 					, "ib.errors"
-					, "errors"
+					, "Error Counters"
 					, "errors/s"
 					, PLUGIN_PROC_NAME
 					, PLUGIN_PROC_MODULE_INFINIBAND_NAME
-					, port->priority + 1
+					, port->priority + 3
 					, update_every
 					, RRDSET_TYPE_LINE
 				);
@@ -607,11 +646,11 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 						, NULL
 						, port->chart_family
 						, "ib.hwerrors"
-						, "errors"
+						, "Hardware Errors"
 						, "errors/s"
 						, PLUGIN_PROC_NAME
 						, PLUGIN_PROC_MODULE_INFINIBAND_NAME
-						, port->priority + 1
+						, port->priority + 4
 						, update_every
 						, RRDSET_TYPE_LINE
 					);
@@ -645,11 +684,11 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 						, NULL
 						, port->chart_family
 						, "ib.hwpackets"
-						, "packets"
+						, "Hardware Packets Statistics"
 						, "packets/s"
 						, PLUGIN_PROC_NAME
 						, PLUGIN_PROC_MODULE_INFINIBAND_NAME
-						, port->priority + 1
+						, port->priority + 5
 						, update_every
 						, RRDSET_TYPE_LINE
 					);
