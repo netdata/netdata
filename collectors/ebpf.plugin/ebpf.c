@@ -117,13 +117,24 @@ ebpf_process_stat_t *global_process_stat = NULL;
  *****************************************************************/
 
 /**
+ * Clean Loaded Events
+ *
+ * This function cleans the events previous loaded on Linux.
+ */
+void clean_loaded_events()
+{
+    int event_pid;
+    for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
+        clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
+}
+
+/**
  * Close the collector gracefully
  *
  * @param sig is the signal number used to close the collector
  */
 static void ebpf_exit(int sig)
 {
-    int event_pid;
     close_ebpf_plugin = 1;
 
     //When both threads were not finished case I try to go in front this address, the collector will crash
@@ -136,7 +147,6 @@ static void ebpf_exit(int sig)
     freez(pid_index);
     freez(global_process_stat);
 
-    event_pid = getpid();
     int ret = fork();
     if (ret < 0) //error
         error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
@@ -158,10 +168,8 @@ static void ebpf_exit(int sig)
         int sid = setsid();
         if(sid >= 0) {
             sleep(1);
-            debug(D_EXIT, "Wait for father %d die", event_pid);
-
-            for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
-                clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
+            debug(D_EXIT, "Wait for father %d die", getpid());
+            clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
         }
@@ -900,6 +908,8 @@ int main(int argc, char **argv)
         {"EBPF SOCKET",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[1].start_routine},
         {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
     };
+
+    clean_loaded_events();
 
     int i;
     for (i = 0; ebpf_threads[i].name != NULL ; i++) {
