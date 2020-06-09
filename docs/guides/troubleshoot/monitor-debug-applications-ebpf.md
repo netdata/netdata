@@ -11,10 +11,10 @@ developed programs that connect to the [_extended Berkeley Packet Filter_ (eBPF)
 machine](/collectors/ebpf.plugin/README.md) to help you see exactly how specific applications are interacting with the
 Linux kernel. With these charts, you can root out bugs, discover optimizations, diagnose memory leaks, and much more.
 
-This means you can see exactly how often, and in what volume, the process creates processes, opens files, writes to the
-virtual file system (VFS), and much more. Even better, the eBPF collector gathers metrics at an _event frequency_, which
-is even faster than Netdata's beloved 1-second granularity. When you troubleshoot and debug applications with eBPF, rest
-assured you miss not even the smallest meaningful event.
+This means you can see exactly how often, and in what volume, the process creates processes, opens files, writes to
+filesystem using virtual filesystem (VFS) functions, and much more. Even better, the eBPF collector gathers metrics at
+an _event frequency_, which is even faster than Netdata's beloved 1-second granularity. When you troubleshoot and debug
+applications with eBPF, rest assured you miss not even the smallest meaningful event.
 
 Using this guide, you'll learn the fundamentals of setting up Netdata to give you kernel-level metrics from your
 application so that you can monitor, troubleshoot, and debug to your heart's content.
@@ -66,6 +66,28 @@ firefox: *firefox*
 
 Restart Netdata with `sudo service netdata restart` or the appropriate method for your system.
 
+## Configure the eBPF collector to monitor errors
+
+The eBPF collector has [two possible modes](/collectors/ebpf.plugin#ebpf-load-mode): `entry` and `return`. The default
+is `entry`, and only monitors calls to kernel functions, but the `return` also monitors and charts _whether these calls
+return in error_.
+
+Let's turn on the `return` mode for more granularity when debugging Firefox's behavior.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory
+sudo ./edit-config ebpf.conf
+```
+
+Replace `entry` with `return`:
+
+```conf
+[global]
+    load = return
+```
+
+Restart Netdata with `sudo service netdata restart` or the appropriate method for your system.
+
 ## Get familiar with per-application eBPF metrics and charts
 
 Visit the Netdata dashboard at `http://NODE:19999`, replacing `NODE` with the hostname or IP of the system you're using
@@ -80,8 +102,8 @@ See the [eBPF collector
 documentation](https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin) for the full
 list of per-application charts.
 
-For example, the following screenshot shows how Firefox closes files, deletes files, and writes to the VFS over the
-course of a few minutes.
+For example, the green lines in the following screenshot shows how Firefox closes files, deletes files, and writes to
+the VFS over the course of a few minutes.
 
 ![Screenshot of eBPF metrics in
 Netdata](https://user-images.githubusercontent.com/1153921/84086279-5e482480-a99c-11ea-8262-fcd4b8343c0c.png)
@@ -89,9 +111,21 @@ Netdata](https://user-images.githubusercontent.com/1153921/84086279-5e482480-a99
 ## Troubleshoot and debug applications with eBPF
 
 The actual process of troubleshooting and debugging any application with Netdata's eBPF metrics depends on the type of
-application you're monitoring and what kind of issues you're trying to trace.
+application you're monitoring and what kind of issues you're trying to trace. The value of using Netdata to collect and
+visualize eBPF metrics is that you don't have to rely on existing (complex) command line eBPF programs or, even worse,
+write your own eBPF program to get the information you need.
 
-**MORE SHOULD GO HERE**
+Let's show some examples of how Firefox engages with the Linux kernel, and thus creates eBPF metrics, to give you some
+ideas.
+
+First, let's try to open a file that doesn't exist. Open your browser, type `file://this/file/does/not/exist.txt` into
+the search bar, and hit `Enter`. Firefox interacts with the Linux kernel to open the file in question, but the function
+returns a failure. You can see these failures in the `apps.vfs_read_error` chart.
+
+![Screenshot of the apps.vfs_read_error
+charts](https://user-images.githubusercontent.com/1153921/84203428-446f1600-aa5e-11ea-9243-b1be84b94a24.png)
+
+
 
 ## View eBPF metrics in Netdata Cloud
 
@@ -103,25 +137,30 @@ If you don't already have a Netdata Cloud account, go [sign in](https://app.netd
 Read the [get started with Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started) for a walkthrough of node
 claiming and other fundamentals.
 
-Add more metrics to the Nodes view by clicking on the **Add metric** button, then typing `apps.` into the context field.
-Choose the eBPF contexts you want to add. Then, you can choose to show just the `firefox` dimension.
+Add more charts to the Nodes view by clicking on the **Add metric** button. Click on the **Context** input and scroll
+until you find `apps.vfs_write_call` in the dropdown, or type that string into the input itself. Next, click on the
+**Dimensions** input and find the `firefox` dimension. Click **Save** to add the chart.
 
-**GIF GOES HERE**
+![Animated GIF of adding an apps.vfs_write_call chart to Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/84194809-6fec0380-aa52-11ea-8609-639afd2f63cb.gif)
+
+Now that you can see these metrics in Netdata Cloud, you can [invite your
+team](https://learn.netdata.cloud/docs/cloud/collaborate/invite-your-team) and share your findings with others.
 
 ## What's next?
 
-Debugging and troubleshooting an application takes 
+Debugging and troubleshooting an application takes a special combination of practice, experience, and sheer luck. With
+Netdata's eBPF metrics to back you up, you can rest assured that you're seeing every minute detail of how your
+application, whether it's Firefox or something completely different, is behaving. Through examining these charts, you
+can find excessive VFS writes, discover zombie processes, or diagnose why your application opens but fails to close
+files.
+
+**MORE HERE**
 
 Be sure to read up on our accompanying documentation and other resources on eBPF monitoring with Netdata:
 
 -   [eBPF collector](/collectors/ebpf.plugin/README.md)
 -   [eBPF's integration with `apps.plugin`](/collectors/apps.plugin.md#integration-with-ebpf)
 -   [Linux eBPF monitoring with Netdata](https://www.netdata.cloud/blog/linux-ebpf-monitoring-with-netdata/)
-
-- https://github.com/zoidbergwill/awesome-ebpf
-- https://qmonnet.github.io/whirl-offload/2016/09/01/dive-into-bpf/
-- http://www.brendangregg.com/ebpf.html
-- http://www.brendangregg.com/blog/2019-01-01/learn-ebpf-tracing.html
-- 
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%troubleshoot%2Fmonitor-debug-applications-ebpf.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
