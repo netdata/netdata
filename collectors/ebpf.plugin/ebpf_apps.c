@@ -1070,52 +1070,6 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 }
 
 /**
- * Sum process stat values read from the memory.
- *
- * @param out   the structure to store data
- * @param in    values read from the memory.
- */
-void ebpf_sum_process_stat(ebpf_process_stat_t *out, ebpf_process_stat_t *in)
-{
-    //Reset values to do sum
-    memset(out, 0, sizeof(ebpf_process_stat_t));
-
-    int i;
-    int end = (running_on_kernel >= NETDATA_KERNEL_V4_15)?ebpf_nprocs:1;
-
-    for (i = 0; i < end ; i++) {
-        out->open_call += in[i].open_call;
-        out->write_call += in[i].write_call;
-        out->writev_call += in[i].writev_call;
-        out->read_call += in[i].read_call;
-        out->readv_call += in[i].readv_call;
-        out->unlink_call += in[i].unlink_call;
-        out->exit_call += in[i].exit_call;
-        out->release_call += in[i].release_call;
-        out->fork_call += in[i].fork_call;
-        out->clone_call += in[i].clone_call;
-        out->close_call += in[i].close_call;
-
-        //Accumulator
-        out->write_bytes += in[i].write_bytes;
-        out->writev_bytes += in[i].writev_bytes;
-        out->readv_bytes += in[i].readv_bytes;
-        out->read_bytes += in[i].read_bytes;
-
-        //Counter
-        out->open_err += in[i].open_err;
-        out->write_err += in[i].write_err;
-        out->writev_err += in[i].writev_err;
-        out->read_err += in[i].read_err;
-        out->readv_err += in[i].readv_err;
-        out->unlink_err += in[i].unlink_err;
-        out->fork_err += in[i].fork_err;
-        out->clone_err += in[i].clone_err;
-        out->close_err += in[i].close_err;
-    }
-}
-
-/**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
@@ -1123,44 +1077,44 @@ void ebpf_sum_process_stat(ebpf_process_stat_t *out, ebpf_process_stat_t *in)
  *
  * @param out                   the output vector where we store data read from hash table.
  * @param index                 the vector to store the indexes read.
- * @param bpf_map_get_next_key  A pointer to the function used to get the indexes
  * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  */
 #ifndef STATIC
-int collect_data_for_all_processes(ebpf_process_stat_t **out,
+void collect_data_for_all_processes(ebpf_process_stat_t **out,
                                    pid_t *index,
-                                   int (*bpf_map_get_next_key)(int, const void *, void *),
                                    int (*bpf_map_lookup_elem)(int, const void *, void *),
                                    int tbl_pid_stats_fd)
 #else
-int collect_data_for_all_processes(ebpf_process_stat_t **out,
+void collect_data_for_all_processes(ebpf_process_stat_t **out,
                                    pid_t *index,
                                    int tbl_pid_stats_fd)
 #endif
 {
-    uint32_t key = 0, next_key;
+    read_proc_filesystem();
     int counter = 0;
-
-    if(!all_pids_count)
-        read_proc_filesystem();
-
-    while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-        ebpf_process_stat_t *w = out[next_key];
+    uint32_t key;
+    struct pid_stat  *pids = root_of_pids;   // global list of all processes running
+    //while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
+    while (pids) {
+        key = pids->pid;
+        ebpf_process_stat_t *w = out[key];
         if (!w) {
             w = mallocz(sizeof(ebpf_process_stat_t));
-            out[next_key] = w;
+            out[key] = w;
         }
 
-        if (!bpf_map_lookup_elem(tbl_pid_stats_fd, &next_key, global_process_stat)) {
-            ebpf_sum_process_stat(w, global_process_stat);
-
-            index[counter] = next_key;
-            counter++;
-            collect_data_for_pid(next_key, NULL);
+        if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
+            pids = pids->next;
+            continue;
         }
 
-        key = next_key;
+        index[counter] = key;
+        counter++;
+        //collect_data_for_pid(key, NULL);
+
+        pids = pids->next;
+        //key = next_key;
     }
 
     link_all_processes_to_their_parents();
@@ -1184,7 +1138,7 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     // --------------------------------------------------------------------
     // apps_groups target
 
-         aggregate_pid_on_target(p->target, p, NULL);
+        aggregate_pid_on_target(p->target, p, NULL);
 
 
     //     // --------------------------------------------------------------------
@@ -1233,6 +1187,4 @@ int collect_data_for_all_processes(ebpf_process_stat_t **out,
     */
 
     cleanup_exited_pids(out);
-
-    return counter;
 }

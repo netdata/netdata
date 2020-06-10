@@ -107,7 +107,6 @@ ebpf_module_t ebpf_modules[] = {
 
 //Link with apps.plugin
 pid_t *pid_index;
-size_t pids_running;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 /*****************************************************************
@@ -244,25 +243,18 @@ void write_chart_dimension(char *dim, long long value)
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
-uint32_t write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end) {
+void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end) {
     write_begin_chart(family, name);
 
-    uint32_t flags = 0;
     uint32_t i = 0;
     while (move && i < end) {
-        long long value = move->ncall;
-        write_chart_dimension(move->name, value);
-
-        if (value > 0)
-            flags |= 1<<i;
+        write_chart_dimension(move->name, move->ncall);
 
         move = move->next;
         i++;
     }
 
     write_end_chart();
-
-    return flags;
 }
 
 /**
@@ -296,23 +288,13 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
-uint32_t write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
+void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
     write_begin_chart(family, chart);
 
-    uint32_t flags = 0;
-    long long value = pvc->write;
-    write_chart_dimension(dwrite, (long long) value);
-    if (value > 0)
-        flags |= 1;
-
-    value = pvc->read;
-    write_chart_dimension(dread, (long long) value);
-    if (value > 0)
-        flags |= 2;
+    write_chart_dimension(dwrite, (long long) pvc->write);
+    write_chart_dimension(dread, (long long)pvc->read);
 
     write_end_chart();
-
-    return  flags;
 }
 
 /**

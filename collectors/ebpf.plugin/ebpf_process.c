@@ -29,28 +29,6 @@ static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
 int process_enabled = 0;
 
-struct ebpf_process_monitor
-{
-    uint32_t global_open;
-    uint32_t apps_open;
-    uint32_t global_close;
-    uint32_t apps_close;
-    uint32_t global_delete;
-    uint32_t apps_delete;
-    uint32_t global_write_call;
-    uint32_t apps_write_call;
-    uint32_t global_write_bytes;
-    uint32_t apps_write_bytes;
-    uint32_t global_read_call;
-    uint32_t apps_read_call;
-    uint32_t global_read_bytes;
-    uint32_t apps_read_bytes;
-    uint32_t global_process;
-    uint32_t apps_process;
-    uint32_t global_thread;
-    uint32_t apps_task;
-} calls_monitoring;
-
 #ifndef STATIC
 /**
  * Pointers used when collector is dynamically linked
@@ -170,41 +148,26 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
     netdata_publish_vfs_common_t pvc;
     ebpf_update_global_publish(process_publish_aggregated, &pvc, process_aggregated_data);
 
-    uint32_t ret;
-    ret = write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
-    if (ret & 1)
-        calls_monitoring.global_open = 1;
-    if (ret & 2)
-        calls_monitoring.global_close = 1;
+    write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
 
-    ret = write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
+    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT,
                             NETDATA_EBPF_FAMILY,
                             &process_publish_aggregated[NETDATA_DEL_START],
                             1);
-    if (ret & 1)
-        calls_monitoring.global_delete = 1;
 
-    ret = write_count_chart(NETDATA_VFS_FILE_IO_COUNT,
+    write_count_chart(NETDATA_VFS_FILE_IO_COUNT,
                             NETDATA_EBPF_FAMILY,
                             &process_publish_aggregated[NETDATA_IN_START_BYTE],
                             2);
-    if (ret & 1)
-        calls_monitoring.global_write_call = 1;
-    if (ret & 2)
-        calls_monitoring.global_read_call = 1;
 
     write_count_chart(NETDATA_EXIT_SYSCALL,
                             NETDATA_EBPF_FAMILY,
                             &process_publish_aggregated[NETDATA_EXIT_START],
                             2);
-    ret = write_count_chart(NETDATA_PROCESS_SYSCALL,
+    write_count_chart(NETDATA_PROCESS_SYSCALL,
                       NETDATA_EBPF_FAMILY,
                       &process_publish_aggregated[NETDATA_PROCESS_START],
                       2);
-    if (ret & 1)
-        calls_monitoring.global_process = 1;
-    if (ret & 2)
-        calls_monitoring.global_thread = 1;
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
     if(em->mode < MODE_ENTRY) {
@@ -219,12 +182,8 @@ static void ebpf_process_send_data(ebpf_module_t *em) {
                                2);
     }
 
-    ret = write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3],
+    write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3],
                          process_id_names[4], &pvc);
-    if (ret & 1)
-        calls_monitoring.global_write_bytes = 1;
-    if (ret & 2)
-        calls_monitoring.global_read_bytes = 1;
 }
 
 /**
@@ -263,19 +222,14 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     struct target *w;
     collected_number value;
 
-    uint32_t counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_open));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_open = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
@@ -288,19 +242,14 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_closed));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_close = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
@@ -313,33 +262,23 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_deleted));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_delete = counter;
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_write_call));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_write_call = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
@@ -352,19 +291,14 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_read_call));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_read_call = counter;
 
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
@@ -377,61 +311,41 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_end_chart();
     }
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_write_bytes));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_write_bytes = counter;
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_read_bytes));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_read_bytes = counter;
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_process));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_process = counter;
 
-    counter = 0;
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
     for (w = root; w ; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, publish_thread));
-            if (value > 0)
-                counter++;
-
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
-    calls_monitoring.apps_task = counter;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE);
     for (w = root; w ; w = w->next) {
@@ -502,7 +416,7 @@ static void read_hash_global_tables()
 static void ebpf_process_update_apps_data()
 {
     size_t i;
-    for ( i = 0 ; i < pids_running ; i++) {
+    for ( i = 0 ; i <  all_pids_count; i++) {
         uint32_t current_pid = pid_index[i];
         ebpf_process_stat_t *ps = local_process_stats[current_pid];
         if (!ps)
@@ -856,38 +770,6 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
  *****************************************************************/
 
 /**
- * Shutdown collector when necessary
- *
- * This function verifies the number of PIDs read from hash table and compare with the number
- * of PIDs got from /proc.
- *
- * @param prev the previous timestamp.
- *
- * @return it returns the last timestamp stored to do math.
- */
-static time_t ebpf_process_shutdown_collector_when_necessary(time_t prev)
-{
-    if (!prev) {
-        prev = time(NULL);
-        return prev;
-    }
-
-    time_t current = time(NULL);
-    size_t expected = all_pids_count * 7/10;
-    if (pids_running < expected) {
-        time_t timestamp_difference =  current - prev;
-        if (timestamp_difference >= EBPF_MAX_SYNCHRONIZATION_TIME) {
-            close_ebpf_plugin = 1;
-            error("ebpf.plugin is losing many probes, plugin will be restarted.");
-        }
-    } else {
-        prev = current;
-    }
-
-    return prev;
-}
-
-/**
  * Main loop for this collector.
  *
  * @param step the number of microseconds used with heart beat
@@ -900,7 +782,6 @@ static void process_collector(usec_t step, ebpf_module_t *em)
     int publish_global = em->global_charts;
     int apps_enabled = em->apps_charts;
     int pid_fd = map_fd[0];
-    time_t last_update = 0;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -908,9 +789,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         read_hash_global_tables();
 
         pthread_mutex_lock(&collect_data_mutex);
-        pids_running = collect_data_for_all_processes(local_process_stats,
+        collect_data_for_all_processes(local_process_stats,
                                                       pid_index,
-                                                      process_functions.bpf_map_get_next_key,
                                                       process_functions.bpf_map_lookup_elem,
                                                       pid_fd);
 
@@ -919,9 +799,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
-        last_update = ebpf_process_shutdown_collector_when_necessary(last_update);
         int publish_apps = 0;
-        if (apps_enabled && pids_running > 0){
+        if (apps_enabled && all_pids_count > 0){
             publish_apps = 1;
             ebpf_process_update_apps_data();
         }
@@ -952,7 +831,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 static void clean_process_stat()
 {
     size_t i;
-    for (i = 0 ; i < pids_running ; i++) {
+    for (i = 0 ; i < all_pids_count ; i++) {
         ebpf_process_stat_t *w = local_process_stats[pid_index[i]];
         freez(w);
     }

@@ -167,11 +167,11 @@ extern void write_begin_chart(char *family, char *name);
 
 extern void write_chart_dimension(char *dim, long long value);
 
-extern uint32_t write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
+extern void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
 
 extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
 
-extern uint32_t write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
+extern void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
@@ -190,7 +190,6 @@ extern void write_end_chart();
 extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
 extern pid_t *pid_index;
-extern size_t pids_running;
 extern int debug_enabled;
 
 //Socket functions and variables
