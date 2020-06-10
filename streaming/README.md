@@ -103,7 +103,7 @@ monitoring (there cannot be health monitoring without a database).
 This also disables the registry (there cannot be a registry without an API).
 
 `accept a streaming request every seconds` can be used to set a limit on how often a parent node will accept streaming
-requests from its children. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
+requests from its child nodes. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
 entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
 ```
@@ -406,7 +406,7 @@ On the parent, edit `/etc/netdata/stream.conf` (to edit it on your system run `/
     health enabled by default = auto
 ```
 
-_`stream.conf` on the parent, to enable receiving metrics from its children using the API key._
+_`stream.conf` on the parent, to enable receiving metrics from its child ndoes using the API key._
 
 If you used many API keys, you can add one such section for each API key.
 
@@ -487,8 +487,8 @@ and something like this on the child:
 
 ### Archiving to a time-series database
 
-The parent Netdata node can also archive metrics, for all its children, to a time-series database. At the time of this
-writing, Netdata supports:
+The parent Netdata node can also archive metrics, for all its child nodes, to a time-series database. At the time of
+this writing, Netdata supports:
 
 -   graphite
 -   opentsdb

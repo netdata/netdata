@@ -138,8 +138,8 @@ Or, by using one of the automatic labels, for only webserver systems running a s
  host labels: _os_name = Debian*
 ```
 
-In a streaming configuration where a parent node is triggering alarms for its children, you could create health entities
-that apply only to child nodes:
+In a streaming configuration where a parent node is triggering alarms, you could create health entities that apply only
+to child nodes:
 
 ```yaml
  host labels: _is_child = true

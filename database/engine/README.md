@@ -51,13 +51,13 @@ you have, how many metrics your Agent collects, and more.
 
 ### Streaming metrics to the database engine
 
-When streaming metrics, the Agent on the parent node creates one instance of the database engine for itself, and
-another instance for every child node it receives metrics from. If you have four streaming nodes, you will have
-five instances in total (`1 parent + 4 children = 5 instances`).
+When streaming metrics, the Agent on the parent node creates one instance of the database engine for itself, and another
+instance for every child node it receives metrics from. If you have four streaming nodes, you will have five instances
+in total (`1 parent + 4 child nodes = 5 instances`).
 
 The Agent allocates resources for each instance separately using the `dbengine disk space` setting. If `dbengine disk
 space` is set to the default `256`, each instance is given 256 MiB in disk space, which means the total disk space
-required to store all instances is, roughly, `256 MiB * 1 parent * 4 children = 1280 MiB`. 
+required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`. 
 
 See the [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to help you correctly
 set `dbengine disk space` and undertand the toal disk space required based on your streaming setup.

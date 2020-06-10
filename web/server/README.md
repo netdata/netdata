@@ -67,7 +67,7 @@ The API requests are serviced as follows:
 
 ### Enabling TLS support
 
-Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data between a parent and its children, via the TLS protocol.
+Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data between a parent and its child nodes, via the TLS protocol.
 
 Inbound unix socket connections are unaffected, regardless of the TLS settings.
 
