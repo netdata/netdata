@@ -35,7 +35,6 @@ static int socket_apps_created = 0;
 //Libbpf (It is necessary to have at least kernel 4.10)
 static int (*bpf_map_lookup_elem)(int, const void *, void *);
 static int (*bpf_map_delete_elem)(int fd, const void *key);
-int (*bpf_map_get_next_key)(int, const void *, void *);
 
 static int *map_fd = NULL;
 /**
@@ -364,6 +363,11 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     ebpf_socket_update_apps_publish(curr, prev);
 }
 
+/**
+ * Bandwidth accumulator.
+ *
+ * @param out the vector with the values to sum
+ */
 void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
 {
     int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15)?ebpf_nprocs:1;
@@ -382,20 +386,24 @@ static void ebpf_socket_update_apps_data()
 {
     int fd = map_fd[0];
     ebpf_bandwidth_t *eb = bandwidth_vector;
-    uint32_t key = 0, next_key;
-    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+    uint32_t key;
+    struct pid_stat  *pids = root_of_pids;
+    while (pids) {
+        key = pids->pid;
 
-        if (bpf_map_lookup_elem(fd, &next_key, eb))
+        if (bpf_map_lookup_elem(fd, &key, eb)) {
+            pids = pids->next;
             continue;
+        }
 
         ebpf_socket_bandwidth_accumulator(eb);
 
-        ebpf_socket_fill_publish_apps(next_key, eb);
+        ebpf_socket_fill_publish_apps(key, eb);
 
         if (eb[0].removed)
-            bpf_map_delete_elem(fd, &next_key);
+            bpf_map_delete_elem(fd, &key);
 
-        key = next_key;
+        pids = pids->next;
     }
 }
 
@@ -513,8 +521,6 @@ static void set_local_pointers(ebpf_module_t *em) {
     (void) bpf_map_lookup_elem;
     bpf_map_delete_elem = socket_functions.bpf_map_delete_elem;
     (void) bpf_map_delete_elem;
-
-    bpf_map_get_next_key = socket_functions.bpf_map_get_next_key;
 #endif
     map_fd = socket_functions.map_fd;
 

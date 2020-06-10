@@ -1111,10 +1111,8 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out,
 
         index[counter] = key;
         counter++;
-        //collect_data_for_pid(key, NULL);
 
         pids = pids->next;
-        //key = next_key;
     }
 
     link_all_processes_to_their_parents();
