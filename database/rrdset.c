@@ -529,108 +529,111 @@ RRDSET *rrdset_create_custom(
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
         }
-        rrdhost_wrlock(host);
-        st = rrdset_find_on_create(host, fullid);
-        if (st) {
-            int mark_rebuild = 0;
-            const char *new_name = name ? name : id;
-            if (unlikely((st->name && !strcmp(st->name, new_name)) || !st->name)) {
-                mark_rebuild = 1;
-                rrdset_set_name(st, new_name);
-            }
+        char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL;
+        int mark_rebuild = 0;
+        const char *new_name = name ? name : id;
 
-            if (unlikely(st->priority != priority)) {
-                st->priority = priority;
-                mark_rebuild = 1;
-            }
-
-            if (unlikely(st->update_every != update_every)) {
-                st->update_every = update_every;
-                mark_rebuild = 1;
-            }
-
-            if (plugin && st->plugin_name) {
-                if (unlikely(strcmp(plugin, st->plugin_name))) {
-                    freez(st->plugin_name);
-                    st->plugin_name = strdupz(plugin);
-                    mark_rebuild = 1;
-                }
-            } else {
-                if (plugin != st->plugin_name) { // one is NULL?
-                    if (st->plugin_name)
-                        freez(st->plugin_name);
-                    st->plugin_name = plugin ? strdupz(plugin) : NULL;
-                    mark_rebuild = 1;
-                }
-            }
-
-            if (module && st->module_name) {
-                if (unlikely(strcmp(module, st->module_name))) {
-                    freez(st->module_name);
-                    st->module_name = strdupz(module);
-                    mark_rebuild = 1;
-                }
-            } else {
-                if (module != st->module_name) {
-                    if (st->module_name)
-                        freez(st->module_name);
-                    st->module_name = module ? strdupz(module) : NULL;
-                    mark_rebuild = 1;
-                }
-            }
-
-            char *new_title = title ? strdupz(title) : NULL;
-            if (new_title) {
-                json_fix_string(new_title);
-                if (unlikely(strcmp(st->title, new_title))) {
-                    freez(st->title);
-                    st->title = new_title;
-                    mark_rebuild = 1;
-                } else
-                    freez(new_title);
-            }
-
-            RRDSET_TYPE new_chart_type =
-                rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
-            if (st->chart_type != new_chart_type) {
-                st->chart_type = new_chart_type;
-                mark_rebuild = 1;
-            }
-
-            char *new_family = family ? strdup(family): NULL;
-            if (new_family) {
-                json_fix_string(new_family);
-                if (unlikely((strcmp(st->family, new_family)))) {
-                    freez(st->family);
-                    st->family = new_family;
-                    mark_rebuild = 1;
-                } else
-                    freez(new_family);
-            }
-
-            char *new_context = context ? strdup(context) : NULL;
-            if (new_context) {
-                json_fix_string(new_context);
-                if (unlikely((strcmp(st->context, new_context)))) {
-                    freez(st->context);
-                    st->context = new_context;
-                    st->hash_context = simple_hash(st->context);
-                    mark_rebuild = 1;
-                } else
-                    freez(new_context);
-            }
-
-            rrdhost_unlock(host);
-
-#ifdef ENABLE_DBENGINE
-            if (is_archived == 0 && st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && mark_rebuild) {
-                debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
-                metalog_commit_update_chart(st);
-            }
-#endif
-            return st;
+        if (unlikely((st->name && !strcmp(st->name, new_name)) || !st->name)) {
+            mark_rebuild = 1;
+            rrdset_set_name(st, new_name);
         }
-        rrdhost_unlock(host);
+
+        if (unlikely(st->priority != priority)) {
+            st->priority = priority;
+            mark_rebuild = 1;
+        }
+        if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != update_every)) {
+            st->update_every = update_every;
+            mark_rebuild = 1;
+        }
+
+        if (plugin && st->plugin_name) {
+            if (unlikely(strcmp(plugin, st->plugin_name))) {
+                old_plugin = st->plugin_name;
+                st->plugin_name = strdupz(plugin);
+                mark_rebuild = 1;
+            }
+        } else {
+            if (plugin != st->plugin_name) { // one is NULL?
+                if (st->plugin_name)
+                    old_plugin = st->plugin_name;
+                st->plugin_name = plugin ? strdupz(plugin) : NULL;
+                mark_rebuild = 1;
+            }
+        }
+
+        if (module && st->module_name) {
+            if (unlikely(strcmp(module, st->module_name))) {
+                old_module = st->module_name;
+                st->module_name = strdupz(module);
+                mark_rebuild = 1;
+            }
+        } else {
+            if (module != st->module_name) {
+                if (st->module_name)
+                    old_module = st->module_name;
+                st->module_name = module ? strdupz(module) : NULL;
+                mark_rebuild = 1;
+            }
+        }
+
+        char *new_title = title ? strdupz(title) : NULL;
+        if (new_title) {
+            json_fix_string(new_title);
+            if (unlikely(strcmp(st->title, new_title))) {
+                old_title = st->title;
+                st->title = new_title;
+                mark_rebuild = 1;
+            } else
+                freez(new_title);
+        }
+
+        RRDSET_TYPE new_chart_type =
+            rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
+        if (st->chart_type != new_chart_type) {
+            st->chart_type = new_chart_type;
+            mark_rebuild = 1;
+        }
+
+        char *new_family = family ? strdup(family): NULL;
+        if (new_family) {
+            json_fix_string(new_family);
+            if (unlikely((strcmp(st->family, new_family)))) {
+                old_family = st->family;
+                st->family = new_family;
+                mark_rebuild = 1;
+            } else
+                freez(new_family);
+        }
+
+        char *new_context = context ? strdup(context) : NULL;
+        if (new_context) {
+            json_fix_string(new_context);
+            if (unlikely((strcmp(st->context, new_context)))) {
+                old_context = st->context;
+                st->context = new_context;
+                st->hash_context = simple_hash(st->context);
+                mark_rebuild = 1;
+            } else
+                freez(new_context);
+        }
+
+        if (mark_rebuild) {
+            freez(old_plugin);
+            freez(old_module);
+            freez(old_title);
+            freez(old_family);
+            freez(old_context);
+            info("Collector updated metadata for chart %s" , st->id);
+            sched_yield();
+        }
+#ifdef ENABLE_DBENGINE
+        if (is_archived == 0 && st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && mark_rebuild) {
+            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
+            metalog_commit_update_chart(st);
+        }
+#endif
+        return st;
     }
 
     rrdhost_wrlock(host);
