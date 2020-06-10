@@ -331,9 +331,7 @@ Auto-scaling is probably the most trendy service deployment strategy these days.
 
 Auto-scaling detects the need for additional resources and boots VMs on demand, based on a template. Soon after they start running the applications, a load balancer starts distributing traffic to them, allowing the service to grow horizontally to the scale needed to handle the load. When demands falls, auto-scaling starts shutting down VMs that are no longer needed.
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23627426/65a9074a-02b9-11e7-9664-cd8f258a00af.png"/>
-</p>
+![Monitoring ephemeral nodes with Netdata](https://cloud.githubusercontent.com/assets/2662304/23627426/65a9074a-02b9-11e7-9664-cd8f258a00af.png)
 
 What a fantastic feature for controlling infrastructure costs! Pay only for what you need for the time you need it!
 
@@ -370,9 +368,7 @@ Netdata used to be self-contained, so that all these functions were handled enti
 
 ### Configuring an auto-scaling setup
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23627468/96daf7ba-02b9-11e7-95ac-1f767dd8dab8.png"/>
-</p>
+![A diagram of an auto-scaling setup with Netdata](https://user-images.githubusercontent.com/1153921/84290043-0c1c1600-aaf8-11ea-9757-dd8dd8a8ec6c.png)
 
 You need a Netdata parent. This node should not be ephemeral. It will be the node where all ephemeral child
 nodes will send their metrics.
@@ -496,13 +492,12 @@ this writing, Netdata supports:
 -   json document DBs
 -   all the compatibles to the above (e.g. kairosdb, influxdb, etc)
 
-Check the Netdata [backends documentation](/exporting/README.md) for configuring this.
+Check the Netdata [exporting documentation](/docs/export/README.md) for configuring this.
 
 This is how such a solution will work:
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23627295/e3569adc-02b8-11e7-9d55-4014bf98c1b3.png"/>
-</p>
+![Diagram showing an example configuration for archiving to a time-series
+database](https://user-images.githubusercontent.com/1153921/84291308-c2ccc600-aaf9-11ea-98a9-89ccbf3a62dd.png)
 
 ### An advanced setup
 
