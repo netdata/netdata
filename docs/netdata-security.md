@@ -40,10 +40,10 @@ There are a few cases however that raw source data are only exposed to processes
 
 So, Netdata **plugins**, even those running with escalated capabilities or privileges, perform a **hard coded data collection job**. They do not accept commands from Netdata. The communication is strictly **unidirectional**: from the plugin towards the Netdata daemon. The original application data collected by each plugin do not leave the process they are collected, are not saved and are not transferred to the Netdata daemon. The communication from the plugins to the Netdata daemon includes only chart metadata and processed metric values.
 
-Netdata transmitters streaming metrics to upstream Netdata servers, use exactly the same protocol local plugins use. The
-raw data collected by the plugins of transmitter Netdata servers are **never leaving the host they are collected**. The
-only data appearing on the wire are chart metadata and metric values. This communication is also **unidirectional**:
-transmitters Netdata servers never accept commands from receiver Netdata servers.
+Child nodes use the same protocol when streaming metrics to their parent nodes. The raw data collected by the plugins of
+child Netdata servers are **never leaving the host they are collected**. The only data appearing on the wire are chart
+metadata and metric values. This communication is also **unidirectional**: child nodes never accept commands from
+parent Netdata servers.
 
 ## Netdata is read-only
 
@@ -193,7 +193,7 @@ Of course, there are many more methods you could use to protect Netdata:
 
 -   If you are always under a static IP, you can use the script given above to allow direct access to your Netdata servers without authentication, from all your static IPs.
 
--   install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a reciver Netdata server, which will be protected with authentication using an nginx server running locally at the reciver Netdata server. This requires more resources (you will need a bigger reciver Netdata server), but does not require any firewall changes, since all the transmitter Netdata servers will not be listening for incoming connections.
+-   install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a reciver Netdata server, which will be protected with authentication using an nginx server running locally at the reciver Netdata server. This requires more resources (you will need a bigger reciver Netdata server), but does not require any firewall changes, since all the child Netdata servers will not be listening for incoming connections.
 
 ## Anonymous Statistics
 
