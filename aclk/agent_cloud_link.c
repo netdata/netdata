@@ -1371,7 +1371,7 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
-    struct netdata_static_thread *stats_thread;
+    struct netdata_static_thread *stats_thread = NULL;
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
     // as it must notify the far end that it shutdown gracefully and avoid the LWT.
@@ -1397,7 +1397,7 @@ void *aclk_main(void *ptr)
         }
     }
 
-    aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", 1);
+    aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", CONFIG_BOOLEAN_YES);
     if (aclk_stats_enabled) {
         stats_thread = callocz(1, sizeof(struct netdata_static_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));
