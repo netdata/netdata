@@ -153,7 +153,7 @@ CentOS 8.x:
 
 - Enable the PowerTools repo
 - Enable the EPEL repo
-- Enable the Extra repo from [extra.getpagespeed.com](https://extras.getpagespeed.com/release-el8-latest.rpm)
+- Enable the Extra repo from [OKAY](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
 
 And install the minimum required dependencies:
 
@@ -168,10 +168,10 @@ yum config-manager --set-enabled PowerTools
 yum install -y epel-release
 
 # Install Repo for libuv-devl (NEW)
-yum install -y https://extras.getpagespeed.com/release-el8-latest.rpm
+yum install -y http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
 
 # Install Devel Packages
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
+yum install autoconf automake curl gcc git cmake libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
 
 # Install Judy-Devel directly
 yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
