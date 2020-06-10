@@ -35,7 +35,8 @@ int process_enabled = 0;
  */
 
 //Libbpf (It is necessary to have at least kernel 4.10)
-static int (*bpf_map_lookup_elem)(int, const void *, void *);
+static int (*bpf_map_lookup_elem)(int, const void *, void *) = NULL;
+static int (*bpf_map_delete_elem)(int fd, const void *key) = NULL;
 
 static int *map_fd = NULL;
 /**
@@ -212,6 +213,30 @@ long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t of
 }
 
 /**
+ * Remove process pid
+ *
+ * Remove from PID task table when task_release was called.
+ */
+void ebpf_process_remove_pids()
+{
+    struct pid_stat  *pids = root_of_pids;
+    int pid_fd = map_fd[0];
+    while (pids) {
+        uint32_t pid = pids->pid;
+        ebpf_process_stat_t *w = local_process_stats[pid];
+        if (w) {
+            if (w->removeme) {
+                freez(w);
+                local_process_stats[pid] = NULL;
+                bpf_map_delete_elem(pid_fd, &pid);
+            }
+        }
+
+        pids = pids->next;
+    }
+}
+
+/**
  * Send data to Netdata calling auxiliar functions.
  *
  * @param em   the structure with thread information
@@ -355,6 +380,8 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         }
     }
     write_end_chart();
+
+    ebpf_process_remove_pids();
 }
 
 /*****************************************************************
@@ -909,6 +936,7 @@ static void set_local_pointers(ebpf_module_t *em) {
 #ifndef STATIC
     bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
 
+    bpf_map_delete_elem = process_functions.bpf_map_delete_elem;
 #endif
 
     map_fd = process_functions.map_fd;

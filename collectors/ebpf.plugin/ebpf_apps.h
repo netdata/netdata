@@ -354,6 +354,8 @@ typedef struct ebpf_process_stat {
     uint32_t fork_err;
     uint32_t clone_err;
     uint32_t close_err;
+
+    uint8_t removeme;
 } ebpf_process_stat_t;
 
 typedef struct ebpf_bandwidth {
