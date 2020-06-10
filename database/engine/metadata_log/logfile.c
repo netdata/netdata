@@ -76,13 +76,13 @@ static void flush_records_buffer_cb(uv_fs_t* req)
     struct metalog_worker_config *wc = req->loop->data;
     struct metalog_instance *ctx = wc->ctx;
 
-    debug(D_RRDENGINE, "%s: Metadata log file block was written to disk.", __func__);
+    debug(D_METADATALOG, "%s: Metadata log file block was written to disk.", __func__);
     if (req->result < 0) {
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     } else {
-        debug(D_RRDENGINE, "%s: Metadata log file block was written to disk.", __func__);
+        debug(D_METADATALOG, "%s: Metadata log file block was written to disk.", __func__);
     }
 
     uv_fs_req_cleanup(req);
@@ -398,7 +398,7 @@ void replay_record(struct metadata_logfile *metalogfile, struct rrdeng_metalog_r
     char *line, *nextline, *record_end;
     int ret;
 
-    info("RECORD contents: %.*s", (int)header->payload_length, (char *)payload);
+    debug(D_METADATALOG, "RECORD contents: %.*s", (int)header->payload_length, (char *)payload);
     record_end = (char *)payload + header->payload_length - 1;
     *record_end = '\0';
 
@@ -408,7 +408,7 @@ void replay_record(struct metadata_logfile *metalogfile, struct rrdeng_metalog_r
             *nextline++ = '\0';
         }
         ret = parser_action(ctx->metalog_parser_object->parser, line);
-        info("parser_action ret:%d", ret);
+        debug(D_METADATALOG, "parser_action ret:%d", ret);
         if (ret)
             return; /* skip record due to error */
     };
@@ -520,7 +520,8 @@ static void iterate_records(struct metadata_logfile *metalogfile)
             error("%s: Record at offset %"PRIu32" was read from disk. CRC32 check: FAILED", __func__, pos);
             continue;
         }
-        debug(D_RRDENGINE, "%s: Record at offset %"PRIu32" was read from disk. CRC32 check: SUCCEEDED", __func__, pos);
+        debug(D_METADATALOG, "%s: Record at offset %"PRIu32" was read from disk. CRC32 check: SUCCEEDED", __func__,
+              pos);
 
         replay_record(metalogfile, header, buf + header->header_length);
         if (!uuid_is_null(state->uuid)) { /* It's a valid object */
@@ -704,13 +705,13 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
         rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
     }
-    info("PARSER ended");
+    debug(D_METADATALOG, "PARSER ended");
 
     parser_destroy(parser);
 
     size_t count = metalog_parser_object.count;
 
-    info("Parsing count=%u", (unsigned)count);
+    debug(D_METADATALOG, "Parsing count=%u", (unsigned)count);
 after_failed_to_parse:
 
     freez(metalogfiles);

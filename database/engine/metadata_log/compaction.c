@@ -97,10 +97,10 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
                     buffer = metalog_update_chart_buffer(st, ctx->current_compaction_id);
                     metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
                 } else {
-                    info("Chart has already been compacted, ignoring record.");
+                    debug(D_METADATALOG, "Chart has already been compacted, ignoring record.");
                 }
             } else {
-                info("Ignoring nonexistent chart metadata record.");
+                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
             }
             break;
         case GUID_TYPE_DIMENSION:
@@ -111,10 +111,10 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
                     buffer = metalog_update_dimension_buffer(rd);
                     metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
                 } else {
-                    info("Dimension has already been compacted, ignoring record.");
+                    debug(D_METADATALOG, "Dimension has already been compacted, ignoring record.");
                 }
             } else {
-                info("Ignoring nonexistent dimension metadata record.");
+                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
             }
             break;
         case GUID_TYPE_HOST:
@@ -123,11 +123,11 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
                 buffer = metalog_update_host_buffer(host);
                 metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
             } else {
-                info("Host has already been compacted, ignoring record.");
+                debug(D_METADATALOG, "Host has already been compacted, ignoring record.");
             }
             break;
         case GUID_TYPE_NOTFOUND:
-            info("Ignoring nonexistent metadata record.");
+            debug(D_METADATALOG, "Ignoring nonexistent metadata record.");
             break;
         default:
             assert(0);

@@ -156,7 +156,8 @@ void metalog_test_quota(struct metalog_worker_config *wc)
 
     metalogfile = ctx->metadata_logfiles.last;
     only_one_metalogfile = (metalogfile == ctx->metadata_logfiles.first) ? 1 : 0;
-    info("records=%lu objects=%lu", (long unsigned)ctx->records_nr, (long unsigned)ctx->rrdeng_ctx->host->objects_nr);
+    debug(D_METADATALOG, "records=%lu objects=%lu", (long unsigned)ctx->records_nr,
+          (long unsigned)ctx->rrdeng_ctx->host->objects_nr);
     if (unlikely(!only_one_metalogfile &&
                  ctx->records_nr > (ctx->rrdeng_ctx->host->objects_nr * (uint64_t)MAX_DUPLICATION_PERCENTAGE) / 100) &&
                 NO_QUIESCE == ctx->quiesce) {
