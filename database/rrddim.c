@@ -119,7 +119,9 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // RRDDIM legacy data collection functions
 
 static void rrddim_collect_init(RRDDIM *rd) {
-    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+    // Don't put a gap into streamed charts
+    if (rd->rrdset->rrdhost == localhost || rd->rrdset->last_collected_time.tv_sec == 0)
+        rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
 }
 static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
     (void)point_in_time;

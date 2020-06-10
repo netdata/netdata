@@ -176,10 +176,10 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         return 0;
     }
 
-    info("STREAM %s [send to %s]: initializing communication...", host->hostname, s->connected_to);
 
 #ifdef ENABLE_HTTPS
     if( netdata_client_ctx ){
+        info("STREAM %s [send to %s]: initializing communication (SSL)...", host->hostname, s->connected_to);
         host->ssl.flags = NETDATA_SSL_START;
         if (!host->ssl.conn){
             host->ssl.conn = SSL_new(netdata_client_ctx);
@@ -203,6 +203,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         }
     }
     else {
+        info("STREAM %s [send to %s]: initializing communication (plain)...", host->hostname, s->connected_to);
         host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
@@ -332,9 +333,14 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
+    if (received == 0) {
+        error("STREAM %s [send to %s]: remote netdata does not respond (timeout).", host->hostname, s->connected_to);
+        rrdpush_sender_thread_close_socket(host);
+        return 0;
+    }
 
     http[received] = '\0';
-    debug(D_STREAM, "Response to sender from far end: %s", http);
+    debug(D_STREAM, "Response to sender from far end (%d-bytes): %s", received, http);
     int answer = -1;
     char *version_start = strchr(http, '=');
     int32_t version = -1;
