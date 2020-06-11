@@ -353,7 +353,9 @@ set(LIBNETDATA_FILES
         libnetdata/health/health.h
         libnetdata/string/utf8.h
         libnetdata/socket/security.c
-        libnetdata/socket/security.h)
+        libnetdata/socket/security.h
+        libnetdata/circular_buffer/circular_buffer.c
+        libnetdata/circular_buffer/circular_buffer.h)
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
@@ -620,6 +622,8 @@ set(API_PLUGIN_FILES
 set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
+        streaming/receiver.c
+        streaming/sender.c
         )
 
 set(BACKENDS_PLUGIN_FILES
