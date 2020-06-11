@@ -31,6 +31,11 @@ struct pg_cache_page_index;
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
 
+#define META_CHART_UPDATED 1
+#define META_PLUGIN_UPDATED 2
+#define META_MODULE_UPDATED 4
+#define META_CHART_ACTIVATED 8
+
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
 
