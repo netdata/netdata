@@ -61,7 +61,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Prepare environment
         run: |
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
           sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
                                   libnetfilter-acct-dev
