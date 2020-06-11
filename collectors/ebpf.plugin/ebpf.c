@@ -197,7 +197,11 @@ collected_number get_value_from_structure(char *basis, size_t offset)
 {
     collected_number *value =  (collected_number *)(basis + offset);
 
-    return (collected_number)llabs(*value);
+    collected_number ret =  (collected_number)llabs(*value);
+    //this reset is necessary to avoid keep a constant value while processing is not executing a task
+    *value = 0;
+
+    return ret;
 }
 
 /**
