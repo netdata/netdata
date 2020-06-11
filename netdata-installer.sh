@@ -1101,7 +1101,7 @@ install_react_dashboard() {
   fi
 }
 
-#install_react_dashboard
+install_react_dashboard
 
 # -----------------------------------------------------------------------------
 
@@ -1369,7 +1369,7 @@ install_ebpf() {
 }
 
 progress "eBPF Kernel Collector"
-#install_ebpf
+install_ebpf
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"

@@ -508,12 +508,13 @@ static void ebpf_process_update_apps_data()
  * @param order  the order number of the specified chart
  */
 static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web, int order) {
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-        , family
-        , name
-        , axis
-        , web
-        , order);
+    printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d\n",
+           family,
+           name,
+           axis,
+           web,
+           order,
+           update_every);
 
     printf("DIMENSION %s %s absolute 1 1\n", process_id_names[3], NETDATA_VFS_DIM_OUT_FILE_BYTES);
     printf("DIMENSION %s %s absolute 1 1\n", process_id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
@@ -529,12 +530,13 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
  * @param order  the order number of the specified chart
  */
 static void ebpf_process_status_chart(char *family, char *name, char *axis, char *web, int order) {
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-        , family
-        , name
-        , axis
-        , web
-        , order);
+    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d ''\n",
+           family,
+           name,
+           axis,
+           web,
+           order,
+           update_every);
 
     printf("DIMENSION %s '' absolute 1 1\n", status[0]);
     printf("DIMENSION %s '' absolute 1 1\n", status[1]);
@@ -549,95 +551,102 @@ static void ebpf_process_status_chart(char *family, char *name, char *axis, char
  */
 static void ebpf_create_global_charts(ebpf_module_t *em)
 {
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_FILE_OPEN_CLOSE_COUNT
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_FILE_GROUP
-        , 21000
-        , ebpf_create_global_dimension
-        , process_publish_aggregated
-        , 2);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_FILE_OPEN_CLOSE_COUNT,
+                      "Open and close calls",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_FILE_GROUP,
+                      21000,
+                      ebpf_create_global_dimension,
+                      process_publish_aggregated,
+                      2);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_FILE_OPEN_ERR_COUNT
-            , EBPF_COMMON_DIMENSION_CALL
-            , NETDATA_FILE_GROUP
-            , 21001
-            , ebpf_create_global_dimension
-            , process_publish_aggregated
-            , 2);
+        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                          NETDATA_FILE_OPEN_ERR_COUNT,
+                          "Open fails",
+                          EBPF_COMMON_DIMENSION_CALL,
+                          NETDATA_FILE_GROUP,
+                          21001,
+                          ebpf_create_global_dimension,
+                          process_publish_aggregated,
+                          2);
     }
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_VFS_FILE_CLEAN_COUNT
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_VFS_GROUP
-        , 21002
-        , ebpf_create_global_dimension
-        , &process_publish_aggregated[NETDATA_DEL_START]
-        , 1);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_VFS_FILE_CLEAN_COUNT,
+                      "Remove files",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_VFS_GROUP,
+                      21002,
+                      ebpf_create_global_dimension,
+                      &process_publish_aggregated[NETDATA_DEL_START],
+                      1);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_VFS_FILE_IO_COUNT
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_VFS_GROUP
-        , 21003
-        , ebpf_create_global_dimension
-        , &process_publish_aggregated[NETDATA_IN_START_BYTE]
-        , 2);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_VFS_FILE_IO_COUNT,
+                      "Calls to IO",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_VFS_GROUP,
+                      21003,
+                      ebpf_create_global_dimension,
+                      &process_publish_aggregated[NETDATA_IN_START_BYTE],
+                      2);
 
-    ebpf_create_io_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_VFS_IO_FILE_BYTES
-        , EBPF_COMMON_DIMENSION_BYTESS
-        , NETDATA_VFS_GROUP
-        , 21004);
+    ebpf_create_io_chart(NETDATA_EBPF_FAMILY,
+                         NETDATA_VFS_IO_FILE_BYTES,
+                         EBPF_COMMON_DIMENSION_BYTESS,
+                         NETDATA_VFS_GROUP,
+                         21004);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_VFS_FILE_ERR_COUNT
-            , EBPF_COMMON_DIMENSION_CALL
-            , NETDATA_VFS_GROUP
-            , 21005
-            , ebpf_create_global_dimension
-            , &process_publish_aggregated[2]
-            , NETDATA_VFS_ERRORS);
-
+        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                          NETDATA_VFS_FILE_ERR_COUNT,
+                          "Fails to write or read",
+                          EBPF_COMMON_DIMENSION_CALL,
+                          NETDATA_VFS_GROUP,
+                          21005,
+                          ebpf_create_global_dimension,
+                          &process_publish_aggregated[2],
+                          NETDATA_VFS_ERRORS);
     }
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_PROCESS_SYSCALL
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_PROCESS_GROUP
-        , 21006
-        , ebpf_create_global_dimension
-        , &process_publish_aggregated[NETDATA_PROCESS_START]
-        , 2);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_PROCESS_SYSCALL,
+                      "Start process",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_PROCESS_GROUP,
+                      21006,
+                      ebpf_create_global_dimension,
+                      &process_publish_aggregated[NETDATA_PROCESS_START],
+                      2);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_EXIT_SYSCALL
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_PROCESS_GROUP
-        , 21007
-        , ebpf_create_global_dimension
-        , &process_publish_aggregated[NETDATA_EXIT_START]
-        , 2);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_EXIT_SYSCALL,
+                      "Exit process",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_PROCESS_GROUP,
+                      21007,
+                      ebpf_create_global_dimension,
+                      &process_publish_aggregated[NETDATA_EXIT_START],
+                      2);
 
-    ebpf_process_status_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_PROCESS_STATUS_NAME
-        , EBPF_COMMON_DIMENSION_DIFFERENCE
-        , NETDATA_PROCESS_GROUP
-        , 21008);
+    ebpf_process_status_chart(NETDATA_EBPF_FAMILY,
+                              NETDATA_PROCESS_STATUS_NAME,
+                              EBPF_COMMON_DIMENSION_DIFFERENCE,
+                              NETDATA_PROCESS_GROUP,
+                              21008);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_PROCESS_ERROR_NAME
-            , EBPF_COMMON_DIMENSION_CALL
-            , NETDATA_PROCESS_GROUP
-            , 21009
-            , ebpf_create_global_dimension
-            , &process_publish_aggregated[NETDATA_PROCESS_START]
-            , 2);
+        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                          NETDATA_PROCESS_ERROR_NAME,
+                          "Fails to create process",
+                          EBPF_COMMON_DIMENSION_CALL,
+                          NETDATA_PROCESS_GROUP,
+                          21009,
+                          ebpf_create_global_dimension,
+                          &process_publish_aggregated[NETDATA_PROCESS_START],
+                          2);
     }
 
 }
@@ -653,6 +662,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
+                               "Number of open files",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20061,
@@ -660,6 +670,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
+                                   "Fails to open files",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20062,
@@ -667,6 +678,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
+                               "Files closed",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20063,
@@ -674,6 +686,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
+                                   "Fails to close files",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20064,
@@ -681,12 +694,14 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
+                               "Files deleted",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20065,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+                               "Write to disk",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20066,
@@ -694,6 +709,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
+                                   "Fails to write",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20067,
@@ -701,6 +717,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
+                               "Read from disk",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20068,
@@ -708,6 +725,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
+                                   "Fails to read",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_SYSCALL_GROUP,
                                    20069,
@@ -715,30 +733,35 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
+                               "Bytes written on disk",
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20070,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
+                               "Bytes read from disk",
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20071,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
+                               "Process started",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20072,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
+                               "Threads started",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20073,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
+                               "Tasks closed",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_SYSCALL_GROUP,
                                20074,

@@ -53,7 +53,7 @@ char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
-static int update_every = 1;
+int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
 struct config collector_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -302,19 +302,23 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
  *
  * @param type    the chart type
  * @param id      the chart id
+ * @param title   the chart title
  * @param units   the units label
  * @param family  the group name used to attach the chart on dashaboard
  * @param order   the chart order
  */
 void ebpf_write_chart_cmd(char *type
     , char *id
+    , char *title
     , char *units
     , char *family
     , int order)
 {
-    printf("CHART %s.%s '' 'title' '%s' '%s' '' line %d %d\n",
+    (void)title;
+    printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d %d\n",
            type,
            id,
+           title,
            units,
            family,
            order,
@@ -355,8 +359,8 @@ void ebpf_create_global_dimension(void *ptr, int end)
  *  Call write_chart_cmd to create the charts
  *
  * @param type   the chart type
- * @param name   the chart name
- * @param axis   the axis label
+ * @param id     the chart id
+ * @param units   the axis label
  * @param family the group name used to attach the chart on dashaboard
  * @param order  the order number of the specified chart
  * @param ncd    a pointer to a function called to create dimensions
@@ -364,15 +368,16 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param end    number of dimensions for the chart created
  */
 void ebpf_create_chart(char *type
-    , char *name
-    , char *axis
+    , char *id
+    , char *title
+    , char *units
     , char *family
     , int order
     , void (*ncd)(void *, int)
     , void *move
     , int end)
 {
-    ebpf_write_chart_cmd(type, name, axis, family, order);
+    ebpf_write_chart_cmd(type, id, title, units, family, order);
 
     ncd(move, end);
 }
@@ -380,16 +385,17 @@ void ebpf_create_chart(char *type
 /**
  * Create charts on apps submenu
  *
- * @param name   the chart name
+ * @param id   the chart id
+ * @param title  the value displayed on vertical axis.
  * @param units  the value displayed on vertical axis.
  * @param family Submenu that the chart will be attached on dashboard.
  * @param order  the chart order
  * @param root   structure used to create the dimensions.
  */
-void ebpf_create_charts_on_apps(char *name, char *units, char *family, int order, struct target *root)
+void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, int order, struct target *root)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, name, units, family, order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, order);
 
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))

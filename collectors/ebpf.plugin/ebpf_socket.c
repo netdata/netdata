@@ -206,62 +206,68 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
  * @param em a pointer to the structure with the default values.
  */
 static void ebpf_create_global_charts(ebpf_module_t *em) {
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_TCP_FUNCTION_COUNT
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_SOCKET_GROUP
-        , 21070
-        , ebpf_create_global_dimension
-        , socket_publish_aggregated
-        , 3);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_TCP_FUNCTION_COUNT,
+                      "Calls to internal functions",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_SOCKET_GROUP,
+                      21070,
+                      ebpf_create_global_dimension,
+                      socket_publish_aggregated,
+                      3);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_TCP_FUNCTION_BYTES
-        , EBPF_COMMON_DIMENSION_BYTESS
-        , NETDATA_SOCKET_GROUP
-        , 21071
-        , ebpf_create_global_dimension
-        , socket_publish_aggregated
-        , 3);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_TCP_FUNCTION_BYTES,
+                      "TCP bandwidth",
+                      EBPF_COMMON_DIMENSION_BYTESS,
+                      NETDATA_SOCKET_GROUP,
+                      21071,
+                      ebpf_create_global_dimension,
+                      socket_publish_aggregated,
+                      3);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_TCP_FUNCTION_ERROR
-            , EBPF_COMMON_DIMENSION_CALL
-            , NETDATA_SOCKET_GROUP
-            , 21072
-            , ebpf_create_global_dimension
-            , socket_publish_aggregated
-            , 2);
+        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                          NETDATA_TCP_FUNCTION_ERROR,
+                          "TCP errors",
+                          EBPF_COMMON_DIMENSION_CALL,
+                          NETDATA_SOCKET_GROUP,
+                          21072,
+                          ebpf_create_global_dimension,
+                          socket_publish_aggregated,
+                          2);
     }
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_UDP_FUNCTION_COUNT
-        , EBPF_COMMON_DIMENSION_CALL
-        , NETDATA_SOCKET_GROUP
-        , 21073
-        , ebpf_create_global_dimension
-        , &socket_publish_aggregated[NETDATA_UDP_START]
-        , 2);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_UDP_FUNCTION_COUNT,
+                      "UDP calls",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_SOCKET_GROUP,
+                      21073,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_UDP_START],
+                      2);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY
-        , NETDATA_UDP_FUNCTION_BYTES
-        , EBPF_COMMON_DIMENSION_BYTESS
-        , NETDATA_SOCKET_GROUP
-        , 21074
-        , ebpf_create_global_dimension
-        , &socket_publish_aggregated[NETDATA_UDP_START]
-        , 2);
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_UDP_FUNCTION_BYTES,
+                      "UDP bandwidth",
+                      EBPF_COMMON_DIMENSION_BYTESS,
+                      NETDATA_SOCKET_GROUP,
+                      21074,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_UDP_START],
+                      2);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_UDP_FUNCTION_ERROR
-            , EBPF_COMMON_DIMENSION_CALL
-            , NETDATA_SOCKET_GROUP
-            , 21075
-            , ebpf_create_global_dimension
-            , &socket_publish_aggregated[NETDATA_UDP_START]
-            , 2);
+        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                          NETDATA_UDP_FUNCTION_ERROR,
+                          "UDP errors",
+                          EBPF_COMMON_DIMENSION_CALL,
+                          NETDATA_SOCKET_GROUP,
+                          21075,
+                          ebpf_create_global_dimension,
+                          &socket_publish_aggregated[NETDATA_UDP_START],
+                          2);
     }
 }
 
@@ -276,12 +282,14 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
     (void)em;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
+                               "Bytes sent",
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20080,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
+                               "bytes received",
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20081,
