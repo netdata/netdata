@@ -302,22 +302,19 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
  *
  * @param type  the chart type
  * @param id    the chart id
- * @param title the chart title
  * @param axis  the axis label
  * @param web   the group name used to attach the chart on dashaboard
  * @param order the chart order
  */
 void ebpf_write_chart_cmd(char *type
     , char *id
-    , char *title
     , char *axis
     , char *web
     , int order)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d 1 ''\n"
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
         , type
         , id
-        , title
         , axis
         , web
         , order);
@@ -358,7 +355,6 @@ void ebpf_create_global_dimension(void *ptr, int end)
  *
  * @param family the chart family
  * @param name   the chart name
- * @param title  the chart title
  * @param axis   the axis label
  * @param web    the group name used to attach the chart on dashaboard
  * @param order  the order number of the specified chart
@@ -368,7 +364,6 @@ void ebpf_create_global_dimension(void *ptr, int end)
  */
 void ebpf_create_chart(char *family
     , char *name
-    , char *title
     , char *axis
     , char *web
     , int order
@@ -376,7 +371,7 @@ void ebpf_create_chart(char *family
     , void *move
     , int end)
 {
-    ebpf_write_chart_cmd(family, name, title, axis, web, order);
+    ebpf_write_chart_cmd(family, name, axis, web, order);
 
     ncd(move, end);
 }
@@ -385,16 +380,15 @@ void ebpf_create_chart(char *family
  * Create charts on apps submenu
  *
  * @param name   the chart name
- * @param title  the chart title
  * @param axis   the value displayed on vertical axis.
  * @param web    Submenu that the chart will be attached on dashboard.
  * @param order  the chart order
  * @param root   structure used to create the dimensions.
  */
-void ebpf_create_charts_on_apps(char *name, char *title, char *axis, char *web, int order, struct target *root)
+void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, name, title, axis, web, order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, name, axis, web, order);
 
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
