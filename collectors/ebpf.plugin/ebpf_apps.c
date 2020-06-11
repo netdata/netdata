@@ -935,7 +935,7 @@ static inline void del_pid_entry(pid_t pid) {
  *
  * @param out is the structure where PIDs are stored.
  */
-static void cleanup_exited_pids(ebpf_process_stat_t **out) {
+void cleanup_exited_pids(ebpf_process_stat_t **out) {
     struct pid_stat *p = NULL;
 
     for(p = root_of_pids; p ;) {
@@ -1196,5 +1196,5 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out,
     post_aggregate_targets(groups_root_target);
     */
 
-    cleanup_exited_pids(out);
+    //cleanup_exited_pids(out);
 }

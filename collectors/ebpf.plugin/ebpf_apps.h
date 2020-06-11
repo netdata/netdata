@@ -400,6 +400,8 @@ extern size_t zero_all_targets(struct target *root);
 
 extern int am_i_running_as_root();
 
+extern void cleanup_exited_pids(ebpf_process_stat_t **out);
+
 #ifndef STATIC
 extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
                            int (*bpf_map_lookup_elem)(int, const void *, void *));

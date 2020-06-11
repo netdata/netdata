@@ -839,6 +839,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         read_hash_global_tables();
 
         pthread_mutex_lock(&collect_data_mutex);
+        cleanup_exited_pids(local_process_stats);
         collect_data_for_all_processes(local_process_stats,
                                                       pid_index,
                                                       process_functions.bpf_map_lookup_elem,
