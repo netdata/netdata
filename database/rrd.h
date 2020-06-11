@@ -16,6 +16,7 @@ typedef struct alarm_entry ALARM_ENTRY;
 
 // forward declarations
 struct rrddim_volatile;
+struct rrdset_volatile;
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -30,6 +31,11 @@ struct pg_cache_page_index;
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
+
+#define META_CHART_UPDATED 1
+#define META_PLUGIN_UPDATED 2
+#define META_MODULE_UPDATED 4
+#define META_CHART_ACTIVATED 8
 
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
@@ -356,6 +362,14 @@ struct rrddim_volatile {
 };
 
 // ----------------------------------------------------------------------------
+// volatile state per chart
+struct rrdset_volatile {
+    char *old_title;
+    char *old_family;
+    char *old_context;
+};
+
+// ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrddim_foreach_read(rd, st) \
@@ -471,7 +485,8 @@ struct rrdset {
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
     size_t compaction_id;                           // The last metadata log compaction procedure that has processed
                                                     // this object.
-    size_t unused[3];
+    struct rrdset_volatile *state;                  // volatile state that is not persistently stored
+    size_t unused[2];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
@@ -860,6 +875,26 @@ extern RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
         , struct rrdhost_system_info *system_info
+);
+
+extern void rrdhost_update(RRDHOST *host
+    , const char *hostname
+    , const char *registry_hostname
+    , const char *guid
+    , const char *os
+    , const char *timezone
+    , const char *tags
+    , const char *program_name
+    , const char *program_version
+    , int update_every
+    , long history
+    , RRD_MEMORY_MODE mode
+    , unsigned int health_enabled
+    , unsigned int rrdpush_enabled
+    , char *rrdpush_destination
+    , char *rrdpush_api_key
+    , char *rrdpush_send_charts_matching
+    , struct rrdhost_system_info *system_info
 );
 
 extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);

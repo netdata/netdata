@@ -202,15 +202,21 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
 
-        rrddim_set_name(st, rd, name);
-        rrddim_set_algorithm(st, rd, algorithm);
-        rrddim_set_multiplier(st, rd, multiplier);
-        rrddim_set_divisor(st, rd, divisor);
+        int rc = rrddim_set_name(st, rd, name);
+        rc += rrddim_set_algorithm(st, rd, algorithm);
+        rc += rrddim_set_multiplier(st, rd, multiplier);
+        rc += rrddim_set_divisor(st, rd, divisor);
         if (!is_archived && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             rd->state->collect_ops.init(rd);
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
         }
-
+        // DBENGINE available and activated?
+#ifdef ENABLE_DBENGINE
+        if (likely(!is_archived && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && unlikely(rc)) {
+            debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
+            metalog_commit_update_dimension(rd);
+        }
+#endif
         rrdset_unlock(st);
         return rd;
     }

@@ -2,6 +2,7 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+#include <sched.h>
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
@@ -366,6 +367,10 @@ void rrdset_free(RRDSET *st) {
     freez(st->config_section);
     freez(st->plugin_name);
     freez(st->module_name);
+    freez(st->state->old_title);
+    freez(st->state->old_family);
+    freez(st->state->old_context);
+    freez(st->state);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -523,18 +528,139 @@ RRDSET *rrdset_create_custom(
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     RRDSET *st = rrdset_find_on_create(host, fullid);
-    if(st) {
+    if (st) {
+        int mark_rebuild = 0;
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+            mark_rebuild |= META_CHART_ACTIVATED;
+        }
+        char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
+             *old_title_v = NULL, *old_family_v = NULL, *old_context_v = NULL;
+        const char *new_name = name ? name : id;
+
+        if (unlikely((st->name && !strcmp(st->name, new_name)) || !st->name)) {
+            mark_rebuild |= META_CHART_UPDATED;
+            rrdset_set_name(st, new_name);
         }
 
-        if(unlikely(name))
-            rrdset_set_name(st, name);
-        else
-            rrdset_set_name(st, id);
+        if (unlikely(st->priority != priority)) {
+            st->priority = priority;
+            mark_rebuild |= META_CHART_UPDATED;
+        }
+        if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && st->update_every != update_every)) {
+            st->update_every = update_every;
+            mark_rebuild |= META_CHART_UPDATED;
+        }
 
+        if (plugin && st->plugin_name) {
+            if (unlikely(strcmp(plugin, st->plugin_name))) {
+                old_plugin = st->plugin_name;
+                st->plugin_name = strdupz(plugin);
+                mark_rebuild |= META_PLUGIN_UPDATED;
+            }
+        } else {
+            if (plugin != st->plugin_name) { // one is NULL?
+                old_plugin = st->plugin_name;
+                st->plugin_name = plugin ? strdupz(plugin) : NULL;
+                mark_rebuild |= META_PLUGIN_UPDATED;
+            }
+        }
+
+        if (module && st->module_name) {
+            if (unlikely(strcmp(module, st->module_name))) {
+                old_module = st->module_name;
+                st->module_name = strdupz(module);
+                mark_rebuild |= META_MODULE_UPDATED;
+            }
+        } else {
+            if (module != st->module_name) {
+                if (st->module_name && *st->module_name) {
+                    old_module = st->module_name;
+                    st->module_name = module ? strdupz(module) : NULL;
+                    mark_rebuild |= META_MODULE_UPDATED;
+                }
+            }
+        }
+
+        if (unlikely(title && st->state->old_title && strcmp(st->state->old_title, title))) {
+            char *new_title = strdupz(title);
+            old_title_v = st->state->old_title;
+            st->state->old_title = strdupz(title);
+            json_fix_string(new_title);
+            old_title = st->title;
+            st->title = new_title;
+            mark_rebuild |= META_CHART_UPDATED;
+        }
+
+        RRDSET_TYPE new_chart_type =
+            rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
+        if (st->chart_type != new_chart_type) {
+            st->chart_type = new_chart_type;
+            mark_rebuild |= META_CHART_UPDATED;
+        }
+
+        if (unlikely(family && st->state->old_family && strcmp(st->state->old_family, family))) {
+            char *new_family = strdupz(family);
+            old_family_v = st->state->old_family;
+            st->state->old_family = strdupz(family);
+            json_fix_string(new_family);
+            old_family = st->family;
+            rrdfamily_free(host, st->rrdfamily);
+            st->family = new_family;
+            st->rrdfamily = rrdfamily_create(host, st->family);
+            mark_rebuild |= META_CHART_UPDATED;
+        }
+
+        if (unlikely(context && st->state->old_context && strcmp(st->state->old_context, context))) {
+            char *new_context = strdupz(context);
+            old_context_v = st->state->old_context;
+            st->state->old_context = strdupz(context);
+            json_fix_string(new_context);
+            old_context = st->context;
+            st->context = new_context;
+            st->hash_context = simple_hash(st->context);
+            mark_rebuild |= META_CHART_UPDATED;
+        }
+
+        if (mark_rebuild) {
+#ifdef ENABLE_ACLK
+            if (netdata_cloud_setting) {
+                if (mark_rebuild & META_CHART_ACTIVATED) {
+                    aclk_add_collector(host->hostname, st->plugin_name, st->module_name);
+                }
+                else {
+                    if (mark_rebuild & (META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
+                        aclk_del_collector(
+                            host->hostname, mark_rebuild & META_PLUGIN_UPDATED ? old_plugin : st->plugin_name,
+                            mark_rebuild & META_MODULE_UPDATED ? old_module : st->module_name);
+                        aclk_add_collector(host->hostname, st->plugin_name, st->module_name);
+                    }
+                }
+                aclk_update_chart(host, st->id, ACLK_CMD_CHART);
+            }
+#endif
+            freez(old_plugin);
+            freez(old_module);
+            freez(old_title);
+            freez(old_family);
+            freez(old_context);
+            freez(old_title_v);
+            freez(old_family_v);
+            freez(old_context_v);
+            if (mark_rebuild != META_CHART_ACTIVATED) {
+                info("Collector updated metadata for chart %s", st->id);
+                sched_yield();
+            }
+        }
+#ifdef ENABLE_DBENGINE
+        if (is_archived == 0 && st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
+            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
+            metalog_commit_update_chart(st);
+        }
+#endif
         return st;
     }
 
@@ -702,13 +828,16 @@ RRDSET *rrdset_create_custom(
     st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
     st->type       = config_get(st->config_section, "type", type);
 
+    st->state = mallocz(sizeof(*st->state));
     st->family     = config_get(st->config_section, "family", family?family:st->type);
+    st->state->old_family = strdupz(st->family);
     json_fix_string(st->family);
 
     st->units      = config_get(st->config_section, "units", units?units:"");
     json_fix_string(st->units);
 
     st->context    = config_get(st->config_section, "context", context?context:st->id);
+    st->state->old_context = strdupz(st->context);
     json_fix_string(st->context);
     st->hash_context = simple_hash(st->context);
 
@@ -760,6 +889,7 @@ RRDSET *rrdset_create_custom(
         rrdset_set_name(st, id);
 
     st->title = config_get(st->config_section, "title", title);
+    st->state->old_title = strdupz(st->title);
     json_fix_string(st->title);
 
     st->rrdfamily = rrdfamily_create(host, st->family);
