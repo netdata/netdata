@@ -102,7 +102,7 @@ Distro=debian Version=10 docker-compose -f projects/only-agent/docker-compose.ym
 
 ```bash
 # Need to call clean-install on the configs used in the parent-child containers
-docker-compose -f master-slaves/docker-compose.yml up --scale agent_slave1=2
+docker-compose -f parent-child/docker-compose.yml up --scale agent_child1=2
 ```
 
 Note: this is not production ready yet, but it is left in so that we can see how it behaves
