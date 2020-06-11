@@ -643,7 +643,7 @@ RRDSET *rrdset_create_custom(
             freez(old_title);
             freez(old_family);
             freez(old_context);
-            if (mark_rebuild != META_CHART_ACTIVATED)
+            if (mark_rebuild != META_CHART_ACTIVATED) {
                 info("Collector updated metadata for chart %s", st->id);
                 sched_yield();
             }
