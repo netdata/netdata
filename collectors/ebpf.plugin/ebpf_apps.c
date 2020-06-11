@@ -1091,10 +1091,22 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out,
                                    int tbl_pid_stats_fd)
 #endif
 {
+    struct pid_stat  *pids = root_of_pids;   // global list of all processes running
+    while (pids) {
+        pids->read             = 0; // mark it as not read, so that collect_data_for_pid() will read it
+        pids->updated          = 0;
+        pids->merged           = 0;
+        pids->children_count   = 0;
+        pids->parent           = NULL;
+
+        pids = pids->next;
+    }
+
     read_proc_filesystem();
+
     int counter = 0;
     uint32_t key;
-    struct pid_stat  *pids = root_of_pids;   // global list of all processes running
+    pids = root_of_pids;   // global list of all processes running
     //while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
