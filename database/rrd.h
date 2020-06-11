@@ -485,9 +485,8 @@ struct rrdset {
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
     size_t compaction_id;                           // The last metadata log compaction procedure that has processed
                                                     // this object.
-    size_t unused[3];
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-    size_t unused[3];
+    size_t unused[2];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
