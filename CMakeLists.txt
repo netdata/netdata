@@ -353,7 +353,9 @@ set(LIBNETDATA_FILES
         libnetdata/health/health.h
         libnetdata/string/utf8.h
         libnetdata/socket/security.c
-        libnetdata/socket/security.h)
+        libnetdata/socket/security.h
+        libnetdata/circular_buffer/circular_buffer.c
+        libnetdata/circular_buffer/circular_buffer.h)
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
@@ -620,6 +622,8 @@ set(API_PLUGIN_FILES
 set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
+        streaming/receiver.c
+        streaming/sender.c
         )
 
 set(BACKENDS_PLUGIN_FILES
@@ -863,31 +867,29 @@ ENDIF()
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
-IF("$ENV{ACLK}")
-    set(ACLK_CAN_BUILD 1)
-    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
-        message(WARNING "Static build of mosquitto not found. Disabling ACLK")
-        set(ACLK_CAN_BUILD 0)
-    ENDIF()
+set(ACLK_CAN_BUILD 1)
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/mosquitto/libmosquitto.a")
+    message(WARNING "Static build of mosquitto not found. Disabling ACLK")
+    set(ACLK_CAN_BUILD 0)
+ENDIF()
 
-    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
-        message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
-        set(ACLK_CAN_BUILD 0)
-    ENDIF()
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/libwebsockets.a")
+    message(WARNING "Static build of libwebsockets not found. Disabling ACLK")
+    set(ACLK_CAN_BUILD 0)
+ENDIF()
 
-    IF(ACLK_CAN_BUILD)
-        message(STATUS "agent-cloud-link: enabled")
-        list(APPEND NETDATA_FILES ${ACLK_PLUGIN_FILES})
-        list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_STATIC_LIBS})
-        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
-        IF(LINUX AND CAP_FOUND)
-            list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
-            list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
-            list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
-        ENDIF()
-    ELSE()
-        message(STATUS "agent-cloud-link: disabled")
+IF(ACLK_CAN_BUILD)
+    message(STATUS "agent-cloud-link: enabled")
+    list(APPEND NETDATA_FILES ${ACLK_PLUGIN_FILES})
+    list(APPEND NETDATA_COMMON_LIBRARIES ${ACLK_STATIC_LIBS})
+    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libwebsockets/include)
+    IF(LINUX AND CAP_FOUND)
+        list(APPEND NETDATA_COMMON_LIBRARIES ${CAP_LIBRARIES})
+        list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CAP_INCLUDE_DIRS})
+        list(APPEND NETDATA_COMMON_CFLAGS ${CAP_CFLAGS_OTHER})
     ENDIF()
+ELSE()
+    message(STATUS "agent-cloud-link: disabled")
 ENDIF()
 
 # -----------------------------------------------------------------------------
