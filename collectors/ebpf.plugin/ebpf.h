@@ -146,18 +146,18 @@ extern void ebpf_global_labels(netdata_syscall_stat_t *is,
 
 extern void ebpf_write_chart_cmd(char *type
     , char *id
-    , char *axis
-    , char *web
+    , char *units
+    , char *family
     , int order);
 
 extern void ebpf_write_global_dimension(char *n, char *d);
 
 extern void ebpf_create_global_dimension(void *ptr, int end);
 
-extern void ebpf_create_chart(char *family
+extern void ebpf_create_chart(char *type
     , char *name
-    , char *axis
-    , char *web
+    , char *units
+    , char *family
     , int order
     , void (*ncd)(void *, int)
     , void *move
@@ -175,7 +175,7 @@ extern void write_io_chart(char *chart, char *family, char *dwrite, char *dread,
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
-extern void ebpf_create_charts_on_apps(char *name, char *axis, char *web, int order, struct target *root);
+extern void ebpf_create_charts_on_apps(char *name, char *units, char *family, int order, struct target *root);
 
 extern void write_end_chart();
 
