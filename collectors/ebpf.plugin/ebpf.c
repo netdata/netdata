@@ -312,12 +312,13 @@ void ebpf_write_chart_cmd(char *type
     , char *web
     , int order)
 {
-    printf("CHART %s.%s '' '' '%s' '%s' '' line %d 1 ''\n"
-        , type
-        , id
-        , axis
-        , web
-        , order);
+    printf("CHART %s.%s '' '' '%s' '%s' '' line %d %d ''\n",
+           type,
+           id,
+           axis,
+           web,
+           order,
+           update_every);
 }
 
 /**
