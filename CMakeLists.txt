@@ -651,6 +651,8 @@ set(ACLK_PLUGIN_FILES
         aclk/aclk_lws_https_client.h
         aclk/mqtt.c
         aclk/mqtt.h
+        aclk/aclk_stats.c
+        aclk/aclk_stats.h
         )
 
 set(SPAWN_PLUGIN_FILES

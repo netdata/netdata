@@ -4,6 +4,7 @@
 #include "../daemon/common.h"
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
+#include "aclk_stats.h"
 
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
@@ -38,8 +39,19 @@ void publish_callback(struct mosquitto *mosq, void *obj, int rc)
     now_realtime_timeval(&now);
     orig = &sendTimes[ rc & 0x3ff ];
     int64_t diff = (now.tv_sec - orig->tv_sec) * USEC_PER_SEC + (now.tv_usec - orig->tv_usec);
+    diff /= 1000;
 
-    info("Publish_callback: mid=%d latency=%" PRId64 "ms", rc, diff / 1000);
+    info("Publish_callback: mid=%d latency=%" PRId64 "ms", rc, diff);
+
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        if (aclk_metrics_per_sample.latency_max < diff)
+            aclk_metrics_per_sample.latency_max = diff;
+
+        aclk_metrics_per_sample.latency_total += diff;
+        aclk_metrics_per_sample.latency_count++;
+        ACLK_STATS_UNLOCK;
+    }
 #endif
     return;
 }

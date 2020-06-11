@@ -4,6 +4,7 @@
 #include "agent_cloud_link.h"
 #include "aclk_lws_https_client.h"
 #include "aclk_common.h"
+#include "aclk_stats.h"
 
 int aclk_shutting_down = 0;
 // State-machine for the on-connect metadata transmission.
@@ -322,6 +323,12 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         debug(D_ACLK, "Removing double entry");
         aclk_query_free(tmp_query);
         aclk_queue.count--;
+    }
+
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.queries_queued++;
+        ACLK_STATS_UNLOCK;
     }
 
     new_query = callocz(1, sizeof(struct aclk_query));
@@ -894,6 +901,12 @@ int aclk_process_query()
 
     aclk_query_free(this_query);
 
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.queries_dispatched++;
+        ACLK_STATS_UNLOCK;
+    }
+
     return 1;
 }
 
@@ -1358,6 +1371,7 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
+    struct netdata_static_thread *stats_thread = NULL;
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
     // as it must notify the far end that it shutdown gracefully and avoid the LWT.
@@ -1381,6 +1395,15 @@ void *aclk_main(void *ptr)
             static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
             return NULL;
         }
+    }
+
+    aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", CONFIG_BOOLEAN_YES);
+    if (aclk_stats_enabled) {
+        stats_thread = callocz(1, sizeof(struct netdata_static_thread));
+        stats_thread->thread = mallocz(sizeof(netdata_thread_t));
+        netdata_thread_create(
+            stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
+            stats_thread);
     }
 
     last_init_sequence = now_realtime_sec();
@@ -1502,6 +1525,13 @@ exited:
         RSA_free(aclk_private_key);
 
     aclk_main_cleanup(ptr);
+
+    if(aclk_stats_enabled) {
+        netdata_thread_join(*stats_thread->thread, NULL);
+        freez(stats_thread->thread);
+        freez(stats_thread);
+    }
+
     return NULL;
 }
 
@@ -1587,6 +1617,9 @@ int aclk_subscribe(char *sub_topic, int qos)
 void aclk_connect()
 {
     info("Connection detected (%"PRIu64" queued queries)", aclk_queue.count);
+
+    aclk_stats_upd_online(1);
+
     aclk_connected = 1;
     waiting_init = 0;
     aclk_reconnect_delay(0);
@@ -1599,6 +1632,9 @@ void aclk_disconnect()
 {
     if (likely(aclk_connected))
         info("Disconnect detected (%"PRIu64" queued queries)", aclk_queue.count);
+
+    aclk_stats_upd_online(0);
+
     aclk_subscribed = 0;
     aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
@@ -1901,6 +1937,11 @@ int aclk_handle_cloud_request(char *payload)
         .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
     };
 
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.cloud_req_recvd++;
+        ACLK_STATS_UNLOCK;
+    }
 
     if (unlikely(agent_state == AGENT_INITIALIZING)) {
         debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
@@ -1937,6 +1978,12 @@ int aclk_handle_cloud_request(char *payload)
 
         if (cloud_to_agent.callback_topic)
             freez(cloud_to_agent.callback_topic);
+
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.cloud_req_err++;
+            ACLK_STATS_UNLOCK;
+        }
 
         return 1;
     }

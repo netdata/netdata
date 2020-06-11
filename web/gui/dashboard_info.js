@@ -3133,6 +3133,21 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // ACLK Internal Stats
+    'netdata.aclk_status': {
+        valueRange: "[0, 1]",
+        info: 'This chart shows if ACLK was online during entirety of the sample duration.'
+    },
+
+    'netdata.aclk_query_per_second': {
+        info: 'This chart shows how many queries were added for ACLK_query thread to process and how many it was actually able to process.'
+    },
+
+    'netdata.aclk_latency_mqtt': {
+        info: 'Measures latency between MQTT publish of the message and it\'s PUB_ACK being received'
+    },
+
+    // ------------------------------------------------------------------------
     // VerneMQ
 
     'vernemq.sockets': {
