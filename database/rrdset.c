@@ -597,7 +597,7 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        char *new_family = family ? strdup(family): NULL;
+        char *new_family = family ? strdupz(family): NULL;
         if (new_family) {
             json_fix_string(new_family);
             if (unlikely((strcmp(st->family, new_family)))) {
@@ -610,7 +610,7 @@ RRDSET *rrdset_create_custom(
                 freez(new_family);
         }
 
-        char *new_context = context ? strdup(context) : NULL;
+        char *new_context = context ? strdupz(context) : NULL;
         if (new_context) {
             json_fix_string(new_context);
             if (unlikely((strcmp(st->context, new_context)))) {
