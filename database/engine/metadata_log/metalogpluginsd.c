@@ -9,7 +9,6 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
                                         int update_every, RRDSET_TYPE chart_type, char *options)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
     RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     uuid_t *chart_uuid;
@@ -19,8 +18,6 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         host, type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
         chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid);
-    if (chart_uuid)
-        uuid_clear(state->uuid);
 
     if (options && *options) {
         if (strstr(options, "obsolete"))
@@ -49,6 +46,14 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
     }
     ((PARSER_USER_OBJECT *)user)->st = st;
 
+    if (chart_uuid) { /* It's a valid object */
+        struct metalog_record record;
+        struct metadata_logfile *metalogfile = state->metalogfile;
+
+        uuid_copy(record.uuid, state->uuid);
+        mlf_record_insert(metalogfile, &record);
+        uuid_clear(state->uuid); /* Consume UUID */
+    }
     return PARSER_RC_OK;
 }
 
@@ -56,7 +61,6 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
                                             long multiplier, long divisor, char *options, RRD_ALGORITHM algorithm_type)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
     UNUSED(user);
     UNUSED(algorithm);
     uuid_t *dim_uuid;
@@ -65,8 +69,6 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 
     RRDDIM *rd = rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1,
                                    dim_uuid);
-    if (dim_uuid)
-        uuid_clear(state->uuid);
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
     if (options && *options) {
@@ -83,13 +85,20 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
     } else {
         rrddim_isnot_obsolete(st, rd);
     }
+    if (dim_uuid) { /* It's a valid object */
+        struct metalog_record record;
+        struct metadata_logfile *metalogfile = state->metalogfile;
+
+        uuid_copy(record.uuid, state->uuid);
+        mlf_record_insert(metalogfile, &record);
+        uuid_clear(state->uuid); /* Consume UUID */
+    }
     return PARSER_RC_OK;
 }
 
 PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
 
     uuid_copy(state->uuid, *uuid);
 
@@ -193,4 +202,5 @@ void metalog_pluginsd_state_init(struct metalog_pluginsd_state *state, struct me
     state->ctx = ctx;
     state->skip_record = 0;
     uuid_clear(state->uuid);
+    state->metalogfile = NULL;
 }

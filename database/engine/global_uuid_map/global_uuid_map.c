@@ -40,8 +40,12 @@ void   dump_object(uuid_t *index, void *object)
     }
 }
 
+/* Returns 0 if it successfully stores the uuid-object mapping or if an identical mapping already exists */
 static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object_type)
 {
+    char *existing_object;
+    GUID_TYPE existing_object_type;
+
     if (unlikely(!object) || uuid == NULL)
         return 0;
 
@@ -50,8 +54,29 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
     PValue = JudyHSIns(&JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t), PJE0);
     if (PPJERR == PValue)
         fatal("JudyHSIns() fatal error.");
-    if (*PValue)
-        return 1;
+    if (*PValue) {
+        existing_object = *PValue;
+        existing_object_type = existing_object[0];
+        if (existing_object_type != object_type)
+            return 1;
+        switch (existing_object_type) {
+            case GUID_TYPE_DIMENSION:
+                if (memcmp(existing_object, object, 1 + 16 + 16 + 16))
+                    return 1;
+                break;
+            case GUID_TYPE_CHART:
+                if (memcmp(existing_object, object, 1 + 16 + 16))
+                    return 1;
+                break;
+            case GUID_TYPE_CHAR:
+                if (strcmp(existing_object + 1, (char *)object))
+                    return 1;
+                break;
+            default:
+                return 1;
+        }
+        freez(existing_object);
+    }
 
     *PValue = (Pvoid_t *) object;
 

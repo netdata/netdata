@@ -326,6 +326,9 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
     unsigned nr_committed_pages;
     int error;
 
+    if (unlikely(ctx->quiesce != NO_QUIESCE)) /* Shutting down */
+        return;
+
     uv_rwlock_rdlock(&pg_cache->committed_page_index.lock);
     nr_committed_pages = pg_cache->committed_page_index.nr_committed_pages;
     uv_rwlock_rdunlock(&pg_cache->committed_page_index.lock);
@@ -683,7 +686,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             ++ctx->last_fileno;
         }
     }
-    if (unlikely(out_of_space)) {
+    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {
         /* delete old data */
         if (wc->now_deleting_files) {
             /* already deleting data */
@@ -719,11 +722,17 @@ static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 
 static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 {
+    struct rrdengine_instance *ctx = wc->ctx;
+
     if (unlikely(wc->cleanup_thread_invalidating_dirty_pages)) {
         after_invalidate_oldest_committed(wc);
     }
     if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
+    }
+    if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
+        ctx->quiesce = QUIESCED;
+        complete(&ctx->rrdengine_completion);
     }
 }
 
@@ -931,7 +940,20 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_SHUTDOWN:
                 shutdown = 1;
+                break;
+            case RRDENG_QUIESCE:
                 ctx->drop_metrics_under_page_cache_pressure = 0;
+                ctx->quiesce = SET_QUIESCE;
+                assert(0 == uv_timer_stop(&timer_req));
+                uv_close((uv_handle_t *)&timer_req, NULL);
+                while (do_flush_pages(wc, 1, NULL)) {
+                    ; /* Force flushing of all committed pages. */
+                }
+                wal_flush_transaction_buffer(wc);
+                if (!rrdeng_threads_alive(wc)) {
+                    ctx->quiesce = QUIESCED;
+                    complete(&ctx->rrdengine_completion);
+                }
                 break;
             case RRDENG_READ_PAGE:
                 do_read_extent(wc, &cmd.read_page.page_cache_descr, 1, 0);
@@ -970,8 +992,6 @@ void rrdeng_worker(void* arg)
      * an issue in the future.
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
-    assert(0 == uv_timer_stop(&timer_req));
-    uv_close((uv_handle_t *)&timer_req, NULL);
 
     while (do_flush_pages(wc, 1, NULL)) {
         ; /* Force flushing of all committed pages. */

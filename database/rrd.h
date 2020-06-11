@@ -316,6 +316,7 @@ struct rrddim_volatile {
     uuid_t *rrdeng_uuid;                 // database engine metric UUID
     uuid_t *metric_uuid;                 // global UUID for this metric (unique_across hosts)
     struct pg_cache_page_index *page_index;
+    uint32_t compaction_id;              // The last metadata log compaction procedure that has processed this object.
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
@@ -468,7 +469,9 @@ struct rrdset {
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
     uuid_t *chart_uuid;                             // Store the global GUID for this chart
-    size_t unused[4];
+    size_t compaction_id;                           // The last metadata log compaction procedure that has processed
+                                                    // this object.
+    size_t unused[3];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
@@ -791,7 +794,10 @@ struct rrdhost {
 
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
-    uuid_t  host_uuid;                             // Global GUID for this host
+    uuid_t  host_uuid;                              // Global GUID for this host
+    unsigned long objects_nr;                       // Number of charts and dimensions in this host
+    uint32_t compaction_id;                         // The last metadata log compaction procedure that has processed
+                                                    // this object.
 #endif
 
 #ifdef ENABLE_HTTPS

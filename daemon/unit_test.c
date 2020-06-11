@@ -1834,9 +1834,10 @@ int test_dbengine(void)
     }
 error_out:
     rrd_wrlock();
+    rrdeng_prepare_exit(host->rrdeng_ctx);
     rrdhost_delete_charts(host);
-    rrd_unlock();
     rrdeng_exit(host->rrdeng_ctx);
+    rrd_unlock();
 
     return errors;
 }
@@ -2223,9 +2224,10 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     }
     freez(query_threads);
     rrd_wrlock();
+    rrdeng_prepare_exit(host->rrdeng_ctx);
     rrdhost_delete_charts(host);
-    rrd_unlock();
     rrdeng_exit(host->rrdeng_ctx);
+    rrd_unlock();
 }
 
 #endif
