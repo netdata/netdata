@@ -144,12 +144,8 @@ extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                char **name,
                                int end);
 
-extern void ebpf_write_chart_cmd(char *type
-    , char *id
-    , char *title
-    , char *units
-    , char *family
-    , int order);
+extern void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
+                                 char *charttype, int order);
 
 extern void ebpf_write_global_dimension(char *n, char *d);
 
