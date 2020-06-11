@@ -5,9 +5,12 @@
 
 #include "metadatalog.h"
 
+extern BUFFER *metalog_update_host_buffer(RRDHOST *host);
 extern void metalog_commit_update_host(RRDHOST *host);
+extern BUFFER *metalog_update_chart_buffer(RRDSET *st, uint32_t compaction_id);
 extern void metalog_commit_update_chart(RRDSET *st);
 extern void metalog_commit_delete_chart(RRDSET *st);
+extern BUFFER *metalog_update_dimension_buffer(RRDDIM *rd);
 extern void metalog_commit_update_dimension(RRDDIM *rd);
 extern void metalog_commit_delete_dimension(RRDDIM *rd);
 
@@ -18,5 +21,6 @@ extern void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_
 /* must call once before using anything */
 extern int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx);
 extern int metalog_exit(struct metalog_instance *ctx);
+extern void metalog_prepare_exit(struct metalog_instance *ctx);
 
 #endif /* NETDATA_METADATALOGAPI_H */

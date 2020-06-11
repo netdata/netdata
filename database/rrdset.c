@@ -381,6 +381,10 @@ void rrdset_free(RRDSET *st) {
             freez(st);
             break;
     }
+#ifdef ENABLE_DBENGINE
+    rrd_atomic_fetch_add(&host->objects_nr, -1);
+#endif
+
 }
 
 void rrdset_save(RRDSET *st) {
@@ -793,6 +797,7 @@ RRDSET *rrdset_create_custom(
             st->chart_uuid = NULL;
             assert(0);
         }
+        st->compaction_id = 0;
     }
 #endif
 
@@ -806,6 +811,7 @@ RRDSET *rrdset_create_custom(
     }
 #endif
 #ifdef ENABLE_DBENGINE
+    rrd_atomic_fetch_add(&st->rrdhost->objects_nr, 1);
     metalog_commit_update_chart(st);
 #endif
 
