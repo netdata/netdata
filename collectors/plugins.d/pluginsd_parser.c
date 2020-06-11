@@ -575,7 +575,7 @@ PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_actio
         return PARSER_RC_ERROR;
     }
 
-    info("Parsed uuid=%s", uuid_str);
+    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
     if (plugins_action->guid_action) {
         return plugins_action->guid_action(user, &uuid);
     }
@@ -597,7 +597,7 @@ PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION *plugins_ac
         return PARSER_RC_ERROR;
     }
 
-    info("Parsed uuid=%s", uuid_str);
+    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
     if (plugins_action->context_action) {
         return plugins_action->context_action(user, &uuid);
     }
@@ -619,7 +619,7 @@ PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION *plugins_
         return PARSER_RC_ERROR;
     }
 
-    info("Parsed uuid=%s", uuid_str);
+    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
     if (plugins_action->tombstone_action) {
         return plugins_action->tombstone_action(user, &uuid);
     }
