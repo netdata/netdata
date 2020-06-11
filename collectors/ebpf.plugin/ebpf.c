@@ -314,7 +314,6 @@ void ebpf_write_chart_cmd(char *type
     , char *family
     , int order)
 {
-    (void)title;
     printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d %d\n",
            type,
            id,
