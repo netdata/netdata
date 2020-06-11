@@ -94,8 +94,8 @@ streamed from a child to its parent node, which concentrates an entire infrastru
 and virtualization information in one place: the parent.
 
 Now, if you'd like to remind yourself of how much RAM a certain child node has, you can access
-`http://localhost:19999/host/PARENT/api/v1/info` and reference the automatically-generated host labels from the child
-system. It's a vastly simplified way of accessing critical information about your infrastructure.
+`http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info` and reference the automatically-generated host labels from the
+child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
 > ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
 > kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
@@ -138,8 +138,8 @@ Or, by using one of the automatic labels, for only webserver systems running a s
  host labels: _os_name = Debian*
 ```
 
-In a streaming configuration where a parent node is triggering alarms, you could create health entities that apply only
-to child nodes:
+In a streaming configuration where a parent node is triggering alarms for its child nodes, you could create health
+entities that apply only to child nodes:
 
 ```yaml
  host labels: _is_child = true

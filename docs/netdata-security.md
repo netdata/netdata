@@ -193,7 +193,10 @@ Of course, there are many more methods you could use to protect Netdata:
 
 -   If you are always under a static IP, you can use the script given above to allow direct access to your Netdata servers without authentication, from all your static IPs.
 
--   install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a reciver Netdata server, which will be protected with authentication using an nginx server running locally at the reciver Netdata server. This requires more resources (you will need a bigger reciver Netdata server), but does not require any firewall changes, since all the child Netdata servers will not be listening for incoming connections.
+-   install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a parent
+    Netdata server, which will be protected with authentication using an nginx server running locally at the parent
+    Netdata server. This requires more resources (you will need a bigger parent Netdata server), but does not require
+    any firewall changes, since all the child Netdata servers will not be listening for incoming connections.
 
 ## Anonymous Statistics
 

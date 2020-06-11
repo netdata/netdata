@@ -549,7 +549,7 @@ Another common problem in slow connections is the CHILD sending a partial messag
 the parent will write the following in its `error.log`:
 
 ```
-ERROR : STREAM_PARENT[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
+ERROR : STREAM_RECEIVER[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
 ```
 
 In this example, `B` was part of a `BEGIN` message that was cut due to connection problems.
@@ -559,7 +559,7 @@ missed message. For example, a parent might miss a message containing the child'
 what to do with the `SET` message that follows. When that happens, the parent will show a message like this:
 
 ```
-ERROR : STREAM_PARENT[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
+ERROR : STREAM_RECEIVER[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
 ```
 
 ### child cannot connect to parent

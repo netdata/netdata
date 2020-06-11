@@ -109,8 +109,8 @@ Note: this is not production ready yet, but it is left in so that we can see how
 and improve it. Currently it produces the following problems:
   * Only the base-configuration in the compose without scaling works.
   * The containers are hard-coded in the compose.
-  * There is no way to separate the agent configurations, so running multiple agent child
-    wth the same GUID kills the parent which exits with a fatal condition.
+  * There is no way to separate the agent configurations, so running multiple agent child nodes with the same GUID kills
+    the parent which exits with a fatal condition.
 
 4. The ACLK
 
