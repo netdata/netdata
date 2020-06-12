@@ -4,7 +4,7 @@ services:
     image: debian_10_dev
     command: /usr/sbin/netdata -D
     ports:
-    - 21001:19999
+      - 21001:19999
     volumes:
       - ./middle_stream.conf:/etc/netdata/stream.conf:ro
       - ./middle_guid:/var/lib/netdata/registry/netdata.public.unique.id:ro

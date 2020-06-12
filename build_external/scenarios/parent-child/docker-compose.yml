@@ -4,9 +4,9 @@ services:
     image: debian_10_dev
     command: /usr/sbin/netdata -D
     ports:
-    - 20000:19999
+      - 20000:19999
     volumes:
-    - ./parent_stream.conf:/etc/netdata/stream.conf:ro
+      - ./parent_stream.conf:/etc/netdata/stream.conf:ro
   agent_child1:
     image: debian_9_dev
     command: /usr/sbin/netdata -D
