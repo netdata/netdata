@@ -5,6 +5,7 @@ info:
   title: CHANGELOG
   repository_url: https://github.com/netdata/netdata
 options:
+  allow_uncategorized: true
   commits:
     filters:
       Type:
