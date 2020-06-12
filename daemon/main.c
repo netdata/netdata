@@ -36,7 +36,7 @@ void netdata_cleanup_and_exit(int ret) {
         // exit cleanly
 
         // stop everything
-        info("EXIT: stopping main threads...");
+        info("EXIT: stopping static threads...");
         cancel_main_threads();
 
         // free the database
