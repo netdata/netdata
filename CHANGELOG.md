@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Adds missing files for streaming changes into cmake build [\#9316](https://github.com/netdata/netdata/pull/9316) ([underhood](https://github.com/underhood))
+- apps\_groups.conf: add agent-service-discovery [\#9315](https://github.com/netdata/netdata/pull/9315) ([ilyam8](https://github.com/ilyam8))
+- Added dummy `--enable-ebpf` flag to avoid breaking updates. [\#9310](https://github.com/netdata/netdata/pull/9310) ([Ferroin](https://github.com/Ferroin))
 - installer: update go.d.plugin version to v0.19.1 [\#9309](https://github.com/netdata/netdata/pull/9309) ([ilyam8](https://github.com/ilyam8))
 - Correct the repo in the docs for CentOS 8. [\#9308](https://github.com/netdata/netdata/pull/9308) ([Ferroin](https://github.com/Ferroin))
 - Fix consistency of kubernetes cgroup names [\#9303](https://github.com/netdata/netdata/pull/9303) ([cakrit](https://github.com/cakrit))
@@ -17,6 +20,7 @@
 - dashboard\_info.js: ebpf: fix close code block [\#9293](https://github.com/netdata/netdata/pull/9293) ([ilyam8](https://github.com/ilyam8))
 - Add guide to exporting metrics to Graphite [\#9285](https://github.com/netdata/netdata/pull/9285) ([joelhans](https://github.com/joelhans))
 - update\_apps\_groups: Bring imunify and lsphp to apps groups [\#9284](https://github.com/netdata/netdata/pull/9284) ([thiagoftsm](https://github.com/thiagoftsm))
+- Adds metrics for ACLK performance and status [\#9269](https://github.com/netdata/netdata/pull/9269) ([underhood](https://github.com/underhood))
 - Fix Coverity defects 359164, 359165 and 358989. [\#9268](https://github.com/netdata/netdata/pull/9268) ([amoss](https://github.com/amoss))
 - Move/refactor docs to accomodate new Guides section on Learn [\#9266](https://github.com/netdata/netdata/pull/9266) ([joelhans](https://github.com/joelhans))
 - Cleanup of main README and registry doc [\#9265](https://github.com/netdata/netdata/pull/9265) ([joelhans](https://github.com/joelhans))
@@ -219,8 +223,6 @@
 - Improved ACLK memory management and shutdown sequence [\#8611](https://github.com/netdata/netdata/pull/8611) ([stelfrag](https://github.com/stelfrag))
 - packaging: fix errors during install-requred-packages [\#8606](https://github.com/netdata/netdata/pull/8606) ([ilyam8](https://github.com/ilyam8))
 - Remove an automatic restart of the apps.plugin [\#8592](https://github.com/netdata/netdata/pull/8592) ([vlvkobal](https://github.com/vlvkobal))
-- charts.d/libreswan: fix sudo check [\#8569](https://github.com/netdata/netdata/pull/8569) ([ilyam8](https://github.com/ilyam8))
-- Docs: Change MacOS to macOS [\#8562](https://github.com/netdata/netdata/pull/8562) ([joelhans](https://github.com/joelhans))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
@@ -238,8 +240,6 @@
 - Fix Coverity Defect CID-349684 [\#8586](https://github.com/netdata/netdata/pull/8586) ([thiagoftsm](https://github.com/thiagoftsm))
 - Coverity scan [\#8579](https://github.com/netdata/netdata/pull/8579) ([amoss](https://github.com/amoss))
 - Fix broken Fedora 30/31 RPM builds [\#8572](https://github.com/netdata/netdata/pull/8572) ([prologic](https://github.com/prologic))
-- Fix regressions in cloud functionality \(build, CI, claiming\) [\#8568](https://github.com/netdata/netdata/pull/8568) ([underhood](https://github.com/underhood))
-- Fix compiler warnings in the claiming code [\#8567](https://github.com/netdata/netdata/pull/8567) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
