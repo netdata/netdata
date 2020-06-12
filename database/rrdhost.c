@@ -365,7 +365,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrd_hosts_available++;
 
 #ifdef ENABLE_DBENGINE
-    if (likely(!is_localhost && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+    if (likely(!is_localhost && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
             metalog_commit_update_host(host);
 #endif
     return host;
