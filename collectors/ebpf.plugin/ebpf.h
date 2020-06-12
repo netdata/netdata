@@ -21,13 +21,16 @@
 # include <dirent.h>
 
 //From libnetdata.h
-# include "../../libnetdata/threads/threads.h"
-# include "../../libnetdata/locks/locks.h"
-# include "../../libnetdata/avl/avl.h"
-# include "../../libnetdata/clocks/clocks.h"
-# include "../../libnetdata/config/appconfig.h"
-# include "../../libnetdata/ebpf/ebpf.h"
-# include "../../daemon/main.h"
+# include "libnetdata/threads/threads.h"
+# include "libnetdata/locks/locks.h"
+# include "libnetdata/avl/avl.h"
+# include "libnetdata/clocks/clocks.h"
+# include "libnetdata/config/appconfig.h"
+# include "libnetdata/ebpf/ebpf.h"
+# include "libnetdata/procfile/procfile.h"
+# include "daemon/main.h"
+
+# include "ebpf_apps.h"
 
 typedef enum {
     MODE_RETURN = 0,    //This attaches kprobe when the function returns
@@ -85,6 +88,20 @@ typedef struct ebpf_module {
     uint32_t thread_id;
 } ebpf_module_t;
 
+extern ebpf_module_t ebpf_modules[];
+#define EBPF_MODULE_PROCESS_IDX 0
+#define EBPF_MODULE_SOCKET_IDX 1
+
+// Copied from musl header
+//
+#ifndef offsetof
+# if __GNUC__ > 3
+#  define offsetof(type, member) __builtin_offsetof(type, member)
+# else
+#  define offsetof(type, member) ((size_t)( (char *)&(((type *)0)->member) - (char *)0 ))
+# endif
+#endif
+
 //Chart defintions
 # define NETDATA_EBPF_FAMILY "ebpf"
 
@@ -99,7 +116,7 @@ typedef struct ebpf_module {
 # define NETDATA_KERNEL_V5_3 328448
 # define NETDATA_KERNEL_V4_15 265984
 
-
+# define EBPF_SYS_CLONE_IDX 11
 # define EBPF_MAX_MAPS 32
 
 
@@ -117,6 +134,9 @@ extern char kernel_string[64];
 extern netdata_ebpf_events_t process_probes[];
 extern netdata_ebpf_events_t socket_probes[];
 
+extern pthread_mutex_t collect_data_mutex;
+extern pthread_cond_t collect_data_cond_var;
+
 //Common functions
 extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                netdata_publish_syscall_t *pio,
@@ -124,20 +144,18 @@ extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                char **name,
                                int end);
 
-extern void ebpf_write_chart_cmd(char *type
-    , char *id
-    , char *axis
-    , char *web
-    , int order);
+extern void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
+                                 char *charttype, int order);
 
 extern void ebpf_write_global_dimension(char *n, char *d);
 
 extern void ebpf_create_global_dimension(void *ptr, int end);
 
-extern void ebpf_create_chart(char *family
-    , char *name
-    , char *axis
-    , char *web
+extern void ebpf_create_chart(char *type
+    , char *id
+    , char *title
+    , char *units
+    , char *family
     , int order
     , void (*ncd)(void *, int)
     , void *move
@@ -147,15 +165,41 @@ extern void write_begin_chart(char *family, char *name);
 
 extern void write_chart_dimension(char *dim, long long value);
 
-extern void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
+extern void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
 
 extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
 
-void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
+extern void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
 
 extern void fill_ebpf_functions(ebpf_functions_t *ef);
 
+extern void ebpf_create_charts_on_apps(char *name, char *title, char *units, char *family,
+                                       int order, struct target *root);
+
+extern void write_end_chart();
+
 # define EBPF_GLOBAL_SECTION "global"
 # define EBPF_PROGRAMS_SECTION "ebpf programs"
+
+# define EBPF_COMMON_DIMENSION_CALL "Calls"
+# define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
+# define EBPF_COMMON_DIMENSION_DIFFERENCE "Difference"
+
+//Common variables
+extern char *ebpf_user_config_dir;
+extern char *ebpf_stock_config_dir;
+extern pid_t *pid_index;
+extern int debug_enabled;
+
+//Socket functions and variables
+//Common functions
+extern void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root);
+extern collected_number get_value_from_structure(char *basis, size_t offset);
+extern struct pid_stat  *root_of_pids;
+extern ebpf_process_stat_t *global_process_stat;
+extern size_t all_pids_count;
+extern int update_every;
+
+# define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
 #endif
