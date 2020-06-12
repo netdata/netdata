@@ -306,7 +306,7 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
 
     // parse the name, and make sure it does not include 'type.'
     if (unlikely(name && *name)) {
-        // when data are streaming from child nodes
+        // when data are streamed from child nodes
         // name will be type.name
         // so we have to remove 'type.' from name too
         size_t len = strlen(type);
@@ -628,4 +628,3 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
     return count;
 }
-
