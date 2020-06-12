@@ -1194,9 +1194,10 @@ static void test_prometheus_remote_write_send_header(void **state)
         "POST /receive HTTP/1.1\r\n"
         "Host: test-host\r\n"
         "Accept: */*\r\n"
+        "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: 11\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
-    expect_value(__wrap_send, len, 125);
+    expect_value(__wrap_send, len, 167);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
     assert_int_equal(prometheus_remote_write_send_header(&sock, instance),0);
