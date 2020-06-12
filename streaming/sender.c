@@ -145,7 +145,7 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
         freez(se->kernel_version);
 }
 
-static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout,
+static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
     struct sender_state *s) {
 
     struct timeval tv = {
@@ -365,7 +365,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     }
     s->version = version;
 
-    info("STREAM %s [send to %s]: established communication with a master using protocol version %d - ready to send metrics..."
+    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
          , host->hostname
          , s->connected_to
          , version);
@@ -385,7 +385,7 @@ static void attempt_to_connect(struct sender_state *state)
 {
     state->send_attempts = 0;
 
-    if(rrdpush_sender_thread_connect_to_master(state->host, state->default_port, state->timeout, state)) {
+    if(rrdpush_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
         state->last_sent_t = now_monotonic_sec();
 
         // reset the buffer, to properly send charts and metrics

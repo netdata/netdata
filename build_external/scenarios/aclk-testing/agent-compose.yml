@@ -1,6 +1,6 @@
 version: '3.3'
 services:
-  agent_master:
+  agent_parent:
     build:
       context: ../../..
       dockerfile: build_external/make-install.Dockerfile

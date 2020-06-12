@@ -410,7 +410,7 @@ if [ -z ${EMAIL_CHARSET} ]; then
 fi
 
 # If we've been asked to use FQDN's for the URL's in the alarm, do so,
-# unless we're sending an alarm for a slave system which we can't get the
+# unless we're sending an alarm for a child system which we can't get the
 # FQDN of easily.
 if [ "${use_fqdn}" = "YES" ] && [ "${host}" = "$(hostname -s 2>/dev/null)" ]; then
 	host="$(hostname -f 2>/dev/null)"

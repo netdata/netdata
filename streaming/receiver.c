@@ -51,7 +51,7 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
     struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
     if (cd->version < VERSION_GAP_FILLING ) {
-        error("STREAM %s from %s: Slave negotiated version %u but sent TIMESTAMP!", host->hostname, cd->cmd,
+        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", host->hostname, cd->cmd,
                cd->version);
         return PARSER_RC_OK;    // Ignore error and continue stream
     }
@@ -232,8 +232,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if(rpt->tags && !*rpt->tags) rpt->tags = NULL;
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO MASTER");
-        error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the master/proxy machine guid to a slave?", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->machine_guid);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
+        error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the parent/proxy machine GUID to a child?", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->machine_guid);
         close(rpt->fd);
         return 1;
     }

@@ -36,7 +36,7 @@ void netdata_cleanup_and_exit(int ret) {
         // exit cleanly
 
         // stop everything
-        info("EXIT: stopping master threads...");
+        info("EXIT: stopping static threads...");
         cancel_main_threads();
 
         // free the database
@@ -232,7 +232,7 @@ void cancel_main_threads() {
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
-            info("EXIT: Stopping master thread: %s", static_threads[i].name);
+            info("EXIT: Stopping main thread: %s", static_threads[i].name);
             netdata_thread_cancel(*static_threads[i].thread);
             found++;
         }
@@ -254,7 +254,7 @@ void cancel_main_threads() {
     if(found) {
         for (i = 0; static_threads[i].name != NULL ; i++) {
             if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
-                error("Master thread %s takes too long to exit. Giving up...", static_threads[i].name);
+                error("Main thread %s takes too long to exit. Giving up...", static_threads[i].name);
         }
     }
     else

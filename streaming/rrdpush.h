@@ -99,7 +99,7 @@ extern void sender_init(struct sender_state *s, RRDHOST *parent);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
 extern int rrdpush_init();
-extern int configured_as_master();
+extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
 extern void rrdset_push_chart_definition_now(RRDSET *st);
 extern void *rrdpush_sender_thread(void *ptr);

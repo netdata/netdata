@@ -144,9 +144,9 @@ static inline int should_send_chart_matching(RRDSET *st) {
     return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
 }
 
-int configured_as_master() {
+int configured_as_parent() {
     struct section *section = NULL;
-    int is_master = 0;
+    int is_parent = 0;
 
     appconfig_wrlock(&stream_config);
     for (section = stream_config.first_section; section; section = section->next) {
@@ -154,13 +154,13 @@ int configured_as_master() {
 
         if (uuid_parse(section->name, uuid) != -1 &&
                 appconfig_get_boolean_by_section(section, "enabled", 0)) {
-            is_master = 1;
+            is_parent = 1;
             break;
         }
     }
     appconfig_unlock(&stream_config);
 
-    return is_master;
+    return is_parent;
 }
 
 // checks if the current chart definition has been sent
@@ -476,7 +476,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         else if(!strcmp(name, "ver"))
             stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
         else {
-            // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
+            // An old Netdata child does not have a compatible streaming protocol, map to something sane.
             if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
                 name = "NETDATA_HOST_OS_NAME";
             else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID"))
