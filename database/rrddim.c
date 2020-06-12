@@ -494,6 +494,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 
     // free(rd->annotations);
 
+    RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
     switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
@@ -514,7 +515,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
             break;
     }
 #ifdef ENABLE_ACLK
-    if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != rd->rrd_memory_mode))
+    if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != rrd_memory_mode))
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
 #ifdef ENABLE_DBENGINE
