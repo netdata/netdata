@@ -16,6 +16,8 @@ filesystem using virtual filesystem (VFS) functions, and much more. Even better,
 an _event frequency_, which is even faster than Netdata's beloved 1-second granularity. When you troubleshoot and debug
 applications with eBPF, rest assured you miss not even the smallest meaningful event.
 
+Better yet, you get all this information without remembering 
+
 Using this guide, you'll learn the fundamentals of setting up Netdata to give you kernel-level metrics from your
 application so that you can monitor, troubleshoot, and debug to your heart's content.
 
