@@ -45,7 +45,6 @@ jobs:
           - 'ubuntu:19.10'
           - 'ubuntu:18.04'
           - 'ubuntu:16.04'
-          - 'gentoo/stage3-amd64:latest'
         include:
           - distro: 'alpine:edge'
             pre: 'apk add -U bash'
@@ -102,11 +101,6 @@ jobs:
           - distro: 'ubuntu:16.04'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
-
-          - distro: 'gentoo/stage3-amd64:latest'
-            pre: 'emerge-webrsync'
-            rmjsonc: 'emerge --deselect dev-libs/json-c; emerge --depclean'
-
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
