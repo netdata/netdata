@@ -53,7 +53,7 @@ every second.
 
 [**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
 correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
-slave nodes you have, how many metrics your Agent collects, and more.
+child nodes you have, how many metrics your Agent collects, and more.
 
 ```conf
 [global]

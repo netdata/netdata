@@ -86,8 +86,8 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 
 Netdata categorizes all block devices in 3 categories:
 
-1.  physical disks (i.e. block devices that does not have slaves and are not partitions)
-2.  virtual disks (i.e. block devices that have slaves - like RAID devices)
+1.  physical disks (i.e. block devices that do not have child devices and are not partitions)
+2.  virtual disks (i.e. block devices that have child devices - like RAID devices)
 3.  disk partitions (i.e. block devices that are part of a physical disk)
 
 Performance metrics are enabled by default for all disk devices, except partitions and not-mounted virtual disks. Of course, you can enable/disable monitoring any block device by editing the Netdata configuration file.
@@ -325,7 +325,7 @@ By default Netdata will enable monitoring metrics only when they are not zero. I
 
 There are several alarms defined in `health.d/net.conf`.
 
-The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a slave or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](/health/REFERENCE.md#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](/health/REFERENCE.md#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
 
 #### configuration
 

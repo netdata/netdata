@@ -57,7 +57,7 @@ metrics. The default settings retain about two day's worth of metris on a system
 
 [**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
 correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
-slave nodes you have, how many metrics your Agent collects, and more.
+child nodes you have, how many metrics your Agent collects, and more.
 
 With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
 redundancy.

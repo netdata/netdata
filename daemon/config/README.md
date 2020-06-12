@@ -82,7 +82,7 @@ Please note that your data history will be lost if you have modified `history` p
 | pthread stack size|auto-detected||||
 | cleanup obsolete charts after seconds|`3600`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also sets the timeout for cleaning up obsolete dimensions|||
 | gap when lost iterations above|`1`||||
-| cleanup orphan hosts after seconds|`3600`|How long to wait until automatically removing from the DB a remote Netdata host (slave) that is no longer sending data.|||
+| cleanup orphan hosts after seconds|`3600`|How long to wait until automatically removing from the DB a remote Netdata host (child) that is no longer sending data.|||
 | delete obsolete charts files|`yes`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also affects the deletion of files for obsolete dimensions|||
 | delete orphan hosts files|`yes`|Set to `no` to disable non-responsive host removal.|||
 | enable zero metrics|`no`|Set to `yes` to show charts when all their metrics are zero.|||

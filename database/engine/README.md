@@ -46,18 +46,18 @@ The `dbengine disk space` option determines the amount of disk space in **MiB** 
 metric values and all related metadata describing them.
 
 Use the  [**database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to correctly set
-`dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many slave nodes you
-have, how many metrics your Agent collects, and more.
+`dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many child nodes
+you have, how many metrics your Agent collects, and more.
 
 ### Streaming metrics to the database engine
 
-When streaming metrics, the Agent on the master node creates one instance of the database engine for itself, and another
-instance for every slave node it receives metrics from. If you have four streaming nodes, you will have five instances
-in total (`1 master + 4 slaves = 5 instances`).
+When streaming metrics, the Agent on the parent node creates one instance of the database engine for itself, and another
+instance for every child node it receives metrics from. If you have four streaming nodes, you will have five instances
+in total (`1 parent + 4 child nodes = 5 instances`).
 
 The Agent allocates resources for each instance separately using the `dbengine disk space` setting. If `dbengine disk
 space` is set to the default `256`, each instance is given 256 MiB in disk space, which means the total disk space
-required to store all instances is, roughly, `256 MiB * 1 master * 4 slaves = 1280 MiB`. 
+required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`. 
 
 See the [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to help you correctly
 set `dbengine disk space` and undertand the toal disk space required based on your streaming setup.
@@ -90,14 +90,14 @@ validate the memory requirements for your particular system(s) and configuration
 
 ### File descriptor requirements
 
-The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming slave or master
-server). When configuring your system you should make sure there are at least 50 file descriptors available per
+The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming child or
+parent server). When configuring your system you should make sure there are at least 50 file descriptors available per
 `dbengine` instance.
 
 Netdata allocates 25% of the available file descriptors to its Database Engine instances. This means that only 25% of
 the file descriptors that are available to the Netdata service are accessible by dbengine instances. You should take
 that into account when configuring your service or system-wide file descriptor limits. You can roughly estimate that the
-Netdata service needs 2048 file descriptors for every 10 streaming slave hosts when streaming is configured to use
+Netdata service needs 2048 file descriptors for every 10 streaming child hosts when streaming is configured to use
 `memory mode = dbengine`.
 
 If for example one wants to allocate 65536 file descriptors to the Netdata service on a systemd system one needs to
@@ -173,10 +173,10 @@ traffic so as to create the minimum possible interference with other application
 
 ## Evaluation
 
-We have evaluated the performance of the `dbengine` API that the netdata daemon uses internally. This is **not** the
-web API of netdata. Our benchmarks ran on a **single** `dbengine` instance, multiple of which can be running in a
-netdata master server. We used a server with an AMD Ryzen Threadripper 2950X 16-Core Processor and 2 disk drives, a
-Seagate Constellation ES.3 2TB magnetic HDD and a SAMSUNG MZQLB960HAJR-00007 960GB NAND Flash SSD.
+We have evaluated the performance of the `dbengine` API that the netdata daemon uses internally. This is **not** the web
+API of netdata. Our benchmarks ran on a **single** `dbengine` instance, multiple of which can be running in a Netdata
+parent node. We used a server with an AMD Ryzen Threadripper 2950X 16-Core Processor and 2 disk drives, a Seagate
+Constellation ES.3 2TB magnetic HDD and a SAMSUNG MZQLB960HAJR-00007 960GB NAND Flash SSD.
 
 For our workload, we defined 32 charts with 128 metrics each, giving us a total of 4096 metrics. We defined 1 worker
 thread per chart (32 threads) that generates new data points with a data generation interval of 1 second. The time axis

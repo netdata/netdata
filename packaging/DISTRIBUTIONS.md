@@ -125,7 +125,9 @@ This is the brand new database engine capability of netdata. It is a mandatory f
 
 #### Encryption Support (HTTPS)
 
-This is Netdata's TLS capability that incorporates encryption on the web server and the APIs between master and slaves. Also a mandatory facility for Netdata, but remains optional for users who are limited or not interested in tight security
+This is Netdata's TLS capability that incorporates encryption on the web server and the APIs between parent and child
+nodes. Also a mandatory facility for Netdata, but remains optional for users who are limited or not interested in tight
+security
 
 |make/make install|netdata-installer.sh|kickstart.sh|kickstart-static64.sh|Docker image|RPM packaging|DEB packaging|
 |:---------------:|:------------------:|:----------:|:-------------------:|:----------:|:-----------:|:-----------:|

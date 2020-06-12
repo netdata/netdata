@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/usin
 
 When you use Netdata to monitor and troubleshoot an entire infrastructure, whether that's dozens or hundreds of systems,
 you need sophisticated ways of keeping everything organized. You need alarms that adapt to the system's purpose, or
-whether the `master` or `slave` in a streaming setup. You need properly-labeled metrics archiving so you can sort,
+whether the parent or child in a streaming setup. You need properly-labeled metrics archiving so you can sort,
 correlate, and mash-up your data to your heart's content. You need to keep tabs on ephemeral Docker containers in a
 Kubernetes cluster.
 
@@ -50,7 +50,7 @@ read the status of your agent. For example, from a VPS system running Debian 10:
 {
   ...
   "host_labels": {
-    "_is_master": "false",
+    "_is_parent": "false",
     "_virt_detection": "systemd-detect-virt",
     "_container_detection": "none",
     "_container": "unknown",
@@ -73,7 +73,7 @@ You may have noticed a handful of labels that begin with an underscore (`_`). Th
 
 When Netdata starts, it captures relevant information about the system and converts them into automatically-generated
 host labels. You can use these to logically organize your systems via health entities, exporting metrics,
-streaming/master status, and more.
+parent-child status, and more.
 
 They capture the following:
 
@@ -82,29 +82,29 @@ They capture the following:
 -   CPU architecture, system cores, CPU frequency, RAM, and disk space
 -   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
 -   What virtualization layer the system runs on top of, if any
--   Whether the system is a streaming master or slave
+-   Whether the system is a streaming parent or child
 
 If you want to organize your systems without manually creating host tags, try the automatic labels in some of the
 features below.
 
 ## Host labels in streaming
 
-You may have noticed the `_is_master` and `_is_slave` automatic labels from above. Host labels are also now streamed
-from a slave to its master agent, which concentrates an entire infrastructure's OS, hardware, container, and
-virtualization information in one place: the master.
+You may have noticed the `_is_parent` and `_is_child` automatic labels from above. Host labels are also now
+streamed from a child to its parent node, which concentrates an entire infrastructure's OS, hardware, container,
+and virtualization information in one place: the parent.
 
-Now, if you'd like to remind yourself of how much RAM a certain slave system has, you can simply access
-`http://localhost:19999/host/SLAVE_NAME/api/v1/info` and reference the automatically-generated host labels from the
-slave system. It's a vastly simplified way of accessing critical information about your infrastructure.
+Now, if you'd like to remind yourself of how much RAM a certain child node has, you can access
+`http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info` and reference the automatically-generated host labels from the
+child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
-> ⚠️ Because automatic labels for slave nodes are accessible via API calls, and contain sensitive information like
+> ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
 > kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
 > documentation](/streaming/README.md#securing-streaming-communications) for details. You may also want to use
 > [access lists](/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
 > connections](/docs/netdata-security.md#expose-netdata-only-in-a-private-lan).
 
-You can also use `_is_master`, `_is_slave`, and any other host labels in both health entities and metrics exporting.
-Speaking of which...
+You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
+exporting. Speaking of which...
 
 ## Host labels in health entities
 
@@ -138,11 +138,11 @@ Or, by using one of the automatic labels, for only webserver systems running a s
  host labels: _os_name = Debian*
 ```
 
-In a streaming configuration where a master agent is triggering alarms for its slaves, you could create health entities
-that apply only to slaves:
+In a streaming configuration where a parent node is triggering alarms for its child nodes, you could create health
+entities that apply only to child nodes:
 
 ```yaml
- host labels: _is_slave = true
+ host labels: _is_child = true
 ```
 
 Or when ephemeral Docker nodes are involved:

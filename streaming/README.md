@@ -1,64 +1,70 @@
 <!--
----
 title: "Streaming and replication"
+description: "Replicate and mirror Netdata's metrics through real-time streaming from child to parent nodes. Then combine, correlate, and export."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
----
 -->
 
 # Streaming and replication
 
 Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected
 metrics, in real-time to it. This is quite different to [data archiving to third party time-series
-databases](/backends/README.md).
+databases](/exporting/README.md).
 
-When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is capable of:
+When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is
+capable of:
 
--   visualize them with a dashboard
--   run health checks that trigger alarms and send alarm notifications
--   archive metrics to a backend time-series database
+-   Visualize metrics with a dashboard
+-   Run health checks that trigger alarms and send alarm notifications
+-   Export metrics to a external time-series database
+
+The nodes that send metrics are called **child** nodes, and the nodes that receive metrics are called **parent** nodes.
+There are also **proxies**, which collects metrics from a child and sends it to a parent.
 
 ## Supported configurations
 
 ### Netdata without a database or web API (headless collector)
 
-Local Netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
-another Netdata (`master`).
+Local Netdata (child), **without any database or alarms**, collects metrics and sends them to another Netdata
+(parent).
 
-The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` Netdata. The URL has the form `http://master-host:master-port/host/slave-host/`.
+The node menu shows a list of all "databases streamed to" the parent. Clicking one of those links allows the user to
+view the full dashboard of the child node. The URL has the form
+`http://parent-host:parent-port/host/child-host/`.
 
-Alarms for the `slave` are served by the `master`.
+Alarms for the child are served by the parent.
 
-In this mode the `slave` is just a plain data collector. It spawns all external plugins, but instead
-of maintaining a local database and accepting dashboard requests, it streams all metrics to the
-`master`. The memory footprint is reduced significantly, to between 6 MiB and 40 MiB, depending on the enabled plugins. To reduce the memory usage as much as possible, refer to [running Netdata in embedded devices](/docs/Performance.md#running-netdata-in-embedded-devices).
+In this mode the child is just a plain data collector. It spawns all external plugins, but instead of maintaining a
+local database and accepting dashboard requests, it streams all metrics to the parent. The memory footprint is reduced
+significantly, to between 6 MiB and 40 MiB, depending on the enabled plugins. To reduce the memory usage as much as
+possible, refer to [running Netdata in embedded devices](/docs/Performance.md#running-netdata-in-embedded-devices).
 
-The same `master` can collect data for any number of `slaves`.
+The same parent can collect data for any number of child nodes.
 
 ### Database Replication
 
-Local Netdata (`slave`), **with a local database (and possibly alarms)**, collects metrics and
-sends them to another Netdata (`master`).
+Local Netdata (child), **with a local database (and possibly alarms)**, collects metrics and
+sends them to another Netdata (parent).
 
-The user can use all the functions **at both** `http://slave-ip:slave-port/` and
-`http://master-host:master-port/host/slave-host/`.
+The user can use all the functions **at both** `http://child-ip:child-port/` and
+`http://parent-host:parent-port/host/child-host/`.
 
-The `slave` and the `master` may have different data retention policies for the same metrics.
+The child and the parent may have different data retention policies for the same metrics.
 
-Alarms for the `slave` are triggered by **both** the `slave` and the `master` (and actually
+Alarms for the child are triggered by **both** the child and the parent (and actually
 each can have different alarms configurations or have alarms disabled).
 
-Take a note, that custom chart names, configured on the `slave`, should be in the form `type.name` to work correctly. The `master` will truncate the `type` part and substitute the original chart `type` to store the name in the database.
+Take a note, that custom chart names, configured on the child, should be in the form `type.name` to work correctly. The parent will truncate the `type` part and substitute the original chart `type` to store the name in the database.
 
 ### Netdata proxies
 
-Local Netdata (`slave`), with or without a database, collects metrics and sends them to another
-Netdata (`proxy`), which may or may not maintain a database, which forwards them to another
-Netdata (`master`).
+Local Netdata (child), with or without a database, collects metrics and sends them to another
+Netdata (**proxy**), which may or may not maintain a database, which forwards them to another
+Netdata (parent).
 
-Alarms for the slave can be triggered by any of the involved hosts that maintains a database.
+Alarms for the child can be triggered by any of the involved hosts that maintains a database.
 
 Any number of daisy chaining Netdata servers are supported, each with or without a database and
-with or without alarms for the `slave` metrics.
+with or without alarms for the child metrics.
 
 ### mix and match with backends
 
@@ -96,7 +102,9 @@ monitoring (there cannot be health monitoring without a database).
 `[web].mode = none` disables the API (Netdata will not listen to any ports).
 This also disables the registry (there cannot be a registry without an API).
 
-`accept a streaming request every seconds` can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log entries "... too busy to accept new streaming request. Will be allowed in X secs".
+`accept a streaming request every seconds` can be used to set a limit on how often a parent node will accept streaming
+requests from its child nodes. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
+entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
 ```
 [backend]
@@ -126,7 +134,7 @@ sending-receiving Netdata.
 
 This is the section for the sending Netdata. On the receiving node, `[stream].enabled` can be `no`.
 If it is `yes`, the receiving node will also stream the metrics to another node (i.e. it will be
-a `proxy`).
+a proxy).
 
 ```
 [stream]
@@ -144,7 +152,7 @@ This is an overview of how these options can be combined:
 | proxy with db|not `none`|not `none`|`yes`|possible|possible|yes|
 | central netdata|not `none`|not `none`|`no`|possible|possible|yes|
 
-For the options to encrypt the data stream between the slave and the master, refer to [securing the communication](#securing-streaming-communications)
+For the options to encrypt the data stream between the child and the parent, refer to [securing the communication](#securing-streaming-communications)
 
 ##### options for the receiving node
 
@@ -166,7 +174,7 @@ all hosts pushed with this API key.
 You can also add sections like this:
 
 ```sh
-# replace MACHINE_GUID with the slave /var/lib/netdata/registry/netdata.public.unique.id
+# replace MACHINE_GUID with the child /var/lib/netdata/registry/netdata.public.unique.id
 [MACHINE_GUID]
     enabled = yes
     history = 3600
@@ -175,7 +183,7 @@ You can also add sections like this:
     allow from = *
 ```
 
-The above is the receiver configuration of a single host, at the receiver end. `MACHINE_GUID` is
+The above is the parent configuration of a single host, at the parent end. `MACHINE_GUID` is
 the unique id the Netdata generating the metrics (i.e. the Netdata that originally collects
 them `/var/lib/netdata/registry/netdata.unique.id`). So, metrics for Netdata `A` that pass through
 any number of other Netdata, will have the same `MACHINE_GUID`.
@@ -195,7 +203,7 @@ important: left to right, the first positive or negative match is used.
 
 ##### tracing
 
-When a `slave` is trying to push metrics to a `master` or `proxy`, it logs entries like these:
+When a child is trying to push metrics to a parent or proxy, it logs entries like these:
 
 ```
 2017-02-25 01:57:44: netdata: ERROR: Failed to connect to '10.11.12.1', port '19999' (errno 111, Connection refused)
@@ -207,7 +215,7 @@ When a `slave` is trying to push metrics to a `master` or `proxy`, it logs entri
 2017-02-25 01:58:14: netdata: INFO : STREAM costa-pc [send]: ready - sending metrics...
 ```
 
-The receiving end (`proxy` or `master`) logs entries like these:
+The receiving end (proxy or parent) logs entries like these:
 
 ```
 2017-02-25 01:58:04: netdata: INFO : STREAM [receive from [10.11.12.11]:33554]: new client connection.
@@ -221,14 +229,14 @@ For Netdata v1.9+, streaming can also be monitored via `access.log`.
 
 ### Securing streaming communications
 
-Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](/web/server/README.md#enabling-tls-support) on the master. With encryption enabled on the receiving side, you need to instruct the slave to use TLS/SSL as well. On the slave's `stream.conf`, configure the destination as follows:
+Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](/web/server/README.md#enabling-tls-support) on the parent. With encryption enabled on the receiving side, you need to instruct the child to use TLS/SSL as well. On the child's `stream.conf`, configure the destination as follows:
 
 ```
 [stream]
     destination = host:port:SSL
 ```
 
-The word `SSL` appended to the end of the destination tells the slave that connections must be encrypted.
+The word `SSL` appended to the end of the destination tells the child that connections must be encrypted.
 
 > While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol,
 > it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata
@@ -237,7 +245,7 @@ The word `SSL` appended to the end of the destination tells the slave that conne
 
 #### Certificate verification
 
-When TLS/SSL is enabled on the slave, the default behavior will be to not connect with the master unless the server's certificate can be verified via the default chain. In case you want to avoid this check, add the following to the slave's `stream.conf` file:
+When TLS/SSL is enabled on the child, the default behavior will be to not connect with the parent unless the server's certificate can be verified via the default chain. In case you want to avoid this check, add the following to the child's `stream.conf` file:
 
 ```
 [stream]
@@ -252,15 +260,15 @@ Given these known issues, you have two options. If you trust your certificate, y
 
 For more details about these options, you can read about [verify locations](https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_load_verify_locations.html).
 
-Before you changed your streaming configuration, you need to copy your trusted certificate to your slave system and add the certificate to OpenSSL's list.
+Before you changed your streaming configuration, you need to copy your trusted certificate to your child system and add the certificate to OpenSSL's list.
 
 On most Linux distributions, the `update-ca-certificates` command searches inside the `/usr/share/ca-certificates` directory for certificates. You should double-check by reading the `update-ca-certificate` manual (`man update-ca-certificate`), and then change the directory in the below commands if needed.
 
-If you have `sudo` configured on your slave system, you can use that to run the following commands. If not, you'll have to log in as `root` to complete them.
+If you have `sudo` configured on your child system, you can use that to run the following commands. If not, you'll have to log in as `root` to complete them.
 
 ```
 # mkdir /usr/share/ca-certificates/netdata
-# cp master_cert.pem /usr/share/ca-certificates/netdata/master_cert.crt
+# cp parent_cert.pem /usr/share/ca-certificates/netdata/parent_cert.crt
 # chown -R netdata.netdata /usr/share/ca-certificates/netdata/
 ```
 
@@ -269,7 +277,7 @@ First, you create a new directory to store your certificates for Netdata. Next, 
 Next, edit the file `/etc/ca-certificates.conf` and add the following line:
 
 ```
-netdata/master_cert.crt
+netdata/parent_cert.crt
 ```
 
 Now you update the list of certificates running the following, again either as `sudo` or `root`:
@@ -281,32 +289,32 @@ Now you update the list of certificates running the following, again either as `
 > Some Linux distributions have different methods of updating the certificate list. For more details, please read this
 > guide on [addding trusted root certificates](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
 
-Once you update your certificate list, you can set the stream parameters for Netdata to trust the master certificate. Open `stream.conf` for editing and change the following lines:
+Once you update your certificate list, you can set the stream parameters for Netdata to trust the parent certificate. Open `stream.conf` for editing and change the following lines:
 
 ```
 [stream]
     CApath = /etc/ssl/certs/
-    CAfile = /etc/ssl/certs/master_cert.pem
+    CAfile = /etc/ssl/certs/parent_cert.pem
 ```
 
-With this configuration, the `CApath` option tells Netdata to search for trusted certificates inside `/etc/ssl/certs`. The `CAfile` option specifies the Netdata master certificate is located at `/etc/ssl/certs/master_cert.pem`. With this configuration, you can skip using the system's entire list of certificates and use Netdata's master certificate instead.
+With this configuration, the `CApath` option tells Netdata to search for trusted certificates inside `/etc/ssl/certs`. The `CAfile` option specifies the Netdata parent certificate is located at `/etc/ssl/certs/parent_cert.pem`. With this configuration, you can skip using the system's entire list of certificates and use Netdata's parent certificate instead.
 
 #### Expected behaviors
 
-With the introduction of TLS/SSL, the master-slave communication behaves as shown in the table below, depending on the following configurations:
+With the introduction of TLS/SSL, the parent-child communication behaves as shown in the table below, depending on the following configurations:
 
--   **Master TLS (Yes/No)**: Whether the `[web]` section in `netdata.conf` has `ssl key` and `ssl certificate`.
--   **Master port TLS (-/force/optional)**: Depends on whether the `[web]` section `bind to` contains a `^SSL=force` or `^SSL=optional` directive on the port(s) used for streaming.
--   **Slave TLS (Yes/No)**: Whether the destination in the slave's `stream.conf` has `:SSL` at the end.
--   **Slave TLS Verification (yes/no)**: Value of the slave's `stream.conf` `ssl skip certificate verification` parameter (default is no).
+-   **Parent TLS (Yes/No)**: Whether the `[web]` section in `netdata.conf` has `ssl key` and `ssl certificate`.
+-   **Parent port TLS (-/force/optional)**: Depends on whether the `[web]` section `bind to` contains a `^SSL=force` or `^SSL=optional` directive on the port(s) used for streaming.
+-   **Child TLS (Yes/No)**: Whether the destination in the child's `stream.conf` has `:SSL` at the end.
+-   **Child TLS Verification (yes/no)**: Value of the child's `stream.conf` `ssl skip certificate verification` parameter (default is no).
 
-| Master TLS enabled|Master port SSL|Slave TLS|Slave SSL Ver.|Behavior|
+| Parent TLS enabled|Parent port SSL|Child TLS|Child SSL Ver.|Behavior|
 |:----------------:|:-------------:|:-------:|:------------:|:-------|
-| No|-|No|no|Legacy behavior. The master-slave stream is unencrypted.|
-| Yes|force|No|no|The master rejects the slave connection.|
-| Yes|-/optional|No|no|The master-slave stream is unencrypted (expected situation for legacy slaves and newer masters)|
-| Yes|-/force/optional|Yes|no|The master-slave stream is encrypted, provided that the master has a valid TLS/SSL certificate. Otherwise, the slave refuses to connect.|
-| Yes|-/force/optional|Yes|yes|The master-slave stream is encrypted.|
+| No|-|No|no|Legacy behavior. The parent-child stream is unencrypted.|
+| Yes|force|No|no|The parent rejects the child connection.|
+| Yes|-/optional|No|no|The parent-child stream is unencrypted (expected situation for legacy child nodes and newer parent nodes)|
+| Yes|-/force/optional|Yes|no|The parent-child stream is encrypted, provided that the parent has a valid TLS/SSL certificate. Otherwise, the child refuses to connect.|
+| Yes|-/force/optional|Yes|yes|The parent-child stream is encrypted.|
 
 ## Viewing remote host dashboards, using mirrored databases
 
@@ -323,9 +331,7 @@ Auto-scaling is probably the most trendy service deployment strategy these days.
 
 Auto-scaling detects the need for additional resources and boots VMs on demand, based on a template. Soon after they start running the applications, a load balancer starts distributing traffic to them, allowing the service to grow horizontally to the scale needed to handle the load. When demands falls, auto-scaling starts shutting down VMs that are no longer needed.
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23627426/65a9074a-02b9-11e7-9664-cd8f258a00af.png"/>
-</p>
+![Monitoring ephemeral nodes with Netdata](https://cloud.githubusercontent.com/assets/2662304/23627426/65a9074a-02b9-11e7-9664-cd8f258a00af.png)
 
 What a fantastic feature for controlling infrastructure costs! Pay only for what you need for the time you need it!
 
@@ -348,84 +354,83 @@ Following the Netdata way of monitoring, we wanted:
 
 All monitoring solutions, including Netdata, work like this:
 
-1.  `collect metrics`, from the system and the running applications
-2.  `store metrics`, in a time-series database
-3.  `examine metrics` periodically, for triggering alarms and sending alarm notifications
-4.  `visualize metrics`, so that users can see what exactly is happening
+1.  Collect metrics from the system and the running applications
+2.  Store metrics in a time-series database
+3.  Examine metrics periodically, for triggering alarms and sending alarm notifications
+4.  Visualize metrics so that users can see what exactly is happening
 
 Netdata used to be self-contained, so that all these functions were handled entirely by each server. The changes we made, allow each Netdata to be configured independently for each function. So, each Netdata can now act as:
 
--   a `self contained system`, much like it used to be.
--   a `data collector`, that collects metrics from a host and pushes them to another Netdata (with or without a local database and alarms).
--   a `proxy`, that receives metrics from other hosts and pushes them immediately to other Netdata servers. Netdata proxies can also be `store and forward proxies` meaning that they are able to maintain a local database for all metrics passing through them (with or without alarms).
--   a `time-series database` node, where data are kept, alarms are run and queries are served to visualise the metrics.
+-   A self-contained system, much like it used to be.
+-   A data collector that collects metrics from a host and pushes them to another Netdata (with or without a local database and alarms).
+-   A proxy, which receives metrics from other hosts and pushes them immediately to other Netdata servers. Netdata proxies can also be `store and forward proxies` meaning that they are able to maintain a local database for all metrics passing through them (with or without alarms).
+-   A time-series database node, where data are kept, alarms are run and queries are served to visualise the metrics.
 
 ### Configuring an auto-scaling setup
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23627468/96daf7ba-02b9-11e7-95ac-1f767dd8dab8.png"/>
-</p>
+![A diagram of an auto-scaling setup with Netdata](https://user-images.githubusercontent.com/1153921/84290043-0c1c1600-aaf8-11ea-9757-dd8dd8a8ec6c.png)
 
-You need a Netdata `master`. This node should not be ephemeral. It will be the node where all ephemeral nodes (let's call them `slaves`) will be sending their metrics.
+You need a Netdata parent. This node should not be ephemeral. It will be the node where all ephemeral child
+nodes will send their metrics.
 
-The master will need to authorize the slaves for accepting their metrics. This is done with an API key.
+The parent will need to authorize child nodes to receive their metrics. This is done with an API key.
 
 #### API keys
 
-API keys are just random GUIDs. Use the Linux command `uuidgen` to generate one. You can use the same API key for all your `slaves`, or you can configure one API for each of them. This is entirely your decision.
+API keys are just random GUIDs. Use the Linux command `uuidgen` to generate one. You can use the same API key for all your child nodes, or you can configure one API for each of them. This is entirely your decision.
 
 We suggest to use the same API key for each ephemeral node template you have, so that all replicas of the same ephemeral node will have exactly the same configuration.
 
 I will use this API_KEY: `11111111-2222-3333-4444-555555555555`. Replace it with your own.
 
-#### Configuring the `master`
+#### Configuring the parent
 
-On the master, edit `/etc/netdata/stream.conf` (to edit it on your system run `/etc/netdata/edit-config stream.conf`) and set these:
+On the parent, edit `/etc/netdata/stream.conf` (to edit it on your system run `/etc/netdata/edit-config stream.conf`) and set these:
 
 ```bash
 [11111111-2222-3333-4444-555555555555]
 	# enable/disable this API key
     enabled = yes
 
-    # one hour of data for each of the slaves
+    # one hour of data for each of the child nodes
     default history = 3600
 
-    # do not save slave metrics on disk
+    # do not save child metrics on disk
     default memory = ram
 
-    # alarms checks, only while the slave is connected
+    # alarms checks, only while the child is connected
     health enabled by default = auto
 ```
 
-_`stream.conf` on master, to enable receiving metrics from slaves using the API key._
+_`stream.conf` on the parent, to enable receiving metrics from its child ndoes using the API key._
 
 If you used many API keys, you can add one such section for each API key.
 
-When done, restart Netdata on the `master` node. It is now ready to receive metrics.
+When done, restart Netdata on the parent node. It is now ready to receive metrics.
 
-Note that `health enabled by default = auto` will still trigger `last_collected` alarms, if a connected slave does not exit gracefully. If the `netdata` process running on the slave is
-stopped, it will close the connection to the master, ensuring that no `last_collected` alarms are triggered. For example, a proper container restart would first terminate
-the `netdata` process, but a system power issue would leave the connection open on the master side. In the second case, you will still receive alarms.
+Note that `health enabled by default = auto` will still trigger `last_collected` alarms, if a connected child does not exit gracefully. If the `netdata` process running on the child is
+stopped, it will close the connection to the parent, ensuring that no `last_collected` alarms are triggered. For example, a proper container restart would first terminate
+the `netdata` process, but a system power issue would leave the connection open on the parent side. In the second case, you will still receive alarms.
 
-#### Configuring the `slaves`
+#### Configuring the child nodes
 
-On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your system run `/etc/netdata/edit-config stream.conf`) and set these:
+On each of the child nodes, edit `/etc/netdata/stream.conf` (to edit it on your system run `/etc/netdata/edit-config stream.conf`) and set these:
 
 ```bash
 [stream]
     # stream metrics to another Netdata
     enabled = yes
 
-    # the IP and PORT of the master
+    # the IP and PORT of the parent
     destination = 10.11.12.13:19999
 
 	# the API key to use
     api key = 11111111-2222-3333-4444-555555555555
 ```
 
-_`stream.conf` on slaves, to enable pushing metrics to master at `10.11.12.13:19999`._
+_`stream.conf` on child nodes, to enable pushing metrics to their parent at `10.11.12.13:19999`._
 
-Using just the above configuration, the `slaves` will be pushing their metrics to the `master` Netdata, but they will still maintain a local database of the metrics and run health checks. To disable them, edit `/etc/netdata/netdata.conf` and set:
+Using just the above configuration, the child nodes will be pushing their metrics to the parent Netdata, but they will still maintain a local database of the metrics and run health checks. To disable them, edit `/etc/netdata/netdata.conf` and set:
 
 ```bash
 [global]
@@ -437,9 +442,9 @@ Using just the above configuration, the `slaves` will be pushing their metrics t
     enabled = no
 ```
 
-_`netdata.conf` configuration on slaves, to disable the local database and health checks._
+_`netdata.conf` configuration on child nodes, to disable the local database and health checks._
 
-Keep in mind that setting `memory mode = none` will also force `[health].enabled = no` (health checks require access to a local database). But you can keep the database and disable health checks if you need to. You are however sending all the metrics to the master server, which can handle the health checking (`[health].enabled = yes`)
+Keep in mind that setting `memory mode = none` will also force `[health].enabled = no` (health checks require access to a local database). But you can keep the database and disable health checks if you need to. You are however sending all the metrics to the parent node, which can handle the health checking (`[health].enabled = yes`)
 
 #### Netdata unique id
 
@@ -449,15 +454,15 @@ The file `/var/lib/netdata/registry/netdata.public.unique.id` contains a random 
 
 #### Troubleshooting metrics streaming
 
-Both the sender and the receiver of metrics log information at `/var/log/netdata/error.log`.
+Both parent and child nodes log information at `/var/log/netdata/error.log`.
 
-On both master and slave do this:
+Run the following on both the parent and child nodes:
 
 ```
 tail -f /var/log/netdata/error.log | grep STREAM
 ```
 
-If the slave manages to connect to the master you will see something like (on the master):
+If the child manages to connect to the parent you will see something like (on the parent):
 
 ```
 2017-03-09 09:38:52: netdata: INFO : STREAM [receive from [10.11.12.86]:38564]: new client connection.
@@ -467,7 +472,7 @@ If the slave manages to connect to the master you will see something like (on th
 2017-03-09 09:38:52: netdata: INFO : STREAM xxx [receive from [10.11.12.86]:38564]: receiving metrics...
 ```
 
-and something like this on the slave:
+and something like this on the child:
 
 ```
 2017-03-09 09:38:28: netdata: INFO : STREAM xxx [send to box:19999]: connecting...
@@ -478,7 +483,8 @@ and something like this on the slave:
 
 ### Archiving to a time-series database
 
-The `master` Netdata node can also archive metrics, for all `slaves`, to a time-series database. At the time of this writing, Netdata supports:
+The parent Netdata node can also archive metrics, for all its child nodes, to a time-series database. At the time of
+this writing, Netdata supports:
 
 -   graphite
 -   opentsdb
@@ -486,13 +492,12 @@ The `master` Netdata node can also archive metrics, for all `slaves`, to a time-
 -   json document DBs
 -   all the compatibles to the above (e.g. kairosdb, influxdb, etc)
 
-Check the Netdata [backends documentation](/backends/README.md) for configuring this.
+Check the Netdata [exporting documentation](/docs/export/README.md) for configuring this.
 
 This is how such a solution will work:
 
-<p align="center">
-<img src="https://cloud.githubusercontent.com/assets/2662304/23627295/e3569adc-02b8-11e7-9d55-4014bf98c1b3.png"/>
-</p>
+![Diagram showing an example configuration for archiving to a time-series
+database](https://user-images.githubusercontent.com/1153921/84291308-c2ccc600-aaf9-11ea-98a9-89ccbf3a62dd.png)
 
 ### An advanced setup
 
@@ -522,93 +527,93 @@ For a practical example see [Monitoring ephemeral nodes](#monitoring-ephemeral-n
 
 ## Troubleshooting streaming connections
 
-This section describes the most common issues you might encounter when connecting slave and master Netdata agents.
+This section describes the most common issues you might encounter when connecting parent and child nodes.
 
-### Slow connections between slave and master
+### Slow connections between parent and child
 
-When you have a slow connection between master and slave, Netdata raises a few different errors. Most of the errors will
-appear in the slave's `error.log`.
+When you have a slow connection between parent and child, Netdata raises a few different errors. Most of the
+errors will appear in the child's `error.log`.
 
-```
-netdata ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER IP:MASTER PORT]: too many data pending - buffer is X bytes long,
+```bash
+netdata ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM CHILD HOSTNAME [send to PARENT IP:PARENT PORT]: too many data pending - buffer is X bytes long,
 Y unsent - we have sent Z bytes in total, W on this connection. Closing connection to flush the data.
 ```
 
-On the master side, you may see various error messages, most commonly the following:
+On the parent side, you may see various error messages, most commonly the following:
 
 ```
-netdata ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : read failed: end of file
+netdata ERROR : STREAM_PARENT[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : read failed: end of file
 ```
 
-Another common problem in slow connections is the slave sending a partial message to the master. In this case, the
-master will write the following in its `error.log`:
+Another common problem in slow connections is the CHILD sending a partial message to the parent. In this case,
+the parent will write the following in its `error.log`:
 
 ```
-ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
+ERROR : STREAM_RECEIVER[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
 ```
 
 In this example, `B` was part of a `BEGIN` message that was cut due to connection problems.
 
-Slow connections can also cause problems when the master misses a message and then recieves a command related to the
-missed message. For example, a master might miss a message containing the slave's charts, and then doesn't know what to
-do with the `SET` message that follows. When that happens, the master will show a message like this:
+Slow connections can also cause problems when the parent misses a message and then recieves a command related to the
+missed message. For example, a parent might miss a message containing the child's charts, and then doesn't know
+what to do with the `SET` message that follows. When that happens, the parent will show a message like this:
 
 ```
-ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
+ERROR : STREAM_RECEIVER[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
 ```
 
-### Slave cannot connect to master
+### child cannot connect to parent
 
-When the slave can't connect to a master for any reason (misconfiguration, networking, firewalls, master down), you will
-see the following in the slave's `error.log`.
+When the child can't connect to a parent for any reason (misconfiguration, networking, firewalls, parent
+down), you will see the following in the child's `error.log`.
 
 ```
-ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'MASTER IP', port 'MASTER PORT' (errno 113, No route to host)
+ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'PARENT IP', port 'PARENT PORT' (errno 113, No route to host)
 ```
 
 ### 'Is this a Netdata?'
 
 This question can appear when Netdata starts the stream and receives an unexpected response. This error can appear when
-the master is using SSL and the slave tries to connect using plain text. You will also see this message when Netdata
-connects to another server that isn't Netdata. The complete error message will look like this:
+the parent is using SSL and the child tries to connect using plain text. You will also see this message when
+Netdata connects to another server that isn't Netdata. The complete error message will look like this:
 
 ```
-ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HOSTNAME:MASTER PORT]: server is not replying properly (is it a netdata?).
+ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM child HOSTNAME [send to PARENT HOSTNAME:PARENT PORT]: server is not replying properly (is it a netdata?).
 ```
 
 ### Stream charts wrong
 
-Chart data needs to be consistent between slave and master agents. If there are differences between chart data on a
-master and a slave, such as gaps in metrics collection, it most often means your slave's `memory mode` does not match
-the master's. To learn more about the different ways Netdata can store metrics, and thus keep chart data consistent,
-read our [memory mode documentation](/database/README.md).
+Chart data needs to be consistent between child and parent nodes. If there are differences between chart data on
+a parent and a child, such as gaps in metrics collection, it most often means your child's `memory mode`
+does not match the parent's. To learn more about the different ways Netdata can store metrics, and thus keep chart
+data consistent, read our [memory mode documentation](/database/README.md).
 
 ### Forbidding access
 
 You may see errors about "forbidding access" for a number of reasons. It could be because of a slow connection between
-the master and slave nodes, but it could also be due to other failures. Look in your master's `error.log` for errors
+the parent and child nodes, but it could also be due to other failures. Look in your parent's `error.log` for errors
 that look like this: 
 
 ```
-STREAM [receive from [SLAVE HOSTNAME]:SLAVE IP]: `MESSAGE`. Forbidding access."
+STREAM [receive from [child HOSTNAME]:child IP]: `MESSAGE`. Forbidding access."
 ```
 
 `MESSAGE` will have one of the following patterns:
 
 -   `request without KEY` : The message received is incomplete and the KEY value can be API, hostname, machine GUID.
--   `API key 'VALUE' is not valid GUID`: The UUID received from slave does not have the format defined in [RFC 4122]
+-   `API key 'VALUE' is not valid GUID`: The UUID received from child does not have the format defined in [RFC 4122]
     (https://tools.ietf.org/html/rfc4122)
 -   `machine GUID 'VALUE' is not GUID.`: This error with machine GUID is like the previous one.
 -   `API key 'VALUE' is not allowed`: This stream has a wrong API key.
--   `API key 'VALUE' is not permitted from this IP`: The IP is not allowed to use STREAM with this master.
+-   `API key 'VALUE' is not permitted from this IP`: The IP is not allowed to use STREAM with this parent.
 -   `machine GUID 'VALUE' is not allowed.`: The GUID that is trying to send stream is not allowed.
 -   `Machine GUID 'VALUE' is not permitted from this IP. `: The IP does not match the pattern or IP allowed to connect 
     to use stream.
 
 ### Netdata could not create a stream
 
-The connection between master and slave is a stream. When the master can't convert the initial connection into a stream,
-it will write the following message inside `error.log`:
+The connection between parent and child is a stream. When the parent can't convert the initial connection into
+a stream, it will write the following message inside `error.log`:
 
 ```
 file descriptor given is not a valid stream

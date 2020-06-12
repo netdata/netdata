@@ -233,8 +233,8 @@ Options:
     of times within each pattern). The patterns are checked against the hostname (the localhost is always checked as
     `localhost`), allowing us to filter which hosts will be sent to the external database when this Netdata is a central
     Netdata aggregating multiple hosts. A pattern starting with `!` gives a negative match. So to match all hosts named
-    `*db*` except hosts containing `*slave*`, use `!*slave* *db*` (so, the order is important: the first pattern
-    matching the hostname will be used - positive or negative).
+    `*db*` except hosts containing `*child*`, use `!*child* *db*` (so, the order is important: the first
+    pattern matching the hostname will be used - positive or negative).
 
 -   `send charts matching = *` includes one or more space separated patterns, using `*` as wildcard (any number of times
     within each pattern). The patterns are checked against both chart id and chart name. A pattern starting with `!`

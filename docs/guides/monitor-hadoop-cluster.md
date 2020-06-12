@@ -96,7 +96,7 @@ al-9866",
 If Netdata can't access the `/jmx` endpoint for either a NameNode or DataNode, it will not be able to auto-detect and
 collect metrics from your HDFS implementation.
 
-Zookeeper auto-detection relies on an accessible client port and a whitelisted `mntr` command. For more details on
+Zookeeper auto-detection relies on an accessible client port and a allow-listed `mntr` command. For more details on
 `mntr`, see Zookeeper's documentation on [cluster
 options](https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_clusterOptions) and [Zookeeper
 commands](https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_zkCommands).
