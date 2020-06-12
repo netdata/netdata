@@ -170,12 +170,12 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 
     if(st->name) {
         rrdset_index_del_name(host, st);
-        st->name = config_set_default(st->config_section, "name", new_name);
+        st->name = strdupz(new_name);
         st->hash_name = simple_hash(st->name);
         rrdsetvar_rename_all(st);
     }
     else {
-        st->name = config_get(st->config_section, "name", new_name);
+        st->name = strdupz(new_name);
         st->hash_name = simple_hash(st->name);
     }
 
@@ -630,10 +630,8 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        RRDSET_TYPE new_chart_type =
-            rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
-        if (st->chart_type != new_chart_type) {
-            st->chart_type = new_chart_type;
+        if (st->chart_type != chart_type) {
+            st->chart_type = chart_type;
             mark_rebuild |= META_CHART_UPDATED;
         }
 
@@ -722,19 +720,11 @@ RRDSET *rrdset_create_custom(
     // get the options from the config, we need to create it
 
     long entries;
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        // only sets it the first time
-        entries = config_get_number(config_section, "history", 5);
-    } else {
-        long rentries = config_get_number(config_section, "history", history_entries);
-        entries = align_entries_to_pagesize(memory_mode, rentries);
-        if (entries != rentries) entries = config_set_number(config_section, "history", entries);
-
-        if (memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
-            entries = config_set_number(config_section, "history", 10);
-    }
     int enabled = config_get_boolean(config_section, "enabled", 1);
-    if(!enabled) entries = 5;
+    if(!enabled || memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        entries = 5;
+    else
+        entries = align_entries_to_pagesize(memory_mode, history_entries);
 
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
@@ -853,22 +843,22 @@ RRDSET *rrdset_create_custom(
 
     st->cache_dir = cache_dir;
 
-    st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
-    st->type       = config_get(st->config_section, "type", type);
+    st->chart_type = chart_type;
+    st->type       = strdupz(type);
 
     st->state = callocz(1, sizeof(*st->state));
-    st->family     = config_get(st->config_section, "family", family?family:st->type);
+    st->family = family ? strdupz(family) : strdupz(st->type);
     json_fix_string(st->family);
 
-    st->units      = config_get(st->config_section, "units", units?units:"");
+    st->units = units ? strdupz(units) : strdupz("");
     json_fix_string(st->units);
 
-    st->context    = config_get(st->config_section, "context", context?context:st->id);
+    st->context = context ? strdupz(context) : strdupz(st->id);
     st->state->old_context = strdupz(st->context);
     json_fix_string(st->context);
     st->hash_context = simple_hash(st->context);
 
-    st->priority = config_get_number(st->config_section, "priority", priority);
+    st->priority = priority;
     if(enabled)
         rrdset_flag_set(st, RRDSET_FLAG_ENABLED);
     else
@@ -918,7 +908,7 @@ RRDSET *rrdset_create_custom(
         // could not use the name, use the id
         rrdset_set_name(st, id);
 
-    st->title = config_get(st->config_section, "title", title);
+    st->title = strdupz(title);
     st->state->old_title = strdupz(st->title);
     json_fix_string(st->title);
 

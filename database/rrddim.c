@@ -252,7 +252,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
-    char varname[CONFIG_MAX_NAME + 1];
     unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
 
     debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
@@ -350,18 +349,14 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     rd->cache_filename = strdupz(fullfilename);
 
-    snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    rd->name = config_get(st->config_section, varname, (name && *name)?name:rd->id);
+    rd->name = (name && *name)?strdupz(name):strdupz(rd->id);
     rd->hash_name = simple_hash(rd->name);
 
-    snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
-    rd->algorithm = rrd_algorithm_id(config_get(st->config_section, varname, rrd_algorithm_name(algorithm)));
+    rd->algorithm = algorithm;
 
-    snprintfz(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
-    rd->multiplier = config_get_number(st->config_section, varname, multiplier);
+    rd->multiplier = multiplier;
 
-    snprintfz(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
-    rd->divisor = config_get_number(st->config_section, varname, divisor);
+    rd->divisor = divisor;
     if(!rd->divisor) rd->divisor = 1;
 
     rd->entries = st->entries;
