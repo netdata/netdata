@@ -275,6 +275,7 @@ struct pid_stat {
     unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
     int keeploops;                  // increases by 1 every time keep is 1 and updated 0
     unsigned char updated:1;        // 1 when the process is currently running
+    unsigned char updated_twice:1;  // 1 when the process was running in the previous iteration
     unsigned char merged:1;         // 1 when it has been merged to its parent
     unsigned char read:1;           // 1 when we have already read this process for this iteration
 
