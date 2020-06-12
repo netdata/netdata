@@ -561,6 +561,71 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
     return PARSER_RC_OK;
 }
 
+PARSER_RC pluginsd_guid(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    char *uuid_str = words[1];
+    uuid_t uuid;
+
+    if (unlikely(!uuid_str)) {
+        error("requested a GUID, without a uuid.");
+        return PARSER_RC_ERROR;
+    }
+    if (unlikely(strlen(uuid_str) != GUID_LEN || uuid_parse(uuid_str, uuid) == -1)) {
+        error("requested a GUID, without a valid uuid string.");
+        return PARSER_RC_ERROR;
+    }
+
+    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
+    if (plugins_action->guid_action) {
+        return plugins_action->guid_action(user, &uuid);
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_context(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    char *uuid_str = words[1];
+    uuid_t uuid;
+
+    if (unlikely(!uuid_str)) {
+        error("requested a CONTEXT, without a uuid.");
+        return PARSER_RC_ERROR;
+    }
+    if (unlikely(strlen(uuid_str) != GUID_LEN || uuid_parse(uuid_str, uuid) == -1)) {
+        error("requested a CONTEXT, without a valid uuid string.");
+        return PARSER_RC_ERROR;
+    }
+
+    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
+    if (plugins_action->context_action) {
+        return plugins_action->context_action(user, &uuid);
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    char *uuid_str = words[1];
+    uuid_t uuid;
+
+    if (unlikely(!uuid_str)) {
+        error("requested a TOMBSTONE, without a uuid.");
+        return PARSER_RC_ERROR;
+    }
+    if (unlikely(strlen(uuid_str) != GUID_LEN || uuid_parse(uuid_str, uuid) == -1)) {
+        error("requested a TOMBSTONE, without a valid uuid string.");
+        return PARSER_RC_ERROR;
+    }
+
+    debug(D_PLUGINSD, "Parsed uuid=%s", uuid_str);
+    if (plugins_action->tombstone_action) {
+        return plugins_action->tombstone_action(user, &uuid);
+    }
+
+    return PARSER_RC_OK;
+}
 
 // New plugins.d parser
 

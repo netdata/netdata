@@ -1400,6 +1400,9 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
+#ifdef ENABLE_DBENGINE
+    init_global_guid_map();
+#endif
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
@@ -1417,6 +1420,9 @@ int main(int argc, char **argv) {
 
     // Load host labels
     reload_host_labels();
+#ifdef ENABLE_DBENGINE
+    metalog_commit_update_host(localhost);
+#endif
 
     // ------------------------------------------------------------------------
     // spawn the threads

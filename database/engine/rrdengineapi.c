@@ -9,6 +9,114 @@ int default_rrdeng_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
+/* This UUID is not unique across hosts */
+void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret_uuid)
+{
+    EVP_MD_CTX *evpctx;
+    unsigned char hash_value[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+
+    evpctx = EVP_MD_CTX_create();
+    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(evpctx, dim_id, strlen(dim_id));
+    EVP_DigestUpdate(evpctx, chart_id, strlen(chart_id));
+    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
+    EVP_MD_CTX_destroy(evpctx);
+    assert(hash_len > sizeof(uuid_t));
+    memcpy(ret_uuid, hash_value, sizeof(uuid_t));
+}
+
+/* Transform legacy UUID to be unique across hosts deterministacally */
+void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid, uuid_t *ret_uuid)
+{
+    EVP_MD_CTX *evpctx;
+    unsigned char hash_value[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+
+    evpctx = EVP_MD_CTX_create();
+    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(evpctx, machine_guid, GUID_LEN);
+    EVP_DigestUpdate(evpctx, *legacy_uuid, sizeof(uuid_t));
+    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
+    EVP_MD_CTX_destroy(evpctx);
+    assert(hash_len > sizeof(uuid_t));
+    memcpy(ret_uuid, hash_value, sizeof(uuid_t));
+}
+
+void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
+{
+    struct page_cache *pg_cache;
+    struct rrdengine_instance *ctx;
+    uuid_t legacy_uuid;
+    Pvoid_t *PValue;
+    struct pg_cache_page_index *page_index;
+    int replace_instead_of_generate = 0;
+
+    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+    pg_cache = &ctx->pg_cache;
+
+    rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
+    rd->state->metric_uuid = callocz(1, sizeof(uuid_t));
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &legacy_uuid, sizeof(uuid_t));
+    if (likely(NULL != PValue)) {
+        page_index = *PValue;
+    }
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    if (NULL == PValue) {
+        /* First time we see the legacy UUID, drop legacy support, normal path */
+
+        if (NULL != dim_uuid) {
+            replace_instead_of_generate = 1;
+            uuid_copy(*rd->state->metric_uuid, *dim_uuid);
+        }
+        if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION,
+                                           replace_instead_of_generate))) {
+            errno = 0;
+            error("FAILED to generate GUID for %s", rd->id);
+            freez(rd->state->metric_uuid);
+            rd->state->metric_uuid = NULL;
+            assert(0);
+        }
+
+        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t));
+        if (likely(NULL != PValue)) {
+            page_index = *PValue;
+        }
+        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+        if (NULL == PValue) {
+            uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
+            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t), PJE0);
+            assert(NULL == *PValue); /* TODO: figure out concurrency model */
+            *PValue = page_index = create_page_index(rd->state->metric_uuid);
+            page_index->prev = pg_cache->metrics_index.last_page_index;
+            pg_cache->metrics_index.last_page_index = page_index;
+            uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
+        }
+    } else {
+        /* There are legacy UUIDs in the database, implement backward compatibility */
+
+
+        rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
+                                                rd->state->metric_uuid);
+        if (dim_uuid && uuid_compare(*rd->state->metric_uuid, *dim_uuid)) {
+            error("Mismatch of metadata log DIMENSION GUID with dbengine metric GUID.");
+        }
+        if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION, 1))) {
+            errno = 0;
+            error("FAILED to generate GUID for %s", rd->id);
+            freez(rd->state->metric_uuid);
+            rd->state->metric_uuid = NULL;
+            assert(0);
+        }
+    }
+    rd->state->rrdeng_uuid = &page_index->id;
+    rd->state->page_index = page_index;
+    rd->state->compaction_id = 0;
+}
+
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
@@ -16,53 +124,21 @@ uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 void rrdeng_store_metric_init(RRDDIM *rd)
 {
     struct rrdeng_collect_handle *handle;
-    struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
-    uuid_t temp_id;
-    Pvoid_t *PValue;
     struct pg_cache_page_index *page_index;
-    EVP_MD_CTX *evpctx;
-    unsigned char hash_value[EVP_MAX_MD_SIZE];
-    unsigned int hash_len;
-
-    //&default_global_ctx; TODO: test this use case or remove it?
 
     ctx = rd->rrdset->rrdhost->rrdeng_ctx;
-    pg_cache = &ctx->pg_cache;
     handle = &rd->state->handle.rrdeng;
     handle->ctx = ctx;
-
-    evpctx = EVP_MD_CTX_create();
-    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
-    EVP_DigestUpdate(evpctx, rd->id, strlen(rd->id));
-    EVP_DigestUpdate(evpctx, rd->rrdset->id, strlen(rd->rrdset->id));
-    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
-    EVP_MD_CTX_destroy(evpctx);
-    assert(hash_len > sizeof(temp_id));
-    memcpy(&temp_id, hash_value, sizeof(temp_id));
 
     handle->descr = NULL;
     handle->prev_descr = NULL;
     handle->unaligned_page = 0;
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &temp_id, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
-        page_index = *PValue;
-    }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (NULL == PValue) {
-        /* First time we see the UUID */
-        uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &temp_id, sizeof(uuid_t), PJE0);
-        assert(NULL == *PValue); /* TODO: figure out concurrency model */
-        *PValue = page_index = create_page_index(&temp_id);
-        page_index->prev = pg_cache->metrics_index.last_page_index;
-        pg_cache->metrics_index.last_page_index = page_index;
-        uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
-    }
-    rd->state->rrdeng_uuid = &page_index->id;
-    handle->page_index = page_index;
+    page_index = rd->state->page_index;
+    uv_rwlock_wrlock(&page_index->lock);
+    ++page_index->writers;
+    uv_rwlock_wrunlock(&page_index->lock);
 }
 
 /* The page must be populated and referenced */
@@ -109,7 +185,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr);
             pg_cache_put(ctx, descr);
-            pg_cache_punch_hole(ctx, descr, 1, 0);
+            pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
             handle->prev_descr = NULL;
         } else {
             /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
@@ -170,7 +246,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
                  must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(rd);
 
-        page = rrdeng_create_page(ctx, &handle->page_index->id, &descr);
+        page = rrdeng_create_page(ctx, &rd->state->page_index->id, &descr);
         assert(page);
 
         handle->descr = descr;
@@ -204,27 +280,38 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             }
         }
 
-        pg_cache_insert(ctx, handle->page_index, descr);
+        pg_cache_insert(ctx, rd->state->page_index, descr);
     } else {
-        pg_cache_add_new_metric_time(handle->page_index, descr);
+        pg_cache_add_new_metric_time(rd->state->page_index, descr);
     }
 }
 
 /*
  * Releases the database reference from the handle for storing metrics.
+ * Returns 1 if it's safe to delete the dimension.
  */
-void rrdeng_store_metric_finalize(RRDDIM *rd)
+int rrdeng_store_metric_finalize(RRDDIM *rd)
 {
     struct rrdeng_collect_handle *handle;
     struct rrdengine_instance *ctx;
+    struct pg_cache_page_index *page_index;
+    uint8_t can_delete_metric = 0;
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
+    page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
     if (handle->prev_descr) {
         /* unpin old second page */
         pg_cache_put(ctx, handle->prev_descr);
     }
+    uv_rwlock_wrlock(&page_index->lock);
+    if (!--page_index->writers && !page_index->page_count) {
+        can_delete_metric = 1;
+    }
+    uv_rwlock_wrunlock(&page_index->lock);
+
+   return can_delete_metric;
 }
 
 /* Returns 1 if the data collection interval is well defined, 0 otherwise */
@@ -577,21 +664,17 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
 
 time_t rrdeng_metric_latest_time(RRDDIM *rd)
 {
-    struct rrdeng_collect_handle *handle;
     struct pg_cache_page_index *page_index;
 
-    handle = &rd->state->handle.rrdeng;
-    page_index = handle->page_index;
+    page_index = rd->state->page_index;
 
     return page_index->latest_time / USEC_PER_SEC;
 }
 time_t rrdeng_metric_oldest_time(RRDDIM *rd)
 {
-    struct rrdeng_collect_handle *handle;
     struct pg_cache_page_index *page_index;
 
-    handle = &rd->state->handle.rrdeng;
-    page_index = handle->page_index;
+    page_index = rd->state->page_index;
 
     return page_index->oldest_time / USEC_PER_SEC;
 }
@@ -765,7 +848,8 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb, unsigned disk_space_mb)
+int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+                unsigned disk_space_mb)
 {
     struct rrdengine_instance *ctx;
     int error;
@@ -776,8 +860,9 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, RRDENG_FD_BUDGET_PER_INSTANCE);
     if (rrdeng_reserved_file_descriptors > max_open_files) {
-        error("Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
-              (unsigned)rrdeng_reserved_file_descriptors, (unsigned)max_open_files);
+        error(
+            "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
+            (unsigned)rrdeng_reserved_file_descriptors, (unsigned)max_open_files);
 
         rrd_stat_atomic_add(&global_fs_errors, 1);
         rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -804,6 +889,9 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     ctx->dbfiles_path[sizeof(ctx->dbfiles_path) - 1] = '\0';
     ctx->drop_metrics_under_page_cache_pressure = rrdeng_drop_metrics_under_page_cache_pressure;
     ctx->metric_API_max_producers = 0;
+    ctx->quiesce = NO_QUIESCE;
+    ctx->metalog_ctx = NULL; /* only set this after the metadata log has finished initializing */
+    ctx->host = host;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->worker_config.ctx = ctx;
@@ -821,6 +909,11 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     destroy_completion(&ctx->rrdengine_completion);
     uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
     if (ctx->worker_config.error) {
+        goto error_after_rrdeng_worker;
+    }
+    error = metalog_init(ctx);
+    if(error) {
+        error("Failed to initialize metadata log file event loop.");
         goto error_after_rrdeng_worker;
     }
     return 0;
@@ -855,6 +948,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     finalize_rrd_files(ctx);
+    metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
     if (ctx != &default_global_ctx) {
@@ -863,3 +957,23 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }
+
+void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
+{
+    struct rrdeng_cmd cmd;
+
+    if (NULL == ctx) {
+        return;
+    }
+
+    init_completion(&ctx->rrdengine_completion);
+    cmd.opcode = RRDENG_QUIESCE;
+    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+
+    /* wait for dbengine to quiesce */
+    wait_for_completion(&ctx->rrdengine_completion);
+    destroy_completion(&ctx->rrdengine_completion);
+
+    metalog_prepare_exit(ctx->metalog_ctx);
+}
+

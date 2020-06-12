@@ -304,7 +304,7 @@ static void invalidate_oldest_committed(void *arg)
 
             goto out;
         }
-        pg_cache_punch_hole(ctx, descr, 1, 1);
+        pg_cache_punch_hole(ctx, descr, 1, 1, NULL);
 
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
@@ -325,6 +325,9 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned nr_committed_pages;
     int error;
+
+    if (unlikely(ctx->quiesce != NO_QUIESCE)) /* Shutting down */
+        return;
 
     uv_rwlock_rdlock(&pg_cache->committed_page_index.lock);
     nr_committed_pages = pg_cache->committed_page_index.nr_committed_pages;
@@ -630,6 +633,8 @@ static void delete_old_data(void *arg)
     struct extent_info *extent, *next;
     struct rrdeng_page_descr *descr;
     unsigned count, i;
+    uint8_t can_delete_metric;
+    uuid_t metric_id;
 
     /* Safe to use since it will be deleted after we are done */
     datafile = ctx->datafiles.first;
@@ -638,7 +643,14 @@ static void delete_old_data(void *arg)
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            pg_cache_punch_hole(ctx, descr, 0, 0);
+            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
+            if (unlikely(can_delete_metric && ctx->metalog_ctx)) {
+                /*
+                 * If the metric is empty, has no active writers and if the metadata log has been initialized then
+                 * attempt to delete the corresponding netdata dimension.
+                 */
+                metalog_delete_dimension_by_uuid(ctx->metalog_ctx, &metric_id);
+            }
         }
         next = extent->next;
         freez(extent);
@@ -674,7 +686,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             ++ctx->last_fileno;
         }
     }
-    if (unlikely(out_of_space)) {
+    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce)) {
         /* delete old data */
         if (wc->now_deleting_files) {
             /* already deleting data */
@@ -710,11 +722,17 @@ static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 
 static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 {
+    struct rrdengine_instance *ctx = wc->ctx;
+
     if (unlikely(wc->cleanup_thread_invalidating_dirty_pages)) {
         after_invalidate_oldest_committed(wc);
     }
     if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
+    }
+    if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
+        ctx->quiesce = QUIESCED;
+        complete(&ctx->rrdengine_completion);
     }
 }
 
@@ -799,14 +817,16 @@ void async_cb(uv_async_t *handle)
 void timer_cb(uv_timer_t* handle)
 {
     struct rrdengine_worker_config* wc = handle->data;
+    struct rrdengine_instance *ctx = wc->ctx;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
+    if (unlikely(!ctx->metalog_ctx))
+        return; /* Wait for the metadata log to initialize */
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
-        struct rrdengine_instance *ctx = wc->ctx;
         struct page_cache *pg_cache = &ctx->pg_cache;
         unsigned long total_bytes, bytes_written, nr_committed_pages, bytes_to_write = 0, producers, low_watermark,
                       high_watermark;
@@ -920,7 +940,20 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_SHUTDOWN:
                 shutdown = 1;
+                break;
+            case RRDENG_QUIESCE:
                 ctx->drop_metrics_under_page_cache_pressure = 0;
+                ctx->quiesce = SET_QUIESCE;
+                assert(0 == uv_timer_stop(&timer_req));
+                uv_close((uv_handle_t *)&timer_req, NULL);
+                while (do_flush_pages(wc, 1, NULL)) {
+                    ; /* Force flushing of all committed pages. */
+                }
+                wal_flush_transaction_buffer(wc);
+                if (!rrdeng_threads_alive(wc)) {
+                    ctx->quiesce = QUIESCED;
+                    complete(&ctx->rrdengine_completion);
+                }
                 break;
             case RRDENG_READ_PAGE:
                 do_read_extent(wc, &cmd.read_page.page_cache_descr, 1, 0);
@@ -959,8 +992,6 @@ void rrdeng_worker(void* arg)
      * an issue in the future.
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
-    assert(0 == uv_timer_stop(&timer_req));
-    uv_close((uv_handle_t *)&timer_req, NULL);
 
     while (do_flush_pages(wc, 1, NULL)) {
         ; /* Force flushing of all committed pages. */
@@ -998,7 +1029,7 @@ void rrdengine_main(void)
     struct rrdengine_instance *ctx;
 
     sanity_check();
-    ret = rrdeng_init(&ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
+    ret = rrdeng_init(NULL, &ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
     if (ret) {
         exit(ret);
     }

@@ -680,6 +680,9 @@ static struct _collector *_add_collector(const char *hostname, const char *plugi
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name)
 {
     struct _collector *tmp_collector;
+    if (unlikely(!netdata_ready)) {
+        return;
+    }
 
     COLLECTOR_LOCK;
 
@@ -711,6 +714,9 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name)
 {
     struct _collector *tmp_collector;
+    if (unlikely(!netdata_ready)) {
+        return;
+    }
 
     COLLECTOR_LOCK;
 
@@ -1752,7 +1758,7 @@ int aclk_send_info_metadata()
     debug(D_ACLK, "Metadata %s with info has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ", \n\t \"charts\" : ");
-    charts2json(localhost, local_buffer, 1);
+    charts2json(localhost, local_buffer, 1, 0);
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
@@ -1859,6 +1865,9 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     UNUSED(chart_name);
     return 0;
 #else
+    if (unlikely(!netdata_ready))
+        return 0;
+
     if (!netdata_cloud_setting)
         return 0;
 
@@ -1885,6 +1894,9 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
     BUFFER *local_buffer = NULL;
+
+    if (unlikely(!netdata_ready))
+        return 0;
 
     if (host != localhost)
         return 0;
