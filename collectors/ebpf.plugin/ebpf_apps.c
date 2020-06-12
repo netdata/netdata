@@ -1093,11 +1093,16 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out,
 {
     struct pid_stat  *pids = root_of_pids;   // global list of all processes running
     while (pids) {
-        pids->read             = 0; // mark it as not read, so that collect_data_for_pid() will read it
-        pids->updated          = 0;
-        pids->merged           = 0;
-        pids->children_count   = 0;
-        pids->parent           = NULL;
+        if (pids->updated_twice) {
+            pids->read = 0; // mark it as not read, so that collect_data_for_pid() will read it
+            pids->updated = 0;
+            pids->merged = 0;
+            pids->children_count = 0;
+            pids->parent = NULL;
+        } else {
+            if (pids->updated)
+                pids->updated_twice = 1;
+        }
 
         pids = pids->next;
     }
