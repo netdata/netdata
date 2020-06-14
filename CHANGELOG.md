@@ -118,7 +118,6 @@
 - Docs: Remove old Cloud/dashboard and replace with new Cloud/dashboard [\#8874](https://github.com/netdata/netdata/pull/8874) ([joelhans](https://github.com/joelhans))
 - removed simley face per Chris since it didn't show up [\#8872](https://github.com/netdata/netdata/pull/8872) ([MeganBishopMoore](https://github.com/MeganBishopMoore))
 - Fix macOS builds building and linking against openssl [\#8865](https://github.com/netdata/netdata/pull/8865) ([prologic](https://github.com/prologic))
-- Add a Google Cloud Pub/Sub connector to the exporting engine [\#8855](https://github.com/netdata/netdata/pull/8855) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed formatting in API swagger json file [\#8814](https://github.com/netdata/netdata/pull/8814) ([dpsy4](https://github.com/dpsy4))
 - Removeed Polyverse Polymorphic Linux from Docker builds. [\#8802](https://github.com/netdata/netdata/pull/8802) ([Ferroin](https://github.com/Ferroin))
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
