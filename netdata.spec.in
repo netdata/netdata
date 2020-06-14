@@ -284,7 +284,7 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install ebpf.plugin
-install -m 4751 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
+install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
 
 # ###########################################################
 # Install cups.plugin
