@@ -318,6 +318,7 @@ Finally, you can load the new policy and start the Netdata agent again:
 ```
 
 ## Lockdown
+
 Beginning with [version 5.4](https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/), the Linux kernel has
 a feature called "lockdown," which may affect `ebpf.plugin` depending how the kernel was compiled. The following table
 shows how the lockdown module impacts `ebpf.plugin` based on the selected options:
