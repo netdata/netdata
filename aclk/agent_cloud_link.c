@@ -7,16 +7,10 @@
 #include "aclk_stats.h"
 
 int aclk_shutting_down = 0;
-// State-machine for the on-connect metadata transmission.
-// TODO: The AGENT_STATE should be centralized as it would be useful to control error-logging during the initial
-//       agent startup phase.
-static ACLK_METADATA_STATE aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
-static AGENT_STATE agent_state = AGENT_INITIALIZING;
 
 // Other global state
 static int aclk_subscribed = 0;
 static int aclk_disable_single_updates = 0;
-static time_t last_init_sequence = 0;
 static int waiting_init = 1;
 static char *aclk_username = NULL;
 static char *aclk_password = NULL;
@@ -30,11 +24,15 @@ usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t queue_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t collector_mutex = NETDATA_MUTEX_INITIALIZER;
 
 #define ACLK_LOCK netdata_mutex_lock(&aclk_mutex)
 #define ACLK_UNLOCK netdata_mutex_unlock(&aclk_mutex)
+
+#define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
+#define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 #define COLLECTOR_LOCK netdata_mutex_lock(&collector_mutex)
 #define COLLECTOR_UNLOCK netdata_mutex_unlock(&collector_mutex)
@@ -88,6 +86,20 @@ struct aclk_query_queue {
     struct aclk_query *aclk_query_tail;
     uint64_t count;
 } aclk_queue = { .aclk_query_head = NULL, .aclk_query_tail = NULL, .count = 0 };
+
+// This is to hold data that can be accessed by any
+// thread and thus protected by mutex
+// instead of reusing mutex for different vars
+// we group them together here
+static struct aclk_shared_state {
+    ACLK_METADATA_STATE metadata_submitted;
+    AGENT_STATE agent_state;
+    time_t last_popcorn_interrupt;
+} aclk_shared_state = {
+    .metadata_submitted = ACLK_METADATA_REQUIRED,
+    .agent_state = AGENT_INITIALIZING,
+    .last_popcorn_interrupt = 0
+};
 
 char *create_uuid()
 {
@@ -668,6 +680,18 @@ static struct _collector *_add_collector(const char *hostname, const char *plugi
     return tmp_collector;
 }
 
+inline static int aclk_popcorn_check_bump()
+{
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+        aclk_shared_state.last_popcorn_interrupt = now_realtime_sec();
+        ACLK_SHARED_STATE_UNLOCK;
+        return 1;
+    }
+    ACLK_SHARED_STATE_UNLOCK;
+    return 0;
+}
+
 /*
  * Add a new collector to the list
  * If it exists, update the chart count
@@ -688,14 +712,13 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
         return;
     }
 
-    if (unlikely(agent_state == AGENT_INITIALIZING))
-        last_init_sequence = now_realtime_sec();
-    else {
-        if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
-            debug(D_ACLK, "ACLK failed to queue on_connect command on collector addition");
-    }
-
     COLLECTOR_UNLOCK;
+
+    if(aclk_popcorn_check_bump())
+        return;
+
+    if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
+        debug(D_ACLK, "ACLK failed to queue on_connect command on collector addition");
 }
 
 /*
@@ -728,16 +751,15 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_UNLOCK;
 
-    if (unlikely(agent_state == AGENT_INITIALIZING))
-        last_init_sequence = now_realtime_sec();
-    else {
-        if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
-            debug(D_ACLK, "ACLK failed to queue on_connect command on collector deletion");
-    }
-
     _free_collector(tmp_collector);
 
+    if (aclk_popcorn_check_bump())
+        return;
+
+    if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
+        debug(D_ACLK, "ACLK failed to queue on_connect command on collector deletion");
 }
+
 /*
  * Take a buffer, encode it and rewrite it
  *
@@ -869,9 +891,12 @@ int aclk_process_query()
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
-            debug(D_ACLK, "EXECUTING on connect metadata command");
+            QUERY_THREAD_LOCK;
             aclk_send_metadata();
-            aclk_metadata_submitted = ACLK_METADATA_SENT;
+            ACLK_SHARED_STATE_LOCK;
+            aclk_shared_state.metadata_submitted = ACLK_METADATA_SENT;
+            ACLK_SHARED_STATE_UNLOCK;
+            QUERY_THREAD_UNLOCK;
             break;
 
         case ACLK_CMD_CHART:
@@ -947,12 +972,20 @@ void *aclk_query_main_thread(void *ptr)
 {
     UNUSED(ptr);
 
-    while (agent_state == AGENT_INITIALIZING && !netdata_exit) {
-        time_t checkpoint;
+    while (!netdata_exit) {
+        ACLK_SHARED_STATE_LOCK;
+        if (aclk_shared_state.agent_state != AGENT_INITIALIZING) {
+            ACLK_SHARED_STATE_UNLOCK;
+            break;
+        }
 
-        checkpoint = now_realtime_sec() - last_init_sequence;
+        time_t checkpoint = now_realtime_sec() - aclk_shared_state.last_popcorn_interrupt;
+        ACLK_SHARED_STATE_UNLOCK;
+
         if (checkpoint > ACLK_STABLE_TIMEOUT) {
-            agent_state = AGENT_STABLE;
+            ACLK_SHARED_STATE_LOCK;
+            aclk_shared_state.agent_state = AGENT_STABLE;
+            ACLK_SHARED_STATE_UNLOCK;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
 #ifdef ACLK_DEBUG
             _dump_collector_list();
@@ -964,14 +997,19 @@ void *aclk_query_main_thread(void *ptr)
     }
 
     while (!netdata_exit) {
-        if (unlikely(!aclk_metadata_submitted)) {
-            aclk_metadata_submitted = ACLK_METADATA_CMD_QUEUED;
+        ACLK_SHARED_STATE_LOCK;
+        if (unlikely(!aclk_shared_state.metadata_submitted)) {
+            ACLK_SHARED_STATE_UNLOCK;
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
-                aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
+                sleep(1);
+                continue;
             }
+            ACLK_SHARED_STATE_LOCK;
+            aclk_shared_state.metadata_submitted = ACLK_METADATA_CMD_QUEUED;
         }
+        ACLK_SHARED_STATE_UNLOCK;
 
         aclk_process_queries();
 
@@ -1416,6 +1454,8 @@ void *aclk_main(void *ptr)
         }
     }
 
+    aclk_shared_state.last_popcorn_interrupt = now_realtime_sec(); // without mutex here because threads are not yet started
+
     aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", CONFIG_BOOLEAN_YES);
     if (aclk_stats_enabled) {
         stats_thread = callocz(1, sizeof(struct netdata_static_thread));
@@ -1424,8 +1464,6 @@ void *aclk_main(void *ptr)
             stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
             stats_thread);
     }
-
-    last_init_sequence = now_realtime_sec();
 
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
@@ -1659,7 +1697,9 @@ void aclk_disconnect()
     aclk_stats_upd_online(0);
 
     aclk_subscribed = 0;
-    aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
+    ACLK_SHARED_STATE_LOCK;
+    aclk_shared_state.metadata_submitted = ACLK_METADATA_REQUIRED;
+    ACLK_SHARED_STATE_UNLOCK;
     waiting_init = 1;
     aclk_connected = 0;
     aclk_connecting = 0;
@@ -1709,6 +1749,10 @@ void aclk_send_alarm_metadata()
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
+    ACLK_SHARED_STATE_LOCK;
+    ACLK_METADATA_STATE metadata_submitted = aclk_shared_state.metadata_submitted;
+    ACLK_SHARED_STATE_UNLOCK;
+
     char *msg_id = create_uuid();
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
@@ -1719,7 +1763,8 @@ void aclk_send_alarm_metadata()
     // use the session time as the fake timestamp to indicate that it starts the session. If it is
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
-    if (aclk_metadata_submitted == ACLK_METADATA_SENT)
+
+    if (metadata_submitted == ACLK_METADATA_SENT)
         aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0);
     else
         aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
@@ -1754,6 +1799,10 @@ int aclk_send_info_metadata()
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
+    ACLK_SHARED_STATE_LOCK;
+    ACLK_METADATA_STATE metadata_submitted = aclk_shared_state.metadata_submitted;
+    ACLK_SHARED_STATE_UNLOCK;
+
     debug(D_ACLK, "Metadata /info start");
 
     char *msg_id = create_uuid();
@@ -1764,7 +1813,7 @@ int aclk_send_info_metadata()
     // use the session time as the fake timestamp to indicate that it starts the session. If it is
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
-    if (aclk_metadata_submitted == ACLK_METADATA_SENT)
+    if (metadata_submitted == ACLK_METADATA_SENT)
         aclk_create_header(local_buffer, "update", msg_id, 0, 0);
     else
         aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
@@ -1829,8 +1878,13 @@ void aclk_single_update_enable()
 // Trigged by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
-    if (unlikely(agent_state == AGENT_INITIALIZING))
+
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+        ACLK_SHARED_STATE_UNLOCK;
         return;
+    }
+    ACLK_SHARED_STATE_UNLOCK;
 
     if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
         if (likely(aclk_connected)) {
@@ -1894,16 +1948,16 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (unlikely(aclk_disable_single_updates))
         return 0;
 
-    if (unlikely(agent_state == AGENT_INITIALIZING))
-        last_init_sequence = now_realtime_sec();
-    else {
-        if (unlikely(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd))) {
-            if (likely(aclk_connected)) {
-                errno = 0;
-                error("ACLK failed to queue chart_update command");
-            }
+    if (aclk_popcorn_check_bump())
+        return 0;
+
+    if (unlikely(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd))) {
+        if (likely(aclk_connected)) {
+            errno = 0;
+            error("ACLK failed to queue chart_update command");
         }
     }
+
     return 0;
 #endif
 }
@@ -1918,8 +1972,12 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     if (host != localhost)
         return 0;
 
-    if (unlikely(agent_state == AGENT_INITIALIZING))
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+        ACLK_SHARED_STATE_UNLOCK;
         return 0;
+    }
+    ACLK_SHARED_STATE_UNLOCK;
 
     /*
      * Check if individual updates have been disabled
@@ -1972,10 +2030,13 @@ int aclk_handle_cloud_request(char *payload)
         ACLK_STATS_UNLOCK;
     }
 
-    if (unlikely(agent_state == AGENT_INITIALIZING)) {
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
         debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
+        ACLK_SHARED_STATE_UNLOCK;
         return 0;
     }
+    ACLK_SHARED_STATE_UNLOCK;
 
     if (unlikely(!payload)) {
         debug(D_ACLK, "ACLK incoming message is empty");
