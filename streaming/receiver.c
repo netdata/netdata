@@ -292,6 +292,9 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     netdata_mutex_lock(&user->st->shared_flags_lock);
     user->st->sflag_replicating = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
+    /*if (!strcmp(user->st->name,"system.ip")) {
+        info("Finished replication of system.ip");
+    }*/
     user->st = NULL;
     return PARSER_RC_OK;
 disable:
@@ -325,6 +328,13 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     RRDDIM *rd = rrddim_find(user->st, id);
     time_t st_last = rrdset_last_entry_t(user->st);
     if (rd == NULL) {
+        /*char buffer[4096] = {0};
+        RRDDIM *d = user->st->dimensions;
+        while(d) {
+            sprintf(buffer+strlen(buffer),"%s+",d->id);
+            d = d->next;
+        }*/
+        //error("Unknown dimension \"%s\" on %s during replication - ignoring (%s)", id, user->st->name, buffer);
         error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
         return PARSER_RC_OK;
     }
