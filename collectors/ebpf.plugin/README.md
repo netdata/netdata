@@ -253,67 +253,81 @@ your complex applications at any load.
 
 ## SELinux
 
-When [SELinux](https://www.redhat.com/en/topics/linux/what-is-selinux) is enabled, `ebpf.plugin` can have trouble to start. If you
-have `EBPF PROCESS` error messages inside your `error.log`:
+When [SELinux](https://www.redhat.com/en/topics/linux/what-is-selinux) is enabled, it may prevent `ebpf.plugin` from
+starting correctly. Check the Agent's `error.log` file for errors like the ones below:
 
-```
+```bash
 2020-06-14 15:32:08: ebpf.plugin ERROR : EBPF PROCESS : Cannot load program: /usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o (errno 13, Permission denied)
 2020-06-14 15:32:19: netdata ERROR : PLUGINSD[ebpf] : read failed: end of file (errno 9, Bad file descriptor)
 ```
 
-and you also have errors related to `ebpf.plugin` inside your `/var/log/audit/audit.log`:
+You can also check for errors errors related to `ebpf.plugin` inside `/var/log/audit/audit.log`:
 
-```
+```bash
 type=AVC msg=audit(1586260134.952:97): avc:  denied  { map_create } for  pid=1387 comm="ebpf_process.pl" scontext=system_u:system_r:unconfined_service_t:s0 tcontext=system_u:system_r:unconfined_service_t:s0 tclass=bpf permissive=0
 type=SYSCALL msg=audit(1586260134.952:97): arch=c000003e syscall=321 success=no exit=-13 a0=0 a1=7ffe6b36f000 a2=70 a3=0 items=0 ppid=1135 pid=1387 auid=4294967295 uid=994 gid=990 euid=0 suid=0 fsuid=0 egid=990 sgid=990 fsgid=990 tty=(none) ses=4294967295 comm="ebpf_proc
 ess.pl" exe="/usr/libexec/netdata/plugins.d/ebpf_process.plugin" subj=system_u:system_r:unconfined_service_t:s0 key=(null)
 ```
 
-it will be necessary to adjust your operate system policy.
+If you see similar errors, you will have to adjust SELinux's policies to enable the eBPF collector.
 
 ### Creation of bpf policies
 
-To enable `ebpf.plugin` to run on a distribution with `SELinux` enabled, it will be necessary to do the following steps:
+To enable `ebpf.plugin` to run on a distribution with SELinux enabled, it will be necessary to take the following
+actions.
 
-1  - Stop netdata
+First, stop the Netdata Agent.
 
 ```bash
 # systemctl stop netdata
 ```
 
-2  -  Create a policy with the logs:
+Next, create a policy with the `audit.log` file you examined earlier.
 
 ```bash
 # grep ebpf.plugin /var/log/audit/audit.log | audit2allow -M netdata_ebpf
 ```
 
-This will create two new files `netdata_ebpf.te` and `netdata_ebpf.mod`.
+This will create two new files: `netdata_ebpf.te` and `netdata_ebpf.mod`.
 
-3 - It is necessary to edit the file `netdata_ebpf.te` changing the options `class` and `allow`. At the end your file should have
-the following  content:
+Edit the `netdata_ebpf.te` file to change the options `class` and `allow`. You should have the following at the end of
+the `netdata_ebpf.te` file.
 
-```
+```conf
 module netdata_ebpf 1.0;
-
 require {
         type unconfined_service_t;
         class bpf { map_create map_read map_write prog_load prog_run };
 }
-
 #============= unconfined_service_t ==============
 allow unconfined_service_t self:bpf { map_create map_read map_write prog_load prog_run };
 ```
 
-4 - The `SELinux` needs a binary to load the policies, compile your `netdata_ebpf.te` file with the following commands:
+Then compile your `netdata_ebpf.te` file with the following commands to create a binary that loads the new policies:
 
 ```bash
 # checkmodule -M -m -o netdata_ebpf.mod netdata_ebpf.te 
 # semodule_package -o netdata_ebpf.pp -m netdata_ebpf.mod
 ```
 
-5 - Finally you can load the new policy and start `Netdata`:
+Finally, you can load the new policy and start the Netdata agent again:
 
 ```bash
 # semodule -i netdata_ebpf.pp
 # systemctl start netdata
 ```
+
+## Lockdown
+
+Since the version [5.4](https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/) Linux has a feature called `Lockdown` that can 
+affect `ebpf.plugin` depending how it was compiled.  The next table demonstrates possible impacts on `ebpf.plugin` when some options are selected:
+
+|Enforcing kernel Lockdown|Enable lockdown LSM early in init|Default lockdown mode|Can `ebpf.plugin` run with this?|
+|:----:|:------:|:-:|:----------|
+|YES|NO|NO|YES|
+|YES|Yes|None|YES|
+|YES|Yes|Integrity|YES|
+|YES|Yes|Confidentiality|No|
+
+If the last combination was used to compile the`lockdown` feature on kernel the `ebpf.plugin` won't be able to load the shared libraries and it will not run.
+
