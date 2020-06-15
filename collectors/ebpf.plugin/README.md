@@ -261,7 +261,7 @@ starting correctly. Check the Agent's `error.log` file for errors like the ones 
 2020-06-14 15:32:19: netdata ERROR : PLUGINSD[ebpf] : read failed: end of file (errno 9, Bad file descriptor)
 ```
 
-You can also check for errors errors related to `ebpf.plugin` inside `/var/log/audit/audit.log`:
+You can also check for errors related to `ebpf.plugin` inside `/var/log/audit/audit.log`:
 
 ```bash
 type=AVC msg=audit(1586260134.952:97): avc:  denied  { map_create } for  pid=1387 comm="ebpf_process.pl" scontext=system_u:system_r:unconfined_service_t:s0 tcontext=system_u:system_r:unconfined_service_t:s0 tclass=bpf permissive=0
@@ -318,16 +318,16 @@ Finally, you can load the new policy and start the Netdata agent again:
 ```
 
 ## Lockdown
+Beginning with [version 5.4](https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/), the Linux kernel has
+a feature called "lockdown," which may affect `ebpf.plugin` depending how the kernel was compiled. The following table
+shows how the lockdown module impacts `ebpf.plugin` based on the selected options:
 
-Since the version [5.4](https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/) Linux has a feature called `Lockdown` that can 
-affect `ebpf.plugin` depending how it was compiled.  The next table demonstrates possible impacts on `ebpf.plugin` when some options are selected:
+| Enforcing kernel lockdown | Enable lockdown LSM early in init | Default lockdown mode | Can `ebpf.plugin` run with this? |
+|:------------------------- |:--------------------------------- |:--------------------- |:-------------------------------- |
+| YES                       | NO                                | NO                    | YES                              |
+| YES                       | Yes                               | None                  | YES                              |
+| YES                       | Yes                               | Integrity             | YES                              |
+| YES                       | Yes                               | Confidentiality       | NO                               |
 
-|Enforcing kernel Lockdown|Enable lockdown LSM early in init|Default lockdown mode|Can `ebpf.plugin` run with this?|
-|:----:|:------:|:-:|:----------|
-|YES|NO|NO|YES|
-|YES|Yes|None|YES|
-|YES|Yes|Integrity|YES|
-|YES|Yes|Confidentiality|No|
-
-If the last combination was used to compile the`lockdown` feature on kernel the `ebpf.plugin` won't be able to load the shared libraries and it will not run.
-
+If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
+required to run `ebpf.plugin`.
