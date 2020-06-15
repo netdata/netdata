@@ -17,7 +17,7 @@ void get_netdata_execution_path(void)
     passwd = getpwuid(getuid());
     user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
 
-    exepath_size = sizeof(exepath);
+    exepath_size = sizeof(exepath) - 1;
     ret = uv_exepath(exepath, &exepath_size);
     if (0 != ret) {
         error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
