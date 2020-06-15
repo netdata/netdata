@@ -340,6 +340,32 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
+long long appconfig_get_number_min_max(struct config *root, const char *section, const char *name, long long value, long long min, long long max)
+{
+    long long val = appconfig_get_number(root, section, name, value);
+
+    if (unlikely(min >= max))
+        fatal("min must be < than max");
+
+    if (unlikely(val > max)) {
+        error(
+            "Configured value \"%lld\" of key \"%s\" in section \"%s\" is out of bounds (%lld-%lld). Forcing maximum value possible.",
+            val, name, section, min, max);
+        val = max;
+        appconfig_set_number(root, section, name, val);
+    }
+
+    if (unlikely(val < min)) {
+        error(
+            "Configured value \"%lld\" of key \"%s\" in section \"%s\" is out of bounds (%lld-%lld). Forcing maximum value possible.",
+            val, name, section, min, max);
+        val = min;
+        appconfig_set_number(root, section, name, val);
+    }
+
+    return val;
+}
+
 LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
 {
     char buffer[100], *s;
