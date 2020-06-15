@@ -971,6 +971,7 @@ int aclk_process_queries()
 void *aclk_query_main_thread(void *ptr)
 {
     UNUSED(ptr);
+    time_t previous_popcorn_interrupt = 0;
 
     while (!netdata_exit) {
         ACLK_SHARED_STATE_LOCK;
@@ -980,10 +981,8 @@ void *aclk_query_main_thread(void *ptr)
         }
 
         time_t checkpoint = now_realtime_sec() - aclk_shared_state.last_popcorn_interrupt;
-        ACLK_SHARED_STATE_UNLOCK;
 
         if (checkpoint > ACLK_STABLE_TIMEOUT) {
-            ACLK_SHARED_STATE_LOCK;
             aclk_shared_state.agent_state = AGENT_STABLE;
             ACLK_SHARED_STATE_UNLOCK;
             info("AGENT stable, last collector initialization activity was %ld seconds ago", checkpoint);
@@ -992,7 +991,12 @@ void *aclk_query_main_thread(void *ptr)
 #endif
             break;
         }
-        info("Waiting for agent collectors to initialize. Last activity was %ld seconds ago" , checkpoint);
+
+        if (previous_popcorn_interrupt != aclk_shared_state.last_popcorn_interrupt) {
+            info("Waiting %ds from this moment for agent collectors to initialize." , ACLK_STABLE_TIMEOUT);
+            previous_popcorn_interrupt = aclk_shared_state.last_popcorn_interrupt;
+        }
+        ACLK_SHARED_STATE_UNLOCK;
         sleep_usec(USEC_PER_SEC * 1);
     }
 
