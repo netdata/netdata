@@ -935,27 +935,6 @@ int aclk_process_queries()
     return 1;
 }
 
-static void aclk_query_thread_cleanup(void *ptr)
-{
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-
-    info("cleaning up...");
-
-    _reset_collector_list();
-    freez(collector_list);
-
-    // Clean memory for pending queries if any
-    struct aclk_query *this_query;
-
-    do {
-        this_query = aclk_queue_pop();
-        aclk_query_free(this_query);
-    } while (this_query);
-
-    freez(static_thread->thread);
-    freez(static_thread);
-}
-
 /**
  * Main query processing thread
  *
@@ -966,7 +945,7 @@ static void aclk_query_thread_cleanup(void *ptr)
  */
 void *aclk_query_main_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
+    UNUSED(ptr);
 
     while (agent_state == AGENT_INITIALIZING && !netdata_exit) {
         time_t checkpoint;
@@ -1003,10 +982,8 @@ void *aclk_query_main_thread(void *ptr)
             sleep_usec(USEC_PER_SEC * 1);
 
         QUERY_THREAD_UNLOCK;
-
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1354,6 +1331,50 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
     }
 }
 
+static void aclk_query_threads_start(struct netdata_static_thread ***query_threads)
+{
+    int query_thread_count =
+        appconfig_get_number_min_max(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2, 1, 8);
+    info("Starting %d query threads.", query_thread_count);
+
+    char thread_name[strlen(ACLK_THREAD_NAME) + 3];
+    strcpy(thread_name, ACLK_THREAD_NAME);
+    thread_name[strlen(ACLK_THREAD_NAME)] = '_';
+    thread_name[strlen(ACLK_THREAD_NAME) + 2] = 0;
+
+    *query_threads = callocz(query_thread_count+1, sizeof(struct netdata_static_thread *));
+    for (int i = 0; i < query_thread_count; i++) {
+        (*query_threads)[i] = callocz(1, sizeof(struct netdata_static_thread));
+        (*query_threads)[i]->thread = callocz(1, sizeof(netdata_thread_t));
+
+        thread_name[strlen(ACLK_THREAD_NAME) + 1] = i + 0x30;
+        netdata_thread_create(
+            (*query_threads)[i]->thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
+            (*query_threads)[i]);
+    }
+}
+
+static void aclk_query_threads_cleanup(struct netdata_static_thread ***query_threads)
+{
+    if (query_threads) {
+        for (int i = 0; (*query_threads)[i]; i++) {
+            netdata_thread_join(*(*query_threads)[i]->thread, NULL);
+            freez((*query_threads)[i]->thread);
+            freez((*query_threads)[i]);
+        }
+        freez(*query_threads);
+    }
+
+    _reset_collector_list();
+    freez(collector_list);
+
+    struct aclk_query *this_query;
+
+    do {
+        this_query = aclk_queue_pop();
+        aclk_query_free(this_query);
+    } while (this_query);
+}
 
 /**
  * Main agent cloud link thread
@@ -1368,7 +1389,7 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
 void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    struct netdata_static_thread *query_thread = NULL;
+    struct netdata_static_thread **query_threads = NULL;
     struct netdata_static_thread *stats_thread = NULL;
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
@@ -1502,12 +1523,8 @@ void *aclk_main(void *ptr)
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 1);
         }
 
-        if (unlikely(!query_thread)) {
-            query_thread = callocz(1, sizeof(struct netdata_static_thread));
-            query_thread->thread = mallocz(sizeof(netdata_thread_t));
-            netdata_thread_create(
-                query_thread->thread, ACLK_THREAD_NAME, NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread,
-                query_thread);
+        if (unlikely(!query_threads)) {
+            aclk_query_threads_start(&query_threads);
         }
     } // forever
 exited:
@@ -1522,6 +1539,8 @@ exited:
         RSA_free(aclk_private_key);
 
     aclk_main_cleanup(ptr);
+
+    aclk_query_threads_cleanup(&query_threads);
 
     if(aclk_stats_enabled) {
         netdata_thread_join(*stats_thread->thread, NULL);
