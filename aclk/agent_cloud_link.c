@@ -30,7 +30,7 @@ usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
-static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t queue_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t collector_mutex = NETDATA_MUTEX_INITIALIZER;
 
 #define ACLK_LOCK netdata_mutex_lock(&aclk_mutex)
@@ -39,8 +39,8 @@ static netdata_mutex_t collector_mutex = NETDATA_MUTEX_INITIALIZER;
 #define COLLECTOR_LOCK netdata_mutex_lock(&collector_mutex)
 #define COLLECTOR_UNLOCK netdata_mutex_unlock(&collector_mutex)
 
-#define QUERY_LOCK netdata_mutex_lock(&query_mutex)
-#define QUERY_UNLOCK netdata_mutex_unlock(&query_mutex)
+#define ACLK_QUEUE_LOCK netdata_mutex_lock(&queue_mutex)
+#define ACLK_QUEUE_UNLOCK netdata_mutex_unlock(&queue_mutex)
 
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
@@ -304,13 +304,13 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
 
     run_after = now_realtime_sec() + run_after;
 
-    QUERY_LOCK;
+    ACLK_QUEUE_LOCK;
     struct aclk_query *last_query = NULL;
 
     tmp_query = aclk_query_find(topic, data, msg_id, query, aclk_cmd, &last_query);
     if (unlikely(tmp_query)) {
         if (tmp_query->run_after == run_after) {
-            QUERY_UNLOCK;
+            ACLK_QUEUE_UNLOCK;
             QUERY_THREAD_WAKEUP;
             return 0;
         }
@@ -360,7 +360,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         if (tmp_query == aclk_queue.aclk_query_tail)
             aclk_queue.aclk_query_tail = new_query;
         aclk_queue.count++;
-        QUERY_UNLOCK;
+        ACLK_QUEUE_UNLOCK;
         QUERY_THREAD_WAKEUP;
         return 0;
     }
@@ -369,7 +369,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     aclk_queue.aclk_query_head = new_query;
     aclk_queue.count++;
 
-    QUERY_UNLOCK;
+    ACLK_QUEUE_UNLOCK;
     QUERY_THREAD_WAKEUP;
     return 0;
 }
@@ -387,10 +387,10 @@ struct aclk_query *aclk_queue_pop()
 {
     struct aclk_query *this_query;
 
-    QUERY_LOCK;
+    ACLK_QUEUE_LOCK;
 
     if (likely(!aclk_queue.aclk_query_head)) {
-        QUERY_UNLOCK;
+        ACLK_QUEUE_UNLOCK;
         return NULL;
     }
 
@@ -412,13 +412,13 @@ struct aclk_query *aclk_queue_pop()
     }
 
     if (likely(!this_query)) {
-        QUERY_UNLOCK;
+        ACLK_QUEUE_UNLOCK;
         return NULL;
     }
 
     if (!this_query->deleted && this_query->run_after > now_realtime_sec()) {
         info("Query %s will run in %ld seconds", this_query->query, this_query->run_after - now_realtime_sec());
-        QUERY_UNLOCK;
+        ACLK_QUEUE_UNLOCK;
         return NULL;
     }
 
@@ -429,7 +429,7 @@ struct aclk_query *aclk_queue_pop()
         aclk_queue.aclk_query_tail = NULL;
     }
 
-    QUERY_UNLOCK;
+    ACLK_QUEUE_UNLOCK;
     return this_query;
 }
 
