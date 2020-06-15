@@ -1904,6 +1904,8 @@ void rrdset_done(RRDSET *st) {
                             metalog_commit_delete_dimension(rd);
                         } else {
                             /* Do not delete this dimension */
+                            last = rd;
+                            rd = rd->next;
                             continue;
                         }
                     }
