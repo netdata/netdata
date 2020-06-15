@@ -497,10 +497,8 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 
     // free(rd->annotations);
 
-#ifdef ENABLE_ACLK
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
-#endif
-    switch(rd->rrd_memory_mode) {
+    switch(rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
