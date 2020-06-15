@@ -460,6 +460,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
 void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 {
+#ifndef ENABLE_ACLK
+    UNUSED(db_rotated);
+#endif
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
@@ -494,7 +497,9 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 
     // free(rd->annotations);
 
+#ifdef ENABLE_ACLK
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
+#endif
     switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:

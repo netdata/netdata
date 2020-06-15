@@ -285,6 +285,7 @@ void metalog_worker(void* arg)
     struct metalog_cmd cmd;
     unsigned cmd_batch_size;
 
+    sanity_check();
     metalog_init_cmd_queue(wc);
 
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
