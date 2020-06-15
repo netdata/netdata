@@ -1004,8 +1004,8 @@ void *aclk_query_main_thread(void *ptr)
 
         QUERY_THREAD_UNLOCK;
 
-    } // forever
-    info("Shutting down query processing thread");
+    }
+
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
@@ -1368,7 +1368,7 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
 void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    struct netdata_static_thread *query_thread;
+    struct netdata_static_thread *query_thread = NULL;
     struct netdata_static_thread *stats_thread = NULL;
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
@@ -1405,7 +1405,6 @@ void *aclk_main(void *ptr)
     }
 
     last_init_sequence = now_realtime_sec();
-    query_thread = NULL;
 
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
