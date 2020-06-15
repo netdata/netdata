@@ -374,11 +374,6 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     return 0;
 }
 
-inline int aclk_submit_request(struct aclk_request *request)
-{
-    return aclk_queue_query(request->callback_topic, NULL, request->msg_id, request->payload, 0, 0, ACLK_CMD_CLOUD);
-}
-
 /*
  * Get the next query to process - NULL if nothing there
  * The caller needs to free memory by calling aclk_query_free()
@@ -2010,7 +2005,7 @@ int aclk_handle_cloud_request(char *payload)
         cloud_to_agent.type_id = NULL;
     }
 
-    if (unlikely(aclk_submit_request(&cloud_to_agent)))
+    if (unlikely(aclk_queue_query(cloud_to_agent.callback_topic, NULL, cloud_to_agent.msg_id, cloud_to_agent.payload, 0, 0, ACLK_CMD_CLOUD)))
         debug(D_ACLK, "ACLK failed to queue incoming message (%s)", payload);
 
     // Note: the payload comes from the callback and it will be automatically freed

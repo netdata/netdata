@@ -95,7 +95,6 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us);
 int aclk_handle_cloud_request(char *payload);
-int aclk_submit_request(struct aclk_request *);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_alarm_reload();
