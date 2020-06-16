@@ -96,7 +96,7 @@ static void child_waited_async_cb(uv_async_t *async_handle)
         fprintf(stderr, "SERVER %s SPAWN_PROT_CMD_EXIT_STATUS\n", __func__);
 #endif
         ret = uv_write(&write_ctx->write_req, (uv_stream_t *) &server_pipe, writebuf, 2, after_pipe_write);
-        assert(ret == 0);
+        fatal_assert(ret == 0);
 
         freez(exec_info);
     }
@@ -131,7 +131,7 @@ static void wait_children(void *arg)
 #ifdef SPAWN_DEBUG
             fprintf(stderr, "SPAWN: Successfully waited for pid:%d.\n", (int) i.si_pid);
 #endif
-            assert(CLD_EXITED == i.si_code);
+            fatal_assert(CLD_EXITED == i.si_code);
             tmp.pid = (pid_t)i.si_pid;
             while (NULL == (ret_avl = avl_remove_lock(&spawn_outstanding_exec_tree, (avl *)&tmp))) {
                 fprintf(stderr,
@@ -144,7 +144,7 @@ static void wait_children(void *arg)
             enqueue_child_waited_list(exec_info);
 
             /* wake up event loop */
-            assert(0 == uv_async_send(&child_waited_async));
+            fatal_assert(0 == uv_async_send(&child_waited_async));
         }
     }
 }
@@ -175,7 +175,7 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
         exec_info->handle = handle;
         exec_info->pid = write_ctx->spawn_result.exec_pid;
         avl_ret = avl_insert_lock(&spawn_outstanding_exec_tree, (avl *)exec_info);
-        assert(avl_ret == (avl *)exec_info);
+        fatal_assert(avl_ret == (avl *)exec_info);
 
         /* wake up the thread that blocks waiting for processes to exit */
         uv_mutex_lock(&wait_children_mutex);
@@ -192,7 +192,7 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
     fprintf(stderr, "SERVER %s SPAWN_PROT_SPAWN_RESULT\n", __func__);
 #endif
     ret = uv_write(&write_ctx->write_req, (uv_stream_t *)&server_pipe, writebuf, 2, after_pipe_write);
-    assert(ret == 0);
+    fatal_assert(ret == 0);
 }
 
 static void server_parse_spawn_protocol(unsigned source_len, char *source)
@@ -210,8 +210,8 @@ static void server_parse_spawn_protocol(unsigned source_len, char *source)
             return; /* Source buffer ran out */
 
         header = (struct spawn_prot_header *)prot_buffer;
-        assert(SPAWN_PROT_EXEC_CMD == header->opcode);
-        assert(NULL != header->handle);
+        fatal_assert(SPAWN_PROT_EXEC_CMD == header->opcode);
+        fatal_assert(NULL != header->handle);
 
         required_len += sizeof(*payload);
         if (prot_buffer_len < required_len)
@@ -338,7 +338,7 @@ void spawn_server(void)
         fprintf(stderr, "uv_pipe_init(): %s\n", uv_strerror(error));
         exit(error);
     }
-    assert(server_pipe.ipc);
+    fatal_assert(server_pipe.ipc);
 
     error = uv_pipe_open(&server_pipe, 0 /* UV_STDIN_FD */);
     if (error) {
@@ -348,8 +348,8 @@ void spawn_server(void)
     avl_init_lock(&spawn_outstanding_exec_tree, spawn_exec_compare);
 
     spawned_processes = 0;
-    assert(0 == uv_cond_init(&wait_children_cond));
-    assert(0 == uv_mutex_init(&wait_children_mutex));
+    fatal_assert(0 == uv_cond_init(&wait_children_cond));
+    fatal_assert(0 == uv_mutex_init(&wait_children_mutex));
     child_waited_list = NULL;
     error = uv_async_init(loop, &child_waited_async, child_waited_async_cb);
     if (error) {
@@ -365,13 +365,13 @@ void spawn_server(void)
 
     prot_buffer_len = 0;
     error = uv_read_start((uv_stream_t *)&server_pipe, on_read_alloc, on_pipe_read);
-    assert(error == 0);
+    fatal_assert(error == 0);
 
     while (!server_shutdown) {
         uv_run(loop, UV_RUN_DEFAULT);
     }
     fprintf(stderr, "Shutting down spawn server loop complete.\n");
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
 
     exit(0);
 }

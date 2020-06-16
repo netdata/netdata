@@ -191,7 +191,7 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_read(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, pos, read_extent_cb);
-    assert (-1 != ret);
+    fatal_assert(-1 != ret);
     ctx->stats.io_read_bytes += real_io_size;
     ++ctx->stats.io_read_requests;
     ctx->stats.io_read_extent_bytes += real_io_size;
@@ -244,7 +244,7 @@ static void do_commit_transaction(struct rrdengine_worker_config* wc, uint8_t ty
         commit_data_extent(wc, (struct extent_io_descriptor *)data);
         break;
     default:
-        assert(type == STORE_DATA);
+        fatal_assert(type == STORE_DATA);
         break;
     }
 }
@@ -284,7 +284,7 @@ static void invalidate_oldest_committed(void *arg)
 
              PValue = JudyLNext(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
                      descr = unlikely(NULL == PValue) ? NULL : *PValue) {
-            assert(0 != descr->page_length);
+            fatal_assert(0 != descr->page_length);
 
             rrdeng_page_descr_mutex_lock(ctx, descr);
             pg_cache_descr = descr->pg_cache_descr;
@@ -292,7 +292,7 @@ static void invalidate_oldest_committed(void *arg)
                 rrdeng_page_descr_mutex_unlock(ctx, descr);
 
                 ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
-                assert(1 == ret);
+                fatal_assert(1 == ret);
                 break;
             }
             rrdeng_page_descr_mutex_unlock(ctx, descr);
@@ -316,7 +316,7 @@ static void invalidate_oldest_committed(void *arg)
 out:
     wc->cleanup_thread_invalidating_dirty_pages = 1;
     /* wake up event loop */
-    assert(0 == uv_async_send(&wc->async));
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
@@ -446,7 +446,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         uint8_t page_write_pending;
 
-        assert(0 != descr->page_length);
+        fatal_assert(0 != descr->page_length);
         page_write_pending = 0;
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
@@ -463,7 +463,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
         if (page_write_pending) {
             ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
-            assert(1 == ret);
+            fatal_assert(1 == ret);
         }
     }
     uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
@@ -483,7 +483,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         size_bytes = payload_offset + uncompressed_payload_length + sizeof(*trailer);
         break;
     default: /* Compress */
-        assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
+        fatal_assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
         max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
         compressed_buf = mallocz(max_compressed_size);
         size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
@@ -563,7 +563,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, flush_pages_cb);
-    assert (-1 != ret);
+    fatal_assert(-1 != ret);
     ctx->stats.io_write_bytes += real_io_size;
     ++ctx->stats.io_write_requests;
     ctx->stats.io_write_extent_bytes += real_io_size;
@@ -657,7 +657,7 @@ static void delete_old_data(void *arg)
     }
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
-    assert(0 == uv_async_send(&wc->async));
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
@@ -751,8 +751,8 @@ void rrdeng_init_cmd_queue(struct rrdengine_worker_config* wc)
 {
     wc->cmd_queue.head = wc->cmd_queue.tail = 0;
     wc->queue_size = 0;
-    assert(0 == uv_cond_init(&wc->cmd_cond));
-    assert(0 == uv_mutex_init(&wc->cmd_mutex));
+    fatal_assert(0 == uv_cond_init(&wc->cmd_cond));
+    fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
 }
 
 void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd)
@@ -764,7 +764,7 @@ void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd)
     while ((queue_size = wc->queue_size) == RRDENG_CMD_Q_MAX_SIZE) {
         uv_cond_wait(&wc->cmd_cond, &wc->cmd_mutex);
     }
-    assert(queue_size < RRDENG_CMD_Q_MAX_SIZE);
+    fatal_assert(queue_size < RRDENG_CMD_Q_MAX_SIZE);
     /* enqueue command */
     wc->cmd_queue.cmd_array[wc->cmd_queue.tail] = *cmd;
     wc->cmd_queue.tail = wc->cmd_queue.tail != RRDENG_CMD_Q_MAX_SIZE - 1 ?
@@ -773,7 +773,7 @@ void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd)
     uv_mutex_unlock(&wc->cmd_mutex);
 
     /* wake up event loop */
-    assert(0 == uv_async_send(&wc->async));
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc)
@@ -914,7 +914,7 @@ void rrdeng_worker(void* arg)
     /* wake up initialization thread */
     complete(&ctx->rrdengine_completion);
 
-    assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+    fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         uv_run(loop, UV_RUN_DEFAULT);
@@ -944,7 +944,7 @@ void rrdeng_worker(void* arg)
             case RRDENG_QUIESCE:
                 ctx->drop_metrics_under_page_cache_pressure = 0;
                 ctx->quiesce = SET_QUIESCE;
-                assert(0 == uv_timer_stop(&timer_req));
+                fatal_assert(0 == uv_timer_stop(&timer_req));
                 uv_close((uv_handle_t *)&timer_req, NULL);
                 while (do_flush_pages(wc, 1, NULL)) {
                     ; /* Force flushing of all committed pages. */
@@ -1003,7 +1003,7 @@ void rrdeng_worker(void* arg)
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
     return;
@@ -1011,7 +1011,7 @@ void rrdeng_worker(void* arg)
 error_after_timer_init:
     uv_close((uv_handle_t *)&wc->async, NULL);
 error_after_async_init:
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
 

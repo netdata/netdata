@@ -474,7 +474,7 @@ static void parse_commands(struct command_context *cmd_ctx)
             cmd_ctx->args = lstrip;
             cmd_ctx->message = NULL;
 
-            assert(0 == uv_queue_work(loop, &cmd_ctx->work, schedule_command, after_schedule_command));
+            fatal_assert(0 == uv_queue_work(loop, &cmd_ctx->work, schedule_command, after_schedule_command));
             break;
         }
     }
@@ -533,7 +533,7 @@ static void connection_cb(uv_stream_t *server, int status)
     int ret;
     uv_pipe_t *client;
     struct command_context *cmd_ctx;
-    assert(status == 0);
+    fatal_assert(status == 0);
 
     /* combined allocation of client pipe and command context */
     cmd_ctx = mallocz(sizeof(*cmd_ctx));
@@ -636,7 +636,7 @@ static void command_thread(void *arg)
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
     info("Shutting down command loop complete.");
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
     return;
@@ -648,7 +648,7 @@ error_after_pipe_init:
     uv_close((uv_handle_t *)&async, NULL);
 error_after_async_init:
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
 
@@ -673,9 +673,9 @@ void commands_init(void)
 
     info("Initializing command server.");
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        assert(0 == uv_mutex_init(&command_lock_array[i]));
+        fatal_assert(0 == uv_mutex_init(&command_lock_array[i]));
     }
-    assert(0 == uv_rwlock_init(&exclusive_rwlock));
+    fatal_assert(0 == uv_rwlock_init(&exclusive_rwlock));
 
     init_completion(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
@@ -713,8 +713,8 @@ void commands_exit(void)
     command_thread_shutdown = 1;
     info("Shutting down command server.");
     /* wake up event loop */
-    assert(0 == uv_async_send(&async));
-    assert(0 == uv_thread_join(&thread));
+    fatal_assert(0 == uv_async_send(&async));
+    fatal_assert(0 == uv_thread_join(&thread));
 
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         uv_mutex_destroy(&command_lock_array[i]);

@@ -60,7 +60,7 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
     if (ret < 0) {
         fatal("uv_fs_fstat: %s\n", uv_strerror(ret));
     }
-    assert(req.result == 0);
+    fatal_assert(req.result == 0);
     s = req.ptr;
     if (!(s->st_mode & S_IFREG)) {
         error("Not a regular file.\n");
@@ -92,7 +92,7 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
     uv_fs_t req;
     int fd, current_flags;
 
-    assert(0 == direct || 1 == direct);
+    fatal_assert(0 == direct || 1 == direct);
     for ( ; direct >= 0 ; --direct) {
 #ifdef __APPLE__
         /* Apple OS does not support O_DIRECT */
@@ -111,7 +111,7 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
                 --direct; /* break the loop */
             }
         } else {
-            assert(req.result >= 0);
+            fatal_assert(req.result >= 0);
             *file = req.result;
 #ifdef __APPLE__
             info("Disabling OS X caching for file \"%s\".", path);

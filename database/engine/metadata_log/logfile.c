@@ -118,7 +118,7 @@ void mlf_flush_records_buffer(struct metalog_worker_config *wc, struct metadata_
     io_descr->iov = uv_buf_init((void *)io_descr->buf, size);
     ret = uv_fs_write(wc->loop, &io_descr->req, metalogfile->file, &io_descr->iov, 1,
                       metalogfile->pos, flush_records_buffer_cb);
-    assert (-1 != ret);
+    fatal_assert(-1 != ret);
     metalogfile->pos += size;
     rrd_atomic_fetch_add(&ctx->disk_space, size);
     records_log->buf = NULL;
@@ -132,7 +132,7 @@ void *mlf_get_records_buffer(struct metalog_worker_config *wc, struct metadata_r
     int ret;
     unsigned buf_pos, buf_size;
 
-    assert(size);
+    fatal_assert(size);
     if (records_log->buf) {
         unsigned remaining;
 
@@ -175,7 +175,7 @@ void metadata_logfile_list_delete(struct metadata_logfile_list *metadata_logfile
     struct metadata_logfile *next;
 
     next = metalogfile->next;
-    assert((NULL != next) && (metadata_logfiles->first == metalogfile) &&
+    fatal_assert((NULL != next) && (metadata_logfiles->first == metalogfile) &&
            (metadata_logfiles->last != metalogfile));
     metadata_logfiles->first = next;
 }
@@ -337,7 +337,7 @@ int create_metadata_logfile(struct metadata_logfile *metalogfile)
 
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        assert(req.result < 0);
+        fatal_assert(req.result < 0);
         error("uv_fs_write: %s", uv_strerror(ret));
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
@@ -375,7 +375,7 @@ static int check_metadata_logfile_superblock(uv_file file)
         uv_fs_req_cleanup(&req);
         goto error;
     }
-    assert(req.result >= 0);
+    fatal_assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
     if (strncmp(superblock->magic_number, RRDENG_METALOG_MAGIC, RRDENG_MAGIC_SZ)) {
@@ -614,7 +614,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
 
     ret = uv_fs_scandir(NULL, &req, dbfiles_path, 0, NULL);
     if (ret < 0) {
-        assert(req.result < 0);
+        fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
         error("uv_fs_scandir(%s): %s", dbfiles_path, uv_strerror(ret));
         ++ctx->stats.fs_errors;

@@ -87,7 +87,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
     ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
         case GUID_TYPE_CHAR:
-            assert(0);
+            fatal_assert(0);
             break;
         case GUID_TYPE_CHART:
             st = metalog_get_chart_from_uuid(ctx, uuid);
@@ -130,7 +130,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
             debug(D_METADATALOG, "Ignoring nonexistent metadata record.");
             break;
         default:
-            assert(0);
+            fatal_assert(0);
             break;
     }
 }
@@ -221,7 +221,7 @@ static void compact_old_records(void *arg)
             break;
         }
     }
-    assert(nextmetalogfile); /* There are always more than 1 metadata log files during compaction */
+    fatal_assert(nextmetalogfile); /* There are always more than 1 metadata log files during compaction */
 
     newmetalogfile = compaction_state->new_metadata_logfiles.last;
     if (newmetalogfile->starting_fileno != 0) { /* Must rename the last compacted file */
@@ -237,7 +237,7 @@ static void compact_old_records(void *arg)
 
     wc->cleanup_thread_compacting_files = 1;
     /* wake up event loop */
-    assert(0 == uv_async_send(&wc->async));
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 /* Returns 0 on success. */
@@ -262,7 +262,7 @@ static int init_compaction_state(struct metalog_instance *ctx)
         return ret;
     }
     newmetalogfile = compaction_state->new_metadata_logfiles.first;
-    assert(newmetalogfile == compaction_state->new_metadata_logfiles.last);
+    fatal_assert(newmetalogfile == compaction_state->new_metadata_logfiles.last);
     init_metadata_record_log(&compaction_state->records_log);
 
     return 0;
@@ -329,7 +329,7 @@ int compaction_failure_recovery(struct metalog_instance *ctx, struct metadata_lo
 
     for (j = 0, recovered_files = 0 ; j < i ; ++j) {
         metalogfile = metalogfiles[j];
-        assert(0 == metalogfile->starting_fileno);
+        fatal_assert(0 == metalogfile->starting_fileno);
         if (metalogfile->fileno < starting_fileno) {
             tmp_metalogfiles[recovered_files++] = metalogfile;
             continue;
@@ -352,7 +352,7 @@ int compaction_failure_recovery(struct metalog_instance *ctx, struct metadata_lo
 
     for ( ; j < i ; ++j) { /* continue iterating through normal metadata log files */
         metalogfile = metalogfiles[j];
-        assert(0 == metalogfile->starting_fileno);
+        fatal_assert(0 == metalogfile->starting_fileno);
         if (metalogfile->fileno < fileno) { /* It has already been compacted */
             error("Deleting invalid metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
                       METALOG_EXTENSION"\"", dbfiles_path, 0U, metalogfile->fileno);

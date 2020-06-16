@@ -406,7 +406,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
-    assert(NULL != PValue);
+    fatal_assert(NULL != PValue);
     page_index = *PValue;
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
@@ -428,7 +428,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
         }
     }
     uv_rwlock_wrunlock(&page_index->lock);
-    assert(1 == ret);
+    fatal_assert(1 == ret);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     ++ctx->stats.pg_cache_deletions;
@@ -565,7 +565,7 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
     uv_rwlock_rdunlock(&page_index->lock);
 
     if (unlikely(NULL == firstPValue)) {
-        assert(NULL == lastPValue);
+        fatal_assert(NULL == lastPValue);
         page_index->oldest_time = page_index->latest_time = INVALID_TIME;
         return;
     }
@@ -586,7 +586,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
         /* there is page cache descriptor pre-allocated state */
         struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
-        assert(pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED);
+        fatal_assert(pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED);
         if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
             pg_cache_reserve_pages(ctx, 1);
             if (!(pg_cache_descr->flags & RRD_PAGE_DIRTY))
@@ -597,7 +597,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     if (unlikely(NULL == index)) {
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
         PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
-        assert(NULL != PValue);
+        fatal_assert(NULL != PValue);
         page_index = *PValue;
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
     } else {
@@ -662,7 +662,7 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
     Word_t Index;
 
     (void)pg_cache;
-    assert(NULL != page_index);
+    fatal_assert(NULL != page_index);
 
     Index = (Word_t)(point_in_time / USEC_PER_SEC);
     uv_rwlock_rdlock(&page_index->lock);
@@ -707,7 +707,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     Word_t Index;
     uint8_t failed_to_reserve;
 
-    assert(NULL != ret_page_indexp);
+    fatal_assert(NULL != ret_page_indexp);
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
@@ -1048,7 +1048,7 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
     page_index = mallocz(sizeof(*page_index));
     page_index->JudyL_array = (Pvoid_t) NULL;
     uuid_copy(page_index->id, *id);
-    assert(0 == uv_rwlock_init(&page_index->lock));
+    fatal_assert(0 == uv_rwlock_init(&page_index->lock));
     page_index->oldest_time = INVALID_TIME;
     page_index->latest_time = INVALID_TIME;
     page_index->prev = NULL;
@@ -1064,7 +1064,7 @@ static void init_metrics_index(struct rrdengine_instance *ctx)
 
     pg_cache->metrics_index.JudyHS_array = (Pvoid_t) NULL;
     pg_cache->metrics_index.last_page_index = NULL;
-    assert(0 == uv_rwlock_init(&pg_cache->metrics_index.lock));
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->metrics_index.lock));
 }
 
 static void init_replaceQ(struct rrdengine_instance *ctx)
@@ -1073,7 +1073,7 @@ static void init_replaceQ(struct rrdengine_instance *ctx)
 
     pg_cache->replaceQ.head = NULL;
     pg_cache->replaceQ.tail = NULL;
-    assert(0 == uv_rwlock_init(&pg_cache->replaceQ.lock));
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->replaceQ.lock));
 }
 
 static void init_committed_page_index(struct rrdengine_instance *ctx)
@@ -1081,7 +1081,7 @@ static void init_committed_page_index(struct rrdengine_instance *ctx)
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->committed_page_index.JudyL_array = (Pvoid_t) NULL;
-    assert(0 == uv_rwlock_init(&pg_cache->committed_page_index.lock));
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->committed_page_index.lock));
     pg_cache->committed_page_index.latest_corr_id = 0;
     pg_cache->committed_page_index.nr_committed_pages = 0;
 }
@@ -1092,7 +1092,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     pg_cache->page_descriptors = 0;
     pg_cache->populated_pages = 0;
-    assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
     init_metrics_index(ctx);
     init_replaceQ(ctx);
@@ -1111,7 +1111,7 @@ void free_page_cache(struct rrdengine_instance *ctx)
 
     /* Free committed page index */
     ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
-    assert(NULL == pg_cache->committed_page_index.JudyL_array);
+    fatal_assert(NULL == pg_cache->committed_page_index.JudyL_array);
     bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;
@@ -1146,14 +1146,14 @@ void free_page_cache(struct rrdengine_instance *ctx)
 
         /* Free page index */
         ret_Judy = JudyLFreeArray(&page_index->JudyL_array, PJE0);
-        assert(NULL == page_index->JudyL_array);
+        fatal_assert(NULL == page_index->JudyL_array);
         bytes_freed += ret_Judy;
         freez(page_index);
         bytes_freed += sizeof(*page_index);
     }
     /* Free metrics index */
     ret_Judy = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
-    assert(NULL == pg_cache->metrics_index.JudyHS_array);
+    fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
     bytes_freed += ret_Judy;
 
     info("Freed %lu bytes of memory from page cache.", bytes_freed);

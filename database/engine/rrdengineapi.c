@@ -22,7 +22,7 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret
     EVP_DigestUpdate(evpctx, chart_id, strlen(chart_id));
     EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
     EVP_MD_CTX_destroy(evpctx);
-    assert(hash_len > sizeof(uuid_t));
+    fatal_assert(hash_len > sizeof(uuid_t));
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
@@ -39,7 +39,7 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     EVP_DigestUpdate(evpctx, *legacy_uuid, sizeof(uuid_t));
     EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
     EVP_MD_CTX_destroy(evpctx);
-    assert(hash_len > sizeof(uuid_t));
+    fatal_assert(hash_len > sizeof(uuid_t));
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
@@ -77,7 +77,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
             error("FAILED to generate GUID for %s", rd->id);
             freez(rd->state->metric_uuid);
             rd->state->metric_uuid = NULL;
-            assert(0);
+            fatal_assert(0);
         }
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -89,7 +89,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         if (NULL == PValue) {
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
             PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t), PJE0);
-            assert(NULL == *PValue); /* TODO: figure out concurrency model */
+            fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
             *PValue = page_index = create_page_index(rd->state->metric_uuid);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
@@ -109,7 +109,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
             error("FAILED to generate GUID for %s", rd->id);
             freez(rd->state->metric_uuid);
             rd->state->metric_uuid = NULL;
-            assert(0);
+            fatal_assert(0);
         }
     }
     rd->state->rrdeng_uuid = &page_index->id;
@@ -192,7 +192,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             rrdeng_page_descr_mutex_lock(ctx, descr);
             ret = pg_cache_try_get_unsafe(descr, 0);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
-            assert (1 == ret);
+            fatal_assert(1 == ret);
 
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
             handle->prev_descr = descr;
@@ -247,7 +247,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         rrdeng_store_metric_flush_current_page(rd);
 
         page = rrdeng_create_page(ctx, &rd->state->page_index->id, &descr);
-        assert(page);
+        fatal_assert(page);
 
         handle->descr = descr;
 
@@ -415,7 +415,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
             continue;
         }
         page_entries = curr->page_length / sizeof(storage_number);
-        assert(0 != page_entries);
+        fatal_assert(0 != page_entries);
         if (likely(1 != page_entries)) {
             dt = (curr->end_time - curr->start_time) / (page_entries - 1);
             *pginfo_to_dt(curr) = ROUND_USEC_TO_SEC(dt);
@@ -451,7 +451,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
             if (1 == page_points)
                 first_valid_time_in_page = current_position_time;
             if (unlikely(!is_first_region_initialized)) {
-                assert(1 == regions);
+                fatal_assert(1 == regions);
                 /* this is the first region */
                 region_info_array[0].start_time = current_position_time;
                 is_first_region_initialized = 1;
@@ -464,7 +464,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
         }
 
         if (unlikely(0 == *pginfo_to_dt(curr))) { /* unknown data collection interval */
-            assert(1 == page_points);
+            fatal_assert(1 == page_points);
 
             if (likely(NULL != prev)) { /* get interval from previous page */
                 *pginfo_to_dt(curr) = *pginfo_to_dt(prev);
@@ -620,7 +620,7 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     }
     handle->position = position;
     handle->now = current_position_time / USEC_PER_SEC;
-/*  assert(handle->now >= rrdimm_handle->start_time && handle->now <= rrdimm_handle->end_time);
+/*  fatal_assert(handle->now >= rrdimm_handle->start_time && handle->now <= rrdimm_handle->end_time);
     The above assertion is an approximation and needs to take update_every into account */
     if (unlikely(handle->now >= rrdimm_handle->end_time)) {
         /* next calls will not load any more metrics */
@@ -716,7 +716,7 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
         debug(D_RRDENGINE, "%s: page descriptor is NULL, page has already been force-committed.", __func__);
         return;
     }
-    assert(descr->page_length);
+    fatal_assert(descr->page_length);
 
     uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
     PValue = JudyLIns(&pg_cache->committed_page_index.JudyL_array, page_correlation_id, PJE0);
@@ -835,7 +835,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
     array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
     array[36] = (uint64_t)global_flushing_pressure_page_deletions;
-    assert(RRDENG_NR_STATS == 37);
+    fatal_assert(RRDENG_NR_STATS == 37);
 }
 
 /* Releases reference to page */
@@ -903,7 +903,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     }
 
     init_completion(&ctx->rrdengine_completion);
-    assert(0 == uv_thread_create(&ctx->worker_config.thread, rrdeng_worker, &ctx->worker_config));
+    fatal_assert(0 == uv_thread_create(&ctx->worker_config.thread, rrdeng_worker, &ctx->worker_config));
     /* wait for worker thread to initialize */
     wait_for_completion(&ctx->rrdengine_completion);
     destroy_completion(&ctx->rrdengine_completion);
@@ -945,7 +945,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     cmd.opcode = RRDENG_SHUTDOWN;
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
-    assert(0 == uv_thread_join(&ctx->worker_config.thread));
+    fatal_assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     finalize_rrd_files(ctx);
     metalog_exit(ctx->metalog_ctx);

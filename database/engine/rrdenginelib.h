@@ -59,8 +59,8 @@ struct completion {
 static inline void init_completion(struct completion *p)
 {
     p->completed = 0;
-    assert(0 == uv_cond_init(&p->cond));
-    assert(0 == uv_mutex_init(&p->mutex));
+    fatal_assert(0 == uv_cond_init(&p->cond));
+    fatal_assert(0 == uv_mutex_init(&p->mutex));
 }
 
 static inline void destroy_completion(struct completion *p)
@@ -75,7 +75,7 @@ static inline void wait_for_completion(struct completion *p)
     while (0 == p->completed) {
         uv_cond_wait(&p->cond, &p->mutex);
     }
-    assert(1 == p->completed);
+    fatal_assert(1 == p->completed);
     uv_mutex_unlock(&p->mutex);
 }
 

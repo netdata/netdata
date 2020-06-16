@@ -927,7 +927,7 @@ RRDSET *rrdset_create_custom(
             error("FAILED to generate GUID for %s", st->id);
             freez(st->chart_uuid);
             st->chart_uuid = NULL;
-            assert(0);
+            fatal_assert(0);
         }
         st->compaction_id = 0;
     }
