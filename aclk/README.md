@@ -26,7 +26,7 @@ documentation](/claim/README.md).
 ## Enable and configure the ACLK
 
 The ACLK is enabled by default, with its settings automatically configured and stored in the Agent's memory. No file is
-created at `var/lib/netdata/cloud.d/cloud.conf` until you either claim a node or create it yourself. The default
+created at `/var/lib/netdata/cloud.d/cloud.conf` until you either claim a node or create it yourself. The default
 configuration uses two settings:
 
 ```conf
