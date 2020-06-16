@@ -4,6 +4,8 @@ netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
 int aclk_stats_enabled;
 
+int query_thread_count;
+
 struct aclk_metrics aclk_metrics = {
     .online = 0,
 };
@@ -29,7 +31,7 @@ static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struc
     rrdset_done(st_aclkstats);
 }
 
-static void aclk_stats_query_thread(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st_query_thread = NULL;
     static RRDDIM *rd_queued = NULL;
@@ -41,12 +43,12 @@ static void aclk_stats_query_thread(struct aclk_metrics_per_sample *per_sample)
             "netdata", "stats", 200001, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rd_queued = rrddim_add(st_query_thread, "added", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_dispatched = rrddim_add(st_query_thread, "dispatched", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_dispatched = rrddim_add(st_query_thread, "dispatched", NULL, -1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     } else
         rrdset_next(st_query_thread);
 
     rrddim_set_by_pointer(st_query_thread, rd_queued, per_sample->queries_queued);
-    rrddim_set_by_pointer(st_query_thread, rd_dispatched, -per_sample->queries_dispatched);
+    rrddim_set_by_pointer(st_query_thread, rd_dispatched, per_sample->queries_dispatched);
 
     rrdset_done(st_query_thread);
 }
@@ -144,13 +146,44 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
+#define MAX_DIM_NAME 10
+static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_thread[ACLK_MAX_QUERY_THREADS];
+
+    char dim_name[MAX_DIM_NAME];
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_query_threads", NULL, "aclk_stats", NULL, "Queries Processed Per Thread", "req/s",
+            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        for (int i = 0; i < query_thread_count; i++) {
+            snprintf(dim_name, MAX_DIM_NAME, "Query %d", i);
+            rd_thread[i] = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        }
+    } else
+        rrdset_next(st);
+
+    for (int i = 0; i < query_thread_count; i++) {
+        rrddim_set_by_pointer(st, rd_thread[i], per_sample->queries_per_thread[i]);
+    }
+
+    rrdset_done(st);
+}
+
 void *aclk_stats_main_thread(void *ptr)
 {
-    UNUSED(ptr);
+    struct aclk_stats_thread *args = ptr;
+    query_thread_count = args->query_thread_count;
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
+
     memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+
     struct aclk_metrics_per_sample per_sample;
     struct aclk_metrics permanent;
 
@@ -171,7 +204,7 @@ void *aclk_stats_main_thread(void *ptr)
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
-        aclk_stats_query_thread(&per_sample);
+        aclk_stats_query_queue(&per_sample);
 #ifdef NETDATA_INTERNAL_CHECKS
         aclk_stats_latency(&per_sample);
 #endif
@@ -179,6 +212,7 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_read_q(&per_sample);
 
         aclk_stats_cloud_req(&per_sample);
+        aclk_stats_query_threads(&per_sample);
     }
     return 0;
 }

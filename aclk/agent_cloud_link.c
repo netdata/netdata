@@ -101,6 +101,16 @@ static struct aclk_shared_state {
     .last_popcorn_interrupt = 0
 };
 
+struct aclk_query_thread {
+    netdata_thread_t *thread;
+    int idx;
+};
+
+struct aclk_query_threads {
+    struct aclk_query_thread **thread_list;
+    int count;
+};
+
 char *create_uuid()
 {
     uuid_t uuid;
@@ -865,7 +875,7 @@ int aclk_execute_query(struct aclk_query *this_query)
  * This function will fetch the next pending command and process it
  *
  */
-int aclk_process_query()
+int aclk_process_query(int t_idx)
 {
     struct aclk_query *this_query;
     static long int query_count = 0;
@@ -931,6 +941,7 @@ int aclk_process_query()
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.queries_dispatched++;
+        aclk_metrics_per_sample.queries_per_thread[t_idx]++;
         ACLK_STATS_UNLOCK;
     }
 
@@ -943,7 +954,7 @@ int aclk_process_query()
  *
  */
 
-int aclk_process_queries()
+static inline int aclk_process_queries(int t_idx)
 {
     if (unlikely(netdata_exit || !aclk_connected))
         return 0;
@@ -954,7 +965,7 @@ int aclk_process_queries()
     debug(D_ACLK, "Processing %d queries", (int)aclk_queue.count);
 
     //TODO: may consider possible throttling here
-    while (aclk_process_query()) {
+    while (aclk_process_query(t_idx)) {
         // Process all commands
     };
 
@@ -971,7 +982,7 @@ int aclk_process_queries()
  */
 void *aclk_query_main_thread(void *ptr)
 {
-    UNUSED(ptr);
+    struct aclk_query_thread *info = ptr;
     time_t previous_popcorn_interrupt = 0;
 
     while (!netdata_exit) {
@@ -1016,7 +1027,7 @@ void *aclk_query_main_thread(void *ptr)
         }
         ACLK_SHARED_STATE_UNLOCK;
 
-        aclk_process_queries();
+        aclk_process_queries(info->idx);
 
         QUERY_THREAD_LOCK;
 
@@ -1374,11 +1385,9 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
     }
 }
 
-static void aclk_query_threads_start(struct netdata_static_thread ***query_threads)
+static void aclk_query_threads_start(struct aclk_query_threads *query_threads)
 {
-    int query_thread_count =
-        appconfig_get_number_min_max(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2, 1, ACLK_MAX_QUERY_THREADS);
-    info("Starting %d query threads.", query_thread_count);
+    info("Starting %d query threads.", query_threads->count);
 
 #if ACLK_MAX_QUERY_THREADS > 10
 #error "You seem to have increased ACLK_MAX_QUERY_THREADS above 10. If you want to do that you need to update following thread name generation."
@@ -1389,27 +1398,27 @@ static void aclk_query_threads_start(struct netdata_static_thread ***query_threa
     thread_name[strlen(ACLK_THREAD_NAME)] = '_';
     thread_name[strlen(ACLK_THREAD_NAME) + 2] = 0;
 
-    *query_threads = callocz(query_thread_count+1, sizeof(struct netdata_static_thread *));
-    for (int i = 0; i < query_thread_count; i++) {
-        (*query_threads)[i] = callocz(1, sizeof(struct netdata_static_thread));
-        (*query_threads)[i]->thread = callocz(1, sizeof(netdata_thread_t));
+    query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread *));
+    for (int i = 0; i < query_threads->count; i++) {
+        query_threads->thread_list[i] = callocz(1, sizeof(struct aclk_query_thread));
+        query_threads->thread_list[i]->thread = callocz(1, sizeof(netdata_thread_t));
+        query_threads->thread_list[i]->idx = i; //thread needs to know its index for statistics
 
         thread_name[strlen(ACLK_THREAD_NAME) + 1] = i + 0x30;
         netdata_thread_create(
-            (*query_threads)[i]->thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
-            (*query_threads)[i]);
+            query_threads->thread_list[i]->thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
+            query_threads->thread_list[i]);
     }
 }
 
-static void aclk_query_threads_cleanup(struct netdata_static_thread ***query_threads)
+static void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
 {
     if (query_threads) {
-        for (int i = 0; (*query_threads)[i]; i++) {
-            netdata_thread_join(*(*query_threads)[i]->thread, NULL);
-            freez((*query_threads)[i]->thread);
-            freez((*query_threads)[i]);
+        for (int i = 0; i < query_threads->count; i++) {
+            netdata_thread_join(*(query_threads->thread_list[i]->thread), NULL);
+            freez(query_threads->thread_list[i]->thread);
+            freez(query_threads->thread_list[i]);
         }
-        freez(*query_threads);
     }
 
     _reset_collector_list();
@@ -1436,8 +1445,10 @@ static void aclk_query_threads_cleanup(struct netdata_static_thread ***query_thr
 void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    struct netdata_static_thread **query_threads = NULL;
-    struct netdata_static_thread *stats_thread = NULL;
+    struct aclk_query_threads query_threads;
+    struct aclk_stats_thread *stats_thread = NULL;
+
+    query_threads.thread_list = NULL;
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
     // as it must notify the far end that it shutdown gracefully and avoid the LWT.
@@ -1463,12 +1474,16 @@ void *aclk_main(void *ptr)
         }
     }
 
+    query_threads.count =
+        appconfig_get_number_min_max(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2, 1, ACLK_MAX_QUERY_THREADS);
+
     aclk_shared_state.last_popcorn_interrupt = now_realtime_sec(); // without mutex here because threads are not yet started
 
     aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", CONFIG_BOOLEAN_YES);
     if (aclk_stats_enabled) {
-        stats_thread = callocz(1, sizeof(struct netdata_static_thread));
+        stats_thread = callocz(1, sizeof(struct aclk_stats_thread));
         stats_thread->thread = mallocz(sizeof(netdata_thread_t));
+        stats_thread->query_thread_count = query_threads.count;
         netdata_thread_create(
             stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
             stats_thread);
@@ -1570,7 +1585,7 @@ void *aclk_main(void *ptr)
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 1);
         }
 
-        if (unlikely(!query_threads)) {
+        if (unlikely(!query_threads.thread_list)) {
             aclk_query_threads_start(&query_threads);
         }
     } // forever
