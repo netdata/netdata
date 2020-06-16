@@ -273,16 +273,16 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
     uuid_t *machine_guid, *chart_char_guid;
 
     ret = find_object_by_guid(chart_uuid, chart_object, 33);
-    assert(GUID_TYPE_CHART == ret);
+    fatal_assert(GUID_TYPE_CHART == ret);
 
     machine_guid = (uuid_t *)chart_object;
     RRDHOST *host = ctx->rrdeng_ctx->host;
-    assert(!uuid_compare(host->host_uuid, *machine_guid));
+    fatal_assert(!uuid_compare(host->host_uuid, *machine_guid));
 
     chart_char_guid = (uuid_t *)(chart_object + 16);
 
     ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
-    assert(GUID_TYPE_CHAR == ret);
+    fatal_assert(GUID_TYPE_CHAR == ret);
     RRDSET *st = rrdset_find(host, chart_fullid);
 
     return st;
@@ -300,22 +300,22 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
 
     machine_guid = (uuid_t *)dim_object;
     RRDHOST *host = ctx->rrdeng_ctx->host;
-    assert(!uuid_compare(host->host_uuid, *machine_guid));
+    fatal_assert(!uuid_compare(host->host_uuid, *machine_guid));
 
     chart_guid = (uuid_t *)(dim_object + 16);
     dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
 
     ret = find_object_by_guid(dim_char_guid, id_str, sizeof(id_str));
-    assert(GUID_TYPE_CHAR == ret);
+    fatal_assert(GUID_TYPE_CHAR == ret);
 
     ret = find_object_by_guid(chart_guid, chart_object, sizeof(chart_object));
-    assert(GUID_TYPE_CHART == ret);
+    fatal_assert(GUID_TYPE_CHART == ret);
     chart_char_guid = (uuid_t *)(chart_object + 16);
 
     ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
-    assert(GUID_TYPE_CHAR == ret);
+    fatal_assert(GUID_TYPE_CHAR == ret);
     RRDSET *st = rrdset_find(host, chart_fullid);
-    assert(st);
+    fatal_assert(st);
 
     RRDDIM *rd = rrddim_find(st, id_str);
 
@@ -386,7 +386,7 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     }
 
     init_completion(&ctx->metalog_completion);
-    assert(0 == uv_thread_create(&ctx->worker_config.thread, metalog_worker, &ctx->worker_config));
+    fatal_assert(0 == uv_thread_create(&ctx->worker_config.thread, metalog_worker, &ctx->worker_config));
     /* wait for worker thread to initialize */
     wait_for_completion(&ctx->metalog_completion);
     destroy_completion(&ctx->metalog_completion);
@@ -418,7 +418,7 @@ int metalog_exit(struct metalog_instance *ctx)
     cmd.opcode = METALOG_SHUTDOWN;
     metalog_enq_cmd(&ctx->worker_config, &cmd);
 
-    assert(0 == uv_thread_join(&ctx->worker_config.thread));
+    fatal_assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     finalize_metalog_files(ctx);
     freez(ctx);

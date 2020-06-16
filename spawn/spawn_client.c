@@ -42,7 +42,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
 
         header = (struct spawn_prot_header *)prot_buffer;
         cmdinfo = (struct spawn_cmd_info *)header->handle;
-        assert(NULL != cmdinfo);
+        fatal_assert(NULL != cmdinfo);
 
         switch(header->opcode) {
         case SPAWN_PROT_SPAWN_RESULT:
@@ -90,7 +90,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
             prot_buffer_len = 0;
             break;
         default:
-            assert(0);
+            fatal_assert(0);
             break;
         }
 
@@ -158,7 +158,7 @@ static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
     info("CLIENT %s SPAWN_PROT_EXEC_CMD %u", __func__, (unsigned)cmdinfo->serial);
 #endif
     ret = uv_write(&write_ctx->write_req, (uv_stream_t *)&spawn_channel, writebuf, 3, after_pipe_write);
-    assert(ret == 0);
+    fatal_assert(ret == 0);
 }
 
 void spawn_client(void *arg)
@@ -189,7 +189,7 @@ void spawn_client(void *arg)
         spawn_thread_error = ret;
         goto error_after_pipe_init;
     }
-    assert(spawn_channel.ipc);
+    fatal_assert(spawn_channel.ipc);
 
     ret = create_spawn_server(loop, &spawn_channel, &process);
     if (ret) {
@@ -205,7 +205,7 @@ void spawn_client(void *arg)
 
     prot_buffer_len = 0;
     ret = uv_read_start((uv_stream_t *)&spawn_channel, on_read_alloc, on_pipe_read);
-    assert(ret == 0);
+    fatal_assert(ret == 0);
 
     while (spawn_thread_shutdown == 0) {
         struct spawn_cmd_info *cmdinfo;
@@ -222,7 +222,7 @@ void spawn_client(void *arg)
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
     info("Shutting down spawn client loop complete.");
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
 
     return;
 
@@ -232,7 +232,7 @@ error_after_pipe_init:
     uv_close((uv_handle_t *)&spawn_async, NULL);
 error_after_async_init:
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
 

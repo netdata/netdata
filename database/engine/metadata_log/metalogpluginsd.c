@@ -117,7 +117,7 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {
     case GUID_TYPE_CHAR:
-        assert(0);
+        fatal_assert(0);
         break;
     case GUID_TYPE_CHART:
     case GUID_TYPE_DIMENSION:
@@ -127,22 +127,22 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
             chart_char_guid = (uuid_t *)(object + 16);
 
             ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-            assert(GUID_TYPE_CHAR == ret);
+            fatal_assert(GUID_TYPE_CHAR == ret);
             ((PARSER_USER_OBJECT *) user)->st = rrdset_find(host, id_str);
             break;
         case GUID_TYPE_DIMENSION:
             chart_guid = (uuid_t *)(object + 16);
 
             ret = find_object_by_guid(chart_guid, chart_object, 33);
-            assert(GUID_TYPE_CHART == ret);
+            fatal_assert(GUID_TYPE_CHART == ret);
             chart_char_guid = (uuid_t *)(chart_object + 16);
 
             ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-            assert(GUID_TYPE_CHAR == ret);
+            fatal_assert(GUID_TYPE_CHAR == ret);
             ((PARSER_USER_OBJECT *) user)->st = rrdset_find(host, id_str);
             break;
         default:
-            assert(0);
+            fatal_assert(0);
             break;
         }
         break;
@@ -168,7 +168,7 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
     ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
         case GUID_TYPE_CHAR:
-            assert(0);
+            fatal_assert(0);
             break;
         case GUID_TYPE_CHART:
             st = metalog_get_chart_from_uuid(ctx, uuid);

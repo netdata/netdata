@@ -254,9 +254,9 @@ void init_global_guid_map()
 
     init = 1;
     info("Configuring locking mechanism for global GUID map");
-    assert(0 == uv_rwlock_init(&guid_lock));
-    assert(0 == uv_rwlock_init(&object_lock));
-    assert(0 == uv_rwlock_init(&global_lock));
+    fatal_assert(0 == uv_rwlock_init(&guid_lock));
+    fatal_assert(0 == uv_rwlock_init(&object_lock));
+    fatal_assert(0 == uv_rwlock_init(&global_lock));
 
 //    int rc = guid_bulk_load("6fc56a64-05d7-47a7-bc82-7f3235d8cbda","d6b37186-74db-11ea-88b2-0bf5095b1f9e/cgroup_qemu_ubuntu18.04.cpu_per_core/cpu3");
 //    rc = guid_bulk_load("75c6fa02-97cc-40c1-aacd-a0132190472e","d6b37186-74db-11ea-88b2-0bf5095b1f9e/services.throttle_io_ops_write/system.slice_setvtrgb.service");

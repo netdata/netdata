@@ -219,7 +219,7 @@ static inline void
 /* The caller must hold a reference to the page and must have already set the new data */
 static inline void pg_cache_atomic_set_pg_info(struct rrdeng_page_descr *descr, usec_t end_time, uint32_t page_length)
 {
-    assert(!(end_time & 1));
+    fatal_assert(!(end_time & 1));
     __sync_synchronize();
     descr->end_time |= 1; /* mark start of uncertainty period by adding 1 microsecond */
     __sync_synchronize();

@@ -52,8 +52,8 @@ void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum me
 {
     struct metalog_cmd cmd;
 
-    assert(buffer_strlen(buffer));
-    assert(opcode == METALOG_COMMIT_CREATION_RECORD || opcode == METALOG_COMMIT_DELETION_RECORD);
+    fatal_assert(buffer_strlen(buffer));
+    fatal_assert(opcode == METALOG_COMMIT_CREATION_RECORD || opcode == METALOG_COMMIT_DELETION_RECORD);
 
     cmd.opcode = opcode;
     cmd.record_io_descr.buffer = buffer;
@@ -191,8 +191,8 @@ static void metalog_init_cmd_queue(struct metalog_worker_config *wc)
 {
     wc->cmd_queue.head = wc->cmd_queue.tail = 0;
     wc->queue_size = 0;
-    assert(0 == uv_cond_init(&wc->cmd_cond));
-    assert(0 == uv_mutex_init(&wc->cmd_mutex));
+    fatal_assert(0 == uv_cond_init(&wc->cmd_cond));
+    fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
 }
 
 void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd)
@@ -204,7 +204,7 @@ void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd)
     while ((queue_size = wc->queue_size) == METALOG_CMD_Q_MAX_SIZE) {
         uv_cond_wait(&wc->cmd_cond, &wc->cmd_mutex);
     }
-    assert(queue_size < METALOG_CMD_Q_MAX_SIZE);
+    fatal_assert(queue_size < METALOG_CMD_Q_MAX_SIZE);
     /* enqueue command */
     wc->cmd_queue.cmd_array[wc->cmd_queue.tail] = *cmd;
     wc->cmd_queue.tail = wc->cmd_queue.tail != METALOG_CMD_Q_MAX_SIZE - 1 ?
@@ -213,7 +213,7 @@ void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd)
     uv_mutex_unlock(&wc->cmd_mutex);
 
     /* wake up event loop */
-    assert(0 == uv_async_send(&wc->async));
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 struct metalog_cmd metalog_deq_cmd(struct metalog_worker_config *wc)
@@ -318,7 +318,7 @@ void metalog_worker(void* arg)
     /* wake up initialization thread */
     complete(&ctx->metalog_completion);
 
-    assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+    fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
     while (likely(shutdown == 0 || metalog_threads_alive(wc))) {
         uv_run(loop, UV_RUN_DEFAULT);
@@ -347,7 +347,7 @@ void metalog_worker(void* arg)
                 break;
             case METALOG_QUIESCE:
                 ctx->quiesce = SET_QUIESCE;
-                assert(0 == uv_timer_stop(&timer_req));
+                fatal_assert(0 == uv_timer_stop(&timer_req));
                 uv_close((uv_handle_t *)&timer_req, NULL);
                 mlf_flush_records_buffer(wc, &ctx->records_log, &ctx->metadata_logfiles);
                 if (!metalog_threads_alive(wc)) {
@@ -390,7 +390,7 @@ void metalog_worker(void* arg)
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
     return;
@@ -398,7 +398,7 @@ void metalog_worker(void* arg)
 error_after_timer_init:
     uv_close((uv_handle_t *)&wc->async, NULL);
 error_after_async_init:
-    assert(0 == uv_loop_close(loop));
+    fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
 
