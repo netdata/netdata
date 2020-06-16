@@ -1272,6 +1272,9 @@ int main(int argc, char **argv) {
         // files using relative filenames
         if(chdir(netdata_configured_user_config_dir) == -1)
             fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+
+        // Get execution path before switching user to avoid permission issues
+        get_netdata_execution_path();
     }
 
     {
