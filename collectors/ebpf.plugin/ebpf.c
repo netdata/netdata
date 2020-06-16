@@ -904,6 +904,7 @@ int main(int argc, char **argv)
 
     signal(SIGINT, ebpf_exit);
     signal(SIGTERM, ebpf_exit);
+    signal(SIGPIPE, ebpf_exit);
 
     if (ebpf_start_pthread_variables()) {
         thread_finished++;
