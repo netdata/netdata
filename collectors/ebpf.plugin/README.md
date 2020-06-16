@@ -264,9 +264,9 @@ starting correctly. Check the Agent's `error.log` file for errors like the ones 
 You can also check for errors related to `ebpf.plugin` inside `/var/log/audit/audit.log`:
 
 ```bash
-type=AVC msg=audit(1586260134.952:97): avc:  denied  { map_create } for  pid=1387 comm="ebpf_process.pl" scontext=system_u:system_r:unconfined_service_t:s0 tcontext=system_u:system_r:unconfined_service_t:s0 tclass=bpf permissive=0
+type=AVC msg=audit(1586260134.952:97): avc:  denied  { map_create } for  pid=1387 comm="ebpf.pl" scontext=system_u:system_r:unconfined_service_t:s0 tcontext=system_u:system_r:unconfined_service_t:s0 tclass=bpf permissive=0
 type=SYSCALL msg=audit(1586260134.952:97): arch=c000003e syscall=321 success=no exit=-13 a0=0 a1=7ffe6b36f000 a2=70 a3=0 items=0 ppid=1135 pid=1387 auid=4294967295 uid=994 gid=990 euid=0 suid=0 fsuid=0 egid=990 sgid=990 fsgid=990 tty=(none) ses=4294967295 comm="ebpf_proc
-ess.pl" exe="/usr/libexec/netdata/plugins.d/ebpf_process.plugin" subj=system_u:system_r:unconfined_service_t:s0 key=(null)
+ess.pl" exe="/usr/libexec/netdata/plugins.d/ebpf.plugin" subj=system_u:system_r:unconfined_service_t:s0 key=(null)
 ```
 
 If you see similar errors, you will have to adjust SELinux's policies to enable the eBPF collector.
