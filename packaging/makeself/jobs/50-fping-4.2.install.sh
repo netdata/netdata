@@ -6,9 +6,8 @@
 
 fetch "fping-4.2" "https://github.com/schweikert/fping/releases/download/v4.2/fping-4.2.tar.gz"
 
-export CFLAGS="-static -I/openssl-static/include"
-export LDFLAGS="-static -L/openssl-static/lib"
-export PKG_CONFIG_PATH="/opnessl-static/lib/pkgconfig"
+export CFLAGS="-static"
+export PKG_CONFIG_PATH="/opnessl/lib/pkgconfig"
 
 run ./configure \
   --prefix="${NETDATA_INSTALL_PATH}" \

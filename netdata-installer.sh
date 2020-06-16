@@ -235,7 +235,6 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
-    "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
     "--auto-update" | "-u") AUTOUPDATE=1 ;;
@@ -461,26 +460,20 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
-  local env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ] ; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
-  fi
-
   if [ "$(uname -s)" = Linux ]; then
-    run ${env_cmd} make -C "${1}/lib"
+    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run ${env_cmd} cmake \
+      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
         -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
         -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
         -D WITH_STATIC_LIBRARIES:boolean=YES \
         .
     else
-      run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
+      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run ${env_cmd} make -C lib
+    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -541,23 +534,17 @@ bundle_libmosquitto
 # -----------------------------------------------------------------------------
 
 build_libwebsockets() {
-  local env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ] ; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
-  fi
-
   pushd "${1}" > /dev/null || exit 1
   if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run ${env_cmd} cmake \
+    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
       -D LWS_WITH_SOCKS5:bool=ON \
       .
   else
-    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON .
+    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
   fi
-  run ${env_cmd} make
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make
   popd > /dev/null || exit 1
 }
 
@@ -621,15 +608,9 @@ bundle_libwebsockets
 # -----------------------------------------------------------------------------
 
 build_jsonc() {
-  local env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ] ; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
-  fi
-
   pushd "${1}" > /dev/null || exit 1
-  run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
-  run ${env_cmd} make
+  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -DBUILD_SHARED_LIBS=OFF .
+  run env CFLAGS= CXXFLAGS= LDFLAGS= make
   popd > /dev/null || exit 1
 }
 
