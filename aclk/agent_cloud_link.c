@@ -236,6 +236,10 @@ char *get_topic(char *sub_topic, char *final_topic, int max_size)
     return final_topic;
 }
 
+#ifndef __GNUC__
+#pragma region ACLK Internal Collector Tracking
+#endif
+
 /*
  * Free a collector structure
  */
@@ -420,6 +424,10 @@ static struct _collector *_add_collector(const char *hostname, const char *plugi
     return tmp_collector;
 }
 
+#ifndef __GNUC__
+#pragma endregion
+#endif
+
 inline static int aclk_popcorn_check_bump()
 {
     ACLK_SHARED_STATE_LOCK;
@@ -550,6 +558,10 @@ static void aclk_main_cleanup(void *ptr)
     }
 }
 
+#ifndef __GNUC__
+#pragma region Incoming Msg Parsing
+#endif
+
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -576,6 +588,15 @@ int json_extract_singleton(JSON_ENTRY *e)
     }
     return 0;
 }
+
+#ifndef __GNUC__
+#pragma endregion
+#endif
+
+
+#ifndef __GNUC__
+#pragma region Challenge Response
+#endif
 
 // Base-64 decoder.
 // Note: This is non-validating, invalid input will be decoded without an error.
@@ -710,29 +731,6 @@ int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decry
     return result;
 }
 
-char *extract_payload(BUFFER *b)
-{
-char *s = b->buffer;
-unsigned int line_len=0;
-    for (size_t i=0; i<b->len; i++)
-    {
-        if (*s == 0 )
-            return NULL;
-        if (*s == '\n' ) {
-            if (line_len==0)
-              return s+1;
-            line_len = 0;
-        }
-        else if (*s == '\r') {
-            /* don't count */
-        }
-        else
-            line_len ++;
-        s++;
-    }
-    return NULL;
-}
-
 void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
 {
     char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -824,6 +822,10 @@ CLEANUP:
     freez(data_buffer);
     return;
 }
+
+#ifndef __GNUC__
+#pragma endregion
+#endif
 
 static void aclk_try_to_connect(char *hostname, char *port, int port_num)
 {
