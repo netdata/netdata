@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- installer: update go.d.plugin version to v0.19.2 [\#9340](https://github.com/netdata/netdata/pull/9340) ([ilyam8](https://github.com/ilyam8))
 - Remove Gentoo from CI [\#9327](https://github.com/netdata/netdata/pull/9327) ([prologic](https://github.com/prologic))
 - Fixed invalid memory access [\#9326](https://github.com/netdata/netdata/pull/9326) ([stelfrag](https://github.com/stelfrag))
 - Add support for persistent metadata [\#9324](https://github.com/netdata/netdata/pull/9324) ([stelfrag](https://github.com/stelfrag))
@@ -101,24 +102,18 @@
 - Don't overwrite netdata.conf on update on static installs. [\#9046](https://github.com/netdata/netdata/pull/9046) ([Ferroin](https://github.com/Ferroin))
 - Change backends to exporting engine in general documentation pages [\#9045](https://github.com/netdata/netdata/pull/9045) ([vlvkobal](https://github.com/vlvkobal))
 - Regenerate topic base on connect [\#9044](https://github.com/netdata/netdata/pull/9044) ([amoss](https://github.com/amoss))
-- \[python.d/samba\] Only use sudo when not running as root user [\#9038](https://github.com/netdata/netdata/pull/9038) ([Duffyx](https://github.com/Duffyx))
 - Missing checks exporting [\#9034](https://github.com/netdata/netdata/pull/9034) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix link in web server log guide [\#9033](https://github.com/netdata/netdata/pull/9033) ([joelhans](https://github.com/joelhans))
 - Included 'cmake' in the list of pkgs installed [\#9031](https://github.com/netdata/netdata/pull/9031) ([zvarnes](https://github.com/zvarnes))
 - Move nc backend [\#9030](https://github.com/netdata/netdata/pull/9030) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add text to claiming doc about reclaiming with id= [\#9027](https://github.com/netdata/netdata/pull/9027) ([joelhans](https://github.com/joelhans))
 - Fixes enable/start of netdata service in debian package [\#9005](https://github.com/netdata/netdata/pull/9005) ([MrFreezeex](https://github.com/MrFreezeex))
 - Add GitHub CI job to check Markdown links during PRs [\#9003](https://github.com/netdata/netdata/pull/9003) ([joelhans](https://github.com/joelhans))
 - Update step-10.md [\#9000](https://github.com/netdata/netdata/pull/9000) ([Jelmerrevers](https://github.com/Jelmerrevers))
 - Fix suid bits on plugin for debian packaging [\#8996](https://github.com/netdata/netdata/pull/8996) ([MrFreezeex](https://github.com/MrFreezeex))
 - Fix incorrect issue link URL in install-required-packages.sh [\#8911](https://github.com/netdata/netdata/pull/8911) ([prologic](https://github.com/prologic))
-- Docs: Remove old Cloud/dashboard and replace with new Cloud/dashboard [\#8874](https://github.com/netdata/netdata/pull/8874) ([joelhans](https://github.com/joelhans))
-- removed simley face per Chris since it didn't show up [\#8872](https://github.com/netdata/netdata/pull/8872) ([MeganBishopMoore](https://github.com/MeganBishopMoore))
 - Fix macOS builds building and linking against openssl [\#8865](https://github.com/netdata/netdata/pull/8865) ([prologic](https://github.com/prologic))
 - Removeed Polyverse Polymorphic Linux from Docker builds. [\#8802](https://github.com/netdata/netdata/pull/8802) ([Ferroin](https://github.com/Ferroin))
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
 - Docs: Update contributing guidelines [\#8781](https://github.com/netdata/netdata/pull/8781) ([joelhans](https://github.com/joelhans))
-- Sort alphabetically and automatic scroll [\#8762](https://github.com/netdata/netdata/pull/8762) ([tnyeanderson](https://github.com/tnyeanderson))
 - single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
 - Correctly track last num vcpus in xenstat\_plugin [\#8720](https://github.com/netdata/netdata/pull/8720) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 - Typo. [\#8703](https://github.com/netdata/netdata/pull/8703) ([cherouvim](https://github.com/cherouvim))
@@ -214,20 +209,10 @@
 - Add session-id using connect timestamp [\#8633](https://github.com/netdata/netdata/pull/8633) ([amoss](https://github.com/amoss))
 - Update main README with 1.21 release news [\#8619](https://github.com/netdata/netdata/pull/8619) ([joelhans](https://github.com/joelhans))
 - Improved ACLK memory management and shutdown sequence [\#8611](https://github.com/netdata/netdata/pull/8611) ([stelfrag](https://github.com/stelfrag))
-- packaging: fix errors during install-requred-packages [\#8606](https://github.com/netdata/netdata/pull/8606) ([ilyam8](https://github.com/ilyam8))
-- Remove an automatic restart of the apps.plugin [\#8592](https://github.com/netdata/netdata/pull/8592) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.20.0...v1.21.0)
-
-**Merged pull requests:**
-
-- dashboard v0.4.12: [\#8599](https://github.com/netdata/netdata/pull/8599) ([jacekkolasa](https://github.com/jacekkolasa))
-- Change all https://app.netdata.cloud URLs to https://netdata.cloud [\#8598](https://github.com/netdata/netdata/pull/8598) ([mfundul](https://github.com/mfundul))
-- Fixes Ubuntu build with both libcap-dev and libcapng [\#8596](https://github.com/netdata/netdata/pull/8596) ([underhood](https://github.com/underhood))
-- Correctly fixed RPM package builds on Fedora. [\#8595](https://github.com/netdata/netdata/pull/8595) ([Ferroin](https://github.com/Ferroin))
-- Ensure we only enable jessie-backports for Debian 8 \(jessie\) once [\#8593](https://github.com/netdata/netdata/pull/8593) ([prologic](https://github.com/prologic))
 
 ## [v1.20.0](https://github.com/netdata/netdata/tree/v1.20.0) (2020-02-21)
 
