@@ -1377,8 +1377,12 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
 static void aclk_query_threads_start(struct netdata_static_thread ***query_threads)
 {
     int query_thread_count =
-        appconfig_get_number_min_max(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2, 1, 8);
+        appconfig_get_number_min_max(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2, 1, ACLK_MAX_QUERY_THREADS);
     info("Starting %d query threads.", query_thread_count);
+
+#if ACLK_MAX_QUERY_THREADS > 10
+#error "You seem to have increased ACLK_MAX_QUERY_THREADS above 10. If you want to do that you need to update following thread name generation."
+#endif
 
     char thread_name[strlen(ACLK_THREAD_NAME) + 3];
     strcpy(thread_name, ACLK_THREAD_NAME);

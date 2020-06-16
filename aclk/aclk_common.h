@@ -17,6 +17,8 @@ const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type);
 #define ACLK_PROXY_ENV "env"
 #define ACLK_PROXY_CONFIG_VAR "proxy"
 
+#define ACLK_MAX_QUERY_THREADS 4
+
 ACLK_PROXY_TYPE aclk_verify_proxy(const char *string);
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
