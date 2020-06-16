@@ -14,7 +14,7 @@ We love to receive contributions. Maintaining a platform for monitoring everythi
 There are many ways to contribute, with varying requirements of skills, explained in detail in the following sections. 
 Specific GitHub issues we need help with can be seen [here](https://github.com/netdata/netdata/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22). Some of them are also labeled as "good first issue". 
 
-## All NetData Users
+## All Netdata Users
 
 ### Give Netdata a GitHub star
 
@@ -83,7 +83,7 @@ Don't be afraid to submit a pull request with your corrections or additions! We 
 
 We expect most contributions to be for new data collection plugins. You can read about how external plugins work [here](collectors/plugins.d/). Additional instructions are available for [Node.js plugins](collectors/node.d.plugin) and [Python plugins](collectors/python.d.plugin).
 
-Of course we appreciate contributions for any other part of the NetData agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include NetData charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
+Of course we appreciate contributions for any other part of the Netdata agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include Netdata charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
 
 If you are working on the C source code please be aware that we have a standard build configuration that we use. This
 is meant to keep the source tree clean and free of warnings. When you are preparing to work on the code:
@@ -188,15 +188,34 @@ However, it's not always that simple. Our [PR approval process](#pr-approval-pro
 
 One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
 
-#### PR title guidelines
+#### PR Guidelines
 
-All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds", "Fixed" instead of "Fixes".
+PR Titles:
 
-Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
+- Must follow the [Imperative Mood](https://en.wikipedia.org/wiki/Imperative_mood)
+- Must be no more than ~50 characters (_longer description in the PR_)
 
-Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+PR Descriptions:
 
-New collectors must have the title "[New collector] : [Name of collector]".
+- Must clearly contain sufficient information regarding the content of the PR, including area/component, test plan, etc.
+- Must reference an existing issue.
+
+Some PR title examples:
+
+- Fix bug in Netdata installer for FreeBSD 11.2
+- Improve docs for other installation methods
+- New collector for Prometheus endpoints
+- Add 4.19 Kernel variant for eBPF
+- Fix typo in README
+- etc
+
+For good examples have a look at other projects like:
+
+- https://github.com/facebook/react/commits/master
+- https://github.com/tensorflow/tensorflow/commits/master
+- https://github.com/vuejs/vue/commits/dev
+- https://github.com/microsoft/vscode/commits/master
+- Also see the Linux Kernel and Git projects as well as good examples.
 
 #### Commit messages when PRs are merged
 
