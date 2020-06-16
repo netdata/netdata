@@ -6,12 +6,12 @@ image: /img/seo/guides/troubleshoot/monitor-debug-applications-ebpf.png
 
 # Monitor, troubleshoot, and debug applications with eBPF metrics
 
-When trying to troubleshoot or debug a finicky appliction, there's no such thing as too much information. At Netdata, we
-developed programs that connect to the [_extended Berkeley Packet Filter_ (eBPF) virtual
+When trying to troubleshoot or debug a finicky application, there's no such thing as too much information. At Netdata,
+we developed programs that connect to the [_extended Berkeley Packet Filter_ (eBPF) virtual
 machine](/collectors/ebpf.plugin/README.md) to help you see exactly how specific applications are interacting with the
 Linux kernel. With these charts, you can root out bugs, discover optimizations, diagnose memory leaks, and much more.
 
-This means you can see exactly how often, and in what volume, the process creates processes, opens files, writes to
+This means you can see exactly how often, and in what volume, the application creates processes, opens files, writes to
 filesystem using virtual filesystem (VFS) functions, and much more. Even better, the eBPF collector gathers metrics at
 an _event frequency_, which is even faster than Netdata's beloved 1-second granularity. When you troubleshoot and debug
 applications with eBPF, rest assured you miss not even the smallest meaningful event.
@@ -28,9 +28,8 @@ You can use the `apps_groups.conf` file to configure which applications appear i
 [`apps.plugin`](/collectors/apps.plugin/README.md). Once you edit this file and create a new group for the application
 you want to monitor, you can see how it's interacting with the Linux kernel via real-time eBPF metrics.
 
-Let's assume you have an application that runs on the process `custom-app`. In order to monitor eBPF metrics for that
-application separate from any others, you need to create a new group in `apps_groups.conf` and associate that process
-name with it.
+Let's assume you have an application that runs on the process `custom-app`. To monitor eBPF metrics for that application
+separate from any others, you need to create a new group in `apps_groups.conf` and associate that process name with it.
 
 Open the `apps_groups.conf` file in your Netdata configuration directory.
 
@@ -39,9 +38,9 @@ cd /etc/netdata   # Replace this path with your Netdata config directory
 sudo ./edit-config apps_groups.conf
 ```
 
-Scroll down past the explanatory comments and stop when you see `# NETDATA processes accounting`. Above that, paste
-paste in the following text, which creates a new `dev` group and adds the `custom-app` process to it. Replace
-`custom-app` with the name of your application's process name.
+Scroll down past the explanatory comments and stop when you see `# NETDATA processes accounting`. Above that, paste in
+the following text, which creates a new `dev` group with the `custom-app` process. Replace `custom-app` with the name of
+your application's process name.
 
 Your file should now look like this:
 
@@ -58,8 +57,7 @@ dev: custom-app
 ```
 
 Restart Netdata with `sudo service netdata restart` or the appropriate method for your system to begin seeing metrics
-for this particular group+process. You can also add other proceses to the same group if you'd like to monitor eBPF
-metrics for a suite of processes together.
+for this particular group+process. You can also add additional processes to the same group.
 
 You can set up `apps_groups.conf` to more show more precise eBPF metrics for any application or service running on your
 system, even if it's a standard package like Redis, Apache, or any other [application/service Netdata collects
@@ -72,6 +70,10 @@ from](/collectors/COLLECTORS.md).
 dev: custom-app
 database: *redis*
 apache: *apache*
+
+# -----------------------------------------------------------------------------
+# NETDATA processes accounting
+...
 ```
 
 Now that you have `apps_groups.conf` set up to monitor your application/service, you can also set up the eBPF collector
@@ -105,15 +107,15 @@ Visit the Netdata dashboard at `http://NODE:19999`, replacing `NODE` with the ho
 to monitor this application. Scroll down to the **Applications** section. These charts now feature a `firefox` dimension
 with metrics specific to that process.
 
-Pay particular attention to the charts in the **ebpf syscall** and **ebpf net** sections. These charts are populated my
+Pay particular attention to the charts in the **ebpf syscall** and **ebpf net** sections. These charts are populated by
 low-level Linux kernel metrics thanks to eBPF, and showcase the volume of calls to open/close files, call functions like
 `do_fork`, IO activity on the VFS, and much more.
 
 See the [eBPF collector documentation](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) for the full list
 of per-application charts.
 
-Let's show some examples of how you can first identify normal patterns within eBPF metrics, then use that knowledge to
-idenfity anomalies in a few simulated scenarios.
+Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to idenfity
+anomalies in a few simulated scenarios.
 
 For example, the following screenshot shows the number of open files, failures to open files, and closed files on a
 Debian 10 system. The first spike is from configuring/compiling a small C program, then from running Apache's `ab` tool
@@ -122,15 +124,15 @@ to benchmark an Apache web server.
 ![An example of eBPF
 charts](https://user-images.githubusercontent.com/1153921/84795632-9b1fa700-afac-11ea-8286-138aac00eae1.png)
 
-In these charts you can see first a spike in syscalls to open and close files from the configure/build process, followed
-by a similar spike from the Apache benchmark.
+In these charts, you can see first a spike in syscalls to open and close files from the configure/build process,
+followed by a similar spike from the Apache benchmark.
 
 ## Troubleshoot and debug applications with eBPF
 
-The actual process of troubleshooting and debugging any application with Netdata's eBPF metrics depends on the type of
-application you're monitoring and what kind of issues you're trying to trace. This guide won't be able to explain how to
-troubleshoot _any_ application with eBPF metrics, but it should give you some ideas on how to start with your own
-systems.
+The actual method of troubleshooting and debugging any application with Netdata's eBPF metrics depends on the
+application, its place within your stack, and the type of issue you're trying to root cause. This guide won't be able to
+explain how to troubleshoot _any_ application with eBPF metrics, but it should give you some ideas on how to start with
+your own systems.
 
 The value of using Netdata to collect and visualize eBPF metrics is that you don't have to rely on existing (complex)
 command line eBPF programs or, even worse, write your own eBPF program to get the information you need.
@@ -139,8 +141,8 @@ Let's walk through some scenarios where you might find value in eBPF metrics.
 
 ### Benchmark application performance
 
-You can use eBPF metrics to better understand the performance of your applications, whether they're custom or a standard
-Linux service, like a web server or database.
+You can use eBPF metrics to profile the performance of your applications, whether they're custom or a standard Linux
+service, like a web server or database.
 
 For example, look at the charts below. The first spike represents running a Redis benchmark _without_ pipelining
 (`redis-benchmark -n 1000000 -t set,get -q`). The second spike represents the same benchmark _with_ pipelining
@@ -149,15 +151,15 @@ For example, look at the charts below. The first spike represents running a Redi
 ![Screenshot of eBPF metrics during a Redis
 benchmark](https://user-images.githubusercontent.com/1153921/84815069-50f7ef00-afc7-11ea-8352-c9277bd4fdf7.png)
 
-The performance optimization is clear from not only the speed at which the benchmark finished (the horizontal length of
-the spike), but also the reduced write/read syscalls and bytes written to disk.
+The performance optimization is clear from the speed at which the benchmark finished (the horizontal length of the
+spike) and the reduced write/read syscalls and bytes written to disk.
 
 You can run similar performance benchmarks against any application, view the results on a Linux kernel level, and
 continuously improve the performance of your infrastructure.
 
 ### Inspect for leaking file descriptors
 
-If you application runs fine and then only crashes after a few hours, leaking file descriptors may be to blame.
+If your application runs fine and then only crashes after a few hours, leaking file descriptors may be to blame.
 
 Check the **Number of open files (apps.file_open)** and **Files closed (apps.file_closed)** for discrepancies. These
 metrics should be more or less equal. If they diverge, with more open files than closed, your application may not be
@@ -187,7 +189,7 @@ closer to the root cause.
 ### Investigate zombie processes
 
 Look for the trio of **Process started (apps.process_create)**, **Threads started (apps.thread_create)**, and **Tasks
-closed (apps.task_close)** charts to investigate situations where an application inadvertantly leaves [zombie
+closed (apps.task_close)** charts to investigate situations where an application inadvertently leaves [zombie
 processes](https://en.wikipedia.org/wiki/Zombie_process).
 
 These processes, which are terminated and don't use up system resources, can still cause issues if your system runs out
@@ -203,8 +205,8 @@ Starting at 14:51:49, Netdata sees the `zombie` group creating one new process e
 continues for roughly 30 seconds, at which point the factory program was killed with `SIGINT`, which results in the 31
 closed tasks in the subsequent second.
 
-Zombie processes may not be catastrophic, but if you're developing an application on Linux, you should absolutely
-eliminate them. If you see them in a service in your stack, it's probably worth a bug report.
+Zombie processes may not be catastrophic, but if you're developing an application on Linux, you should eliminate them.
+If you see them in a service in your stack, it's probably worth filing a bug report.
 
 ## View eBPF metrics in Netdata Cloud
 
@@ -216,7 +218,7 @@ If you don't already have a Netdata Cloud account, go [sign in](https://app.netd
 Read the [get started with Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started) for a walkthrough of node
 claiming and other fundamentals.
 
-Add more charts to the Nodew view by clicking on the gear icon at the far end of the table. Click on the **Context**
+Add more charts to the Nodes view by clicking on the gear icon at the far end of the table. Click on the **Context**
 input and scroll until you find the eBPF chart you're interested in, or type in the name of the context directly. Maybe
 something like `apps.vfs_write_call`? Next, click on the **Dimensions** input and find the `dev` dimension, or maybe
 `apache`/`redis` if you set your `apps_groups.conf` up like the examples above.
@@ -230,8 +232,8 @@ team](https://learn.netdata.cloud/docs/cloud/collaborate/invite-your-team) and s
 ## What's next?
 
 Debugging and troubleshooting an application takes a special combination of practice, experience, and sheer luck. With
-Netdata's eBPF metrics to back you up, you can rest assured that you're seeing every minute detail of how your
-application interacts with the Linux kernel.
+Netdata's eBPF metrics to back you up, you can rest assured that you see every minute detail of how your application
+interacts with the Linux kernel.
 
 If you're still trying to wrap your head aroud what we offer, be sure to read up on our accompanying documentation and
 other resources on eBPF monitoring with Netdata:
@@ -241,7 +243,7 @@ other resources on eBPF monitoring with Netdata:
 -   [Linux eBPF monitoring with Netdata](https://www.netdata.cloud/blog/linux-ebpf-monitoring-with-netdata/)
 
 The scenarios described above are just the beginning when it comes to troubleshooting with eBPF metrics. We're excited
-to explore othes and see what our community dreams up. If you have other use cases, whether simulated or real-world,
+to explore others and see what our community dreams up. If you have other use cases, whether simulated or real-world,
 we'd love to hear them: [info@netdata.cloud](mailto:info@netdata.cloud).
 
 Happy troubleshooting!
