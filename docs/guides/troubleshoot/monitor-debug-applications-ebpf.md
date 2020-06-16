@@ -109,9 +109,8 @@ Pay particular attention to the charts in the **ebpf syscall** and **ebpf net** 
 low-level Linux kernel metrics thanks to eBPF, and showcase the volume of calls to open/close files, call functions like
 `do_fork`, IO activity on the VFS, and much more.
 
-See the [eBPF collector
-documentation](https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#integration-with-appsplugin) for the full
-list of per-application charts.
+See the [eBPF collector documentation](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) for the full list
+of per-application charts.
 
 Let's show some examples of how you can first identify normal patterns within eBPF metrics, then use that knowledge to
 idenfity anomalies in a few simulated scenarios.
@@ -238,7 +237,7 @@ If you're still trying to wrap your head aroud what we offer, be sure to read up
 other resources on eBPF monitoring with Netdata:
 
 -   [eBPF collector](/collectors/ebpf.plugin/README.md)
--   [eBPF's integration with `apps.plugin`](/collectors/apps.plugin.md#integration-with-ebpf)
+-   [eBPF's integration with `apps.plugin`](/collectors/apps.plugin/README.md#integration-with-ebpf)
 -   [Linux eBPF monitoring with Netdata](https://www.netdata.cloud/blog/linux-ebpf-monitoring-with-netdata/)
 
 The scenarios described above are just the beginning when it comes to troubleshooting with eBPF metrics. We're excited
