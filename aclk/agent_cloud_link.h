@@ -82,8 +82,11 @@ int aclk_subscribe(char *topic, int qos);
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
-int aclk_send_metadata();
-int aclk_send_info_metadata();
+
+int aclk_send_metadata(ACLK_METADATA_STATE state);
+int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted);
+void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
+
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
 
@@ -98,7 +101,6 @@ int aclk_handle_cloud_request(char *payload);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_alarm_reload();
-void aclk_send_alarm_metadata();
 int aclk_execute_query(struct aclk_query *query);
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);

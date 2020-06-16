@@ -869,6 +869,7 @@ int aclk_process_query()
 {
     struct aclk_query *this_query;
     static long int query_count = 0;
+    ACLK_METADATA_STATE meta_state;
 
     if (!aclk_connected)
         return 0;
@@ -891,12 +892,12 @@ int aclk_process_query()
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
-            QUERY_THREAD_LOCK;
-            aclk_send_metadata();
+            debug(D_ACLK, "EXECUTING on connect metadata command");
             ACLK_SHARED_STATE_LOCK;
+            meta_state = aclk_shared_state.metadata_submitted;
             aclk_shared_state.metadata_submitted = ACLK_METADATA_SENT;
             ACLK_SHARED_STATE_UNLOCK;
-            QUERY_THREAD_UNLOCK;
+            aclk_send_metadata(meta_state);
             break;
 
         case ACLK_CMD_CHART:
@@ -1749,13 +1750,10 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
  *    active alarms
  */
 void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb);
-void aclk_send_alarm_metadata()
+
+void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted)
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-
-    ACLK_SHARED_STATE_LOCK;
-    ACLK_METADATA_STATE metadata_submitted = aclk_shared_state.metadata_submitted;
-    ACLK_SHARED_STATE_UNLOCK;
 
     char *msg_id = create_uuid();
     buffer_flush(local_buffer);
@@ -1799,13 +1797,9 @@ void aclk_send_alarm_metadata()
  *    /api/v1/info
  *    charts
  */
-int aclk_send_info_metadata()
+int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted)
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-
-    ACLK_SHARED_STATE_LOCK;
-    ACLK_METADATA_STATE metadata_submitted = aclk_shared_state.metadata_submitted;
-    ACLK_SHARED_STATE_UNLOCK;
 
     debug(D_ACLK, "Metadata /info start");
 
@@ -1860,11 +1854,11 @@ void aclk_send_stress_test(size_t size)
 
 // Send info metadata message to the cloud if the link is established
 // or on request
-int aclk_send_metadata()
+int aclk_send_metadata(ACLK_METADATA_STATE state)
 {
 
-    aclk_send_info_metadata();
-    aclk_send_alarm_metadata();
+    aclk_send_info_metadata(state);
+    aclk_send_alarm_metadata(state);
 
     return 0;
 }
