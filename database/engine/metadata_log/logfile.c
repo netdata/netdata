@@ -524,13 +524,6 @@ static void iterate_records(struct metadata_logfile *metalogfile)
               pos);
 
         replay_record(metalogfile, header, buf + header->header_length);
-        if (!uuid_is_null(state->uuid)) { /* It's a valid object */
-            struct metalog_record record;
-
-            uuid_copy(record.uuid, state->uuid);
-            mlf_record_insert(metalogfile, &record);
-            uuid_clear(state->uuid); /* Clear state for parsing of next record */
-        }
     }
 
     freez(buf);
