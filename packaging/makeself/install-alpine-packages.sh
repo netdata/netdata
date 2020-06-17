@@ -24,14 +24,12 @@ apk add --no-cache -U \
   libtool \
   pkgconfig \
   util-linux-dev \
-  openssl-dev \
   gnutls-dev \
   zlib-dev \
   libmnl-dev \
   libnetfilter_acct-dev \
   libuv-dev \
   lz4-dev \
-  openssl-dev \
   snappy-dev \
   protobuf-dev \
   binutils \
