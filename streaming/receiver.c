@@ -295,6 +295,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     /*if (!strcmp(user->st->name,"system.ip")) {
         info("Finished replication of system.ip");
     }*/
+    rrdset_flag_set(user->st, RRDSET_FLAG_STORE_FIRST);     // Prevent 1-sec gap after replication
     user->st = NULL;
     return PARSER_RC_OK;
 disable:
@@ -345,6 +346,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         rd->values[(rd->rrdset->current_entry + idx) % rd->entries] = value;
     rd->last_collected_time.tv_sec = timestamp;
     rd->last_collected_time.tv_usec = timestamp;
+    rd->collections_counter++;
 
     return PARSER_RC_OK;
 disable:
