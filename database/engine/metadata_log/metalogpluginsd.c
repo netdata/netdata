@@ -117,7 +117,7 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {
         case GUID_TYPE_NOTFOUND:
-            uuid_unparse_lower(uuid, object);
+            uuid_unparse_lower(*uuid, object);
             error("Failed to find valid context with GUID [%s]", object);
             break;
         case GUID_TYPE_CHAR:
