@@ -315,7 +315,8 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
     fatal_assert(GUID_TYPE_CHAR == ret);
     RRDSET *st = rrdset_find(host, chart_fullid);
-    fatal_assert(st);
+    if (!st)
+        return NULL;
 
     RRDDIM *rd = rrddim_find(st, id_str);
 

@@ -116,41 +116,45 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {
-    case GUID_TYPE_CHAR:
-        fatal_assert(0);
-        break;
-    case GUID_TYPE_CHART:
-    case GUID_TYPE_DIMENSION:
-        host = ctx->rrdeng_ctx->host;
-        switch (ret) {
-        case GUID_TYPE_CHART:
-            chart_char_guid = (uuid_t *)(object + 16);
-
-            ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-            fatal_assert(GUID_TYPE_CHAR == ret);
-            ((PARSER_USER_OBJECT *) user)->st = rrdset_find(host, id_str);
+        case GUID_TYPE_NOTFOUND:
+            uuid_unparse_lower(uuid, object);
+            error("Failed to find valid context with GUID [%s]", object);
             break;
-        case GUID_TYPE_DIMENSION:
-            chart_guid = (uuid_t *)(object + 16);
-
-            ret = find_object_by_guid(chart_guid, chart_object, 33);
-            fatal_assert(GUID_TYPE_CHART == ret);
-            chart_char_guid = (uuid_t *)(chart_object + 16);
-
-            ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-            fatal_assert(GUID_TYPE_CHAR == ret);
-            ((PARSER_USER_OBJECT *) user)->st = rrdset_find(host, id_str);
-            break;
-        default:
+        case GUID_TYPE_CHAR:
             fatal_assert(0);
             break;
-        }
-        break;
-    case GUID_TYPE_HOST:
-        /* Ignore for now */
-        break;
-    default:
-        break;
+        case GUID_TYPE_CHART:
+        case GUID_TYPE_DIMENSION:
+            host = ctx->rrdeng_ctx->host;
+            switch (ret) {
+                case GUID_TYPE_CHART:
+                    chart_char_guid = (uuid_t *)(object + 16);
+
+                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
+                    fatal_assert(GUID_TYPE_CHAR == ret);
+                    ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+                    break;
+                case GUID_TYPE_DIMENSION:
+                    chart_guid = (uuid_t *)(object + 16);
+
+                    ret = find_object_by_guid(chart_guid, chart_object, 33);
+                    fatal_assert(GUID_TYPE_CHART == ret);
+                    chart_char_guid = (uuid_t *)(chart_object + 16);
+
+                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
+                    fatal_assert(GUID_TYPE_CHAR == ret);
+                    ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+                    break;
+                default:
+                    fatal_assert(0);
+                    break;
+            }
+            break;
+        case GUID_TYPE_HOST:
+            /* Ignore for now */
+            break;
+        default:
+            break;
     }
 
     return PARSER_RC_OK;

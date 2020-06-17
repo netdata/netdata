@@ -106,7 +106,12 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
         case GUID_TYPE_DIMENSION:
             rd = metalog_get_dimension_from_uuid(ctx, uuid);
             if (rd) {
-                if (ctx->current_compaction_id > rd->state->compaction_id) {
+                if (ctx->current_compaction_id > rd->rrdset->compaction_id) {
+                    error("Forcing compaction of chart %s", rd->rrdset->id);
+                    rd->rrdset->compaction_id = ctx->current_compaction_id;
+                    buffer = metalog_update_chart_buffer(rd->rrdset, ctx->current_compaction_id);
+                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, rd->rrdset->chart_uuid, 1);
+                } else if (ctx->current_compaction_id > rd->state->compaction_id) {
                     rd->state->compaction_id = ctx->current_compaction_id;
                     buffer = metalog_update_dimension_buffer(rd);
                     metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
