@@ -1,15 +1,22 @@
 <!--
 title: "Install Netdata on a Kubernetes cluster"
-description: ""
+description: "Use Netdata's Helm chart to bootstrap a Netdata monitoring and troubleshooting toolkit on your Kubernetes (k8s) cluster."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md
 -->
 
 # Install Netdata on a Kubernetes cluster
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster. By following this installation
-method, you enable five different types of Kubernetes monitoring with Netdata:
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster. By following these directions, you
+will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to bootstrap a Netdata deployment on your cluster.
+The Helm chart installs one parent pod for storing metrics and managing alarm notifications plus an additional child pod
+for every node in the cluster.
 
--   
+Each child pod will collect metrics from the node it runs on in addition to [22 supported
+services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) via [service
+discovery](https://github.com/netdata/agent-service-discovery/). Each child pod will also collect
+[cgroups](/collectors/cgroups.plugin/README.md),
+[Kubelet](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), and
+[kube-proxy](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy) metrics from its node.
 
 To install Netdata on a Kubernetes cluster, you need:
 
@@ -54,8 +61,8 @@ Read up on the various configuration options in the [Helm chart
 documentation](https://github.com/netdata/helmchart#configuration) to see if you need to change any of the options based
 on your cluster's setup.
 
-To change a setting, you can edit the `values.yml` file inside of the `netdata-helmchart` folder. Then upgrade the Helm
-deployment with `helm upgrade`:
+To change a setting, you can edit the `values.yml` file inside of the `netdata-helmchart` folder. Then install the chart
+as described in the previous step, or upgrade an existing Helm deployment with `helm upgrade`:
 
 ```bash
 helm upgrade netdata ./netdata-helmchart
@@ -69,20 +76,19 @@ parent.database.volumesize=4Gi`.
 
 As mentioned in the introduction, Netdata has a [service discovery
 plugin](https://github.com/netdata/agent-service-discovery/#service-discovery) to identify compatible pods and collect
-metrics from the service they run. This service discovery plugin is installed into your k8s cluster when you use the
-Netdata Helm chart.
+metrics from the service they run. The Netdata Helm chart installs this service discovery plugin into your k8s cluster.
 
 Service discovery scans your cluster for pods exposed on certain ports and with certain image names. By default, it
 looks for its supported services on the ports they most commonly listen on, and using default image names. Service
-discovery currently supports [22 popular services](https://github.com/netdata/).
+discovery currently supports [22 popular
+services](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
-If you haven't changed listening ports or other defaults, service discovery should find your pods and the services
-running inside of them, create the proper configurations, and begin monitoring them as soon as the Netdata child pods
-finish deploying.
+If you haven't changed listening ports or other defaults, service discovery should find your pods, create the proper
+configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
 
 However, if you have changed some of these defaults, you'll need to open the `netdata-helmchart/sd-child.yml` file and
 edit the ports or image names that service discovery uses to find supported pods. You can then run `helm upgrade netdata
-./netdata-helmchart` to push this change to your cluster.
+./netdata-helmchart` to push changes to your cluster.
 
 ## Access the Netdata dashboard
 
@@ -96,7 +102,7 @@ kubectl port-forward netdata-parent-0 19999:19999
 You can now access the dashboard at `http://CLUSTER:19999`, replacing `CLUSTER` with the IP address or hostname of your
 k8s cluster.
 
-If you set up the Netdata Helm chart with `service.type=LoadBalancer`, you can often find the external IP for your load
+If you set up the Netdata Helm chart with `service.type=LoadBalancer`, you can find the external IP for the load
 balancer with `kubectl get services`, under the `EXTERNAL-IP` column.
 
 ```bash
