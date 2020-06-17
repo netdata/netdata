@@ -27,13 +27,18 @@ Let's get started.
 
 ## Prerequisites
 
-To follow this guide, you need a working k8s cluster running Kubernetes v1.9 or newer, the
-[kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool on the system you use to administer
-your k8s cluster, and the [Helm package manager](https://helm.sh/) on that same system.
+To follow this guide, you need:
 
-This guide uses a 3-node cluster, running on Digital Ocean, as an example. This cluster also runs CockroachDB, which
-we'll use as an example of how to monitor not only the health of Kubernetes cluster itself, but also the service(s)
-running in its pods.
+-   A working k8s cluster running Kubernetes v1.9 or newer.
+-   The [Helm package manager](https://helm.sh/) on an administrative system.
+-   The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool on the same system.
+
+**You all need to install the Netdata Helm chart on your cluster** before you proceed. See our [Kubernetes installation
+process](/packaging/installer/methods/kubernetes.md) for details.
+
+This guide uses a 3-node cluster, running on Digital Ocean, as an example. This cluster runs CockroachDB, Redis, and
+Apache, which we'll use as examples of how to monitor not only the cluster itself, but also the services running in its
+many pods.
 
 ```bash
 kubectl get nodes 
@@ -43,124 +48,66 @@ pool-0z7557lfb-3fnbx   Ready    <none>   51m   v1.17.5
 pool-0z7557lfb-3fnby   Ready    <none>   51m   v1.17.5
 
 kubectl get pods
-NAME                            READY   STATUS      RESTARTS   AGE
-cockroachdb-0                   1/1     Running     0          92m
-cockroachdb-1                   1/1     Running     0          92m
-cockroachdb-2                   1/1     Running     1          92m
-cockroachdb-init-q7mp6          0/1     Completed   0          92m
+NAME                     READY   STATUS      RESTARTS   AGE
+cockroachdb-0            1/1     Running     0          44h
+cockroachdb-1            1/1     Running     0          44h
+cockroachdb-2            1/1     Running     1          44h
+cockroachdb-init-q7mp6   0/1     Completed   0          44h
+httpd-6f6cb96d77-4zlc9   1/1     Running     0          2m47s
+httpd-6f6cb96d77-d9gs6   1/1     Running     0          2m47s
+httpd-6f6cb96d77-xtpwn   1/1     Running     0          11m
+netdata-child-5p2m9      2/2     Running     0          42h
+netdata-child-92qvf      2/2     Running     0          42h
+netdata-child-djc6w      2/2     Running     0          42h
+netdata-parent-0         1/1     Running     0          42h
+redis-6bb94d4689-6nn6v   1/1     Running     0          73s
+redis-6bb94d4689-c2fk2   1/1     Running     0          73s
+redis-6bb94d4689-tjcz5   1/1     Running     0          88s
 ```
 
 Once you're ready, you can start deploying Netdata monitoring on your k8s cluster.
 
 ## Install the Netdata Helm chart
 
-To monitor a Kubernetes cluster with Netdata, you need to begin by installing the Netdata Helm chart.
+You all need to install the Netdata Helm chart on your k8s cluster to monitor it. See our [Kubernetes installation
+process](/packaging/installer/methods/kubernetes.md) for details.
 
-Download the [Netdata Helm chart](https://github.com/netdata/helmchart) on the administation system where you have the
-`helm` binary installed.
-
-```bash
-git clone https://github.com/netdata/helmchart.git netdata-helmchart
-```
-
-You may not need to configure either the Helm chart or the service discovery configuration file, but it's important to
-read up on the following two steps to better understand how they work.
-
-### Configure the Helm chart for your cluster
-
-Read up on the various configuration options in the [Helm chart
-documentation](https://github.com/netdata/helmchart#configuration) to see if you need to change any of the options based
-on your cluster's setup.
-
-For example, Digital Ocean's Kubernetes implementation requires that volumes are a minimum of 1Gi, and the default
-setting for the parent pod's persistent storage for alarms is 100Mi (`parent.alarms.volumesize`).
-
-To override a setting, you can edit the `values.yml` file inside of the `netdata-helmchart` folder, or you can use
-`--set`: `--set parent.alarms.volumesize=1Gi` when running `helm install`.
-
-### Configure service discovery
-
-As mentioned in the introduction, Netdata has a [service discovery
-plugin](https://github.com/netdata/agent-service-discovery/#service-discovery) to identify compatible pods and collect
-metrics from the service they run. This service discovery plugin is installed into your k8s cluster when you use the
-Netdata Helm chart.
-
-Service discovery scans your cluster for pods exposed on certain ports and with certain image names. By default, it
-looks for its [supported services](https://github.com/netdata/helmchart/blob/master/sd-slave.yml#L11-L54) on the ports
-they most commonly listen on, and using default image names.
-
-For example, this example Kubernetes cluser is running CockroachDB. The service discovery plugin looks for images with a
-name following the pattern `**/cockroach*` and running on port `8080`.
-
-If you haven't changed listening ports or other defaults, service discovery should find your pods and the services
-running inside of them, create the proper configurations, and begin monitoring them as soon as the Netdata pods finish
-deploying.
-
-However, if you have changed some of these defaults, and want to monitor
+## 
 
 
+See our [Kubernetes docs](/packaging/installer/methods/kubernetes.md#access-the-netdata-dashboard) for more information on how to access your 
 
-### Install the Helm chart
-
-If you didn't configure your cluster in the previous step, you can run the `helm` command below, replacing `--name
-netdata` with the release name of your choosing.
-
-```bash
-helm install --name netdata ./netdata-helmchart
-```
-
-> If you edited the `values.yml` file in the previous step, add `-f netdata-helmchart/values.yaml` to the end of the
-> above command: `helm install --name netdata ./netdata-helmchart -f netdata-helmchart/values.yaml`.
-
-Run `kubectl get services` and `kubectl get pods` to confirm the `netdata` service, plus the various `parent` and
-`child` pods, were created successfully. Your output should look similar to the following.
-
-You now have a deployment of Netdata pods to help you monitor your Kubernetes cluster. The `netdata-child` pods collect
-metrics and stream them to `netdata-parent`, which uses two persistent volumes to store metrics and alarms. In addition,
-the parent pod handles alarm notifications and enables the Netdata dashboard using an ingress controller.
-
-### Update/reinstall or remove the Netdata Helm chart
-
-If you want to update the Helm chart's configuration, you can run `helm upgrade`, replacing `netdata` with the name of
-the release if you changed it upon installtion.
-
-```bash
-helm upgrade netdata ./netdata-helmchart
-```
-
-Delete the Helm deployment altogether with the following command:
-
-```bash
-helm delete netdata --purge 
-```
-
-Based on your k8s provider, you may need to manually delete volumes or volumes claims.
-
-## Start monitoring your Kubernetes cluster with Netdata
+## Explore Netdata's Kubernetes charts
 
 The Helm chart installs and enables everything you need for visibility into your k8s cluster, including the service
 discovery plugin, Kubelet collector, and kube-proxy collector.
 
 The service discovery plugin itself
 
-### Explore pod metrics
+### Pods
 
 - See the K
 - cgroups collector shows the various containers running in each 
 
-### Explore service discovery
+### Applications running inside of pods (service discovery)
 
 t/k
 
-### Explore Kubelet charts
+### cgroups
 
 t/k
 
-### Explore kube-proxy charts
+### Kubelet
+
+t/k
+
+### kube-proxy
 
 t/k
 
 ### See all other containers
+
+???
 
 ## What's next?
 
