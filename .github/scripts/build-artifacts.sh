@@ -23,6 +23,7 @@ prepare_build() {
 build_dist() {
   progress "Building dist"
   (
+    command -v git > /dev/null && [ -d .git ] && git clean -d -f
     autoreconf -ivf
     ./configure \
       --prefix=/usr \
@@ -41,6 +42,7 @@ build_dist() {
 build_static_x86_64() {
   progress "Building static x86_64"
   (
+    command -v git > /dev/null && [ -d .git ] && git clean -d -f
     USER="" ./packaging/makeself/build-x86_64-static.sh
   ) >&2
 }
