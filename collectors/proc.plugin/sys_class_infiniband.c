@@ -484,7 +484,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt) {
 					p->width = str2ull(buffer_width);
 				}
 
-
+				info("Infiniband card %s port %s at speed %llu width %llu", dev_dent->d_name, port_dent->d_name, p->speed, p->width);
 
 			}
 			closedir(ports_dir);
