@@ -7,8 +7,7 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
-//TODO:underhood
-extern int aclk_connected;
+volatile int aclk_connected = 0;
 
 #ifndef __GNUC__
 #pragma region ACLK_QUEUE
@@ -33,8 +32,18 @@ struct aclk_query {
 struct aclk_query_queue {
     struct aclk_query *aclk_query_head;
     struct aclk_query *aclk_query_tail;
-    uint64_t count;
+    unsigned int count;
 } aclk_queue = { .aclk_query_head = NULL, .aclk_query_tail = NULL, .count = 0 };
+
+
+unsigned int aclk_query_size()
+{
+    int r;
+    ACLK_QUEUE_LOCK;
+    r = aclk_queue.count;
+    ACLK_QUEUE_UNLOCK;
+    return r;
+}
 
 /*
  * Free a query structure when done

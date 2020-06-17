@@ -17,7 +17,6 @@ static char *aclk_password = NULL;
 
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
-int aclk_connected = 0;             // Exposed in the web-api
 int aclk_force_reconnect = 0;       // Indication from lower layers
 int aclk_kill_link = 0;             // Tell the agent to tear down the link
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
@@ -1117,8 +1116,7 @@ int aclk_subscribe(char *sub_topic, int qos)
 // This is called from a callback when the link goes up
 void aclk_connect()
 {
-    //TODO:underhood
-    //info("Connection detected (%"PRIu64" queued queries)", aclk_queue.count);
+    info("Connection detected (%u queued queries)", aclk_query_size());
 
     aclk_stats_upd_online(1);
 
@@ -1131,9 +1129,8 @@ void aclk_connect()
 // This is called from a callback when the link goes down
 void aclk_disconnect()
 {
-    //TODO:underhood
-    /*if (likely(aclk_connected))
-        info("Disconnect detected (%"PRIu64" queued queries)", aclk_queue.count);*/
+    if (likely(aclk_connected))
+        info("Disconnect detected (%u queued queries)", aclk_query_size());
 
     aclk_stats_upd_online(0);
 
