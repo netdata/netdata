@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- dashboard v1.0.14\_2 [\#9350](https://github.com/netdata/netdata/pull/9350) ([jacekkolasa](https://github.com/jacekkolasa))
+- Revert "Override linker and include paths for static builds." [\#9343](https://github.com/netdata/netdata/pull/9343) ([Ferroin](https://github.com/Ferroin))
 - installer: update go.d.plugin version to v0.19.2 [\#9340](https://github.com/netdata/netdata/pull/9340) ([ilyam8](https://github.com/ilyam8))
+- Get netdata execution path early to avoid user permission issues [\#9339](https://github.com/netdata/netdata/pull/9339) ([mfundul](https://github.com/mfundul))
+- Fix issues on ebpf.plugin [\#9333](https://github.com/netdata/netdata/pull/9333) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove Gentoo from CI [\#9327](https://github.com/netdata/netdata/pull/9327) ([prologic](https://github.com/prologic))
 - Fixed invalid memory access [\#9326](https://github.com/netdata/netdata/pull/9326) ([stelfrag](https://github.com/stelfrag))
 - Add support for persistent metadata [\#9324](https://github.com/netdata/netdata/pull/9324) ([stelfrag](https://github.com/stelfrag))
@@ -33,6 +37,7 @@
 - Cleanup of main README and registry doc [\#9265](https://github.com/netdata/netdata/pull/9265) ([joelhans](https://github.com/joelhans))
 - Fixed handling of OpenSSL on CentOS/RHEL by bundling a static copy and selecting a configuration directory at install time. [\#9263](https://github.com/netdata/netdata/pull/9263) ([Ferroin](https://github.com/Ferroin))
 - Fix frontmatter in circular\_buffer README [\#9262](https://github.com/netdata/netdata/pull/9262) ([joelhans](https://github.com/joelhans))
+- Doc: Add missing slash [\#9257](https://github.com/netdata/netdata/pull/9257) ([oneoneonepig](https://github.com/oneoneonepig))
 - Fixes documentation ambiguity leading into issue \#8239 [\#9255](https://github.com/netdata/netdata/pull/9255) ([underhood](https://github.com/underhood))
 - Add new exporting "home base" document [\#9246](https://github.com/netdata/netdata/pull/9246) ([joelhans](https://github.com/joelhans))
 - Add a random offset to the update script when running non-interactively. [\#9245](https://github.com/netdata/netdata/pull/9245) ([Ferroin](https://github.com/Ferroin))
@@ -91,12 +96,8 @@
 - OpenTSDB and TLS [\#9068](https://github.com/netdata/netdata/pull/9068) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add links to promote database engine calculator [\#9067](https://github.com/netdata/netdata/pull/9067) ([joelhans](https://github.com/joelhans))
 - Update the exporting documentation [\#9066](https://github.com/netdata/netdata/pull/9066) ([vlvkobal](https://github.com/vlvkobal))
-- Add proc.plugin configuration example for high-processor systems [\#9062](https://github.com/netdata/netdata/pull/9062) ([joelhans](https://github.com/joelhans))
 - Added required bundle for libuuid on ClearLinux. [\#9060](https://github.com/netdata/netdata/pull/9060) ([Ferroin](https://github.com/Ferroin))
-- claim: fix `New/ephemeral Agent containers` instruction [\#9058](https://github.com/netdata/netdata/pull/9058) ([ilyam8](https://github.com/ilyam8))
 - Add notes/known issues section to installation page [\#9053](https://github.com/netdata/netdata/pull/9053) ([joelhans](https://github.com/joelhans))
-- Add frontmatter to exporting connectors [\#9052](https://github.com/netdata/netdata/pull/9052) ([joelhans](https://github.com/joelhans))
-- Add agent restart note for reclaiming [\#9049](https://github.com/netdata/netdata/pull/9049) ([zack-shoylev](https://github.com/zack-shoylev))
 - Missing error aws [\#9048](https://github.com/netdata/netdata/pull/9048) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add ACLK Connection Details [\#9047](https://github.com/netdata/netdata/pull/9047) ([zack-shoylev](https://github.com/zack-shoylev))
 - Don't overwrite netdata.conf on update on static installs. [\#9046](https://github.com/netdata/netdata/pull/9046) ([Ferroin](https://github.com/Ferroin))
@@ -111,16 +112,15 @@
 - Fix suid bits on plugin for debian packaging [\#8996](https://github.com/netdata/netdata/pull/8996) ([MrFreezeex](https://github.com/MrFreezeex))
 - Fix incorrect issue link URL in install-required-packages.sh [\#8911](https://github.com/netdata/netdata/pull/8911) ([prologic](https://github.com/prologic))
 - Fix macOS builds building and linking against openssl [\#8865](https://github.com/netdata/netdata/pull/8865) ([prologic](https://github.com/prologic))
-- Removeed Polyverse Polymorphic Linux from Docker builds. [\#8802](https://github.com/netdata/netdata/pull/8802) ([Ferroin](https://github.com/Ferroin))
+- Improve PR Guidelines for Developers and Contributors. [\#8809](https://github.com/netdata/netdata/pull/8809) ([prologic](https://github.com/prologic))
+- Removed Polyverse Polymorphic Linux from Docker builds. [\#8802](https://github.com/netdata/netdata/pull/8802) ([Ferroin](https://github.com/Ferroin))
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
 - Docs: Update contributing guidelines [\#8781](https://github.com/netdata/netdata/pull/8781) ([joelhans](https://github.com/joelhans))
 - single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
 - Correctly track last num vcpus in xenstat\_plugin [\#8720](https://github.com/netdata/netdata/pull/8720) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
-- Typo. [\#8703](https://github.com/netdata/netdata/pull/8703) ([cherouvim](https://github.com/cherouvim))
 - install and enable eBPF Plugin by default [\#8665](https://github.com/netdata/netdata/pull/8665) ([Ferroin](https://github.com/Ferroin))
 - Update synology.md [\#8658](https://github.com/netdata/netdata/pull/8658) ([thenktor](https://github.com/thenktor))
 - Ceph: Added OSD size collection [\#8649](https://github.com/netdata/netdata/pull/8649) ([elelayan](https://github.com/elelayan))
-- Update freebsd.md [\#8643](https://github.com/netdata/netdata/pull/8643) ([thenktor](https://github.com/thenktor))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
@@ -207,8 +207,6 @@
 - collectors/python.d/mysql: fix `threads\_creation\_rate` chart context [\#8636](https://github.com/netdata/netdata/pull/8636) ([ilyam8](https://github.com/ilyam8))
 - Show internal stats for the exporting engine [\#8635](https://github.com/netdata/netdata/pull/8635) ([vlvkobal](https://github.com/vlvkobal))
 - Add session-id using connect timestamp [\#8633](https://github.com/netdata/netdata/pull/8633) ([amoss](https://github.com/amoss))
-- Update main README with 1.21 release news [\#8619](https://github.com/netdata/netdata/pull/8619) ([joelhans](https://github.com/joelhans))
-- Improved ACLK memory management and shutdown sequence [\#8611](https://github.com/netdata/netdata/pull/8611) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
