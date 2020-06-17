@@ -443,30 +443,6 @@ static int aclk_process_query(int t_idx)
     return 1;
 }
 
-/*
- * Process all pending queries
- * Return 0 if no queries were processed, 1 otherwise
- *
- */
-static inline int aclk_process_queries(int t_idx)
-{
-    if (unlikely(netdata_exit || !aclk_connected))
-        return 0;
-
-    if (likely(!aclk_queue.count))
-        return 0;
-
-    debug(D_ACLK, "Processing %d queries", (int)aclk_queue.count);
-    error("Processing %d queries", (int)aclk_queue.count);
-
-    //TODO: may consider possible throttling here
-    while (aclk_process_query(t_idx)) {
-        // Process all commands
-    };
-
-    return 1;
-}
-
 void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
 {
     if (query_threads) {
@@ -566,7 +542,9 @@ void *aclk_query_main_thread(void *ptr)
         }
         ACLK_SHARED_STATE_UNLOCK;
 
-        aclk_process_queries(info->idx);
+        while (aclk_process_query(info->idx)) {
+            // Process all commands
+        };
 
         QUERY_THREAD_LOCK;
 
