@@ -8,7 +8,7 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
 //TODO:underhood
-extern int aclk_connected, waiting_init;
+extern int aclk_connected;
 
 #ifndef __GNUC__
 #pragma region ACLK_QUEUE
@@ -174,7 +174,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
     struct aclk_query *new_query, *tmp_query;
 
     // Ignore all commands while we wait for the agent to initialize
-    if (unlikely(waiting_init))
+    if (unlikely(!aclk_connected))
         return 1;
 
     run_after = now_realtime_sec() + run_after;

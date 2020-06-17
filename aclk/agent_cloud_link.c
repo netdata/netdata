@@ -12,7 +12,6 @@ int aclk_shutting_down = 0;
 // Other global state
 static int aclk_subscribed = 0;
 static int aclk_disable_single_updates = 0;
-int waiting_init = 1;
 static char *aclk_username = NULL;
 static char *aclk_password = NULL;
 
@@ -1124,7 +1123,6 @@ void aclk_connect()
     aclk_stats_upd_online(1);
 
     aclk_connected = 1;
-    waiting_init = 0;
     aclk_reconnect_delay(0);
     QUERY_THREAD_WAKEUP;
     return;
@@ -1143,7 +1141,6 @@ void aclk_disconnect()
     ACLK_SHARED_STATE_LOCK;
     aclk_shared_state.metadata_submitted = ACLK_METADATA_REQUIRED;
     ACLK_SHARED_STATE_UNLOCK;
-    waiting_init = 1;
     aclk_connected = 0;
     aclk_connecting = 0;
     aclk_force_reconnect = 1;
