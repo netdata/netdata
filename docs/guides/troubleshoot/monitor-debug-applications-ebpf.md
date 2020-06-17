@@ -96,7 +96,12 @@ Replace `entry` with `return`:
 
 ```conf
 [global]
-    load = return
+    ebpf load mode = return
+    disable apps = no
+
+[ebpf programs]
+    process = yes
+    network viewer = yes
 ```
 
 Restart Netdata with `sudo service netdata restart` or the appropriate method for your system.
@@ -127,6 +132,18 @@ charts](https://user-images.githubusercontent.com/1153921/84795632-9b1fa700-afac
 In these charts, you can see first a spike in syscalls to open and close files from the configure/build process,
 followed by a similar spike from the Apache benchmark.
 
+> 👋 Don't forget that you can view chart data directly via Netdata's API!
+> 
+> For example, open your browser and navigate to `http://NODE:19999/api/v1/data?chart=apps.file_open`, replacing `NODE`
+> with the IP address or hostname of your Agent. The API returns JSON of that chart's dimensions and metrics, which you
+> can use in other operations.
+>
+> To see other charts, replace `apps.file_open` with the context of the chart you want to see data for.
+>
+> To see all the API options, visit our [Swagger
+> documentation](https://editor.swagger.io/?url=https://raw.githubusercontent.com/netdata/netdata/master/web/api/netdata-swagger.yaml)
+> and look under the **/data** section.
+
 ## Troubleshoot and debug applications with eBPF
 
 The actual method of troubleshooting and debugging any application with Netdata's eBPF metrics depends on the
@@ -149,7 +166,7 @@ For example, look at the charts below. The first spike represents running a Redi
 (`redis-benchmark -n 1000000 -t set,get -q -P 16`).
 
 ![Screenshot of eBPF metrics during a Redis
-benchmark](https://user-images.githubusercontent.com/1153921/84815069-50f7ef00-afc7-11ea-8352-c9277bd4fdf7.png)
+benchmark](https://user-images.githubusercontent.com/1153921/84916168-91607700-b072-11ea-8fec-b76df89315aa.png)
 
 The performance optimization is clear from the speed at which the benchmark finished (the horizontal length of the
 spike) and the reduced write/read syscalls and bytes written to disk.
@@ -181,8 +198,9 @@ syscalls return in failure.
 
 By understanding when these failures happen, and when, you might be able to diagnose a bug in your application.
 
-To diagnose potential issues with an application, look at the Fails to open files, Fails to close files, Fails to write,
-and Fails to read charts for failed syscalls coming from your application. If you see any, look to the surrounding
+To diagnose potential issues with an application, look at the **Fails to open files (apps.file_open_error)**, **Fails to
+close files (apps.file_close_error)**, **Fails to write (apps.vfs_write_error)**, and **Fails to read
+(apps.vfs_read_error)** charts for failed syscalls coming from your application. If you see any, look to the surrounding
 charts for anomalies at the same time frame, or correlate with other activity in the application or on the system to get
 closer to the root cause.
 
@@ -206,7 +224,7 @@ continues for roughly 30 seconds, at which point the factory program was killed 
 closed tasks in the subsequent second.
 
 Zombie processes may not be catastrophic, but if you're developing an application on Linux, you should eliminate them.
-If you see them in a service in your stack, it's probably worth filing a bug report.
+If a service in your stack creates them, you should consider filing a bug report.
 
 ## View eBPF metrics in Netdata Cloud
 
