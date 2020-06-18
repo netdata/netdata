@@ -413,13 +413,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
 
     size_t count = streaming_parser(rpt, &cd, fp);
-    //size_t count = pluginsd_process(host, &cd, fp, 1);
-
-    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "DISCONNECTED");
-    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->host->hostname, rpt->client_ip, rpt->client_port, count);
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit) {
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "DISCONNECTED");
+        error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->host->hostname, rpt->client_ip, rpt->client_port, count);
         netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == rpt) {
             rrdhost_wrlock(rpt->host);
