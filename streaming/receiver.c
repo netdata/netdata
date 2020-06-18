@@ -11,7 +11,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         struct receiver_state *rpt = (struct receiver_state *) ptr;
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
-        if (rpt->host) {
+        if (!netdata_exit && rpt->host) {
             netdata_mutex_lock(&rpt->host->receiver_lock);
             if (rpt->host->receiver == rpt)
                 rpt->host->receiver = NULL;
@@ -414,15 +414,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     size_t count = streaming_parser(rpt, &cd, fp);
 
+    log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,
+                          "DISCONNECTED");
+    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
+          rpt->client_port, count);
+
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
-    if (!netdata_exit) {
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "DISCONNECTED");
-        error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->host->hostname, rpt->client_ip, rpt->client_port, count);
+    if (!netdata_exit && rpt->host) {
         netdata_mutex_lock(&rpt->host->receiver_lock);
-        // During the delay in locking the mutex the host structure has been deleted and cannot be touched again.
-        // This is a panicky exit as we cannot unlock the mutex..
-        if (netdata_exit)
-            goto error;
         if (rpt->host->receiver == rpt) {
             rrdhost_wrlock(rpt->host);
             rpt->host->senders_disconnected_time = now_realtime_sec();
@@ -435,7 +434,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
         netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
 
-error:
     // cleanup
     fclose(fp);
     return (int)count;

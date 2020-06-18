@@ -674,12 +674,18 @@ void rrdhost_free(RRDHOST *host) {
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
     // ------------------------------------------------------------------------
-    // clean up the sender
+    // clean up streaming
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
     freez(host->sender);
     host->sender = NULL;
+    netdata_mutex_lock(&host->receiver_lock);
+    if (host->receiver)
+        host->receiver->shutdown = 1;
+    netdata_mutex_unlock(&host->receiver_lock);
+
+
 
     rrdhost_wrlock(host);   // lock this RRDHOST
 
