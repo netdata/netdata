@@ -7,7 +7,7 @@
 import subprocess
 import threading
 import xml.etree.ElementTree as et
-import os 
+import os
 import pwd
 
 from bases.FrameworkServices.SimpleService import SimpleService
