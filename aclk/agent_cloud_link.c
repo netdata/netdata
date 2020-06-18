@@ -1063,9 +1063,6 @@ static void aclk_main_cleanup(void *ptr)
         QUERY_THREAD_WAKEUP;
         aclk_graceful_disconnect();
     }
-
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 struct dictionary_singleton {
@@ -1538,6 +1535,13 @@ exited:
         freez(stats_thread);
     }
 
+    /*
+     * this must be last -> if all static threads signal
+     * THREAD_EXITED rrdengine will dealloc the RRDSETs
+     * and RRDDIMs that are used by still runing stat thread.
+     * see netdata_cleanup_and_exit() for reference
+     */
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
 
