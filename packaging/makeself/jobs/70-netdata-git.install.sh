@@ -26,6 +26,7 @@ run ./netdata-installer.sh \
   --install "${NETDATA_INSTALL_PARENT}" \
   --dont-wait \
   --dont-start-it \
+  --require-cloud \
   --dont-scrub-cflags-even-though-it-may-break-things
 
 # Remove the netdata.conf file from the tree. It has hard-coded sensible defaults builtin.
