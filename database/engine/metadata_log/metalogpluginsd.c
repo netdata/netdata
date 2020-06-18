@@ -105,6 +105,15 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
     return PARSER_RC_OK;
 }
 
+static inline void error_with_guid(uuid_t *uuid, char *reason)
+{
+    char  uuid_str[37];
+
+    uuid_unparse_lower(*uuid, uuid_str);
+    errno = 0;
+    error("%s (GUID = %s)", reason, uuid_str);
+}
+
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
     GUID_TYPE ret;
@@ -117,11 +126,10 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {
         case GUID_TYPE_NOTFOUND:
-            uuid_unparse_lower(*uuid, object);
-            error("Failed to find valid context with GUID [%s]", object);
+            error_with_guid(uuid, "Failed to find valid context");
             break;
         case GUID_TYPE_CHAR:
-            fatal_assert(0);
+            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
             break;
         case GUID_TYPE_CHART:
         case GUID_TYPE_DIMENSION:
@@ -131,22 +139,33 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
                     chart_char_guid = (uuid_t *)(object + 16);
 
                     ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-                    fatal_assert(GUID_TYPE_CHAR == ret);
-                    ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+                    if (unlikely(GUID_TYPE_CHAR != ret)) {
+                        error_with_guid(uuid, "Failed to find valid chart name");
+                        ((PARSER_USER_OBJECT *)user)->st = NULL;
+                    }
+                    else
+                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
                     break;
                 case GUID_TYPE_DIMENSION:
                     chart_guid = (uuid_t *)(object + 16);
 
                     ret = find_object_by_guid(chart_guid, chart_object, 33);
-                    fatal_assert(GUID_TYPE_CHART == ret);
-                    chart_char_guid = (uuid_t *)(chart_object + 16);
+                    if (unlikely(GUID_TYPE_CHART != ret)) {
+                        error_with_guid(uuid, "Failed to find valid chart");
+                        ((PARSER_USER_OBJECT *)user)->st = NULL;
+                        break;
+                    }
+                    chart_char_guid = (uuid_t *)(object + 16);
 
                     ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-                    fatal_assert(GUID_TYPE_CHAR == ret);
-                    ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+                    if (unlikely(GUID_TYPE_CHAR != ret)) {
+                        error_with_guid(uuid, "Failed to find valid chart name");
+                        ((PARSER_USER_OBJECT *)user)->st = NULL;
+                    }
+                    else
+                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
                     break;
                 default:
-                    fatal_assert(0);
                     break;
             }
             break;
