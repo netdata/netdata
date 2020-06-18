@@ -7,7 +7,8 @@
 import subprocess
 import threading
 import xml.etree.ElementTree as et
-import psutil
+import os 
+import pwd
 
 from bases.FrameworkServices.SimpleService import SimpleService
 from bases.collection import find_binary
@@ -315,7 +316,9 @@ class GPU:
         ps = []
         for p in p_nodes:
             pid = int(p.find('pid').text)
-            username = psutil.Process(pid).username()
+            proc_stat_file = os.stat("/proc/%d" % pid)
+            uid = proc_stat_file.st_uid
+            username = pwd.getpwuid(uid)[0]
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
