@@ -8,19 +8,21 @@ image: /img/seo/guides/monitor-kubernetes-k8s-netdata.png
 
 **ADD AN INTRO**
 
-We offer four main methods of monitoring a Kubernetes cluster:
+We offer a few complimentary methods of monitoring a Kubernetes cluster:
 
--   A [Helm chart](https://github.com/netdata/helmchart), which bootstraps a Netdata deployment on a Kubernetes cluster.
+-   A [Helm chart](https://github.com/netdata/helmchart), which bootstraps a Netdata Agent pod on every node in your
+    cluster, plus an additional parent pod for storing metrics and managing alarm notifications.
 -   A [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers 22 different
     services that might be running inside of your cluster's pods and creates the configuration files required for
-    Netdata to monitor that service. Compatible services include Nginx, Apache, MySQL, CoreDNS, and much more.
+    Netdata to monitor that service. [Compatible services]() include Nginx, Apache, MySQL, CoreDNS, and much more.
 -   A [Kubelet collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), which runs
     on each node in a k8s cluster to monitor the number of pods/containers, the volume of operations on each container,
     and more.
 -   A [kube-proxy collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy), which
     also runs on each node and monitors latency and the volume of HTTP requests to the proxy.
+-   A [cgroups collector](/collectors/cgroups.plugin/README.md), which 
 
-These four methods work together to help you troubleshoot performance or availablility issues across your Kubernetes
+These methods work together to help you troubleshoot performance or availablility issues across your Kubernetes
 infrastructure.
 
 Let's get started.
@@ -65,18 +67,6 @@ redis-6bb94d4689-c2fk2   1/1     Running     0          73s
 redis-6bb94d4689-tjcz5   1/1     Running     0          88s
 ```
 
-Once you're ready, you can start deploying Netdata monitoring on your k8s cluster.
-
-## Install the Netdata Helm chart
-
-You all need to install the Netdata Helm chart on your k8s cluster to monitor it. See our [Kubernetes installation
-process](/packaging/installer/methods/kubernetes.md) for details.
-
-## 
-
-
-See our [Kubernetes docs](/packaging/installer/methods/kubernetes.md#access-the-netdata-dashboard) for more information on how to access your 
-
 ## Explore Netdata's Kubernetes charts
 
 The Helm chart installs and enables everything you need for visibility into your k8s cluster, including the service
@@ -93,10 +83,6 @@ The service discovery plugin itself
 
 t/k
 
-### cgroups
-
-t/k
-
 ### Kubelet
 
 t/k
@@ -105,9 +91,9 @@ t/k
 
 t/k
 
-### See all other containers
+### Containers via cgroups
 
-???
+t/k
 
 ## What's next?
 
