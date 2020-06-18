@@ -364,7 +364,7 @@ class GPU:
             if 'user_mem_{0}'.format(p['user_name']) not in users:
                 users.add(p['user_name'])
 
-        data['user_num'] = len(users)
+        data['user_num_user_num'] = len(users)
 
         return dict(
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
@@ -412,6 +412,7 @@ class Service(SimpleService):
             data.update(gpu.data())
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)
+            self.update_user_num_chart(gpu)
 
         return data or None
 
@@ -422,7 +423,7 @@ class Service(SimpleService):
         chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
         active_dim_ids = []
         for p in ps:
-            dim_id = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
+            dim_id = 'gpu{0}_process_mem_{1} {2}'.format(gpu.num, p['pid'], p['process_name'])
             active_dim_ids.append(dim_id)
             if dim_id not in chart:
                 chart.add_dimension([dim_id, '{0} {1}'.format(p['pid'], p['process_name'])])
@@ -444,6 +445,12 @@ class Service(SimpleService):
         for dim in chart:
             if dim.id not in active_dim_ids:
                 chart.del_dimension(dim.id, hide=False)
+
+    def update_user_num_chart(self, gpu):
+        chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_NUM)]
+        dim_id = 'gpu{0}_user_num_{1}'.format(gpu.num, 'user_num')
+        if dim_id not in chart:
+            chart.add_dimension([dim_id, 'user_num'])
 
     def check(self):
         if not self.poller.has_smi():
