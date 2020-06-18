@@ -509,7 +509,7 @@ This means a setup like the following is also possible:
 <img src="https://cloud.githubusercontent.com/assets/2662304/23629551/bb1fd9c2-02c0-11e7-90f5-cab5a3ed4c53.png"/>
 </p>
 
-## proxies
+## Proxies
 
 A proxy is a Netdata instance that is receiving metrics from a Netdata, and streams them to another Netdata.
 
@@ -562,7 +562,7 @@ what to do with the `SET` message that follows. When that happens, the parent wi
 ERROR : STREAM_RECEIVER[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
 ```
 
-### child cannot connect to parent
+### Child cannot connect to parent
 
 When the child can't connect to a parent for any reason (misconfiguration, networking, firewalls, parent
 down), you will see the following in the child's `error.log`.
