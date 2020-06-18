@@ -34,6 +34,7 @@ CLOCKS = 'clocks'
 POWER = 'power'
 PROCESSES_MEM = 'processes_mem'
 USER_MEM = 'user_mem'
+USER_NUM = 'user_num'
 
 ORDER = [
     PCI_BANDWIDTH,
@@ -47,6 +48,7 @@ ORDER = [
     POWER,
     PROCESSES_MEM,
     USER_MEM,
+    USER_NUM,
 ]
 
 
@@ -122,6 +124,12 @@ def gpu_charts(gpu):
         USER_MEM: {
             'options': [None, 'Memory Used by Each User', 'MiB', fam, 'nvidia_smi.user_mem', 'stacked'],
             'lines': []
+        },
+        USER_NUM: {
+            'options': [None, 'Number of User on GPU', 'Nr', fam, 'nvidia_smi.user_num', 'stacked'],
+            'lines': [
+                ['nr', 'nr'],
+            ]
         },
     }
 
@@ -347,7 +355,16 @@ class GPU:
         }
         processes = self.processes() or []
         data.update({'process_mem_{0}'.format(p['pid']): p['used_memory'] for p in processes})
-        data.update({'user_mem_{0}'.format(p['user_name']): p['used_memory'] for p in processes})
+        users = set()
+        for p in processes:
+            if 'user_mem_{0}'.format(p['user_name']) in data:
+                data['user_mem_{0}'.format(p['user_name'])] += p['used_memory']
+            else :
+                data['user_mem_{0}'.format(p['user_name'])] = p['used_memory'] 
+            if 'user_mem_{0}'.format(p['user_name']) not in users:
+                users.add(p['user_name'])
+
+        data['user_num'] = len(users)
 
         return dict(
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
