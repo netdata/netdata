@@ -152,6 +152,8 @@ static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
     static RRDSET *st = NULL;
     static RRDDIM *rd_thread[ACLK_MAX_QUERY_THREADS];
 
+    assert(query_thread_count <= ACLK_MAX_QUERY_THREADS);
+
     char dim_name[MAX_DIM_NAME];
 
     if (unlikely(!st)) {
