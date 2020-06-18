@@ -92,7 +92,6 @@
 - Introduce a random sleep in the Netdata updater [\#9079](https://github.com/netdata/netdata/pull/9079) ([prologic](https://github.com/prologic))
 - New alarms \(exporting and Backend\) [\#9075](https://github.com/netdata/netdata/pull/9075) ([thiagoftsm](https://github.com/thiagoftsm))
 - Implement new incremental parser [\#9074](https://github.com/netdata/netdata/pull/9074) ([stelfrag](https://github.com/stelfrag))
-- python.d/proxysql: add `Requirements` to the readme [\#9071](https://github.com/netdata/netdata/pull/9071) ([ilyam8](https://github.com/ilyam8))
 - OpenTSDB and TLS [\#9068](https://github.com/netdata/netdata/pull/9068) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add links to promote database engine calculator [\#9067](https://github.com/netdata/netdata/pull/9067) ([joelhans](https://github.com/joelhans))
 - Update the exporting documentation [\#9066](https://github.com/netdata/netdata/pull/9066) ([vlvkobal](https://github.com/vlvkobal))
