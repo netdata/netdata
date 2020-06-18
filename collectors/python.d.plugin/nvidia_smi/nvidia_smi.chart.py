@@ -360,7 +360,7 @@ class GPU:
             if 'user_mem_{0}'.format(p['user_name']) in data:
                 data['user_mem_{0}'.format(p['user_name'])] += p['used_memory']
             else :
-                data['user_mem_{0}'.format(p['user_name'])] = p['used_memory'] 
+                data['user_mem_{0}'.format(p['user_name'])] = p['used_memory']
             if 'user_mem_{0}'.format(p['user_name']) not in users:
                 users.add(p['user_name'])
 
