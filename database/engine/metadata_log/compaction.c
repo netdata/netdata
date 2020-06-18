@@ -87,7 +87,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
     ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
         case GUID_TYPE_CHAR:
-            fatal_assert(0);
+            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
             break;
         case GUID_TYPE_CHART:
             st = metalog_get_chart_from_uuid(ctx, uuid);
@@ -134,8 +134,11 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
         case GUID_TYPE_NOTFOUND:
             debug(D_METADATALOG, "Ignoring nonexistent metadata record.");
             break;
+        case GUID_TYPE_NOSPACE:
+            error_with_guid(uuid, "Not enough space for object retrieval");
+            break;
         default:
-            fatal_assert(0);
+            error("Unknown return code %u from find_object_by_guid", ret);
             break;
     }
 }

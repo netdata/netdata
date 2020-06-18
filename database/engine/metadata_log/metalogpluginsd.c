@@ -105,15 +105,6 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
     return PARSER_RC_OK;
 }
 
-static inline void error_with_guid(uuid_t *uuid, char *reason)
-{
-    char  uuid_str[37];
-
-    uuid_unparse_lower(*uuid, uuid_str);
-    errno = 0;
-    error("%s (GUID = %s)", reason, uuid_str);
-}
-
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
     GUID_TYPE ret;
@@ -199,6 +190,8 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
                 rrdhost_wrlock(host);
                 rrdset_free(st);
                 rrdhost_unlock(host);
+            } else {
+                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
             }
             break;
         case GUID_TYPE_DIMENSION:
@@ -208,6 +201,9 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
                 rrdset_wrlock(st);
                 rrddim_free_custom(st, rd, 0);
                 rrdset_unlock(st);
+            }
+            else {
+                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
             }
             break;
         case GUID_TYPE_HOST:
