@@ -172,7 +172,11 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
         case GUID_TYPE_HOST:
             /* Ignore for now */
             break;
+        case GUID_TYPE_NOSPACE:
+            error_with_guid(uuid, "Not enough space for object retrieval");
+            break;
         default:
+            error("Unknown return code %u from find_object_by_guid", ret);
             break;
     }
 
