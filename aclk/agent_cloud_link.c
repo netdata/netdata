@@ -538,24 +538,6 @@ static void aclk_graceful_disconnect()
     aclk_shutting_down = 0;
 }
 
-
-// Thread cleanup
-static void aclk_main_cleanup(void *ptr)
-{
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    info("cleaning up...");
-
-    char *agent_id = is_agent_claimed();
-    if (agent_id && aclk_connected) {
-        freez(agent_id);
-        // Wakeup thread to cleanup
-        QUERY_THREAD_WAKEUP;
-        aclk_graceful_disconnect();
-    }
-}
-
 #ifndef __GNUC__
 #pragma region Incoming Msg Parsing
 #endif
@@ -1012,7 +994,15 @@ exited:
     if (aclk_private_key != NULL)
         RSA_free(aclk_private_key);
 
-    aclk_main_cleanup(ptr);
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id && aclk_connected) {
+        freez(agent_id);
+        // Wakeup thread to cleanup
+        QUERY_THREAD_WAKEUP;
+        aclk_graceful_disconnect();
+    }
 
     aclk_query_threads_cleanup(&query_threads);
 
