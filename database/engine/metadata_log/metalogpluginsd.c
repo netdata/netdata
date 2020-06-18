@@ -140,10 +140,8 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
                     chart_char_guid = (uuid_t *)(object + 16);
 
                     ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-                    if (unlikely(GUID_TYPE_CHAR != ret)) {
+                    if (unlikely(GUID_TYPE_CHAR != ret))
                         error_with_guid(uuid, "Failed to find valid chart name");
-                        ((PARSER_USER_OBJECT *)user)->st = NULL;
-                    }
                     else
                         ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
                     break;
@@ -153,16 +151,13 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
                     ret = find_object_by_guid(chart_guid, chart_object, 33);
                     if (unlikely(GUID_TYPE_CHART != ret)) {
                         error_with_guid(uuid, "Failed to find valid chart");
-                        ((PARSER_USER_OBJECT *)user)->st = NULL;
                         break;
                     }
                     chart_char_guid = (uuid_t *)(object + 16);
 
                     ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-                    if (unlikely(GUID_TYPE_CHAR != ret)) {
+                    if (unlikely(GUID_TYPE_CHAR != ret))
                         error_with_guid(uuid, "Failed to find valid chart name");
-                        ((PARSER_USER_OBJECT *)user)->st = NULL;
-                    }
                     else
                         ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
                     break;
