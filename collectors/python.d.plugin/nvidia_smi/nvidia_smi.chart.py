@@ -2,10 +2,12 @@
 # Description: nvidia-smi netdata python.d module
 # Original Author: Steven Noonan (tycho)
 # Author: Ilya Mashchenko (ilyam8)
+# User Memory Stat Author: Guido Scatena (scatenag)
 
 import subprocess
 import threading
 import xml.etree.ElementTree as et
+import psutil
 
 from bases.FrameworkServices.SimpleService import SimpleService
 from bases.collection import find_binary
@@ -30,6 +32,7 @@ TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
 PROCESSES_MEM = 'processes_mem'
+USER_MEM = 'user_mem'
 
 ORDER = [
     PCI_BANDWIDTH,
@@ -42,6 +45,7 @@ ORDER = [
     CLOCKS,
     POWER,
     PROCESSES_MEM,
+    USER_MEM,
 ]
 
 
@@ -112,6 +116,10 @@ def gpu_charts(gpu):
         },
         PROCESSES_MEM: {
             'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
+            'lines': []
+        },
+        USER_MEM: {
+            'options': [None, 'Memory Used by Each User', 'MiB', fam, 'nvidia_smi.user_mem', 'stacked'],
             'lines': []
         },
     }
@@ -306,10 +314,13 @@ class GPU:
         p_nodes = self.root.find('processes').findall('process_info')
         ps = []
         for p in p_nodes:
+            pid = int(p.find('pid').text)
+            username = psutil.Process(pid).username()
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
                 'used_memory': int(p.find('used_memory').text.split()[0]),
+                'user_name': username,
             })
         return ps
 
@@ -333,6 +344,7 @@ class GPU:
         }
         processes = self.processes() or []
         data.update({'process_mem_{0}'.format(p['pid']): p['used_memory'] for p in processes})
+        data.update({'user_mem_{0}'.format(p['user_name']): p['used_memory'] for p in processes})
 
         return dict(
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
@@ -379,6 +391,7 @@ class Service(SimpleService):
             gpu = GPU(idx, root)
             data.update(gpu.data())
             self.update_processes_mem_chart(gpu)
+            self.update_processes_user_mem_chart(gpu)
 
         return data or None
 
@@ -393,6 +406,21 @@ class Service(SimpleService):
             active_dim_ids.append(dim_id)
             if dim_id not in chart:
                 chart.add_dimension([dim_id, '{0} {1}'.format(p['pid'], p['process_name'])])
+        for dim in chart:
+            if dim.id not in active_dim_ids:
+                chart.del_dimension(dim.id, hide=False)
+
+    def update_processes_user_mem_chart(self, gpu):
+        ps = gpu.processes()
+        if not ps:
+            return
+        chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_MEM)]
+        active_dim_ids = []
+        for p in ps:
+            dim_id = 'gpu{0}_user_mem_{1}'.format(gpu.num, p['user_name'])
+            active_dim_ids.append(dim_id)
+            if dim_id not in chart:
+                chart.add_dimension([dim_id, '{0}'.format(p['user_name'])])
         for dim in chart:
             if dim.id not in active_dim_ids:
                 chart.del_dimension(dim.id, hide=False)
