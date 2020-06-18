@@ -10,6 +10,7 @@
 extern pthread_cond_t query_cond_wait;
 extern pthread_mutex_t query_lock_wait;
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
+#define QUERY_THREAD_WAKEUP_ALL pthread_cond_broadcast(&query_cond_wait)
 
 extern volatile int aclk_connected;
 

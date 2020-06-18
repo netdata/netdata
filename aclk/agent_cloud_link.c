@@ -1003,7 +1003,7 @@ void *aclk_main(void *ptr)
     } // forever
 exited:
     // Wakeup query thread to cleanup
-    QUERY_THREAD_WAKEUP;
+    QUERY_THREAD_WAKEUP_ALL;
 
     freez(aclk_username);
     freez(aclk_password);
