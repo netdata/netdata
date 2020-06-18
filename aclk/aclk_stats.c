@@ -160,6 +160,7 @@ void *aclk_stats_main_thread(void *ptr)
         // Wait for the next iteration point.
 
         heartbeat_next(&hb, step_ut);
+        if (netdata_exit) break;
 
         ACLK_STATS_LOCK;
         // to not hold lock longer than necessary, especially not to hold it
