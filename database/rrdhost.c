@@ -666,6 +666,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     }
 }
 
+void destroy_receiver_state(struct receiver_state *rpt);
 void rrdhost_free(RRDHOST *host) {
     if(!host) return;
 
@@ -674,12 +675,25 @@ void rrdhost_free(RRDHOST *host) {
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
     // ------------------------------------------------------------------------
-    // clean up the sender
+    // clean up streaming
     rrdpush_sender_thread_stop(host); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
     buffer_free(host->sender->build);
     freez(host->sender);
     host->sender = NULL;
+    if (netdata_exit) {
+        netdata_mutex_lock(&host->receiver_lock);
+        if (host->receiver) {
+            if (!host->receiver->exited)
+                netdata_thread_cancel(host->receiver->thread);
+            while (!host->receiver->exited)
+                sleep_usec(50 * USEC_PER_MS);
+            destroy_receiver_state(host->receiver);
+        }
+        netdata_mutex_unlock(&host->receiver_lock);
+    }
+
+
 
     rrdhost_wrlock(host);   // lock this RRDHOST
 

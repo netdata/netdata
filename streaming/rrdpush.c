@@ -673,14 +673,13 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
 
 
-    netdata_thread_t thread;
 
     debug(D_SYSTEM, "starting STREAM receive thread.");
 
     char tag[FILENAME_MAX + 1];
     snprintfz(tag, FILENAME_MAX, "STREAM_RECEIVER[%s,[%s]:%s]", rpt->hostname, w->client_ip, w->client_port);
 
-    if(netdata_thread_create(&thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt))
+    if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt))
         error("Failed to create new STREAM receive thread for client.");
 
     // prevent the caller from closing the streaming socket

@@ -64,6 +64,7 @@ struct sender_state {
 
 struct receiver_state {
     RRDHOST *host;
+    netdata_thread_t thread;
     int fd;
     char *key;
     char *hostname;
@@ -85,7 +86,8 @@ struct receiver_state {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
-    unsigned int shutdown:1;
+    unsigned int shutdown:1;    // Tell the thread to exit
+    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 };
 
 
