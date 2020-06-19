@@ -159,15 +159,12 @@ void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
 {
     int ret = 0;
 
+    threadname[0] = '\0';
 #if defined(__FreeBSD__)
     pthread_get_name_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
-#else /* Linux & macOS */
-    ret = pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
+#elif defined(HAVE_PTHREAD_GETNAME_NP) /* Linux & macOS */
+    (void)pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
 #endif
-
-    if (ret) {
-        threadname[0] = '\0';
-    }
 }
 
 static void *thread_start(void *ptr) {

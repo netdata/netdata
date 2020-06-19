@@ -265,6 +265,12 @@ LIBS="${PTHREAD_LIBS} ${LIBS}"
 CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
 CC="${PTHREAD_CC}"
 
+AC_CHECK_LIB(
+[pthread],
+[pthread_getname_np],
+[AC_DEFINE([HAVE_PTHREAD_GETNAME_NP], [1], [Is set if pthread_getname_np is available])]
+)
+
 
 # -----------------------------------------------------------------------------
 # libm
