@@ -4,11 +4,35 @@
 
 extern struct config stream_config;
 
+void destroy_receiver_state(struct receiver_state *rpt) {
+    freez(rpt->key);
+    freez(rpt->hostname);
+    freez(rpt->registry_hostname);
+    freez(rpt->machine_guid);
+    freez(rpt->os);
+    freez(rpt->timezone);
+    freez(rpt->tags);
+    freez(rpt->client_ip);
+    freez(rpt->client_port);
+    freez(rpt->program_name);
+    freez(rpt->program_version);
+#ifdef ENABLE_HTTPS
+    if(rpt->ssl.conn){
+        SSL_free(rpt->ssl.conn);
+    }
+#endif
+    freez(rpt);
+}
+
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
     static __thread int executed = 0;
     if(!executed) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
+        // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
+        // the host pointer as it is unpredicable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
+        if (netdata_exit && rpt->host)
+            return;
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if (!netdata_exit && rpt->host) {
@@ -19,25 +43,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         }
 
         info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-
-        freez(rpt->key);
-        freez(rpt->hostname);
-        freez(rpt->registry_hostname);
-        freez(rpt->machine_guid);
-        freez(rpt->os);
-        freez(rpt->timezone);
-        freez(rpt->tags);
-        freez(rpt->client_ip);
-        freez(rpt->client_port);
-        freez(rpt->program_name);
-        freez(rpt->program_version);
-#ifdef ENABLE_HTTPS
-        if(rpt->ssl.conn){
-            SSL_free(rpt->ssl.conn);
-        }
-#endif
-        freez(rpt);
-
+        destroy_receiver_state(rpt);
     }
 }
 

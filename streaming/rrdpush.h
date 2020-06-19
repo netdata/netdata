@@ -64,6 +64,7 @@ struct sender_state {
 
 struct receiver_state {
     RRDHOST *host;
+    netdata_thread_t thread;
     int fd;
     char *key;
     char *hostname;
