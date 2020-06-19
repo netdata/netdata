@@ -19,7 +19,7 @@ static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struc
 
     if (unlikely(!st_aclkstats)) {
         st_aclkstats = rrdset_create_localhost(
-            "netdata", "aclk_status", NULL, "aclk_stats", NULL, "ACLK/Cloud connection status",
+            "netdata", "aclk_status", NULL, "aclk", NULL, "ACLK/Cloud connection status",
             "connected", "netdata", "stats", 200000, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_online_status = rrddim_add(st_aclkstats, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -39,7 +39,7 @@ static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st_query_thread)) {
         st_query_thread = rrdset_create_localhost(
-            "netdata", "aclk_query_per_second", NULL, "aclk_stats", NULL, "ACLK Queries per second", "queries/s",
+            "netdata", "aclk_query_per_second", NULL, "aclk", NULL, "ACLK Queries per second", "queries/s",
             "netdata", "stats", 200001, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rd_queued = rrddim_add(st_query_thread, "added", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -62,7 +62,7 @@ static void aclk_stats_latency(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_latency_mqtt", NULL, "aclk_stats", NULL, "ACLK Message Publish Latency", "ms",
+            "netdata", "aclk_latency_mqtt", NULL, "aclk", NULL, "ACLK Message Publish Latency", "ms",
             "netdata", "stats", 200002, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_avg = rrddim_add(st, "avg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -88,7 +88,7 @@ static void aclk_stats_write_q(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_write_q", NULL, "aclk_stats", NULL, "Write Queue Mosq->Libwebsockets", "kB/s",
+            "netdata", "aclk_write_q", NULL, "aclk", NULL, "Write Queue Mosq->Libwebsockets", "kB/s",
             "netdata", "stats", 200003, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rd_wq_add = rrddim_add(st, "added", NULL, 1, 1024 * localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -110,7 +110,7 @@ static void aclk_stats_read_q(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_read_q", NULL, "aclk_stats", NULL, "Read Queue Libwebsockets->Mosq", "kB/s",
+            "netdata", "aclk_read_q", NULL, "aclk", NULL, "Read Queue Libwebsockets->Mosq", "kB/s",
             "netdata", "stats", 200004, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rd_rq_add = rrddim_add(st, "added", NULL, 1, 1024 * localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -132,7 +132,7 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_cloud_req", NULL, "aclk_stats", NULL, "Requests received from cloud", "req/s",
+            "netdata", "aclk_cloud_req", NULL, "aclk", NULL, "Requests received from cloud", "req/s",
             "netdata", "stats", 200005, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_rq_rcvd = rrddim_add(st, "received", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -158,7 +158,7 @@ static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_query_threads", NULL, "aclk_stats", NULL, "Queries Processed Per Thread", "req/s",
+            "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
