@@ -116,41 +116,55 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {
-    case GUID_TYPE_CHAR:
-        fatal_assert(0);
-        break;
-    case GUID_TYPE_CHART:
-    case GUID_TYPE_DIMENSION:
-        host = ctx->rrdeng_ctx->host;
-        switch (ret) {
-        case GUID_TYPE_CHART:
-            chart_char_guid = (uuid_t *)(object + 16);
-
-            ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-            fatal_assert(GUID_TYPE_CHAR == ret);
-            ((PARSER_USER_OBJECT *) user)->st = rrdset_find(host, id_str);
+        case GUID_TYPE_NOTFOUND:
+            if (unlikely(ctx->rrdeng_ctx->host && uuid_compare(ctx->rrdeng_ctx->host->host_uuid, *uuid)))
+                error_with_guid(uuid, "Failed to find valid context");
             break;
+        case GUID_TYPE_CHAR:
+            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
+            break;
+        case GUID_TYPE_CHART:
         case GUID_TYPE_DIMENSION:
-            chart_guid = (uuid_t *)(object + 16);
+            host = ctx->rrdeng_ctx->host;
+            switch (ret) {
+                case GUID_TYPE_CHART:
+                    chart_char_guid = (uuid_t *)(object + 16);
 
-            ret = find_object_by_guid(chart_guid, chart_object, 33);
-            fatal_assert(GUID_TYPE_CHART == ret);
-            chart_char_guid = (uuid_t *)(chart_object + 16);
+                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
+                    if (unlikely(GUID_TYPE_CHAR != ret))
+                        error_with_guid(uuid, "Failed to find valid chart name");
+                    else
+                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+                    break;
+                case GUID_TYPE_DIMENSION:
+                    chart_guid = (uuid_t *)(object + 16);
 
-            ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-            fatal_assert(GUID_TYPE_CHAR == ret);
-            ((PARSER_USER_OBJECT *) user)->st = rrdset_find(host, id_str);
+                    ret = find_object_by_guid(chart_guid, chart_object, 33);
+                    if (unlikely(GUID_TYPE_CHART != ret)) {
+                        error_with_guid(uuid, "Failed to find valid chart");
+                        break;
+                    }
+                    chart_char_guid = (uuid_t *)(object + 16);
+
+                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
+                    if (unlikely(GUID_TYPE_CHAR != ret))
+                        error_with_guid(uuid, "Failed to find valid chart name");
+                    else
+                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case GUID_TYPE_HOST:
+            /* Ignore for now */
+            break;
+        case GUID_TYPE_NOSPACE:
+            error_with_guid(uuid, "Not enough space for object retrieval");
             break;
         default:
-            fatal_assert(0);
+            error("Unknown return code %u from find_object_by_guid", ret);
             break;
-        }
-        break;
-    case GUID_TYPE_HOST:
-        /* Ignore for now */
-        break;
-    default:
-        break;
     }
 
     return PARSER_RC_OK;
@@ -176,6 +190,8 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
                 rrdhost_wrlock(host);
                 rrdset_free(st);
                 rrdhost_unlock(host);
+            } else {
+                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
             }
             break;
         case GUID_TYPE_DIMENSION:
@@ -185,6 +201,9 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
                 rrdset_wrlock(st);
                 rrddim_free_custom(st, rd, 0);
                 rrdset_unlock(st);
+            }
+            else {
+                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
             }
             break;
         case GUID_TYPE_HOST:

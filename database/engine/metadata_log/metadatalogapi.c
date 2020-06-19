@@ -273,16 +273,21 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
     uuid_t *machine_guid, *chart_char_guid;
 
     ret = find_object_by_guid(chart_uuid, chart_object, 33);
-    fatal_assert(GUID_TYPE_CHART == ret);
+    if (unlikely(GUID_TYPE_CHART != ret))
+        return NULL;
 
     machine_guid = (uuid_t *)chart_object;
     RRDHOST *host = ctx->rrdeng_ctx->host;
-    fatal_assert(!uuid_compare(host->host_uuid, *machine_guid));
+    if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+        error("Metadata host machine GUID does not match the one assosiated with the chart");
+        return NULL;
+    }
 
     chart_char_guid = (uuid_t *)(chart_object + 16);
 
     ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
-    fatal_assert(GUID_TYPE_CHAR == ret);
+    if (unlikely(GUID_TYPE_CHAR != ret))
+        return NULL;
     RRDSET *st = rrdset_find(host, chart_fullid);
 
     return st;
@@ -300,22 +305,29 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
 
     machine_guid = (uuid_t *)dim_object;
     RRDHOST *host = ctx->rrdeng_ctx->host;
-    fatal_assert(!uuid_compare(host->host_uuid, *machine_guid));
+    if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+        error("Metadata host machine GUID does not match the one assosiated with the dimension");
+        return NULL;
+    }
 
     chart_guid = (uuid_t *)(dim_object + 16);
     dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
 
     ret = find_object_by_guid(dim_char_guid, id_str, sizeof(id_str));
-    fatal_assert(GUID_TYPE_CHAR == ret);
+    if (unlikely(GUID_TYPE_CHAR != ret))
+        return NULL;
 
     ret = find_object_by_guid(chart_guid, chart_object, sizeof(chart_object));
-    fatal_assert(GUID_TYPE_CHART == ret);
+    if (unlikely(GUID_TYPE_CHART != ret))
+        return NULL;
     chart_char_guid = (uuid_t *)(chart_object + 16);
 
     ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
-    fatal_assert(GUID_TYPE_CHAR == ret);
+    if (unlikely(GUID_TYPE_CHAR != ret))
+        return NULL;
     RRDSET *st = rrdset_find(host, chart_fullid);
-    fatal_assert(st);
+    if (!st)
+        return NULL;
 
     RRDDIM *rd = rrddim_find(st, id_str);
 

@@ -74,10 +74,14 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION,
                                            replace_instead_of_generate))) {
             errno = 0;
-            error("FAILED to generate GUID for %s", rd->id);
-            freez(rd->state->metric_uuid);
-            rd->state->metric_uuid = NULL;
-            fatal_assert(0);
+            error("FAILED to reuse GUID for %s", rd->id);
+            if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION, 0))) {
+                errno = 0;
+                error("FAILED to generate GUID for %s", rd->id);
+                freez(rd->state->metric_uuid);
+                rd->state->metric_uuid = NULL;
+                fatal_assert(0);
+            }
         }
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);

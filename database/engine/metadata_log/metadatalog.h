@@ -132,5 +132,5 @@ extern void metalog_test_quota(struct metalog_worker_config *wc);
 extern void metalog_worker(void* arg);
 extern void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd);
 extern struct metalog_cmd metalog_deq_cmd(struct metalog_worker_config *wc);
-
+extern void error_with_guid(uuid_t *uuid, char *reason);
 #endif /* NETDATA_METADATALOG_H */

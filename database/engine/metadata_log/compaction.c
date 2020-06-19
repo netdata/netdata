@@ -87,7 +87,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
     ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
         case GUID_TYPE_CHAR:
-            fatal_assert(0);
+            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
             break;
         case GUID_TYPE_CHART:
             st = metalog_get_chart_from_uuid(ctx, uuid);
@@ -106,7 +106,12 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
         case GUID_TYPE_DIMENSION:
             rd = metalog_get_dimension_from_uuid(ctx, uuid);
             if (rd) {
-                if (ctx->current_compaction_id > rd->state->compaction_id) {
+                if (ctx->current_compaction_id > rd->rrdset->compaction_id) {
+                    error("Forcing compaction of chart %s", rd->rrdset->id);
+                    rd->rrdset->compaction_id = ctx->current_compaction_id;
+                    buffer = metalog_update_chart_buffer(rd->rrdset, ctx->current_compaction_id);
+                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, rd->rrdset->chart_uuid, 1);
+                } else if (ctx->current_compaction_id > rd->state->compaction_id) {
                     rd->state->compaction_id = ctx->current_compaction_id;
                     buffer = metalog_update_dimension_buffer(rd);
                     metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
@@ -129,8 +134,11 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
         case GUID_TYPE_NOTFOUND:
             debug(D_METADATALOG, "Ignoring nonexistent metadata record.");
             break;
+        case GUID_TYPE_NOSPACE:
+            error_with_guid(uuid, "Not enough space for object retrieval");
+            break;
         default:
-            fatal_assert(0);
+            error("Unknown return code %u from find_object_by_guid", ret);
             break;
     }
 }
