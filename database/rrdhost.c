@@ -682,7 +682,8 @@ void rrdhost_free(RRDHOST *host) {
     host->sender = NULL;
     netdata_mutex_lock(&host->receiver_lock);
     if (host->receiver) {
-        netdata_thread_cancel(host->receiver->thread);
+        if (!host->receiver->exited)
+            netdata_thread_cancel(host->receiver->thread);
         destroy_receiver_state(host->receiver);
     }
     netdata_mutex_unlock(&host->receiver_lock);
