@@ -463,7 +463,7 @@ trap build_error EXIT
 build_libmosquitto() {
   local env_cmd=''
 
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ] ; then
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
   fi
 
@@ -543,7 +543,7 @@ bundle_libmosquitto
 build_libwebsockets() {
   local env_cmd=''
 
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ] ; then
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
   fi
 
@@ -553,9 +553,10 @@ build_libwebsockets() {
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
       -D LWS_WITH_SOCKS5:bool=ON \
+      $CMAKE_FLAGS \
       .
   else
-    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON .
+    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON $CMAKE_FLAGS .
   fi
   run ${env_cmd} make
   popd > /dev/null || exit 1
@@ -623,7 +624,7 @@ bundle_libwebsockets
 build_jsonc() {
   local env_cmd=''
 
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ] ; then
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
   fi
 

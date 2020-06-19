@@ -20,7 +20,11 @@ export IS_NETDATA_STATIC_BINARY="yes"
 
 # Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
 export EBPF_LIBC="static"
-export PKG_CONFIG_PATH="/opnessl-static/lib/pkgconfig"
+export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
+
+# Set correct CMake flags for building against non-System OpenSSL
+# See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
+export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib/libssl.a;/openssl-static/lib/libcrypto.a"
 
 run ./netdata-installer.sh \
   --install "${NETDATA_INSTALL_PARENT}" \
