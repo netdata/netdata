@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Fixes the race-hazard in streaming during the shutdown sequence [\#9370](https://github.com/netdata/netdata/pull/9370) ([amoss](https://github.com/amoss))
 - Fixed ACLK shutdown sequence [\#9367](https://github.com/netdata/netdata/pull/9367) ([underhood](https://github.com/underhood))
+- Improved error handling and recovery during compaction and metadata log replay [\#9354](https://github.com/netdata/netdata/pull/9354) ([stelfrag](https://github.com/stelfrag))
 - dashboard v1.0.14\_2 [\#9350](https://github.com/netdata/netdata/pull/9350) ([jacekkolasa](https://github.com/jacekkolasa))
 - Revert "Override linker and include paths for static builds." [\#9343](https://github.com/netdata/netdata/pull/9343) ([Ferroin](https://github.com/Ferroin))
 - installer: update go.d.plugin version to v0.19.2 [\#9340](https://github.com/netdata/netdata/pull/9340) ([ilyam8](https://github.com/ilyam8))
@@ -89,13 +91,10 @@
 - Fix typo in dashboard description [\#9096](https://github.com/netdata/netdata/pull/9096) ([Neamar](https://github.com/Neamar))
 - Reduce minimum size for dbengine disk space [\#9094](https://github.com/netdata/netdata/pull/9094) ([mfundul](https://github.com/mfundul))
 - Fix issue \#9085:  Prometheus TYPE lines incorrectly formatted \(when enabled via query parm\) [\#9086](https://github.com/netdata/netdata/pull/9086) ([jeffgdotorg](https://github.com/jeffgdotorg))
-- Clean instances [\#9081](https://github.com/netdata/netdata/pull/9081) ([thiagoftsm](https://github.com/thiagoftsm))
 - Introduce a random sleep in the Netdata updater [\#9079](https://github.com/netdata/netdata/pull/9079) ([prologic](https://github.com/prologic))
 - New alarms \(exporting and Backend\) [\#9075](https://github.com/netdata/netdata/pull/9075) ([thiagoftsm](https://github.com/thiagoftsm))
 - Implement new incremental parser [\#9074](https://github.com/netdata/netdata/pull/9074) ([stelfrag](https://github.com/stelfrag))
 - OpenTSDB and TLS [\#9068](https://github.com/netdata/netdata/pull/9068) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add links to promote database engine calculator [\#9067](https://github.com/netdata/netdata/pull/9067) ([joelhans](https://github.com/joelhans))
-- Update the exporting documentation [\#9066](https://github.com/netdata/netdata/pull/9066) ([vlvkobal](https://github.com/vlvkobal))
 - Added required bundle for libuuid on ClearLinux. [\#9060](https://github.com/netdata/netdata/pull/9060) ([Ferroin](https://github.com/Ferroin))
 - Add notes/known issues section to installation page [\#9053](https://github.com/netdata/netdata/pull/9053) ([joelhans](https://github.com/joelhans))
 - Missing error aws [\#9048](https://github.com/netdata/netdata/pull/9048) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -206,7 +205,6 @@
 - Docs: Pin mkdocs-material to older version to re-enable builds [\#8639](https://github.com/netdata/netdata/pull/8639) ([joelhans](https://github.com/joelhans))
 - collectors/python.d/mysql: fix `threads\_creation\_rate` chart context [\#8636](https://github.com/netdata/netdata/pull/8636) ([ilyam8](https://github.com/ilyam8))
 - Show internal stats for the exporting engine [\#8635](https://github.com/netdata/netdata/pull/8635) ([vlvkobal](https://github.com/vlvkobal))
-- Add session-id using connect timestamp [\#8633](https://github.com/netdata/netdata/pull/8633) ([amoss](https://github.com/amoss))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
