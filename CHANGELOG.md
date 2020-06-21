@@ -117,7 +117,6 @@
 - Docs: Update contributing guidelines [\#8781](https://github.com/netdata/netdata/pull/8781) ([joelhans](https://github.com/joelhans))
 - single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
 - Correctly track last num vcpus in xenstat\_plugin [\#8720](https://github.com/netdata/netdata/pull/8720) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
-- install and enable eBPF Plugin by default [\#8665](https://github.com/netdata/netdata/pull/8665) ([Ferroin](https://github.com/Ferroin))
 - Update synology.md [\#8658](https://github.com/netdata/netdata/pull/8658) ([thenktor](https://github.com/thenktor))
 - Ceph: Added OSD size collection [\#8649](https://github.com/netdata/netdata/pull/8649) ([elelayan](https://github.com/elelayan))
 
@@ -188,7 +187,6 @@
 - Update pfSense doc and add warning for apcupsd users [\#8686](https://github.com/netdata/netdata/pull/8686) ([cryptoluks](https://github.com/cryptoluks))
 - added certificate revocation alert [\#8684](https://github.com/netdata/netdata/pull/8684) ([yasharne](https://github.com/yasharne))
 - \[ReOpen \#8626\] Improved offline installation instructions to point to correct installation scripts and clarify process [\#8680](https://github.com/netdata/netdata/pull/8680) ([IceCodeNew](https://github.com/IceCodeNew))
-- Docs: Standardize links between documentation [\#8638](https://github.com/netdata/netdata/pull/8638) ([joelhans](https://github.com/joelhans))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
@@ -202,9 +200,6 @@
 - Update apps\_groups.conf [\#8655](https://github.com/netdata/netdata/pull/8655) ([thenktor](https://github.com/thenktor))
 - health/alarm\_notify: add dynatrace enabled check [\#8654](https://github.com/netdata/netdata/pull/8654) ([ilyam8](https://github.com/ilyam8))
 - Update apps\_groups.conf [\#8646](https://github.com/netdata/netdata/pull/8646) ([thenktor](https://github.com/thenktor))
-- Docs: Pin mkdocs-material to older version to re-enable builds [\#8639](https://github.com/netdata/netdata/pull/8639) ([joelhans](https://github.com/joelhans))
-- collectors/python.d/mysql: fix `threads\_creation\_rate` chart context [\#8636](https://github.com/netdata/netdata/pull/8636) ([ilyam8](https://github.com/ilyam8))
-- Show internal stats for the exporting engine [\#8635](https://github.com/netdata/netdata/pull/8635) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
