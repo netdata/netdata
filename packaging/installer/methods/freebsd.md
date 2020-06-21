@@ -4,11 +4,8 @@ title: "Install Netdata on FreeBSD"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
 ---
 -->
-![image](https://user-images.githubusercontent.com/43221193/82707320-3776b800-9c52-11ea-9b8b-9ff4b1d1d9ac.png)
 
-# Install Netdata on FreeBSD ![image](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png)
-
-# Netdata ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+# Install Netdata on FreeBSD
 
 ## Install latest version
 This is how to install the latest Netdata version on FreeBSD:
@@ -31,13 +28,13 @@ Unzip the downloaded file:
 gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 ```
 
-Install Netdata in `/opt/netdata`, if you want to enable automatic updates, add `--auto-update` or `-u` for install netdata-updater in `cron` (**need root permission**):
+Install Netdata in `/opt/netdata`. If you want to enable automatic updates, add `--auto-update` or `-u` to install `netdata-updater` in `cron` (**need root permission**):
 
 ```sh
 cd netdata-v* && ./netdata-installer.sh --install /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
 ```
 
-You also need to enable the netdata service in `/etc/rc.conf`:
+You also need to enable the `netdata` service in `/etc/rc.conf`:
 
 ```sh
 sysrc netdata_enable="YES"
@@ -49,7 +46,7 @@ Finally, and very importantly, update Netdata using the script provided by the N
 cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 ```
 
-All set, we can now access the Netdata Web Interface. Ex: `http://server.ip:19999`
+You can now access the Netdata dashboard by navigating to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your system.
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -57,8 +54,6 @@ From Netdata v1.12 and above, anonymous usage information is collected by defaul
 more about the information collected and how to opt-out, check the [anonymous statistics
 page](/docs/anonymous-statistics.md).
 
-
-# Important
 ## Updating the Agent on FreeBSD
 If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 
 The `netdata-updater.sh` script will update your Agent.
