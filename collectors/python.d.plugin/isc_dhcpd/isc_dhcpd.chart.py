@@ -89,53 +89,71 @@ class Pool:
 
         self.networks = list()
         for network in network.split(" "):
-            range_ip = network.split("-")
-            if len(range_ip) == 1:
-                self.networks.append({
-                    'type': 'network',
-                    'list': ipaddress.ip_network(address=u'%s' % network)
-                })
-            elif len(range_ip) == 2:
-                self.networks.append({
-                    'type': 'range',
-                    'list': list(
-                                ipaddress.summarize_address_range(
-                                    ipaddress.ip_address(u'%s' % range_ip[0]), 
-                                    ipaddress.ip_address(u'%s' % range_ip[1])
-                                )
-                            )
-                })
+            if not network:
+                continue
+
+            ip_type = self.detect_ip_type(ip=network)
+            if ip_type == "CIDR":
+                self.networks.append(PoolCIDR(network=network))
+            elif ip_type == "IP_RANGE":
+                self.networks.append(PoolIPRange(ip_range=network))
             else:
-                raise ValueError('Network syntaxis error!')
+                raise ValueError('Network ({0}) syntaxis error!'.format(network))
 
-    def _get_networks_by_type(self, type_network):
-        filter_network = filter(lambda network: network.get("type") == type_network, self.networks)
-        data_return = list()
-        if type_network == "range":
-            for network in filter_network:
-                data_return = data_return + network.get('list')
-            
-        elif type_network == "network":
-            data_return = list( network.get('list') for network in filter_network )
-        
-        elif type_network == "all":
-            data_return += self._get_networks_by_type("network")
-            data_return += self._get_networks_by_type("range")
-
-        return data_return
+    @staticmethod
+    def detect_ip_type(ip):
+        ip_type = ip.split("-")
+        if len(ip_type) == 1:
+            return "CIDR"
+        elif len(ip_type) == 2:
+            return "IP_RANGE"
+        else:
+            return "UNKNOWN"
 
     def num_hosts(self):
-        data_return = 0
-        data_return += sum([network.num_addresses - 2 for network in self._get_networks_by_type("network")])
-        data_return += sum([network.num_addresses for network in self._get_networks_by_type("range")])
-        return data_return
+        return sum([network.num_hosts() for network in self.networks])
 
     def __contains__(self, item):
-        for network in self._get_networks_by_type("all"):
+        for network in self.networks:
+            if network.__contains__(item):
+                return True
+        return False
+
+
+class PoolCIDR:
+    def __init__(self, network):
+        self.network = ipaddress.ip_network(address=u'%s' % network)
+
+    def num_hosts(self):
+        return self.network.num_addresses - 2
+
+    def __contains__(self, item):
+        return item.address in self.network
+
+
+class PoolIPRange:
+    def __init__(self, ip_range):
+        ip_range = ip_range.split("-")
+        self.networks = list(self._summarize_address_range(ip_range[0], ip_range[1]))
+
+    @staticmethod
+    def ip_address(ip):
+        return ipaddress.ip_address(u'%s' % ip)
+
+    def _summarize_address_range(self, first, last):
+        address_first = self.ip_address(first)
+        address_last = self.ip_address(last)
+        return ipaddress.summarize_address_range(address_first, address_last)
+
+    def num_hosts(self):
+        return sum([network.num_addresses for network in self.networks])
+
+    def __contains__(self, item):
+        for network in self.networks:
             if item.address in network:
                 return True
-
         return False
+
 
 class Lease:
     def __init__(self, address, ends, state):
