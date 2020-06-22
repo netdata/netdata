@@ -37,7 +37,7 @@ There are three types of plugins:
     independent processes. They communicate with the daemon via pipes.
 -   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
     type of collector. We have a few plugin orchestrators available for those who want to develop their own collectors,
-    but focus most of our efforts on the [Go plugin](/collectors/go.d.plugin/README.md).
+    but focus most of our efforts on the [Go plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/).
 
 ## Enable, configure, and disable modules
 
