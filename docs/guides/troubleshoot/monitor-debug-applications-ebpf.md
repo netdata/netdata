@@ -77,7 +77,7 @@ apache: *apache*
 ```
 
 Now that you have `apps_groups.conf` set up to monitor your application/service, you can also set up the eBPF collector
-to show more charts that just might help you debug 
+to show other charts that will help you debug and troubleshoot how it interacts with the Linux kernel.
 
 ## Configure the eBPF collector to monitor errors
 
