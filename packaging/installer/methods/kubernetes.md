@@ -21,8 +21,10 @@ discovery](https://github.com/netdata/agent-service-discovery/). Each child pod 
 To install Netdata on a Kubernetes cluster, you need:
 
 -   A working cluster running Kubernetes v1.9 or newer.
--   The [Helm package manager](https://helm.sh/) on an administrative system.
--   The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool on the same system.
+-   The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
+    difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
+    administrative system.
+-   The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
 
 The default configuration creates four pods in your cluster: three `child` pods and one `parent` pod. The `child` pods
 collect metrics and stream the information to the `parent` pod, which uses two persistent volumes to store metrics and
@@ -34,18 +36,18 @@ Download the [Netdata Helm chart](https://github.com/netdata/helmchart) on the a
 `helm` binary installed.
 
 ```bash
-git clone https://github.com/netdata/helmchart.git netdata-helmchart
+helm repo add netdata https://netdata.github.io/helmchart/
+helm repo update
 ```
 
 > You may not need to configure the Helm chart to get a functioning service on your cluster, but you should read the
 > sections on [configuring the Helm chart](#configure-the-netdata-helm-chart) and [configuring service
 > discovery](#configure-service-discovery) for details.
 
-Install the Helm chart to your cluster with `helm install`, replacing `--name netdata` with the release name of your
-choosing:
+Install the Helm chart to your cluster with `helm install`:
 
 ```bash
-helm install --name netdata ./netdata-helmchart
+helm install netdata netdata/netdata
 ```
 
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
@@ -61,16 +63,17 @@ Read up on the various configuration options in the [Helm chart
 documentation](https://github.com/netdata/helmchart#configuration) to see if you need to change any of the options based
 on your cluster's setup.
 
-To change a setting, you can edit the `values.yml` file inside of the `netdata-helmchart` folder. Then install the chart
-as described in the previous step, or upgrade an existing Helm deployment with `helm upgrade`:
+To change a setting, use the `--set` or `--values` arguments along with `helm install`:
 
 ```bash
-helm upgrade netdata ./netdata-helmchart
+helm install --set a.b.c=xyz netdata netdata/netdata
 ```
 
-You can also change a setting with the `--set` option for `helm install`. For example, to change the size of the
-persistent metrics volume, you would run `helm install --name netdata ./netdata-helmchart --set
-parent.database.volumesize=4Gi`.
+For example, to change the size of the persistent metrics volume, you would run the following:
+
+```bash
+helm install --set parent.database.volumesize=4Gi netdata
+```
 
 ### Configure service discovery
 
@@ -88,7 +91,7 @@ configurations based on the service that pod runs, and begin monitoring them imm
 
 However, if you have changed some of these defaults, you'll need to open the `netdata-helmchart/sd-child.yml` file and
 edit the ports or image names that service discovery uses to find supported pods. You can then run `helm upgrade netdata
-./netdata-helmchart` to push changes to your cluster.
+netdata/netdata` to push changes to your cluster.
 
 ## Access the Netdata dashboard
 
@@ -122,7 +125,7 @@ If you update the Helm chart's configuration, either via `values.yml` or `sd-chi
 replacing `netdata` with the name of the release if you changed it upon installtion:
 
 ```bash
-helm upgrade netdata ./netdata-helmchart
+helm upgrade netdata netdata/netdata
 ```
 
 ## What's next?
@@ -132,3 +135,5 @@ especially if you want to change any of the configuration settings for either th
 
 To futher configure Netdata for your cluster, see our [Helm chart repository](https://github.com/netdata/helmchart) and
 the [service discovery repository](https://github.com/netdata/agent-service-discovery/).
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2Fmethods%2Fkubernetes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
