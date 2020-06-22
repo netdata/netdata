@@ -127,7 +127,7 @@ Debian 10 system. The first spike is from configuring/compiling a small C progra
 to benchmark an Apache web server.
 
 ![An example of eBPF
-charts](https://user-images.githubusercontent.com/1153921/84795632-9b1fa700-afac-11ea-8286-138aac00eae1.png)
+charts](https://user-images.githubusercontent.com/1153921/85311677-a8380c80-b46a-11ea-9735-babaedc22fdb.png)
 
 In these charts, you can see first a spike in syscalls to open and close files from the configure/build process,
 followed by a similar spike from the Apache benchmark.

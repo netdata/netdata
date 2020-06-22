@@ -16,7 +16,7 @@ variety of kernel functions, such as `do_sys_open`, `__close_fd`, `vfs_read`, `v
 `return` program also monitors the return of each kernel functions to deliver more granular metrics about how your
 system and its applications interact with the Linux kernel.
 
-eBPF monitorign can help you troubleshoot and debug how applications interact with the Linux kernel. See our [guide on
+eBPF monitoring can help you troubleshoot and debug how applications interact with the Linux kernel. See our [guide on
 troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for configuration
 and troubleshooting tips.
 
