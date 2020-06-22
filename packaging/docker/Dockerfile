@@ -57,20 +57,10 @@ ARG ARCH
 # This image contains preinstalled dependecies
 FROM netdata/base:${ARCH}
 
-# Conditional subscription to Polyverse's Polymorphic Linux repositories
-RUN if [ "$(uname -m)" == "x86_64" ]; then \
-        apk update && apk upgrade; \
-        curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
-        if [ $? -eq 0 ]; then \
-                apk update && \
-                apk upgrade --available --no-cache && \
-                sed -in 's/^#//g' /etc/apk/repositories; \
-        fi \
-    fi
-
 # Copy files over
 RUN mkdir -p /opt/src
 COPY --from=builder /app /
+COPY packaging/docker/health.sh /health.sh
 
 # Configure system
 ARG NETDATA_UID=201
@@ -98,8 +88,8 @@ RUN \
         /var/cache/netdata \
         /var/lib/netdata \
         /var/log/netdata && \
-    chown -R netdata:netdata /etc/netdata/claim.d && \
-    chmod 0700 /etc/netdata/claim.d && \
+    chown -R netdata:netdata /var/lib/netdata/cloud.d && \
+    chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \
@@ -117,3 +107,5 @@ ENV NETDATA_PORT 19999
 EXPOSE $NETDATA_PORT
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
+
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /health.sh

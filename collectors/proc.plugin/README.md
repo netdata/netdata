@@ -86,8 +86,8 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 
 Netdata categorizes all block devices in 3 categories:
 
-1.  physical disks (i.e. block devices that does not have slaves and are not partitions)
-2.  virtual disks (i.e. block devices that have slaves - like RAID devices)
+1.  physical disks (i.e. block devices that do not have child devices and are not partitions)
+2.  virtual disks (i.e. block devices that have child devices - like RAID devices)
 3.  disk partitions (i.e. block devices that are part of a physical disk)
 
 Performance metrics are enabled by default for all disk devices, except partitions and not-mounted virtual disks. Of course, you can enable/disable monitoring any block device by editing the Netdata configuration file.
@@ -234,13 +234,31 @@ So, to disable performance metrics for all loop devices you could add `performan
 
 ## Monitoring CPUs
 
-The `/proc/stat` module monitors CPU utilization, interrupts, context switches, processes started/running, thermal throttling, frequency, and idle states. It gathers this information from multiple files.
+The `/proc/stat` module monitors CPU utilization, interrupts, context switches, processes started/running, thermal
+throttling, frequency, and idle states. It gathers this information from multiple files.
 
-If more than 50 cores are present in a system then CPU thermal throttling, frequency, and idle state charts are disabled.
+If your system has more than 50 processors (`physical processors * cores per processor * threads per core`), the Agent
+automatically disables CPU thermal throttling, frequency, and idle state charts. To override this default, see the next
+section on configuration.
 
-#### configuration
+### Configuration
 
-`keep per core files open` option in the `[plugin:proc:/proc/stat]` configuration section allows reducing the number of file operations on multiple files.
+The settings for monitoring CPUs is in the `[plugin:proc:/proc/stat]` of your `netdata.conf` file.
+
+The `keep per core files open` option lets you reduce the number of file operations on multiple files.
+
+If your system has more than 50 processors and you would like to see the CPU thermal throttling, frequency, and idle
+state charts that are automatically disabled, you can set the following boolean options in the
+`[plugin:proc:/proc/stat]` section.
+
+```conf
+    keep per core files open = yes
+    keep cpuidle files open = yes
+    core_throttle_count = yes
+    package_throttle_count = yes
+    cpu frequency = yes
+    cpu idle states = yes
+```
 
 ### CPU frequency
 
@@ -307,7 +325,7 @@ By default Netdata will enable monitoring metrics only when they are not zero. I
 
 There are several alarms defined in `health.d/net.conf`.
 
-The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a slave or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](/health/REFERENCE.md#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](/health/REFERENCE.md#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
 
 #### configuration
 

@@ -796,11 +796,21 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
     va_list args;
+    const char *thread_tag;
+    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
 
     if(error_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_CRIT,  fmt, args );
         va_end( args );
+    }
+
+    thread_tag = netdata_thread_tag();
+    if (!netdata_thread_tag_exists()) {
+        os_thread_get_current_name_np(os_threadname);
+        if ('\0' != os_threadname[0]) { /* If it is not an empty string replace "MAIN" thread_tag */
+            thread_tag = os_threadname;
+        }
     }
 
     char date[LOG_DATE_LENGTH];
@@ -809,8 +819,8 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
-    else            fprintf(stderr, "%s: %s FATAL : %s :", date, program_name, netdata_thread_tag());
+    if(debug_flags) fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
+    else            fprintf(stderr, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -823,7 +833,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
     char action_result[60+1];
 
-    snprintfz(action_result, 60, "%s:%s", program_name, strncmp(netdata_thread_tag(), "STREAM_RECEIVER", strlen("STREAM_RECEIVER"))?netdata_thread_tag():"[x]");
+    snprintfz(action_result, 60, "%s:%s", program_name, strncmp(thread_tag, "STREAM_RECEIVER", strlen("STREAM_RECEIVER")) ? thread_tag : "[x]");
     send_statistics("FATAL", action_result, action_data);
 
     netdata_cleanup_and_exit(1);

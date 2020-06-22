@@ -3,7 +3,7 @@ FROM archlinux/base:latest
 # There is some redundancy between this file and the archlinux Dockerfile in the helper images
 # repo and also with the clean-install.Dockefile. Once the help image is availabled on Docker
 # Hub this file can be deleted.
-
+RUN echo sdlsjdkls
 RUN pacman -Syyu --noconfirm
 RUN pacman --noconfirm --needed -S autoconf \
                                    autoconf-archive \
@@ -20,7 +20,8 @@ RUN pacman --noconfirm --needed -S autoconf \
                                    python \
                                    libvirt \
                                    cmake \
-                                   valgrind
+                                   valgrind \
+                                   gdb
 
 ARG EXTRA_CFLAGS
 COPY . /opt/netdata/source
@@ -44,12 +45,14 @@ RUN rm -rf autom4te.cache
 RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
-RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
+RUN CFLAGS="-Og -g -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
     -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --require-cloud --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
+
+RUN rm /var/lib/netdata/registry/netdata.public.unique.id
 
 CMD ["/usr/sbin/valgrind", "--leak-check=full", "/usr/sbin/netdata", "-D"]
    

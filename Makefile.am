@@ -64,16 +64,21 @@ dist_noinst_DATA = \
     packaging/dashboard.checksums \
     packaging/go.d.version \
     packaging/go.d.checksums \
+    packaging/jsonc.version \
+    packaging/jsonc.checksums \
     packaging/libwebsockets.version \
     packaging/libwebsockets.checksums \
     packaging/mosquitto.version \
     packaging/mosquitto.checksums \
+    packaging/bundle-dashboard.sh \
     packaging/bundle-mosquitto.sh \
+    packaging/check-kernel-config.sh \
+    packaging/ebpf.checksums \
+    packaging/ebpf.version \
     packaging/bundle-lws.sh \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
-    netlify.toml \
     $(NULL)
 
 # until integrated within build
@@ -85,12 +90,7 @@ dist_noinst_SCRIPTS = \
     packaging/installer/kickstart.sh \
     packaging/installer/kickstart-static64.sh \
     packaging/installer/functions.sh \
-    netdata-installer.sh \
-    docs/generator/buildhtml.sh \
-    docs/generator/buildyaml.sh \
-    docs/generator/checklinks.sh \
-    docs/generator/requirements.txt \
-    docs/generator/runtime.txt \
+    netdata-installer.sh
     $(NULL)
 
 # -----------------------------------------------------------------------------
@@ -108,7 +108,9 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+    parser \
     aclk \
+    spawn \
     $(NULL)
 
 
@@ -136,6 +138,8 @@ LIBNETDATA_FILES = \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
+    libnetdata/circular_buffer/circular_buffer.c \
+    libnetdata/circular_buffer/circular_buffer.h \
     libnetdata/clocks/clocks.c \
     libnetdata/clocks/clocks.h \
     libnetdata/dictionary/dictionary.c \
@@ -262,9 +266,15 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-EBPF_PROCESS_PLUGIN_FILES = \
-    collectors/ebpf_process.plugin/ebpf_process.c \
-    collectors/ebpf_process.plugin/ebpf_process.h \
+EBPF_PLUGIN_FILES = \
+    collectors/ebpf.plugin/ebpf.c \
+    collectors/ebpf.plugin/ebpf_process.c \
+    collectors/ebpf.plugin/ebpf_process.h \
+    collectors/ebpf.plugin/ebpf_socket.c \
+    collectors/ebpf.plugin/ebpf_socket.h \
+    collectors/ebpf.plugin/ebpf.h \
+    collectors/ebpf.plugin/ebpf_apps.c \
+    collectors/ebpf.plugin/ebpf_apps.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -327,6 +337,8 @@ MACOS_PLUGIN_FILES = \
 PLUGINSD_PLUGIN_FILES = \
     collectors/plugins.d/plugins_d.c \
     collectors/plugins.d/plugins_d.h \
+    collectors/plugins.d/pluginsd_parser.c \
+    collectors/plugins.d/pluginsd_parser.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
@@ -365,6 +377,19 @@ if ENABLE_DBENGINE
         database/engine/pagecache.h \
         database/engine/rrdenglocking.c \
         database/engine/rrdenglocking.h \
+        database/engine/metadata_log/metadatalog.c \
+        database/engine/metadata_log/metadatalog.h \
+        database/engine/metadata_log/metadatalogapi.c \
+        database/engine/metadata_log/metadatalogapi.h \
+        database/engine/metadata_log/logfile.h \
+        database/engine/metadata_log/logfile.c \
+        database/engine/metadata_log/metadatalogprotocol.h \
+        database/engine/metadata_log/metalogpluginsd.c \
+        database/engine/metadata_log/metalogpluginsd.h \
+        database/engine/metadata_log/compaction.c \
+        database/engine/metadata_log/compaction.h \
+        database/engine/global_uuid_map/global_uuid_map.c \
+        database/engine/global_uuid_map/global_uuid_map.h \
         $(NULL)
 endif
 
@@ -421,6 +446,8 @@ API_PLUGIN_FILES = \
 
 STREAMING_PLUGIN_FILES = \
     streaming/rrdpush.c \
+    streaming/sender.c \
+    streaming/receiver.c \
     streaming/rrdpush.h \
     $(NULL)
 
@@ -474,9 +501,16 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
+PARSER_FILES = \
+    parser/parser.c \
+    parser/parser.h \
+    $(NULL)
+
 ACLK_FILES = \
     aclk/aclk_common.c \
     aclk/aclk_common.h \
+    aclk/aclk_stats.c \
+    aclk/aclk_stats.h
     $(NULL)
 
 if ENABLE_ACLK
@@ -494,6 +528,13 @@ endif
 
 
 
+SPAWN_PLUGIN_FILES = \
+    spawn/spawn.c \
+    spawn/spawn_server.c \
+    spawn/spawn_client.c \
+    spawn/spawn.h \
+    $(NULL)
+
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
     exporting/exporting_engine.h \
@@ -506,6 +547,7 @@ EXPORTING_ENGINE_FILES = \
     exporting/prometheus/prometheus.c \
     exporting/prometheus/prometheus.h \
     exporting/read_config.c \
+    exporting/clean_connectors.c \
     exporting/init_connectors.c \
     exporting/process_data.c \
     exporting/check_filters.c \
@@ -526,6 +568,13 @@ KINESIS_EXPORTING_FILES = \
     exporting/aws_kinesis/aws_kinesis.h \
     exporting/aws_kinesis/aws_kinesis_put_record.cc \
     exporting/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
+PUBSUB_EXPORTING_FILES = \
+    exporting/pubsub/pubsub.c \
+    exporting/pubsub/pubsub.h \
+    exporting/pubsub/pubsub_publish.cc \
+    exporting/pubsub/pubsub_publish.h \
     $(NULL)
 
 MONGODB_EXPORTING_FILES = \
@@ -584,7 +633,9 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
+    $(PARSER_FILES) \
     $(ACLK_FILES) \
+    $(SPAWN_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -622,6 +673,10 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_EBPF_LIBS) \
     $(NULL)
+
+if LINK_STATIC_JSONC
+    NETDATA_COMMON_LIBS += externaldeps/jsonc/libjson-c.a
+endif
 
 NETDATACLI_FILES = \
     daemon/commands.h \
@@ -690,9 +745,9 @@ if ENABLE_PLUGIN_FREEIPMI
 endif
 
 if ENABLE_PLUGIN_EBPF
-    plugins_PROGRAMS += ebpf_process.plugin
-    ebpf_process_plugin_SOURCES = $(EBPF_PROCESS_PLUGIN_FILES)
-    ebpf_process_plugin_LDADD = \
+    plugins_PROGRAMS += ebpf.plugin
+    ebpf_plugin_SOURCES = $(EBPF_PLUGIN_FILES)
+    ebpf_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
@@ -743,6 +798,11 @@ endif
 if ENABLE_BACKEND_KINESIS
     netdata_SOURCES += $(KINESIS_BACKEND_FILES) $(KINESIS_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
+
+if ENABLE_EXPORTING_PUBSUB
+    netdata_SOURCES += $(PUBSUB_EXPORTING_FILES)
+    netdata_LDADD += $(OPTIONAL_PUBSUB_LIBS)
 endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
@@ -859,7 +919,6 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=rrdset_is_exportable \
         -Wl,--wrap=exporting_calculate_value_from_stored_data \
         -Wl,--wrap=prepare_buffers \
-        -Wl,--wrap=notify_workers \
         -Wl,--wrap=send_internal_metrics \
         -Wl,--wrap=now_realtime_sec \
         -Wl,--wrap=uv_thread_set_name_np \
@@ -897,6 +956,16 @@ if ENABLE_BACKEND_KINESIS
         -Wl,--wrap=kinesis_init \
         -Wl,--wrap=kinesis_put_record \
         -Wl,--wrap=kinesis_get_result \
+        $(NULL)
+endif
+if ENABLE_EXPORTING_PUBSUB
+    exporting_tests_exporting_engine_testdriver_SOURCES += $(PUBSUB_EXPORTING_FILES)
+    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PUBSUB_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+        -Wl,--wrap=pubsub_init \
+        -Wl,--wrap=pubsub_add_message \
+        -Wl,--wrap=pubsub_publish \
+        -Wl,--wrap=pubsub_get_result \
         $(NULL)
 endif
 if ENABLE_BACKEND_MONGODB

@@ -1,8 +1,6 @@
 <!--
----
 title: "python.d.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/README.md
----
 -->
 
 # python.d.plugin

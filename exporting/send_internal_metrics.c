@@ -15,7 +15,7 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
         return;
 
     *st_rusage = rrdset_create_localhost(
-        "netdata", "exporting_main_thread_cpu", NULL, "exporting", NULL, "Netdata Main Exporting Thread CPU Usage",
+        "netdata", "exporting_main_thread_cpu", NULL, "exporting", "exporting_cpu_usage", "Netdata Main Exporting Thread CPU Usage",
         "milliseconds/s", "exporting", NULL, 130600, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
     *rd_user = rrddim_add(*st_rusage, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -67,7 +67,7 @@ void send_internal_metrics(struct instance *instance)
         netdata_fix_chart_id(id);
 
         stats->st_metrics = rrdset_create_localhost(
-            "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Buffered Metrics", "metrics", "exporting", NULL,
+            "netdata", id, NULL, buffer_tostring(family), "exporting_buffer", "Netdata Buffered Metrics", "metrics", "exporting", NULL,
             130610, instance->config.update_every, RRDSET_TYPE_LINE);
 
         stats->rd_buffered_metrics = rrddim_add(stats->st_metrics, "buffered", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -80,7 +80,7 @@ void send_internal_metrics(struct instance *instance)
         netdata_fix_chart_id(id);
 
         stats->st_bytes = rrdset_create_localhost(
-            "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Exporting Data Size", "KiB", "exporting", NULL,
+            "netdata", id, NULL, buffer_tostring(family), "exporting_data_size", "Netdata Exporting Data Size", "KiB", "exporting", NULL,
             130620, instance->config.update_every, RRDSET_TYPE_AREA);
 
         stats->rd_buffered_bytes = rrddim_add(stats->st_bytes, "buffered", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -94,7 +94,7 @@ void send_internal_metrics(struct instance *instance)
         netdata_fix_chart_id(id);
 
         stats->st_ops = rrdset_create_localhost(
-            "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Exporting Operations", "operations", "exporting",
+            "netdata", id, NULL, buffer_tostring(family), "exporting_operations", "Netdata Exporting Operations", "operations", "exporting",
             NULL, 130630, instance->config.update_every, RRDSET_TYPE_LINE);
 
         stats->rd_transmission_successes = rrddim_add(stats->st_ops, "write", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -109,7 +109,7 @@ void send_internal_metrics(struct instance *instance)
         netdata_fix_chart_id(id);
 
         stats->st_rusage = rrdset_create_localhost(
-            "netdata", id, NULL, buffer_tostring(family), NULL, "Netdata Exporting Instance Thread CPU Usage",
+            "netdata", id, NULL, buffer_tostring(family), "exporting_instance", "Netdata Exporting Instance Thread CPU Usage",
             "milliseconds/s", "exporting", NULL, 130640, instance->config.update_every, RRDSET_TYPE_STACKED);
 
         stats->rd_user   = rrddim_add(stats->st_rusage, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);

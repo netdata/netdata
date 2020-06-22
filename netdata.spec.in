@@ -93,6 +93,10 @@ Group:		Applications/System
 Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
 
+# Remove conflicting EPEL packages
+Obsoletes:  %{name}-conf
+Obsoletes:  %{name}-data
+
 # #####################################################################
 # Core build/install/runtime dependencies
 # #####################################################################
@@ -279,8 +283,8 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
-# Install ebpf_process.plugin
-install -m 4750 -p ebpf_process.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf_process.plugin"
+# Install ebpf.plugin
+install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
 
 # ###########################################################
 # Install cups.plugin

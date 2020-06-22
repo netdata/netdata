@@ -21,6 +21,9 @@ typedef enum cmd {
     CMD_FATAL,
     CMD_RELOAD_CLAIMING_STATE,
     CMD_RELOAD_LABELS,
+    CMD_READ_CONFIG,
+    CMD_WRITE_CONFIG,
+    CMD_PING,
     CMD_TOTAL_COMMANDS
 } cmd_t;
 

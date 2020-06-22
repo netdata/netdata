@@ -863,7 +863,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 memcpy(hostname,"not available",13);
                 hostname[13] = 0x00;
             }
-            error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
+            error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.",hostname);
             s = NULL;
         }
 #endif
@@ -1511,7 +1511,7 @@ void web_client_process_request(struct web_client *w) {
                         return;
                     }
 
-                    w->response.code = rrdpush_receiver_thread_spawn(localhost, w, w->decoded_url);
+                    w->response.code = rrdpush_receiver_thread_spawn(w, w->decoded_url);
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:

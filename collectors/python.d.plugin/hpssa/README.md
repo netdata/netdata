@@ -1,8 +1,7 @@
 <!--
----
 title: "HP Smart Storage Arrays monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/hpssa/README.md
----
+sidebar_label: "HP Smart Storage Arrays"
 -->
 
 # HP Smart Storage Arrays monitoring with Netdata

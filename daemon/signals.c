@@ -111,6 +111,21 @@ void signals_init(void) {
     }
 }
 
+void signals_restore_SIGCHLD(void)
+{
+    struct sigaction sa;
+
+    if (reaper_enabled == 0)
+        return;
+
+    sa.sa_flags = 0;
+    sigfillset(&sa.sa_mask);
+    sa.sa_handler = signal_handler;
+
+    if(sigaction(SIGCHLD, &sa, NULL) == -1)
+        error("SIGNAL: Failed to change signal handler for: SIGCHLD");
+}
+
 void signals_reset(void) {
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);

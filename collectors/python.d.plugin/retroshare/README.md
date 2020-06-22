@@ -1,8 +1,7 @@
 <!--
----
 title: "RetroShare monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/retroshare/README.md
----
+sidebar_label: "RetroShare"
 -->
 
 # RetroShare monitoring with Netdata

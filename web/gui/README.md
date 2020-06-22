@@ -1,25 +1,30 @@
 <!--
 ---
 title: "The standard web dashboard"
-date: 2020-03-11
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
 ---
 -->
 
 # The standard web dashboard
 
-The standard web dashboard is the heart of Netdata's performance troubleshooting
-toolkit. You've probably seen it before:
+The standard web dashboard is the heart of Netdata's performance troubleshooting toolkit. You've probably seen it
+before:
 
-![A GIF of the standard Netdata web
-dashboard](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
+![The Netdata dashboard in
+action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
 Learn more about how dashboards work and how they're populated using the
 `dashboards.js` file in our [web dashboards overview](/web/README.md).
 
-By default, Netdata starts a web server for its dashboard at port `19999`. Open
-up your web browser of choice and navigate to `http://SERVER-IP:19999`, or
-`http://localhost:19999` on `localhost`.
+By default, Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and
+navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If you're unsure, try
+`http://localhost:19999` first.
+
+> In v1.21 of the Agent, we replaced the legacy dashboard with a refactored dashboard written in React. By using React,
+> we simplify our code and give our engineers better tools to add new features and fix bugs. The only UI change with
+> this dashboard is the top navigation and left-hand navigation for [Cloud integration](/docs/agent-cloud.md). The old
+> dashboard is still accessible at the `http://NODE:19999/old` subfolder.
 
 Netdata uses an [internal, static-threaded web server](/web/server/README.md) to host the
 HTML, CSS, and JavaScript files that make up the standard dashboard. You don't
@@ -27,26 +32,16 @@ have to configure anything to access it, although you can adjust [your
 settings](/web/server/README.md#other-netdataconf-web-section-options) in the
 `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
 
-<details markdown="1"><summary>Want to see the dashboard and its features in action? Check out our video.</summary>
-<iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-</details>
-
-## New React Dashboard
-
-We've been working on refactoring the standard dashboard code to simplify the process of adding new features and fixing bugs. 
-
-The new dashboard is added to the codebase, but the old version is still here. If you want to use it, run `/usr/libexec/netdata/netdata-switch-dashboard.sh  classic`. To switch back, do `netdata-switch-dashboard.sh  react`. Currently, the refactored dashboard doesn't include any noticeable changes in UI.
-
 ## Navigating the standard dashboard
 
 Beyond charts, the standard dashboard can be broken down into three key areas:
 
 1.  [**Sections**](#sections)
-2.  [**Menus/submenus**](#menus)
-3.  [**Nodes menu**](#nodes-menu)
+2.  [**Metrics menus/submenus**](#metrics-menus)
+3.  [**Cloud menus: Spaces, War Rooms, and Visited nodes)**](#cloud-menus-spaces-war-rooms-and-visited-nodes)
 
 ![Annotated screenshot of the
-dashboard](https://user-images.githubusercontent.com/1153921/62810777-ef681980-bab3-11e9-9310-ec7a0c9f4faa.png)
+dashboard](https://user-images.githubusercontent.com/1153921/80834497-ac9c2380-8ba5-11ea-83c4-b323dd89557f.png)
 
 ### Sections
 
@@ -58,56 +53,41 @@ broken down into [contexts](/web/README.md#contexts) and
 An example of the **Memory** section on a Linux desktop system.
 
 ![Screenshot of the Memory section of the Netdata
-dashboard](https://user-images.githubusercontent.com/1153921/62811044-1410c100-bab5-11e9-91cc-414cf6c23985.png)
+dashboard](https://user-images.githubusercontent.com/1153921/80834530-bcb40300-8ba5-11ea-9219-cd554577844e.png)
 
 All sections and their associated charts appear on a single "page," so all you
 need to do to view different sections is scroll up and down the page. But it's
-usually quicker to use the [menus](#menus).
+usually quicker to use the [menus](#metrics-menus).
 
-### Menus
+### Metrics menus
 
-**Menus** appears on the right-hand side of the standard dashboard. Netdata
-generates a menu for each section, and menus link to the section they're
-associated with.
+**Metrics menus** appears on the right-hand side of the standard dashboard. Netdata generates a menu for each section,
+and menus link to the section they're associated with.
 
-![Screenshot of the
-menu](https://user-images.githubusercontent.com/1153921/62811361-38b96880-bab6-11e9-8d41-4d9b29778e86.png)
+![A screenshot of metrics menus](https://user-images.githubusercontent.com/1153921/80834638-f08f2880-8ba5-11ea-99ae-f610b2885fd6.png)
 
-Most menu items will contain several **submenu** entries, which represent any
+Most metrics menu items will contain several **submenu** entries, which represent any
 [families](/web/README.md#families) from that section. Netdata automatically
 generates these submenu entries.
 
 Here's a **Disks** menu with several submenu entries for each disk drive and
 partition Netdata recognizes.
 
-![Screenshot of some
-submenus](https://user-images.githubusercontent.com/1153921/62811428-70281500-bab6-11e9-9a61-ecd0a7aba453.png)
+![Screenshot of some metrics
+submenus](https://user-images.githubusercontent.com/1153921/80834697-11577e00-8ba6-11ea-979c-92fd19cdb480.png)
 
-### Nodes menu
+### Cloud menus (Spaces, War Rooms, and Visited nodes)
 
-The nodes menu appears in the top-left corner of the standard dashboard and is
-labeled with the hostname of the system Netdata is monitoring.
+The dashboard also features a menu related to Cloud functionality. You can view your existing Spaces or create new ones
+via the vertical column of boxes. This menu also displays the name of your current Space, shows a list of any War Rooms
+you've added you your Space, and lists your Visited nodes. If you click on a War Room's name, the dashboard redirects
+you to the Netdata Cloud web interface.
 
-Clicking on it will display a drop-down menu of any nodes you might have
-connected via the [Netdata registry](/registry/README.md). By default, you'll find
-nothing under the **My nodes** heading, but you can try out any of the demo
-Netdata nodes to see how the nodes menu works.
+![A screenshot of the Cloud
+menus](https://user-images.githubusercontent.com/1153921/80837210-3f8b8c80-8bab-11ea-9c75-128c2d823ef8.png)
 
-![Screenshot of the default (empty) nodes
-menu](https://user-images.githubusercontent.com/1153921/62795508-c3d13900-ba8b-11e9-98ed-f0be1b201340.png)
-
-Once you add nodes via [Netdata Cloud](/docs/netdata-cloud/README.md) or a [private
-registry](/registry/README.md#run-your-own-registry), you will see them appear under
-the **My nodes** heading.
-
-![Screenshot of a nodes menu populated by registry
-agents](https://user-images.githubusercontent.com/1153921/62795509-c3d13900-ba8b-11e9-8459-e85bf71f7ceb.png)
-
-The nodes menu will also show the master netdata node and all slave nodes
-streaming to that master, if you have [configured streaming](/streaming/README.md).
-
-![Screenshot of a nodes menu populated by streaming
-agents.](https://user-images.githubusercontent.com/1153921/62965774-90a7e600-bdba-11e9-8b80-495f35b29ecb.png)
+If you want to know more about how Cloud populates this menu, and the Agent-Cloud integration at a high level, see our
+document on [using the Agent with Netdata Cloud](/docs/agent-cloud.md).
 
 ## Customizing the standard dashboard
 

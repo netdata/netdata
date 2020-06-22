@@ -19,15 +19,19 @@ your metrics.
 
 Ready to take the next steps with health monitoring?
 
-[Health quickstart](/health/QUICKSTART.md)
+[Quickstart](/health/QUICKSTART.md)
 
-[Health configuration reference](/health/REFERENCE.md)
+[Configuration reference](/health/REFERENCE.md)
 
-## Tutorials
+## Guides
 
-[Stopping notifications for individual alarms](/health/tutorials/stop-notifications-alarms.md)
+Every infrastructure is different, so we're not interested in mandating how you should configure Netdata's health
+monitoring features. Instead, these guides should give you the details you need to tweak alarms to your heart's
+content.
 
-[Use dimension templates to create dynamic alarms](/health/tutorials/dimension-templates.md)
+[Stopping notifications for individual alarms](/docs/guides/monitor/stop-notifications-alarms.md)
+
+[Use dimension templates to create dynamic alarms](/docs/guides/monitor/dimension-templates.md)
 
 ## Related features
 

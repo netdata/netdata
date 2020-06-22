@@ -17,8 +17,7 @@ rules:
   comments: disable
   comments-indentation: disable
   document-end: disable
-  document-start:
-    level: warning
+  document-start: disable
   empty-lines: enable
   empty-values: disable
   hyphens: enable

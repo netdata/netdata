@@ -1,11 +1,10 @@
 <!--
----
-title: "Linux machines sensors monitoring with Netdata"
+title: "Linux machine sensors monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/sensors/README.md
----
+sidebar_label: "Linux machine sensors"
 -->
 
-# Linux machines sensors monitoring with Netdata
+# Linux machine sensors monitoring with Netdata
 
 Reads system sensors information (temperature, voltage, electric current, power, etc.).
 

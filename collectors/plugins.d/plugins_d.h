@@ -31,6 +31,11 @@
 #define PLUGINSD_KEYWORD_VARIABLE "VARIABLE"
 #define PLUGINSD_KEYWORD_LABEL "LABEL"
 #define PLUGINSD_KEYWORD_OVERWRITE "OVERWRITE"
+#define PLUGINSD_KEYWORD_GUID "GUID"
+#define PLUGINSD_KEYWORD_CONTEXT "CONTEXT"
+#define PLUGINSD_KEYWORD_TOMBSTONE "TOMBSTONE"
+#define PLUGINSD_KEYWORD_HOST "HOST"
+
 
 #define PLUGINSD_LINE_MAX 1024
 #define PLUGINSD_LINE_MAX_SSL_READ 512
@@ -60,7 +65,7 @@ struct plugind {
     volatile sig_atomic_t enabled;      // if this is enabled or not
 
     time_t started_t;
-
+    uint32_t version;
     struct plugind *next;
 };
 
@@ -69,10 +74,11 @@ extern struct plugind *pluginsd_root;
 extern void *pluginsd_main(void *ptr);
 
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
-extern int pluginsd_split_words(char *str, char **words, int max_words);
+extern int pluginsd_split_words(char *str, char **words, int max_words, char *recover_string, char **recover_location, int max_recover);
 
 extern int pluginsd_initialize_plugin_directories();
 
 extern int config_isspace(char c);
+extern int pluginsd_space(char c);
 
 #endif /* NETDATA_PLUGINS_D_H */

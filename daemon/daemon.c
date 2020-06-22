@@ -5,6 +5,27 @@
 
 char pidfile[FILENAME_MAX + 1] = "";
 char claimingdirectory[FILENAME_MAX + 1];
+char exepath[FILENAME_MAX + 1];
+
+void get_netdata_execution_path(void)
+{
+    int ret;
+    size_t exepath_size = 0;
+    struct passwd *passwd = NULL;
+    char *user = NULL;
+
+    passwd = getpwuid(getuid());
+    user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
+
+    exepath_size = sizeof(exepath) - 1;
+    ret = uv_exepath(exepath, &exepath_size);
+    if (0 != ret) {
+        error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
+              uv_strerror(ret));
+        fatal("Cannot start netdata without getting execution path.");
+    }
+    exepath[exepath_size] = '\0';
+}
 
 static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     if(fd == -1) return;
@@ -437,7 +458,7 @@ int become_daemon(int dont_fork, const char *user)
     sched_setscheduler_set();
 
     // Set claiming directory based on user config directory with correct ownership
-    snprintfz(claimingdirectory, FILENAME_MAX, "%s/claim.d", netdata_configured_user_config_dir);
+    snprintfz(claimingdirectory, FILENAME_MAX, "%s/cloud.d", netdata_configured_varlib_dir);
 
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {

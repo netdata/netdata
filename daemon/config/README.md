@@ -76,13 +76,13 @@ Please note that your data history will be lost if you have modified `history` p
 | debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](/daemon/README.md#debugging).|||
 | error log|`/var/log/netdata/error.log`|The filename to save error messages for Netdata daemon and all plugins (`stderr` is sent here for all Netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.|||
 | access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing Netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.|||
-| errors flood protection period|`1200`|UNUSED - Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|||
-| errors to trigger flood protection|`200`|UNUSED - Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.|||
+| errors flood protection period|`1200`|Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|||
+| errors to trigger flood protection|`200`|Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.|||
 | run as user|`netdata`|The user Netdata will run as.|||
 | pthread stack size|auto-detected||||
 | cleanup obsolete charts after seconds|`3600`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also sets the timeout for cleaning up obsolete dimensions|||
 | gap when lost iterations above|`1`||||
-| cleanup orphan hosts after seconds|`3600`|How long to wait until automatically removing from the DB a remote Netdata host (slave) that is no longer sending data.|||
+| cleanup orphan hosts after seconds|`3600`|How long to wait until automatically removing from the DB a remote Netdata host (child) that is no longer sending data.|||
 | delete obsolete charts files|`yes`|See [monitoring ephemeral containers](/collectors/cgroups.plugin/README.md#monitoring-ephemeral-containers), also affects the deletion of files for obsolete dimensions|||
 | delete orphan hosts files|`yes`|Set to `no` to disable non-responsive host removal.|||
 | enable zero metrics|`no`|Set to `yes` to show charts when all their metrics are zero.|||
@@ -161,7 +161,7 @@ In this area of `netdata.conf` you can find configuration options for individual
 following the pattern `[NAME]`.
 
 Using the settings and values under these sections, you can control all aspects of a specific chart. You can change its
-title, make it appear higher in Netdata's [menu](/web/gui/README.md#menus), tweak its dimensions, and much more.
+title, make it appear higher in Netdata's [menu](/web/gui/README.md#metrics-menus), tweak its dimensions, and much more.
 
 To find the name of a given chart, and thus the name of its section in `netdata.conf`, look at the top-left corner of a
 chart:
@@ -178,7 +178,7 @@ that is information about lines that begin with `dim`, which affect a chart's di
 | `enabled`         | A boolean (`yes` or `no`) that explicitly enables or disables the chart in question.                                                                                                                                                                            |
 | `cache directory` | The directory where cache files for this plugin, if needed, are stored.                                                                                                                                                                                         |
 | `chart type`      | Defines what type of chart to display. It can be `line`, `area`, or `stacked`. If empty or missing, `line` will be used.                                                                                                                                        |
-| `type`            | Uniquely identify which [menu](/web/gui/README.md#menus) on the Netdata dashboard this chart should appear under. Some examples include `system` (**System**), `disk` (**Disks**), `net` (**Network Interfaces**), and `netdata` (**Netdata Monitoring**). |
+| `type`            | Uniquely identify which [metrics menu](/web/gui/README.md#metrics-menus) on the Netdata dashboard this chart should appear under. Some examples include `system` (**System**), `disk` (**Disks**), `net` (**Network Interfaces**), and `netdata` (**Netdata Monitoring**). |
 | `family`          | Change the chart's [family](/web/README.md#families) from its default. For example, you could force a disk space chart to collect metrics for family `sdb` instead of family `sda`.                                                                        |
 | `units`           | Text for the label of the vertical axis of the chart. This means all dimensions should have the same unit of measurement.                                                                                                                                       |
 | `context`         | Change the default [context](/web/README.md#contexts) of the chart. Changing this setting will affect what metrics and metrics the chart displays, and which alarms are attached to it.                                                                    |

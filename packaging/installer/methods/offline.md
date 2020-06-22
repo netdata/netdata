@@ -76,8 +76,8 @@ bash kickstart.sh --local-files /tmp/netdata-(version-number-here).tar.gz /tmp/s
 bash kickstart-static64.sh --local-files /tmp/netdata-(version-number-here).gz.run /tmp/sha256sums.txt
 ```
 
-Now that Netdata is installed, be sure to visit our [getting started guide](../../../docs/getting-started.md) for a
+Now that Netdata is installed, be sure to visit our [getting started guide](/docs/getting-started.md) for a
 quick overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. 
 
 Or, get the full guided tour of Netdata's capabilities with our [step-by-step
-tutorial](../../../docs/step-by-step/step-00.md)!
+guide](/docs/guides/step-by-step/step-00.md)!

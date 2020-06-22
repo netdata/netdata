@@ -3,6 +3,29 @@
 #include "aws_kinesis.h"
 
 /**
+ * Clean AWS Kinesis *
+ */
+void aws_kinesis_cleanup(struct instance *instance)
+{
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+    kinesis_shutdown(instance->connector_specific_data);
+
+    freez(instance->connector_specific_data);
+
+    struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
+    if (connector_specific_config) {
+        freez(connector_specific_config->auth_key_id);
+        freez(connector_specific_config->secure_key);
+        freez(connector_specific_config->stream_name);
+
+        freez(connector_specific_config);
+    }
+
+    info("EXPORTING: instance %s exited", instance->config.name);
+    instance->exited = 1;
+}
+
+/**
  * Initialize AWS Kinesis connector instance
  *
  * @param instance an instance data structure.
@@ -33,8 +56,10 @@ int init_aws_kinesis_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     if (!instance->engine->aws_sdk_initialized) {
         aws_sdk_init();
@@ -44,6 +69,11 @@ int init_aws_kinesis_instance(struct instance *instance)
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct aws_kinesis_specific_data *connector_specific_data = callocz(1, sizeof(struct aws_kinesis_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
+
+    if (!strcmp(connector_specific_config->stream_name, "")) {
+        error("stream name is a mandatory Kinesis parameter but it is not configured");
+        return 1;
+    }
 
     kinesis_init(
         (void *)connector_specific_data,
@@ -68,12 +98,16 @@ void aws_kinesis_connector_worker(void *instance_p)
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct aws_kinesis_specific_data *connector_specific_data = instance->connector_specific_data;
 
-    while (!netdata_exit) {
+    while (!instance->engine->exit) {
         unsigned long long partition_key_seq = 0;
         struct stats *stats = &instance->stats;
 
         uv_mutex_lock(&instance->mutex);
         uv_cond_wait(&instance->cond_var, &instance->mutex);
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
+            break;
+        }
 
         // reset the monitoring chart counters
         stats->received_bytes =
@@ -108,7 +142,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                 record_len = buffer_len - sent;
             } else {
                 record_len = KINESIS_RECORD_MAX - partition_key_len;
-                while (*(first_char + record_len) != '\n' && record_len)
+                while (record_len && *(first_char + record_len - 1) != '\n')
                     record_len--;
             }
             char error_message[ERROR_LINE_MAX + 1] = "";
@@ -155,7 +189,7 @@ void aws_kinesis_connector_worker(void *instance_p)
                 stats->receptions++;
             }
 
-            if (unlikely(netdata_exit))
+            if (unlikely(instance->engine->exit))
                 break;
         }
 
@@ -172,7 +206,9 @@ void aws_kinesis_connector_worker(void *instance_p)
         uv_mutex_unlock(&instance->mutex);
 
 #ifdef UNIT_TESTING
-        break;
+        return;
 #endif
     }
+
+    aws_kinesis_cleanup(instance);
 }

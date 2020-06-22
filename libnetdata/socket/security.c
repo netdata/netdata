@@ -66,12 +66,16 @@ int tls_select_version(const char *lversion) {
         return TLS1_1_VERSION;
     else if (!strcmp(lversion, "1.2"))
         return TLS1_2_VERSION;
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
+#if defined(TLS1_3_VERSION)
     else if (!strcmp(lversion, "1.3"))
         return TLS1_3_VERSION;
 #endif
 
+#if defined(TLS_MAX_VERSION)
     return TLS_MAX_VERSION;
+#else
+    return TLS1_2_VERSION;
+#endif
 }
 #endif
 
@@ -120,7 +124,18 @@ SSL_CTX * security_initialize_openssl_client() {
     ctx = SSL_CTX_new(TLS_client_method());
 #endif
     if(ctx) {
-        security_openssl_common_options(ctx, 1);
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+#else
+        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
+# if defined(TLS_MAX_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS_MAX_VERSION);
+# elif defined(TLS1_3_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+# elif defined(TLS1_2_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
+# endif
+#endif
     }
 
     return ctx;
@@ -301,7 +316,7 @@ int security_process_accept(SSL *ssl,int msg) {
 /**
  * Test Certificate
  *
- * Check the certificate of Netdata master
+ * Check the certificate of Netdata parent
  *
  * @param ssl is the connection structure
  *
@@ -333,10 +348,10 @@ int security_test_certificate(SSL *ssl) {
  * Location for context
  *
  * Case the user give us a directory with the certificates available and
- * the Netdata master certificate, we use this function to validate the certificate.
+ * the Netdata parent certificate, we use this function to validate the certificate.
  *
  * @param ctx the context where the path will be set.
- * @param file the file with Netdata master certificate.
+ * @param file the file with Netdata parent certificate.
  * @param path the directory where the certificates are stored.
  *
  * @return It returns 0 on success and -1 otherwise.
@@ -344,7 +359,7 @@ int security_test_certificate(SSL *ssl) {
 int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     struct stat statbuf;
     if (stat(file, &statbuf)) {
-        info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validate certificates!");
+        info("Netdata does not have the parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
         return 0;
     }
 
@@ -364,7 +379,7 @@ int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
 slfc:
     while ((err = ERR_get_error()) != 0) {
         ERR_error_string_n(err, buf, sizeof(buf));
-        error("Cannot set the directory for the certificates and the master SSL certificate: %s",buf);
+        error("Cannot set the directory for the certificates and the parent SSL certificate: %s",buf);
     }
     return -1;
 }

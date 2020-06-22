@@ -4,6 +4,7 @@
 #include "agent_cloud_link.h"
 #include "aclk_lws_https_client.h"
 #include "aclk_common.h"
+#include "aclk_stats.h"
 
 int aclk_shutting_down = 0;
 // State-machine for the on-connect metadata transmission.
@@ -23,6 +24,8 @@ static char *aclk_password = NULL;
 static char *global_base_topic = NULL;
 static int aclk_connecting = 0;
 int aclk_connected = 0;             // Exposed in the web-api
+int aclk_force_reconnect = 0;       // Indication from lower layers
+int aclk_kill_link = 0;             // Tell the agent to tear down the link
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
@@ -47,7 +50,7 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_WAKEUP pthread_cond_signal(&query_cond_wait)
 
 void lws_wss_check_queues(size_t *write_len, size_t *write_len_bytes, size_t *read_len);
-
+void aclk_lws_wss_destroy_context();
 /*
  * Maintain a list of collectors and chart count
  * If all the charts of a collector are deleted
@@ -148,8 +151,11 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 static RSA *aclk_private_key = NULL;
 static int create_private_key()
 {
+    if (aclk_private_key != NULL)
+        RSA_free(aclk_private_key);
+    aclk_private_key = NULL;
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
 
     long bytes_read;
     char *private_key = read_by_filename(filename, &bytes_read);
@@ -319,6 +325,12 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         aclk_queue.count--;
     }
 
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.queries_queued++;
+        ACLK_STATS_UNLOCK;
+    }
+
     new_query = callocz(1, sizeof(struct aclk_query));
     new_query->cmd = aclk_cmd;
     if (internal) {
@@ -428,29 +440,29 @@ struct aclk_query *aclk_queue_pop()
 
 // This will give the base topic that the agent will publish messages.
 // subtopics will be sent under the base topic e.g.  base_topic/subtopic
-// This is called by aclk_init(), to compute the base topic once and have
-// it stored internally.
-// Need to check if additional logic should be added to make sure that there
-// is enough information to determine the base topic at init time
+// This is called during the connection, we delete any previous topic
+// in-case the user has changed the agent id and reclaimed.
 
 char *create_publish_base_topic()
 {
-    if (unlikely(!is_agent_claimed()))
+    char *agent_id = is_agent_claimed();
+    if (unlikely(!agent_id))
         return NULL;
 
     ACLK_LOCK;
 
-    if (unlikely(!global_base_topic)) {
-        char tmp_topic[ACLK_MAX_TOPIC + 1], *tmp;
+    if (global_base_topic)
+        freez(global_base_topic);
+    char tmp_topic[ACLK_MAX_TOPIC + 1], *tmp;
 
-        snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, is_agent_claimed());
-        tmp = strchr(tmp_topic, '\n');
-        if (unlikely(tmp))
-            *tmp = '\0';
-        global_base_topic = strdupz(tmp_topic);
-    }
+    snprintf(tmp_topic, ACLK_MAX_TOPIC, ACLK_TOPIC_STRUCTURE, agent_id);
+    tmp = strchr(tmp_topic, '\n');
+    if (unlikely(tmp))
+        *tmp = '\0';
+    global_base_topic = strdupz(tmp_topic);
 
     ACLK_UNLOCK;
+    freez(agent_id);
     return global_base_topic;
 }
 
@@ -668,6 +680,9 @@ static struct _collector *_add_collector(const char *hostname, const char *plugi
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name)
 {
     struct _collector *tmp_collector;
+    if (unlikely(!netdata_ready)) {
+        return;
+    }
 
     COLLECTOR_LOCK;
 
@@ -699,6 +714,9 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name)
 {
     struct _collector *tmp_collector;
+    if (unlikely(!netdata_ready)) {
+        return;
+    }
 
     COLLECTOR_LOCK;
 
@@ -889,6 +907,12 @@ int aclk_process_query()
 
     aclk_query_free(this_query);
 
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.queries_dispatched++;
+        ACLK_STATS_UNLOCK;
+    }
+
     return 1;
 }
 
@@ -991,6 +1015,39 @@ void *aclk_query_main_thread(void *ptr)
     return NULL;
 }
 
+static void aclk_graceful_disconnect()
+{
+    size_t write_q, write_q_bytes, read_q;
+    time_t event_loop_timeout;
+
+    // Send a graceful disconnect message
+    BUFFER *b = buffer_create(512);
+    aclk_create_header(b, "disconnect", NULL, 0, 0);
+    buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
+    aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
+    buffer_free(b);
+
+    event_loop_timeout = now_realtime_sec() + 5;
+    write_q = 1;
+    while (write_q && event_loop_timeout > now_realtime_sec()) {
+        _link_event_loop();
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+    }
+
+    aclk_shutting_down = 1;
+    _link_shutdown();
+    aclk_lws_wss_mqtt_layer_disconect_notif();
+
+    write_q = 1;
+    event_loop_timeout = now_realtime_sec() + 5;
+    while (write_q && event_loop_timeout > now_realtime_sec()) {
+        _link_event_loop();
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+    }
+    aclk_shutting_down = 0;
+}
+
+
 // Thread cleanup
 static void aclk_main_cleanup(void *ptr)
 {
@@ -999,40 +1056,13 @@ static void aclk_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    if (is_agent_claimed() && aclk_connected) {
-        size_t write_q, write_q_bytes, read_q;
-        time_t event_loop_timeout;
-
+    char *agent_id = is_agent_claimed();
+    if (agent_id && aclk_connected) {
+        freez(agent_id);
         // Wakeup thread to cleanup
         QUERY_THREAD_WAKEUP;
-        // Send a graceful disconnect message
-        BUFFER *b = buffer_create(512);
-        aclk_create_header(b, "disconnect", NULL, 0, 0);
-        buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
-        aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
-        buffer_free(b);
-
-        event_loop_timeout = now_realtime_sec() + 5;
-        write_q = 1;
-        while (write_q && event_loop_timeout > now_realtime_sec()) {
-            _link_event_loop();
-            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        }
-
-        aclk_shutting_down = 1;
-        _link_shutdown();
-        aclk_lws_wss_mqtt_layer_disconect_notif();
-
-        write_q = 1;
-        event_loop_timeout = now_realtime_sec() + 5;
-        while (write_q && event_loop_timeout > now_realtime_sec()) {
-            _link_event_loop();
-            lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        }
+        aclk_graceful_disconnect();
     }
-
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 struct dictionary_singleton {
@@ -1297,23 +1327,32 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     if (aclk_password != NULL )
         freez(aclk_password);
-    if (aclk_username == NULL)
-        aclk_username = strdupz(agent_id);
     aclk_password = password.result;
+    if (aclk_username != NULL)
+        freez(aclk_username);
+    aclk_username = agent_id;
+    agent_id = NULL;
 
 CLEANUP:
+    if (agent_id != NULL)
+        freez(agent_id);
     freez(data_buffer);
     return;
 }
 
 static void aclk_try_to_connect(char *hostname, char *port, int port_num)
 {
+    if (!aclk_private_key) {
+            error("Cannot try to establish the agent cloud link - no private key available!");
+            return;
+    }
     info("Attempting to establish the agent cloud link");
     aclk_get_challenge(hostname, port);
     if (aclk_password == NULL)
         return;
     int rc;
     aclk_connecting = 1;
+    create_publish_base_topic();
     rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
@@ -1335,16 +1374,39 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct netdata_static_thread *query_thread;
+    struct netdata_static_thread *stats_thread = NULL;
 
-    if (!netdata_cloud_setting) {
-        info("Killing ACLK thread -> cloud functionality has been disabled");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return NULL;
-    }
+    // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
+    // as it must notify the far end that it shutdown gracefully and avoid the LWT.
+    netdata_thread_disable_cancelability();
+
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK)
+    info("Killing ACLK thread -> cloud functionality has been disabled");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    return NULL;
+#endif
 
     info("Waiting for netdata to be ready");
     while (!netdata_ready) {
         sleep_usec(USEC_PER_MS * 300);
+    }
+
+    info("Waiting for Cloud to be enabled");
+    while (!netdata_cloud_setting) {
+        sleep_usec(USEC_PER_SEC * 1);
+        if (netdata_exit) {
+            static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+            return NULL;
+        }
+    }
+
+    aclk_stats_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "statistics", CONFIG_BOOLEAN_YES);
+    if (aclk_stats_enabled) {
+        stats_thread = callocz(1, sizeof(struct netdata_static_thread));
+        stats_thread->thread = mallocz(sizeof(netdata_thread_t));
+        netdata_thread_create(
+            stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
+            stats_thread);
     }
 
     last_init_sequence = now_realtime_sec();
@@ -1353,42 +1415,60 @@ void *aclk_main(void *ptr)
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
     char *aclk_port = NULL;
     uint32_t port_num = 0;
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-    if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
-        error("Configuration error - cannot use agent cloud link");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return NULL;
-    }
-    port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
-
     info("Waiting for netdata to be claimed");
     while(1) {
-        while (likely(!is_agent_claimed())) {
-            sleep_usec(USEC_PER_SEC * 5);
+        char *agent_id = is_agent_claimed();
+        while (likely(!agent_id)) {
+            sleep_usec(USEC_PER_SEC * 1);
             if (netdata_exit)
                 goto exited;
+            agent_id = is_agent_claimed();
         }
-        if (!create_private_key() && !_mqtt_lib_init())
-            break;
-
-        if (netdata_exit)
+        freez(agent_id);
+        // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
+        // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
+        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        if (cloud_base_url == NULL) {
+            error("Do not move the cloud base url out of post_conf_load!!");
             goto exited;
+        }
+        if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
+            error("Agent is claimed but the configuration is invalid, please fix");
+        }
+        else
+        {
+            port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
+            if (!create_private_key() && !_mqtt_lib_init())
+                break;
+        }
 
-        sleep_usec(USEC_PER_SEC * 60);
+        for (int i=0; i<60; i++) {
+            if (netdata_exit)
+                goto exited;
+
+            sleep_usec(USEC_PER_SEC * 1);
+        }
     }
-    create_publish_base_topic();
 
     usec_t reconnect_expiry = 0; // In usecs
 
-    netdata_thread_disable_cancelability();
-
     while (!netdata_exit) {
         static int first_init = 0;
-        size_t write_q, write_q_bytes, read_q;
-        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
-        //info("loop state first_init_%d connected=%d connecting=%d wq=%zu (%zu-bytes) rq=%zu",
-        //   first_init, aclk_connected, aclk_connecting, write_q, write_q_bytes, read_q);
-        if (unlikely(!netdata_exit && !aclk_connected)) {
+ /*       size_t write_q, write_q_bytes, read_q;
+        lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);*/
+
+        if (aclk_kill_link) {                       // User has reloaded the claiming state
+            aclk_kill_link = 0;
+            aclk_graceful_disconnect();
+            create_private_key();
+            continue;
+        }
+
+        if (aclk_force_reconnect) {
+            aclk_lws_wss_destroy_context();
+            aclk_force_reconnect = 0;
+        }
+        if (unlikely(!netdata_exit && !aclk_connected && !aclk_force_reconnect)) {
             if (unlikely(!first_init)) {
                 aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
                 first_init = 1;
@@ -1414,7 +1494,7 @@ void *aclk_main(void *ptr)
         }
 
         _link_event_loop();
-        if (unlikely(!aclk_connected))
+        if (unlikely(!aclk_connected || aclk_force_reconnect))
             continue;
         /*static int stress_counter = 0;
         if (write_q_bytes==0 && stress_counter ++ >5)
@@ -1448,6 +1528,20 @@ exited:
         RSA_free(aclk_private_key);
 
     aclk_main_cleanup(ptr);
+
+    if(aclk_stats_enabled) {
+        netdata_thread_join(*stats_thread->thread, NULL);
+        freez(stats_thread->thread);
+        freez(stats_thread);
+    }
+
+    /*
+     * this must be last -> if all static threads signal
+     * THREAD_EXITED rrdengine will dealloc the RRDSETs
+     * and RRDDIMs that are used by still runing stat thread.
+     * see netdata_cleanup_and_exit() for reference
+     */
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
 
@@ -1533,6 +1627,9 @@ int aclk_subscribe(char *sub_topic, int qos)
 void aclk_connect()
 {
     info("Connection detected (%"PRIu64" queued queries)", aclk_queue.count);
+
+    aclk_stats_upd_online(1);
+
     aclk_connected = 1;
     waiting_init = 0;
     aclk_reconnect_delay(0);
@@ -1545,19 +1642,15 @@ void aclk_disconnect()
 {
     if (likely(aclk_connected))
         info("Disconnect detected (%"PRIu64" queued queries)", aclk_queue.count);
+
+    aclk_stats_upd_online(0);
+
     aclk_subscribed = 0;
     aclk_metadata_submitted = ACLK_METADATA_REQUIRED;
     waiting_init = 1;
     aclk_connected = 0;
     aclk_connecting = 0;
-}
-
-void aclk_shutdown()
-{
-    info("Shutdown initiated");
-    aclk_connected = 0;
-    _link_shutdown();
-    info("Shutdown complete");
+    aclk_force_reconnect = 1;
 }
 
 inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us)
@@ -1598,6 +1691,7 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
  *    alarm_log
  *    active alarms
  */
+void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb);
 void aclk_send_alarm_metadata()
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -1618,17 +1712,18 @@ void aclk_send_alarm_metadata()
         aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
+
     buffer_sprintf(local_buffer, "{\n\t \"configured-alarms\" : ");
     health_alarms2json(localhost, local_buffer, 1);
     debug(D_ACLK, "Metadata %s with configured alarms has %zu bytes", msg_id, local_buffer->len);
-
-    buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
-    health_alarm_log2json(localhost, local_buffer, 0);
-    debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
-
+    //    buffer_sprintf(local_buffer, ",\n\t \"alarm-log\" : ");
+    //   health_alarm_log2json(localhost, local_buffer, 0);
+    //   debug(D_ACLK, "Metadata %s with alarm_log has %zu bytes", msg_id, local_buffer->len);
     buffer_sprintf(local_buffer, ",\n\t \"alarms-active\" : ");
-    health_alarms_values2json(localhost, local_buffer, 0);
-    debug(D_ACLK, "Metadata %s with alarms_active has %zu bytes", msg_id, local_buffer->len);
+    health_active_log_alarms_2json(localhost, local_buffer);
+    //debug(D_ACLK, "Metadata message %s", local_buffer->buffer);
+
+
 
     buffer_sprintf(local_buffer, "\n}\n}");
     aclk_send_message(ACLK_ALARMS_TOPIC, local_buffer->buffer, msg_id);
@@ -1657,7 +1752,7 @@ int aclk_send_info_metadata()
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (aclk_metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "connect", msg_id, 0, 0);
+        aclk_create_header(local_buffer, "update", msg_id, 0, 0);
     else
         aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
@@ -1667,7 +1762,7 @@ int aclk_send_info_metadata()
     debug(D_ACLK, "Metadata %s with info has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ", \n\t \"charts\" : ");
-    charts2json(localhost, local_buffer, 1);
+    charts2json(localhost, local_buffer, 1, 0);
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
@@ -1774,6 +1869,9 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     UNUSED(chart_name);
     return 0;
 #else
+    if (unlikely(!netdata_ready))
+        return 0;
+
     if (!netdata_cloud_setting)
         return 0;
 
@@ -1800,6 +1898,9 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
     BUFFER *local_buffer = NULL;
+
+    if (unlikely(!netdata_ready))
+        return 0;
 
     if (host != localhost)
         return 0;
@@ -1852,6 +1953,11 @@ int aclk_handle_cloud_request(char *payload)
         .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
     };
 
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.cloud_req_recvd++;
+        ACLK_STATS_UNLOCK;
+    }
 
     if (unlikely(agent_state == AGENT_INITIALIZING)) {
         debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
@@ -1888,6 +1994,12 @@ int aclk_handle_cloud_request(char *payload)
 
         if (cloud_to_agent.callback_topic)
             freez(cloud_to_agent.callback_topic);
+
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.cloud_req_err++;
+            ACLK_STATS_UNLOCK;
+        }
 
         return 1;
     }

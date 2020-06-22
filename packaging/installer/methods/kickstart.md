@@ -44,7 +44,7 @@ installation. Here are a few important parameters:
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](../../../docs/anonymous-statistics.md) we use to make
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
@@ -58,15 +58,15 @@ To use `md5sum` to verify the intregity of the `kickstart.sh` script you will do
 run the following:
 
 ```bash
-[ "3058dbf398ba0d73d02c7626545610f5" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "2057599f8b11ce56f85aa7f26ce7b15b" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
-for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](../../../docs/getting-started.md) for a quick overview.
+guide](/docs/getting-started.md) for a quick overview.

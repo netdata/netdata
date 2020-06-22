@@ -153,7 +153,7 @@ CentOS 8.x:
 
 - Enable the PowerTools repo
 - Enable the EPEL repo
-- Enable the Extra repo from [extra.getpagespeed.com](https://extras.getpagespeed.com/release-el8-latest.rpm)
+- Enable the Extra repo from [OKAY](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
 
 And install the minimum required dependencies:
 
@@ -168,10 +168,10 @@ yum config-manager --set-enabled PowerTools
 yum install -y epel-release
 
 # Install Repo for libuv-devl (NEW)
-yum install -y https://extras.getpagespeed.com/release-el8-latest.rpm
+yum install -y http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
 
 # Install Devel Packages
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
+yum install autoconf automake curl gcc git cmake libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
 
 # Install Judy-Devel directly
 yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
@@ -206,10 +206,18 @@ You can edit this file to set options. One common option to tweak is `history`, 
 
 To apply the changes you made, you have to restart Netdata.
 
+### 'nonrepresentable section on output' errors
+
+Our current build process unfortunately has some issues when using certain configurations of the `clang` C compiler on Linux.
+
+If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install. 
+
+In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
+
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
-for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](../../../docs/getting-started.md) for a quick overview.
+guide](/docs/getting-started.md) for a quick overview.

@@ -1,8 +1,7 @@
 <!--
----
 title: "Samba monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/samba/README.md
----
+sidebar_label: "Samba"
 -->
 
 # Samba monitoring with Netdata

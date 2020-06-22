@@ -11,7 +11,11 @@
 #  --disable-telemetry      Opt-out of anonymous telemetry program (DO_NOT_TRACK=1)
 #  --local-files            Use a manually provided tarball for the installation
 #
-# ---------------------------------------------------------------------------------------------------------------------
+# Environment options:
+#
+#  NETDATA_TARBALL_BASEURL  set the base url for downloading the dist tarball
+#
+# ----------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
 setup_terminal() {
@@ -43,7 +47,7 @@ setup_terminal() {
 }
 setup_terminal || echo > /dev/null
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 fatal() {
   printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
   exit 1
@@ -130,9 +134,9 @@ download() {
   url="${1}"
   dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
   elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O - "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run wget -T 15 -O "${dest}" "${url}" || fatal "Cannot download ${url}"
   else
     fatal "I need curl or wget to proceed, but neither is available on this system."
   fi
@@ -147,13 +151,12 @@ set_tarball_urls() {
   if [ "$1" = "stable" ]; then
     local latest
     # Simple version
-    # latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.gz.run"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.gz.run"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+    export NETDATA_TARBALL_URL="$NETDATA_TARBALL_BASEURL/netdata-latest.gz.run"
+    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_TARBALL_BASEURL/sha256sums.txt"
   fi
 }
 
@@ -169,14 +172,14 @@ safe_sha256sum() {
   fi
 }
 
-# ---------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 umask 022
 
 sudo=""
 [ -z "${UID}" ] && UID="$(id -u)"
 [ "${UID}" -ne "0" ] && sudo="sudo"
 
-# ---------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 if [ "$(uname -m)" != "x86_64" ]; then
   fatal "Static binary versions of netdata are available only for 64bit Intel/AMD CPUs (x86_64), but yours is: $(uname -m)."
 fi
@@ -185,7 +188,7 @@ if [ "$(uname -s)" != "Linux" ]; then
   fatal "Static binary versions of netdata are available only for Linux, but this system is $(uname -s)"
 fi
 
-# ---------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 opts=
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
@@ -235,7 +238,10 @@ if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }--disable-telemtry"
 fi
 
-# ---------------------------------------------------------------------------------------------------------------------
+# Netdata Tarball Base URL (defaults to our Google Storage Bucket)
+[ -z "$NETDATA_TARBALL_BASEURL" ] && NETDATA_TARBALL_BASEURL=https://storage.googleapis.com/netdata-nightlies
+
+# ----------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)
 cd "${TMPDIR}" || exit 1
 
@@ -255,7 +261,7 @@ if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - 
   fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
 fi
 
-# ---------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 progress "Installing netdata"
 run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} -- ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
 

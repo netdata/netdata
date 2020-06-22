@@ -300,6 +300,7 @@ extern char *netdata_configured_host_prefix;
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"
+#include "circular_buffer/circular_buffer.h"
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"
@@ -323,6 +324,6 @@ extern char *netdata_configured_host_prefix;
 #include "string/utf8.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://netdata.cloud"
+#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
 
 #endif // NETDATA_LIB_H

@@ -356,7 +356,7 @@ For more information check prometheus documentation.
 
 ### Streaming data from upstream hosts
 
-The `format=prometheus` parameter only exports the host's Netdata metrics. If you are using the master/slave
+The `format=prometheus` parameter only exports the host's Netdata metrics. If you are using the parent-child
 functionality of Netdata this ignores any upstream hosts - so you should consider using the below in your
 **prometheus.yml**:
 
@@ -387,6 +387,8 @@ To expose them, append `variables=yes` to the Netdata URL.
 To save bandwidth, and because prometheus does not use them anyway, `# TYPE` and `# HELP` lines are suppressed. If
 wanted they can be re-enabled via `types=yes` and `help=yes`, e.g.
 `/api/v1/allmetrics?format=prometheus&types=yes&help=yes`
+
+Note that if enabled, the `# TYPE` and `# HELP` lines are repeated for every occurrence of a metric, which goes against the Prometheus documentation's [specification for these lines](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#comments-help-text-and-type-information).
 
 ### Names and IDs
 

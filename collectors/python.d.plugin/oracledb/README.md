@@ -1,8 +1,7 @@
 <!--
----
 title: "OracleDB monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/oracledb/README.md
----
+sidebar_label: "OracleDB"
 -->
 
 # OracleDB monitoring with Netdata
@@ -47,9 +46,10 @@ It produces following charts:
 
 To use the Oracle module do the following:
 
-1.  Install `cx_Oracle` package ([link](https://cx-oracle.readthedocs.io/en/latest/installation.html#install-cx-oracle)).
+1.  Install `cx_Oracle` package ([link](https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html)).
 
-2.  Install Oracle Client libraries ([link](https://cx-oracle.readthedocs.io/en/latest/installation.html#install-oracle-client)).
+2.  Install Oracle Client libraries
+    ([link](https://cx-oracle.readthedocs.io/en/latest/user_guide/installation.html#install-oracle-client)).
 
 3.  Create a read-only `netdata` user with proper access to your Oracle Database Server.
 

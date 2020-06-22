@@ -1,8 +1,7 @@
 <!--
----
 title: "Icecast monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/icecast/README.md
----
+sidebar_label: "Icecast"
 -->
 
 # Icecast monitoring with Netdata

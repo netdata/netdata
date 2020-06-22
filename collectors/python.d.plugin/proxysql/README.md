@@ -1,13 +1,21 @@
 <!--
----
 title: "ProxySQL monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/proxysql/README.md
----
+sidebar_label: "ProxySQL"
 -->
 
 # ProxySQL monitoring with Netdata
 
 Monitors database backend and frontend performance metrics.
+
+## Requirements
+
+-   python library [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
+-   `netdata` local user to connect to the ProxySQL server.
+
+To create the `netdata` user, follow [the documentation](https://github.com/sysown/proxysql/wiki/Users-configuration#creating-a-new-user).
+
+## Charts
 
 It produces:
 

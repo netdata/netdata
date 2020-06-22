@@ -1,0 +1,8 @@
+{
+    "replacementPatterns": [
+        {
+            "pattern": "^/",
+            "replacement": "/github/workspace/"
+        }
+    ]
+}

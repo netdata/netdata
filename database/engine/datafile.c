@@ -30,7 +30,7 @@ void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_dataf
     struct rrdengine_datafile *next;
 
     next = datafile->next;
-    assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
+    fatal_assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
     ctx->datafiles.first = next;
 }
 
@@ -38,7 +38,7 @@ void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_dataf
 static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_instance *ctx,
                           unsigned tier, unsigned fileno)
 {
-    assert(tier == 1);
+    fatal_assert(tier == 1);
     datafile->tier = tier;
     datafile->fileno = fileno;
     datafile->file = (uv_file)0;
@@ -146,7 +146,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        assert(req.result < 0);
+        fatal_assert(req.result < 0);
         error("uv_fs_write: %s", uv_strerror(ret));
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
@@ -184,7 +184,7 @@ static int check_data_file_superblock(uv_file file)
         uv_fs_req_cleanup(&req);
         goto error;
     }
-    assert(req.result >= 0);
+    fatal_assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
     if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
@@ -271,7 +271,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     ret = uv_fs_scandir(NULL, &req, ctx->dbfiles_path, 0, NULL);
     if (ret < 0) {
-        assert(req.result < 0);
+        fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
         error("uv_fs_scandir(%s): %s", ctx->dbfiles_path, uv_strerror(ret));
         ++ctx->stats.fs_errors;

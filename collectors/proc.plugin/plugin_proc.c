@@ -148,7 +148,7 @@ void *proc_main(void *ptr) {
             static RRDSET *st = NULL;
 
             if(unlikely(!st)) {
-                st = rrdset_find_bytype_localhost("netdata", "plugin_proc_modules");
+                st = rrdset_find_active_bytype_localhost("netdata", "plugin_proc_modules");
 
                 if(!st) {
                     st = rrdset_create_localhost(

@@ -105,6 +105,7 @@ else
                 CONTAINER_OS_DETECTION="/etc/os-release"
         fi
 
+        # shellcheck disable=SC2153
         if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
                 if [ -f "/etc/lsb-release" ]; then
                         if [ "${OS_DETECTION}" = "unknown" ]; then
@@ -121,9 +122,9 @@ else
                         if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
                 fi
                 if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-                        if [ "${OS_DETECTION}" = "unknown" ]; then 
+                        if [ "${OS_DETECTION}" = "unknown" ]; then
                                 CONTAINER_OS_DETECTION="lsb_release"
-                        else 
+                        else
                                 CONTAINER_OS_DETECTION="Mixed"
                         fi
                         if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
@@ -307,8 +308,7 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
         fi
 
         DISK_DETECTION="df"
-        total="$(/bin/df -k -t ${types} | tail -n +1 | awk '{s+=$2} END {print s}')"
-        DISK_SIZE="$((total * 1024))"
+        DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | tr '\n' '+' | rev | cut -f 2- -d '+' | rev) * 1024))
 elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         types='ufs'
 
@@ -320,16 +320,20 @@ elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         total="$(df -t ${types} -c -k | tail -n 1 | awk '{print $2}')"
         DISK_SIZE="$((total * 1024))"
 else
-        if [ -d /sys/block ] ; then
-                # List of device majors we actually count towards total disk space.
-                # The meanings of these can be found in `Documentation/admin-guide/devices.txt` in the Linux sources.
-                # The ':' surrounding each number are important for matching.
-                dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:256:257:'
+        if [ -d /sys/block ] && [ -r /proc/devices ] ; then
+                dev_major_whitelist=''
 
-                if [ "${VIRTUALIZATION}" != "unknown" ] ; then
-                    # We're running virtualized, add the local range of device major numbers so that we catch paravirtualized block devices.
-                    dev_major_whitelist="${dev_major_whitelist}240:241:242:243:244:245:246:247:248:249:250:251:252:253:254:"
-                fi
+                # This is a list of device names used for block storage devices.
+                # These translate to the prefixs of files in `/dev` indicating the device type.
+                # They are sorted by lowest used device major number, with dynamically assigned ones at the end.
+                # We use this to look up device major numbers in `/proc/devices`
+                device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme'
+
+                for name in ${device_names} ; do
+                        if grep -qE " ${name}\$" /proc/devices ; then
+                                dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | sed -e 's/^[[:space:]]*//' | cut -f 1 -d ' ' | tr '\n' ':'):"
+                        fi
+                done
 
                 DISK_DETECTION="sysfs"
                 DISK_SIZE="0"
@@ -338,18 +342,17 @@ else
                            (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") && \
                            grep -qv 1 "${disk}/removable"
                         then
-                            size="$(cat "${disk}/size")"
+                            size="$(($(cat "${disk}/size") * 512))"
                             DISK_SIZE="$((DISK_SIZE + size))"
                         fi
                 done
         elif df --version 2>/dev/null | grep -qF "GNU coreutils" ; then
                 DISK_DETECTION="df"
-                DISK_SIZE="$(df -x tmpfs -x devtmpfs -x squashfs -l --total -B1 --output=size | tail -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+                DISK_SIZE=$(($(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size | tail -n +2 | sort -u -k 1 | awk '{print $2}' | tr '\n' '+' | head -c -1)))
         else
                 DISK_DETECTION="df"
                 include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
-                total="$(df -T -P | grep "${include_fs_types}" | awk '{s+=$3} END {print s}')"
-                DISK_SIZE="$((total * 1024))"
+                DISK_SIZE=$(($(df -T -P | tail -n +2 | sort -u -k 1 | grep "${include_fs_types}" | awk '{print $3}' | tr '\n' '+' | head -c -1) * 1024))
         fi
 fi
 

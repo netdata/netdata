@@ -2451,7 +2451,8 @@ static inline void link_all_processes_to_their_parents(void) {
         p->parent = NULL;
 
         if(unlikely(!p->ppid)) {
-            p->parent = NULL;
+            //unnecessary code from apps_plugin.c
+            //p->parent = NULL;
             continue;
         }
 

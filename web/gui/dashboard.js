@@ -792,12 +792,26 @@ NETDATA.unitsConversion = {
             'gigabits/s': 1000000,
             'terabits/s': 1000000000
         },
+        'bytes/s': {
+            'bytes/s': 1,
+            'kilobytes/s': 1024,
+            'megabytes/s': 1024 * 1024,
+            'gigabytes/s': 1024 * 1024 * 1024,
+            'terabytes/s': 1024 * 1024 * 1024 * 1024
+        },
         'kilobytes/s': {
             'bytes/s': 1 / 1024,
             'kilobytes/s': 1,
             'megabytes/s': 1024,
             'gigabytes/s': 1024 * 1024,
             'terabytes/s': 1024 * 1024 * 1024
+        },
+        'B/s': {
+            'B/s': 1,
+            'KiB/s': 1024,
+            'MiB/s': 1024 * 1024,
+            'GiB/s': 1024 * 1024 * 1024,
+            'TiB/s': 1024 * 1024 * 1024 * 1024
         },
         'KB/s': {
             'B/s': 1 / 1024,

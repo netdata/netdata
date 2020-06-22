@@ -145,6 +145,8 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
         return EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_KINESIS;
+    } else if (!strcmp(type, "pubsub") || !strcmp(type, "pubsub:plaintext")) {
+        return EXPORTING_CONNECTOR_TYPE_PUBSUB;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
         return EXPORTING_CONNECTOR_TYPE_MONGODB;
 
@@ -288,6 +290,7 @@ struct engine *read_exporting_config()
     while (tmp_ci_list) {
         struct instance *tmp_instance;
         char *instance_name;
+        char *default_destination = "localhost";
 
         info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
@@ -310,6 +313,13 @@ struct engine *read_exporting_config()
         }
 #endif
 
+#ifndef ENABLE_EXPORTING_PUBSUB
+        if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
+            error("Google Cloud Pub/Sub support isn't compiled");
+            goto next_connector_instance;
+        }
+#endif
+
 #ifndef HAVE_MONGOC
         if (tmp_ci_list->backend_type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
             error("MongoDB support isn't compiled");
@@ -326,9 +336,9 @@ struct engine *read_exporting_config()
 
         instance_name = tmp_ci_list->local_ci.instance_name;
 
+        tmp_instance->config.type_name = strdupz(tmp_ci_list->local_ci.connector_name);
         tmp_instance->config.name = strdupz(tmp_ci_list->local_ci.instance_name);
 
-        tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", "localhost"));
 
         tmp_instance->config.update_every =
             exporter_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
@@ -346,6 +356,12 @@ struct engine *read_exporting_config()
         char *data_source = exporter_get(instance_name, "data source", "average");
 
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
+        if (EXPORTING_OPTIONS_DATA_SOURCE(tmp_instance->config.options) != EXPORTING_SOURCE_DATA_AS_COLLECTED &&
+            tmp_instance->config.update_every % localhost->rrd_update_every)
+            info(
+                "The update interval %d for instance %s is not a multiple of the database update interval %d. "
+                "Metric values will deviate at different points in time.",
+                tmp_instance->config.update_every, tmp_instance->config.name, localhost->rrd_update_every);
 
         if (exporter_get_boolean(instance_name, "send configured labels", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
@@ -376,13 +392,27 @@ struct engine *read_exporting_config()
             struct aws_kinesis_specific_config *connector_specific_config =
                 callocz(1, sizeof(struct aws_kinesis_specific_config));
 
+            default_destination = "us-east-1";
+
             tmp_instance->config.connector_specific_config = connector_specific_config;
 
-            connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", "netdata"));
+            connector_specific_config->stream_name = strdupz(exporter_get(instance_name, "stream name", ""));
 
             connector_specific_config->auth_key_id = strdupz(exporter_get(instance_name, "aws_access_key_id", ""));
-
             connector_specific_config->secure_key = strdupz(exporter_get(instance_name, "aws_secret_access_key", ""));
+        }
+
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
+            struct pubsub_specific_config *connector_specific_config =
+                callocz(1, sizeof(struct pubsub_specific_config));
+
+            default_destination = "pubsub.googleapis.com";
+
+            tmp_instance->config.connector_specific_config = connector_specific_config;
+
+            connector_specific_config->credentials_file = strdupz(exporter_get(instance_name, "credentials file", ""));
+            connector_specific_config->project_id = strdupz(exporter_get(instance_name, "project id", ""));
+            connector_specific_config->topic_id = strdupz(exporter_get(instance_name, "topic id", ""));
         }
 
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
@@ -397,6 +427,14 @@ struct engine *read_exporting_config()
             connector_specific_config->collection = strdupz(exporter_get(
                 instance_name, "collection", ""));
         }
+
+        tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
+
+#ifdef ENABLE_HTTPS
+        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) {
+            tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
+        }
+#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
         info(

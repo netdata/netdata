@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Netdata daemon"
+date: 2020-04-29
 custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
 ---
 -->
@@ -117,15 +118,15 @@ The command line options of the Netdata 1.10.0 version are the following:
  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   
  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
- Copyright (C) 2016-2017, Costa Tsaousis <costa@tsaousis.gr>
+ Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>
  Released under GNU General Public License v3 or later.
  All rights reserved.
 
- Home Page  : https://my-netdata.io
+ Home Page  : https://netdata.cloud
  Source Code: https://github.com/netdata/netdata
- Wiki / Docs: https://github.com/netdata/netdata/wiki
+ Docs       : https://learn.netdata.cloud
  Support    : https://github.com/netdata/netdata/issues
- License    : https://github.com/netdata/netdata/blob/master/LICENSE
+ License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
 
  Twitter    : https://twitter.com/linuxnetdata
  Facebook   : https://www.facebook.com/linuxnetdata/
@@ -184,6 +185,8 @@ The command line options of the Netdata 1.10.0 version are the following:
   -W simple-pattern pattern string
                            Check if string matches pattern and exit.
 
+  -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 url=https://app.netdata.cloud"
+                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.
 
  Signals netdata handles:
 

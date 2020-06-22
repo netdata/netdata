@@ -11,9 +11,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-beh
 > and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites 
 > and powers quite a number of the world's most visited ones.
 
-If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name 
-can be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to 
-connect to Netdata at <https://example.com> or <https://example.com/netdata/>, which is a much nicer experience then <http://example.com:19999>.
+If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can
+be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to connect to
+Netdata at `https://example.com` or `https://example.com/netdata/`, which is a much nicer experience then
+`http://example.com:19999`.
 
 To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata, 
 the following configuration can be used:
@@ -29,7 +30,7 @@ defaults
 
 ## Simple Configuration
 
-A simple example where the base URL, say <http://example.com>, is used with no subpath:
+A simple example where the base URL, say `http://example.com`, is used with no subpath:
 
 ### Frontend
 
@@ -167,7 +168,7 @@ backend netdata_backend
 
 ## Enable authentication
 
-To use basic HTTP Authentication, create a authentication list:
+To use basic HTTP Authentication, create an authentication list:
 
 ```conf
 # HTTP Auth

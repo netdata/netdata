@@ -2,7 +2,6 @@
 
 # Find the arch we are building for, as this determines
 # the location of plugins in /usr/lib
-DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 TOP = $(CURDIR)/debian/netdata
 TEMPTOP = $(CURDIR)/debian/tmp
 
@@ -41,10 +40,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib \
 	--libexecdir=/usr/libexec --with-user=netdata --with-math --with-zlib --with-webdir=/var/lib/netdata/www
 
-debian/%.postinst: debian/%.postinst.in
-	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
-
-override_dh_install: debian/netdata.postinst
+override_dh_install:
 	cp -v $(BASE_CONFIG) debian/netdata.conf
 
 	dh_install
@@ -80,19 +76,6 @@ override_dh_install: debian/netdata.postinst
 		ln -s "/usr/share/netdata/www/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
-	# Update postinst to set correct group for www files on installation.
-	# Should probably be dpkg-statoverride really, but that gets *really*
-	# messy. We also set all web files in /var as conffiles so an upgrade
-	# doesn't splat them.
-	#
-	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type f -printf '%f '); do \
-		echo Updating postinst for $$D; \
-		sed -i "s/^#PERMS#/chgrp netdata \/var\/lib\/netdata\/www\/$$D\n#PERMS#/g" \
-			$(CURDIR)/debian/netdata.postinst; \
-		echo "/var/lib/netdata/www/$$D" >> $(CURDIR)/debian/netdata.conffiles; \
-	done
-	sed -i "/^#PERMS#/d" $(CURDIR)/debian/netdata.postinst
-
 	# Install go
 	#
 	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata $(TOP)/usr/libexec/netdata
@@ -125,7 +108,7 @@ override_dh_fixperms:
 	chmod 0750 $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
 
 	# freeIPMI plugin package
-	chmod 0754 $(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
+	chmod 4750 $(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
 
 override_dh_installlogrotate:
 	cp system/netdata.logrotate debian/netdata.logrotate
@@ -137,5 +120,4 @@ override_dh_clean:
 	# Tidy up copied/generated files
 	#
 	-[ -r $(CURDIR)/debian/netdata.logrotate ] && rm $(CURDIR)/debian/netdata.logrotate
-	-[ -r $(CURDIR)/debian/netdata.postinst ] && rm $(CURDIR)/debian/netdata.postinst
 	-[ -r $(CURDIR)/debian/netdata.conffiles ] && rm $(CURDIR)/debian/netdata.conffiles

@@ -1,3 +1,10 @@
+<!--
+title: "Export metrics to Prometheus"
+description: "Export Netdata metrics to Prometheus for archiving and further analysis."
+custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md
+sidebar_label: Using Netdata with Prometheus
+-->
+
 # Using Netdata with Prometheus
 
 > IMPORTANT: the format Netdata sends metrics to Prometheus has changed since Netdata v1.7. The new Prometheus exporting
@@ -13,7 +20,7 @@ are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM
 
 ### Installing Netdata
 
-There are number of ways to install Netdata according to [Installation](../../packaging/installer/). The suggested way
+There are number of ways to install Netdata according to [Installation](/packaging/installer/README.md). The suggested way
 of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
 
 ```sh
@@ -350,7 +357,7 @@ For more information check Prometheus documentation.
 
 ### Streaming data from upstream hosts
 
-The `format=prometheus` parameter only exports the host's Netdata metrics. If you are using the master/slave
+The `format=prometheus` parameter only exports the host's Netdata metrics. If you are using the parent-child
 functionality of Netdata this ignores any upstream hosts - so you should consider using the below in your
 **prometheus.yml**:
 
@@ -382,6 +389,8 @@ To save bandwidth, and because Prometheus does not use them anyway, `# TYPE` and
 wanted they can be re-enabled via `types=yes` and `help=yes`, e.g.
 `/api/v1/allmetrics?format=prometheus&types=yes&help=yes`
 
+Note that if enabled, the `# TYPE` and `# HELP` lines are repeated for every occurrence of a metric, which goes against the Prometheus documentation's [specification for these lines](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#comments-help-text-and-type-information).
+
 ### Names and IDs
 
 Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and
@@ -390,10 +399,10 @@ names are human friendly labels (also unique).
 Most charts and metrics have the same ID and name, but in several cases they are different: disks with device-mapper,
 interrupts, QoS classes, statsd synthetic charts, etc.
 
-The default is controlled in `netdata.conf`:
+The default is controlled in `exporting.conf`:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	send names instead of ids = yes | no
 ```
 
@@ -407,22 +416,22 @@ You can overwrite it from Prometheus, by appending to the URL:
 Netdata can filter the metrics it sends to Prometheus with this setting:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	send charts matching = *
 ```
 
-This settings accepts a space separated list of [simple patterns](../../libnetdata/simple_pattern/README.md) to match
-the **charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is
-valid). Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and
-groups except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right,
-is used.
+This settings accepts a space separated list of [simple patterns](/libnetdata/simple_pattern/README.md) to match the
+**charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is valid).
+Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and groups
+except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right, is
+used.
 
 ### Changing the prefix of Netdata metrics
 
 Netdata sends all metrics prefixed with `netdata_`. You can change this in `netdata.conf`, like this:
 
 ```conf
-[backend]
+[prometheus:exporter]
 	prefix = netdata
 ```
 

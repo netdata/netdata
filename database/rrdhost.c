@@ -139,6 +139,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->disk_space_mb       = default_rrdeng_disk_quota_mb;
 #endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
+
+    host->sender = mallocz(sizeof(*host->sender));
+    sender_init(host->sender, host);
+    netdata_mutex_init(&host->receiver_lock);
+
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
@@ -148,7 +153,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
 
-    host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;
+    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
     host->ssl.flags = NETDATA_SSL_START;
@@ -156,7 +161,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
 
-    netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels_rwlock);
 
@@ -241,6 +245,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
+        if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
+            error("Host machine GUID is not valid.");
+        }
+        host->objects_nr = 1;
+        host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
@@ -249,7 +258,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         if(ret != 0 && errno != EEXIST)
             error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
         else
-            ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+            ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
         if(ret) {
             error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
                   host->hostname, host->machine_guid, host->cache_dir);
@@ -357,7 +366,89 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrd_hosts_available++;
 
+#ifdef ENABLE_DBENGINE
+    if (likely(!is_localhost && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+            metalog_commit_update_host(host);
+#endif
     return host;
+}
+
+void rrdhost_update(RRDHOST *host
+                    , const char *hostname
+                    , const char *registry_hostname
+                    , const char *guid
+                    , const char *os
+                    , const char *timezone
+                    , const char *tags
+                    , const char *program_name
+                    , const char *program_version
+                    , int update_every
+                    , long history
+                    , RRD_MEMORY_MODE mode
+                    , unsigned int health_enabled
+                    , unsigned int rrdpush_enabled
+                    , char *rrdpush_destination
+                    , char *rrdpush_api_key
+                    , char *rrdpush_send_charts_matching
+                    , struct rrdhost_system_info *system_info
+)
+{
+    UNUSED(guid);
+    UNUSED(rrdpush_enabled);
+    UNUSED(rrdpush_destination);
+    UNUSED(rrdpush_api_key);
+    UNUSED(rrdpush_send_charts_matching);
+
+    host->health_enabled = health_enabled;
+    //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
+
+    rrdhost_system_info_free(host->system_info);
+    host->system_info = system_info;
+
+    rrdhost_init_os(host, os);
+    rrdhost_init_timezone(host, timezone);
+
+    freez(host->registry_hostname);
+    host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
+
+    if(strcmp(host->hostname, hostname) != 0) {
+        info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", host->hostname, hostname);
+        char *t = host->hostname;
+        host->hostname = strdupz(hostname);
+        host->hash_hostname = simple_hash(host->hostname);
+        freez(t);
+    }
+
+    if(strcmp(host->program_name, program_name) != 0) {
+        info("Host '%s' switched program name from '%s' to '%s'", host->hostname, host->program_name, program_name);
+        char *t = host->program_name;
+        host->program_name = strdupz(program_name);
+        freez(t);
+    }
+
+    if(strcmp(host->program_version, program_version) != 0) {
+        info("Host '%s' switched program version from '%s' to '%s'", host->hostname, host->program_version, program_version);
+        char *t = host->program_version;
+        host->program_version = strdupz(program_version);
+        freez(t);
+    }
+
+    if(host->rrd_update_every != update_every)
+        error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every, update_every);
+
+    if(host->rrd_history_entries < history)
+        error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
+
+    if(host->rrd_memory_mode != mode)
+        error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+
+    // update host tags
+    rrdhost_init_tags(host, tags);
+#ifdef ENABLE_DBENGINE
+    if (likely(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+        metalog_commit_update_host(host);
+#endif
+    return;
 }
 
 RRDHOST *rrdhost_find_or_create(
@@ -406,42 +497,24 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
-        host->health_enabled = health_enabled;
-        host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;
-
-        if(strcmp(host->hostname, hostname) != 0) {
-            info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", host->hostname, hostname);
-            char *t = host->hostname;
-            host->hostname = strdupz(hostname);
-            host->hash_hostname = simple_hash(host->hostname);
-            freez(t);
-        }
-
-        if(strcmp(host->program_name, program_name) != 0) {
-            info("Host '%s' switched program name from '%s' to '%s'", host->hostname, host->program_name, program_name);
-            char *t = host->program_name;
-            host->program_name = strdupz(program_name);
-            freez(t);
-        }
-
-        if(strcmp(host->program_version, program_version) != 0) {
-            info("Host '%s' switched program version from '%s' to '%s'", host->hostname, host->program_version, program_version);
-            char *t = host->program_version;
-            host->program_version = strdupz(program_version);
-            freez(t);
-        }
-
-        if(host->rrd_update_every != update_every)
-            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every, update_every);
-
-        if(host->rrd_history_entries < history)
-            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
-
-        if(host->rrd_memory_mode != mode)
-            error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
-
-        // update host tags
-        rrdhost_init_tags(host, tags);
+        rrdhost_update(host
+           , hostname
+           , registry_hostname
+           , guid
+           , os
+           , timezone
+           , tags
+           , program_name
+           , program_version
+           , update_every
+           , history
+           , mode
+           , health_enabled
+           , rrdpush_enabled
+           , rrdpush_destination
+           , rrdpush_api_key
+           , rrdpush_send_charts_matching
+           , system_info);
     }
 
     rrdhost_cleanup_orphan_hosts_nolock(host);
@@ -450,12 +523,11 @@ RRDHOST *rrdhost_find_or_create(
 
     return host;
 }
-
 inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
     if(host != protected
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && !host->connected_senders
+       && host->receiver
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
         return 1;
@@ -594,6 +666,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     }
 }
 
+void destroy_receiver_state(struct receiver_state *rpt);
 void rrdhost_free(RRDHOST *host) {
     if(!host) return;
 
@@ -601,14 +674,35 @@ void rrdhost_free(RRDHOST *host) {
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
-    // stop a possibly running thread
-    rrdpush_sender_thread_stop(host);
+    // ------------------------------------------------------------------------
+    // clean up streaming
+    rrdpush_sender_thread_stop(host); // stop a possibly running thread
+    cbuffer_free(host->sender->buffer);
+    buffer_free(host->sender->build);
+    freez(host->sender);
+    host->sender = NULL;
+    if (netdata_exit) {
+        netdata_mutex_lock(&host->receiver_lock);
+        if (host->receiver) {
+            if (!host->receiver->exited)
+                netdata_thread_cancel(host->receiver->thread);
+            while (!host->receiver->exited)
+                sleep_usec(50 * USEC_PER_MS);
+            destroy_receiver_state(host->receiver);
+        }
+        netdata_mutex_unlock(&host->receiver_lock);
+    }
+
+
 
     rrdhost_wrlock(host);   // lock this RRDHOST
 
     // ------------------------------------------------------------------------
     // release its children resources
 
+#ifdef ENABLE_DBENGINE
+    rrdeng_prepare_exit(host->rrdeng_ctx);
+#endif
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
 
@@ -667,6 +761,8 @@ void rrdhost_free(RRDHOST *host) {
         if(h) h->next = host->next;
         else error("Request to free RRDHOST '%s': cannot find it", host->hostname);
     }
+
+
 
     // ------------------------------------------------------------------------
     // free it
@@ -827,7 +923,7 @@ struct label *load_auto_labels()
             add_label_to_list(label_list, "_virt_detection", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
 
     label_list = add_label_to_list(
-        label_list, "_is_master", (localhost->next || configured_as_master()) ? "true" : "false", LABEL_SOURCE_AUTO);
+        label_list, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", LABEL_SOURCE_AUTO);
 
     if (localhost->rrdpush_send_destination)
         label_list =
@@ -1193,11 +1289,12 @@ void reload_host_labels()
     health_label_log_save(localhost);
     rrdhost_unlock(localhost);
 
+/*  TODO-GAPS - fix this so that it looks properly at the state and version of the sender
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
         localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         rrdpush_send_labels(localhost);
     }
-
+*/
     health_reload();
 }
 
@@ -1283,7 +1380,7 @@ void rrdhost_cleanup_all(void) {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if(host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS) && !host->connected_senders)
+        if(host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS) && !host->receiver)
             rrdhost_delete_charts(host);
         else
             rrdhost_cleanup_charts(host);
@@ -1310,7 +1407,17 @@ restart_after_removal:
                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
         )) {
-
+#ifdef ENABLE_DBENGINE
+            if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+                rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
+                rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+                if (st->dimensions) {
+                    /* If the chart still has dimensions don't delete it from the metadata log */
+                    continue;
+                }
+                metalog_commit_delete_chart(st);
+            }
+#endif
             rrdset_rdlock(st);
 
             if(rrdhost_delete_obsolete_charts)
@@ -1481,4 +1588,19 @@ int alarm_compare_name(void *a, void *b) {
     else if(in1->hash > in2->hash) return 1;
 
     return strcmp(in1->name,in2->name);
+}
+
+// Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
+// the last entry times as the metric updates, but let's see if it is a problem first.
+time_t rrdhost_last_entry_t(RRDHOST *h) {
+    rrdhost_rdlock(h);
+    RRDSET *st;
+    time_t result = 0;
+    rrdset_foreach_read(st, h) {
+        time_t st_last = rrdset_last_entry_t(st);
+        if (st_last > result)
+            result = st_last;
+    }
+    rrdhost_unlock(h);
+    return result;
 }

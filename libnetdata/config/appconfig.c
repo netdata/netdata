@@ -79,6 +79,8 @@ int is_valid_connector(char *type, int check_reserved)
         return rc;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return rc;
+    } else if (!strcmp(type, "pubsub") || !strcmp(type, "pubsub:plaintext")) {
+        return rc;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
         return rc;
     }
@@ -289,18 +291,21 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
 {
     struct config_option *cv;
 
+    // Only calls internal to this file check for a NULL result and they do not supply a NULL arg.
+    // External caller should treat NULL as an error case.
     cv = appconfig_option_index_find(co, name, 0);
-    if(!cv) {
+    if (!cv) {
+        if (!default_value) return NULL;
         cv = appconfig_value_create(co, name, default_value);
-        if(!cv) return NULL;
+        if (!cv) return NULL;
     }
     cv->flags |= CONFIG_VALUE_USED;
 
     if((cv->flags & CONFIG_VALUE_LOADED) || (cv->flags & CONFIG_VALUE_CHANGED)) {
         // this is a loaded value from the config file
-        // if it is different that the default, mark it
+        // if it is different than the default, mark it
         if(!(cv->flags & CONFIG_VALUE_CHECKED)) {
-            if(strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
+            if(default_value && strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
             cv->flags |= CONFIG_VALUE_CHECKED;
         }
     }
@@ -308,11 +313,17 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
     return(cv->value);
 }
 
+
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
+    if (default_value == NULL)
+        debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
+    else
+        debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
     struct section *co = appconfig_section_find(root, section);
+    if (!co && !default_value)
+        return NULL;
     if(!co) co = appconfig_section_create(root, section);
 
     return appconfig_get_by_section(co, name, default_value);
