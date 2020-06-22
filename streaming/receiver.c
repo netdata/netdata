@@ -168,6 +168,8 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
 // as contention will be low and it guards against future updates.
 PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
     PARSER_USER_OBJECT *user = user_v;
+    if (!strcmp(user->st->name,"system.io"))
+        error("BEGIN on system.io %llu %llu", microseconds, remote_clock);
     netdata_mutex_lock(&st->shared_flags_lock);
     if (st->sflag_replicating) {
         debug(D_STREAM, "Ignoring data stream for %s @ %llu during replication", st->name, remote_clock);
@@ -281,17 +283,20 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         netdata_rwlock_unlock(&st->rrdset_rwlock);
     */
     user->st->last_collected_time.tv_sec += num_points * user->st->update_every;
-    user->st->last_collected_time.tv_usec = 0;
+    user->st->last_collected_time.tv_usec = 0;          // Spikes?
     user->st->last_updated.tv_sec += num_points * user->st->update_every;
-    user->st->last_updated.tv_usec = 0;
+    user->st->last_updated.tv_usec = 0;                 // Spikes?
     user->st->counter += num_points;
     user->st->counter_done += num_points;
     user->st->current_entry += num_points;
+    user->st->usec_since_last_update = USEC_PER_SEC;
     if (user->st->current_entry >= user->st->entries)
         user->st->current_entry -= user->st->entries;
     netdata_mutex_lock(&user->st->shared_flags_lock);
     user->st->sflag_replicating = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
+    if (!strcmp(user->st->name,"system.uptime"))
+        error("Finished replication on uptime");
     /*if (!strcmp(user->st->name,"system.ip")) {
         info("Finished replication of system.ip");
     }*/
