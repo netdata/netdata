@@ -53,6 +53,10 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t cloud_req_err;
 
     volatile uint32_t queries_per_thread[ACLK_MAX_QUERY_THREADS];
+
+    volatile uint32_t cloud_q_process_total;
+    volatile uint32_t cloud_q_process_count;
+    volatile uint32_t cloud_q_process_max;
 } aclk_metrics_per_sample;
 
 void *aclk_stats_main_thread(void *ptr);

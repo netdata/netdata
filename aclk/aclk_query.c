@@ -384,6 +384,7 @@ static int aclk_process_query(int t_idx)
     struct aclk_query *this_query;
     static long int query_count = 0;
     ACLK_METADATA_STATE meta_state;
+    usec_t t;
 
     if (!aclk_connected)
         return 0;
@@ -431,8 +432,10 @@ static int aclk_process_query(int t_idx)
             break;
 
         case ACLK_CMD_CLOUD:
+            t = now_monotonic_usec();
             debug(D_ACLK, "EXECUTING a cloud command");
             aclk_execute_query(this_query);
+            t = now_monotonic_usec() - t;
             break;
 
         default:
@@ -440,14 +443,20 @@ static int aclk_process_query(int t_idx)
     }
     debug(D_ACLK, "Query #%ld (%s) done", query_count, this_query->topic);
 
-    aclk_query_free(this_query);
-
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.queries_dispatched++;
         aclk_metrics_per_sample.queries_per_thread[t_idx]++;
+        if(this_query->cmd == ACLK_CMD_CLOUD) {
+            aclk_metrics_per_sample.cloud_q_process_total += t;
+            aclk_metrics_per_sample.cloud_q_process_count++;
+            if(aclk_metrics_per_sample.cloud_q_process_max < t)
+                aclk_metrics_per_sample.cloud_q_process_max = t;
+        }
         ACLK_STATS_UNLOCK;
     }
+
+    aclk_query_free(this_query);
 
     return 1;
 }

@@ -159,7 +159,7 @@ static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
-            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
             snprintf(dim_name, MAX_DIM_NAME, "Query %d", i);
@@ -171,6 +171,34 @@ static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
     for (int i = 0; i < query_thread_count; i++) {
         rrddim_set_by_pointer(st, rd_thread[i], per_sample->queries_per_thread[i]);
     }
+
+    rrdset_done(st);
+}
+
+static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_rq_avg = NULL;
+    static RRDDIM *rd_rq_max = NULL;
+    static RRDDIM *rd_rq_total = NULL;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_query_time", NULL, "aclk", NULL, "Time it took to process cloud requested DB queries", "us",
+            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+
+        rd_rq_avg = rrddim_add(st, "avg", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_max = rrddim_add(st, "max", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_total = rrddim_add(st, "total", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st);
+
+    if(per_sample->cloud_q_process_count)
+        rrddim_set_by_pointer(st, rd_rq_avg, roundf((float)per_sample->cloud_q_process_total / per_sample->cloud_q_process_count));
+    else
+        rrddim_set_by_pointer(st, rd_rq_avg, 0);
+    rrddim_set_by_pointer(st, rd_rq_max, per_sample->cloud_q_process_max);
+    rrddim_set_by_pointer(st, rd_rq_total, per_sample->cloud_q_process_total);
 
     rrdset_done(st);
 }
@@ -215,6 +243,8 @@ void *aclk_stats_main_thread(void *ptr)
 
         aclk_stats_cloud_req(&per_sample);
         aclk_stats_query_threads(&per_sample);
+
+        aclk_stats_query_time(&per_sample);
     }
     return 0;
 }
