@@ -432,10 +432,10 @@ static int aclk_process_query(int t_idx)
             break;
 
         case ACLK_CMD_CLOUD:
-            t = now_monotonic_usec();
+            t = now_monotonic_high_precision_usec();
             debug(D_ACLK, "EXECUTING a cloud command");
             aclk_execute_query(this_query);
-            t = now_monotonic_usec() - t;
+            t = now_monotonic_high_precision_usec() - t;
             break;
 
         default:
