@@ -65,33 +65,7 @@ usage() {
   cat << EOF
 OPTIONS:
 
-${ME} [--dont-wait] [--non-interactive] \\
-  [distribution DD [version VV] [codename CN]] [installer IN] [packages]
-
-Supported distributions (DD):
-
-    - arch           (all Arch Linux derivatives)
-    - centos         (all CentOS derivatives)
-    - gentoo         (all Gentoo Linux derivatives)
-    - sabayon        (all Sabayon Linux derivatives)
-    - debian, ubuntu (all Debian and Ubuntu derivatives)
-    - redhat, fedora (all Red Hat and Fedora derivatives)
-    - suse, opensuse (all SUSE and openSUSE derivatives)
-    - clearlinux     (all Clear Linux derivatives)
-    - macos          (Apple's macOS)
-
-Supported installers (IN):
-
-    - apt-get        all Debian / Ubuntu Linux derivatives
-    - dnf            newer Red Hat / Fedora Linux
-    - emerge         all Gentoo Linux derivatives
-    - equo           all Sabayon Linux derivatives
-    - pacman         all Arch Linux derivatives
-    - yum            all Red Hat / Fedora / CentOS Linux derivatives
-    - zypper         all SUSE Linux derivatives
-    - apk            all Alpine derivatives
-    - swupd          all Clear Linux derivatives
-    - brew           macOS Homebrew
+${ME} [--dont-wait] [--non-interactive] [packages]
 
 Supported packages (you can append many of them):
 
@@ -291,74 +265,6 @@ autodetect_distribution() {
   esac
 }
 
-user_picks_distribution() {
-  # let the user pick a distribution
-
-  echo >&2
-  echo >&2 "I NEED YOUR HELP"
-  echo >&2 "It seems I cannot detect your system automatically."
-
-  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
-    echo >&2 "Running in non-interactive mode"
-    echo >&2 " > Bailing out..."
-    exit 1
-  fi
-
-  if [ -z "${equo}" ] && [ -z "${emerge}" ] && [ -z "${apt_get}" ] && [ -z "${yum}" ] && [ -z "${dnf}" ] && [ -z "${pacman}" ] && [ -z "${apk}" ] && [ -z "${swupd}" ]; then
-    echo >&2 "And it seems I cannot find a known package manager in this system."
-    echo >&2 "Please open a github issue to help us support your system too."
-    exit 1
-  fi
-
-  local opts=
-  echo >&2 "I found though that the following installers are available:"
-  echo >&2
-  [ -n "${apt_get}" ] && echo >&2 " - Debian/Ubuntu based (installer is: apt-get)" && opts="apt-get ${opts}"
-  [ -n "${yum}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: yum)" && opts="yum ${opts}"
-  [ -n "${dnf}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: dnf)" && opts="dnf ${opts}"
-  [ -n "${zypper}" ] && echo >&2 " - SuSe based (installer is: zypper)" && opts="zypper ${opts}"
-  [ -n "${pacman}" ] && echo >&2 " - Arch Linux based (installer is: pacman)" && opts="pacman ${opts}"
-  [ -n "${emerge}" ] && echo >&2 " - Gentoo based (installer is: emerge)" && opts="emerge ${opts}"
-  [ -n "${equo}" ] && echo >&2 " - Sabayon based (installer is: equo)" && opts="equo ${opts}"
-  [ -n "${apk}" ] && echo >&2 " - Alpine Linux based (installer is: apk)" && opts="apk ${opts}"
-  [ -n "${swupd}" ] && echo >&2 " - Clear Linux based (installer is: swupd)" && opts="swupd ${opts}"
-  [ -n "${brew}" ] && echo >&2 " - macOS based (installer is: brew)" && opts="brew ${opts}"
-  echo >&2
-
-  REPLY=
-  while [ -z "${REPLY}" ]; do
-    echo "To proceed please write one of these:"
-    echo "${opts// /, }"
-    if ! read -r -p ">" REPLY; then
-      continue
-    fi
-
-    if [ "${REPLY}" = "yum" ] && [ -z "${distribution}" ]; then
-      REPLY=
-      while [ -z "${REPLY}" ]; do
-        if ! read -r -p "yum in centos, rhel or fedora? > "; then
-          continue
-        fi
-
-        case "${REPLY,,}" in
-          fedora | rhel)
-            distribution="rhel"
-            ;;
-          centos)
-            distribution="centos"
-            ;;
-          *)
-            echo >&2 "Please enter 'centos', 'fedora' or 'rhel'."
-            REPLY=
-            ;;
-        esac
-      done
-      REPLY="yum"
-    fi
-    check_package_manager "${REPLY}" || REPLY=
-  done
-}
-
 detect_package_manager_from_distribution() {
   case "${1,,}" in
     arch* | manjaro*)
@@ -458,107 +364,10 @@ detect_package_manager_from_distribution() {
 
     *)
       # oops! unknown system
-      user_picks_distribution
-      ;;
-  esac
-}
-
-check_package_manager() {
-  # This is called only when the user is selecting a package manager
-  # It is used to verify the user selection is right
-
-  echo >&2 "Checking package manager: ${1}"
-
-  case "${1}" in
-    apt-get)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${apt_get}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_apt_get"
-      tree="debian"
-      detection="user-input"
-      return 0
-      ;;
-
-    dnf)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${dnf}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_dnf"
-      tree="rhel"
-      detection="user-input"
-      return 0
-      ;;
-
-    apk)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${apk}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_apk"
-      tree="alpine"
-      detection="user-input"
-      return 0
-      ;;
-
-    equo)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${equo}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_equo"
-      tree="sabayon"
-      detection="user-input"
-      return 0
-      ;;
-
-    emerge)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${emerge}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_emerge"
-      tree="gentoo"
-      detection="user-input"
-      return 0
-      ;;
-
-    pacman)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${pacman}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_pacman"
-      tree="arch"
-      detection="user-input"
-
-      return 0
-      ;;
-
-    zypper)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${zypper}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_zypper"
-      tree="suse"
-      detection="user-input"
-      return 0
-      ;;
-
-    yum)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_yum"
-      if [ "${distribution}" = "centos" ]; then
-        tree="centos"
-      else
-        tree="rhel"
-      fi
-      detection="user-input"
-      return 0
-      ;;
-
-    swupd)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${swupd}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_swupd"
-      tree="clear-linux"
-      detection="user-input"
-      return 0
-      ;;
-
-    brew)
-      [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${brew}" ] && echo >&2 "${1} is not available." && return 1
-      package_installer="install_brew"
-      tree="macos"
-      detection="user-input"
-
-      return 0
-      ;;
-
-    *)
-      echo >&2 "Invalid package manager: '${1}'."
-      return 1
+      echo >&2 "ERROR: Unsupported system ${1}"
+      echo >&2 " > Please contact Netdata support by filing an issue at:"
+      echo >&2 " > https://github.com/netdata/netdata/issues"
+      exit 1
       ;;
   esac
 }
@@ -1803,26 +1612,6 @@ NON_INTERACTIVE=0
 IGNORE_INSTALLED=0
 while [ -n "${1}" ]; do
   case "${1}" in
-    distribution)
-      distribution="${2}"
-      shift
-      ;;
-
-    version)
-      version="${2}"
-      shift
-      ;;
-
-    codename)
-      codename="${2}"
-      shift
-      ;;
-
-    installer)
-      check_package_manager "${2}" || exit 1
-      shift
-      ;;
-
     dont-wait | --dont-wait | -n)
       DONT_WAIT=1
       ;;
@@ -1967,8 +1756,7 @@ fi
 
 if [ -z "${package_installer}" ] || [ -z "${tree}" ]; then
   if [ -z "${distribution}" ]; then
-    # we dont know the distribution
-    autodetect_distribution || user_picks_distribution
+    autodetect_distribution
   fi
 
   # When no package installer is detected, try again from distro info if any
