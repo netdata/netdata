@@ -9,7 +9,7 @@ fetch "curl-curl-7_60_0" "https://github.com/curl/curl/archive/curl-7_60_0.tar.g
 export CFLAGS="-I/openssl-static/include"
 export LDFLAGS="-static -L/openssl-static/lib"
 export PKG_CONFIG="pkg-config --static"
-export PKG_CONFIG_PATH="/opnessl-static/lib/pkgconfig"
+export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 
 run ./buildconf
 
