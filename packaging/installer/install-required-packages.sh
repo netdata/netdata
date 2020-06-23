@@ -1781,20 +1781,8 @@ What to do now:
 
 
 EOF
-  remote_log "FAILED" "${ret}"
   exit 1
 }
-
-remote_log() {
-  # log success or failure on our system
-  # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
-}
-
-if [ -z "${1}" ]; then
-  usage
-  exit 1
-fi
 
 pv=$(python --version 2>&1)
 if [ "${tree}" = macos ]; then
@@ -2042,7 +2030,5 @@ else
   echo >&2 "All required packages are already installed. Now proceed to the next step."
   echo >&2
 fi
-
-remote_log "OK"
 
 exit 0
