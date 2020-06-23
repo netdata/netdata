@@ -239,6 +239,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     int replicating = st->sflag_replicating;
     netdata_mutex_unlock(&st->shared_flags_lock);
     if (!replicating) {
+        errno = 0;
         error("Received REPBEGIN on %s - but chart is not replicating!", st->name);
         return PARSER_RC_ERROR;
     }
@@ -247,12 +248,49 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     end_t = str2ull(end_txt);
 
     time_t now = now_realtime_sec();
-    debug(D_STREAM, "REPBEGIN %s %ld..%d against current gap %ld..%ld", st->name, start_t, end_t, st->last_updated.tv_sec, now);
+    debug(D_STREAM, "REPBEGIN %s %ld..%ld against current gap %ld..%ld", st->name, start_t, end_t, st->last_updated.tv_sec, now);
 
     return PARSER_RC_OK;
 disable:
+    errno = 0;
     error("Gap replication failed - Invalid REPBEGIN %s %s %s on host %s. Disabling it.", words[1], words[2], words[3], 
           user->host->hostname);
+    user->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    UNUSED(plugins_action);
+    char *id = words[1];
+    char *last_collected_str = words[2];
+    char *collected_str = words[3];
+    char *collected_max_str = words[4];
+    char *last_stored_str = words[5];
+
+    if ( !id || !last_collected_str || !collected_str || !collected_max_str || !last_stored_str)
+        goto disable;
+
+    if (user->st == NULL) {
+        errno = 0;
+        error("Received RRDMETA out of sequence");
+        goto disable;
+    }
+    RRDDIM *rd = rrddim_find(user->st, id);
+    if (rd == NULL) {
+        errno = 0;
+        error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
+        return PARSER_RC_OK;
+    }
+    rd->last_collected_value = strtoll(last_collected_str, NULL, 0);
+    rd->collected_value = strtoll(collected_str, NULL, 0);
+    rd->collected_value_max = strtoll(collected_max_str, NULL, 0);
+    rd->last_stored_value = strtod(last_stored_str, NULL);
+    return PARSER_RC_OK;
+disable:
+    errno = 0;
+    error("Gap replication failed - Invalid REPMETA %s %s %s %s %s on host %s. Disabling it.", words[1], words[2], 
+          words[3], words[4], words[5], user->host->hostname);
     user->enabled = 0;
     return PARSER_RC_ERROR;
 }
@@ -304,6 +342,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     user->st = NULL;
     return PARSER_RC_OK;
 disable:
+    errno = 0;
     error("Gap replication failed - Invalid REPEND %s on host %s. Disabling it.", words[1], user->host->hostname);
     user->enabled = 0;
     return PARSER_RC_ERROR;
@@ -319,6 +358,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     char *value_txt = words[4];
 
     if (user->st == NULL) {
+        errno = 0;
         error("Received RRDDIM out of sequence");
         goto disable;
     }
@@ -425,6 +465,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser_add_keyword(parser, "REPBEGIN", streaming_rep_begin);
     parser_add_keyword(parser, "REPDIM", streaming_rep_dim);
     parser_add_keyword(parser, "REPEND", streaming_rep_end);
+    parser_add_keyword(parser, "REPMETA", streaming_rep_meta);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
