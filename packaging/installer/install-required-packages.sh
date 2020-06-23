@@ -48,6 +48,7 @@ release=
 version=
 codename=
 package_installer=
+packages_selected=
 tree=
 detection=
 NAME=
@@ -1595,6 +1596,7 @@ while [ -n "${1}" ]; do
       ;;
 
     netdata-all)
+      packages_selected="netdata-all"
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_NODEJS=1
       if [ "${pv}" -eq 2 ]; then
@@ -1613,20 +1615,24 @@ while [ -n "${1}" ]; do
       ;;
 
     netdata)
+      packages_selected="netdata"
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_DATABASE=1
       ;;
 
     python | netdata-python)
+      packages_selected="netdata-python"
       PACKAGES_NETDATA_PYTHON=1
       ;;
 
     python3 | netdata-python3)
+      packages_selected="netdata-python3"
       PACKAGES_NETDATA_PYTHON3=1
       ;;
 
     python-mysql | mysql-python | mysqldb | netdata-mysql)
+      packages_selected="netdata-mysql"
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MYSQL=1
@@ -1637,6 +1643,7 @@ while [ -n "${1}" ]; do
       ;;
 
     python-postgres | postgres-python | psycopg2 | netdata-postgres)
+      packages_selected="netdata-postgres"
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_POSTGRES=1
@@ -1646,7 +1653,8 @@ while [ -n "${1}" ]; do
       fi
       ;;
 
-    python-pymongo)
+    python-pymongo | netdata-mongo)
+      packages_selected="netdata-mongo"
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
         PACKAGES_NETDATA_PYTHON_MONGO=1
@@ -1657,12 +1665,14 @@ while [ -n "${1}" ]; do
       ;;
 
     nodejs | netdata-nodejs)
+      packages_selected="netdata-nodejs"
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_NODEJS=1
       PACKAGES_NETDATA_DATABASE=1
       ;;
 
     sensors | netdata-sensors)
+      packages_selected="netdata-sensors"
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_SENSORS=1
@@ -1678,6 +1688,26 @@ while [ -n "${1}" ]; do
   esac
   shift
 done
+
+# By default install everything (netdata-all)
+if [ -z "$packages_selected" ]; then
+  packages_selected="netdata-default"
+  PACKAGES_NETDATA=1
+  PACKAGES_NETDATA_NODEJS=1
+  if [ "${pv}" -eq 2 ]; then
+    PACKAGES_NETDATA_PYTHON=1
+    PACKAGES_NETDATA_PYTHON_MYSQL=1
+    PACKAGES_NETDATA_PYTHON_POSTGRES=1
+    PACKAGES_NETDATA_PYTHON_MONGO=1
+  else
+    PACKAGES_NETDATA_PYTHON3=1
+    PACKAGES_NETDATA_PYTHON3_MYSQL=1
+    PACKAGES_NETDATA_PYTHON3_POSTGRES=1
+    PACKAGES_NETDATA_PYTHON3_MONGO=1
+  fi
+  PACKAGES_NETDATA_SENSORS=1
+  PACKAGES_NETDATA_DATABASE=1
+fi
 
 # Check for missing core commands like grep, warn the user to install it and bail out cleanly
 if ! command -v grep > /dev/null 2>&1; then
