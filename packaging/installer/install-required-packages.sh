@@ -1577,16 +1577,21 @@ NON_INTERACTIVE=0
 IGNORE_INSTALLED=0
 while [ -n "${1}" ]; do
   case "${1}" in
-    dont-wait | --dont-wait | -n)
+    --dont-wait | -n)
       DONT_WAIT=1
       ;;
 
-    non-interactive | --non-interactive | -y)
+    --non-interactive | -y)
       NON_INTERACTIVE=1
       ;;
 
-    ignore-installed | --ignore-installed | -i)
+    --ignore-installed | -i)
       IGNORE_INSTALLED=1
+      ;;
+
+    -h | --help)
+      usage
+      exit 1
       ;;
 
     netdata-all)
@@ -1662,11 +1667,6 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
-      ;;
-
-    help | -h | --help)
-      usage
-      exit 1
       ;;
 
     *)
