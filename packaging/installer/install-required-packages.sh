@@ -25,11 +25,6 @@ PACKAGES_NETDATA_PYTHON_MYSQL=${PACKAGES_NETDATA_PYTHON_MYSQL-0}
 PACKAGES_NETDATA_PYTHON_POSTGRES=${PACKAGES_NETDATA_PYTHON_POSTGRES-0}
 PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
 PACKAGES_DEBUG=${PACKAGES_DEBUG-0}
-PACKAGES_IPRANGE=${PACKAGES_IPRANGE-0}
-PACKAGES_FIREHOL=${PACKAGES_FIREHOL-0}
-PACKAGES_FIREQOS=${PACKAGES_FIREQOS-0}
-PACKAGES_UPDATE_IPSETS=${PACKAGES_UPDATE_IPSETS-0}
-PACKAGES_NETDATA_DEMO_SITE=${PACKAGES_NETDATA_DEMO_SITE-0}
 PACKAGES_NETDATA_SENSORS=${PACKAGES_NETDATA_SENSORS-0}
 PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-0}
 
@@ -94,14 +89,6 @@ Supported packages (you can append many of them):
     - python-pymongo install python-pymongo (or python3-pymongo for python3)
 
     - sensors        install lm_sensors for monitoring h/w sensors
-
-    - firehol-all    packages required for FireHOL, FireQoS, update-ipsets
-    - firehol        packages required for FireHOL
-    - fireqos        packages required for FireQoS
-    - update-ipsets  packages required for update-ipsets
-
-    - demo           packages required for running a netdata demo site
-                     (includes nginx and various debugging tools)
 
 
 If you don't supply the --dont-wait option, the program
@@ -410,7 +397,6 @@ declare -A pkg_autoconf=(
 )
 
 # required to compile netdata with --enable-sse
-# https://github.com/firehol/netdata/pull/450
 declare -A pkg_autoconf_archive=(
   ['gentoo']="sys-devel/autoconf-archive"
   ['clearlinux']="c-basic"
@@ -1058,27 +1044,6 @@ packages() {
   fi
 
   # -------------------------------------------------------------------------
-  # firehol/fireqos/update-ipsets command line tools
-
-  if [ "${PACKAGES_FIREQOS}" -ne 0 ]; then
-    require_cmd ip || suitable_package iproute2
-  fi
-
-  if [ "${PACKAGES_FIREHOL}" -ne 0 ]; then
-    require_cmd iptables || suitable_package iptables
-    require_cmd ipset || suitable_package ipset
-    require_cmd ulogd ulogd2 || suitable_package ulogd
-    require_cmd traceroute || suitable_package traceroute
-    require_cmd bridge || suitable_package bridge-utils
-  fi
-
-  if [ "${PACKAGES_UPDATE_IPSETS}" -ne 0 ]; then
-    require_cmd ipset || suitable_package ipset
-    require_cmd zip || suitable_package zip
-    require_cmd funzip || suitable_package unzip
-  fi
-
-  # -------------------------------------------------------------------------
   # netdata libraries
 
   if [ "${PACKAGES_NETDATA}" -ne 0 ]; then
@@ -1696,37 +1661,6 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_SENSORS=1
-      PACKAGES_NETDATA_DATABASE=1
-      ;;
-
-    firehol | update-ipsets | firehol-all | fireqos)
-      PACKAGES_IPRANGE=1
-      PACKAGES_FIREHOL=1
-      PACKAGES_FIREQOS=1
-      PACKAGES_IPRANGE=1
-      PACKAGES_UPDATE_IPSETS=1
-      ;;
-
-    demo | all)
-      PACKAGES_NETDATA=1
-      PACKAGES_NETDATA_NODEJS=1
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MYSQL=1
-        PACKAGES_NETDATA_PYTHON_POSTGRES=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MYSQL=1
-        PACKAGES_NETDATA_PYTHON3_POSTGRES=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
-      fi
-      PACKAGES_DEBUG=1
-      PACKAGES_IPRANGE=1
-      PACKAGES_FIREHOL=1
-      PACKAGES_FIREQOS=1
-      PACKAGES_UPDATE_IPSETS=1
-      PACKAGES_NETDATA_DEMO_SITE=1
       PACKAGES_NETDATA_DATABASE=1
       ;;
 
