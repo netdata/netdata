@@ -192,7 +192,7 @@ struct engine *read_exporting_config()
         struct connector_instance_list *next;
     };
     struct connector_instance local_ci;
-    struct connector_instance_list *tmp_ci_list, *tmp_ci_list1, *tmp_ci_list_prev = NULL;
+    struct connector_instance_list *tmp_ci_list = NULL, *tmp_ci_list1 = NULL, *tmp_ci_list_prev = NULL;
 
     if (unlikely(engine))
         return engine;

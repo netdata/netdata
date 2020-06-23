@@ -61,7 +61,8 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 
         ssize_t r;
 #ifdef ENABLE_HTTPS
-        if (options & EXPORTING_OPTION_USE_TLS &&
+        if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
+            options & EXPORTING_OPTION_USE_TLS &&
             connector_specific_data->conn &&
             connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
             r = (ssize_t)SSL_read(connector_specific_data->conn,
@@ -159,7 +160,8 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     if (!ret) {
 #ifdef ENABLE_HTTPS
-        if (options & EXPORTING_OPTION_USE_TLS &&
+        if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
+            options & EXPORTING_OPTION_USE_TLS &&
             connector_specific_data->conn &&
             connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
             written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), len);
@@ -280,7 +282,7 @@ void simple_connector_worker(void *instance_p)
                 NULL,
                 0);
 #ifdef ENABLE_HTTPS
-            if(sock != -1) {
+            if(instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && sock != -1) {
                 if (netdata_opentsdb_ctx) {
                     if ( sock_delnonblock(sock) < 0 )
                         error("Exporting cannot remove the non-blocking flag from socket %d", sock);
@@ -387,7 +389,7 @@ void simple_connector_worker(void *instance_p)
 #endif
 
 #ifdef ENABLE_HTTPS
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&  options & EXPORTING_OPTION_USE_TLS) {
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && options & EXPORTING_OPTION_USE_TLS) {
         SSL_free(connector_specific_data->conn);
         freez(instance->connector_specific_data);
     }
