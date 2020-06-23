@@ -280,13 +280,14 @@ autodetect_distribution() {
       version="$(uname -r)"
       detection="uname"
 
-      if [ ${EUID} -eq 0 ] ; then
+      if [ ${EUID} -eq 0 ]; then
         echo >&2 "This script does not support running as EUID 0 on macOS. Please run it as a regular user."
         exit 1
       fi
       ;;
     *)
       return 1
+      ;;
   esac
 }
 
@@ -1360,7 +1361,7 @@ run() {
 }
 
 sudo=
-if [ ${UID} -ne 0 ] ; then
+if [ ${UID} -ne 0 ]; then
   sudo="sudo"
 fi
 
@@ -1796,7 +1797,7 @@ if [ -z "${1}" ]; then
 fi
 
 pv=$(python --version 2>&1)
-if [ "${tree}" = macos ] ; then
+if [ "${tree}" = macos ]; then
   pv=3
 elif [[ "${pv}" =~ ^Python\ 2.* ]]; then
   pv=2
