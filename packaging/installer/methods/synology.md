@@ -48,4 +48,4 @@ installed. You'll have to do this manually:
 [ -x /etc/rc.netdata ] && /etc/rc.netdata start
 ```
 
-3. Make sure `/etc/rc.local` is executable: `chmod 0755 /etc/rc.netdata`.
+3. Make sure `/etc/rc.netdata` is executable: `chmod 0755 /etc/rc.netdata`.
