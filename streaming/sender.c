@@ -416,6 +416,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
         if (rd->updated && rd->exposed) {
             buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
                            COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT "\n",
+                rd->id,
                 rd->last_collected_value,
                 rd->collected_value,
                 rd->collected_value_max,
@@ -569,7 +570,7 @@ void execute_replicate(struct sender_state *s, char *st_id, long start_t, long e
 void execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
-    info("STREAM %s [send to %s] received command over connection (%d-bytes): %s", s->host->hostname, s->connected_to, 
+    info("STREAM %s [send to %s] received command over connection (%d-bytes): %s", s->host->hostname, s->connected_to,
          s->read_len, start);
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
