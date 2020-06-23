@@ -36,8 +36,7 @@ Download the [Netdata Helm chart](https://github.com/netdata/helmchart) on the a
 `helm` binary installed.
 
 ```bash
-helm repo add netdata https://netdata.github.io/helmchart/
-helm repo update
+git clone https://github.com/netdata/helmchart.git netdata-helmchart
 ```
 
 > You may not need to configure the Helm chart to get a functioning service on your cluster, but you should read the
@@ -47,7 +46,7 @@ helm repo update
 Install the Helm chart to your cluster with `helm install`:
 
 ```bash
-helm install netdata netdata/netdata
+helm install netdata ./netdata-helmchart
 ```
 
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
@@ -66,13 +65,13 @@ on your cluster's setup.
 To change a setting, use the `--set` or `--values` arguments along with `helm install`:
 
 ```bash
-helm install --set a.b.c=xyz netdata netdata/netdata
+helm install --set a.b.c=xyz netdata ./netdata-helmchart
 ```
 
 For example, to change the size of the persistent metrics volume, you would run the following:
 
 ```bash
-helm install --set parent.database.volumesize=4Gi netdata
+helm install --set parent.database.volumesize=4Gi ./netdata-helmchart
 ```
 
 ### Configure service discovery
@@ -91,7 +90,7 @@ configurations based on the service that pod runs, and begin monitoring them imm
 
 However, if you have changed some of these defaults, you'll need to open the `netdata-helmchart/sd-child.yml` file and
 edit the ports or image names that service discovery uses to find supported pods. You can then run `helm upgrade netdata
-netdata/netdata` to push changes to your cluster.
+./netdata-helmchart` to push changes to your cluster.
 
 ## Access the Netdata dashboard
 
@@ -125,7 +124,7 @@ If you update the Helm chart's configuration, either via `values.yml` or `sd-chi
 replacing `netdata` with the name of the release if you changed it upon installtion:
 
 ```bash
-helm upgrade netdata netdata/netdata
+helm upgrade netdata ./netdata-helmchart
 ```
 
 ## What's next?
