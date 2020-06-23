@@ -157,8 +157,6 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
 
 void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
 {
-    int ret = 0;
-
     threadname[0] = '\0';
 #if defined(__FreeBSD__)
     pthread_get_name_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
