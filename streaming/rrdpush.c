@@ -297,35 +297,6 @@ void rrdset_push_chart_definition_now(RRDSET *st) {
     rrdset_unlock(st);
 }
 
-void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
-{
-    UNUSED(s);
-    RRDDIM *rd;
-    struct rrddim_query_handle handle;
-    time_t start = st->gap_sent, end = st->last_updated.tv_sec;
-    buffer_sprintf(s->build, "REPBEGIN %s %ld %ld\n", st->id, start, end);
-    rrddim_foreach_read(rd, st) {
-        if (rd->updated && rd->exposed) {
-            time_t sample_t = start;
-            time_t ignore;
-            size_t index = 0;
-            rd->state->query_ops.init(rd, &handle, sample_t, end);
-            while (sample_t <= end) {
-                storage_number n = rd->state->query_ops.next_metric(&handle, &ignore);
-                buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index, sample_t, n);
-                // Technically rd->update_every could differ from st->update_every, but it does not.
-                sample_t += rd->update_every;
-                index++;
-            }
-        }
-    }
-    if (((end - start) % st->update_every) == 0)
-        buffer_sprintf(s->build, "REPEND %ld\n", (end - start) / st->update_every + 1);
-    else
-        buffer_sprintf(s->build, "REPEND %ld\n", (end - start) / st->update_every);
-    st->gap_sent = end;
-}
-
 void rrdset_done_push(RRDSET *st) {
     if(unlikely(!should_send_chart_matching(st)))
         return;
