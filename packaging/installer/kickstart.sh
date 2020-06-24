@@ -14,6 +14,7 @@
 #  --non-interactive          do not prompt for user input
 #  --no-updates               do not install script for daily updates
 #  --local-files              set the full path of the desired tarball to run install with
+#  --allow-duplicate-install  do not bail if we detect a duplicate install
 #
 # Environment options:
 #
@@ -278,21 +279,62 @@ sudo=""
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
 # ---------------------------------------------------------------------------------------------------------------------
-# try to update using autoupdater in the first place
+# look for an existing install and try to update that instead if it exists
 
-updater=""
-[ -x /etc/periodic/daily/netdata-updater ] && updater=/etc/periodic/daily/netdata-updater
-[ -x /etc/cron.daily/netdata-updater ] && updater=/etc/cron.daily/netdata-updater
-if [ -L "${updater}" ]; then
-  # remove old updater (symlink)
-  run ${sudo} rm -f "${updater}"
-  updater=""
+ndpath="$(command -v netdata)"
+if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
+    ndpath="/opt/netdata/bin/netdata"
 fi
-if [ -n "${updater}" ]; then
-  # attempt to run the updater, to respect any compilation settings already in place
-  progress "Re-installing netdata..."
-  run ${sudo} "${updater}" -f || fatal "Failed to forcefully update netdata"
-  exit 0
+
+if [ -n "$ndpath" ] ; then
+  ndprefix="$(dirname "$(dirname "${ndpath}")")"
+
+  if [ "${ndprefix}" = /usr ] ; then
+    ndprefix="/"
+  fi
+
+  progress "Found existing install of Netdata under: ${ndprefix}"
+
+  if [ -r "${ndprefix}/etc/netdata/.environment" ] ; then
+    if [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
+      # the crazy statement below pulls the value of a single variable out of the environment file without polluting the runtime environment
+      is_static="$(env "$(cat "${ndprefix}/etc/netdata/.environment") /bin/sh -c 'echo ${IS_NETDATA_STATIC_BINARY}'")"
+      if [ -n "${is_static}" ] ; then
+        progress "Attempting to update existing static install instead of creating a new one"
+        if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
+          progress "Updated existing static install at ${ndpath}"
+          exit 0
+        else
+          fatal "Failed to update existing Netdata install"
+          exit 1
+        fi
+      else
+        progress "Attempting to update existing kickstart install instead of creating a new one"
+        if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
+          progress "Updated existing kickstart install at ${ndpath}"
+          exit 0
+        else
+          fatal "Failed to update existing Netdata install"
+          exit 1
+        fi
+      fi
+    else
+      if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+        fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
+        exit 1
+      else
+        progress "User explicitly requested duplicate install, proceeding."
+      fi
+    fi
+  else
+    progress "Existing install appears to be handled manually or through the system package manager."
+    if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+      fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
+      exit 1
+    else
+      progress "User explicitly requested duplicate install, proceeding."
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -317,6 +359,9 @@ while [ -n "${1}" ]; do
   elif [ "${1}" = "--stable-channel" ]; then
     RELEASE_CHANNEL="stable"
     NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --stable-channel"
+    shift 1
+  elif [ "${1}" = "--allow-duplicate-install" ]; then
+    NETDATA_ALLOW_DUPLICATE_INSTALL=1
     shift 1
   elif [ "${1}" = "--local-files" ]; then
     shift 1
