@@ -203,11 +203,14 @@ PR Descriptions:
 Some PR title examples:
 
 - Fix bug in Netdata installer for FreeBSD 11.2
-- Improve docs for other installation methods
-- New collector for Prometheus endpoints
+- Update docs for other installation methods
+- Add new collector for Prometheus endpoints
 - Add 4.19 Kernel variant for eBPF
 - Fix typo in README
+- Refactor code for better maintainability
 - etc
+
+The key idea here is to start with a "verb" of what you are doing in the PR.
 
 For good examples have a look at other projects like:
 
