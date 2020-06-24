@@ -1105,21 +1105,6 @@ packages() {
     [ "${PACKAGES_NETDATA_PYTHON_MYSQL}" -ne 0 ] && suitable_package python3-mysqldb
     [ "${PACKAGES_NETDATA_PYTHON_POSTGRES}" -ne 0 ] && suitable_package python3-psycopg2
   fi
-
-  # -------------------------------------------------------------------------
-  # applications needed for the netdata demo sites
-
-  if [ "${PACKAGES_NETDATA_DEMO_SITE}" -ne 0 ]; then
-    require_cmd sudo || suitable_package sudo
-    require_cmd jq || suitable_package jq
-    require_cmd nginx || suitable_package nginx
-    require_cmd postconf || suitable_package postfix
-    require_cmd lxc-create || suitable_package lxc
-    require_cmd logwatch || suitable_package logwatch
-    require_cmd mail || suitable_package mailutils
-    require_cmd iostat || suitable_package sysstat
-    require_cmd iotop || suitable_package iotop
-  fi
 }
 
 DRYRUN=0
