@@ -1,7 +1,7 @@
 <!--
 title: "Monitor a Kubernetes (k8s) cluster with Netdata"
 description: "Use Netdata's helmchart, service discovery plugin, and Kubelet/kube-proxy collectors for real-time visibility into your Kubernetes cluster."
-image: /img/seo/guides/monitor-kubernetes-k8s-netdata.png
+image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
 -->
 
 # Monitor a Kubernetes cluster with Netdata
