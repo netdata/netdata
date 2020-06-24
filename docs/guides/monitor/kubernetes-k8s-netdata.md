@@ -6,9 +6,19 @@ image: /img/seo/guides/monitor-kubernetes-k8s-netdata.png
 
 # Monitor a Kubernetes cluster with Netdata
 
-**ADD AN INTRO**
+Kubernetes (k8s) is the de facto method of deploying containerized and microservice environments today, and while it's
+relatively easy to deploy, scale, and load-balance your applications, k8s doesn't come with pre-configured tools to help
+you monitor your cluster. There's no "batteries included" when it comes to monitoring.
 
-We offer a few complimentary methods of monitoring a Kubernetes cluster:
+You need a monitoring stack that's flexible enough to handle Kubernetes' scaling and load-balancing features, but also
+smart enough to discover and monitor new pods or services without manual intervention. You also need your monitoring
+stack to integrate with and monitor the many intertwined layers of a functional Kubernetes cluster, from individual
+nodes to the technologies run on every pod. And, ideally, you need the solution to cost as little as possible, both in
+terms of a monthly bill and overhead on the cluster itself.
+
+Netdata offers a few complementary tools and collectors for monitoring the many layers of a Kubernetes cluster,
+_entirely for free_. These methods work together to help you troubleshoot performance or availablility issues across
+your k8s infrastructure.
 
 -   A [Helm chart](https://github.com/netdata/helmchart), which bootstraps a Netdata Agent pod on every node in your
     cluster, plus an additional parent pod for storing metrics and managing alarm notifications.
@@ -22,11 +32,11 @@ We offer a few complimentary methods of monitoring a Kubernetes cluster:
     and more.
 -   A [kube-proxy collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy), which
     also runs on each node and monitors latency and the volume of HTTP requests to the proxy.
--   A [cgroups collector](/collectors/cgroups.plugin/README.md), which collects metrics about each container running on
-    your k8s cluster.
+-   A [cgroups collector](/collectors/cgroups.plugin/README.md), which collects CPU, memory, and bandwidth metrics for
+    each container running on your k8s cluster.
 
-These methods work together to help you troubleshoot performance or availablility issues across your Kubernetes
-infrastructure. Let's get started.
+By following this guide, you'll learn how to discover, explore, and take away insights from each of these layers in your
+Kubernetes cluster. Let's get started.
 
 ## Prerequisites
 
@@ -176,7 +186,8 @@ healthy. Think of it as a manager for the various pods on that node.
 Monitoring each node's Kubelet can be invaluable when diagnosing issues with your Kubernetes cluster. For example, you
 can see when the volume of running containers/pods has dropped.
 
-**IMAGE OF BEFORE/AFTER removing pods**
+![Charts showing pod and container removal during a scale
+down](https://user-images.githubusercontent.com/1153921/85598613-9ab48b00-b600-11ea-827e-d9ec7779e2d4.png)
 
 This drop might signal a fault or crash in a particular Kubernetes service or deployment (see `kubectl get services` or
 `kubectl get deployments` for more details). If the number of pods increases, it may be because of something more
@@ -220,13 +231,17 @@ in the previous part on [service discovery](#service-discovery-services-running-
 ![cgroups metrics for an Apache
 container/pod](https://user-images.githubusercontent.com/1153921/85480516-03562600-b575-11ea-92ae-dd605bf04106.png)
 
-At first glance, these sections might seem redundant. 
+At first glance, these sections might seem redundant. You might ask, "Why do I need both a service discovery section
+_and_ a container section? It's just one pod, after all!"
 
-You might ask, "Why do I need both a servi
+The difference is that while the service discovery section shows _Apache_ metrics, the equivalent cgroups section shows
+that container's CPU, memory, and bandwidth usage. You can use the two sections in conjunction to monitor the health and
+performance of your pods and the services they run. 
 
-
-
-Because Netdata discovers both the pod's service via service discovery, _and_ the container that represents that pod, it might seem like you're 
+For example, let's say you get an alarm notification from `netdata-parent-0` saying the
+`ea287694-0f22-4f39-80aa-2ca066caf45a` container (also known as the `httpd-6f6cb96d77-xtpwn` pod) is using 99% of its
+available RAM. You can then hop over to the **Apache apache-default httpd-6f6cb96d77-xtpwn httpd tcp 80** section to
+further investigate why Apache is using an unexpected amount of RAM.
 
 All container metrics, whether they're managed by Kubernetes or the Docker service directly, are collected by the
 [cgroups collector](/collectors/cgroups.plugin/README.md). Because this collector integrates with the cgroups Linux
@@ -244,28 +259,13 @@ complex `kubectl` commands to see hundreds of highly granular metrics from your 
 exec -it pod bash` to start up a shell on a pod in order to find and diagnose an issue with any given pod on your
 cluster.
 
+And with service discovery, all your compatible pods will appear and disappear automatically as they scale up, move, or
+scale down across your cluster.
 
-
-
-A Kubernetes-aware monitoring tool with service discovery lets you make full use of the scaling and automation built
-into Kubernetes, without sacrificing visibility. Service discovery enables your monitoring system to detect any change
-in your inventory of running pods and automatically re-configure your data collection so you can continuously monitor
-your containerized workloads even as they expand, contract, or shift across hosts.
-
-
-
-Simply [install the Helm chart]() to create a platform for troubleshooting the next performance or availability issue on
-your Kubernetes cluster.
-
-
-
-We're continuing to develop Netdata's k8s/container monitoring capabilities, but for now, this setup allows you to
-better
-
-Platform for troubleshooting performance and availability issues
-
-work efficiently to identify the root cause of issues
-
-
+To monitor your Kubernetes cluster with Netdata, start by [installing the Helm
+chart](/packaging/installer/methods/kubernetes.md) if you haven't already. The Netdata Agent is open source and entirely
+free for every cluster and every orgranization, whether you have 10 or 10,000 pods, and in just a few minutes you'll
+have built yourself an effective platform for troubleshooting the next performance or availability issue on your
+Kubernetes cluster.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fkubernetes-k8s-netdata.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
