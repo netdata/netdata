@@ -457,6 +457,26 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if (!is_archived)
         calc_link_to_rrddim(rd);
 
+    // If we are restarting then preserve the metdata-time stamps for charts on remote hosts to allow replication to
+    // kick in and fill the gap. On local host we need to keep the zero times to fill the gap with null values to
+    // align the charts properly.
+#ifdef ENABLE_DBENGINE
+    if (st->rrdhost != localhost &&
+        (rd->last_collected_time.tv_sec > st->last_collected_time.tv_sec
+         || (rd->last_collected_time.tv_sec == st->last_collected_time.tv_sec &&
+             rd->last_collected_time.tv_usec > st->last_collected_time.tv_usec)))
+    {
+        st->last_collected_time = rd->last_collected_time;
+        info("Updating collected time on %s", st->id);
+    }
+    time_t stored_t = rd->state->query_ops.latest_time(rd);
+    if (stored_t > st->last_updated.tv_sec) {
+        st->last_updated.tv_sec = stored_t;
+        st->last_updated.tv_usec = 0;
+        info("Updating updated time on %s", st->id);
+    }
+#endif
+
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
