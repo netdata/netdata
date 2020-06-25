@@ -603,6 +603,7 @@ declare -A pkg_find=(
   ['fedora']="findutils"
   ['clearlinux']="findutils"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="NOTREQUIRED"
   ['default']="WARNING|"
 )
 
@@ -664,6 +665,7 @@ declare -A pkg_json_c_dev=(
   ['gentoo']="dev-libs/json-c"
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
+  ['freebsd']="json-c"
   ['default']="json-c-devel"
 )
 
@@ -766,6 +768,7 @@ declare -A pkg_libz_dev=(
   ['suse']="zlib-devel"
   ['clearlinux']="devpkg-zlib"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="lzlib"
   ['default']=""
 )
 
@@ -780,6 +783,7 @@ declare -A pkg_libuuid_dev=(
   ['rhel']="libuuid-devel"
   ['suse']="libuuid-devel"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="e2fsprogs-libuuid"
   ['default']=""
 )
 
@@ -808,6 +812,7 @@ declare -A pkg_lm_sensors=(
   ['suse']="sensors"
   ['clearlinux']="lm-sensors"
   ['macos']="WARNING|"
+  ['freebsd']="NOTREQUIRED"
   ['default']="lm_sensors"
 )
 
@@ -835,6 +840,7 @@ declare -A pkg_mailutils=(
 declare -A pkg_make=(
   ['gentoo']="sys-devel/make"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="gmake"
   ['default']="make"
 )
 
@@ -865,6 +871,7 @@ declare -A pkg_nginx=(
 declare -A pkg_nodejs=(
   ['gentoo']="net-libs/nodejs"
   ['clearlinux']="nodejs-basic"
+  ['freebsd']="node"
   ['default']="nodejs"
 
   # exceptions
@@ -890,6 +897,7 @@ declare -A pkg_pkg_config=(
   ['sabayon']="virtual/pkgconfig"
   ['rhel']="pkgconfig"
   ['suse']="pkg-config"
+  ['freebsd']="pkgconf"
   ['clearlinux']="c-basic"
   ['default']="pkg-config"
 )
@@ -1017,6 +1025,7 @@ declare -A pkg_python3_pymongo=(
   ['gentoo']="dev-python/pymongo"
   ['suse']="python3-pymongo"
   ['clearlinux']="WARNING|"
+  ['freebsd']="py37-pymongo"
   ['macos']="WARNING|"
   ['default']="python3-pymongo"
 )
@@ -1060,6 +1069,7 @@ declare -A pkg_lz4=(
   ['clearlinux']="devpkg-lz4"
   ['arch']="lz4"
   ['macos']="lz4"
+  ['freebsd']="liblz4"
   ['default']="lz4-devel"
 )
 
@@ -1071,6 +1081,7 @@ declare -A pkg_libuv=(
   ['arch']="libuv"
   ['clearlinux']="devpkg-libuv"
   ['macos']="libuv"
+  ['freebsd']="libuv"
   ['default']="libuv-devel"
 )
 
@@ -1082,6 +1093,7 @@ declare -A pkg_openssl=(
   ['clearlinux']="devpkg-openssl"
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
+  ['freebsd']="openssl"
   ['macos']="openssl@1.1"
   ['default']="openssl-devel"
 )
@@ -1095,6 +1107,7 @@ declare -A pkg_judy=(
   ['suse']="judy-devel"
   ['gentoo']="dev-libs/judy"
   ['arch']="judy"
+  ['freebsd']="Judy"
   ['default']="Judy-devel"
 )
 
@@ -1439,6 +1452,24 @@ prompt() {
       *) echo >&2 "Please answer with yes (y) or no (n)." ;;
     esac
   done
+}
+
+validate_tree_freebsd() {
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  echo >&2 " > FreeBSD Version: ${version} ..."
+
+  make="make"
+  echo >&2 " > Checking for gmake ..."
+  if ! pkg query %n-%v | grep -q gmake; then
+    if prompt "gmake is required to build on FreeBSD and is not installed. Shall I install it?"; then
+      run ${sudo} pkg ${opts} install gmake
+    fi
+  fi
 }
 
 validate_tree_centos() {
