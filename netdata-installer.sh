@@ -297,6 +297,13 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+make="make"
+# See: https://github.com/netdata/netdata/issues/9163
+if [ "$(uname -s)" = "FreeBSD" ]; then
+  make="gmake"
+  NETDATA_CONFIGURE_OPTIONS="$NETDATA_CONFIGURE_OPTIONS --disable-dependency-tracking"
+fi
+
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
 
@@ -705,12 +712,12 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Cleanup compilation directory"
 
-run make clean
+run $make clean
 
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run make -j$(find_processors) || exit 1
+run $make -j$(find_processors) || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
@@ -817,7 +824,7 @@ touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
-run make install || exit 1
+run $make install || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"

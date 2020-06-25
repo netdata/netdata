@@ -40,6 +40,7 @@ lsb_release=$(command -v lsb_release 2> /dev/null)
 apk=$(command -v apk 2> /dev/null)
 apt_get=$(command -v apt-get 2> /dev/null)
 brew=$(command -v brew 2> /dev/null)
+pkg=$(command -v pkg 2> /dev/null)
 dnf=$(command -v dnf 2> /dev/null)
 emerge=$(command -v emerge 2> /dev/null)
 equo=$(command -v equo 2> /dev/null)
@@ -92,6 +93,7 @@ Supported installers (IN):
     - apk            all Alpine derivatives
     - swupd          all Clear Linux derivatives
     - brew           macOS Homebrew
+    - pkg            FreeBSD Ports
 
 Supported packages (you can append many of them):
 
@@ -275,18 +277,24 @@ autodetect_distribution() {
     "Linux")
       get_os_release || get_lsb_release || find_etc_any_release
       ;;
+    "FreeBSD")
+      distribution="freebsd"
+      version="$(uname -r)"
+      detection="uname"
+      ;;
     "Darwin")
       distribution="macos"
       version="$(uname -r)"
       detection="uname"
 
-      if [ ${EUID} -eq 0 ] ; then
+      if [ ${EUID} -eq 0 ]; then
         echo >&2 "This script does not support running as EUID 0 on macOS. Please run it as a regular user."
         exit 1
       fi
       ;;
     *)
       return 1
+      ;;
   esac
 }
 
@@ -322,6 +330,7 @@ user_picks_distribution() {
   [ -n "${apk}" ] && echo >&2 " - Alpine Linux based (installer is: apk)" && opts="apk ${opts}"
   [ -n "${swupd}" ] && echo >&2 " - Clear Linux based (installer is: swupd)" && opts="swupd ${opts}"
   [ -n "${brew}" ] && echo >&2 " - macOS based (installer is: brew)" && opts="brew ${opts}"
+  # XXX: This is being removed in another PR.
   echo >&2
 
   REPLY=
@@ -446,6 +455,14 @@ detect_package_manager_from_distribution() {
       fi
       ;;
 
+    freebsd)
+      package_installer="install_pkg"
+      tree="freebsd"
+      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${pkg}" ]; then
+        echo >&2 "command 'pkg' is required to install packages on a '${distribution} ${version}' system."
+        exit 1
+      fi
+      ;;
     macos)
       package_installer="install_brew"
       tree="macos"
@@ -462,6 +479,7 @@ detect_package_manager_from_distribution() {
   esac
 }
 
+# XXX: This is being removed in another PR.
 check_package_manager() {
   # This is called only when the user is selecting a package manager
   # It is used to verify the user selection is right
@@ -585,6 +603,7 @@ declare -A pkg_find=(
   ['fedora']="findutils"
   ['clearlinux']="findutils"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="NOTREQUIRED"
   ['default']="WARNING|"
 )
 
@@ -646,6 +665,7 @@ declare -A pkg_json_c_dev=(
   ['gentoo']="dev-libs/json-c"
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
+  ['freebsd']="json-c"
   ['default']="json-c-devel"
 )
 
@@ -748,6 +768,7 @@ declare -A pkg_libz_dev=(
   ['suse']="zlib-devel"
   ['clearlinux']="devpkg-zlib"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="lzlib"
   ['default']=""
 )
 
@@ -762,6 +783,7 @@ declare -A pkg_libuuid_dev=(
   ['rhel']="libuuid-devel"
   ['suse']="libuuid-devel"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="e2fsprogs-libuuid"
   ['default']=""
 )
 
@@ -790,6 +812,7 @@ declare -A pkg_lm_sensors=(
   ['suse']="sensors"
   ['clearlinux']="lm-sensors"
   ['macos']="WARNING|"
+  ['freebsd']="NOTREQUIRED"
   ['default']="lm_sensors"
 )
 
@@ -817,6 +840,7 @@ declare -A pkg_mailutils=(
 declare -A pkg_make=(
   ['gentoo']="sys-devel/make"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="gmake"
   ['default']="make"
 )
 
@@ -847,6 +871,7 @@ declare -A pkg_nginx=(
 declare -A pkg_nodejs=(
   ['gentoo']="net-libs/nodejs"
   ['clearlinux']="nodejs-basic"
+  ['freebsd']="node"
   ['default']="nodejs"
 
   # exceptions
@@ -872,6 +897,7 @@ declare -A pkg_pkg_config=(
   ['sabayon']="virtual/pkgconfig"
   ['rhel']="pkgconfig"
   ['suse']="pkg-config"
+  ['freebsd']="pkgconf"
   ['clearlinux']="c-basic"
   ['default']="pkg-config"
 )
@@ -999,6 +1025,7 @@ declare -A pkg_python3_pymongo=(
   ['gentoo']="dev-python/pymongo"
   ['suse']="python3-pymongo"
   ['clearlinux']="WARNING|"
+  ['freebsd']="py37-pymongo"
   ['macos']="WARNING|"
   ['default']="python3-pymongo"
 )
@@ -1042,6 +1069,7 @@ declare -A pkg_lz4=(
   ['clearlinux']="devpkg-lz4"
   ['arch']="lz4"
   ['macos']="lz4"
+  ['freebsd']="liblz4"
   ['default']="lz4-devel"
 )
 
@@ -1053,6 +1081,7 @@ declare -A pkg_libuv=(
   ['arch']="libuv"
   ['clearlinux']="devpkg-libuv"
   ['macos']="libuv"
+  ['freebsd']="libuv"
   ['default']="libuv-devel"
 )
 
@@ -1064,6 +1093,7 @@ declare -A pkg_openssl=(
   ['clearlinux']="devpkg-openssl"
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
+  ['freebsd']="openssl"
   ['macos']="openssl@1.1"
   ['default']="openssl-devel"
 )
@@ -1077,6 +1107,7 @@ declare -A pkg_judy=(
   ['suse']="judy-devel"
   ['gentoo']="dev-libs/judy"
   ['arch']="judy"
+  ['freebsd']="Judy"
   ['default']="Judy-devel"
 )
 
@@ -1360,7 +1391,7 @@ run() {
 }
 
 sudo=
-if [ ${UID} -ne 0 ] ; then
+if [ ${UID} -ne 0 ]; then
   sudo="sudo"
 fi
 
@@ -1421,6 +1452,24 @@ prompt() {
       *) echo >&2 "Please answer with yes (y) or no (n)." ;;
     esac
   done
+}
+
+validate_tree_freebsd() {
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  echo >&2 " > FreeBSD Version: ${version} ..."
+
+  make="make"
+  echo >&2 " > Checking for gmake ..."
+  if ! pkg query %n-%v | grep -q gmake; then
+    if prompt "gmake is required to build on FreeBSD and is not installed. Shall I install it?"; then
+      run ${sudo} pkg install ${opts} gmake
+    fi
+  fi
 }
 
 validate_tree_centos() {
@@ -1736,8 +1785,32 @@ install_swupd() {
 # -----------------------------------------------------------------------------
 # macOS
 
+validate_install_pkg() {
+  pkg query %n-%v | grep -q "${*}" || echo "${*}"
+}
+
 validate_install_brew() {
   brew list | grep -q "${*}" || echo "${*}"
+}
+
+install_pkg() {
+  # download the latest package info
+  if [ "${DRYRUN}" -eq 1 ]; then
+    echo >&2 " >> IMPORTANT << "
+    echo >&2 "    Please make sure your system is up to date"
+    echo >&2 "    by running:  pkg update "
+    echo >&2
+  fi
+
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  read -r -a pkg_opts <<< "${opts}"
+
+  run ${sudo} pkg install "${pkg_opts[@]}" "${@}"
 }
 
 install_brew() {
@@ -1796,7 +1869,7 @@ if [ -z "${1}" ]; then
 fi
 
 pv=$(python --version 2>&1)
-if [ "${tree}" = macos ] ; then
+if [ "${tree}" = macos ]; then
   pv=3
 elif [[ "${pv}" =~ ^Python\ 2.* ]]; then
   pv=2
