@@ -28,8 +28,8 @@ and troubleshooting tips.
 ## Enable the collector on Linux
 
 **The eBPF collector is installed and enabled by default on most new installations of the Agent**. The eBPF collector
-does not currently work with [static build installations](/packaging/installer/methods/kickstart-static64.md), but
-improved support is in active development.
+does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md), but improved
+support is in active development.
 
 eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`,
 and all kernels on CentOS 7.6 or later.
