@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.23.0](https://github.com/netdata/netdata/tree/v1.23.0) (2020-06-25)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.22.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.22.1...v1.23.0)
 
 **Merged pull requests:**
 
@@ -88,7 +88,6 @@
 - Update the kernel-collector version to v0.2.0 [\#9118](https://github.com/netdata/netdata/pull/9118) ([prologic](https://github.com/prologic))
 - Dynamic memory cleanup for Pub/Sub exporting connector [\#9112](https://github.com/netdata/netdata/pull/9112) ([vlvkobal](https://github.com/vlvkobal))
 - Package: obsoletes conflicting EPEL packages \(\#6879 \#8784\) [\#9108](https://github.com/netdata/netdata/pull/9108) ([Saruspete](https://github.com/Saruspete))
-- Update eBPF documentation to reflect default enabled status [\#9105](https://github.com/netdata/netdata/pull/9105) ([joelhans](https://github.com/joelhans))
 - Add support for eBPF for Netdata static64 \(kickstart-static64.sh\) [\#9104](https://github.com/netdata/netdata/pull/9104) ([prologic](https://github.com/prologic))
 - Dynamic memory cleanup for MongoDB exporting connector [\#9103](https://github.com/netdata/netdata/pull/9103) ([vlvkobal](https://github.com/vlvkobal))
 - Exporting cleanup [\#9098](https://github.com/netdata/netdata/pull/9098) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -106,7 +105,6 @@
 - Update step-10.md [\#9000](https://github.com/netdata/netdata/pull/9000) ([Jelmerrevers](https://github.com/Jelmerrevers))
 - Fix suid bits on plugin for debian packaging [\#8996](https://github.com/netdata/netdata/pull/8996) ([MrFreezeex](https://github.com/MrFreezeex))
 - Fix incorrect issue link URL in install-required-packages.sh [\#8911](https://github.com/netdata/netdata/pull/8911) ([prologic](https://github.com/prologic))
-- Fix macOS builds building and linking against openssl [\#8865](https://github.com/netdata/netdata/pull/8865) ([prologic](https://github.com/prologic))
 - Improve PR Guidelines for Developers and Contributors. [\#8809](https://github.com/netdata/netdata/pull/8809) ([prologic](https://github.com/prologic))
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
 - single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
@@ -183,10 +181,6 @@
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.21.0...v1.21.1)
-
-**Merged pull requests:**
-
-- V1.21.0 dashboard performance fix extended [\#8664](https://github.com/netdata/netdata/pull/8664) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.21.0](https://github.com/netdata/netdata/tree/v1.21.0) (2020-04-06)
 
