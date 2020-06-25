@@ -1544,3 +1544,27 @@ components:
         old_value:
           type: number
           nullable: true
+    alarms_values:
+      type: object
+      description: "Fixed keys together with HashMap where keys are alarm names"
+      properties:
+        hostname:
+          type: string
+        additionalProperties:
+          type: object
+          properties:
+            id: 
+              type: integer
+            value:
+              type: integer
+            status:
+              type: string
+              enum:
+                - REMOVED
+                - UNDEFINED
+                - UNINITIALIZED
+                - CLEAR
+                - RAISED
+                - WARNING
+                - CRITICAL
+                - UNKNOWN
