@@ -27,9 +27,12 @@ and troubleshooting tips.
 
 ## Enable the collector on Linux
 
-**The eBPF collector is installed and enabled by default on new nightly installations of the Agent**. eBPF monitoring
-only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels
-on CentOS 7.6 or later.
+**The eBPF collector is installed and enabled by default on most new installations of the Agent**. The eBPF collector
+does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md), but improved
+support is in active development.
+
+eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`,
+and all kernels on CentOS 7.6 or later.
 
 If your Agent is v1.22 or older, you may to enable the collector yourself. See the [configuration](#configuration)
 section for details.
@@ -190,7 +193,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
 
 ## Troubleshooting
 
-If the eBPF collector does not work, you can troubleshoot it by running the `ebpf.plugin` command and investigating its output.
+If the eBPF collector does not work, you can troubleshoot it by running the `ebpf.plugin` command and investigating its
+output.
 
 ```bash
 cd /usr/libexec/netdata/plugins.d/
@@ -333,3 +337,5 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Febpf.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
