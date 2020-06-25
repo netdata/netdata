@@ -125,8 +125,8 @@ Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_se
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0)
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-To install Netdata from source on any Linux system (physical, virtual, container, IoT, edge) and keep it up to date with
-our **nightly releases** automatically, run the following:
+To install Netdata from source on any Linux system (physical, virtual, container, IoT, edge), including all dependencies
+required to connect to Netdata Cloud, and get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 # make sure you run `bash` for your shell

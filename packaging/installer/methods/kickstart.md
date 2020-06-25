@@ -12,8 +12,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 This page covers detailed instructions on using and configuring the automatic one-line installation script named
 `kickstart.sh`.
 
-This method is fully automatic on all Linux distributions. To install Netdata from source and get _automatic nightly
-updates_, run the following as your normal user:
+This method is fully automatic on all Linux distributions. To install Netdata from source, including all dependencies
+required to connect to Netdata Cloud, and get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
