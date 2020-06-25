@@ -84,7 +84,11 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
     RRDDIM *rd;
     BUFFER *buffer;
 
-    ret = find_object_by_guid(uuid, NULL, 0);
+    if (unlikely(!uuid_compare(host->host_uuid, *uuid))) {
+        /* We don't support host UUIDs in the GUID map yet so we hard code it for now */
+        ret = GUID_TYPE_HOST;
+    } else
+        ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
         case GUID_TYPE_CHAR:
             error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
