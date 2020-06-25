@@ -1467,7 +1467,7 @@ validate_tree_freebsd() {
   echo >&2 " > Checking for gmake ..."
   if ! pkg query %n-%v | grep -q gmake; then
     if prompt "gmake is required to build on FreeBSD and is not installed. Shall I install it?"; then
-      run ${sudo} pkg ${opts} install gmake
+      run ${sudo} pkg install ${opts} gmake
     fi
   fi
 }
