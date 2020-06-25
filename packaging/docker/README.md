@@ -1,9 +1,7 @@
 <!--
----
 title: "Install Netdata with Docker"
 date: 2020-04-23
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
----
 -->
 
 # Install the Netdata Agent with Docker
@@ -159,8 +157,8 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](/docs/running-behind-haproxy/) so that it restricts connections to read-only access
-to the CONTAINERS endpoint.
+[HAProxy](/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
+endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
 network. Access to the proxy container is limited to only within the network.
