@@ -1555,7 +1555,7 @@ components:
           additionalProperties:
             type: object
             properties:
-              id: 
+              id:
                 type: integer
               value:
                 type: integer
