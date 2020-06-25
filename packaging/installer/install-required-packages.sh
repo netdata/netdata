@@ -1802,7 +1802,15 @@ install_pkg() {
     echo >&2
   fi
 
-  run pkg install "${@}"
+  local opts=
+  if [ "${NON_INTERACTIVE}" -eq 1 ]; then
+    echo >&2 "Running in non-interactive mode"
+    opts="-y"
+  fi
+
+  read -r -a pkg_opts <<< "${opts}"
+
+  run ${sudo} pkg install "${pkg_opts[@]}" "${@}"
 }
 
 install_brew() {
