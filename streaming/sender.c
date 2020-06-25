@@ -560,7 +560,7 @@ void execute_replicate(struct sender_state *s, char *st_id, long start_t, long e
         // Use the chart shared flags (thread-safe) to tell the collector that replication is requested
         // The sender buffer lock is not held at this point.
         netdata_mutex_lock(&st->shared_flags_lock);
-        st->sflag_replicating = 1;
+        st->sflag_replicating_up = 1;
         st->gap_sent = (size_t)start_t;
         netdata_mutex_unlock(&st->shared_flags_lock);
     }

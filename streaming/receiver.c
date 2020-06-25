@@ -164,14 +164,14 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
         error("Failed to send replication request for %s!", st_id);
 }
 
-// On the receiver side this is the only thread that will access the shared flags - but take the locks anyway
-// as contention will be low and it guards against future updates.
 PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
     PARSER_USER_OBJECT *user = user_v;
     if (!strcmp(user->st->name,"system.io"))
         error("BEGIN on system.io %llu %llu", microseconds, remote_clock);
     netdata_mutex_lock(&st->shared_flags_lock);
-    if (st->sflag_replicating) {
+    // TODO: we should supress this on the other side and use this as an indicator that the two sides are out of
+    //       sync so that we can trigger recovery.
+    if (st->sflag_replicating_down) {
         debug(D_STREAM, "Ignoring data stream for %s @ %llu during replication", st->name, remote_clock);
         netdata_mutex_unlock(&st->shared_flags_lock);
         return PARSER_RC_OK;
@@ -190,7 +190,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
        (now - remote_t > st->update_every*2))
     {
         info("Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t, expected_t, now);
-        st->sflag_replicating = 1;
+        st->sflag_replicating_down = 1;
         netdata_mutex_unlock(&st->shared_flags_lock);
         send_replication_req(user->host, st->id, expected_t, now);
         return PARSER_RC_OK;
@@ -203,7 +203,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
 
 PARSER_RC streaming_set_action(void *user_v, RRDSET *st, RRDDIM *rd, long long int value) {
     netdata_mutex_lock(&st->shared_flags_lock);
-    int replicating = st->sflag_replicating;
+    int replicating = st->sflag_replicating_down;
     netdata_mutex_unlock(&st->shared_flags_lock);
     if (replicating)
         return PARSER_RC_OK;
@@ -212,7 +212,7 @@ PARSER_RC streaming_set_action(void *user_v, RRDSET *st, RRDDIM *rd, long long i
 
 PARSER_RC streaming_end_action(void *user_v, RRDSET *st) {
     netdata_mutex_lock(&st->shared_flags_lock);
-    int replicating = st->sflag_replicating;
+    int replicating = st->sflag_replicating_down;
     netdata_mutex_unlock(&st->shared_flags_lock);
     if (replicating)
         return PARSER_RC_OK;
@@ -236,7 +236,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
         goto disable;
     user->st = st;
     netdata_mutex_lock(&st->shared_flags_lock);
-    int replicating = st->sflag_replicating;
+    int replicating = st->sflag_replicating_down;
     netdata_mutex_unlock(&st->shared_flags_lock);
     if (!replicating) {
         errno = 0;
@@ -315,7 +315,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     if (user->st->current_entry >= user->st->entries)
         user->st->current_entry -= user->st->entries;
     netdata_mutex_lock(&user->st->shared_flags_lock);
-    user->st->sflag_replicating = 0;
+    user->st->sflag_replicating_down = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
     if (!strcmp(user->st->name,"system.uptime"))
         error("Finished replication on uptime");

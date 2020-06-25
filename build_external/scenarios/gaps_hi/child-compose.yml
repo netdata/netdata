@@ -3,8 +3,8 @@ services:
   agent_child:
     image: debian_10_dev
     command: /usr/sbin/netdata -D
-    #ports:
-    #- 21002+:19999
+    ports:
+    - 21002:19999
     volumes:
       - ./child_stream.conf:/etc/netdata/stream.conf:ro
       #- ./child_guid:/var/lib/netdata/registry/netdata.public.unique.id:ro

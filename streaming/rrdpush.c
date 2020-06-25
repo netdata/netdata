@@ -323,13 +323,13 @@ void rrdset_done_push(RRDSET *st) {
     netdata_mutex_lock(&st->shared_flags_lock);
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
-    if (st->sflag_replicating) {
+    if (st->sflag_replicating_up) {
         debug(D_STREAM, "Not sending collector new data - chart %s in replication mode from %ld", st->name, (long)st->gap_sent);
         if (st->gap_sent == 0) 
             error("Invalid replication request - cannot replicate from time 0 on %s", st->name);
         else
             sender_fill_gap_nolock(host->sender, st);
-        st->sflag_replicating = 0;
+        st->sflag_replicating_up = 0;
     }
     netdata_mutex_unlock(&st->shared_flags_lock);
     rrdpush_send_chart_metrics_nolock(st, host->sender);

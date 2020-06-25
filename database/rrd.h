@@ -535,7 +535,8 @@ struct rrdset {
     // -------------------------------------------------------------------------
     // it should be safe to extend this structure with volatile fields that are wiped on load
     netdata_mutex_t shared_flags_lock;
-    unsigned int sflag_replicating:1;               // if this chart is being replicated by an upstream receiver
+    unsigned int sflag_replicating_up:1;            // if this chart is being replicated to an upstream parent
+    unsigned int sflag_replicating_down:1;          // if this chart is being replicated from a downstream child
 
 };
 

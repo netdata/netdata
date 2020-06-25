@@ -538,9 +538,12 @@ RRDSET *rrdset_create_custom(
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if (st) {
         int mark_rebuild = 0;
+
         netdata_mutex_lock(&st->shared_flags_lock);
-        st->sflag_replicating = 0;  // Resetting chart definition on reconnect, assume not in replication mode
+        st->sflag_replicating_down = 0;
+        // Leave replicating_up in current side - req on both sides is independent
         netdata_mutex_unlock(&st->shared_flags_lock);
+
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
@@ -684,6 +687,10 @@ RRDSET *rrdset_create_custom(
             rrdcalctemplate_link_matching(st);
         }
         rrdhost_unlock(host);
+        netdata_mutex_lock(&st->shared_flags_lock);
+        st->sflag_replicating_down = 0;
+        // Leave replicating_up in current side - req on both sides is independent
+        netdata_mutex_unlock(&st->shared_flags_lock);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
@@ -766,6 +773,8 @@ RRDSET *rrdset_create_custom(
             st->alarms = NULL;
             st->flags = 0x00000000;
             st->exporting_flags = NULL;
+            st->sflag_replicating_down = 0;
+            st->sflag_replicating_up = 0;
 
             if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);
@@ -900,8 +909,8 @@ RRDSET *rrdset_create_custom(
 
     netdata_rwlock_init(&st->rrdset_rwlock);
     netdata_mutex_init(&st->shared_flags_lock);
-    st->sflag_replicating = 0;  // Assume we are not in replication mode until the far end requests it
-
+    st->sflag_replicating_up = 0;    // Sensible defaults, updated on connect
+    st->sflag_replicating_down = 0;  // Sensible defaults, updated on connect
     if(name && *name && rrdset_set_name(st, name))
         // we did set the name
         ;
