@@ -6,25 +6,23 @@ image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
 
 # Monitor a Kubernetes cluster with Netdata
 
-Kubernetes (k8s) is the de facto method of deploying containerized and microservice environments today, and while it's
-relatively easy to deploy, scale, and load-balance your applications, k8s doesn't come with pre-configured tools to help
-you monitor your cluster. There's no "batteries included" when it comes to monitoring.
+While Kubernetes (k8s) might simplify the way you deploy, scale, and load-balance your applications, no cluster comes
+with "batteries included" when it comes to monitoring. There are no pre-configured tools and no visibility when you
+first deploy. It's like building an entire house and _then_ smashing your way through the finished walls to add windows.
 
-You need a monitoring stack that's flexible enough to handle Kubernetes' scaling and load-balancing features, but also
-smart enough to discover and monitor new pods or services without manual intervention. You also need your monitoring
-stack to integrate with and monitor the many intertwined layers of a functional Kubernetes cluster, from individual
-nodes to the technologies run on every pod. And, ideally, you need the solution to cost as little as possible, both in
-terms of a monthly bill and overhead on the cluster itself.
+At Netdata, we're working to build a Kubernetes monitoring toolkit that lets you add visibility without adding
+complexity. Better yet, this toolkit includes a few complementary collectors that let you monitor the many layers of a
+Kubernetes cluster entirely for free.
 
-Netdata offers a few complementary tools and collectors for monitoring the many layers of a Kubernetes cluster,
+We already have a few complementary tools and collectors for monitoring the many layers of a Kubernetes cluster,
 _entirely for free_. These methods work together to help you troubleshoot performance or availablility issues across
 your k8s infrastructure.
 
 -   A [Helm chart](https://github.com/netdata/helmchart), which bootstraps a Netdata Agent pod on every node in your
     cluster, plus an additional parent pod for storing metrics and managing alarm notifications.
--   A [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers 22 different
-    services that might be running inside of your cluster's pods and creates the configuration files required for
-    Netdata to monitor that service. [Compatible
+-   A [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers and immediately
+    monitors 22 different services that might be running inside of your cluster's pods. Service discovery happens
+    without manual intervention as pods are created, destroyed, or moved between nodes. [Compatible
     services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) include Nginx, Apache,
     MySQL, CoreDNS, and much more.
 -   A [Kubelet collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), which runs
@@ -93,7 +91,7 @@ You'll see metrics from the parent pod as soon as you navigate to the dashboard:
 ![The Netdata dashboard when monitoring a Kubernetes
 cluster](https://user-images.githubusercontent.com/1153921/85343043-c6206400-b4a0-11ea-8de6-cf2c6837c456.png)
 
-Remember that the parent pod is responsible for storing metrics from all the child pods, in addition to sending alarms.
+Remember that the parent pod is responsible for storing metrics from all the child pods and sending alarms.
 
 Take note of the **Replicated Nodes** menu, which shows not only the parent pod, but also the three child pods. This
 example cluster has three child pods, but the number of child pods depends entirely on the number of nodes in your
@@ -104,9 +102,8 @@ that now to explore the pod-level Kubernetes monitoring Netdata delivers.
 
 ### Pods
 
-Click on any of the nodes under **netdata-parent-0**. These are named after the hostnames of the nodes in your cluster.
-You're redirected to a separate instance of the Netdata dashboard, which is enriched with node metrics collected by the
-child pod.
+Click on any of the nodes under **netdata-parent-0**. Netdata redirects you to a separate instance of the Netdata
+dashboard, run by the Netdata child pod, which visualizes thousands of metrics from that node.
 
 ![The Netdata dashboard monitoring a pod in a Kubernetes
 cluster](https://user-images.githubusercontent.com/1153921/85348461-85c8e200-b4b0-11ea-85fa-e88046e94719.png)
@@ -118,7 +115,7 @@ more.
 You can use the menus on the right-hand side of the dashboard to navigate between different sections of charts and
 metrics.
 
-For example, click on the **Applications** section to view per-application metrics, which are collected by
+For example, click on the **Applications** section to view per-application metrics, collected by
 [apps.plugin](/collectors/apps.plugin/README.md). The first chart you see is **Apps CPU Time (100% = 1 core)
 (apps.cpu)**, which shows the CPU utilization of various applications running on the node. You shouldn't be surprised to
 find Netdata processes (`netdata`, `sd-agent`, and more) alongside Kubernetes processes (`kubelet`, `kube-proxy`, and
@@ -143,7 +140,7 @@ services](https://github.com/netdata/helmchart#service-discovery-and-supported-s
 or removed from Netdata as soon as the pods are created or destroyed.
 
 You can find these service discovery sections near the bottom of the menu. The names for these sections follow a
-pattern: first the name of the detected service, then a string of the module name, pod TUID, service type, port
+pattern: the name of the detected service, followed by a string of the module name, pod TUID, service type, port
 protocol, and port number. See the graphic below to help you identify service discovery sections.
 
 ![Showing the difference between cgroups and service discovery
@@ -152,10 +149,10 @@ sections](https://user-images.githubusercontent.com/1153921/85443711-73998300-b5
 For example, the first service discovery section shows metrics for a pod running an Apache web server running on port 80
 in a pod named `httpd-6f6cb96d77-xtpwn`.
 
-> If you don't see any service discovery sections, it's because your installed services are either not yet compatible
-> with service discovery, or you changed their default configuration, such as the listening port. See the [list of
-> supported services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) for details about
-> whether your installed services are compatible with service discovery, or read the [configuration
+> If you don't see any service discovery sections, it's either because your services are not compatible with service
+> discovery or you changed their default configuration, such as the listening port. See the [list of supported
+> services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) for details about whether
+> your installed services are compatible with service discovery, or read the [configuration
 > instructions](/packaging/installer/methods/kubernetes.md#configure-service-discovery) to change how it discovers the
 > supported services.
 
@@ -163,19 +160,18 @@ Click on any of these service discovery sections to see metrics from that partic
 **Apache apache-default httpd-6f6cb96d77-xtpwn httpd tcp 80** section brings you to a series of charts populated by the
 [Apache collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache) itself.
 
-With service discovery, you can now see valuable metrics like requests, bandwidth, workers, and more for this particular
-pod.
+With service discovery, you can now see valuable metrics like requests, bandwidth, workers, and more for this pod.
 
 ![Apache metrics collected via service
 discovery](https://user-images.githubusercontent.com/1153921/85443905-a5aae500-b546-11ea-99f0-be20ba796feb.png)
 
-Same goes for metrics coming from the CockroachDB pod running on this same node.
+The same goes for metrics coming from the CockroachDB pod running on this same node.
 
 ![CockroachDB metrics collected via service
 discovery](https://user-images.githubusercontent.com/1153921/85444316-0e925d00-b547-11ea-83ba-b834275cb419.png)
 
 Service discovery helps you monitor the health of specific applications running on your Kubernetes cluster, which in
-turn gives you a more complete resource when troubleshooting the health and performance of your infrastructure.
+turn gives you a complete resource when troubleshooting your infrastructure's health and performance.
 
 ### Kubelet
 
@@ -206,8 +202,8 @@ Scroll down into the **k8s kubeproxy** section to see metrics about the network 
 Kubernetes cluster. kube-proxy allows for pods to communicate with each other and accept sessions from outside your
 cluster.
 
-With Netdata, you can monitor how often and how quickly your k8s proxies are syncing proxy rules between nodes. Dramatic
-changes in these figures could indicate an anomaly in your cluster that's worthy of further investigation.
+With Netdata, you can monitor how often your k8s proxies are syncing proxy rules between nodes. Dramatic changes in
+these figures could indicate an anomaly in your cluster that's worthy of further investigation.
 
 kube-proxy metrics are collected and visualized thanks to the [kube-proxy
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy), which is enabled with
@@ -216,8 +212,8 @@ zero configuration on most Kubernetes clusters with standard configurations.
 ### Containers
 
 We can finally talk about the final piece of Kubernetes monitoring: containers. Each Kubernetes pod is a container (a
-Docker container, in the example cluster), which are resourced and tracked by the cgroups feature of the Linux kernel.
-Netdata automatically detects and monitors each running container by interfacing with the cgroups feature itself.
+Docker container, in the example cluster), resourced and tracked by the cgroups feature of the Linux kernel. Netdata
+automatically detects and monitors each running container by interfacing with the cgroups feature itself.
 
 You can find these sections beneath **Users**, **k8s kubelet**, and **k8s kubeproxy**. Below, a number of containers
 devoted to running services like CockroachDB, Apache, Redis, and more.
@@ -256,16 +252,15 @@ you need to make informed decisions about your cluster.
 
 The best part of monitoring a Kubernetes cluster with Netdata is that you don't have to worry about constantly running
 complex `kubectl` commands to see hundreds of highly granular metrics from your nodes. And forget about using `kubectl
-exec -it pod bash` to start up a shell on a pod in order to find and diagnose an issue with any given pod on your
-cluster.
+exec -it pod bash` to start up a shell on a pod to find and diagnose an issue with any given pod on your cluster.
 
-And with service discovery, all your compatible pods will appear and disappear automatically as they scale up, move, or
+And with service discovery, all your compatible pods will automatically appear and disappear as they scale up, move, or
 scale down across your cluster.
 
 To monitor your Kubernetes cluster with Netdata, start by [installing the Helm
 chart](/packaging/installer/methods/kubernetes.md) if you haven't already. The Netdata Agent is open source and entirely
-free for every cluster and every orgranization, whether you have 10 or 10,000 pods, and in just a few minutes you'll
-have built yourself an effective platform for troubleshooting the next performance or availability issue on your
-Kubernetes cluster.
+free for every cluster and every organization, whether you have 10 or 10,000 pods. A few minutes and one `helm install`
+later and you'll have started on the path of building an effective platform for troubleshooting the next performance or
+availability issue on your Kubernetes cluster.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fkubernetes-k8s-netdata.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
