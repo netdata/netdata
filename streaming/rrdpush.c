@@ -297,6 +297,7 @@ void rrdset_push_chart_definition_now(RRDSET *st) {
     rrdset_unlock(st);
 }
 
+void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st);
 void rrdset_done_push(RRDSET *st) {
     if(unlikely(!should_send_chart_matching(st)))
         return;

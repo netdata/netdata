@@ -267,8 +267,11 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     char *collected_str = words[3];
     char *collected_max_str = words[4];
     char *last_stored_str = words[5];
+    char *calculated_str = words[6];
+    char *last_calculated_str = words[7];
 
-    if ( !id || !last_collected_str || !collected_str || !collected_max_str || !last_stored_str)
+    if ( !id || !last_collected_str || !collected_str || !collected_max_str || !last_stored_str || !calculated_str ||
+         !!last_calculated_str )
         goto disable;
 
     if (user->st == NULL) {
@@ -286,6 +289,8 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     rd->collected_value = strtoll(collected_str, NULL, 0);
     rd->collected_value_max = strtoll(collected_max_str, NULL, 0);
     rd->last_stored_value = strtod(last_stored_str, NULL);
+    rd->calculated_value = strtod(last_stored_str, NULL);
+    rd->last_calculated_value = strtod(last_stored_str, NULL);
     return PARSER_RC_OK;
 disable:
     errno = 0;

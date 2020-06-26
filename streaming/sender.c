@@ -415,12 +415,15 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
     rrddim_foreach_read(rd, st) {
         if (rd->updated && rd->exposed) {
             buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
-                           COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT "\n",
+                           COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
+                           CALCULATED_NUMBER_FORMAT "\n",
                 rd->id,
                 rd->last_collected_value,
                 rd->collected_value,
                 rd->collected_value_max,
-                rd->last_stored_value);
+                rd->last_stored_value,
+                rd->calculated_value,
+                rd->last_calculated_value);
         }
     }
     if (((end - start) % st->update_every) == 0)

@@ -980,7 +980,6 @@ RRDSET *rrdset_create_custom(
     return(st);
 }
 
-
 // ----------------------------------------------------------------------------
 // RRDSET - data collection iteration control
 
@@ -1222,7 +1221,7 @@ static inline size_t rrdset_done_interpolate(
                                    / (calculated_number)(now_collect_ut - last_collect_ut)
                             );
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    if (!strcmp(st->name, "system.io") )
+                    if (!strcmp(st->name, "system.cpu") )
                         error("interpolate %s.%s@%llu stored(last=%llu,next=%llu) collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
                               st->name, rd->name, update_every_ut,
                               last_stored_ut, next_store_ut,
