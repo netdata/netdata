@@ -271,7 +271,7 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     char *last_calculated_str = words[7];
 
     if ( !id || !last_collected_str || !collected_str || !collected_max_str || !last_stored_str || !calculated_str ||
-         !!last_calculated_str )
+         !last_calculated_str )
         goto disable;
 
     if (user->st == NULL) {
@@ -294,8 +294,8 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     return PARSER_RC_OK;
 disable:
     errno = 0;
-    error("Gap replication failed - Invalid REPMETA %s %s %s %s %s on host %s. Disabling it.", words[1], words[2], 
-          words[3], words[4], words[5], user->host->hostname);
+    error("Gap replication failed - Invalid REPMETA %s %s %s %s %s %s %s on host %s. Disabling it.", words[1], words[2], 
+          words[3], words[4], words[5], words[6], words[7], user->host->hostname);
     user->enabled = 0;
     return PARSER_RC_ERROR;
 }

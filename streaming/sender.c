@@ -340,7 +340,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
 
     http[received] = '\0';
-    debug(D_STREAM, "Response to sender from far end (%d-bytes): %s", received, http);
+    debug(D_STREAM, "Response to sender from far end (%ld-bytes): %s", received, http);
     int answer = -1;
     char *version_start = strchr(http, '=');
     int32_t version = -1;
