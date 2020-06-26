@@ -36,7 +36,8 @@ _actively_ contributing to Netdata's future.
 
 This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others.
 
-To install Netdata from source and get _automatic nightly updates_, run the following as your normal user:
+To install Netdata from source, including all dependencies required to connect to Netdata Cloud, and get _automatic
+nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -189,6 +190,33 @@ man-in-the-middle attacks.
 To install the Agent on certain CentOS and RHEL systems, you must enable non-default repositories, such as EPEL or
 PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos-rehel-6-x) and
 [CentOS 8](/packaging/installer/methods/manual.md#centos-rehel-8-x) sections for more information.
+
+### Access to file is not permitted
+
+If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web//index.html` when you try to
+visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's permissions to match those of your
+system.
+
+Run `ls -la /usr/share/netdata/web/index.html` to find the file's permissions. You may need to change this path based on
+the error you're seeing in your browser. In the below example, the file is owned by the user `netdata` and the group
+`netdata`.
+
+```bash
+ls -la /usr/share/netdata/web/index.html
+-rw-r--r--. 1 netdata netdata 89377 May  5 06:30 /usr/share/netdata/web/index.html
+```
+
+Open your `netdata.conf` file and find the `[web]` section, plus the `web files owner`/`web files group` settings. Edit
+the lines to match the output from `ls -la` above and uncomment them if necessary.
+
+```conf
+[web]
+    web files owner = netdata
+    web files group = netdata
+```
+
+Save the file, [restart the Netdata Agent](/docs/getting-started.md#start-stop-and-restart-netdata), and try accessing
+the dashboard again.
 
 ### Multiple versions of OpenSSL
 

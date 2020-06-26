@@ -14,7 +14,8 @@ This page covers detailed instructions on using and configuring the installation
 This method uses a pre-compiled static binary to install Netdata on any Intel/AMD 64bit Linux system and on any Linux
 distribution, even those with a broken or unsupported package manager.
 
-To install Netdata from a binary package and get _automatic nightly updates_, run the following as your normal user:
+To install Netdata from a static binary package, including all dependencies required to connect to Netdata Cloud, and
+get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
