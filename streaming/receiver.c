@@ -292,9 +292,8 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     rd->last_stored_value = strtod(last_stored_str, NULL);
     rd->calculated_value = strtod(last_stored_str, NULL);
     rd->last_calculated_value = strtod(last_stored_str, NULL);
-    debug(D_REPLICATION, "Finished replication of %s.%s: last_col_val=%ld col_val=%ld col_val_max=%ld last_store="
-          CALCULATED_VALUE " calc_val=" CALCULATED_VALUE " last_calc_val=" CALCULATED_VAL,
-          user-st->id, id, rd->last_collected_value, rd->collected_value, rd->collected_value_max,
+    debug(D_REPLICATION, "Finished replication of %s.%s: last_col_val=%ld col_val=%ld col_val_max=%ld last_store=" CALCULATED_NUMBER_FORMAT " calc_val=" CALCULATED_NUMBER_FORMAT " last_calc_val=" CALCULATED_NUMBER_FORMAT,
+          user->st->id, id, rd->last_collected_value, rd->collected_value, rd->collected_value_max,
           rd->last_stored_value, rd->calculated_value, rd->last_calculated_value);
     return PARSER_RC_OK;
 disable:
