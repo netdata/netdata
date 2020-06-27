@@ -410,6 +410,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                 sample_t += rd->update_every;
                 index++;
             }
+            debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t, index);
         }
     }
     rrddim_foreach_read(rd, st) {
@@ -555,10 +556,12 @@ int ret;
 
 void execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
     time_t now = now_realtime_sec();
-    info("REPLICATE: %ld - %ld @ %ld", start_t, end_t, now);
+    debug(D_REPLICATION, "Replication request started @%ld: %s %ld - %ld @ %ld", now, st_id, start_t, end_t);
     RRDSET *st = rrdset_find(s->host, st_id);
-    if (!st)
-        error("Cannot replicate chart %s - not found!", st_id);
+    if (!st) {
+        errno = 0;
+        error("Cannot replicate chart %s @ %ld - not found!", st_id, now);
+    }
     else {
         // Use the chart shared flags (thread-safe) to tell the collector that replication is requested
         // The sender buffer lock is not held at this point.
@@ -569,12 +572,11 @@ void execute_replicate(struct sender_state *s, char *st_id, long start_t, long e
     }
 }
 
-// This is just a placeholder until the gap filling state machine is inserted
 void execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
-    info("STREAM %s [send to %s] received command over connection (%d-bytes): %s", s->host->hostname, s->connected_to,
-         s->read_len, start);
+    debug(D_STREAM, "%s [send to %s] received command over connection (%d-bytes): %s", s->host->hostname,
+          s->connected_to, s->read_len, start);
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
         if (!strncmp(start, "REPLICATE ", 10)) {
@@ -592,11 +594,13 @@ void execute_commands(struct sender_state *s) {
                     }
                 }
             }
+            errno = 0;
             error("Malformed command on streaming link: %s", start);
             start = newline+1;
             continue;
         }
         start = newline+1;
+        errno = 0;
         error("Unrecognised command received, skipping to position %ld", start - s->read_buffer);
     }
     if (start<end) {

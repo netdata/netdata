@@ -189,7 +189,8 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     if ((remote_t - expected_t > st->update_every * 2) ||
        (now - remote_t > st->update_every*2))
     {
-        info("Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t, expected_t, now);
+        debug(D_REPLICATION, "Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t, 
+              expected_t, now);
         st->sflag_replicating_down = 1;
         netdata_mutex_unlock(&st->shared_flags_lock);
         send_replication_req(user->host, st->id, expected_t, now);
@@ -248,8 +249,8 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     end_t = str2ull(end_txt);
 
     time_t now = now_realtime_sec();
-    debug(D_STREAM, "REPBEGIN %s %ld..%ld against current gap %ld..%ld", st->name, start_t, end_t, st->last_updated.tv_sec, now);
-
+    debug(D_REPLICATION, "Replication started on %s for interval %ld..%ld against current gap %ld..%ld", st->name, 
+          start_t, end_t, st->last_updated.tv_sec, now);
     return PARSER_RC_OK;
 disable:
     errno = 0;
@@ -291,6 +292,10 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     rd->last_stored_value = strtod(last_stored_str, NULL);
     rd->calculated_value = strtod(last_stored_str, NULL);
     rd->last_calculated_value = strtod(last_stored_str, NULL);
+    debug(D_REPLICATION, "Finished replication of %s.%s: last_col_val=%ld col_val=%ld col_val_max=%ld last_store="
+          CALCULATED_VALUE " calc_val=" CALCULATED_VALUE " last_calc_val=" CALCULATED_VAL,
+          user-st->id, id, rd->last_collected_value, rd->collected_value, rd->collected_value_max,
+          rd->last_stored_value, rd->calculated_value, rd->last_calculated_value);
     return PARSER_RC_OK;
 disable:
     errno = 0;
@@ -322,11 +327,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     netdata_mutex_lock(&user->st->shared_flags_lock);
     user->st->sflag_replicating_down = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
-    if (!strcmp(user->st->name,"system.uptime"))
-        error("Finished replication on uptime");
-    /*if (!strcmp(user->st->name,"system.ip")) {
-        info("Finished replication of system.ip");
-    }*/
+
     rrdset_flag_set(user->st, RRDSET_FLAG_STORE_FIRST);     // Prevent 1-sec gap after replication
     user->st = NULL;
     return PARSER_RC_OK;
@@ -363,13 +364,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     RRDDIM *rd = rrddim_find(user->st, id);
     time_t st_last = rrdset_last_entry_t(user->st);
     if (rd == NULL) {
-        /*char buffer[4096] = {0};
-        RRDDIM *d = user->st->dimensions;
-        while(d) {
-            sprintf(buffer+strlen(buffer),"%s+",d->id);
-            d = d->next;
-        }*/
-        //error("Unknown dimension \"%s\" on %s during replication - ignoring (%s)", id, user->st->name, buffer);
+        errno = 0;
         error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
         return PARSER_RC_OK;
     }
@@ -384,7 +379,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
 
     return PARSER_RC_OK;
 disable:
-    error("Gap replication failed - Invalid REPDIM %s %s %s on host %s. Disabling it.", words[1], words[2], words[3], 
+    error("Gap replication failed - Invalid REPDIM %s %s %s on host %s. Disabling it.", words[1], words[2], words[3],
           user->host->hostname);
     user->enabled = 0;
     return PARSER_RC_ERROR;
