@@ -87,7 +87,7 @@ int get_kernel_version(char *out, int size) {
         return -1;
 
     move = patch;
-    while (*version) *move++ = *version++;
+    while (*version && *version != '\n') *move++ = *version++;
     *move = '\0';
 
     fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
