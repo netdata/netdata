@@ -1386,6 +1386,7 @@ int main(int argc, char **argv) {
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
     // fork the spawn server
+    registry_init();
     spawn_init();
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
