@@ -1221,12 +1221,12 @@ static inline size_t rrdset_done_interpolate(
                                    / (calculated_number)(now_collect_ut - last_collect_ut)
                             );
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    if (!strcmp(st->name, "system.cpu") )
-                        error("interpolate %s.%s@%llu stored(last=%llu,next=%llu) collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
-                              st->name, rd->name, update_every_ut,
-                              last_stored_ut, next_store_ut,
-                              last_collect_ut, now_collect_ut,
-                              rd->calculated_value, new_value);
+                    debug(D_REPLICATION, "interpolate %s.%s@%llu stored(last=%llu,next=%llu) "
+                          "collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
+                          st->name, rd->name, update_every_ut,
+                          last_stored_ut, next_store_ut,
+                          last_collect_ut, now_collect_ut,
+                          rd->calculated_value, new_value);
                     #endif
 
                     #ifdef NETDATA_INTERNAL_CHECKS
@@ -1311,12 +1311,10 @@ static inline size_t rrdset_done_interpolate(
                 rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, storage_flags));
 //                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 #ifdef NETDATA_INTERNAL_CHECKS
-                if (!strcmp(st->name, "system.io") )
-                    error("interpolate-store %s.%s@%llu stored(last=%llu,next=%llu) collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
-                          st->name, rd->name, update_every_ut,
-                          last_stored_ut, next_store_ut,
-                          last_collect_ut, now_collect_ut,
-                          rd->last_stored_value, new_value);
+                debug(D_REPLICATION, "interpolate-store %s.%s@%llu stored(last=%llu,next=%llu) "
+                      "collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
+                      st->name, rd->name, update_every_ut, last_stored_ut, next_store_ut, last_collect_ut, 
+                      now_collect_ut, rd->last_stored_value, new_value);
                 #endif
 
                 rd->last_stored_value = new_value;

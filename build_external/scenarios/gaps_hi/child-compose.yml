@@ -2,7 +2,7 @@ version: '3.3'
 services:
   agent_child:
     image: debian_10_dev
-    command: /usr/sbin/netdata -D
+    command: /usr/sbin/netdata -D -W set global "debug flags" 0xc0000000 -W set global hostname "child"
     ports:
     - 21002:19999
     volumes:
