@@ -89,7 +89,6 @@
 - Dynamic memory cleanup for Pub/Sub exporting connector [\#9112](https://github.com/netdata/netdata/pull/9112) ([vlvkobal](https://github.com/vlvkobal))
 - Package: obsoletes conflicting EPEL packages \(\#6879 \#8784\) [\#9108](https://github.com/netdata/netdata/pull/9108) ([Saruspete](https://github.com/Saruspete))
 - Add support for eBPF for Netdata static64 \(kickstart-static64.sh\) [\#9104](https://github.com/netdata/netdata/pull/9104) ([prologic](https://github.com/prologic))
-- Dynamic memory cleanup for MongoDB exporting connector [\#9103](https://github.com/netdata/netdata/pull/9103) ([vlvkobal](https://github.com/vlvkobal))
 - Exporting cleanup [\#9098](https://github.com/netdata/netdata/pull/9098) ([thiagoftsm](https://github.com/thiagoftsm))
 - Introduce a random sleep in the Netdata updater [\#9079](https://github.com/netdata/netdata/pull/9079) ([prologic](https://github.com/prologic))
 - New alarms \(exporting and Backend\) [\#9075](https://github.com/netdata/netdata/pull/9075) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -173,10 +172,6 @@
 - Fixed Arch Linux Ci checks. [\#8699](https://github.com/netdata/netdata/pull/8699) ([Ferroin](https://github.com/Ferroin))
 - yamllint: enable truthy rule [\#8698](https://github.com/netdata/netdata/pull/8698) ([ilyam8](https://github.com/ilyam8))
 - Fixes compatibility with RH 7.x family [\#8694](https://github.com/netdata/netdata/pull/8694) ([thiagoftsm](https://github.com/thiagoftsm))
-- charts.d/apcupsd: fix ups status check [\#8688](https://github.com/netdata/netdata/pull/8688) ([ilyam8](https://github.com/ilyam8))
-- Update pfSense doc and add warning for apcupsd users [\#8686](https://github.com/netdata/netdata/pull/8686) ([cryptoluks](https://github.com/cryptoluks))
-- added certificate revocation alert [\#8684](https://github.com/netdata/netdata/pull/8684) ([yasharne](https://github.com/yasharne))
-- \[ReOpen \#8626\] Improved offline installation instructions to point to correct installation scripts and clarify process [\#8680](https://github.com/netdata/netdata/pull/8680) ([IceCodeNew](https://github.com/IceCodeNew))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
