@@ -116,7 +116,7 @@ BUFFER *metalog_update_chart_buffer(RRDSET *st, uint32_t compaction_id)
         , rrdset_type_name(st->chart_type)
         , st->priority
         , st->update_every
-        , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
+        , "" /* archived charts cannot be obsolete */
         , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
         , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
         , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
@@ -140,7 +140,7 @@ BUFFER *metalog_update_chart_buffer(RRDSET *st, uint32_t compaction_id)
             , rrd_algorithm_name(rd->algorithm)
             , rd->multiplier
             , rd->divisor
-            , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
+            , "" /* archived dimensions cannot be obsolete */
             , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
             , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
@@ -216,7 +216,7 @@ BUFFER *metalog_update_dimension_buffer(RRDDIM *rd)
         , rrd_algorithm_name(rd->algorithm)
         , rd->multiplier
         , rd->divisor
-        , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
+        , "" /* archived dimensions cannot be obsolete */
         , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
         , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
     );

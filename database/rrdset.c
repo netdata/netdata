@@ -185,6 +185,11 @@ int rrdset_set_name(RRDSET *st, const char *name) {
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))) {
+        info("Cannot obsolete already archived chart %s", st->name);
+        return;
+    }
+
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);

@@ -19,12 +19,8 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         plugin, module, priority, update_every,
         chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid);
 
+    rrdset_isnot_obsolete(st); /* archived charts cannot be obsolete */
     if (options && *options) {
-        if (strstr(options, "obsolete"))
-            rrdset_is_obsolete(st);
-        else
-            rrdset_isnot_obsolete(st);
-
         if (strstr(options, "detail"))
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
         else
@@ -40,7 +36,6 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         else
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
     } else {
-        rrdset_isnot_obsolete(st);
         rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
         rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
     }
@@ -71,19 +66,14 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
                                    dim_uuid);
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+    rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
     if (options && *options) {
-        if (strstr(options, "obsolete") != NULL)
-            rrddim_is_obsolete(st, rd);
-        else
-            rrddim_isnot_obsolete(st, rd);
         if (strstr(options, "hidden") != NULL)
             rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
         if (strstr(options, "noreset") != NULL)
             rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
         if (strstr(options, "nooverflow") != NULL)
             rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    } else {
-        rrddim_isnot_obsolete(st, rd);
     }
     if (dim_uuid) { /* It's a valid object */
         struct metalog_record record;
