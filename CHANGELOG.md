@@ -1,5 +1,13 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.23.0...HEAD)
+
+**Merged pull requests:**
+
+- Stop reading from /proc/sys/kernel/osrelease at trailing newline. [\#9374](https://github.com/netdata/netdata/pull/9374) ([sjuxax](https://github.com/sjuxax))
+
 ## [v1.23.0](https://github.com/netdata/netdata/tree/v1.23.0) (2020-06-25)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.22.1...v1.23.0)
@@ -171,7 +179,6 @@
 - added whoisquery health templates [\#8700](https://github.com/netdata/netdata/pull/8700) ([yasharne](https://github.com/yasharne))
 - Fixed Arch Linux Ci checks. [\#8699](https://github.com/netdata/netdata/pull/8699) ([Ferroin](https://github.com/Ferroin))
 - yamllint: enable truthy rule [\#8698](https://github.com/netdata/netdata/pull/8698) ([ilyam8](https://github.com/ilyam8))
-- Fixes compatibility with RH 7.x family [\#8694](https://github.com/netdata/netdata/pull/8694) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
