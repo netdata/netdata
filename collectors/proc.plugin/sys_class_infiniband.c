@@ -211,21 +211,19 @@ struct ibporthw_mlx {
 };
 void infiniband_hwcounters_parse_mlx(struct ibport *port)
 {
-    if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {
-        FOREACH_HWCOUNTER_MLX_ERRORS(GEN_DO_HWCOUNTER_READ, port, port->hwcounters_mlx)
-    }
-    if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
+    if (port->do_hwerrors != CONFIG_BOOLEAN_NO)
+        FOREACH_HWCOUNTER_MLX_ERRORS(GEN_DO_HWCOUNTER_READ,  port, port->hwcounters_mlx)
+    if (port->do_hwpackets != CONFIG_BOOLEAN_NO)
         FOREACH_HWCOUNTER_MLX_PACKETS(GEN_DO_HWCOUNTER_READ, port, port->hwcounters_mlx)
-    }
 }
 void infiniband_hwcounters_dorrd_mlx(struct ibport *port)
 {
     if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {
-        FOREACH_HWCOUNTER_MLX_ERRORS(GEN_RRD_DIM_SETP_HW, port, port->hwcounters_mlx)
+        FOREACH_HWCOUNTER_MLX_ERRORS(GEN_RRD_DIM_SETP_HW,    port, port->hwcounters_mlx)
         rrdset_done(port->st_hwerrors);
     }
     if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
-        FOREACH_HWCOUNTER_MLX_PACKETS(GEN_RRD_DIM_SETP_HW, port, port->hwcounters_mlx)
+        FOREACH_HWCOUNTER_MLX_PACKETS(GEN_RRD_DIM_SETP_HW,   port, port->hwcounters_mlx)
         rrdset_done(port->st_hwpackets);
     }
 }
@@ -258,28 +256,28 @@ static struct ibport *get_ibport(const char *dev, const char *port)
     // create a new one
     p = callocz(1, sizeof(struct ibport));
     p->name = strdupz(name);
-    p->len = strlen(p->name);
+    p->len  = strlen(p->name);
 
-    p->chart_type_bytes = strdupz("infiniband_cnt_bytes");
-    p->chart_type_packets = strdupz("infiniband_cnt_packets");
-    p->chart_type_errors = strdupz("infiniband_cnt_errors");
+    p->chart_type_bytes     = strdupz("infiniband_cnt_bytes");
+    p->chart_type_packets   = strdupz("infiniband_cnt_packets");
+    p->chart_type_errors    = strdupz("infiniband_cnt_errors");
     p->chart_type_hwpackets = strdupz("infiniband_hwc_packets");
-    p->chart_type_hwerrors = strdupz("infiniband_hwc_errors");
+    p->chart_type_hwerrors  = strdupz("infiniband_hwc_errors");
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cntbytes_%s", p->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cntbytes_%s",     p->name);
     p->chart_id_bytes = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cntpackets_%s", p->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cntpackets_%s",   p->name);
     p->chart_id_packets = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cnterrors_%s", p->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_cnterrors_%s",    p->name);
     p->chart_id_errors = strdupz(buffer);
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_hwcntpackets_%s", p->name);
     p->chart_id_hwpackets = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_hwcnterrors_%s", p->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "ib_hwcnterrors_%s",  p->name);
     p->chart_id_hwerrors = strdupz(buffer);
 
     p->chart_family = strdupz(p->name);
@@ -315,19 +313,19 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
         sys_class_infiniband_dirname =
             config_get(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "dirname to monitor", dirname);
 
-        do_bytes = config_get_boolean_ondemand(
-            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "bandwidth counters", CONFIG_BOOLEAN_YES);
-        do_packets = config_get_boolean_ondemand(
-            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "packets counters", CONFIG_BOOLEAN_YES);
-        do_errors = config_get_boolean_ondemand(
-            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "errors counters", CONFIG_BOOLEAN_YES);
+        do_bytes     = config_get_boolean_ondemand(
+            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "bandwidth counters",        CONFIG_BOOLEAN_YES);
+        do_packets   = config_get_boolean_ondemand(
+            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "packets counters",          CONFIG_BOOLEAN_YES);
+        do_errors    = config_get_boolean_ondemand(
+            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "errors counters",           CONFIG_BOOLEAN_YES);
         do_hwpackets = config_get_boolean_ondemand(
             CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "hardware packets counters", CONFIG_BOOLEAN_AUTO);
-        do_hwerrors = config_get_boolean_ondemand(
-            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "hardware errors counters", CONFIG_BOOLEAN_AUTO);
+        do_hwerrors  = config_get_boolean_ondemand(
+            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "hardware errors counters",  CONFIG_BOOLEAN_AUTO);
 
         enable_only_active = config_get_boolean_ondemand(
-            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "monitor only ports being active", CONFIG_BOOLEAN_AUTO);
+            CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "monitor only active ports", CONFIG_BOOLEAN_AUTO);
         disabled_list = simple_pattern_create(
             config_get(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "disable by default interfaces matching", ""), NULL,
             SIMPLE_PATTERN_EXACT);
@@ -396,15 +394,15 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                     // Enable by default, will be filtered out later
                     p->enabled = 1;
 
-                    p->counters_path = strdupz(counters_dirname);
+                    p->counters_path   = strdupz(counters_dirname);
                     p->hwcounters_path = strdupz(hwcounters_dirname);
 
                     snprintfz(buffer, FILENAME_MAX, "plugin:proc:/sys/class/infiniband:%s", p->name);
 
                     // Standard counters
-                    p->do_bytes = config_get_boolean_ondemand(buffer, "bytes", do_bytes);
+                    p->do_bytes   = config_get_boolean_ondemand(buffer, "bytes",   do_bytes);
                     p->do_packets = config_get_boolean_ondemand(buffer, "packets", do_packets);
-                    p->do_errors = config_get_boolean_ondemand(buffer, "errors", do_errors);
+                    p->do_errors  = config_get_boolean_ondemand(buffer, "errors",  do_errors);
 
 // Gen filename allocation and concatenation
 #define GEN_DO_COUNTER_NAME(NAME, GRP, DESC, DIR, PORT, ...)                                                           \
@@ -417,7 +415,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                     if (hwcounters_dir) {
                         // By default set standard
                         p->do_hwpackets = config_get_boolean_ondemand(buffer, "hwpackets", do_hwpackets);
-                        p->do_hwerrors = config_get_boolean_ondemand(buffer, "hwerrors", do_hwerrors);
+                        p->do_hwerrors  = config_get_boolean_ondemand(buffer, "hwerrors",  do_hwerrors);
 
 // VENDORS: Set your own
 
@@ -521,9 +519,18 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             // First creation of RRD Set (charts)
             if (unlikely(!port->st_bytes)) {
                 port->st_bytes = rrdset_create_localhost(
-                    "Infiniband", port->chart_id_bytes, NULL, port->chart_family, "ib.bytes", "Bandwidth usage",
-                    "kilobits/s", PLUGIN_PROC_NAME, PLUGIN_PROC_MODULE_INFINIBAND_NAME, port->priority + 1,
-                    update_every, RRDSET_TYPE_AREA);
+                    "Infiniband",
+                    port->chart_id_bytes,
+                    NULL,
+                    port->chart_family,
+                    "ib.bytes",
+                    "Bandwidth usage",
+                    "kilobits/s",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_INFINIBAND_NAME,
+                    port->priority + 1,
+                    update_every,
+                    RRDSET_TYPE_AREA);
                 // Create Dimensions
                 rrdset_flag_set(port->st_bytes, RRDSET_FLAG_DETAIL);
                 // On this chart, we want to have a KB/s so the dashboard will autoscale it
@@ -550,8 +557,17 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             // First creation of RRD Set (charts)
             if (unlikely(!port->st_packets)) {
                 port->st_packets = rrdset_create_localhost(
-                    "Infiniband", port->chart_id_packets, NULL, port->chart_family, "ib.packets", "Packets Statistics",
-                    "packets/s", PLUGIN_PROC_NAME, PLUGIN_PROC_MODULE_INFINIBAND_NAME, port->priority + 2, update_every,
+                    "Infiniband",
+                    port->chart_id_packets,
+                    NULL,
+                    port->chart_family,
+                    "ib.packets",
+                    "Packets Statistics",
+                    "packets/s",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_INFINIBAND_NAME,
+                    port->priority + 2,
+                    update_every,
                     RRDSET_TYPE_AREA);
                 // Create Dimensions
                 rrdset_flag_set(port->st_packets, RRDSET_FLAG_DETAIL);
@@ -571,8 +587,17 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             // First creation of RRD Set (charts)
             if (unlikely(!port->st_errors)) {
                 port->st_errors = rrdset_create_localhost(
-                    "Infiniband", port->chart_id_errors, NULL, port->chart_family, "ib.errors", "Error Counters",
-                    "errors/s", PLUGIN_PROC_NAME, PLUGIN_PROC_MODULE_INFINIBAND_NAME, port->priority + 3, update_every,
+                    "Infiniband",
+                    port->chart_id_errors,
+                    NULL,
+                    port->chart_family,
+                    "ib.errors",
+                    "Error Counters",
+                    "errors/s",
+                    PLUGIN_PROC_NAME,
+                    PLUGIN_PROC_MODULE_INFINIBAND_NAME,
+                    port->priority + 3,
+                    update_every,
                     RRDSET_TYPE_LINE);
                 // Create Dimensions
                 rrdset_flag_set(port->st_errors, RRDSET_FLAG_DETAIL);
@@ -598,9 +623,18 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // First creation of RRD Set (charts)
                 if (unlikely(!port->st_hwerrors)) {
                     port->st_hwerrors = rrdset_create_localhost(
-                        "Infiniband", port->chart_id_hwerrors, NULL, port->chart_family, "ib.hwerrors",
-                        "Hardware Errors", "errors/s", PLUGIN_PROC_NAME, PLUGIN_PROC_MODULE_INFINIBAND_NAME,
-                        port->priority + 4, update_every, RRDSET_TYPE_LINE);
+                        "Infiniband",
+                        port->chart_id_hwerrors,
+                        NULL,
+                        port->chart_family,
+                        "ib.hwerrors",
+                        "Hardware Errors",
+                        "errors/s",
+                        PLUGIN_PROC_NAME,
+                        PLUGIN_PROC_MODULE_INFINIBAND_NAME,
+                        port->priority + 4,
+                        update_every,
+                        RRDSET_TYPE_LINE);
 
                     rrdset_flag_set(port->st_hwerrors, RRDSET_FLAG_DETAIL);
 
@@ -626,9 +660,18 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // First creation of RRD Set (charts)
                 if (unlikely(!port->st_hwpackets)) {
                     port->st_hwpackets = rrdset_create_localhost(
-                        "Infiniband", port->chart_id_hwpackets, NULL, port->chart_family, "ib.hwpackets",
-                        "Hardware Packets Statistics", "packets/s", PLUGIN_PROC_NAME,
-                        PLUGIN_PROC_MODULE_INFINIBAND_NAME, port->priority + 5, update_every, RRDSET_TYPE_LINE);
+                        "Infiniband",
+                        port->chart_id_hwpackets,
+                        NULL,
+                        port->chart_family,
+                        "ib.hwpackets",
+                        "Hardware Packets Statistics",
+                        "packets/s",
+                        PLUGIN_PROC_NAME,
+                        PLUGIN_PROC_MODULE_INFINIBAND_NAME,
+                        port->priority + 5,
+                        update_every,
+                        RRDSET_TYPE_LINE);
 
                     rrdset_flag_set(port->st_hwpackets, RRDSET_FLAG_DETAIL);
 
