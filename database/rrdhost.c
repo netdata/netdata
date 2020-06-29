@@ -566,7 +566,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         gap_when_lost_iterations_above = 1;
 
     health_init();
-    registry_init();
+
     rrdpush_init();
 
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
