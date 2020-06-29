@@ -15,37 +15,37 @@
 
 // I use macro as there's no single file acting as summary, but a lot of different files, so can't use helpers like
 // procfile(). Also, omnipath generates other counters, that are not provided by infiniband
-#define FOREACH_COUNTER(GEN, ...)                                                                                      \
-    FOREACH_COUNTER_BYTES(GEN, __VA_ARGS__)                                                                            \
-    FOREACH_COUNTER_PACKETS(GEN, __VA_ARGS__)                                                                          \
-    FOREACH_COUNTER_ERRORS(GEN, __VA_ARGS__)
+#define FOREACH_COUNTER(GEN, ...)              \
+    FOREACH_COUNTER_BYTES(GEN,   __VA_ARGS__)  \
+    FOREACH_COUNTER_PACKETS(GEN, __VA_ARGS__)  \
+    FOREACH_COUNTER_ERRORS(GEN,  __VA_ARGS__)
 
-#define FOREACH_COUNTER_BYTES(GEN, ...)                                                                                \
-    GEN(port_rcv_data, bytes, "Received", 1, __VA_ARGS__)                                                              \
-    GEN(port_xmit_data, bytes, "Sent", -1, __VA_ARGS__)
+#define FOREACH_COUNTER_BYTES(GEN, ...)                                                             \
+    GEN(port_rcv_data,                   bytes,   "Received",                      1, __VA_ARGS__)  \
+    GEN(port_xmit_data,                  bytes,   "Sent",                         -1, __VA_ARGS__)
 
-#define FOREACH_COUNTER_PACKETS(GEN, ...)                                                                              \
-    GEN(port_rcv_packets, packets, "Received", 1, __VA_ARGS__)                                                         \
-    GEN(port_xmit_packets, packets, "Sent", -1, __VA_ARGS__)                                                           \
-    GEN(multicast_rcv_packets, packets, "Mcast rcvd", 1, __VA_ARGS__)                                                  \
-    GEN(multicast_xmit_packets, packets, "Mcast sent", -1, __VA_ARGS__)                                                \
-    GEN(unicast_rcv_packets, packets, "Ucast rcvd", 1, __VA_ARGS__)                                                    \
-    GEN(unicast_xmit_packets, packets, "Ucast sent", -1, __VA_ARGS__)
+#define FOREACH_COUNTER_PACKETS(GEN, ...)                                                           \
+    GEN(port_rcv_packets,                packets, "Received",                      1, __VA_ARGS__)  \
+    GEN(port_xmit_packets,               packets, "Sent",                         -1, __VA_ARGS__)  \
+    GEN(multicast_rcv_packets,           packets, "Mcast rcvd",                    1, __VA_ARGS__)  \
+    GEN(multicast_xmit_packets,          packets, "Mcast sent",                   -1, __VA_ARGS__)  \
+    GEN(unicast_rcv_packets,             packets, "Ucast rcvd",                    1, __VA_ARGS__)  \
+    GEN(unicast_xmit_packets,            packets, "Ucast sent",                   -1, __VA_ARGS__)
 
-#define FOREACH_COUNTER_ERRORS(GEN, ...)                                                                               \
-    GEN(port_rcv_errors, errors, "Pkts malformated", 1, __VA_ARGS__)                                                   \
-    GEN(port_rcv_constraint_errors, errors, "Pkts rcvd discarded ", 1, __VA_ARGS__)                                    \
-    GEN(port_xmit_discards, errors, "Pkts sent discarded", 1, __VA_ARGS__)                                             \
-    GEN(port_xmit_wait, errors, "Tick Wait to send", 1, __VA_ARGS__)                                                   \
-    GEN(VL15_dropped, errors, "Pkts missed ressource", 1, __VA_ARGS__)                                                 \
-    GEN(excessive_buffer_overrun_errors, errors, "Buffer overrun", 1, __VA_ARGS__)                                     \
-    GEN(link_downed, errors, "Link Downed", 1, __VA_ARGS__)                                                            \
-    GEN(link_error_recovery, errors, "Link recovered", 1, __VA_ARGS__)                                                 \
-    GEN(local_link_integrity_errors, errors, "Link integrity err", 1, __VA_ARGS__)                                     \
-    GEN(symbol_error, errors, "Link minor errors", 1, __VA_ARGS__)                                                     \
-    GEN(port_rcv_remote_physical_errors, errors, "Pkts rcvd with EBP", 1, __VA_ARGS__)                                 \
-    GEN(port_rcv_switch_relay_errors, errors, "Pkts rcvd discarded by switch", 1, __VA_ARGS__)                         \
-    GEN(port_xmit_constraint_errors, errors, "Pkts sent discarded by switch", 1, __VA_ARGS__)
+#define FOREACH_COUNTER_ERRORS(GEN, ...)                                                            \
+    GEN(port_rcv_errors,                 errors,  "Pkts malformated",              1, __VA_ARGS__)  \
+    GEN(port_rcv_constraint_errors,      errors,  "Pkts rcvd discarded ",          1, __VA_ARGS__)  \
+    GEN(port_xmit_discards,              errors,  "Pkts sent discarded",           1, __VA_ARGS__)  \
+    GEN(port_xmit_wait,                  errors,  "Tick Wait to send",             1, __VA_ARGS__)  \
+    GEN(VL15_dropped,                    errors,  "Pkts missed ressource",         1, __VA_ARGS__)  \
+    GEN(excessive_buffer_overrun_errors, errors,  "Buffer overrun",                1, __VA_ARGS__)  \
+    GEN(link_downed,                     errors,  "Link Downed",                   1, __VA_ARGS__)  \
+    GEN(link_error_recovery,             errors,  "Link recovered",                1, __VA_ARGS__)  \
+    GEN(local_link_integrity_errors,     errors,  "Link integrity err",            1, __VA_ARGS__)  \
+    GEN(symbol_error,                    errors,  "Link minor errors",             1, __VA_ARGS__)  \
+    GEN(port_rcv_remote_physical_errors, errors,  "Pkts rcvd with EBP",            1, __VA_ARGS__)  \
+    GEN(port_rcv_switch_relay_errors,    errors,  "Pkts rcvd discarded by switch", 1, __VA_ARGS__)  \
+    GEN(port_xmit_constraint_errors,     errors,  "Pkts sent discarded by switch", 1, __VA_ARGS__)
 
 //
 // Hardware Counters
@@ -62,42 +62,42 @@
 #define FOREACH_HWCOUNTER_NAME(GEN, ...) GEN(mlx, __VA_ARGS__)
 
 // VENDOR-MLX: HW Counters for Mellanox ConnectX Devices
-#define FOREACH_HWCOUNTER_MLX(GEN, ...)                                                                                \
-    FOREACH_HWCOUNTER_MLX_PACKETS(GEN, __VA_ARGS__)                                                                    \
-    FOREACH_HWCOUNTER_MLX_ERRORS(GEN, __VA_ARGS__)
+#define FOREACH_HWCOUNTER_MLX(GEN, ...)               \
+    FOREACH_HWCOUNTER_MLX_PACKETS(GEN, __VA_ARGS__)   \
+    FOREACH_HWCOUNTER_MLX_ERRORS(GEN,  __VA_ARGS__)
 
-#define FOREACH_HWCOUNTER_MLX_PACKETS(GEN, ...)                                                                        \
-    GEN(np_cnp_sent, hwpackets, "RoCEv2 Congestion sent", 1, __VA_ARGS__)                                              \
-    GEN(np_ecn_marked_roce_packets, hwpackets, "RoCEv2 Congestion rcvd", -1, __VA_ARGS__)                              \
-    GEN(rp_cnp_handled, hwpackets, "IB Congestion handled", 1, __VA_ARGS__)                                            \
-    GEN(rx_atomic_requests, hwpackets, "ATOMIC req. rcvd", 1, __VA_ARGS__)                                             \
-    GEN(rx_dct_connect, hwpackets, "Connection req. rcvd", 1, __VA_ARGS__)                                             \
-    GEN(rx_read_requests, hwpackets, "Read req. rcvd", 1, __VA_ARGS__)                                                 \
-    GEN(rx_write_requests, hwpackets, "Write req. rcvd", 1, __VA_ARGS__)                                               \
-    GEN(roce_adp_retrans, hwpackets, "RoCE retrans adaptive", 1, __VA_ARGS__)                                          \
-    GEN(roce_adp_retrans_to, hwpackets, "RoCE retrans timeout", 1, __VA_ARGS__)                                        \
-    GEN(roce_slow_restart, hwpackets, "RoCE slow restart", 1, __VA_ARGS__)                                             \
-    GEN(roce_slow_restart_cnps, hwpackets, "RoCE slow restart congestion", 1, __VA_ARGS__)                             \
-    GEN(roce_slow_restart_trans, hwpackets, "RoCE slow restart count", 1, __VA_ARGS__)
+#define FOREACH_HWCOUNTER_MLX_PACKETS(GEN, ...)                                                   \
+    GEN(np_cnp_sent,                hwpackets, "RoCEv2 Congestion sent",        1, __VA_ARGS__)   \
+    GEN(np_ecn_marked_roce_packets, hwpackets, "RoCEv2 Congestion rcvd",       -1, __VA_ARGS__)   \
+    GEN(rp_cnp_handled,             hwpackets, "IB Congestion handled",         1, __VA_ARGS__)   \
+    GEN(rx_atomic_requests,         hwpackets, "ATOMIC req. rcvd",              1, __VA_ARGS__)   \
+    GEN(rx_dct_connect,             hwpackets, "Connection req. rcvd",          1, __VA_ARGS__)   \
+    GEN(rx_read_requests,           hwpackets, "Read req. rcvd",                1, __VA_ARGS__)   \
+    GEN(rx_write_requests,          hwpackets, "Write req. rcvd",               1, __VA_ARGS__)   \
+    GEN(roce_adp_retrans,           hwpackets, "RoCE retrans adaptive",         1, __VA_ARGS__)   \
+    GEN(roce_adp_retrans_to,        hwpackets, "RoCE retrans timeout",          1, __VA_ARGS__)   \
+    GEN(roce_slow_restart,          hwpackets, "RoCE slow restart",             1, __VA_ARGS__)   \
+    GEN(roce_slow_restart_cnps,     hwpackets, "RoCE slow restart congestion",  1, __VA_ARGS__)   \
+    GEN(roce_slow_restart_trans,    hwpackets, "RoCE slow restart count",       1, __VA_ARGS__)
 
-#define FOREACH_HWCOUNTER_MLX_ERRORS(GEN, ...)                                                                         \
-    GEN(duplicate_request, hwerrors, "Duplicated packets", -1, __VA_ARGS__)                                            \
-    GEN(implied_nak_seq_err, hwerrors, "Pkt Seq Num gap", 1, __VA_ARGS__)                                              \
-    GEN(local_ack_timeout_err, hwerrors, "Ack timer expired", 1, __VA_ARGS__)                                          \
-    GEN(out_of_buffer, hwerrors, "Drop missing buffer", 1, __VA_ARGS__)                                                \
-    GEN(out_of_sequence, hwerrors, "Drop out of sequence", 1, __VA_ARGS__)                                             \
-    GEN(packet_seq_err, hwerrors, "NAK sequence rcvd", 1, __VA_ARGS__)                                                 \
-    GEN(req_cqe_error, hwerrors, "CQE err Req", 1, __VA_ARGS__)                                                        \
-    GEN(resp_cqe_error, hwerrors, "CQE err Resp", 1, __VA_ARGS__)                                                      \
-    GEN(req_cqe_flush_error, hwerrors, "CQE Flushed err Req", 1, __VA_ARGS__)                                          \
-    GEN(resp_cqe_flush_error, hwerrors, "CQE Flushed err Resp", 1, __VA_ARGS__)                                        \
-    GEN(req_remote_access_errors, hwerrors, "Remote access err Req", 1, __VA_ARGS__)                                   \
-    GEN(resp_remote_access_errors, hwerrors, "Remote access err Resp", 1, __VA_ARGS__)                                 \
-    GEN(req_remote_invalid_request, hwerrors, "Remote invalid req", 1, __VA_ARGS__)                                    \
-    GEN(resp_local_length_error, hwerrors, "Local length err Resp", 1, __VA_ARGS__)                                    \
-    GEN(rnr_nak_retry_err, hwerrors, "RNR NAK Packets", 1, __VA_ARGS__)                                                \
-    GEN(rp_cnp_ignored, hwerrors, "CNP Pkts ignored", 1, __VA_ARGS__)                                                  \
-    GEN(rx_icrc_encapsulated, hwerrors, "RoCE ICRC Errors", 1, __VA_ARGS__)
+#define FOREACH_HWCOUNTER_MLX_ERRORS(GEN, ...)                                                    \
+    GEN(duplicate_request,          hwerrors, "Duplicated packets",            -1, __VA_ARGS__)   \
+    GEN(implied_nak_seq_err,        hwerrors, "Pkt Seq Num gap",                1, __VA_ARGS__)   \
+    GEN(local_ack_timeout_err,      hwerrors, "Ack timer expired",              1, __VA_ARGS__)   \
+    GEN(out_of_buffer,              hwerrors, "Drop missing buffer",            1, __VA_ARGS__)   \
+    GEN(out_of_sequence,            hwerrors, "Drop out of sequence",           1, __VA_ARGS__)   \
+    GEN(packet_seq_err,             hwerrors, "NAK sequence rcvd",              1, __VA_ARGS__)   \
+    GEN(req_cqe_error,              hwerrors, "CQE err Req",                    1, __VA_ARGS__)   \
+    GEN(resp_cqe_error,             hwerrors, "CQE err Resp",                   1, __VA_ARGS__)   \
+    GEN(req_cqe_flush_error,        hwerrors, "CQE Flushed err Req",            1, __VA_ARGS__)   \
+    GEN(resp_cqe_flush_error,       hwerrors, "CQE Flushed err Resp",           1, __VA_ARGS__)   \
+    GEN(req_remote_access_errors,   hwerrors, "Remote access err Req",          1, __VA_ARGS__)   \
+    GEN(resp_remote_access_errors,  hwerrors, "Remote access err Resp",         1, __VA_ARGS__)   \
+    GEN(req_remote_invalid_request, hwerrors, "Remote invalid req",             1, __VA_ARGS__)   \
+    GEN(resp_local_length_error,    hwerrors, "Local length err Resp",          1, __VA_ARGS__)   \
+    GEN(rnr_nak_retry_err,          hwerrors, "RNR NAK Packets",                1, __VA_ARGS__)   \
+    GEN(rp_cnp_ignored,             hwerrors, "CNP Pkts ignored",               1, __VA_ARGS__)   \
+    GEN(rx_icrc_encapsulated,       hwerrors, "RoCE ICRC Errors",               1, __VA_ARGS__)
 
 // Common definitions used more than once
 #define GEN_RRD_DIM_ADD(NAME, GRP, DESC, DIR, PORT)                                                                    \
