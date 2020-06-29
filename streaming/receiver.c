@@ -255,8 +255,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rpt->os
                 , rpt->timezone
                 , rpt->tags
-                , program_name
-                , program_version
+                , rpt->program_name
+                , rpt->program_version
                 , rpt->update_every
                 , history
                 , mode
@@ -294,8 +294,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
             , rpt->os
             , rpt->timezone
             , rpt->tags
-            , program_name
-            , program_version
+            , rpt->program_name
+            , rpt->program_version
             , rpt->update_every
             , history
             , mode
