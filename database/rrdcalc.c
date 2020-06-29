@@ -252,6 +252,9 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
         }
     }
 
+    if (unlikely(!host->health_log.next_alarm_id))
+        host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+
     return host->health_log.next_alarm_id++;
 }
 

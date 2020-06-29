@@ -199,8 +199,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->health_log.next_log_id = 1;
     host->health_log.next_alarm_id = 1;
     host->health_log.max = 1000;
-    host->health_log.next_log_id =
-    host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_alarm_id = 0;
 
     long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
@@ -243,6 +243,34 @@ RRDHOST *rrdhost_create(const char *hostname,
        }
 
     }
+
+    if(host->health_enabled) {
+        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+        int r = mkdir(filename, 0775);
+        if(r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, filename);
+    }
+
+    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
+    host->health_log_filename = strdupz(filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
+    host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+    host->health_default_recipient = strdupz("root");
+
+
+    // ------------------------------------------------------------------------
+    // load health configuration
+
+    if(host->health_enabled) {
+        rrdhost_wrlock(host);
+        health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
+        rrdhost_unlock(host);
+
+        health_alarm_log_load(host);
+        health_alarm_log_open(host);
+    }
+
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
@@ -272,34 +300,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
     }
-
-    if(host->health_enabled) {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", host->hostname, filename);
-    }
-
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(filename);
-
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = strdupz("root");
-
-
-    // ------------------------------------------------------------------------
-    // load health configuration
-
-    if(host->health_enabled) {
-        rrdhost_wrlock(host);
-        health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-        rrdhost_unlock(host);
-
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
-    }
-
 
     // ------------------------------------------------------------------------
     // link it and add it to the index
