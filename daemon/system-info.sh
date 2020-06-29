@@ -23,13 +23,11 @@ if [ -z "${VIRTUALIZATION}" ]; then
             if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
                     VIRTUALIZATION="hypervisor"
                     VIRT_DETECTION="/proc/cpuinfo"
-            elif [ -n "$(command -v dmidecode)" ]; then
-                    # Virtualization detection from https://unix.stackexchange.com/questions/89714/easy-way-to-determine-virtualization-technology
-                    # This only works as root
-                    if dmidecode -s system-product-name 2>/dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
-                            VIRTUALIZATION="$(dmidecode -s system-product-name)"
-                            VIRT_DETECTION="dmidecode"
-                    fi
+            elif [ -n "$(command -v dmidecode)" ] && dmidecode -s system-product-name 2>/dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
+                    VIRTUALIZATION="$(dmidecode -s system-product-name)"
+                    VIRT_DETECTION="dmidecode"
+            else
+                    VIRTUALIZATION="none"
             fi
     fi
 else
