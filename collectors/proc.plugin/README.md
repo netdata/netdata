@@ -483,7 +483,7 @@ Each port will have its counters metrics monitored, grouped in the following cha
     - Link: downed, recovered, integrity error, minor error
     - Other events: Tick Wait to send, buffer overrun
 
-If your vendor is supported, you'll also get HW-Counters statistics. These being vendor specific, please report to their documentation.
+If your vendor is supported, you'll also get HW-Counters statistics. These being vendor specific, please refer to their documentation.
 
 - Mellanox: [see statistics documentation](https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters)
 
