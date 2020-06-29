@@ -199,8 +199,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->health_log.next_log_id = 1;
     host->health_log.next_alarm_id = 1;
     host->health_log.max = 1000;
-    host->health_log.next_log_id =
-    host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_alarm_id = 0;
 
     long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
