@@ -995,6 +995,7 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
+                            registry_init();
                             if(rrd_init("unittest", NULL)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
                                 return 1;
