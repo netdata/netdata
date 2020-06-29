@@ -21,7 +21,9 @@ def cmp_data(direct_data, remote_data, remote_name):
     # Work out time ranges
     times_ds = [ d[0] for d in direct_data ]
     times_rs = [ r[0] for r in remote_data ]
-    print(times_ds,times_rs)
+    if len(times_ds)==0 or len(times_rs)==0:
+        print(f"Empty dataset returned direct={times_ds} remote={times_rs}")
+        return False
     start_d = min(times_ds)
     end_d = max(times_ds)
     start_r = min(times_rs)
@@ -40,30 +42,31 @@ def cmp_data(direct_data, remote_data, remote_name):
     direct_data = direct_data[:]
     remote_data = remote_data[:]
     uniques = 0
+    shared = 0
     while (len(direct_data)>0 and len(remote_data)>0):
         d = direct_data.pop()
         r = remote_data.pop()
         if d[0] > r[0]:
             print(f"{r[0]} is remote only")
             uniques += 1
-            r = remote_data.pop()
+            if len(remote_data)>0:
+                r = remote_data.pop()
+            else:
+                break
         elif d[0] < r[0]:
             print(f"{d[0]} is direct only")
             uniques += 1
-            d = direct_data.pop()
+            if len(direct_data)>0:
+                d = direct_data.pop()
+            else:
+                break
         else:
-            def ratio(x,y):
-                if x == 0 and y == 0:
-                    return 1
-                if y == 0:
-                    return x
-                return float(x/y)
-
             ratios = [ math.fabs(d[i]-r[i])/dyn_range for i in range (1,len(d)) ]
             if (max(ratios)>0.01 ):
                 print( d[0], d, r)
                 return False
-    if uniques < 5:
+            shared += 1
+    if uniques < 5 and shared > 3:
         return True
     return False
 
