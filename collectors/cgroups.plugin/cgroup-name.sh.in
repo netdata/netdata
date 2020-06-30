@@ -181,7 +181,11 @@ done
 if [ -z "${NAME}" ]; then
 	if [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
 		k8s_get_name "${CGROUP}"
-	elif [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
+	fi
+fi
+
+if [ -z "${NAME}" ]; then
+	if [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
 		# docker containers
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
