@@ -90,9 +90,24 @@ services](https://github.com/netdata/helmchart#service-discovery-and-supported-s
 If you haven't changed listening ports or other defaults, service discovery should find your pods, create the proper
 configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
 
-However, if you have changed some of these defaults, you'll need to open the `netdata-helmchart/sd-child.yml` file and
-edit the ports or image names that service discovery uses to find supported pods. You can then run `helm upgrade netdata
-./netdata-helmchart` to push changes to your cluster.
+However, if you have changed some of these defaults, you'll need to copy the `netdata-helmchart/sdconfig/child.yml`
+file, edit it, and pass the changed file to `helm install`. First, copy the file to a new location.
+
+```bash
+cp netdata-helmchart/sdconfig/child.yml .
+```
+
+Edit the new `child.yml` file according to your needs. See the [Helm chart
+configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details. You can then run
+`helm install`/`helm upgrade` with the `--set-file` argument to use your configured `child.yml` file instead of the
+default.
+
+```bash
+helm install --set-file sd.child.configmap.from.value=../child.yml netdata ./netdata-helmchart
+helm upgrade --set-file sd.child.configmap.from.value=../child.yml netdata ./netdata-helmchart
+```
+
+Your configured service discovery is now pushed to your cluster.
 
 ## Access the Netdata dashboard
 
@@ -122,8 +137,8 @@ In the above example, access the dashboard by navigating to `http://203.0.113.0:
 
 ## Update/reinstall the Netdata Helm chart
 
-If you update the Helm chart's configuration, either via `values.yml` or `sd-child.yml`, you can run `helm upgrade`,
-replacing `netdata` with the name of the release if you changed it upon installtion:
+If you update the Helm chart's configuration, run `helm upgrade` to redeploy your Netdata service, replacing `netdata` 
+with the name of the release if you changed it upon installtion:
 
 ```bash
 helm upgrade netdata ./netdata-helmchart
