@@ -26,9 +26,11 @@ To install Netdata on a Kubernetes cluster, you need:
     administrative system.
 -   The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
 
-The default configuration creates four pods in your cluster: three `child` pods and one `parent` pod. The `child` pods
-collect metrics and stream the information to the `parent` pod, which uses two persistent volumes to store metrics and
-alarms. The `parent` pod also handles alarm notifications and enables the Netdata dashboard using an ingress controller.
+The default configuration creates one `parent` pod, installed on one of your cluster's nodes, and a DaemonSet for
+additional `child` pods. This DaemonSet ensures that every node in your k8s cluster also runs a `child` pod, including
+the node that also runs `parent`. The `child` pods collect metrics and stream the information to the `parent` pod, which
+uses two persistent volumes to store metrics and alarms. The `parent` pod also handles alarm notifications and enables
+the Netdata dashboard using an ingress controller.
 
 ## Install the Netdata Helm chart
 
