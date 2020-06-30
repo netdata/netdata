@@ -292,7 +292,7 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     rd->last_stored_value = strtod(last_stored_str, NULL);
     rd->calculated_value = strtod(last_stored_str, NULL);
     rd->last_calculated_value = strtod(last_stored_str, NULL);
-    debug(D_REPLICATION, "Finished replication of %s.%s: last_col_val=%ld col_val=%ld col_val_max=%ld last_store=" CALCULATED_NUMBER_FORMAT " calc_val=" CALCULATED_NUMBER_FORMAT " last_calc_val=" CALCULATED_NUMBER_FORMAT,
+    debug(D_REPLICATION, "Replication of %s.%s: last_col_val=%ld col_val=%ld col_val_max=%ld last_store=" CALCULATED_NUMBER_FORMAT " calc_val=" CALCULATED_NUMBER_FORMAT " last_calc_val=" CALCULATED_NUMBER_FORMAT,
           user->st->id, id, rd->last_collected_value, rd->collected_value, rd->collected_value_max,
           rd->last_stored_value, rd->calculated_value, rd->last_calculated_value);
     return PARSER_RC_OK;
@@ -313,10 +313,13 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     size_t num_points = str2ull(num_points_txt);
     struct receiver_state *rpt = user->opaque;
 
+    debug(D_REPLICATION, "Replication finished on %s: %zu points transferred last_col_time->%ld last_up_time->%ld",
+          user->st->name, user->st->last_collected_time.tv_sec, user->st->last_updated.tv_sec);
+
     user->st->last_collected_time.tv_sec += num_points * user->st->update_every;
-    user->st->last_collected_time.tv_usec = 0;          // Spikes?
+    //user->st->last_collected_time.tv_usec = 0;          // Spikes?
     user->st->last_updated.tv_sec += num_points * user->st->update_every;
-    user->st->last_updated.tv_usec = 0;                 // Spikes?
+    //user->st->last_updated.tv_usec = 0;                 // Spikes?
     user->st->counter += num_points;
     user->st->counter_done += num_points;
     user->st->current_entry += num_points;

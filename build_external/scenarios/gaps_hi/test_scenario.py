@@ -24,17 +24,19 @@ def cmp_data(direct_data, remote_data, remote_name):
     if len(times_ds)==0 or len(times_rs)==0:
         print(f"  Empty dataset returned direct={times_ds} remote={times_rs}")
         return False
-    start_d = min(times_ds)
-    end_d = max(times_ds)
-    start_r = min(times_rs)
-    end_r = max(times_rs)
-
     # Do a range estimation across the charts
-    all_ds = functools.reduce( operator.add, [ d[1:] for d in direct_data ], [])
-    all_rs = functools.reduce( operator.add, [ r[1:] for r in remote_data ], [])
-
-    max_d, min_d = max(all_ds), min(all_ds)
-    max_r, min_r = max(all_rs), min(all_rs)
+    try:
+        start_d = min(times_ds)
+        end_d = max(times_ds)
+        start_r = min(times_rs)
+        end_r = max(times_rs)
+        all_ds = functools.reduce( operator.add, [ d[1:] for d in direct_data ], [])
+        all_rs = functools.reduce( operator.add, [ r[1:] for r in remote_data ], [])
+        max_d, min_d = max(all_ds), min(all_ds)
+        max_r, min_r = max(all_rs), min(all_rs)
+    except e:
+        print(f"{e} occurred on {all_ds} and {all_rs}")
+        return False
     print(f"  Range estimates: Direct={min_d}-{max_d}@{start_d}-{end_d} {remote_name}={min_r}-{max_r}@{start_r}-{end_r}")
 
     dyn_range = max_d - min_d
@@ -106,8 +108,13 @@ def check_sync():
     return False
 
 
+class Baseline(object):
+    def body(self):
+        time.sleep(60)
+
 class ShortChildDisconnect(object):
     def body(self):
+        time.sleep(10)
         sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
         time.sleep(3)
         sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
@@ -158,21 +165,22 @@ class ParentRestart(object):
 
 
 test_cases = [
+   Baseline(),
    ShortChildDisconnect(),
    LongChildDisconnect(),
    ShortMiddleDisconnect(),
    LongMiddleDisconnect(),
    ShortParentDisconnect(),
    LongParentDisconnect(),
-   MiddleRestart,
-   ParentRestart
+   MiddleRestart(),
+   ParentRestart()
 ]
 
-def cleanup():
+def cleanup(name):
     sh("docker kill gaps_hi_agent_child_1 gaps_hi_agent_middle_1 gaps_hi_agent_parent_1");
-    sh("docker logs gaps_hi_agent_child_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_child.log")
-    sh("docker logs gaps_hi_agent_middle_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_middle.log")
-    sh("docker logs gaps_hi_agent_parent_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_parent.log")
+    sh(f"docker logs gaps_hi_agent_child_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_child.log")
+    sh(f"docker logs gaps_hi_agent_middle_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_middle.log")
+    sh(f"docker logs gaps_hi_agent_parent_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_parent.log")
 
 for tc in test_cases:
     name = tc.__class__.__name__
@@ -181,17 +189,17 @@ for tc in test_cases:
     sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml up -d")
     print(f"Pre-test... {name} @{time.time()}")
     if not check_sync():
-        sh("docker kill gaps_hi_agent_child_1 gaps_hi_agent_middle_1 gaps_hi_agent_parent_1");
-        cleanup()
+        print(f"ABORTED@{time.time()}")
+        cleanup(name)
         continue
     print(f"Test:  {name}@{time.time()}")
     tc.body()
     print(f"Finished: {name}@{time.time()}")
     if not check_sync():
-        print(f"FAILED")
+        print(f"  FAILED")
     else:
-        print(f"PASSED")
-    cleanup()
+        print(f"  PASSED")
+    cleanup(name)
 
 
 
