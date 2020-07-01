@@ -91,7 +91,10 @@ If you haven't changed listening ports or other defaults, service discovery shou
 configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
 
 However, if you have changed some of these defaults, you'll need to copy the `netdata-helmchart/sdconfig/child.yml`
-file, edit it, and pass the changed file to `helm install`. First, copy the file to a new location.
+file, edit it, and pass the changed file to `helm install`/`helm upgrade`. 
+
+First, copy the file to a new location outside the `netdata-helmchart` directory. The destination can be anywhere you
+like, but the following examples assume it resides next to the `netdata-helmchart` directory.
 
 ```bash
 cp netdata-helmchart/sdconfig/child.yml .
@@ -100,11 +103,11 @@ cp netdata-helmchart/sdconfig/child.yml .
 Edit the new `child.yml` file according to your needs. See the [Helm chart
 configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details. You can then run
 `helm install`/`helm upgrade` with the `--set-file` argument to use your configured `child.yml` file instead of the
-default.
+default, changing the path if you copied it elsewhere.
 
 ```bash
-helm install --set-file sd.child.configmap.from.value=../child.yml netdata ./netdata-helmchart
-helm upgrade --set-file sd.child.configmap.from.value=../child.yml netdata ./netdata-helmchart
+helm install --set-file sd.child.configmap.from.value=./child.yml netdata ./netdata-helmchart
+helm upgrade --set-file sd.child.configmap.from.value=./child.yml netdata ./netdata-helmchart
 ```
 
 Your configured service discovery is now pushed to your cluster.
