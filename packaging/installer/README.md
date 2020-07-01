@@ -1,8 +1,6 @@
 <!--
----
 title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
----
 -->
 
 # Installation guide
@@ -83,8 +81,7 @@ Netdata on Docker](/packaging/docker/README.md)
 
 [![Install Netdata on
 Kubernetes](https://user-images.githubusercontent.com/1153921/76029478-cc8ad000-5ef1-11ea-8981-dd04744b00da.png) Install
-Netdata on Kubernetes with a Helm
-chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
+Netdata on a Kubernetes cluster](/packaging/installer/methods/kubernetes.md)
 
 [![Install Netdata on cloud providers
 (GCP/AWS/Azure)](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png)
