@@ -184,6 +184,7 @@ static enum cgroups_type cgroups_try_detect_version()
 
     if (!fgets(buf, MAXSIZE_PROC_CMDLINE, f)) {
         error("couldn't read all cmdline params into buffer");
+        fclose(f);
         return CGROUPS_AUTODETECT_FAIL;
     }
 
@@ -213,7 +214,7 @@ void read_cgroup_plugin_configuration() {
         cgroup_check_for_new_every = cgroup_update_every;
 
     cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
-    if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO) 
+    if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
         cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
 
     info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
