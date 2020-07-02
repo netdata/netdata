@@ -28,6 +28,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 -   `/proc/pressure/{cpu,memory,io}` (pressure stall information)
 -   `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
 -   `/sys/class/power_supply` (power supply properties)
+-   `/sys/class/infiniband` (infiniband interconnect)
 -   `ipc` (IPC semaphores and message queues)
 -   `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
 -   `netdata` (internal Netdata resources utilization)
@@ -461,6 +462,48 @@ and metrics:
     corresponding `min` or `empty` attribute, then Netdata will still provide
     the corresponding `min` or `empty`, which will then always read as zero.
     This way, alerts which match on these will still work.
+
+## Infiniband interconnect
+
+This module monitors every active Infiniband port. It provides generic counters statistics, and per-vendor hw-counters (if vendor is supported).
+
+### Monitored interface metrics
+
+Each port will have its counters metrics monitored, grouped in the following charts:
+
+-   **Bandwidth usage**
+    Sent/Received data, in KB/s
+
+-   **Packets Statistics**
+    Sent/Received packets, in 3 categories: total, unicast and multicast.
+
+-  **Errors Statistics**
+    Many errors counters are provided, presenting statistics for:
+    - Packets: malformated, sent/received discarded by card/switch, missing ressource
+    - Link: downed, recovered, integrity error, minor error
+    - Other events: Tick Wait to send, buffer overrun
+
+If your vendor is supported, you'll also get HW-Counters statistics. These being vendor specific, please refer to their documentation.
+
+- Mellanox: [see statistics documentation](https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters)
+
+### configuration
+
+Default configuration will monitor only enabled infiniband ports, and refresh newly activated or created ports every 30 seconds
+
+```
+[plugin:proc:/sys/class/infiniband]
+  # dirname to monitor = /sys/class/infiniband
+  # bandwidth counters = yes
+  # packets counters = yes
+  # errors counters = yes
+  # hardware packets counters = auto
+  # hardware errors counters = auto
+  # monitor only ports being active = auto
+  # disable by default interfaces matching = 
+  # refresh ports state every seconds = 30
+```
+
 
 ## IPC
 
