@@ -27,6 +27,7 @@ collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cosmix
 daemon/ @thiagoftsm @mfundul @cosmix
 database/ @mfundul @thiagoftsm @cosmix
 docs/ @cosmix @joelhans @shortpatti
+exporting/ @vlvkobal @thiagoftsm
 health/ @thiagoftsm @vlvkobal @cosmix
 health/health.d/ @thiagoftsm @vlvkobal @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cosmix
