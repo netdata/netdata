@@ -45,34 +45,34 @@ fatal() {
 	exit 1
 }
 
-function docker_get_name_classic() {
-	local id="${1}"
-	info "Running command: docker ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
-	NAME="$(docker ps --filter=id="${id}" --format="{{.Names}}")"
+function docker_like_get_name_command() {
+	local command="${1}"
+	local id="${2}"
+	info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
+	NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
 	return 0
 }
 
-function docker_get_name_api() {
-	local path="/containers/${1}/json"
-	if [ -z "${DOCKER_HOST}" ]; then
-		warning "No DOCKER_HOST is set"
+function docker_like_get_name_api() {
+	local host_var="${1}"
+	local host="${!host_var}"
+	local path="/containers/${2}/json"
+	if [ -z "${host}" ]; then
+		warning "No ${host_var} is set"
 		return 1
 	fi
 	if ! command -v jq >/dev/null 2>&1; then
-		warning "Can't find jq command line tool. jq is required for netdata to retrieve docker container name using ${DOCKER_HOST} API, falling back to docker ps"
+		warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
 		return 1
 	fi
-	if [ -S "${DOCKER_HOST}" ]; then
-		info "Running API command: curl --unix-socket ${DOCKER_HOST} http://localhost${path}"
-		JSON=$(curl -sS --unix-socket "${DOCKER_HOST}" "http://localhost${path}")
-	elif [ "${DOCKER_HOST}" == "/var/run/docker.sock" ]; then
-		warning "Docker socket was not found at ${DOCKER_HOST}"
-		return 1
+	if [ -S "${host}" ]; then
+		info "Running API command: curl --unix-socket \"${host}\" http://localhost${path}"
+		JSON=$(curl -sS --unix-socket "${host}" "http://localhost${path}")
 	else
-		info "Running API command: curl ${DOCKER_HOST}${path}"
-		JSON=$(curl -sS "${DOCKER_HOST}${path}")
+		info "Running API command: curl \"${host}${path}\""
+		JSON=$(curl -sS "${host}${path}")
 	fi
-	NAME=$(echo "$JSON" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+	NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
 	return 0
 }
 
@@ -126,9 +126,9 @@ function k8s_get_name() {
 function docker_get_name() {
 	local id="${1}"
 	if hash docker 2>/dev/null; then
-		docker_get_name_classic "${id}"
+		docker_like_get_name_command docker "${id}"
 	else
-		docker_get_name_api "${id}" || docker_get_name_classic "${id}"
+		docker_like_get_name_api DOCKER_HOST "${id}" || docker_like_get_name_command podman "${id}"
 	fi
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of docker container '${id}'"
@@ -148,6 +148,30 @@ function docker_validate_id() {
 	fi
 }
 
+function podman_get_name() {
+	local id="${1}"
+
+	# for Podman, prefer using the API if we can, as netdata will not normally have access
+	# to other users' containers, so they will not be visible when running `podman ps`
+	docker_like_get_name_api PODMAN_HOST "${id}" || docker_like_get_name_command podman "${id}"
+
+	if [ -z "${NAME}" ]; then
+		warning "cannot find the name of podman container '${id}'"
+		NAME_NOT_FOUND=2
+		NAME="${id:0:12}"
+	else
+		info "podman container '${id}' is named '${NAME}'"
+	fi
+}
+
+function podman_validate_id() {
+	local id="${1}"
+	if [ -n "${id}" ] && [ ${#id} -eq 64 ]; then
+		podman_get_name "${id}"
+	else
+		error "a podman id cannot be extracted from docker cgroup '${CGROUP}'."
+	fi
+}
 
 # -----------------------------------------------------------------------------
 
@@ -155,6 +179,7 @@ function docker_validate_id() {
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
+PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
 CGROUP="${1}"
 NAME_NOT_FOUND=0
 NAME=
@@ -195,6 +220,10 @@ if [ -z "${NAME}" ]; then
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
 		docker_validate_id "${DOCKERID}"
+	elif [[ ${CGROUP} =~ ^.*libpod-[a-fA-F0-9]+.*$ ]]; then
+		# Podman
+		PODMANID="$(echo "${CGROUP}" | sed "s|^.*libpod-\([a-fA-F0-9]\+\).*$|\1|")"
+		podman_validate_id "${PODMANID}"
 
 	elif [[ ${CGROUP} =~ machine.slice[_/].*\.service ]]; then
 		# systemd-nspawn
