@@ -6,6 +6,13 @@ int aclk_stats_enabled;
 
 int query_thread_count;
 
+// data ACLK stats need per query thread
+struct aclk_qt_data {
+    RRDDIM *dim;
+} *aclk_qt_data = NULL;
+
+uint32_t *aclk_queries_per_thread = NULL;
+
 struct aclk_metrics aclk_metrics = {
     .online = 0,
 };
@@ -146,13 +153,10 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-#define MAX_DIM_NAME 10
-static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
+#define MAX_DIM_NAME 16
+static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 {
     static RRDSET *st = NULL;
-    static RRDDIM *rd_thread[ACLK_MAX_QUERY_THREADS];
-
-    assert(query_thread_count <= ACLK_MAX_QUERY_THREADS);
 
     char dim_name[MAX_DIM_NAME];
 
@@ -163,13 +167,13 @@ static void aclk_stats_query_threads(struct aclk_metrics_per_sample *per_sample)
 
         for (int i = 0; i < query_thread_count; i++) {
             snprintf(dim_name, MAX_DIM_NAME, "Query %d", i);
-            rd_thread[i] = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+            aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
     } else
         rrdset_next(st);
 
     for (int i = 0; i < query_thread_count; i++) {
-        rrddim_set_by_pointer(st, rd_thread[i], per_sample->queries_per_thread[i]);
+        rrddim_set_by_pointer(st, aclk_qt_data[i].dim, queries_per_thread[i]);
     }
 
     rrdset_done(st);
@@ -203,10 +207,22 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
+void aclk_stats_thread_cleanup(void *ptr)
+{
+    UNUSED(ptr);
+    freez(aclk_qt_data);
+    freez(aclk_queries_per_thread);
+}
+
 void *aclk_stats_main_thread(void *ptr)
 {
     struct aclk_stats_thread *args = ptr;
+
     query_thread_count = args->query_thread_count;
+    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
+    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
+    uint32_t *aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+    netdata_thread_cleanup_push(aclk_stats_thread_cleanup, NULL);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -231,6 +247,9 @@ void *aclk_stats_main_thread(void *ptr)
         memcpy(&per_sample, &aclk_metrics_per_sample, sizeof(struct aclk_metrics_per_sample));
         memcpy(&permanent, &aclk_metrics, sizeof(struct aclk_metrics));
         memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+
+        mempcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
+        memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
@@ -242,10 +261,12 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_read_q(&per_sample);
 
         aclk_stats_cloud_req(&per_sample);
-        aclk_stats_query_threads(&per_sample);
+        aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
         aclk_stats_query_time(&per_sample);
     }
+
+    netdata_thread_cleanup_pop(1);
     return 0;
 }
 

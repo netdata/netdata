@@ -446,7 +446,7 @@ static int aclk_process_query(int t_idx)
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.queries_dispatched++;
-        aclk_metrics_per_sample.queries_per_thread[t_idx]++;
+        aclk_queries_per_thread[t_idx]++;
         if(this_query->cmd == ACLK_CMD_CLOUD) {
             aclk_metrics_per_sample.cloud_q_process_total += t;
             aclk_metrics_per_sample.cloud_q_process_count++;
@@ -479,26 +479,19 @@ void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
     } while (this_query);
 }
 
+#define TASK_LEN_MAX 16
 void aclk_query_threads_start(struct aclk_query_threads *query_threads)
 {
     info("Starting %d query threads.", query_threads->count);
 
-#if ACLK_MAX_QUERY_THREADS > 10
-#error "You seem to have increased ACLK_MAX_QUERY_THREADS above 10. If you want to do that you need to update following thread name generation."
-#endif
-
-    char thread_name[strlen(ACLK_THREAD_NAME) + 3];
-    strcpy(thread_name, ACLK_THREAD_NAME);
-    thread_name[strlen(ACLK_THREAD_NAME)] = '_';
-    thread_name[strlen(ACLK_THREAD_NAME) + 2] = 0;
-
+    char thread_name[TASK_LEN_MAX];
     query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread *));
     for (int i = 0; i < query_threads->count; i++) {
         query_threads->thread_list[i] = callocz(1, sizeof(struct aclk_query_thread));
         query_threads->thread_list[i]->thread = callocz(1, sizeof(netdata_thread_t));
         query_threads->thread_list[i]->idx = i; //thread needs to know its index for statistics
 
-        thread_name[strlen(ACLK_THREAD_NAME) + 1] = i + 0x30;
+        snprintf(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_THREAD_NAME, i);
         netdata_thread_create(
             query_threads->thread_list[i]->thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
             query_threads->thread_list[i]);

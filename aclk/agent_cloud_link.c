@@ -868,8 +868,12 @@ void *aclk_main(void *ptr)
         }
     }
 
-    query_threads.count =
-        appconfig_get_number_min_max(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2, 1, ACLK_MAX_QUERY_THREADS);
+    query_threads.count = appconfig_get_number(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", 2);
+    if(query_threads.count < 1) {
+        error("You need at least one query thread. Overriding configured setting of \"%d\"", query_threads.count);
+        query_threads.count = 1;
+        appconfig_set_number(&cloud_config, CONFIG_SECTION_GLOBAL, "query thread count", query_threads.count);
+    }
 
     aclk_shared_state.last_popcorn_interrupt = now_realtime_sec(); // without mutex here because threads are not yet started
 
