@@ -179,7 +179,7 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
     buffer_sprintf(
         instance->buffer,
         "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s%s%s\n",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
@@ -226,7 +226,7 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
     buffer_sprintf(
         instance->buffer,
         "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s%s\n",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)last_t,
@@ -336,7 +336,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "    \"host\": \"%s%s%s\"%s"
         "  }"
         "}",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
@@ -396,7 +396,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "    \"host\": \"%s%s%s\"%s"
         "  }"
         "}",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)last_t,
