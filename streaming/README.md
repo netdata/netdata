@@ -402,7 +402,7 @@ On the parent, edit `/etc/netdata/stream.conf` (to edit it on your system run `/
     health enabled by default = auto
 ```
 
-_`stream.conf` on the parent, to enable receiving metrics from its child ndoes using the API key._
+_`stream.conf` on the parent, to enable receiving metrics from its child nodes using the API key._
 
 If you used many API keys, you can add one such section for each API key.
 
