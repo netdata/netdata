@@ -149,6 +149,9 @@ helm upgrade netdata ./netdata-helmchart
 
 ## What's next?
 
+Read the [monitoring a Kubernetes cluster guide](/docs/guides/monitor/kubernetes-k8s-netdata.md) for details on the
+various metrics and charts created by the Helm chart and some best practices on real-time troubleshooting using Netdata.
+
 Check out our [Agent's getting started guide](/docs/getting-started.md) for a quick overview of Netdata's capabilities,
 especially if you want to change any of the configuration settings for either the parent or child nodes.
 
