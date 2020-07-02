@@ -1859,7 +1859,7 @@ int main(void)
                    cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
 
     const struct CMUnitTest internal_metrics_tests[] = {
-        cmocka_unit_test(test_create_main_rusage_chart),
+        cmocka_unit_test_setup_teardown(test_create_main_rusage_chart, setup_rrdhost, teardown_rrdhost),
         cmocka_unit_test(test_send_main_rusage),
         cmocka_unit_test(test_send_internal_metrics),
     };
