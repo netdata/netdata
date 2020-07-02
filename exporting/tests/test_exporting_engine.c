@@ -77,7 +77,6 @@ static void test_read_exporting_config(void **state)
     *state = engine;
 
     assert_ptr_not_equal(engine, NULL);
-    assert_string_equal(engine->config.prefix, "netdata");
     assert_string_equal(engine->config.hostname, "test-host");
     assert_int_equal(engine->config.update_every, 3);
     assert_int_equal(engine->instance_num, 0);
@@ -89,6 +88,7 @@ static void test_read_exporting_config(void **state)
     assert_ptr_equal(instance->engine, engine);
     assert_int_equal(instance->config.type, EXPORTING_CONNECTOR_TYPE_GRAPHITE);
     assert_string_equal(instance->config.destination, "localhost");
+    assert_string_equal(instance->config.prefix, "netdata");
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);
     assert_int_equal(instance->config.timeoutms, 10000);

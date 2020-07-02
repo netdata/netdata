@@ -36,7 +36,6 @@ static void exporting_clean_engine()
         clean_instance(current_instance);
     }
 
-    freez((void *)engine->config.prefix);
     freez((void *)engine->config.hostname);
     freez(engine);
 }

@@ -128,7 +128,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
     buffer_sprintf(
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
-        engine->config.prefix,
+        instance->config.prefix,
         (host == localhost) ? engine->config.hostname : host->hostname,
         chart_name,
         dimension_name,
@@ -175,7 +175,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
     buffer_sprintf(
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
-        engine->config.prefix,
+        instance->config.prefix,
         (host == localhost) ? engine->config.hostname : host->hostname,
         chart_name,
         dimension_name,

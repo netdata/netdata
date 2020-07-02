@@ -258,7 +258,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     dimension,
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
                     PROMETHEUS_ELEMENT_MAX);
-                snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->engine->config.prefix, context, suffix);
+                snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
@@ -274,7 +274,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(
-                    name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->engine->config.prefix, context, dimension,
+                    name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->config.prefix, context, dimension,
                     suffix);
 
                 add_metric(
@@ -300,7 +300,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(
-                    name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->engine->config.prefix, context, units, suffix);
+                    name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->config.prefix, context, units, suffix);
 
                 add_metric(
                     connector_specific_data->write_request,

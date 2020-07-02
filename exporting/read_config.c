@@ -282,7 +282,6 @@ struct engine *read_exporting_config()
     if (exporting_config_exists) {
         engine->config.hostname =
             strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "hostname", netdata_configured_hostname));
-        engine->config.prefix = strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "prefix", "netdata"));
         engine->config.update_every = exporter_get_number(
             CONFIG_SECTION_EXPORTING, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
     }
@@ -430,6 +429,8 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
 
+        tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
+
 #ifdef ENABLE_HTTPS
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) {
             tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
@@ -448,7 +449,6 @@ struct engine *read_exporting_config()
 
         if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
             engine->config.hostname = strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
-            engine->config.prefix = strdupz(config_get(instance_name, "prefix", "netdata"));
             engine->config.update_every =
                 config_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
         }
