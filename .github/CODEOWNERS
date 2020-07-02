@@ -7,6 +7,7 @@
 # Ownership by directory structure
 .travis/ @cosmix @Ferroin @prologic
 .github/ @cosmix @Ferroin @prologic
+aclk/ @stelfrag @underhood @amoss
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
