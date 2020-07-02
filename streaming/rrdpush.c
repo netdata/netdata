@@ -263,11 +263,14 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_state *s) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
-    if (s->version >= VERSION_GAP_FILLING)
-        buffer_sprintf(host->sender->build, " %ld\n", st->last_collected_time.tv_sec);
+    // Format looks the same - meaning of the microsecond field has changed
+    if (s->version >= VERSION_GAP_FILLING) {
+        usec_t collected_time = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
+        usec_t stored_time = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
+        buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu\n", st->id, collected_time - stored_time);
+    }
     else
-        buffer_strcat(host->sender->build, "\n");
+        buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {

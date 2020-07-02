@@ -5,14 +5,13 @@
 
 #include "../../parser/parser.h"
 
-
 typedef struct parser_user_object {
     PARSER  *parser;
     RRDSET *st;
     RRDHOST *host;
     void    *opaque;
     struct plugind *cd;
-    int trust_durations;
+    pluginsd_usecs usec_semantics;
     struct label *new_labels;
     size_t count;
     int enabled;

@@ -95,7 +95,13 @@ int parser_push(PARSER *working_parser, char *line);
 void parser_destroy(PARSER *working_parser);
 int parser_recover_input(PARSER *working_parser);
 
-extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
+typedef enum {
+    PLUGINSD_USEC_IGNORE,
+    PLUGINSD_USEC_TRUST,
+    PLUGINSD_USEC_SLEW,
+} pluginsd_usecs;
+
+extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, pluginsd_usecs usec_semantics);
 
 extern PARSER_RC pluginsd_set(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
 extern PARSER_RC pluginsd_begin(char **words, void *user, PLUGINSD_ACTION  *plugins_action);

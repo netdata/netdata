@@ -178,9 +178,9 @@ test_cases = [
 
 def cleanup(name):
     sh("docker kill gaps_hi_agent_child_1 gaps_hi_agent_middle_1 gaps_hi_agent_parent_1");
-    sh(f"docker logs gaps_hi_agent_child_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_child.log")
-    sh(f"docker logs gaps_hi_agent_middle_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_middle.log")
-    sh(f"docker logs gaps_hi_agent_parent_1 2>&1 | grep -v 'collect within the same interpolation' >{name}_parent.log")
+    sh(f"docker logs gaps_hi_agent_child_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_child.log")
+    sh(f"docker logs gaps_hi_agent_middle_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_middle.log")
+    sh(f"docker logs gaps_hi_agent_parent_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_parent.log")
 
 for tc in test_cases:
     name = tc.__class__.__name__

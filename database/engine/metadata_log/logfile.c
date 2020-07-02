@@ -667,7 +667,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
     metalog_parser_object.enabled = cd.enabled;
     metalog_parser_object.host = ctx->rrdeng_ctx->host;
     metalog_parser_object.cd = &cd;
-    metalog_parser_object.trust_durations = 0;
+    metalog_parser_object.usec_semantics = PLUGINSD_USEC_IGNORE;
     metalog_parser_object.private = &metalog_parser_state;
 
     PARSER *parser = parser_init(metalog_parser_object.host, &metalog_parser_object, NULL, PARSER_INPUT_SPLIT);

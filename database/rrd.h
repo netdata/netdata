@@ -1005,6 +1005,7 @@ static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 
 extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
+extern void rrdset_next_usec_slew(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
 extern void rrdset_done(RRDSET *st);

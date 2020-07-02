@@ -189,7 +189,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     if ((remote_t - expected_t > st->update_every * 2) ||
        (now - remote_t > st->update_every*2))
     {
-        debug(D_REPLICATION, "Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t, 
+        debug(D_REPLICATION, "Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t,
               expected_t, now);
         st->sflag_replicating_down = 1;
         netdata_mutex_unlock(&st->shared_flags_lock);
@@ -444,7 +444,10 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     user->host = rpt->host;
     user->opaque = rpt;
     user->cd = cd;
-    user->trust_durations = 0;
+    if (cd->version >= VERSION_GAP_FILLING)
+        user->usec_semantics = PLUGINSD_USEC_SLEW;
+    else
+        user->usec_semantics = PLUGINSD_USEC_TRUST;
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);

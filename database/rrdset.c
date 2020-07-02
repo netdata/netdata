@@ -983,6 +983,18 @@ RRDSET *rrdset_create_custom(
 // ----------------------------------------------------------------------------
 // RRDSET - data collection iteration control
 
+// Slew times are the delta between last_stored and last_collected on a remote machine. We synthesize a synthetic
+// collection time by applying the delta to the local last_stored. This guarantees that the sequence of time intervals
+// used during interpolation is the same on both machines regardless of slew and latency. Happy face.
+void rrdset_next_usec_slew(RRDSET *st, usec_t microseconds) {
+    usec_t stored_time = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
+    usec_t prev_collected_time = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
+    usec_t collected_time = stored_time - microseconds;
+    st->last_collected_time.tv_sec = collected_time / USEC_PER_SEC;
+    st->last_collected_time.tv_usec = collected_time % USEC_PER_SEC;
+    st->usec_since_last_update = collected_time - prev_collected_time;
+}
+
 inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds) {
     if(unlikely(!st->last_collected_time.tv_sec || !microseconds || (rrdset_flag_check_noatomic(st, RRDSET_FLAG_SYNC_CLOCK)))) {
         // call the full next_usec() function
@@ -1312,9 +1324,9 @@ static inline size_t rrdset_done_interpolate(
 //                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 #ifdef NETDATA_INTERNAL_CHECKS
                 debug(D_REPLICATION, "interpolate-store %s.%s@%llu stored(last=%llu,next=%llu) "
-                      "collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
-                      st->name, rd->name, update_every_ut, last_stored_ut, next_store_ut, last_collect_ut, 
-                      now_collect_ut, rd->last_stored_value, new_value);
+                      "collect(last=%llu,now=%llu,val=" COLLECTED_NUMBER_FORMAT ") " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
+                      st->name, rd->name, update_every_ut, last_stored_ut, next_store_ut, last_collect_ut,
+                      now_collect_ut, rd->collected_value, rd->last_stored_value, new_value);
                 #endif
 
                 rd->last_stored_value = new_value;
