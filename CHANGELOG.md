@@ -122,7 +122,6 @@
 - Improve PR Guidelines for Developers and Contributors. [\#8809](https://github.com/netdata/netdata/pull/8809) ([prologic](https://github.com/prologic))
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
 - single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
-- Correctly track last num vcpus in xenstat\_plugin [\#8720](https://github.com/netdata/netdata/pull/8720) ([rushikeshjadhav](https://github.com/rushikeshjadhav))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
@@ -179,7 +178,6 @@
 - Revert "Improved ACLK reconnection sequence " [\#8728](https://github.com/netdata/netdata/pull/8728) ([cosmix](https://github.com/cosmix))
 - Fix crash when shutdown with ACLK disabled [\#8725](https://github.com/netdata/netdata/pull/8725) ([lassebm](https://github.com/lassebm))
 - Docs: Combined claiming+ACLK documentation [\#8724](https://github.com/netdata/netdata/pull/8724) ([joelhans](https://github.com/joelhans))
-- Fix docs Docker-based builder image [\#8718](https://github.com/netdata/netdata/pull/8718) ([prologic](https://github.com/prologic))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
