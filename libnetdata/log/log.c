@@ -680,14 +680,17 @@ int error_log_limit(int reset) {
 void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     va_list args;
 
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH);
+    char entry[512];
+    log_date(entry, LOG_DATE_LENGTH);
 
     va_start( args, fmt );
-    printf("%s: %s DEBUG : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
-    vprintf(fmt, args);
+    sprintf(entry+strlen(entry), ": %s DEBUG : %s : (%04lu@%-10.10s:%-15.15s): ", program_name, netdata_thread_tag(), line, file, function);
+    size_t n = strlen(entry);
+    vsnprintf(entry+n, sizeof(entry)-1-n, fmt, args);
     va_end( args );
-    putchar('\n');
+    n = strlen(entry);
+    entry[n] = '\n';
+    fwrite(entry, 1, n+1, stdout);
 
     if(output_log_syslog) {
         va_start( args, fmt );
