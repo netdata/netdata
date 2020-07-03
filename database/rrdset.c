@@ -989,9 +989,11 @@ RRDSET *rrdset_create_custom(
 void rrdset_next_usec_slew(RRDSET *st, usec_t microseconds) {
     usec_t stored_time = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
     usec_t prev_collected_time = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
-    usec_t collected_time = stored_time - microseconds;
-    st->last_collected_time.tv_sec = collected_time / USEC_PER_SEC;
-    st->last_collected_time.tv_usec = collected_time % USEC_PER_SEC;
+    usec_t collected_time = stored_time + microseconds;
+    debug(D_REPLICATION, "next_usec on %s stored=%llu collected=%llu delta=%llu new_col=%llu",
+          st->id, stored_time, prev_collected_time, microseconds, collected_time);
+    //st->last_collected_time.tv_sec = collected_time / USEC_PER_SEC;
+    //st->last_collected_time.tv_usec = collected_time % USEC_PER_SEC;
     st->usec_since_last_update = collected_time - prev_collected_time;
 }
 
@@ -1196,7 +1198,6 @@ static inline size_t rrdset_done_interpolate(
         , uint32_t storage_flags
 ) {
     RRDDIM *rd;
-
 
     size_t stored_entries = 0;     // the number of entries we have stored in the db, during this call to rrdset_done()
 

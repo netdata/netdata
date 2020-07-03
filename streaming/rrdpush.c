@@ -267,6 +267,7 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st, struct sender_s
     if (s->version >= VERSION_GAP_FILLING) {
         usec_t collected_time = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
         usec_t stored_time = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
+        debug(D_REPLICATION, "Sending %s update collected=%llu stored=%llu delta=%llu", st->id, collected_time, stored_time, collected_time - stored_time);
         buffer_sprintf(host->sender->build, "BEGIN \"%s\" %llu\n", st->id, collected_time - stored_time);
     }
     else

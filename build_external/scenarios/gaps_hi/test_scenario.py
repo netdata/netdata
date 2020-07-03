@@ -210,7 +210,7 @@ class TestState(object):
 
 cases = [
     BaselineMiddleFirst,
-    BaselineChildFirst
+    #BaselineChildFirst
 ]
 
 state = TestState()

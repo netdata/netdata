@@ -186,8 +186,9 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     // There are two cases to drop into replication mode:
     //   - the data is old, this is probably a stale buffer that arrived as part of a reconnection
     //   - the data contains a gap, either the connection dropped or this node restarted
-    if ((remote_t - expected_t > st->update_every * 2) ||
-       (now - remote_t > st->update_every*2))
+    // TODO: switch the initial replication back on later in testing...
+    if (remote_t &&
+        ((remote_t - expected_t > st->update_every * 2) || (now - remote_t > st->update_every*2)))
     {
         debug(D_REPLICATION, "Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t,
               expected_t, now);
