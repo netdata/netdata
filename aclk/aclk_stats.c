@@ -12,6 +12,7 @@ struct aclk_qt_data {
 } *aclk_qt_data = NULL;
 
 uint32_t *aclk_queries_per_thread = NULL;
+uint32_t *aclk_queries_per_thread_sample = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -207,11 +208,11 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-void aclk_stats_thread_cleanup(void *ptr)
+void aclk_stats_thread_cleanup()
 {
-    UNUSED(ptr);
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
+    freez(aclk_queries_per_thread_sample);
 }
 
 void *aclk_stats_main_thread(void *ptr)
@@ -221,8 +222,7 @@ void *aclk_stats_main_thread(void *ptr)
     query_thread_count = args->query_thread_count;
     aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
     aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
-    uint32_t *aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
-    netdata_thread_cleanup_push(aclk_stats_thread_cleanup, NULL);
+    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -266,7 +266,6 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_query_time(&per_sample);
     }
 
-    netdata_thread_cleanup_pop(1);
     return 0;
 }
 

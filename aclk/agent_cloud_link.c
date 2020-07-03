@@ -1015,6 +1015,7 @@ exited:
 
     if(aclk_stats_enabled) {
         netdata_thread_join(*stats_thread->thread, NULL);
+        aclk_stats_thread_cleanup();
         freez(stats_thread->thread);
         freez(stats_thread);
     }
