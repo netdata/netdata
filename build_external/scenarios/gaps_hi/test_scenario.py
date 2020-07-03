@@ -107,99 +107,215 @@ def check_sync():
     print("  Could not establish sync within max number of trials")
     return False
 
+def BaselineMiddleFirst(state):
+    state.start("middle")
+    state.wait_up("middle")
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    print("  Measure baseline for 60s...")
+    time.sleep(60)
+    state.post_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_norep() )
 
-class Baseline(object):
-    def body(self):
-        time.sleep(60)
+def BaselineChildFirst(state):
+    state.start("child")
+    state.wait_up("child")
+    state.start("parent")
+    state.wait_up("parent")
+    time.sleep(60)
+    #self.check_sync("child","parent")
 
-class ShortChildDisconnect(object):
-    def body(self):
-        time.sleep(10)
-        sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
-        time.sleep(3)
-        sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
-
-class LongChildDisconnect(object):
-    def body(self):
-        sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
-        time.sleep(30)
-        sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
-
-class ShortMiddleDisconnect(object):
-    def body(self):
-        sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
-        time.sleep(3)
-        sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
-
-class LongMiddleDisconnect(object):
-    def body(self):
-        sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
-        time.sleep(30)
-        sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
-
-class ShortParentDisconnect(object):
-    def body(self):
-        sh("docker network disconnect gaps_hi_default gaps_hi_agent_parent_1")
-        time.sleep(3)
-        sh("docker network connect gaps_hi_default gaps_hi_agent_parent_1")
-
-class LongParentDisconnect(object):
-    def body(self):
-        sh("docker network disconnect gaps_hi_default gaps_hi_agent_parent_1")
-        time.sleep(30)
-        sh("docker network connect gaps_hi_default gaps_hi_agent_parent_1")
-
-class MiddleRestart(object):
-    def body(self):
-        sh("docker kill gaps_hi_agent_middle_1")
-        time.sleep(3)
-        sh("docker start gaps_hi_agent_middle_1")
-        time.sleep(10)
-
-class ParentRestart(object):
-    def body(self):
-        sh("docker kill gaps_hi_agent_parent_1")
-        time.sleep(3)
-        sh("docker start gaps_hi_agent_parent_1")
-        time.sleep(10)
+class Node(object):
+    def __init__(self, name, cname):
+        self.name = name
+        self.container_name = cname
+        self.port = None
+        self.guid = None
+        self.log = None
 
 
-test_cases = [
-   Baseline(),
-   ShortChildDisconnect(),
-   LongChildDisconnect(),
-   ShortMiddleDisconnect(),
-   LongMiddleDisconnect(),
-   ShortParentDisconnect(),
-   LongParentDisconnect(),
-   MiddleRestart(),
-   ParentRestart()
+class TestState(object):
+    def __init__(self, prefix="gaps_hi", network="_default"):
+        self.network         = prefix + network
+        self.prefix          = prefix
+        self.nodes           = {}
+
+
+    def wipe(self):
+        sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml down --remove-orphans")
+        self.post_checks = []
+        self.nodes           = {}
+        self.nodes['child']  = Node("child", self.prefix + "_agent_child_1")
+        self.nodes['middle'] = Node("middle", self.prefix + "_agent_middle_1")
+        self.nodes['parent'] = Node("parent", self.prefix + "_agent_parent_1")
+
+    def wrap(self, case):
+        print(f"Wipe test state: {case.__name__}")
+        self.wipe()
+        case(self)
+        for n in self.nodes.values():
+            sh(f"docker kill {n.container_name}")
+            n.log = f"{case.__name__}-{n.name}.log"
+            sh(f"docker logs {n.container_name} >{n.log} 2>&1")
+        for c in self.post_checks:
+            c()
+
+    def start(self, node):
+        sh(f"docker-compose -f {base}/{node}-compose.yml up -d")
+        container = json.loads(sh(f"docker inspect {self.nodes[node].container_name}"))
+        self.nodes[node].port = container[0]["NetworkSettings"]["Ports"]["19999/tcp"][0]["HostPort"]
+
+    def wait_up(self, node):
+        url = f"http://localhost:{self.nodes[node].port}/api/v1/info"
+        print(f"  Waiting for {node} on {url}")
+        while True:
+            try:
+                r = requests.get(url)
+                info = requests.get(url).json()
+                self.nodes[node].guid = info['uid']
+                return
+            except requests.ConnectionError:
+                print(f"  Waiting for {node}...")
+            except json.decoder.JSONDecodeError:
+                print(f"  Waiting for {node}...")
+            time.sleep(1)
+
+    def wait_connected(self, sender, receiver):
+        url = f"http://localhost:{self.nodes[receiver].port}/api/v1/info"
+        print(f"  Waiting for {sender} to connect to {receiver}")
+        while True:
+            try:
+                r = requests.get(url)
+                info = requests.get(url).json()
+            except requests.ConnectionError:
+                print(f"  {receiver} not responding...")
+                time.sleep(1)
+                continue
+            if sender in info['mirrored_hosts']:
+               print(f"  {sender} in mirrored_hosts on {receiver}")
+               return
+            print(f"  {receiver} mirrors {info['mirrored_hosts']}...")
+            time.sleep(1)
+
+    def check_sync(self, source, target):
+        print(f"  check_sync {source} {target}")
+
+    def check_norep(self):
+        for n in self.nodes.values():
+            if len(sh(f"grep -i replic {n.log}"))>0:
+                print(f"  FAILED {n.name} was involved in replication")
+
+
+
+cases = [
+    BaselineMiddleFirst,
+    BaselineChildFirst
 ]
 
-def cleanup(name):
-    sh("docker kill gaps_hi_agent_child_1 gaps_hi_agent_middle_1 gaps_hi_agent_parent_1");
-    sh(f"docker logs gaps_hi_agent_child_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_child.log")
-    sh(f"docker logs gaps_hi_agent_middle_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_middle.log")
-    sh(f"docker logs gaps_hi_agent_parent_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_parent.log")
+state = TestState()
+for c in cases:
+    state.wrap(c)
 
-for tc in test_cases:
-    name = tc.__class__.__name__
-    print("Wipe test state")
-    sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml down --remove-orphans")
-    sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml up -d")
-    print(f"Pre-test... {name} @{time.time()}")
-    if not check_sync():
-        print(f"ABORTED@{time.time()}")
-        cleanup(name)
-        continue
-    print(f"Test:  {name}@{time.time()}")
-    tc.body()
-    print(f"Finished: {name}@{time.time()}")
-    if not check_sync():
-        print(f"  FAILED")
-    else:
-        print(f"  PASSED")
-    cleanup(name)
+#
+#
+#
+#class BaselineParentFirst(object):
+#    def body(self):
+#        time.sleep(60)
+#
+#class Baseline(object):
+#    def body(self):
+#        time.sleep(60)
+#
+#class ShortChildDisconnect(object):
+#    def body(self):
+#        time.sleep(10)
+#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
+#        time.sleep(3)
+#        sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
+#
+#class LongChildDisconnect(object):
+#    def body(self):
+#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
+#        time.sleep(30)
+#        sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
+#
+#class ShortMiddleDisconnect(object):
+#    def body(self):
+#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
+#        time.sleep(3)
+#        sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
+#
+#class LongMiddleDisconnect(object):
+#    def body(self):
+#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
+#        time.sleep(30)
+#        sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
+#
+#class ShortParentDisconnect(object):
+#    def body(self):
+#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_parent_1")
+#        time.sleep(3)
+#        sh("docker network connect gaps_hi_default gaps_hi_agent_parent_1")
+#
+#class LongParentDisconnect(object):
+#    def body(self):
+#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_parent_1")
+#        time.sleep(30)
+#        sh("docker network connect gaps_hi_default gaps_hi_agent_parent_1")
+#
+#class MiddleRestart(object):
+#    def body(self):
+#        sh("docker kill gaps_hi_agent_middle_1")
+#        time.sleep(3)
+#        sh("docker start gaps_hi_agent_middle_1")
+#        time.sleep(10)
+#
+#class ParentRestart(object):
+#    def body(self):
+#        sh("docker kill gaps_hi_agent_parent_1")
+#        time.sleep(3)
+#        sh("docker start gaps_hi_agent_parent_1")
+#        time.sleep(10)
+#
+#
+#test_cases = [
+#   BaselineParentFirst(),
+#   ShortChildDisconnect(),
+#   LongChildDisconnect(),
+#   ShortMiddleDisconnect(),
+#   LongMiddleDisconnect(),
+#   ShortParentDisconnect(),
+#   LongParentDisconnect(),
+#   MiddleRestart(),
+#   ParentRestart()
+#]
+#
+#def cleanup(name):
+#    sh("docker kill gaps_hi_agent_child_1 gaps_hi_agent_middle_1 gaps_hi_agent_parent_1");
+#    sh(f"docker logs gaps_hi_agent_child_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_child.log")
+#    sh(f"docker logs gaps_hi_agent_middle_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_middle.log")
+#    sh(f"docker logs gaps_hi_agent_parent_1 2>&1 | grep -v 'collected in the same interpolation' >{name}_parent.log")
+#
+#for tc in test_cases:
+#    name = tc.__class__.__name__
+#    print("Wipe test state")
+#    sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml down --remove-orphans")
+#    sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml up -d")
+#    print(f"Pre-test... {name} @{time.time()}")
+#    if not check_sync():
+#        print(f"ABORTED@{time.time()}")
+#        cleanup(name)
+#        continue
+#    print(f"Test:  {name}@{time.time()}")
+#    tc.body()
+#    print(f"Finished: {name}@{time.time()}")
+#    if not check_sync():
+#        print(f"  FAILED")
+#    else:
+#        print(f"  PASSED")
+#    cleanup(name)
 
 
 
