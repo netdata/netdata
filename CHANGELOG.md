@@ -1,5 +1,23 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.23.1...HEAD)
+
+**Merged pull requests:**
+
+- Bring code owner for missing directory [\#9465](https://github.com/netdata/netdata/pull/9465) ([thiagoftsm](https://github.com/thiagoftsm))
+- Read the prefix option from instance config sections [\#9463](https://github.com/netdata/netdata/pull/9463) ([vlvkobal](https://github.com/vlvkobal))
+- Fix a coverity defect [\#9462](https://github.com/netdata/netdata/pull/9462) ([vlvkobal](https://github.com/vlvkobal))
+- Fix the exporting engine unit tests [\#9460](https://github.com/netdata/netdata/pull/9460) ([vlvkobal](https://github.com/vlvkobal))
+- Wrap header definitions in compilation conditions [\#9458](https://github.com/netdata/netdata/pull/9458) ([candrews](https://github.com/candrews))
+- Fixes error in Swagger Documentation [\#9417](https://github.com/netdata/netdata/pull/9417) ([underhood](https://github.com/underhood))
+- Added missing caps letters [\#9379](https://github.com/netdata/netdata/pull/9379) ([Jiab77](https://github.com/Jiab77))
+- Fixed typo in the streaming readme [\#9378](https://github.com/netdata/netdata/pull/9378) ([Jiab77](https://github.com/Jiab77))
+- ipfs-plugin: change HTTP method to make it compatible with ipfs 0.5.0+ [\#9248](https://github.com/netdata/netdata/pull/9248) ([RubenKelevra](https://github.com/RubenKelevra))
+- UrlService add support get headers [\#9236](https://github.com/netdata/netdata/pull/9236) ([vsc55](https://github.com/vsc55))
+- Add infiniband monitoring to collector proc.plugin [\#9091](https://github.com/netdata/netdata/pull/9091) ([Saruspete](https://github.com/Saruspete))
+
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.23.0...v1.23.1)
@@ -121,7 +139,6 @@
 - Fix incorrect issue link URL in install-required-packages.sh [\#8911](https://github.com/netdata/netdata/pull/8911) ([prologic](https://github.com/prologic))
 - Improve PR Guidelines for Developers and Contributors. [\#8809](https://github.com/netdata/netdata/pull/8809) ([prologic](https://github.com/prologic))
 - Remove old docs generation tooling [\#8783](https://github.com/netdata/netdata/pull/8783) ([prologic](https://github.com/prologic))
-- single quote apostrophe [\#8723](https://github.com/netdata/netdata/pull/8723) ([zack-shoylev](https://github.com/zack-shoylev))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
@@ -173,11 +190,6 @@
 - health/portcheck: remove no-clear-notification option [\#8748](https://github.com/netdata/netdata/pull/8748) ([ilyam8](https://github.com/ilyam8))
 - packaging/docker/{build,publish}.sh: Simplify scripts. Support only single ARCH [\#8747](https://github.com/netdata/netdata/pull/8747) ([knatsakis](https://github.com/knatsakis))
 - Ebpf index size [\#8743](https://github.com/netdata/netdata/pull/8743) ([thiagoftsm](https://github.com/thiagoftsm))
-- \[docs\]: fix enabling charts.d modules instruction for IOT [\#8740](https://github.com/netdata/netdata/pull/8740) ([Jiab77](https://github.com/Jiab77))
-- Improved ACLK reconnection sequence [\#8729](https://github.com/netdata/netdata/pull/8729) ([stelfrag](https://github.com/stelfrag))
-- Revert "Improved ACLK reconnection sequence " [\#8728](https://github.com/netdata/netdata/pull/8728) ([cosmix](https://github.com/cosmix))
-- Fix crash when shutdown with ACLK disabled [\#8725](https://github.com/netdata/netdata/pull/8725) ([lassebm](https://github.com/lassebm))
-- Docs: Combined claiming+ACLK documentation [\#8724](https://github.com/netdata/netdata/pull/8724) ([joelhans](https://github.com/joelhans))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
