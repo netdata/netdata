@@ -1,6 +1,9 @@
 #ifndef _NETDATA_EBPF_H_
 # define _NETDATA_EBPF_H_ 1
 
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
+
 # define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
 
 /**

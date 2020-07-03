@@ -174,7 +174,7 @@ char *ebpf_library_suffix(int version, int isrh) {
 
 int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
 {
-    char *err = NULL;
+    // char *err = NULL;
     char lpath[4096];
     char netdatasl[128];
     void *libnetdata;
@@ -206,30 +206,35 @@ int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
         info("Current shared library %s loaded with success.", lpath);
         ef->libnetdata = libnetdata;
     }
+    dlclose(libnetdata);
 
-    ef->load_bpf_file = dlsym(libnetdata, "load_bpf_file");
-    if ((err = dlerror()) != NULL) {
-        error("Cannot find load_bpf_file: %s", err);
-        return -1;
-    }
+    ef->load_bpf_file = bpf_prog_load;
+    // ef->load_bpf_file = dlsym(libnetdata, "load_bpf_file");
+    // if ((err = dlerror()) != NULL) {
+    //     error("Cannot find load_bpf_file: %s", err);
+    //     return -1;
+    // }
 
-    ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
-    if ((err = dlerror()) != NULL) {
-        error("Cannot find bpf_map_lookup_elem: %s", err);
-        return -1;
-    }
+    ef->bpf_map_lookup_elem = bpf_map_lookup_elem;
+    // ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
+    // if ((err = dlerror()) != NULL) {
+    //     error("Cannot find bpf_map_lookup_elem: %s", err);
+    //     return -1;
+    // }
 
-    ef->bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
-    if ((err = dlerror()) != NULL) {
-        error("Cannot find bpf_map_delete_elem: %s", err);
-        return -1;
-    }
+    ef->bpf_map_delete_elem = bpf_map_delete_elem;
+    // ef->bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
+    // if ((err = dlerror()) != NULL) {
+    //     error("Cannot find bpf_map_delete_elem: %s", err);
+    //     return -1;
+    // }
 
-    ef->bpf_map_get_next_key = dlsym(libnetdata, "bpf_map_get_next_key");
-    if ((err = dlerror()) != NULL) {
-        error("Cannot find bpf_map_delete_elem: %s", err);
-        return -1;
-    }
+    ef->bpf_map_get_next_key = bpf_map_get_next_key;
+    // ef->bpf_map_get_next_key = dlsym(libnetdata, "bpf_map_get_next_key");
+    // if ((err = dlerror()) != NULL) {
+    //     error("Cannot find bpf_map_delete_elem: %s", err);
+    //     return -1;
+    // }
 
     return 0;
 }
@@ -253,19 +258,38 @@ int ebpf_load_program(char *plugins_dir,
                       int *map_fd,
                       int (*load_bpf_file)(int *, char *, int))
 {
+    UNUSED(event_id);
+    UNUSED(load_bpf_file);
+
     char lpath[4096];
     char lname[128];
+    struct bpf_object *obj;
+    int prog_fd;
 
     int test = select_file(lname, name, (size_t)127, mode, kernel_string);
     if (test < 0 || test > 127)
         return -1;
 
     snprintf(lpath, 4096, "%s/%s", plugins_dir,  lname);
-    if (load_bpf_file(map_fd, lpath, event_id)) {
+    if (bpf_prog_load(lpath, BPF_PROG_TYPE_KPROBE, &obj, &prog_fd)) {
         info("Cannot load program: %s", lpath);
         return -1;
     } else {
         info("The eBPF program %s was loaded with success.", name);
+    }
+
+    struct bpf_map *map;
+    size_t i = 0;
+    bpf_map__for_each(map, obj)
+    {
+        map_fd[i] = bpf_map__fd(map);
+        i++;
+    }
+
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, obj)
+    {
+        bpf_program__attach(prog);
     }
 
     return 0;

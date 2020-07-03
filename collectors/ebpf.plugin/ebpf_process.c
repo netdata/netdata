@@ -34,10 +34,6 @@ int process_enabled = 0;
  * Pointers used when collector is dynamically linked
  */
 
-//Libbpf (It is necessary to have at least kernel 4.10)
-static int (*bpf_map_lookup_elem)(int, const void *, void *) = NULL;
-static int (*bpf_map_delete_elem)(int fd, const void *key) = NULL;
-
 static int *map_fd = NULL;
 /**
  * End of the pointers
@@ -944,12 +940,6 @@ static void change_syscalls() {
  *
  */
 static void set_local_pointers() {
-#ifndef STATIC
-    bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
-
-    bpf_map_delete_elem = process_functions.bpf_map_delete_elem;
-#endif
-
     map_fd = process_functions.map_fd;
 
     if (process_functions.isrh >= NETDATA_MINIMUM_RH_VERSION && process_functions.isrh < NETDATA_RH_8)

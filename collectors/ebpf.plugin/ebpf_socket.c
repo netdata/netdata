@@ -33,8 +33,6 @@ static int socket_apps_created = 0;
  */
 
 //Libbpf (It is necessary to have at least kernel 4.10)
-static int (*bpf_map_lookup_elem)(int, const void *, void *);
-static int (*bpf_map_delete_elem)(int fd, const void *key);
 
 static int *map_fd = NULL;
 /**
@@ -526,12 +524,6 @@ void change_socket_event() {
  * Set local function pointers, this function will never be compiled with static libraries
  */
 static void set_local_pointers(ebpf_module_t *em) {
-#ifndef STATIC
-    bpf_map_lookup_elem = socket_functions.bpf_map_lookup_elem;
-    (void) bpf_map_lookup_elem;
-    bpf_map_delete_elem = socket_functions.bpf_map_delete_elem;
-    (void) bpf_map_delete_elem;
-#endif
     map_fd = socket_functions.map_fd;
 
     if (em->mode == MODE_ENTRY) {
