@@ -189,7 +189,6 @@
 - Additional cases for the thread exit fix [\#8750](https://github.com/netdata/netdata/pull/8750) ([amoss](https://github.com/amoss))
 - health/portcheck: remove no-clear-notification option [\#8748](https://github.com/netdata/netdata/pull/8748) ([ilyam8](https://github.com/ilyam8))
 - packaging/docker/{build,publish}.sh: Simplify scripts. Support only single ARCH [\#8747](https://github.com/netdata/netdata/pull/8747) ([knatsakis](https://github.com/knatsakis))
-- Ebpf index size [\#8743](https://github.com/netdata/netdata/pull/8743) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
