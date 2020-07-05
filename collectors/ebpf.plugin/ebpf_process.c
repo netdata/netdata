@@ -877,18 +877,6 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * Clean the allocated process stat structure
- */
-static void clean_process_stat()
-{
-    size_t i;
-    for (i = 0 ; i < all_pids_count ; i++) {
-        ebpf_process_stat_t *w = local_process_stats[pid_index[i]];
-        freez(w);
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -901,7 +889,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
-    clean_process_stat();
     freez(local_process_stats);
 
     if (process_functions.libnetdata) {
