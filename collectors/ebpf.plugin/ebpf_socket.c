@@ -517,7 +517,9 @@ static void ebpf_socket_allocate_global_vectors(size_t length) {
 
 static void change_collector_event() {
     socket_probes[0].type = 'p';
+    socket_probes[4].type = 'p';
     socket_probes[5].type = 'p';
+    socket_probes[7].name = NULL;
 }
 
 /**

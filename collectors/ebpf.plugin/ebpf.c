@@ -86,13 +86,14 @@ netdata_ebpf_events_t process_probes[] = {
 };
 
 netdata_ebpf_events_t socket_probes[] = {
-    { .type = 'r', .name = "tcp_sendmsg" },
     { .type = 'p', .name = "tcp_cleanup_rbuf" },
     { .type = 'p', .name = "tcp_close" },
     { .type = 'p', .name = "udp_recvmsg" },
     { .type = 'r', .name = "udp_recvmsg" },
     { .type = 'r', .name = "udp_sendmsg" },
     { .type = 'p', .name = "do_exit" },
+    { .type = 'p', .name = "tcp_sendmsg" },
+    { .type = 'r', .name = "tcp_sendmsg" },
     { .type = 0, .name = NULL }
 };
 
