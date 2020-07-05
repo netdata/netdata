@@ -262,7 +262,7 @@ int ebpf_load_program(char *plugins_dir,
 
     snprintf(lpath, 4096, "%s/%s", plugins_dir,  lname);
     if (load_bpf_file(map_fd, lpath, event_id)) {
-        error("Cannot load program: %s", lpath);
+        info("Cannot load program: %s", lpath);
         return -1;
     } else {
         info("The eBPF program %s was loaded with success.", name);
