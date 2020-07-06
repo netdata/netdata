@@ -54,7 +54,8 @@ typedef struct ebpf_socket_publish_apps {
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_port_list {
-    char *range;
+    char *value;
+    uint32_t hash;
     uint16_t first;
     uint16_t last;
     struct ebpf_network_viewer_port_list *next;

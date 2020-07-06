@@ -658,6 +658,28 @@ static inline int parse_disable_apps(char *ptr)
 }
 
 /**
+ * Fill Port list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_port_list_t *move = *out;
+        for (; move->next ; move = move->next );
+
+        move->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding to list %s( %u, %u) to the list",in->value, in->first, in->last);
+#endif
+}
+
+/**
  * Fill port list
  *
  * Fill an allocated port list with the range given
@@ -665,10 +687,11 @@ static inline int parse_disable_apps(char *ptr)
  * @param out a pointer to store the link list
  * @param range the informed range for the user.
  */
-static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, char *range)
+static void parse_port_list(ebpf_network_viewer_port_list_t **out, char *range)
 {
     ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    w->range = strdup(range);
+    w->value = strdup(range);
+    w->hash = simple_hash(range);
 
     char *end = range;
     //Move while I cannot find a separator
@@ -697,15 +720,34 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, char *r
 
     w->last = test;
 
-    if (likely(*out)) {
-        ebpf_network_viewer_port_list_t *move = *out;
-        for (; move->next ; move = move->next );
+    fill_port_list(out, w);
+}
 
-        move->next = w;
-    } else {
-        *out = w;
+/**
+ * Parse Service List
+ *
+ * @param out a pointer to store the link list
+ * @param service the service used to create the structure that will be linked.
+ */
+static void parse_service_list(ebpf_network_viewer_port_list_t **out, char *service)
+{
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = strdup(service);
+    w->hash = simple_hash(service);
+
+    struct servent *serv = getservbyname((const char *)service, "tcp");
+    if (!serv)
+        serv = getservbyname((const char *)service, "udp");
+
+    if (!serv) {
+        error("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        freez(w);
+        return;
     }
 
+    w->first = w->last = (uint16_t)ntohs(serv->s_port);
+
+    fill_port_list(out, w);
 }
 
 /**
@@ -713,22 +755,26 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, char *r
  *
  * Parse the port ranges given and create Network Viewer Port Structure
  *
- * @param ptr
+ * @param out is the output link list
+ * @param ptr is a pointer with the text to parser.
+ * @param valid_char the function from ctype.h used to find the first valid value
  */
-static ebpf_network_viewer_port_list_t *parse_port_range(char *ptr)
+static void parse_values(ebpf_network_viewer_port_list_t *out,
+                             char *ptr,
+                             int (*valid_char)(int),
+                             void (*fill_struct)(ebpf_network_viewer_port_list_t **, char *))
 {
     //No value
     if (unlikely(!ptr))
-        return NULL;
+        return;
 
-    //Find the first number
-    while (!isdigit(*ptr)) ptr++;
+    //Find the first valid value
+    while (!valid_char(*ptr)) ptr++;
 
-    //No digit found
+    //No valid value found
     if (unlikely(!ptr))
-        return NULL;
+        return;
 
-    ebpf_network_viewer_port_list_t *ret = NULL;
     while (likely(ptr)) {
         //Find space that ends the list
         char *end = strchr(ptr, ' ');
@@ -736,12 +782,10 @@ static ebpf_network_viewer_port_list_t *parse_port_range(char *ptr)
             *end++ = '\0';
         }
 
-        fill_port_list(&ret, ptr);
+        fill_struct(&out, ptr);
 
         ptr = end;
     }
-
-    return ret;
 }
 
 /**
@@ -755,10 +799,16 @@ static void parse_network_viewer_section()
                                                       500);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included ports", NULL);
-    network_viewer_opt.included_port = parse_port_range(value);
+    parse_values(network_viewer_opt.included_port, value, isdigit, parse_port_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ports", NULL);
-    network_viewer_opt.excluded_port = parse_port_range(value);
+    parse_values(network_viewer_opt.excluded_port, value, isdigit, parse_port_list);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included services", NULL);
+    parse_values(network_viewer_opt.included_port, value, isalpha, parse_service_list);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded services", NULL);
+    parse_values(network_viewer_opt.excluded_port, value, isalpha, parse_service_list);
 }
 
 /**
