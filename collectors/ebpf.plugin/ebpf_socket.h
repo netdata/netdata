@@ -53,4 +53,20 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t publish_recv;
 } ebpf_socket_publish_apps_t;
 
-#endif /* NETDATA_EBPF_SOCKET_H */
+typedef struct ebpf_network_viewer_port_list {
+    char *range;
+    uint16_t first;
+    uint16_t last;
+    struct ebpf_network_viewer_port_list *next;
+} ebpf_network_viewer_port_list_t;
+
+typedef struct ebpf_network_viewer_options {
+    uint32_t max_dim;   //Store value read from 'maximum dimensions'
+
+    ebpf_network_viewer_port_list_t *excluded_port;
+    ebpf_network_viewer_port_list_t *included_port;
+} ebpf_network_viewer_options_t;
+
+extern ebpf_network_viewer_options_t network_viewer_opt;
+
+#endif

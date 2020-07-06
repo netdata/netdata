@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 
 #include "ebpf.h"
+#include "ebpf_socket.h"
 
 /*****************************************************************
  *
@@ -113,6 +114,9 @@ ebpf_module_t ebpf_modules[] = {
 // Link with apps.plugin
 pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
+
+//Network viewer
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL };
 
 /*****************************************************************
  *
@@ -654,6 +658,110 @@ static inline int parse_disable_apps(char *ptr)
 }
 
 /**
+ * Fill port list
+ *
+ * Fill an allocated port list with the range given
+ *
+ * @param out a pointer to store the link list
+ * @param range the informed range for the user.
+ */
+static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, char *range)
+{
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->range = strdup(range);
+
+    char *end = range;
+    //Move while I cannot find a separator
+    while (*end && *end != ':' && *end != '-') end++;
+
+    //It has a range
+    if (likely(*end)) {
+        *end++ = '\0';
+    }
+
+    int test;
+    test = str2i((const char *)range);
+    if (test < 0 || test > 65535) {
+        error("The port %d is invalid and it will be ignored!", test);
+        freez(w);
+        return;
+    }
+
+    w->first = test;
+    test = ((likely(*end)))?str2i((const char *)end):w->first;
+    if (test < 0 || test > 65535) {
+        error("The second port %d of the range is invalid and the whole range will be ignored!", test);
+        freez(w);
+        return;
+    }
+
+    w->last = test;
+
+    if (likely(*out)) {
+        ebpf_network_viewer_port_list_t *move = *out;
+        for (; move->next ; move = move->next );
+
+        move->next = w;
+    } else {
+        *out = w;
+    }
+
+}
+
+/**
+ * Parse Port Range
+ *
+ * Parse the port ranges given and create Network Viewer Port Structure
+ *
+ * @param ptr
+ */
+static ebpf_network_viewer_port_list_t *parse_port_range(char *ptr)
+{
+    //No value
+    if (unlikely(!ptr))
+        return NULL;
+
+    //Find the first number
+    while (!isdigit(*ptr)) ptr++;
+
+    //No digit found
+    if (unlikely(!ptr))
+        return NULL;
+
+    ebpf_network_viewer_port_list_t *ret = NULL;
+    while (likely(ptr)) {
+        //Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        fill_port_list(&ret, ptr);
+
+        ptr = end;
+    }
+
+    return ret;
+}
+
+/**
+ * Parse network viewer section
+ */
+static void parse_network_viewer_section()
+{
+    network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
+                                                      EBPF_NETWORK_VIEWER_SECTION,
+                                                      "maximum dimensions",
+                                                      500);
+
+    char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included ports", NULL);
+    network_viewer_opt.included_port = parse_port_range(value);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ports", NULL);
+    network_viewer_opt.excluded_port = parse_port_range(value);
+}
+
+/**
  * Read collector values
  *
  * @param disable_apps variable to store information related to apps.
@@ -683,11 +791,16 @@ static void read_collector_values(int *disable_apps)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name, 1);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
+        //Read network viewer section if network viewer is enabled
+        parse_network_viewer_section();
         started++;
     }
 
-    if (!started)
+    if (!started){
         ebpf_enable_all_charts(*disable_apps);
+        //Read network viewer section
+        parse_network_viewer_section();
+    }
 }
 
 /**

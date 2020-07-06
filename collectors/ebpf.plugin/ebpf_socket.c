@@ -459,6 +459,23 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
  *****************************************************************/
 
 /**
+ * Clean netowrk ports allocated during initializaion.
+ *
+ * @param ptr a pointer to the link list.
+ */
+static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
+{
+    if (unlikely(!ptr))
+        return;
+
+    while (ptr) {
+        ebpf_network_viewer_port_list_t *next = ptr->next;
+        freez(ptr);
+        ptr = next;
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -476,6 +493,9 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(bandwidth_vector);
 
     ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
+
+    clean_network_ports(network_viewer_opt.included_port);
+    clean_network_ports(network_viewer_opt.excluded_port);
 }
 
 /*****************************************************************
