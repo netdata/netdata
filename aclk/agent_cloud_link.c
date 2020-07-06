@@ -133,7 +133,7 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
             break;
         case JSON_NUMBER:
             if (!strcmp(e->name, "version")) {
-                data->version = atoi(e->original_string);
+                data->version = e->data.number;
                 break;
             }
             break;
