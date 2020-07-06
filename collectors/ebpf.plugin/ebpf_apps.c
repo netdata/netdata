@@ -127,56 +127,6 @@ size_t zero_all_targets(struct target *root)
     for (w = root; w; w = w->next) {
         count++;
 
-        /* These variables are not necessary for eBPF collector
-        w->minflt = 0;
-        w->majflt = 0;
-        w->utime = 0;
-        w->stime = 0;
-        w->gtime = 0;
-        w->cminflt = 0;
-        w->cmajflt = 0;
-        w->cutime = 0;
-        w->cstime = 0;
-        w->cgtime = 0;
-        w->num_threads = 0;
-        // w->rss = 0;
-        w->processes = 0;
-
-        w->status_vmsize = 0;
-        w->status_vmrss = 0;
-        w->status_vmshared = 0;
-        w->status_rssfile = 0;
-        w->status_rssshmem = 0;
-        w->status_vmswap = 0;
-
-        w->io_logical_bytes_read = 0;
-        w->io_logical_bytes_written = 0;
-        // w->io_read_calls = 0;
-        // w->io_write_calls = 0;
-        w->io_storage_bytes_read = 0;
-        w->io_storage_bytes_written = 0;
-        // w->io_cancelled_write_bytes = 0;
-
-        // zero file counters
-        if(w->target_fds) {
-            memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
-            w->openfiles = 0;
-            w->openpipes = 0;
-            w->opensockets = 0;
-            w->openinotifies = 0;
-            w->openeventfds = 0;
-            w->opentimerfds = 0;
-            w->opensignalfds = 0;
-            w->openeventpolls = 0;
-            w->openother = 0;
-        }
-
-        w->collected_starttime = 0;
-        w->uptime_min = 0;
-        w->uptime_sum = 0;
-        w->uptime_max = 0;
-         */
-
         if (unlikely(w->root_pid)) {
             struct pid_on_target *pid_on_target = w->root_pid;
 
@@ -737,11 +687,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
         p->ppid = 0;
     }
 
-    /*
-    if(unlikely(debug_enabled && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
-        debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
-    */
-
     // mark it as updated
     p->updated = 1;
     p->keep = 0;
@@ -1049,59 +994,11 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         return;
     }
 
-    /*
-    w->cutime  += p->cutime;
-    w->cstime  += p->cstime;
-    w->cgtime  += p->cgtime;
-    w->cminflt += p->cminflt;
-    w->cmajflt += p->cmajflt;
-
-    w->utime  += p->utime;
-    w->stime  += p->stime;
-    w->gtime  += p->gtime;
-    w->minflt += p->minflt;
-    w->majflt += p->majflt;
-
-    // w->rss += p->rss;
-
-    w->status_vmsize   += p->status_vmsize;
-    w->status_vmrss    += p->status_vmrss;
-    w->status_vmshared += p->status_vmshared;
-    w->status_rssfile  += p->status_rssfile;
-    w->status_rssshmem += p->status_rssshmem;
-    w->status_vmswap   += p->status_vmswap;
-
-    w->io_logical_bytes_read    += p->io_logical_bytes_read;
-    w->io_logical_bytes_written += p->io_logical_bytes_written;
-    // w->io_read_calls            += p->io_read_calls;
-    // w->io_write_calls           += p->io_write_calls;
-    w->io_storage_bytes_read    += p->io_storage_bytes_read;
-    w->io_storage_bytes_written += p->io_storage_bytes_written;
-    // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
-     */
-
     w->processes++;
     struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
     pid_on_target->pid = p->pid;
     pid_on_target->next = w->root_pid;
     w->root_pid = pid_on_target;
-    /*
-    w->num_threads += p->num_threads;
-
-    if(!w->collected_starttime || p->collected_starttime < w->collected_starttime) w->collected_starttime = p->collected_starttime;
-    if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
-    w->uptime_sum += p->uptime;
-    if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
-
-    if(unlikely(debug_enabled || w->debug_enabled)) {
-        // debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
-        struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
-        pid_on_target->pid = p->pid;
-        pid_on_target->next = w->root_pid;
-        w->root_pid = pid_on_target;
-    }
-    */
 }
 
 /**
@@ -1162,66 +1059,14 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int
 
     apply_apps_groups_targets_inheritance();
 
-    /* These lines are not necessary for ebpf plugin
-    zero_all_targets(users_root_target);
-    zero_all_targets(groups_root_target);
-     */
-
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
     struct pid_stat *p = NULL;
-    // struct target *w = NULL, *o = NULL;
 
     // // concentrate everything on the targets
-    for (p = root_of_pids; p; p = p->next) {
-        // --------------------------------------------------------------------
-        // apps_groups target
-
+    for (p = root_of_pids; p; p = p->next)
         aggregate_pid_on_target(p->target, p, NULL);
 
-        //     // --------------------------------------------------------------------
-        //     // user target
-
-        //     o = p->user_target;
-        //     if(likely(p->user_target && p->user_target->uid == p->uid))
-        //         w = p->user_target;
-        //     else {
-        //         if(unlikely(debug_enabled && p->user_target))
-        //             debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
-
-        //         w = p->user_target = get_users_target(p->uid);
-        //     }
-
-        //     aggregate_pid_on_target(w, p, o);
-
-        //     // --------------------------------------------------------------------
-        //     // user group target
-
-        //     o = p->group_target;
-        //     if(likely(p->group_target && p->group_target->gid == p->gid))
-        //         w = p->group_target;
-        //     else {
-        //         if(unlikely(debug_enabled && p->group_target))
-        //             debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
-
-        //         w = p->group_target = get_groups_target(p->gid);
-        //     }
-
-        //     aggregate_pid_on_target(w, p, o);
-
-        //     // --------------------------------------------------------------------
-        //     // aggregate all file descriptors
-
-        //     if(enable_file_charts)
-        //         aggregate_pid_fds_on_targets(p);
-    }
-
     post_aggregate_targets(apps_groups_root_target);
-    /* These lines are not necessary for ebpf plugin
-    post_aggregate_targets(users_root_target);
-    post_aggregate_targets(groups_root_target);
-    */
-
-    // cleanup_exited_pids(out);
 }

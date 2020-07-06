@@ -148,7 +148,7 @@ int get_redhat_release()
 
 static int has_ebpf_kernel_version(int version)
 {
-    //Kernel 4.11.0 or RH > 7.5
+    // Kernel 4.11.0 or RH > 7.5
     return (version >= NETDATA_MINIMUM_EBPF_KERNEL || get_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
 }
 
