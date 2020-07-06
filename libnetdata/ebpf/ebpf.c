@@ -152,7 +152,7 @@ int has_condition_to_run(int version) {
 
 //----------------------------------------------------------------------------------------------------------------------
 
-char *ebpf_library_suffix(int version, int isrh) {
+char *ebpf_kernel_suffix(int version, int isrh) {
     if (isrh) {
         if (version >= NETDATA_EBPF_KERNEL_4_11)
             return "4.18.0";
@@ -172,69 +172,12 @@ char *ebpf_library_suffix(int version, int isrh) {
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int ebpf_load_libraries(ebpf_functions_t *ef, char *libbase, char *pluginsdir)
+int ebpf_update_kernel(ebpf_data_t *ed)
 {
-    // char *err = NULL;
-    char lpath[4096];
-    char netdatasl[128];
-    void *libnetdata;
-
-    snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
-    snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
-    libnetdata = dlopen(lpath, RTLD_LAZY);
-    if (!libnetdata) {
-        info("Cannot load library %s for the current kernel.", lpath);
-
-        //Update kernel
-        char *library = ebpf_library_suffix(ef->running_on_kernel, (ef->isrh < 0)?0:1);
-        size_t length = strlen(library);
-        strncpyz(ef->kernel_string, library, length);
-        ef->kernel_string[length] = '\0';
-
-        //Try to load the default version
-        snprintf(netdatasl, 127, "%s.%s", libbase, ef->kernel_string);
-        snprintf(lpath, 4095, "%s/%s", pluginsdir, netdatasl);
-        libnetdata = dlopen(lpath, RTLD_LAZY);
-        if (!libnetdata) {
-            error("Cannot load %s default library.", lpath);
-            return -1;
-        } else {
-            info("Default shared library %s loaded with success.", lpath);
-            ef->libnetdata = libnetdata;
-        }
-    } else {
-        info("Current shared library %s loaded with success.", lpath);
-        ef->libnetdata = libnetdata;
-    }
-    dlclose(libnetdata);
-
-    ef->load_bpf_file = bpf_prog_load;
-    // ef->load_bpf_file = dlsym(libnetdata, "load_bpf_file");
-    // if ((err = dlerror()) != NULL) {
-    //     error("Cannot find load_bpf_file: %s", err);
-    //     return -1;
-    // }
-
-    ef->bpf_map_lookup_elem = bpf_map_lookup_elem;
-    // ef->bpf_map_lookup_elem = dlsym(libnetdata, "bpf_map_lookup_elem");
-    // if ((err = dlerror()) != NULL) {
-    //     error("Cannot find bpf_map_lookup_elem: %s", err);
-    //     return -1;
-    // }
-
-    ef->bpf_map_delete_elem = bpf_map_delete_elem;
-    // ef->bpf_map_delete_elem = dlsym(libnetdata, "bpf_map_delete_elem");
-    // if ((err = dlerror()) != NULL) {
-    //     error("Cannot find bpf_map_delete_elem: %s", err);
-    //     return -1;
-    // }
-
-    ef->bpf_map_get_next_key = bpf_map_get_next_key;
-    // ef->bpf_map_get_next_key = dlsym(libnetdata, "bpf_map_get_next_key");
-    // if ((err = dlerror()) != NULL) {
-    //     error("Cannot find bpf_map_delete_elem: %s", err);
-    //     return -1;
-    // }
+    char *kernel = ebpf_kernel_suffix(ed->running_on_kernel, (ed->isrh < 0)?0:1);
+    size_t length = strlen(kernel);
+    strncpyz(ed->kernel_string, kernel, length);
+    ed->kernel_string[length] = '\0';
 
     return 0;
 }
@@ -255,11 +198,9 @@ int ebpf_load_program(char *plugins_dir,
                       int event_id, int mode ,
                       char *kernel_string,
                       const char *name,
-                      int *map_fd,
-                      int (*load_bpf_file)(int *, char *, int))
+                      int *map_fd)
 {
     UNUSED(event_id);
-    UNUSED(load_bpf_file);
 
     char lpath[4096];
     char lname[128];

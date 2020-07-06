@@ -171,7 +171,7 @@ extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t 
 
 extern void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
 
-extern void fill_ebpf_functions(ebpf_functions_t *ef);
+extern void fill_ebpf_data(ebpf_data_t *ef);
 
 extern void ebpf_create_charts_on_apps(char *name, char *title, char *units, char *family,
                                        int order, struct target *root);

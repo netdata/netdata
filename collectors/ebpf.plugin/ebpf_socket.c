@@ -19,7 +19,7 @@ static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t *socket_aggregated_data = NULL;
 static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 
-static ebpf_functions_t socket_functions;
+static ebpf_data_t socket_data;
 
 static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
@@ -467,11 +467,7 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    if (socket_functions.libnetdata) {
-        dlclose(socket_functions.libnetdata);
-    }
-
-    freez(socket_functions.map_fd);
+    freez(socket_data.map_fd);
     freez(socket_bandwidth_curr);
     freez(socket_bandwidth_prev);
     freez(bandwidth_vector);
@@ -513,7 +509,7 @@ void change_socket_event() {
  * Set local function pointers, this function will never be compiled with static libraries
  */
 static void set_local_pointers(ebpf_module_t *em) {
-    map_fd = socket_functions.map_fd;
+    map_fd = socket_data.map_fd;
 
     if (em->mode == MODE_ENTRY) {
         change_socket_event();
@@ -540,7 +536,7 @@ void *ebpf_socket_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    fill_ebpf_functions(&socket_functions);
+    fill_ebpf_data(&socket_data);
 
     if (!em->enabled)
         goto endsocket;
@@ -549,14 +545,14 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
 
-    if (ebpf_load_libraries(&socket_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
+    if (ebpf_update_kernel(&socket_data)) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
 
     set_local_pointers(em);
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                          em->thread_name, socket_functions.map_fd, socket_functions.load_bpf_file) ) {
+                          em->thread_name, socket_data.map_fd) ) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }

@@ -21,7 +21,7 @@ static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t *process_aggregated_data = NULL;
 static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
-static ebpf_functions_t process_functions;
+static ebpf_data_t process_data;
 
 static ebpf_process_stat_t **local_process_stats = NULL;
 static ebpf_process_publish_apps_t **current_apps_data = NULL;
@@ -875,11 +875,7 @@ static void ebpf_process_cleanup(void *ptr)
 
     freez(local_process_stats);
 
-    if (process_functions.libnetdata) {
-        dlclose(process_functions.libnetdata);
-    }
-
-    freez(process_functions.map_fd);
+    freez(process_data.map_fd);
     freez(current_apps_data);
     freez(prev_apps_data);
 }
@@ -928,9 +924,9 @@ static void change_syscalls() {
  *
  */
 static void set_local_pointers() {
-    map_fd = process_functions.map_fd;
+    map_fd = process_data.map_fd;
 
-    if (process_functions.isrh >= NETDATA_MINIMUM_RH_VERSION && process_functions.isrh < NETDATA_RH_8)
+    if (process_data.isrh >= NETDATA_MINIMUM_RH_VERSION && process_data.isrh < NETDATA_RH_8)
         change_syscalls();
 }
 
@@ -983,19 +979,19 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     process_enabled = em->enabled;
-    fill_ebpf_functions(&process_functions);
+    fill_ebpf_data(&process_data);
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_MAX_MONITOR_VECTOR);
 
-    if (ebpf_load_libraries(&process_functions, "libnetdata_ebpf.so", ebpf_plugin_dir)) {
+    if (ebpf_update_kernel(&process_data)) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
 
     set_local_pointers();
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                      em->thread_name, process_functions.map_fd, process_functions.load_bpf_file) ) {
+                      em->thread_name, process_data.map_fd) ) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
