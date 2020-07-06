@@ -403,30 +403,13 @@ extern int am_i_running_as_root();
 
 extern void cleanup_exited_pids(ebpf_process_stat_t **out);
 
-#ifndef STATIC
-extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
-                           int (*bpf_map_lookup_elem)(int, const void *, void *));
+extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
-extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd, ebpf_functions_t *ef,
-                                                           struct pid_on_target *pids);
+extern size_t
+read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd, struct pid_on_target *pids);
 
-extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,
-                                                           ebpf_functions_t *ef, struct pid_on_target *pids);
+extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids);
 
-extern void collect_data_for_all_processes(ebpf_process_stat_t **out,
-                                          pid_t *index,
-                                          int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                          int tbl_pid_stats_fd);
-
-#else
-extern int ebpf_read_hash_table(void *ep, int fd, pid_t pid);
-
-extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids);
-
-extern void collect_data_for_all_processes(ebpf_process_stat_t **out,
-                                          pid_t *index,
-                                          int tbl_pid_stats_fd);
-
-#endif
+extern void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int tbl_pid_stats_fd);
 
 #endif

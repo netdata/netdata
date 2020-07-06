@@ -27,18 +27,7 @@ static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 
-#ifndef STATIC
-/**
- * Pointers used when collector is dynamically linked
- */
-
-//Libbpf (It is necessary to have at least kernel 4.10)
-
 static int *map_fd = NULL;
-/**
- * End of the pointers
- */
-#endif
 
 /*****************************************************************
  *

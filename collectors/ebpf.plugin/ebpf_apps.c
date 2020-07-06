@@ -27,12 +27,7 @@ static int
  *
  * @return It returns 0 when the data was copied and -1 otherwise
  */
-#ifndef STATIC
-int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
-                           int (*bpf_map_lookup_elem)(int, const void *, void *))
-#else
-int ebpf_read_hash_table(void *ep, int fd, pid_t pid)
-#endif
+int ebpf_read_hash_table(void *ep, int fd, uint32_t pid)
 {
     if (!ep)
         return -1;
@@ -55,21 +50,12 @@ int ebpf_read_hash_table(void *ep, int fd, pid_t pid)
  *
  * @return
  */
-#ifndef STATIC
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,
-                                                    ebpf_functions_t *ef, struct pid_on_target *pids)
-#else
 size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,struct pid_on_target *pids)
-#endif
 {
     size_t count = 0;
-    while(pids) {
+    while (pids) {
         uint32_t current_pid = pids->pid;
-#ifndef STATIC
-        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid, ef->bpf_map_lookup_elem))
-#else
-            if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
-#endif
+        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
             count++;
 
         pids = pids->next;
@@ -86,13 +72,7 @@ size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int f
  * @param bpf_map_lookup_elem   a pointer for the function to read the data
  * @param bpf_map_get_next_key  a pointer fo the function to read the index.
  */
-#ifndef STATIC
-size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd,
-                                               int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                               int (*bpf_map_get_next_key)(int, const void *, void *))
-#else
 size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd)
-#endif
 {
     size_t count = 0;
     uint32_t key =0;
@@ -104,11 +84,7 @@ size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd)
             eps = callocz(1, sizeof(ebpf_process_stat_t));
             out[next_key] = eps;
         }
-#ifndef STATIC
-        ebpf_read_hash_table(eps, fd, next_key, bpf_map_lookup_elem);
-#else
         ebpf_read_hash_table(eps, fd, next_key);
-#endif
     }
 
     return count;
@@ -1080,16 +1056,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  */
-#ifndef STATIC
-void collect_data_for_all_processes(ebpf_process_stat_t **out,
-                                   pid_t *index,
-                                   int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                   int tbl_pid_stats_fd)
-#else
 void collect_data_for_all_processes(ebpf_process_stat_t **out,
                                    pid_t *index,
                                    int tbl_pid_stats_fd)
-#endif
 {
     struct pid_stat  *pids = root_of_pids;   // global list of all processes running
     while (pids) {
