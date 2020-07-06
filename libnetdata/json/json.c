@@ -137,10 +137,12 @@ int json_callback_print(JSON_ENTRY *e)
  * @param e the output structure
  */
 static inline void json_jsonc_set_string(JSON_ENTRY *e,char *key,const char *value) {
-    size_t length = strlen(key);
+    size_t len = strlen(key);
+    if(len > JSON_NAME_LEN)
+        len = JSON_NAME_LEN;
     e->type = JSON_STRING;
-    memcpy(e->name,key,length);
-    e->name[length] = 0x00;
+    memcpy(e->name,key,len);
+    e->name[len] = 0x00;
     e->data.string = (char *) value;
 }
 
