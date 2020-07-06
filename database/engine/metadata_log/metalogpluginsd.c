@@ -9,9 +9,48 @@ PARSER_RC metalog_pluginsd_host_action(
     char *tags)
 {
     UNUSED(user);
+    //return PARSER_RC_OK;
 
-    info("HOST action: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s",
-         machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
+        info(
+        "HOST action: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s", machine_guid,
+        hostname, registry_hostname, update_every, os, timezone, tags);
+
+    if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
+        info("This is localhost will not replay HOST command");
+        strcpy(machine_guid, "535767b4-83c9-11ea-a908-525400201d9b");
+        strcpy(hostname, "ubuntu1804");
+        //return PARSER_RC_OK;
+    }
+
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    if (host) {
+        info("Ignoring host %s we have it already", hostname);
+        return PARSER_RC_OK;
+    }
+
+    host = rrdhost_find_or_create(
+        hostname
+        , registry_hostname
+        , machine_guid
+        , os
+        , timezone
+        , tags
+        , NULL
+        , NULL
+        , update_every
+        , 3600
+        , RRD_MEMORY_MODE_DBENGINE
+        , 0   // health enabled
+        , 0   // Push enabled
+        , NULL
+        , NULL
+        , NULL
+        , callocz(1, sizeof(struct rrdhost_system_info))
+    );
+
+    if (host)
+        info("HOST REPLAY created host ok");
+
     return PARSER_RC_OK;
 }
 

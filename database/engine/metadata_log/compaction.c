@@ -118,12 +118,6 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
                     error("Forcing compaction of CHART %s", rd->rrdset->id);
                     compact_record_by_uuid(ctx, rd->rrdset->chart_uuid);
                 }
-
-                if (strcmp(rd->id, "iwlwifi_1-virtual-0_temp1") == 0) {
-                    error("SKIPPING %s on purpose (chart = %s)", rd->id, rd->rrdset->id);
-                   break;
-                }
-
                 if (ctx->current_compaction_id > rd->state->compaction_id) {
                     rd->state->compaction_id = ctx->current_compaction_id;
                     buffer = metalog_update_dimension_buffer(rd);

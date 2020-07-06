@@ -596,6 +596,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , 1
     );
     rrd_unlock();
+    info("megadb metadatalog replay started");
+    //rrdeng_init(localhost, NULL, NULL, 0, 0);
+    int error = metalog_init(localhost->rrdeng_ctx);
+    if (error) {
+        error("Failed to initialize metadata log file event loop.");
+    }
+    info("megadb metadatalog replay finished");
 	web_client_api_v1_management_init();
     return localhost==NULL;
 }
