@@ -25,5 +25,7 @@ extern PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char 
 extern PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid);
 extern PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid);
 extern PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid);
+extern PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plugins_action);
+extern PARSER_RC metalog_pluginsd_host_action(void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone, char *tags);
 
 #endif /* NETDATA_METALOGPLUGINSD_H */

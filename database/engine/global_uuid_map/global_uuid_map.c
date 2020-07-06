@@ -155,6 +155,7 @@ GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
                     return GUID_TYPE_NOSPACE;
                 strncpyz(object, (char *) *PValue+1, max_bytes - 1);
                 break;
+            case GUID_TYPE_HOST:
             case GUID_TYPE_CHART:
             case GUID_TYPE_DIMENSION:
                 if (unlikely(max_bytes < (size_t) value_type * 16))
@@ -220,6 +221,11 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type, int
             target_object[0] = object_type;
             memcpy(target_object + 1, (((RRDSET *)object))->rrdhost->host_uuid, 16);
             memcpy(target_object + 17, temp_uuid, 16);
+            break;
+        case GUID_TYPE_HOST:
+            target_object = mallocz(17);
+            target_object[0] = object_type;
+            memcpy(target_object + 1, (((RRDHOST *)object))->host_uuid, 16);
             break;
         case GUID_TYPE_CHAR:
             target_object = mallocz(strlen((char *) object)+2);

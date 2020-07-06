@@ -276,6 +276,10 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
             error("Host machine GUID is not valid.");
         }
+        if (unlikely(find_or_generate_guid((void *) host, host->host_uuid, GUID_TYPE_HOST, 1)))
+            error("Failed to store machine GUID to global map");
+        else
+            info("Added %s to global map for host %s", host->machine_guid, host->hostname);
         host->objects_nr = 1;
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
