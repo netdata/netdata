@@ -12,8 +12,8 @@
  *****************************************************************/
 
 static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent", "received" };
-static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close", "udp_sendmsg",
-                                                            "udp_recvmsg" };
+static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close",
+                                                            "udp_sendmsg", "udp_recvmsg" };
 
 static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t *socket_aggregated_data = NULL;
@@ -43,19 +43,18 @@ static int *map_fd = NULL;
  * @param udp      structure to store IO from udp sockets
  * @param input    the structure with the input data.
  */
-static void ebpf_update_global_publish(netdata_publish_syscall_t *publish,
-                                       netdata_publish_vfs_common_t *tcp,
-                                       netdata_publish_vfs_common_t *udp,
-                                       netdata_syscall_stat_t *input) {
-
+static void ebpf_update_global_publish(
+    netdata_publish_syscall_t *publish, netdata_publish_vfs_common_t *tcp, netdata_publish_vfs_common_t *udp,
+    netdata_syscall_stat_t *input)
+{
     netdata_publish_syscall_t *move = publish;
-    while(move) {
-        if(input->call != move->pcall) {
+    while (move) {
+        if (input->call != move->pcall) {
             //This condition happens to avoid initial values with dimensions higher than normal values.
-            if(move->pcall) {
-                move->ncall = (input->call > move->pcall)?input->call - move->pcall: move->pcall - input->call;
-                move->nbyte = (input->bytes > move->pbyte)?input->bytes - move->pbyte: move->pbyte - input->bytes;
-                move->nerr = (input->ecall > move->nerr)?input->ecall - move->perr: move->perr - input->ecall;
+            if (move->pcall) {
+                move->ncall = (input->call > move->pcall) ? input->call - move->pcall : move->pcall - input->call;
+                move->nbyte = (input->bytes > move->pbyte) ? input->bytes - move->pbyte : move->pbyte - input->bytes;
+                move->nerr = (input->ecall > move->nerr) ? input->ecall - move->perr : move->perr - input->ecall;
             } else {
                 move->ncall = 0;
                 move->nbyte = 0;
@@ -88,8 +87,7 @@ static void ebpf_update_global_publish(netdata_publish_syscall_t *publish,
  * @param curr   Last values read from memory.
  * @param prev   Previous values read from memory.
  */
-static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr,
-                                            ebpf_socket_publish_apps_t *prev)
+static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr, ebpf_socket_publish_apps_t *prev)
 {
     curr->publish_recv = curr->received - prev->received;
     curr->publish_sent = curr->sent - prev->sent;
@@ -100,23 +98,28 @@ static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr,
  *
  * @param em the structure with thread information
  */
-static void ebpf_socket_send_data(ebpf_module_t *em) {
+static void ebpf_socket_send_data(ebpf_module_t *em)
+{
     netdata_publish_vfs_common_t common_tcp;
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
 
-    write_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
-    write_io_chart(NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[0], socket_id_names[1], &common_tcp);
+    write_count_chart(
+      NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
+    write_io_chart(
+        NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[0], socket_id_names[1], &common_tcp);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
+        write_err_chart(
+          NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
     }
 
-    write_count_chart(NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY,
-                             &socket_publish_aggregated[NETDATA_UDP_START], 2);
-    write_io_chart(NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[3], socket_id_names[4], &common_udp);
+    write_count_chart(
+        NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
+    write_io_chart(
+        NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[3], socket_id_names[4], &common_udp);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY,
-                               &socket_publish_aggregated[NETDATA_UDP_START], 2);
+        write_err_chart(
+            NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
     }
 }
 
@@ -153,7 +156,7 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
  */
 void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 {
-    (void)em;
+    UNUSED(em);
     if (!socket_apps_created)
         return;
 
@@ -161,7 +164,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
-    for (w = root; w ; w = w->next) {
+    for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_sent));
             write_chart_dimension(w->name, value);
@@ -170,7 +173,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     write_end_chart();
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV);
-    for (w = root; w ; w = w->next) {
+    for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_recv));
             write_chart_dimension(w->name, value);
@@ -192,7 +195,8 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
  *
  * @param em a pointer to the structure with the default values.
  */
-static void ebpf_create_global_charts(ebpf_module_t *em) {
+static void ebpf_create_global_charts(ebpf_module_t *em)
+{
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
                       NETDATA_TCP_FUNCTION_COUNT,
                       "Calls to internal functions",
@@ -267,7 +271,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em) {
  */
 void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
-    (void)em;
+    UNUSED(em);
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                "Bytes sent",
                                EBPF_COMMON_DIMENSION_BYTESS,
@@ -301,7 +305,7 @@ static void read_hash_global_tables()
 
     netdata_idx_t *val = socket_hash_values;
     int fd = map_fd[4];
-    for (idx = 0; idx < NETDATA_SOCKET_COUNTER ; idx++) {
+    for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
             int i;
@@ -340,7 +344,7 @@ static void read_hash_global_tables()
  */
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
-    ebpf_socket_publish_apps_t *curr= socket_bandwidth_curr[current_pid];
+    ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
     ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
     if (!curr) {
         ebpf_socket_publish_apps_t *ptr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
@@ -365,7 +369,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
  */
 void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
 {
-    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15)?ebpf_nprocs:1;
+    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
     ebpf_bandwidth_t *total = &out[0];
     for (i = 1; i < end; i++) {
         ebpf_bandwidth_t *move = &out[i];
@@ -382,7 +386,7 @@ static void ebpf_socket_update_apps_data()
     int fd = map_fd[0];
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
-    struct pid_stat  *pids = root_of_pids;
+    struct pid_stat *pids = root_of_pids;
     while (pids) {
         key = pids->pid;
 
@@ -408,7 +412,6 @@ static void ebpf_socket_update_apps_data()
  *
  *****************************************************************/
 
-
 /**
  * Main loop for this collector.
  *
@@ -417,14 +420,14 @@ static void ebpf_socket_update_apps_data()
  */
 static void socket_collector(usec_t step, ebpf_module_t *em)
 {
-    (void)em;
-    (void)step;
+    UNUSED(em);
+    UNUSED(step);
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
     int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
-    while(!close_ebpf_plugin) {
+    while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
@@ -462,7 +465,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
  */
 static void ebpf_socket_cleanup(void *ptr)
 {
-    (void)ptr;
+    UNUSED(ptr);
     freez(socket_aggregated_data);
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
@@ -488,17 +491,19 @@ static void ebpf_socket_cleanup(void *ptr)
  *
  * @param length is the length for the vectors used inside the collector.
  */
-static void ebpf_socket_allocate_global_vectors(size_t length) {
+static void ebpf_socket_allocate_global_vectors(size_t length)
+{
     socket_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
     socket_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-    bandwidth_vector = callocz((size_t) ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 }
 
-void change_socket_event() {
+void change_socket_event()
+{
     socket_probes[0].type = 'p';
     socket_probes[4].type = 'p';
     socket_probes[5].type = 'p';
@@ -508,7 +513,8 @@ void change_socket_event() {
 /**
  * Set local function pointers, this function will never be compiled with static libraries
  */
-static void set_local_pointers(ebpf_module_t *em) {
+static void set_local_pointers(ebpf_module_t *em)
+{
     map_fd = socket_data.map_fd;
 
     if (em->mode == MODE_ENTRY) {
@@ -551,20 +557,21 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     set_local_pointers(em);
-    if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
-                          em->thread_name, socket_data.map_fd) ) {
+    if (ebpf_load_program(
+            ebpf_plugin_dir, em->thread_id, em->mode, kernel_string, em->thread_name, socket_data.map_fd)) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
 
-    ebpf_global_labels(socket_aggregated_data, socket_publish_aggregated, socket_dimension_names,
-                       socket_id_names, NETDATA_MAX_SOCKET_VECTOR);
+    ebpf_global_labels(
+        socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
+        NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
 
     pthread_mutex_unlock(&lock);
 
-    socket_collector((usec_t)(em->update_time*USEC_PER_SEC), em);
+    socket_collector((usec_t)(em->update_time * USEC_PER_SEC), em);
 
 endsocket:
     netdata_thread_cleanup_pop(1);
