@@ -1,10 +1,12 @@
-#ifndef _NETDATA_EBPF_H_
-# define _NETDATA_EBPF_H_ 1
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_EBPF_H
+#define NETDATA_EBPF_H 1
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-# define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
+#define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
 
 /**
  * The next magic number is got doing the following math:
@@ -12,7 +14,7 @@
  *
  *  For more details, please, read /usr/include/linux/version.h
  */
-# define NETDATA_MINIMUM_EBPF_KERNEL 264960
+#define NETDATA_MINIMUM_EBPF_KERNEL 264960
 
 /**
  * The RedHat magic number was got doing:
@@ -22,33 +24,33 @@
  *  For more details, please, read /usr/include/linux/version.h
  *  in any Red Hat installation.
  */
-# define NETDATA_MINIMUM_RH_VERSION 1797
+#define NETDATA_MINIMUM_RH_VERSION 1797
 
 /**
  * 2048 = 8*256 + 0
  */
-# define NETDATA_RH_8 2048
+#define NETDATA_RH_8 2048
 
 /**
  *  Kernel 4.17
  *
  *  266496 = 4*65536 + 17*256
  */
-# define NETDATA_EBPF_KERNEL_4_17 266496
+#define NETDATA_EBPF_KERNEL_4_17 266496
 
 /**
  *  Kernel 4.15
  *
  *  265984 = 4*65536 + 15*256
  */
-# define NETDATA_EBPF_KERNEL_4_15 265984
+#define NETDATA_EBPF_KERNEL_4_15 265984
 
 /**
  *  Kernel 4.11
  *
  *  264960 = 4*65536 + 15*256
  */
-# define NETDATA_EBPF_KERNEL_4_11 264960
+#define NETDATA_EBPF_KERNEL_4_11 264960
 
 typedef struct netdata_ebpf_events {
     char type;
@@ -75,4 +77,4 @@ extern int ebpf_load_program(char *plugins_dir,
                              const char *name,
                              int *map_fd);
 
-#endif
+#endif /* NETDATA_EBPF_H */
