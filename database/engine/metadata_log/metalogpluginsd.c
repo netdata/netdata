@@ -8,6 +8,10 @@ PARSER_RC metalog_pluginsd_host_action(
     void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone,
     char *tags)
 {
+    UNUSED(user);
+
+    info("HOST action: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s",
+         machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
     return PARSER_RC_OK;
 }
 
@@ -213,11 +217,8 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
     return PARSER_RC_OK;
 }
 
-    PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-
-
     char *machine_guid = words[1];
     char *hostname = words[2];
     char *registry_hostname = words[3];
@@ -235,13 +236,10 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
     info("HOST PARSED: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s",
          machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
 
-
-//    if (have_action) {
-//        return plugins_action->chart_action(
-//            user, type, id, name, family, context, title, units,
-//            (plugin && *plugin) ? plugin : ((PARSER_USER_OBJECT *)user)->cd->filename, module, priority, update_every,
-//            chart_type, options);
-//    }
+    if (plugins_action->host_action) {
+        return plugins_action->host_action(
+            user, machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
+    }
 
     return PARSER_RC_OK;
 }
