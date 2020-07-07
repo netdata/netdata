@@ -116,6 +116,15 @@ ebpf_process_stat_t *global_process_stat = NULL;
  *
  *****************************************************************/
 
+static void change_events()
+{
+    if (ebpf_modules[0].mode == MODE_ENTRY)
+        change_process_event();
+
+    if (ebpf_modules[1].mode == MODE_ENTRY)
+        change_socket_event();
+}
+
 /**
  * Clean Loaded Events
  *
@@ -921,6 +930,7 @@ int main(int argc, char **argv)
         {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
     };
 
+    change_events();
     clean_loaded_events();
 
     int i;

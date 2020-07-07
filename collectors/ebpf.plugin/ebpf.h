@@ -202,4 +202,8 @@ extern int update_every;
 
 # define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
+//External functions
+extern void change_socket_event();
+extern void change_process_event();
+
 #endif

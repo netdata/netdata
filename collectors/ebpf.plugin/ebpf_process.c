@@ -923,7 +923,7 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     prev_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
 }
 
-static void change_collector_event() {
+void change_process_event() {
     int i;
     if (running_on_kernel < NETDATA_KERNEL_V5_3)
         process_probes[EBPF_SYS_CLONE_IDX].name = NULL;
@@ -951,10 +951,6 @@ static void set_local_pointers(ebpf_module_t *em) {
 #endif
 
     map_fd = process_functions.map_fd;
-
-    if (em->mode == MODE_ENTRY) {
-        change_collector_event();
-    }
 
     if (process_functions.isrh >= NETDATA_MINIMUM_RH_VERSION && process_functions.isrh < NETDATA_RH_8)
         change_syscalls();
