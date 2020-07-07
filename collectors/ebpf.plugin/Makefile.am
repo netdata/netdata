@@ -3,11 +3,18 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
+include $(top_srcdir)/build/subst.inc
+SUFFIXES = .in
+
+dist_plugins_SCRIPTS = \
+    reset_netdata_trace.sh \
+    $(NULL)
+
 dist_noinst_DATA = \
+    reset_netdata_trace.sh.in \
     README.md \
     $(NULL)
 
 dist_libconfig_DATA = \
     ebpf.conf \
     $(NULL)
-
