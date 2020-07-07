@@ -1484,6 +1484,56 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     return 0;
 }
 
+static inline void aclk_request_free(struct aclk_request *req)
+{
+    if (req->payload) {
+        freez(req->payload);
+        req->payload = NULL;
+    }
+
+    if (req->type_id) {
+        freez(req->type_id);
+        req->type_id = NULL;
+    }
+
+    if (req->msg_id) {
+        freez(req->msg_id);
+        req->msg_id = NULL;
+    }
+
+    if (req->callback_topic) {
+        freez(req->callback_topic);
+        req->callback_topic = NULL;
+    }
+}
+
+static inline int aclk_extract_v2_payload(char *payload, struct aclk_request *req)
+{
+    char* ptr = strstr(payload, ACLK_V2_PAYLOAD_SEPARATOR);
+    if(!ptr)
+        return 1;
+    ptr += strlen(ACLK_V2_PAYLOAD_SEPARATOR);
+    req->payload = strdupz(ptr);
+    return 0;
+}
+
+static inline int aclk_v2_payload_preverify(const char *payload)
+{
+    // we do better parsing when we handle the command in query thread
+    // this is only to check roughly if all looks OK
+    if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
+        error("Only accepting GET requests from CLOUD.");
+        return 1;
+    }
+
+    if(!strstr(payload, " HTTP/1.1\x0D\x0A")) {
+        error("Doesn't look like HTTP GET request.");
+        return 1;
+    }
+
+    return 0;
+}
+
 /*
  * Parse the incoming payload and queue a command if valid
  */

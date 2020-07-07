@@ -2,6 +2,8 @@
 #include "aclk_query.h"
 #include "aclk_stats.h"
 
+#define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
+
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
@@ -18,7 +20,7 @@ static netdata_mutex_t queue_mutex = NETDATA_MUTEX_INITIALIZER;
 #define ACLK_QUEUE_UNLOCK netdata_mutex_unlock(&queue_mutex)
 
 struct aclk_query {
-    time_t created;
+    usec_t created;
     time_t run_after; // Delay run until after this time
     ACLK_CMD cmd;     // What command is this
     char *topic;      // Topic to respond to
@@ -231,7 +233,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         new_query->data = strdupz(data);
 
     new_query->next = NULL;
-    new_query->created = now_realtime_sec();
+    new_query->created = now_realtime_usec();
     new_query->run_after = run_after;
 
     debug(D_ACLK, "Added query (%s) (%s)", topic, query ? query : "");
@@ -318,6 +320,26 @@ static char *aclk_encode_response(char *src, size_t content_size, int keep_newli
 #pragma region ACLK_QUERY
 #endif
 
+static usec_t aclk_web_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
+{
+    usec_t t;
+
+    t = now_monotonic_high_precision_usec();
+    w->response.code = web_client_api_request_v1(host, w, url);
+    t = now_monotonic_high_precision_usec() - t;
+
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.cloud_q_process_total += t;
+        aclk_metrics_per_sample.cloud_q_process_count++;
+        if (aclk_metrics_per_sample.cloud_q_process_max < t)
+            aclk_metrics_per_sample.cloud_q_process_max = t;
+        ACLK_STATS_UNLOCK;
+    }
+
+    return t;
+}
+
 static int aclk_execute_query(struct aclk_query *this_query)
 {
     if (strncmp(this_query->query, "/api/v1/", 8) == 0) {
@@ -340,7 +362,7 @@ static int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        w->response.code = web_client_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
         now_realtime_timeval(&w->tv_ready);
         w->response.data->date = w->tv_ready.tv_sec;
         web_client_build_http_header(w);  // TODO: this function should offset from date, not tv_ready
@@ -375,16 +397,161 @@ static int aclk_execute_query(struct aclk_query *this_query)
     return 1;
 }
 
+static int aclk_execute_query_v2(struct aclk_query *this_query)
+{
+//TODO both aclk_execute_query() and aclk_execute_query_v2() are not pretty :/
+    int retval = 0;
+    usec_t t;
+
+#ifdef NETDATA_WITH_ZLIB
+    int z_ret;
+    BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+#endif
+
+    //get the query
+    char buff[NETDATA_WEB_REQUEST_URL_SIZE];
+    char *rd = this_query->query;
+    char *end;
+    int len;
+    if (strncmp(rd, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX)))
+        return 1;
+    rd += strlen(ACLK_CLOUD_REQ_V2_PREFIX);
+
+    if(!(end = strstr(rd, "\x0D\x0A")))
+        return 1;
+
+    len = MIN(NETDATA_WEB_REQUEST_URL_SIZE-1, end-rd);
+    strncpy(buff, rd, len);
+    buff[len] = 0;
+
+    rd = end + 2;
+
+    if(!(end = strstr(buff," HTTP/1.")))
+        return 1;
+    *end = 0;
+
+    struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
+    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+    strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
+    w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
+    w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
+    w->acl = 0x1f;
+
+    char *mysep = strchr(buff, '?');
+    if (mysep) {
+        strncpyz(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE);
+        *mysep = '\0';
+    } else
+        strncpyz(w->decoded_query_string, buff, NETDATA_WEB_REQUEST_URL_SIZE);
+
+    // execute the query
+    t = aclk_web_api_request_v1(localhost, w, *buff ? buff : "noop");
+
+#ifdef NETDATA_WITH_ZLIB
+    // check if gzip encoding can and should be used
+    if ((rd = strstr(rd, WEB_HDR_ACCEPT_ENC))) {
+        rd += strlen(WEB_HDR_ACCEPT_ENC);
+        end = strstr(rd, "\x0D\x0A");
+        if(end)
+            len = MIN(NETDATA_WEB_REQUEST_URL_SIZE-1, end-rd);
+        else
+            len = NETDATA_WEB_REQUEST_URL_SIZE-1;
+
+        strncpy(buff, rd, len);
+        buff[len] = 0;
+
+        if(strstr(buff, "gzip")) {
+            w->response.zstream.zalloc = Z_NULL;
+            w->response.zstream.zfree = Z_NULL;
+            w->response.zstream.opaque = Z_NULL;
+            if(deflateInit2(&w->response.zstream, web_gzip_level, Z_DEFLATED, 15 + 16, 8, web_gzip_strategy) == Z_OK) {
+                w->response.zinitialized = 1;
+                w->response.zoutput = 1;
+            } else
+                error("Failed to initialize zlib. Proceeding without compression.");
+        }
+    }
+
+    if (w->response.data->len && w->response.zinitialized) {
+        w->response.zstream.next_in = (Bytef *)w->response.data->buffer;
+        w->response.zstream.avail_in = w->response.data->len;
+        do {
+            w->response.zstream.avail_out = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE;
+            w->response.zstream.next_out = w->response.zbuffer;
+            z_ret = deflate(&w->response.zstream, Z_FINISH);
+            if(z_ret < 0) {
+                if(w->response.zstream.msg)
+                    error("Error compressing body. ZLIB error: \"%s\"", w->response.zstream.msg);
+                else
+                    error("Unknown error during zlib compression.");
+                retval = 1;
+                goto cleanup;
+            }
+            int bytes_to_cpy = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE - w->response.zstream.avail_out;
+            buffer_need_bytes(z_buffer, bytes_to_cpy);
+            memcpy(&z_buffer->buffer[z_buffer->len], w->response.zbuffer, bytes_to_cpy);
+            z_buffer->len += bytes_to_cpy;
+        } while(z_ret != Z_STREAM_END);
+        // so that web_client_build_http_header
+        // puts correct content lenght into header
+        buffer_free(w->response.data);
+        w->response.data = z_buffer;
+        z_buffer = NULL;
+    }
+#endif
+
+    now_realtime_timeval(&w->tv_ready);
+    w->response.data->date = w->tv_ready.tv_sec;
+    web_client_build_http_header(w);
+    BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    local_buffer->contenttype = CT_APPLICATION_JSON;
+
+    aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0, aclk_shared_state.version_neg);
+    buffer_sprintf(local_buffer, ",\"t-exec\": %llu,\"t-rcvd\": %llu", t, this_query->created);
+    buffer_strcat(local_buffer, "}\x0D\x0A\x0D\x0A");
+    buffer_strcat(local_buffer, w->response.header_output->buffer);
+
+    if (w->response.data->len) {
+#ifdef NETDATA_WITH_ZLIB
+        if (w->response.zinitialized) {
+            buffer_need_bytes(local_buffer, w->response.data->len);
+            memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
+            local_buffer->len += w->response.data->len;
+        } else {
+#endif
+            buffer_strcat(local_buffer, w->response.data->buffer);
+#ifdef NETDATA_WITH_ZLIB
+        }
+#endif
+    }
+
+    aclk_send_message_bin(this_query->topic, local_buffer->buffer, local_buffer->len, this_query->msg_id);
+
+cleanup:
+#ifdef NETDATA_WITH_ZLIB
+    if(w->response.zinitialized)
+        deflateEnd(&w->response.zstream);
+    buffer_free(z_buffer);
+#endif
+    buffer_free(w->response.data);
+    buffer_free(w->response.header);
+    buffer_free(w->response.header_output);
+    freez(w);
+    buffer_free(local_buffer);
+    return retval;
+}
+
 /*
  * This function will fetch the next pending command and process it
  *
  */
-static int aclk_process_query(int t_idx)
+static int aclk_process_query(struct aclk_query_thread *t_info)
 {
     struct aclk_query *this_query;
     static long int query_count = 0;
     ACLK_METADATA_STATE meta_state;
-    usec_t t = 0;
 
     if (!aclk_connected)
         return 0;
@@ -402,8 +569,8 @@ static int aclk_process_query(int t_idx)
     query_count++;
 
     debug(
-        D_ACLK, "Query #%ld (%s) size=%zu in queue %d seconds", query_count, this_query->topic,
-        this_query->query ? strlen(this_query->query) : 0, (int)(now_realtime_sec() - this_query->created));
+        D_ACLK, "Query #%ld (%s) size=%zu in queue %d ms", query_count, this_query->topic,
+        this_query->query ? strlen(this_query->query) : 0, (int)(now_realtime_usec() - this_query->created)/1000);
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
@@ -432,10 +599,12 @@ static int aclk_process_query(int t_idx)
             break;
 
         case ACLK_CMD_CLOUD:
-            t = now_monotonic_high_precision_usec();
+        case ACLK_CMD_CLOUD_2:
             debug(D_ACLK, "EXECUTING a cloud command");
-            aclk_execute_query(this_query);
-            t = now_monotonic_high_precision_usec() - t;
+            if(this_query->cmd == ACLK_CMD_CLOUD)
+                aclk_execute_query(this_query);
+            else
+                aclk_execute_query_v2(this_query);
             break;
 
         default:
@@ -446,13 +615,7 @@ static int aclk_process_query(int t_idx)
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.queries_dispatched++;
-        aclk_queries_per_thread[t_idx]++;
-        if(this_query->cmd == ACLK_CMD_CLOUD) {
-            aclk_metrics_per_sample.cloud_q_process_total += t;
-            aclk_metrics_per_sample.cloud_q_process_count++;
-            if(aclk_metrics_per_sample.cloud_q_process_max < t)
-                aclk_metrics_per_sample.cloud_q_process_max = t;
-        }
+        aclk_queries_per_thread[t_info->idx]++;
         ACLK_STATS_UNLOCK;
     }
 
@@ -566,7 +729,7 @@ void *aclk_query_main_thread(void *ptr)
         }
         ACLK_SHARED_STATE_UNLOCK;
 
-        while (aclk_process_query(info->idx)) {
+        while (aclk_process_query(info)) {
             // Process all commands
         };
 

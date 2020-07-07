@@ -27,6 +27,7 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
+    ACLK_CMD_CLOUD_2,
     ACLK_CMD_ONCONNECT,
     ACLK_CMD_INFO,
     ACLK_CMD_CHART,
@@ -69,6 +70,8 @@ const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type);
 #define ACLK_PROXY_PROTO_ADDR_SEPARATOR "://"
 #define ACLK_PROXY_ENV "env"
 #define ACLK_PROXY_CONFIG_VAR "proxy"
+
+#define ACLK_CLOUD_REQ_V2_PREFIX "GET /api/v1/"
 
 ACLK_PROXY_TYPE aclk_verify_proxy(const char *string);
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);

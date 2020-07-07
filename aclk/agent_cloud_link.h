@@ -28,6 +28,8 @@
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
+#define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
+
 struct aclk_request {
     char *type_id;
     char *msg_id;

@@ -4,6 +4,7 @@
 #define NETDATA_ACLK_QUERY_H
 
 #include "libnetdata/libnetdata.h"
+#include "web/server/web_client.h"
 
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
