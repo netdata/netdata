@@ -916,7 +916,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-    if (localhost && localhost != host) {
+    if (localhost == host || (!rrdhost_flag_check(host, RRDHOST_FLAG_MULTIHOST))) {
         info("Metadatalog init for host %s starting...", host->hostname);
         error = metalog_init(ctx);
         if (error) {

@@ -276,39 +276,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         health_alarm_log_open(host);
     }
 
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-#ifdef ENABLE_DBENGINE
-        if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
-            error("Host machine GUID is not valid.");
-        }
-        if (unlikely(find_or_generate_guid((void *) host, &host->host_uuid, GUID_TYPE_HOST, 1)))
-            error("Failed to store machine GUID to global map");
-        else
-            info("Added %s to global map for host %s", host->machine_guid, host->hostname);
-        host->objects_nr = 1;
-        host->compaction_id = 0;
-        char dbenginepath[FILENAME_MAX + 1];
-        int ret;
-
-        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
-        ret = mkdir(dbenginepath, 0775);
-        if(ret != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
-        else
-            ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
-        if(ret) {
-            error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-                  host->hostname, host->machine_guid, host->cache_dir);
-            rrdhost_free(host);
-            host = NULL;
-            //rrd_hosts_available++; //TODO: maybe we want this?
-
-            return host;
-        }
-#else
-        fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
-#endif
-    }
 
     // ------------------------------------------------------------------------
     // link it and add it to the index
@@ -371,6 +338,41 @@ RRDHOST *rrdhost_create(const char *hostname,
              , host->health_default_exec
              , host->health_default_recipient
         );
+    }
+
+
+    if (host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
+            error("Host machine GUID is not valid.");
+        }
+        if (unlikely(find_or_generate_guid((void *) host, &host->host_uuid, GUID_TYPE_HOST, 1)))
+            error("Failed to store machine GUID to global map");
+        else
+            info("Added %s to global map for host %s", host->machine_guid, host->hostname);
+        host->objects_nr = 1;
+        host->compaction_id = 0;
+        char dbenginepath[FILENAME_MAX + 1];
+        int ret;
+
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+        ret = mkdir(dbenginepath, 0775);
+        if(ret != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
+        else
+            ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+        if(ret) {
+            error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+                  host->hostname, host->machine_guid, host->cache_dir);
+            rrdhost_free(host);
+            host = NULL;
+            //rrd_hosts_available++; //TODO: maybe we want this?
+
+            return host;
+        }
+#else
+        fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
+#endif
     }
 
     rrd_hosts_available++;
@@ -603,13 +605,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , 0
     );
     rrd_unlock();
-    info("megadb metadatalog replay started");
-    //rrdeng_init(localhost, NULL, NULL, 0, 0);
-    int error = metalog_init(localhost->rrdeng_ctx);
-    if (error) {
-        error("Failed to initialize metadata log file event loop.");
-    }
-    info("megadb metadatalog replay finished");
 	web_client_api_v1_management_init();
     return localhost==NULL;
 }
