@@ -116,7 +116,8 @@ pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL };
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL,
+                                                     .names = NULL };
 
 /*****************************************************************
  *
@@ -667,7 +668,15 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
 {
     if (likely(*out)) {
         ebpf_network_viewer_port_list_t *move = *out;
-        for (; move->next ; move = move->next );
+        for (; move->next ; move = move->next ) {
+            if (move->first <= in->first && move->last >= in->first &&
+                move->first <= in->last && move->last >= in->last) {
+                info("The range/value (%u, %u) is inside the range/value (%u, %u), it will be ignored.",
+                     in->first, in->last, move->first, move->last);
+                freez(in->value);
+                freez(in);
+            }
+        }
 
         move->next = in;
     } else {
@@ -675,7 +684,7 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding to list %s( %u, %u) to the list",in->value, in->first, in->last);
+    info("Adding values %s( %u, %u) to port list used on network viewer",in->value, in->first, in->last);
 #endif
 }
 
@@ -704,16 +713,18 @@ static void parse_port_list(ebpf_network_viewer_port_list_t **out, char *range)
 
     int test;
     test = str2i((const char *)range);
-    if (test < 0 || test > 65535) {
+    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
         error("The port %d is invalid and it will be ignored!", test);
+        freez(w->value);
         freez(w);
         return;
     }
 
     w->first = test;
     test = ((likely(*end)))?str2i((const char *)end):w->first;
-    if (test < 0 || test > 65535) {
+    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
         error("The second port %d of the range is invalid and the whole range will be ignored!", test);
+        freez(w->value);
         freez(w);
         return;
     }
@@ -741,6 +752,7 @@ static void parse_service_list(ebpf_network_viewer_port_list_t **out, char *serv
 
     if (!serv) {
         error("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        freez(w->value);
         freez(w);
         return;
     }
@@ -798,7 +810,8 @@ static void parse_network_viewer_section()
                                                       "maximum dimensions",
                                                       500);
 
-    char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included ports", NULL);
+    char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
+                                "included ports", NULL);
     parse_values(network_viewer_opt.included_port, value, isdigit, parse_port_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ports", NULL);
@@ -809,6 +822,69 @@ static void parse_network_viewer_section()
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded services", NULL);
     parse_values(network_viewer_opt.excluded_port, value, isalpha, parse_service_list);
+}
+
+/**
+ * Link dimension name
+ *
+ * Link user specified names inside a link list.
+ *
+ * @param port the port number associated to the dimension name.
+ * @param hash the calculated hash for the dimension name.
+ * @param name the dimension name.
+ */
+static void link_dimension_name(char *port, uint32_t hash, char *value)
+{
+    int test = str2i(port);
+    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
+        error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
+        return;
+    }
+
+    ebpf_network_viewer_dim_name_t *w;
+    w = callocz(1, sizeof(ebpf_network_viewer_dim_name_t));
+
+    w->name = strdupz(value);
+    w->hash = hash;
+
+    w->port = (uint16_t) test;
+
+    ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
+    if (unlikely(!names)) {
+        names = w;
+    } else {
+        for (; names->next; names = names->next) {
+            if (names->port == w->port) {
+                error("Dupplicated definition for the service '%u', the name %s will be ignored. ", hash, names->name);
+                freez(names->name);
+                names->name = w->name;
+                names->hash = w->hash;
+                freez(w);
+                return;
+            }
+        }
+        names->next = w;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding values %s( %u) to port list used on network viewer",w->name, w->port);
+#endif
+}
+
+/**
+ * Parse service Name section.
+ *
+ * This function gets the values that will be used to overwrite dimensions.
+ */
+static void parse_serice_name_section()
+{
+    struct section *co = appconfig_get_section(&collector_config, EBPF_SERVICE_NAME_SECTION);
+    if (co) {
+        struct config_option *cv;
+        for (cv = co->values; cv ; cv = cv->next) {
+            link_dimension_name(cv->name, cv->hash, cv->value);
+        }
+    }
 }
 
 /**
@@ -843,6 +919,7 @@ static void read_collector_values(int *disable_apps)
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
         //Read network viewer section if network viewer is enabled
         parse_network_viewer_section();
+        parse_serice_name_section();
         started++;
     }
 
@@ -850,6 +927,7 @@ static void read_collector_values(int *disable_apps)
         ebpf_enable_all_charts(*disable_apps);
         //Read network viewer section
         parse_network_viewer_section();
+        parse_serice_name_section();
     }
 }
 

@@ -43,6 +43,10 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
 #define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
 
+//Port range
+# define NETDATA_MINIMUM_PORT_VALUE 0
+# define NETDATA_MAXIMUM_PORT_VALUE 65535
+
 typedef struct ebpf_socket_publish_apps {
     // Data read
     uint64_t sent;
@@ -53,9 +57,19 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t publish_recv;
 } ebpf_socket_publish_apps_t;
 
+typedef struct ebpf_network_viewer_dimension_names {
+    char *name;
+    uint32_t hash;
+
+    uint16_t port;
+
+    struct ebpf_network_viewer_dimension_names *next;
+} ebpf_network_viewer_dim_name_t ;
+
 typedef struct ebpf_network_viewer_port_list {
     char *value;
     uint32_t hash;
+
     uint16_t first;
     uint16_t last;
     struct ebpf_network_viewer_port_list *next;
@@ -66,6 +80,8 @@ typedef struct ebpf_network_viewer_options {
 
     ebpf_network_viewer_port_list_t *excluded_port;
     ebpf_network_viewer_port_list_t *included_port;
+
+    ebpf_network_viewer_dim_name_t *names;
 } ebpf_network_viewer_options_t;
 
 extern ebpf_network_viewer_options_t network_viewer_opt;

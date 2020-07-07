@@ -470,8 +470,29 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
 
     while (ptr) {
         ebpf_network_viewer_port_list_t *next = ptr->next;
+        freez(ptr->value);
         freez(ptr);
         ptr = next;
+    }
+}
+
+/**
+ * Clean service names
+ *
+ * Clean the allocated link list that stores names.
+ *
+ * @param names the link list.
+ */
+static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
+{
+    if (unlikely(!names))
+        return;
+
+    while (names) {
+        ebpf_network_viewer_dim_name_t *next = names->next;
+        freez(names->name);
+        freez(names);
+        names = next;
     }
 }
 
@@ -496,6 +517,7 @@ static void ebpf_socket_cleanup(void *ptr)
 
     clean_network_ports(network_viewer_opt.included_port);
     clean_network_ports(network_viewer_opt.excluded_port);
+    clean_service_names(network_viewer_opt.names);
 }
 
 /*****************************************************************
