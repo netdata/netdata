@@ -11,15 +11,13 @@ PARSER_RC metalog_pluginsd_host_action(
     UNUSED(user);
     //return PARSER_RC_OK;
 
-        info(
+    info(
         "HOST action: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s", machine_guid,
         hostname, registry_hostname, update_every, os, timezone, tags);
 
     if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
         info("This is localhost will not replay HOST command");
-        strcpy(machine_guid, "535767b4-83c9-11ea-a908-525400201d9b");
-        strcpy(hostname, "ubuntu1804");
-        //return PARSER_RC_OK;
+        return PARSER_RC_OK;
     }
 
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
@@ -28,7 +26,7 @@ PARSER_RC metalog_pluginsd_host_action(
         return PARSER_RC_OK;
     }
 
-    host = rrdhost_find_or_create(
+    host = rrdhost_create(
         hostname
         , registry_hostname
         , machine_guid
@@ -46,6 +44,8 @@ PARSER_RC metalog_pluginsd_host_action(
         , NULL
         , NULL
         , callocz(1, sizeof(struct rrdhost_system_info))
+        , 0     // localhost
+        , 1     // archived
     );
 
     if (host)

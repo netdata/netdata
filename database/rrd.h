@@ -560,6 +560,8 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
     RRDHOST_FLAG_BACKEND_SEND           = 1 << 3, // send it to backends
     RRDHOST_FLAG_BACKEND_DONT_SEND      = 1 << 4, // don't send it to backends
+    RRDHOST_FLAG_ARCHIVED               = 1 << 5, // The host is archived, no collected charts yet
+    RRDHOST_FLAG_MULTIHOST              = 1 << 6, // Host belongs to localhost/megadb
 } RRDHOST_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -1195,6 +1197,12 @@ extern void rrdset_delete_custom(RRDSET *st, int db_rotated);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
+extern RRDHOST *rrdhost_create(
+    const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
+    const char *tags, const char *program_name, const char *program_version, int update_every, long entries,
+    RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled, char *rrdpush_destination,
+    char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
+    int is_localhost, int is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
