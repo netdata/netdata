@@ -415,3 +415,36 @@ void error_with_guid(uuid_t *uuid, char *reason)
     errno = 0;
     error("%s (GUID = %s)", reason, uuid_str);
 }
+
+int count_legacy_children(char *dbfiles_path)
+{
+    int ret;
+    unsigned tier, no, matched_files, i,failed_to_load;
+    static uv_fs_t req;
+    uv_dirent_t dent;
+
+    ret = uv_fs_scandir(NULL, &req, dbfiles_path, 0, NULL);
+    if (ret < 0) {
+        uv_fs_req_cleanup(&req);
+        error("uv_fs_scandir(%s): %s", dbfiles_path, uv_strerror(ret));
+        return ret;
+    }
+    info("Found %d files in path %s", ret, dbfiles_path);
+
+    uuid_t uuid;
+    int legacy_engines = 0;
+    for (matched_files = 0; UV_EOF != uv_fs_scandir_next(&req, &dent); matched_files++) {
+        if (dent.type == UV_DIRENT_DIR) {
+            if (!uuid_parse(dent.name, &uuid)) {
+                info("Found legacy engine folder \"%s/%s\"", dbfiles_path, dent.name);
+                legacy_engines++;
+            } else
+                info("Skipping non UUID folder \"%s/%s\"", dbfiles_path, dent.name);
+        }
+        else
+            info("Skipping file \"%s/%s\"", dbfiles_path, dent.name);
+    }
+    uv_fs_req_cleanup(&req);
+
+    return legacy_engines;
+}
