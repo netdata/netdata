@@ -851,7 +851,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
 
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
     if (unlikely(!names)) {
-        names = w;
+        network_viewer_opt.names = w;
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
