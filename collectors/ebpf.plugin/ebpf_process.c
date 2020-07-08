@@ -943,7 +943,7 @@ static void change_syscalls() {
  * Set local variables
  *
  */
-static void set_local_pointers(ebpf_module_t *em) {
+static void set_local_pointers() {
 #ifndef STATIC
     bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
 
@@ -1015,7 +1015,7 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
-    set_local_pointers(em);
+    set_local_pointers();
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
                       em->thread_name, process_functions.map_fd, process_functions.load_bpf_file) ) {
         pthread_mutex_unlock(&lock);
