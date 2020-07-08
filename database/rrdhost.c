@@ -296,8 +296,10 @@ RRDHOST *rrdhost_create(const char *hostname,
 
             return host;
         }
-        int rc = count_legacy_children(host->cache_dir);
-        info("Found %ld files", rc);
+        if (is_localhost) {
+            int rc = count_legacy_children(host->cache_dir);
+            info("MEGADB Found %ld files, setting diskspace to %d MB", rc, rc * default_rrdeng_disk_quota_mb);
+        }
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
