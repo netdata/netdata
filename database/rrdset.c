@@ -181,7 +181,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-    return 1;
+    return 2;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
@@ -545,12 +545,15 @@ RRDSET *rrdset_create_custom(
         }
         char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
              *old_title_v = NULL, *old_family_v = NULL, *old_context_v = NULL;
-        const char *new_name = name ? name : id;
+        int rc;
 
-        if (unlikely((st->name && !strcmp(st->name, new_name)) || !st->name)) {
+        if(unlikely(name))
+            rc = rrdset_set_name(st, name);
+        else
+            rc = rrdset_set_name(st, id);
+
+        if (rc == 2)
             mark_rebuild |= META_CHART_UPDATED;
-            rrdset_set_name(st, new_name);
-        }
 
         if (unlikely(st->priority != priority)) {
             st->priority = priority;
