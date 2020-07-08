@@ -199,6 +199,7 @@ void web_client_request_done(struct web_client *w) {
         w->response.zstream.total_in = 0;
         w->response.zstream.total_out = 0;
         w->response.zinitialized = 0;
+        w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
     }
 #endif // NETDATA_WITH_ZLIB
 }
@@ -501,6 +502,7 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
     w->response.zsent = 0;
     w->response.zoutput = 1;
     w->response.zinitialized = 1;
+    w->flags |= WEB_CLIENT_CHUNKED_TRANSFER;
 
     debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
@@ -1238,12 +1240,11 @@ void web_client_build_http_header(struct web_client *w) {
         buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
     // headers related to the transfer method
-    if(likely(w->response.zoutput)) {
-        buffer_strcat(w->response.header_output,
-                "Content-Encoding: gzip\r\n"
-                        "Transfer-Encoding: chunked\r\n"
-        );
-    }
+    if(likely(w->response.zoutput))
+        buffer_strcat(w->response.header_output, "Content-Encoding: gzip\r\n");
+
+    if(likely(w->flags & WEB_CLIENT_CHUNKED_TRANSFER))
+        buffer_strcat(w->response.header_output, "Transfer-Encoding: chunked\r\n");
     else {
         if(likely((w->response.data->len || w->response.rlen))) {
             // we know the content length, put it
