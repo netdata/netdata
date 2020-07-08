@@ -1074,7 +1074,7 @@ exited:
  * If base_topic is missing then the global_base_topic will be used (if available)
  *
  */
-int aclk_send_message(char *sub_topic, char *message, char *msg_id)
+int aclk_send_message_bin(char *sub_topic, const void *message, size_t len, char *msg_id)
 {
     int rc;
     int mid;
@@ -1098,7 +1098,7 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
     }
 
     ACLK_LOCK;
-    rc = _link_send_message(final_topic, (unsigned char *)message, &mid);
+    rc = _link_send_message(final_topic, message, len, &mid);
     // TODO: link the msg_id with the mid so we can trace it
     ACLK_UNLOCK;
 
@@ -1108,6 +1108,11 @@ int aclk_send_message(char *sub_topic, char *message, char *msg_id)
     }
 
     return rc;
+}
+
+int aclk_send_message(char *sub_topic, char *message, char *msg_id)
+{
+    return aclk_send_message_bin(sub_topic, message, strlen(message), msg_id);
 }
 
 /*

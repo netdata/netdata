@@ -52,6 +52,7 @@ void *aclk_main(void *ptr);
       .start_routine = aclk_main },
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
+extern int aclk_send_message_bin(char *sub_topic, const void *message, size_t len, char *msg_id);
 
 extern char *is_agent_claimed(void);
 extern void aclk_lws_wss_mqtt_layer_disconect_notif();
