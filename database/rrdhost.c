@@ -297,8 +297,37 @@ RRDHOST *rrdhost_create(const char *hostname,
             return host;
         }
         if (is_localhost) {
-            int rc = count_legacy_children(host->cache_dir);
-            info("MEGADB Found %ld files, setting diskspace to %d MB", rc, rc * default_rrdeng_disk_quota_mb);
+            char multidb_disk_space_file[FILENAME_MAX+1];
+            FILE *fp;
+            default_rrdeng_multidb_disk_quota_mb = -1;
+
+            snprintfz(multidb_disk_space_file, FILENAME_MAX, "%s/dbengine_multihost_size", host->varlib_dir);
+            fp = fopen(multidb_disk_space_file,"r");
+            if (likely(fp)) {
+                int rc = fscanf(fp, "%d", &default_rrdeng_multidb_disk_quota_mb);
+                fclose(fp);
+                if (rc == 1)
+                    info("Setting computed default multidb storage size to %dMB", default_rrdeng_multidb_disk_quota_mb);
+                else {
+                    errno = 0;
+                    error("File '%s' contains invalid input, it will be rebuild", multidb_disk_space_file);
+                    default_rrdeng_multidb_disk_quota_mb = -1;
+                }
+            }
+
+            if (default_rrdeng_multidb_disk_quota_mb == -1) {
+                int rc = count_legacy_children(host->cache_dir);
+                default_rrdeng_multidb_disk_quota_mb = (rc + 1) * default_rrdeng_disk_quota_mb;
+                info("Found %d legacy dbengine folders, setting multidb diskspace to %dMB", rc, default_rrdeng_multidb_disk_quota_mb);
+                fp = fopen(multidb_disk_space_file, "w");
+                if (likely(fp)) {
+                    fprintf(fp, "%d", rc * default_rrdeng_disk_quota_mb);
+                    info("Created file '%s' to store the computed value", multidb_disk_space_file);
+                    fclose(fp);
+                }
+                else
+                    error("Failed to store the default multidb disk quota size on '%s'", multidb_disk_space_file);
+            }
         }
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
