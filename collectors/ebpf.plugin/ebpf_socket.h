@@ -75,6 +75,31 @@ typedef struct ebpf_network_viewer_port_list {
     struct ebpf_network_viewer_port_list *next;
 } ebpf_network_viewer_port_list_t;
 
+union netdata_ip_t {
+    __u8 addr8[16];
+    __u16 addr16[8];
+    __u32 addr32[4];
+};
+
+typedef struct ebpf_network_viewer_ip_list {
+    char *value;            //IP value
+    uint32_t hash;          //IP hash
+
+    uint8_t ver;            //IP version
+
+    netdata_ip_t ip;        //The IP address informed
+    uint32_t mask;          //The mask
+
+    struct ebpf_network_viewer_ip_list *next;
+} ebpf_network_viewer_ip_list_t;
+
+typedef struct ebpf_network_viewer_hostname_list {
+    char *value;            //IP value
+    uint32_t hash;          //IP hash
+
+    struct ebpf_network_viewer_hostname_list *next;
+} ebpf_network_viewer_hostname_list_t;
+
 typedef struct ebpf_network_viewer_options {
     uint32_t max_dim;   //Store value read from 'maximum dimensions'
 
@@ -82,6 +107,12 @@ typedef struct ebpf_network_viewer_options {
     ebpf_network_viewer_port_list_t *included_port;
 
     ebpf_network_viewer_dim_name_t *names;
+
+    ebpf_network_viewer_ip_list_t *excluded_ips;
+    ebpf_network_viewer_ip_list_t *included_ips;
+
+    ebpf_network_viewer_hostname_list_t *excluded_hostnames;
+    ebpf_network_viewer_hostname_list_t *included_hostnames;
 } ebpf_network_viewer_options_t;
 
 extern ebpf_network_viewer_options_t network_viewer_opt;
