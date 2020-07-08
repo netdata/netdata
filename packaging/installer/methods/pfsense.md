@@ -16,6 +16,7 @@ Netdata, Judy and Python are downloaded from the FreeBSD repository.
 ```sh
 pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/json-c-0.14.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.6.20.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.20.txz
@@ -30,11 +31,14 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.3.1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.23.0.txz
 ```
 
-**Note:** If you receive a `Not Found` error during the last two commands above, you will either need to manually look
+**Note:** If you receive a `Not Found` error at any of the commands above, you will either need to manually look
 in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its
-URL instead, or you can try manually changing the Netdata version in the URL to the latest version.
+URL instead, or you can try manually changing the Netdata version in the URL to the latest version
+(in case Netdata is the only package erroring out).
 
 **Note:** On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should should not install Python from the FreeBSD repository as instructed above.
+
+**WARNING:** Packages from the `latest` tag in the FreeBSD 11 repository will always be at the latest stable train. As of early July 2020, that means 11.3-RELEASE. If you are running earlier versions of pfSense, such as 2.4.4 (now outdated, but might be running in some edge cases in production environments) at this time, then you'll be running __11.2-RELEASE__. Be mindful of your update train or you might cause havoc in your system! **BE MINDFUL OF YOUR PACKAGE MANAGER WARNINGS, THEY SHOULD NOT BE DEALT WITH LIGHTLY!** - With that said, if you are running an older version, you might need to manually browse for the correct package versions for your release train. For ease and reference, [11.3-RELEASE](http://pkg.freebsd.org/FreeBSD:11:amd64/release_3/), [11.2-RELEASE](http://pkg.freebsd.org/FreeBSD:11:amd64/release_2/), [11.1-RELEASE](http://pkg.freebsd.org/FreeBSD:11:amd64/release_1/) and [11.0-RELEASE](http://pkg.freebsd.org/FreeBSD:11:amd64/release_0/) are linked here.
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
