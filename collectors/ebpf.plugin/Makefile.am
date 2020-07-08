@@ -3,6 +3,10 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
+CLEANFILES = \
+    reset_netdata_trace.sh \
+    $(NULL)
+
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
