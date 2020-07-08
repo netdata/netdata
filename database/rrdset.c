@@ -547,7 +547,7 @@ RRDSET *rrdset_create_custom(
              *old_title_v = NULL, *old_family_v = NULL, *old_context_v = NULL;
         const char *new_name = name ? name : id;
 
-        if (unlikely((st->name && !strcmp(st->name, new_name)) || !st->name)) {
+        if (unlikely((st->name && strcmp(st->name, new_name)) || !st->name)) {
             mark_rebuild |= META_CHART_UPDATED;
             rrdset_set_name(st, new_name);
         }
