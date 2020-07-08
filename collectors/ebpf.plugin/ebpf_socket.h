@@ -87,7 +87,7 @@ typedef struct ebpf_network_viewer_ip_list {
 
     uint8_t ver;            //IP version
 
-    netdata_ip_t ip;        //The IP address informed
+    union netdata_ip_t ip;        //The IP address informed
     uint32_t mask;          //The mask
 
     struct ebpf_network_viewer_ip_list *next;
@@ -96,6 +96,8 @@ typedef struct ebpf_network_viewer_ip_list {
 typedef struct ebpf_network_viewer_hostname_list {
     char *value;            //IP value
     uint32_t hash;          //IP hash
+
+    SIMPLE_PATTERN *value_pattern;
 
     struct ebpf_network_viewer_hostname_list *next;
 } ebpf_network_viewer_hostname_list_t;

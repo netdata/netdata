@@ -671,10 +671,11 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
         for (; move->next ; move = move->next ) {
             if (move->first <= in->first && move->last >= in->first &&
                 move->first <= in->last && move->last >= in->last) {
-                info("The range/value (%u, %u) is inside the range/value (%u, %u), it will be ignored.",
+                info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
                      in->first, in->last, move->first, move->last);
                 freez(in->value);
                 freez(in);
+                return;
             }
         }
 
@@ -742,20 +743,18 @@ static void parse_port_list(ebpf_network_viewer_port_list_t **out, char *range)
  */
 static void parse_service_list(ebpf_network_viewer_port_list_t **out, char *service)
 {
-    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    w->value = strdup(service);
-    w->hash = simple_hash(service);
-
     struct servent *serv = getservbyname((const char *)service, "tcp");
     if (!serv)
         serv = getservbyname((const char *)service, "udp");
 
     if (!serv) {
         error("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
-        freez(w->value);
-        freez(w);
         return;
     }
+
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = strdupz(service);
+    w->hash = simple_hash(service);
 
     w->first = w->last = (uint16_t)ntohs(serv->s_port);
 
@@ -771,7 +770,7 @@ static void parse_service_list(ebpf_network_viewer_port_list_t **out, char *serv
  * @param ptr is a pointer with the text to parser.
  * @param valid_char the function from ctype.h used to find the first valid value
  */
-static void parse_values(ebpf_network_viewer_port_list_t *out,
+static void parse_values(ebpf_network_viewer_port_list_t **out,
                              char *ptr,
                              int (*valid_char)(int),
                              void (*fill_struct)(ebpf_network_viewer_port_list_t **, char *))
@@ -784,7 +783,7 @@ static void parse_values(ebpf_network_viewer_port_list_t *out,
     while (!valid_char(*ptr)) ptr++;
 
     //No valid value found
-    if (unlikely(!ptr))
+    if (unlikely(!*ptr))
         return;
 
     while (likely(ptr)) {
@@ -794,9 +793,73 @@ static void parse_values(ebpf_network_viewer_port_list_t *out,
             *end++ = '\0';
         }
 
-        fill_struct(&out, ptr);
+        fill_struct(out, ptr);
 
         ptr = end;
+    }
+}
+
+/**
+ * Link hostname
+ *
+ * @param out is the output link list
+ * @param in the hostname to add to list.
+ */
+static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_network_viewer_hostname_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_hostname_list_t *move = *out;
+        for (; move->next ; move = move->next ) {
+            if (move->hash == in->hash && !strcmp(move->value, in->value)) {
+                error("The hostname %s was already inserted, it will be ignored.", in->value);
+                freez(in->value);
+                simple_pattern_free(in->value_pattern);
+                freez(in);
+                return;
+            }
+        }
+
+        move->next = in;
+    } else {
+        *out = in;
+    }
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding value %s to hostname list used on network viewer", in->value);
+#endif
+}
+
+/**
+ * Link Hostnames
+ *
+ * Parse the list of hostnames to create the link list.
+ *
+ * @param out is the output link list
+ * @param parse is a pointer with the text to parser.
+ */
+static void link_hostnames(ebpf_network_viewer_hostname_list_t **out, char *parse)
+{
+    //No value
+    if (unlikely(!parse))
+        return;
+
+    //Find the first valid value
+    while (isspace(*parse)) parse++;
+
+    while (likely(parse)) {
+        //Find space that ends the list
+        char *end = strchr(parse, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        ebpf_network_viewer_hostname_list_t *hostname = callocz(1 , sizeof(ebpf_network_viewer_hostname_list_t));
+        hostname->value = strdupz(parse);
+        hostname->hash = simple_hash(parse);
+        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT);
+
+        link_hostname(out, hostname);
+
+        parse = end;
     }
 }
 
@@ -812,16 +875,22 @@ static void parse_network_viewer_section()
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                                 "included ports", NULL);
-    parse_values(network_viewer_opt.included_port, value, isdigit, parse_port_list);
+    parse_values(&network_viewer_opt.included_port, value, isdigit, parse_port_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ports", NULL);
-    parse_values(network_viewer_opt.excluded_port, value, isdigit, parse_port_list);
+    parse_values(&network_viewer_opt.excluded_port, value, isdigit, parse_port_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included services", NULL);
-    parse_values(network_viewer_opt.included_port, value, isalpha, parse_service_list);
+    parse_values(&network_viewer_opt.included_port, value, isalpha, parse_service_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded services", NULL);
-    parse_values(network_viewer_opt.excluded_port, value, isalpha, parse_service_list);
+    parse_values(&network_viewer_opt.excluded_port, value, isalpha, parse_service_list);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included hostnames", NULL);
+    link_hostnames(&network_viewer_opt.included_hostnames, value);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded hostnames", NULL);
+    link_hostnames(&network_viewer_opt.excluded_hostnames, value);
 }
 
 /**

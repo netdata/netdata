@@ -497,6 +497,25 @@ static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
 }
 
 /**
+ * Clean hostnames
+ *
+ * @param hostnames the hostnames to clean
+ */
+static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
+{
+    if (unlikely(!hostnames))
+        return;
+
+    while (hostnames) {
+        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
+        freez(hostnames->value);
+        simple_pattern_free(hostnames->value_pattern);
+        freez(hostnames);
+        hostnames = next;
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -518,6 +537,8 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_network_ports(network_viewer_opt.included_port);
     clean_network_ports(network_viewer_opt.excluded_port);
     clean_service_names(network_viewer_opt.names);
+    clean_hostnames(network_viewer_opt.included_hostnames);
+    clean_hostnames(network_viewer_opt.excluded_hostnames);
 }
 
 /*****************************************************************
