@@ -8,6 +8,65 @@ static uv_rwlock_t guid_lock;
 static uv_rwlock_t object_lock;
 static uv_rwlock_t global_lock;
 
+MAP_STORE   *guid_map_store = NULL;
+
+void add_to_guid_store(uuid_t *uuid)
+{
+    MAP_STORE *tmp_guid_map_store;
+    //return;
+
+    if (!guid_map_store)
+        guid_map_store = callocz(1, sizeof(*guid_map_store));
+
+    uuid_copy(guid_map_store->list[guid_map_store->index++], *uuid);
+    char uuid_str[37];
+    uuid_unparse_lower(guid_map_store->list[guid_map_store->index-1], uuid_str);
+    info("Adding %d UUID = %s", guid_map_store->index-1, uuid_str);
+    if (guid_map_store->index == 128) {
+        tmp_guid_map_store = callocz(1, sizeof(*guid_map_store));
+        tmp_guid_map_store->next = guid_map_store;
+        guid_map_store = tmp_guid_map_store;
+    }
+}
+
+void destroy_store_map()
+{
+    MAP_STORE *tmp_guid_map_store;
+    int i;
+    Pvoid_t *PValue;
+    char *existing_object;
+
+    info("Deleting storage");
+    //return;
+
+    while (guid_map_store) {
+        for (i = 0; i < guid_map_store->index; i++) {
+            char uuid_str[37];
+            uuid_unparse_lower(guid_map_store->list[i], uuid_str);
+            info("Remove UUID = %s", uuid_str);
+
+            //uv_rwlock_rdlock(&global_lock);
+            PValue = JudyHSGet(JGUID_map, (void *) guid_map_store->list[i], (Word_t) sizeof(uuid_t));
+            if (likely(PValue)) {
+                //uv_rwlock_rdunlock(&global_lock);
+                JudyHSDel(JGUID_map, (void *) guid_map_store->list[i], (Word_t) sizeof(uuid_t), PJE0);
+                existing_object = *PValue;
+                GUID_TYPE object_type = existing_object[0];
+//                PValue = JudyHSGet(JGUID_object_map, (void *) existing_object, (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2);
+//                if (*PValue)
+//                    freez(*PValue);
+                JudyHSDel(JGUID_object_map, (void *) existing_object, (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2, PJE0);
+                freez(existing_object);
+                info("Deleted object type %d", object_type);
+                //return GUID_TYPE_NOTFOUND;
+            }
+
+        }
+        tmp_guid_map_store = guid_map_store->next;
+        freez(guid_map_store);
+        guid_map_store = tmp_guid_map_store;
+    }
+}
 
 void   dump_object(uuid_t *index, void *object)
 {
@@ -88,6 +147,8 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
         uuid_copy(*value, *uuid);
         *PValue = value;
     }
+
+    add_to_guid_store(uuid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t count = 0;
