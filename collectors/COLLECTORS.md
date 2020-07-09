@@ -343,8 +343,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
     functions related to file descriptors using the eBPF collector.
 -   [Virtual file system (VFS)](/collectors/ebpf.plugin/README.md): Monitor IO, errors, deleted objects, and
     more for kernel virtual file systems (VFS) using the eBPF collector.
--   [Processes](/collectors/ebpf.plugin/README.md/): Monitor threads, task exits, and errors using the eBPF
-    collector.
+-   [Processes](/collectors/ebpf.plugin/README.md): Monitor threads, task exits, and errors using the eBPF collector.
 
 ### Hardware
 
