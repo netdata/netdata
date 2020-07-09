@@ -899,9 +899,9 @@ static void parse_ip_list(void **out, char *ip)
             }
 
             in_addr_t myip = inet_addr(ip);
-            in_addr_t br = htonl(broadcast(htonl(myip), select));
-
-            last.addr32[0] = br;
+            last.addr32[0] = (uint32_t)htonl(broadcast(htonl(myip), select));
+            //This was added to remove https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
+            UNUSED(last.addr32[0]);
         } else { //Range
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
