@@ -611,18 +611,6 @@ RRDSET *rrdset_create_custom(
             mark_rebuild |= META_CHART_UPDATED;
         }
 
-        if (unlikely(family && st->state->old_family && strcmp(st->state->old_family, family))) {
-            char *new_family = strdupz(family);
-            old_family_v = st->state->old_family;
-            st->state->old_family = strdupz(family);
-            json_fix_string(new_family);
-            old_family = st->family;
-            rrdfamily_free(host, st->rrdfamily);
-            st->family = new_family;
-            st->rrdfamily = rrdfamily_create(host, st->family);
-            mark_rebuild |= META_CHART_UPDATED;
-        }
-
         if (unlikely(context && st->state->old_context && strcmp(st->state->old_context, context))) {
             char *new_context = strdupz(context);
             old_context_v = st->state->old_context;
