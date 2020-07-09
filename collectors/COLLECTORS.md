@@ -339,11 +339,11 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 
 ### eBPF
 
--   [Files](/collectors/ebpf_process.plugin/README.md): Provides information about how often a system calls kernel
+-   [Files](/collectors/ebpf.plugin/README.md): Provides information about how often a system calls kernel
     functions related to file descriptors using the eBPF collector.
--   [Virtual file system (VFS)](/collectors/ebpf_process.plugin/README.md): Monitor IO, errors, deleted objects, and
+-   [Virtual file system (VFS)](/collectors/ebpf.plugin/README.md): Monitor IO, errors, deleted objects, and
     more for kernel virtual file systems (VFS) using the eBPF collector.
--   [Processes](/collectors/ebpf_process.plugin/README.md/): Monitor threads, task exits, and errors using the eBPF
+-   [Processes](/collectors/ebpf.plugin/README.md/): Monitor threads, task exits, and errors using the eBPF
     collector.
 
 ### Hardware
