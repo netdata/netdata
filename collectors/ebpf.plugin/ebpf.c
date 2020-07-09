@@ -700,9 +700,6 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
 static void parse_port_list(void **out, char *range)
 {
     ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
-    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    w->value = strdup(range);
-    w->hash = simple_hash(range);
 
     char *end = range;
     //Move while I cannot find a separator
@@ -717,12 +714,14 @@ static void parse_port_list(void **out, char *range)
     test = str2i((const char *)range);
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
         info("The port %d is invalid and it will be ignored!", test);
-        freez(w->value);
-        freez(w);
         return;
     }
 
-    w->first = test;
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = strdup(range);
+    w->hash = simple_hash(range);
+
+    w->first = (uint16_t)test;
     test = ((likely(*end)))?str2i((const char *)end):w->first;
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
         info("The second port %d of the range is invalid and the whole range will be ignored!", test);
@@ -731,7 +730,7 @@ static void parse_port_list(void **out, char *range)
         return;
     }
 
-    w->last = test;
+    w->last = (uint16_t)test;
 
     fill_port_list(list, w);
 }
@@ -761,6 +760,180 @@ static void parse_service_list(void **out, char *service)
     w->first = w->last = (uint16_t)ntohs(serv->s_port);
 
     fill_port_list(list, w);
+}
+
+/**
+ * Netmask
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param prefix create the netmask based in the CIDR value.
+ *
+ * @return
+ */
+static inline in_addr_t netmask(int prefix) {
+
+    if (prefix == 0)
+        return (~((in_addr_t) - 1));
+    else
+        return (in_addr_t)(~((1 << (32 - prefix)) - 1));
+
+}
+
+/**
+ * Broadcast
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param addr is the ip address
+ * @param prefix is the CIDR value.
+ *
+ */
+static inline in_addr_t broadcast(in_addr_t addr, int prefix) {
+    return (addr | ~netmask(prefix));
+}
+
+/**
+ * IP to network long
+ *
+ * @param dst the vector to store the result
+ * @param ip the source ip given by our users.
+ * @param domain the ip domain (IPV4 or IPV6)
+ * @param source the original string
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
+{
+    if (inet_pton(domain, ip, dst) <= 0) {
+        error("The address specified (%s) is invalid ", source);
+        freez(source);
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Fill IP list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_ip_list_t *move = *out;
+        for (; move->next ; move = move->next ) {
+            if (!memcmp(move->first.addr8,
+                        in->first.addr8,
+                        (in->ver == AF_INET)?sizeof(union netdata_ip_t):sizeof(INET_ADDRSTRLEN)) &&
+                !memcmp(move->last.addr8,
+                        in->last.addr8,
+                        (in->ver == AF_INET)?sizeof(union netdata_ip_t):sizeof(INET_ADDRSTRLEN))
+                ) {
+                info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
+                     in->value, move->value);
+                freez(in->value);
+                freez(in);
+                return;
+            }
+        }
+
+        move->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char first[512], last[512];
+    if (in->ver == AF_INET) {
+        if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
+            inet_ntop(AF_INET, in->first.addr8, last, INET_ADDRSTRLEN))
+            info("Adding values %s - %s to IP list used on network viewer", first, last);
+    } else {
+        if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
+            inet_ntop(AF_INET6, in->first.addr8, last, INET6_ADDRSTRLEN))
+            info("Adding values %s - %s to IP list used on network viewer", first, last);
+    }
+#endif
+}
+
+/**
+ * Parse IP List
+ *
+ * Parse IP list and link it.
+ *
+ * @param out a pointer to store the link list
+ * @param ip the value given as parameter
+ */
+static void parse_ip_list(void **out, char *ip)
+{
+    ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
+
+    char *end = ip;
+    //Move while I cannot find a separator
+    while (*end && *end != '/' && *end != '-') end++;
+
+    //We will use only the classic IPV6 for while, but we could consider the base 85 in a near future
+    //https://tools.ietf.org/html/rfc1924
+    char *is_ipv6 = strchr(ip, ':');
+
+    union netdata_ip_t first;
+    union netdata_ip_t last = { };
+    char *ipdup = strdupz(ip);
+    int select;
+    if (*end && !is_ipv6) { //IPV4 range
+        select = (*end == '/') ? 0 : 1;
+        *end++ = '\0';
+
+        if (!select) { //CIDR
+            select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+            if (select)
+                return;
+
+            select = (int) str2i(end);
+            if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
+                info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
+                return;
+            }
+
+            in_addr_t myip = ntohl(inet_addr(ip));
+            in_addr_t br = broadcast(myip, select) ;
+
+            last.addr32[0] = br;
+        } else { //Range
+            select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+            if (select)
+                return;
+
+            select = ip2nl(last.addr8, end, AF_INET, ipdup);
+            if (select)
+                return;
+        }
+    } else if (is_ipv6) { //IPV6
+        if (*end)
+            *end = '\0';
+
+        select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+        if (select)
+            return;
+    } else { //Unique ip
+        select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+        if (select)
+            return;
+
+        memcpy(last.addr8, first.addr8, sizeof(first.addr8));
+    }
+
+    ebpf_network_viewer_ip_list_t *store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
+    store->value = ipdup;
+    store->hash = simple_hash(ipdup);
+    store->ver = (uint8_t)(!is_ipv6)?AF_INET:AF_INET6;
+    memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
+    memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
+
+    fill_ip_list(list, store);
 }
 
 /**
@@ -893,6 +1066,12 @@ static void parse_network_viewer_section()
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded hostnames", NULL);
     link_hostnames(&network_viewer_opt.excluded_hostnames, value);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included ips", NULL);
+    parse_values((void **)&network_viewer_opt.included_ips, value, isspace, parse_ip_list);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ips", NULL);
+    parse_values((void **)&network_viewer_opt.excluded_ips, value, isspace, parse_ip_list);
 }
 
 /**

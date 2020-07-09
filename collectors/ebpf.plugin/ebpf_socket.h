@@ -47,6 +47,9 @@ typedef enum ebpf_socket_idx {
 # define NETDATA_MINIMUM_PORT_VALUE 0
 # define NETDATA_MAXIMUM_PORT_VALUE 65535
 
+# define NETDATA_MINIMUM_IPV4_CIDR 0
+# define NETDATA_MAXIMUM_IPV4_CIDR 32
+
 typedef struct ebpf_socket_publish_apps {
     // Data read
     uint64_t sent;
@@ -76,9 +79,9 @@ typedef struct ebpf_network_viewer_port_list {
 } ebpf_network_viewer_port_list_t;
 
 union netdata_ip_t {
-    __u8 addr8[16];
-    __u16 addr16[8];
-    __u32 addr32[4];
+    uint8_t  addr8[16];
+    uint16_t addr16[8];
+    uint32_t addr32[4];
 };
 
 typedef struct ebpf_network_viewer_ip_list {
@@ -87,8 +90,8 @@ typedef struct ebpf_network_viewer_ip_list {
 
     uint8_t ver;            //IP version
 
-    union netdata_ip_t ip;        //The IP address informed
-    uint32_t mask;          //The mask
+    union netdata_ip_t first;        //The IP address informed
+    union netdata_ip_t last;        //The IP address informed
 
     struct ebpf_network_viewer_ip_list *next;
 } ebpf_network_viewer_ip_list_t;
