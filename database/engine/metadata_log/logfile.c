@@ -130,7 +130,7 @@ void *mlf_get_records_buffer(struct metalog_worker_config *wc, struct metadata_r
                              struct metadata_logfile_list *metadata_logfiles, unsigned size)
 {
     int ret;
-    unsigned buf_pos, buf_size;
+    unsigned buf_pos = 0, buf_size;
 
     fatal_assert(size);
     if (records_log->buf) {

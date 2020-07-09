@@ -400,7 +400,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct page_cache_descr *pg_cache_descr = NULL;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
+    struct pg_cache_page_index *page_index = NULL;
     int ret;
     uint8_t can_delete_metric = 0;
 
@@ -622,7 +622,7 @@ usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
+    struct pg_cache_page_index *page_index = NULL;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
@@ -703,7 +703,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     unsigned i, j, k, preload_count, count, page_info_array_max_size;
     unsigned long flags;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
+    struct pg_cache_page_index *page_index = NULL;
     Word_t Index;
     uint8_t failed_to_reserve;
 
@@ -849,7 +849,7 @@ struct rrdeng_page_descr *
     struct page_cache_descr *pg_cache_descr = NULL;
     unsigned long flags;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
+    struct pg_cache_page_index *page_index = NULL;
     Word_t Index;
     uint8_t page_not_in_cache;
 
@@ -956,7 +956,7 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     struct page_cache_descr *pg_cache_descr = NULL;
     unsigned long flags;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
+    struct pg_cache_page_index *page_index = NULL;
     uint8_t page_not_in_cache;
 
     if (unlikely(NULL == index)) {
