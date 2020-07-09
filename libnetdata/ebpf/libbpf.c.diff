@@ -1,0 +1,111 @@
+diff --git a/libnetdata/ebpf/libbpf/src/libbpf.c b/libnetdata/ebpf/libbpf/src/libbpf.c
+index 477c679..c391e9b 100644
+--- a/libnetdata/ebpf/libbpf/src/libbpf.c
++++ b/libnetdata/ebpf/libbpf/src/libbpf.c
+@@ -620,6 +620,93 @@ bpf_object__init_prog_names(struct bpf_object *obj)
+ 	return 0;
+ }
+
++static __u32 choose_specific_version0(int fd, __u32 current)
++{
++    char ver[256];
++    __u32 v_major, v_minor, v_patch;
++    ssize_t len = read(fd, ver, sizeof(ver));
++    if (len < 0) {
++        return 0;
++    }
++    ver[len] = '\0';
++
++    char *first = strchr(ver, ' ');
++    if (!first) {
++        return 0;
++    }
++
++    first++;
++    char *version = strchr(first, ' ');
++    if (!version) {
++        return 0;
++    }
++
++    version++;
++    if (sscanf(version, "%u.%u.%u", &v_major, &v_minor, &v_patch) != 3)
++        return current;
++
++    return KERNEL_VERSION(v_major, v_minor, v_patch);
++}
++
++static __u32 choose_kernel_version(__u32 current)
++{
++    FILE *fp_d = fopen("/etc/debian_version","r");
++    int fp_u = open("/proc/version_signature", O_RDONLY);
++    FILE *fp_rh = fopen("/etc/redhat-release","r");
++    char tmp[32];
++    int de = 0;
++    __u32 ret;
++
++    if (!fp_d && !fp_rh && fp_u == -1)
++        return current;
++
++    struct utsname u;
++    uname(&u);
++
++    if (fp_d) {
++        fclose(fp_d);
++        de = 1;
++    }
++
++    if (fp_rh) {
++        fclose(fp_rh);
++        de = 0;
++    }
++
++    if ( fp_u > 0 ) {
++        ret = choose_specific_version0(fp_u, current);
++        close(fp_u);
++        return (!ret)?current:ret;
++    }
++
++    __u32 v_kernel,v_major, v_minor, v_patch;
++    __u32 r_kernel,r_major, r_minor, r_patch;
++
++    if (sscanf(u.release, "%u.%u.%u-%u", &v_kernel, &v_major, &v_minor, &v_patch) != 4)
++        return current;
++
++    int length = snprintf(tmp, 31, "%u.%u", v_kernel, v_major);
++    tmp[length] = '\0';
++
++    char *parse = strstr(u.version, tmp);
++    if (!parse) {
++        return current;
++    }
++
++    char *space = strchr(parse, ' ');
++    if(space) {
++        length = (int)(space - parse);
++        strncpy(tmp, parse, (size_t)length);
++        tmp[length] = '\0';
++    }
++
++    if (sscanf(tmp, "%u.%u.%u-%u", &r_kernel, &r_major, &r_minor, &r_patch) != 4)
++        return current;
++
++    ret = (de)?KERNEL_VERSION(r_kernel, r_major, r_minor):KERNEL_VERSION(r_kernel, r_major, r_minor) + r_patch;
++    return (ret > current)?ret:current;
++}
++
+ static __u32 get_kernel_version(void)
+ {
+ 	__u32 major, minor, patch;
+@@ -628,7 +715,11 @@ static __u32 get_kernel_version(void)
+ 	uname(&info);
+ 	if (sscanf(info.release, "%u.%u.%u", &major, &minor, &patch) != 3)
+ 		return 0;
+-	return KERNEL_VERSION(major, minor, patch);
++
++	if (major < 5)
++		return choose_kernel_version(KERNEL_VERSION(major, minor, patch));
++	else
++		return KERNEL_VERSION(major, minor, patch);
+ }
+
+ static const struct btf_member *
