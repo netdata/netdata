@@ -463,12 +463,11 @@ static int aclk_process_query(int t_idx)
 
 void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
 {
-    if (query_threads) {
+    if (query_threads && query_threads->thread_list) {
         for (int i = 0; i < query_threads->count; i++) {
-            netdata_thread_join(*(query_threads->thread_list[i]->thread), NULL);
-            freez(query_threads->thread_list[i]->thread);
-            freez(query_threads->thread_list[i]);
+            netdata_thread_join(query_threads->thread_list[i].thread, NULL);
         }
+        freez(query_threads->thread_list);
     }
 
     struct aclk_query *this_query;
@@ -485,16 +484,14 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads)
     info("Starting %d query threads.", query_threads->count);
 
     char thread_name[TASK_LEN_MAX];
-    query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread *));
+    query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread));
     for (int i = 0; i < query_threads->count; i++) {
-        query_threads->thread_list[i] = callocz(1, sizeof(struct aclk_query_thread));
-        query_threads->thread_list[i]->thread = callocz(1, sizeof(netdata_thread_t));
-        query_threads->thread_list[i]->idx = i; //thread needs to know its index for statistics
+        query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
 
         snprintf(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_THREAD_NAME, i);
         netdata_thread_create(
-            query_threads->thread_list[i]->thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
-            query_threads->thread_list[i]);
+            &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
+            &query_threads->thread_list[i]);
     }
 }
 

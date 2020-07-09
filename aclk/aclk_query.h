@@ -15,12 +15,12 @@ extern pthread_mutex_t query_lock_wait;
 extern volatile int aclk_connected;
 
 struct aclk_query_thread {
-    netdata_thread_t *thread;
+    netdata_thread_t thread;
     int idx;
 };
 
 struct aclk_query_threads {
-    struct aclk_query_thread **thread_list;
+    struct aclk_query_thread *thread_list;
     int count;
 };
 
