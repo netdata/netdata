@@ -1,5 +1,5 @@
---- a/libnetdata/ebpf/libbpf/src/libbpf.c
-+++ b/libnetdata/ebpf/libbpf/src/libbpf.c
+--- a/src/libbpf.c
++++ b/src/libbpf.c
 @@ -620,6 +620,93 @@ bpf_object__init_prog_names(struct bpf_object *obj)
  	return 0;
  }

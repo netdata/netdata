@@ -406,29 +406,6 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
-# libbpf
-
-PKG_CHECK_MODULES(
-    [BPF],
-    [libbpf],
-    [have_bpf=yes],
-    [AC_MSG_ERROR([libbpf required but not found. Try installing 'libbpf-dev' or 'libbpf-devel'.])]
-)
-OPTIONAL_BPF_CFLAGS="${BPF_CFLAGS}"
-OPTIONAL_BPF_LIBS="${BPF_LIBS}"
-
-# -----------------------------------------------------------------------------
-# VFS plugin libs
-
-AC_CHECK_LIB(
-    [dl],
-    [dlopen],
-    [EBPF_LIBS="-ldl"]
-)
-
-OPTIONAL_EBPF_LIBS="${EBPF_LIBS}"
-
-# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
@@ -969,8 +946,19 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # -----------------------------------------------------------------------------
 # ebpf.plugin
 
+PKG_CHECK_MODULES(
+    [LIBELF],
+    [libelf],
+    [have_libelf=yes],
+    [have_libelf=no]
+)
+OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS}"
+OPTIONAL_BPF_LIBS="${LIBELF_LIBS}"
+
 AC_MSG_CHECKING([if ebpf.plugin should be enabled])
-if test "${build_target}" == "linux" -a "${EBPF_LIBS}"; then
+if test "${build_target}" == "linux" -a "${have_libelf}" = "yes" -a -f externaldeps/libbpf/libbpf.a; then
+    OPTIONAL_BPF_CFLAGS="${OPTIONAL_BPF_CFLAGS} -I externaldeps/libbpf/include"
+    OPTIONAL_BPF_LIBS="${OPTIONAL_BPF_LIBS} externaldeps/libbpf/libbpf.a"
     enable_ebpf="yes"
 else
     enable_ebpf="no"
@@ -1364,7 +1352,6 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
-AC_SUBST([OPTIONAL_EBPF_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
