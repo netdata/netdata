@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fixed the check condition for chart name change [\#9503](https://github.com/netdata/netdata/pull/9503) ([stelfrag](https://github.com/stelfrag))
+- fix ACLK protocol version always parsed as 0 [\#9502](https://github.com/netdata/netdata/pull/9502) ([underhood](https://github.com/underhood))
 - Fix broken link in Kavenegar notification doc [\#9492](https://github.com/netdata/netdata/pull/9492) ([joelhans](https://github.com/joelhans))
 - fixes vulnerability in JSON parsing [\#9491](https://github.com/netdata/netdata/pull/9491) ([underhood](https://github.com/underhood))
 - Add guide for monitoring a k8s cluster with Netdata [\#9466](https://github.com/netdata/netdata/pull/9466) ([joelhans](https://github.com/joelhans))
@@ -186,8 +188,6 @@
 - TTL headers [\#8760](https://github.com/netdata/netdata/pull/8760) ([amoss](https://github.com/amoss))
 - web/gui/demo2.html: Silence Netlify's mixed content warnings [\#8759](https://github.com/netdata/netdata/pull/8759) ([knatsakis](https://github.com/knatsakis))
 - dashboard v.0.4.17: [\#8757](https://github.com/netdata/netdata/pull/8757) ([jacekkolasa](https://github.com/jacekkolasa))
-- Docs: Add Docker instructions to claiming [\#8755](https://github.com/netdata/netdata/pull/8755) ([joelhans](https://github.com/joelhans))
-- Fixed issue in `system-info.sh`regarding the parsing of `lscpu` output. [\#8754](https://github.com/netdata/netdata/pull/8754) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
