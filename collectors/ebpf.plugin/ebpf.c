@@ -672,7 +672,7 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
             if (move->first <= in->first && move->last >= in->first &&
                 move->first <= in->last && move->last >= in->last) {
                 info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
-                     in->first, in->last, move->first, move->last);
+                     ntohs(in->first), ntohs(in->last), ntohs(move->first), ntohs(move->last));
                 freez(in->value);
                 freez(in);
                 return;
@@ -685,7 +685,7 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u, %u) to port list used on network viewer",in->value, in->first, in->last);
+    info("Adding values %s( %u, %u) to port list used on network viewer",in->value, ntohs(in->first), ntohs(in->last));
 #endif
 }
 
@@ -721,8 +721,8 @@ static void parse_port_list(void **out, char *range)
     w->value = strdup(range);
     w->hash = simple_hash(range);
 
-    w->first = (uint16_t)test;
-    test = ((likely(*end)))?str2i((const char *)end):w->first;
+    w->first = (uint16_t)htons((uint16_t)test);
+    test = ((likely(*end)))?str2i((const char *)end):test;
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
         info("The second port %d of the range is invalid and the whole range will be ignored!", test);
         freez(w->value);
@@ -730,7 +730,7 @@ static void parse_port_list(void **out, char *range)
         return;
     }
 
-    w->last = (uint16_t)test;
+    w->last = (uint16_t)htons((uint16_t)test);
 
     fill_port_list(list, w);
 }
@@ -757,7 +757,7 @@ static void parse_service_list(void **out, char *service)
     w->value = strdupz(service);
     w->hash = simple_hash(service);
 
-    w->first = w->last = (uint16_t)ntohs(serv->s_port);
+    w->first = w->last = (uint16_t)serv->s_port;
 
     fill_port_list(list, w);
 }
@@ -827,10 +827,10 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
         for (; move->next ; move = move->next ) {
             if (!memcmp(move->first.addr8,
                         in->first.addr8,
-                        (in->ver == AF_INET)?sizeof(union netdata_ip_t):sizeof(INET_ADDRSTRLEN)) &&
+                        sizeof(union netdata_ip_t)) &&
                 !memcmp(move->last.addr8,
                         in->last.addr8,
-                        (in->ver == AF_INET)?sizeof(union netdata_ip_t):sizeof(INET_ADDRSTRLEN))
+                        sizeof(union netdata_ip_t))
                 ) {
                 info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
                      in->value, move->value);
@@ -849,11 +849,11 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
     char first[512], last[512];
     if (in->ver == AF_INET) {
         if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
-            inet_ntop(AF_INET, in->first.addr8, last, INET_ADDRSTRLEN))
+            inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
             info("Adding values %s - %s to IP list used on network viewer", first, last);
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
-            inet_ntop(AF_INET6, in->first.addr8, last, INET6_ADDRSTRLEN))
+            inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
             info("Adding values %s - %s to IP list used on network viewer", first, last);
     }
 #endif
@@ -898,8 +898,8 @@ static void parse_ip_list(void **out, char *ip)
                 return;
             }
 
-            in_addr_t myip = ntohl(inet_addr(ip));
-            in_addr_t br = broadcast(myip, select) ;
+            in_addr_t myip = inet_addr(ip);
+            in_addr_t br = htonl(broadcast(htonl(myip), select));
 
             last.addr32[0] = br;
         } else { //Range
@@ -912,12 +912,23 @@ static void parse_ip_list(void **out, char *ip)
                 return;
         }
     } else if (is_ipv6) { //IPV6
-        if (*end)
-            *end = '\0';
+        if (!*end) { // unique
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                return;
 
-        select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
-        if (select)
-            return;
+            memcpy(last.addr8, first.addr8, sizeof(first.addr8));
+        } else if (*end == '-') {
+            *end++ = 0x00;
+
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                return;
+
+            select = ip2nl(last.addr8, end, AF_INET6, ipdup);
+            if (select)
+                return;
+        }
     } else { //Unique ip
         select = ip2nl(first.addr8, ip, AF_INET, ipdup);
         if (select)
@@ -1068,10 +1079,10 @@ static void parse_network_viewer_section()
     link_hostnames(&network_viewer_opt.excluded_hostnames, value);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included ips", NULL);
-    parse_values((void **)&network_viewer_opt.included_ips, value, isspace, parse_ip_list);
+    parse_values((void **)&network_viewer_opt.included_ips, value, isascii, parse_ip_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ips", NULL);
-    parse_values((void **)&network_viewer_opt.excluded_ips, value, isspace, parse_ip_list);
+    parse_values((void **)&network_viewer_opt.excluded_ips, value, isascii, parse_ip_list);
 }
 
 /**
@@ -1117,7 +1128,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u) to port list used on network viewer",w->name, w->port);
+    info("Adding values %s( %u) to dimension name list used on network viewer",w->name, w->port);
 #endif
 }
 
