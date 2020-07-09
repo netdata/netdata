@@ -1,0 +1,4 @@
+[submodule "libnetdata/ebpf/libbpf"]
+	path = libnetdata/ebpf/libbpf
+	url = https://github.com/libbpf/libbpf.git
+	ignore = dirty
