@@ -191,6 +191,50 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
 
+### `[network viewer]`
+
+You can configure the information that you will see on `outbund` and `inbound` charts with options inside this section. 
+
+```conf
+[network viewer]
+    maximum dimensions = 500
+    included ports = 19999 100-1024
+    excluded ports = 145 139
+    included services = ssh http
+    excluded services = ftp
+    included hostnames = netdata.cloud netdata.io
+    excluded hostnames = example.com
+    excluded ips = 127.0.0.1 192.168.0.1-192.168.0.5
+    included ips = 192.168.0.0/24 2804:14c:5b72:888d:6ee2:1aee:9b62:cbb5
+```
+
+When an `included` option is defined, Netdata will not collect all possible values of that option, it will restrict 
+ the collection for the values listed, for example, if you write `included ports = 19999` Netdata will collect  only connections 
+ for itself.  On the other hand if a value is listed for an `excluded` option, Netdata will collect everything except that values.
+The following pairs of `included` and `excluded` are available.
+
+-  `ports`: Define the destination ports that will be monitored.
+-  `services`: When you do not know the port number, you can list the ports as a service. Netdata will resolve the service
+name to its associated port to monitor the connection.
+-  `hostnames`: The list of hostnames that can be resolved to an IP address. This is the unique option that accepts
+simple pattern.
+-  `ips`: The IP or range of IPs that you want to monitor. You can use dash as separator of IPs, or a CIDR value.
+
+By default Netdata displays 500 dimensions on these charts, and any other possible value will 
+be stored in the dimension `other`. You can change the number of dimensions according to your necessities setting a new
+value for the option `maximum dimensions`.
+
+### `[service name]`
+
+Netdata uses the service listed inside the file `/etc/services` to plot the charts, but this file does not have name for 
+all the ports, for example, Netdata default port cannot find inside it. If you want to see names for specific services
+instead their ports, you can use this section to define them.
+
+```conf
+[service name]
+    19999 = Netdata
+```
+
 ## Troubleshooting
 
 If the eBPF collector does not work, you can troubleshoot it by running the `ebpf.plugin` command and investigating its
