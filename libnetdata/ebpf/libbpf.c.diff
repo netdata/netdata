@@ -1,5 +1,3 @@
-diff --git a/libnetdata/ebpf/libbpf/src/libbpf.c b/libnetdata/ebpf/libbpf/src/libbpf.c
-index 477c679..c391e9b 100644
 --- a/libnetdata/ebpf/libbpf/src/libbpf.c
 +++ b/libnetdata/ebpf/libbpf/src/libbpf.c
 @@ -620,6 +620,93 @@ bpf_object__init_prog_names(struct bpf_object *obj)
@@ -109,3 +107,109 @@ index 477c679..c391e9b 100644
  }
 
  static const struct btf_member *
+@@ -7612,6 +7703,88 @@ static int perf_event_open_probe(bool uprobe, bool retprobe, const char *name,
+ 	return pfd;
+ }
+
++static int perf_event_open_old_kprobe(bool retprobe, const char *name)
++{
++#define DEBUG_FS "/sys/kernel/debug/tracing/"
++	struct perf_event_attr attr = {};
++	char errmsg[STRERR_BUFSIZE];
++	int kfd = -1, ret = -1, err;
++	char event_alias[256], buf[PATH_MAX];
++	const char *event_prefix = "";
++	bool event_was_written = false;
++
++	kfd = open(DEBUG_FS "kprobe_events", O_WRONLY | O_APPEND, 0);
++	if (kfd < 0) {
++		pr_warn("failed to open '%s%s': %s\n",
++			DEBUG_FS,
++			"kprobe_events",
++			libbpf_strerror_r(kfd, errmsg, sizeof(errmsg)));
++		return kfd;
++	}
++
++	char type = retprobe ? 'r' : 'p';
++	snprintf(event_alias, sizeof(event_alias), "%c_netdata_%s_%d", type, name, getpid());
++
++#ifdef __x86_64__
++	if (strncmp(name, "sys_", 4) == 0) {
++		snprintf(buf, sizeof(buf), "%c:__x64_%s __x64_%s",
++			type, event_alias, name);
++		ret = write(kfd, buf, strlen(buf));
++
++		if (ret >= 0) {
++			event_was_written = true;
++			event_prefix = "__x64_";
++		}
++	}
++#endif
++
++	if (!event_was_written) {
++		snprintf(buf, sizeof(buf), "%c:%s %s",
++			type, event_alias, name);
++		ret = write(kfd, buf, strlen(buf));
++		if (ret < 0) {
++			pr_warn("failed to create kprobe '%s': %s\n",
++				name,
++				libbpf_strerror_r(ret, errmsg, sizeof(errmsg)));
++			close(kfd);
++			return ret;
++		}
++	}
++
++	close(kfd);
++
++	snprintf(buf, sizeof(buf), DEBUG_FS "events/kprobes/%s%s/id",
++		event_prefix,
++		event_alias);
++
++	ret = parse_uint_from_file(buf, "%d\n");
++	if (ret < 0) {
++		pr_warn("failed to determine event id: %s\n",
++			libbpf_strerror_r(ret, errmsg, sizeof(errmsg)));
++		return ret;
++	}
++	attr.config = ret;
++
++	attr.size = sizeof(attr);
++	attr.type = PERF_TYPE_TRACEPOINT;
++	attr.config1 = ptr_to_u64(name); /* kprobe_func */
++	attr.config2 = 0;		 /* kprobe_addr */
++
++	/* pid filter is meaningful only for uprobes */
++	kfd = syscall(__NR_perf_event_open, &attr,
++		      -1 /* pid */,
++		      0 /* cpu */,
++		      -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
++	if (kfd < 0) {
++		err = -errno;
++		pr_warn("%s perf_event_open_old_kprobe() failed: %s\n",
++			"kprobe",
++			libbpf_strerror_r(err, errmsg, sizeof(errmsg)));
++		return err;
++	}
++	return kfd;
++}
++
+ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
+ 					    bool retprobe,
+ 					    const char *func_name)
+@@ -7627,7 +7800,15 @@ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
+ 			bpf_program__title(prog, false),
+ 			retprobe ? "kretprobe" : "kprobe", func_name,
+ 			libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
+-		return ERR_PTR(pfd);
++		pr_warn("fall back on old 'kprobe_events' interface...");
++		pfd = perf_event_open_old_kprobe(retprobe, func_name);
++		if (pfd < 0) {
++			pr_warn("program '%s': failed to create %s '%s' perf event: %s\n",
++				bpf_program__title(prog, false),
++				retprobe ? "kretprobe" : "kprobe", func_name,
++				libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
++			return ERR_PTR(pfd);
++		}
+ 	}
+ 	link = bpf_program__attach_perf_event(prog, pfd);
+ 	if (IS_ERR(link)) {
