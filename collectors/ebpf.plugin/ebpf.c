@@ -1137,7 +1137,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
  *
  * This function gets the values that will be used to overwrite dimensions.
  */
-static void parse_serice_name_section()
+static void parse_service_name_section()
 {
     struct section *co = appconfig_get_section(&collector_config, EBPF_SERVICE_NAME_SECTION);
     if (co) {
@@ -1146,6 +1146,17 @@ static void parse_serice_name_section()
             link_dimension_name(cv->name, cv->hash, cv->value);
         }
     }
+
+    //Always associated the default port to Netdata
+    ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
+    uint16_t default_port = htons(19999);
+    for (; names->next; names = names->next) {
+        if (names->port == default_port) {
+            return;
+        }
+    }
+
+    link_dimension_name("Netdata", simple_hash("Netdata"), "19999");
 }
 
 /**
@@ -1180,7 +1191,7 @@ static void read_collector_values(int *disable_apps)
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
         //Read network viewer section if network viewer is enabled
         parse_network_viewer_section();
-        parse_serice_name_section();
+        parse_service_name_section();
         started++;
     }
 
@@ -1188,7 +1199,7 @@ static void read_collector_values(int *disable_apps)
         ebpf_enable_all_charts(*disable_apps);
         //Read network viewer section
         parse_network_viewer_section();
-        parse_serice_name_section();
+        parse_service_name_section();
     }
 }
 
