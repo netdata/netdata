@@ -18,7 +18,7 @@ current_time_ms_from_date() {
 	if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]; then
 		now_ms="$($LOOPSLEEP_DATE +'%s')000"
 	else
-		now_ms="$(($($LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000')))"
+		now_ms="$(($($LOOPSLEEP_DATE +'%s * 1000 + 10#%-N / 1000000')))"
 	fi
 }
 
