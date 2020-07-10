@@ -1640,51 +1640,51 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // Vnstat
 
-    'vnstat.hoursAvg_chart': {
+    'vnstat.hours_average_chart': {
         heads: [
-            '<div data-netdata="vnstat.hoursAvg_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_1"></div>'
+            '<div data-netdata="vnstat.hours_average_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_1"></div>'
         ]
     },
 
-    'vnstat.hoursTot_chart': {
+    'vnstat.hours_total_chart': {
         heads: [
-            '<div data-netdata="vnstat.hoursTot_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_2"></div>'
+            '<div data-netdata="vnstat.hours_total_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_2"></div>'
         ]
     },
 
-    'vnstat.daysAvg_chart': {
+    'vnstat.days_average_chart': {
         heads: [
-            '<div data-netdata="vnstat.daysAvg_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_3"></div>'
+            '<div data-netdata="vnstat.days_average_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_3"></div>'
         ]
     },
 
-    'vnstat.daysTot_chart': {
+    'vnstat.days_total_chart': {
         heads: [
-            '<div data-netdata="vnstat.daysTot_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_4"></div>'
+            '<div data-netdata="vnstat.days_total_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_4"></div>'
         ]
     },
 
-    'vnstat.monthsAvg_chart': {
+    'vnstat.months_average_chart': {
         heads: [
-            '<div data-netdata="vnstat.monthsAvg_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_5"></div>'
+            '<div data-netdata="vnstat.months_average_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_5"></div>'
         ]
     },
 
-    'vnstat.monthsTot_chart': {
+    'vnstat.months_total_chart': {
         heads: [
-            '<div data-netdata="vnstat.monthsTot_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_6"></div>'
+            '<div data-netdata="vnstat.months_total_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_6"></div>'
         ]
     },
 
-    'vnstat.yearsAvg_chart': {
+    'vnstat.years_average_chart': {
         heads: [
-            '<div data-netdata="vnstat.yearsAvg_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_7"></div>'
+            '<div data-netdata="vnstat.years_average_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_7"></div>'
         ]
     },
 
-    'vnstat.yearsTot_chart': {
+    'vnstat.years_total_chart': {
         heads: [
-            '<div data-netdata="vnstat.yearsTot_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_8"></div>'
+            '<div data-netdata="vnstat.years_total_chart" data-chart-library="d3pie" data-d3pie-pieinnerradius="60%" data-d3pie-pieouterradius="90%" data-width="100%" data-height="300px" data-dt-element-name="vnstat_chart_8"></div>'
         ]
     },
 
