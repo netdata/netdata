@@ -860,6 +860,35 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
 }
 
 /**
+ * Get IPV6 Last Address
+ *
+ * @param out the address to store the last address.
+ * @param in the address used to do the math.
+ * @param prefix number of bits used to calculate the address
+ */
+static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint32_t prefix)
+{
+    uint64_t mask;
+    memcpy(out->addr64, in->addr64, sizeof(union netdata_ip_t));
+
+    if (prefix == 128) {
+        return;
+    }
+
+    if (prefix <= 64) {
+        out->addr64[1] = 0xFFFFFFFFFFFFFFFF;
+        mask = (out->addr64[1] >> (64 - prefix));
+
+        out->addr64[0] &= ~mask;
+        return;
+    }
+
+    prefix = 128 - prefix;
+    mask = (0xFFFFFFFFFFFFFFFF >> (64 - prefix));
+    out->addr64[1] &= ~mask;
+}
+
+/**
  * Parse IP List
  *
  * Parse IP list and link it.
@@ -928,6 +957,19 @@ static void parse_ip_list(void **out, char *ip)
             select = ip2nl(last.addr8, end, AF_INET6, ipdup);
             if (select)
                 return;
+        } else { //CIDR
+            *end++ = 0x00;
+            select = str2i(end);
+            if (select < 0 || select > 128) {
+                info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
+                return;
+            }
+
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                return;
+
+            get_ipv6_last_addr(&last, &first, (uint32_t)select);
         }
     } else { //Unique ip
         select = ip2nl(first.addr8, ip, AF_INET, ipdup);
