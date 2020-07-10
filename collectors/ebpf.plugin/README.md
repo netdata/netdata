@@ -192,8 +192,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
     bandwidth consumed by each.
 
 ### `[network viewer]`
-
-You can configure the information that you will see on `outbund` and `inbound` charts with options inside this section. 
+You can configure the information shown on `outbund` and `inbound` charts with the settings in this section. 
 
 ```conf
 [network viewer]
@@ -208,27 +207,31 @@ You can configure the information that you will see on `outbund` and `inbound` c
     included ips = 192.168.0.0/24 2804:14c:5b72:888d:6ee2:1aee:9b62:cbb5
 ```
 
-When an `included` option is defined, Netdata will not collect all possible values of that option, it will restrict 
- the collection for the values listed, for example, if you write `included ports = 19999` Netdata will collect  only connections 
- for itself.  On the other hand if a value is listed for an `excluded` option, Netdata will collect everything except that values.
-The following pairs of `included` and `excluded` are available.
+When you define an `included` setting, Netdat will collect network metrics for that specific port. For example, if you
+write `included ports = 19999`, Netdata will collect only connections for itself. If you list values in the `excluded`
+setting, Netdata will collect metrics on all included ports except those values.
+In the above example, Netdata will collect metrics for all ports between 100 and 1024, with the exception of 145 and
+139.
 
--  `ports`: Define the destination ports that will be monitored.
--  `services`: When you do not know the port number, you can list the ports as a service. Netdata will resolve the service
-name to its associated port to monitor the connection.
--  `hostnames`: The list of hostnames that can be resolved to an IP address. This is the unique option that accepts
-simple pattern.
--  `ips`: The IP or range of IPs that you want to monitor. You can use dash as separator of IPs, or a CIDR value.
-
-By default Netdata displays 500 dimensions on these charts, and any other possible value will 
-be stored in the dimension `other`. You can change the number of dimensions according to your necessities setting a new
-value for the option `maximum dimensions`.
+The following pairs of `included` and `excluded` are available:
+-   `ports`: Define the destination ports for Netdata to monitor.
+-   `services`: If you do not know which port number you want to monitor, you can list the service. Netdata will resolve
+    the service name to its associated port to monitor the connection.
+-   `hostnames`: The list of hostnames that can be resolved to an IP address. This option accept [simple
+    patterns](/libnetdata/simple_pattern/README.md).
+-   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
+    range of IPs, or use CIDR values.
+    
+By default, Netdata displayes up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
+will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
+dimensions` setting.
 
 ### `[service name]`
 
-Netdata uses the service listed inside the file `/etc/services` to plot the charts, but this file does not have name for 
-all the ports, for example, Netdata default port cannot find inside it. If you want to see names for specific services
-instead their ports, you can use this section to define them.
+Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
+name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
+For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
+service in network viewer charts, and thus see the name of the service instead of its port, define it:
 
 ```conf
 [service name]
