@@ -38,6 +38,16 @@ configuration uses two settings:
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
 claiming](/claim/README.md#claim-through-a-proxy).
 
+You can configure following keys in the `netdata.conf` section `[cloud]`:
+```
+[cloud]
+    statistics = yes
+    query thread count = 2
+```
+
+- `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
+- `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
+
 ## Disable the ACLK
 
 You have two options if you prefer to disable the ACLK and not use Netdata Cloud.

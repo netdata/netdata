@@ -5,6 +5,7 @@
 
 #include "../daemon/common.h"
 #include "mqtt.h"
+#include "aclk_common.h"
 
 #define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
@@ -25,7 +26,6 @@
 #define ACLK_MAX_TOPIC 255
 
 #define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
-#define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
@@ -36,27 +36,6 @@ struct aclk_request {
     char *payload;
     int version;
 };
-
-typedef enum aclk_cmd {
-    ACLK_CMD_CLOUD,
-    ACLK_CMD_ONCONNECT,
-    ACLK_CMD_INFO,
-    ACLK_CMD_CHART,
-    ACLK_CMD_CHARTDEL,
-    ACLK_CMD_ALARM,
-    ACLK_CMD_MAX
-} ACLK_CMD;
-
-typedef enum aclk_metadata_state {
-    ACLK_METADATA_REQUIRED,
-    ACLK_METADATA_CMD_QUEUED,
-    ACLK_METADATA_SENT
-} ACLK_METADATA_STATE;
-
-typedef enum agent_state {
-    AGENT_INITIALIZING,
-    AGENT_STABLE
-} AGENT_STATE;
 
 typedef enum aclk_init_action { ACLK_INIT, ACLK_REINIT } ACLK_INIT_ACTION;
 
@@ -82,25 +61,22 @@ int aclk_subscribe(char *topic, int qos);
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
-int aclk_send_metadata();
-int aclk_send_info_metadata();
+
+int aclk_send_metadata(ACLK_METADATA_STATE state);
+int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted);
+void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
+
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
 
 int aclk_send_single_chart(char *host, char *chart);
-int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal, ACLK_CMD cmd);
-struct aclk_query *
-aclk_query_find(char *token, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query);
 int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us);
 int aclk_handle_cloud_request(char *payload);
-int aclk_submit_request(struct aclk_request *);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_alarm_reload();
-void aclk_send_alarm_metadata();
-int aclk_execute_query(struct aclk_query *query);
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 void aclk_single_update_enable();

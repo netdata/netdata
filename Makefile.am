@@ -518,6 +518,8 @@ if ENABLE_ACLK
 ACLK_FILES += \
     aclk/agent_cloud_link.c \
     aclk/agent_cloud_link.h \
+    aclk/aclk_query.c \
+    aclk/aclk_query.h \
     aclk/mqtt.c \
     aclk/mqtt.h \
     aclk/aclk_lws_wss_client.c \

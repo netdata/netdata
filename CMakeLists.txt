@@ -665,6 +665,8 @@ set(ACLK_PLUGIN_FILES
         aclk/aclk_common.h
         aclk/agent_cloud_link.c
         aclk/agent_cloud_link.h
+        aclk/aclk_query.c
+        aclk/aclk_query.h
         aclk/aclk_lws_wss_client.c
         aclk/aclk_lws_wss_client.h
         aclk/aclk_lws_https_client.c
