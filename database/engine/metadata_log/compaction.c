@@ -117,8 +117,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
                 if (ctx->current_compaction_id > rd->rrdset->compaction_id) {
                     error("Forcing compaction of CHART %s", rd->rrdset->id);
                     compact_record_by_uuid(ctx, rd->rrdset->chart_uuid);
-                }
-                if (ctx->current_compaction_id > rd->state->compaction_id) {
+                } else if (ctx->current_compaction_id > rd->state->compaction_id) {
                     rd->state->compaction_id = ctx->current_compaction_id;
                     buffer = metalog_update_dimension_buffer(rd);
                     metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
