@@ -384,7 +384,7 @@ static int aclk_process_query(int t_idx)
     struct aclk_query *this_query;
     static long int query_count = 0;
     ACLK_METADATA_STATE meta_state;
-    usec_t t;
+    usec_t t = 0;
 
     if (!aclk_connected)
         return 0;
