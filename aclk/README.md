@@ -38,7 +38,7 @@ configuration uses two settings:
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
 claiming](/claim/README.md#claim-through-a-proxy).
 
-Additionally in the `netdata.conf` section `[cloud]` you can configure following keys:
+You can configure following keys in the `netdata.conf` section `[cloud]`:
 ```
 [cloud]
     statistics = yes
