@@ -276,7 +276,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         health_alarm_log_open(host);
     }
 
-    if (host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
             error("Host machine GUID is not valid.");
