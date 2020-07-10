@@ -14,8 +14,14 @@ PARSER_RC metalog_pluginsd_host_action(
     if (host)
         goto write_replay;
 
-    if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0)
+    if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
+        struct metalog_record record;
+        struct metadata_logfile *metalogfile = state->metalogfile;
+
+        uuid_parse(machine_guid, record.uuid);
+        mlf_record_insert(metalogfile, &record);
         return PARSER_RC_OK;
+    }
 
     // Ignore HOST command for now
     // TODO: Remove when the next task is completed ie. accept new children in the lcoalhost / multidb
@@ -48,9 +54,8 @@ write_replay:
         struct metalog_record record;
         struct metadata_logfile *metalogfile = state->metalogfile;
 
-        uuid_copy(record.uuid, state->uuid);
+        uuid_copy(record.uuid, host->host_uuid);
         mlf_record_insert(metalogfile, &record);
-        uuid_clear(state->uuid); /* Consume UUID */
     }
 
     return PARSER_RC_OK;
