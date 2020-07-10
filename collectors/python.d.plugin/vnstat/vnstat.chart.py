@@ -150,7 +150,7 @@ class Service(ExecutableService):
         self.definitions = DYNAMIC_CHARTS
         self.command = VNSTAT_BASE_COMMAND
 
-	def add_chart_dimension(self, chart_name, line_to_add):
+    def add_chart_dimension(self, chart_name, line_to_add):
         try:
             self.charts[chart_name].add_dimension(line_to_add)
         except Exception as msg:
