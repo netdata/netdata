@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- charts.d: loopsleepms: fix now\_ms [\#9510](https://github.com/netdata/netdata/pull/9510) ([ilyam8](https://github.com/ilyam8))
+- Fixed an issue with random crashes when updating a chart's metadata on the fly [\#9509](https://github.com/netdata/netdata/pull/9509) ([stelfrag](https://github.com/stelfrag))
+- python.d: thread safe safe\_print \(stdout write\) [\#9508](https://github.com/netdata/netdata/pull/9508) ([ilyam8](https://github.com/ilyam8))
 - Fixed the check condition for chart name change [\#9503](https://github.com/netdata/netdata/pull/9503) ([stelfrag](https://github.com/stelfrag))
 - fix ACLK protocol version always parsed as 0 [\#9502](https://github.com/netdata/netdata/pull/9502) ([underhood](https://github.com/underhood))
 - Fix broken link in Kavenegar notification doc [\#9492](https://github.com/netdata/netdata/pull/9492) ([joelhans](https://github.com/joelhans))
@@ -185,9 +188,6 @@
 - dashboard v0.4.18 [\#8786](https://github.com/netdata/netdata/pull/8786) ([jacekkolasa](https://github.com/jacekkolasa))
 - fix\_lock: Add the missing lock [\#8780](https://github.com/netdata/netdata/pull/8780) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added JSON-C dependency handling to instlal and packaging. [\#8776](https://github.com/netdata/netdata/pull/8776) ([Ferroin](https://github.com/Ferroin))
-- TTL headers [\#8760](https://github.com/netdata/netdata/pull/8760) ([amoss](https://github.com/amoss))
-- web/gui/demo2.html: Silence Netlify's mixed content warnings [\#8759](https://github.com/netdata/netdata/pull/8759) ([knatsakis](https://github.com/knatsakis))
-- dashboard v.0.4.17: [\#8757](https://github.com/netdata/netdata/pull/8757) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
