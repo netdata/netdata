@@ -866,7 +866,7 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
  * @param in the address used to do the math.
  * @param prefix number of bits used to calculate the address
  */
-static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint32_t prefix)
+static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
 {
     uint64_t mask;
     memcpy(out->addr64, in->addr64, sizeof(union netdata_ip_t));
@@ -876,8 +876,9 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
     }
 
     if (prefix < 64) {
+        prefix = 64 - prefix;
         out->addr64[1] = 0xFFFFFFFFFFFFFFFF;
-        mask = (0xFFFFFFFFFFFFFFFFULL >> (64 - prefix));
+        mask = (0xFFFFFFFFFFFFFFFFULL >> (prefix));
 
         out->addr64[0] &= ~mask;
         return;
@@ -969,7 +970,7 @@ static void parse_ip_list(void **out, char *ip)
             if (select)
                 return;
 
-            get_ipv6_last_addr(&last, &first, (uint32_t)select);
+            get_ipv6_last_addr(&last, &first, (uint64_t)select);
         }
     } else { //Unique ip
         select = ip2nl(first.addr8, ip, AF_INET, ipdup);
