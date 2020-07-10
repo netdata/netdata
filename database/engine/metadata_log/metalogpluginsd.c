@@ -17,6 +17,10 @@ PARSER_RC metalog_pluginsd_host_action(
     if (host)
         return PARSER_RC_OK;
 
+    // Ignore HOST command for now
+    // TODO: Remove when the next task is completed ie. accept new children in the lcoalhost / multidb
+    return PARSER_RC_OK;
+
     host = rrdhost_create(
         hostname
         , registry_hostname
