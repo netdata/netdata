@@ -868,28 +868,31 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
  */
 static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
 {
-    uint64_t mask;
-    memcpy(out->addr64, in->addr64, sizeof(union netdata_ip_t));
+    uint64_t mask,tmp;
+    uint64_t ret[2];
+    memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
 
     if (prefix == 128) {
         return;
     }
 
-    if (prefix < 64) {
-        prefix = 64 - prefix;
-        out->addr64[1] = 0xFFFFFFFFFFFFFFFF;
-        mask = (0xFFFFFFFFFFFFFFFFULL >> (prefix));
+    if (prefix <= 64) {
+        ret[1] = 0xFFFFFFFFFFFFFFFFULL;
 
-        out->addr64[0] &= ~mask;
-        return;
+        tmp = be64toh(ret[0]);
+        if (prefix != 64) {
+            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+            tmp |= ~mask;
+        }
+        ret[0] = htobe64(tmp);
+    } else {
+        mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
+        tmp = be64toh(ret[1]);
+        tmp |= ~mask;
+        ret[1] = htobe64(tmp);
     }
 
-    prefix = 128 - prefix;
-    //To prevent undefined behavior
-    if (prefix > 63)
-        prefix = 63;
-    mask = (0xFFFFFFFFFFFFFFFFULL >> (64 - prefix));
-    out->addr64[1] &= ~mask;
+    memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
 }
 
 /**
@@ -969,11 +972,12 @@ static void parse_ip_list(void **out, char *ip)
                 return;
             }
 
+            uint64_t prefix = (uint64_t)select;
             select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
             if (select)
                 return;
 
-            get_ipv6_last_addr(&last, &first, (uint64_t)select);
+            get_ipv6_last_addr(&last, &first, prefix);
         }
     } else { //Unique ip
         select = ip2nl(first.addr8, ip, AF_INET, ipdup);
