@@ -885,6 +885,9 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
     }
 
     prefix = 128 - prefix;
+    //To prevent undefined behavior
+    if (prefix > 63)
+        prefix = 63;
     mask = (0xFFFFFFFFFFFFFFFFULL >> (64 - prefix));
     out->addr64[1] &= ~mask;
 }
