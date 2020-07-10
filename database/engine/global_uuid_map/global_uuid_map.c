@@ -35,37 +35,32 @@ void destroy_store_map()
     int i;
     Pvoid_t *PValue, *PValue1;
     char *existing_object;
+    Word_t  size;
 
-    info("Deleting storage");
-    //return;
-
+    info("Releasing memory allocated to the GUID global map ...");
     while (guid_map_store) {
         for (i = 0; i < guid_map_store->index; i++) {
-            char uuid_str[37];
-            uuid_unparse_lower(guid_map_store->list[i], uuid_str);
-            info("Remove UUID = %s", uuid_str);
-
-            //uv_rwlock_rdlock(&global_lock);
             PValue = JudyHSGet(JGUID_map, (void *) guid_map_store->list[i], (Word_t) sizeof(uuid_t));
             if (likely(PValue)) {
                 existing_object = *PValue;
                 GUID_TYPE object_type = existing_object[0];
-                //if (object_type < 3)
-                PValue1 = JudyHSGet(JGUID_object_map, (void *) existing_object, (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2);
-                if (PValue1 && *PValue1)
+                size = (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2;
+                PValue1 = JudyHSGet(JGUID_object_map, (void *) existing_object, (Word_t) size);
+                if (PValue1 && *PValue1) {
                     freez(*PValue1);
-
+                }
                 JudyHSDel(&JGUID_object_map, (void *) existing_object, (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2, PJE0);
-                freez(existing_object);
                 JudyHSDel(&JGUID_map, (void *) guid_map_store->list[i], (Word_t) sizeof(uuid_t), PJE0);
-                info("Deleted object type %d", object_type);
-                //return GUID_TYPE_NOTFOUND;
+                freez(existing_object);
             }
         }
         tmp_guid_map_store = guid_map_store->next;
         freez(guid_map_store);
         guid_map_store = tmp_guid_map_store;
     }
+    JudyHSFreeArray(&JGUID_map, PJE0);
+    JudyHSFreeArray(&JGUID_object_map, PJE0);
+    info("Released memory allocated to the GUID global map");
 }
 
 void   dump_object(uuid_t *index, void *object)

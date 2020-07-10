@@ -7,9 +7,10 @@
 #include <Judy.h>
 #include "../../rrd.h"
 
+#define MAP_STORE_SIZE  256
 typedef struct map_store {
-    uint8_t index;
-    uuid_t  list[128];
+    uint16_t index;
+    uuid_t  list[MAP_STORE_SIZE];
     struct map_store *next;
 } MAP_STORE;
 

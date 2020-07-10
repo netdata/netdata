@@ -388,6 +388,7 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
         case RRD_MEMORY_MODE_DBENGINE:
+            freez(st->chart_uuid);
             freez(st);
             break;
     }
