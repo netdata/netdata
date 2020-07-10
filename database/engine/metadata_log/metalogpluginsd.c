@@ -8,13 +8,13 @@ PARSER_RC metalog_pluginsd_host_action(
     void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone,
     char *tags)
 {
-    UNUSED(user);
-
-    if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0)
-        return PARSER_RC_OK;
+    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (host)
+        goto write_replay;
+
+    if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0)
         return PARSER_RC_OK;
 
     // Ignore HOST command for now
@@ -42,6 +42,16 @@ PARSER_RC metalog_pluginsd_host_action(
         , 0     // localhost
         , 1     // archived
     );
+
+write_replay:
+    if (host) { /* It's a valid object */
+        struct metalog_record record;
+        struct metadata_logfile *metalogfile = state->metalogfile;
+
+        uuid_copy(record.uuid, state->uuid);
+        mlf_record_insert(metalogfile, &record);
+        uuid_clear(state->uuid); /* Consume UUID */
+    }
 
     return PARSER_RC_OK;
 }
