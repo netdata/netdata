@@ -129,8 +129,9 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
             }
             break;
         case GUID_TYPE_HOST:
-            error_with_guid(uuid, "Compaction: Processing HOST record");
-            RRDHOST *this_host = metalog_get_host_from_uuid(ctx, uuid);
+            RRDHOST *this_host = ctx->rrdeng_ctx->host;
+            //TODO: will be enabled when multidb is activated
+            //RRDHOST *this_host = metalog_get_host_from_uuid(ctx, uuid);
             if (ctx->current_compaction_id > this_host->compaction_id) {
                 this_host->compaction_id = ctx->current_compaction_id;
                 buffer = metalog_update_host_buffer(this_host);
