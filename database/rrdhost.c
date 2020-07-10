@@ -1415,6 +1415,12 @@ restart_after_removal:
 #ifdef ENABLE_DBENGINE
             if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
+                while(st->variables)  rrdsetvar_free(st->variables);
+                while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+
+                debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, st->id);
+                rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
+
                 rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
                 if (st->dimensions) {
                     /* If the chart still has dimensions don't delete it from the metadata log */
