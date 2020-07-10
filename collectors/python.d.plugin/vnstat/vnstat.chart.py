@@ -151,14 +151,14 @@ class Service(ExecutableService):
         self.command = VNSTAT_BASE_COMMAND
 
 	def add_chart_dimension(self, chart_name, line_to_add):
-		try:
-			self.charts[chart_name].add_dimension(line_to_add)
-		except Exception as msg:
-			# This exception is kept generic, as it is raised upstream, and any change there could break this code
-			# Most-likely to be raised because the value either already exists or the chart has not been instantiated yet
-			self.debug(str(msg))
+        try:
+            self.charts[chart_name].add_dimension(line_to_add)
+        except Exception as msg:
+            # This exception is kept generic, as it is raised upstream, and any change there could break this code
+            # Most-likely to be raised because the value either already exists or the chart has not been instantiated yet
+            self.debug(str(msg))
 
-	def generate_charts_and_values(self, interfaces, data_points):
+    def generate_charts_and_values(self, interfaces, data_points):
         charts = {}
         order = []
         data = dict()
@@ -176,7 +176,7 @@ class Service(ExecutableService):
 
         try:
             data_representation = int(self.configuration.get("data_representation", 1))
-            if not (data_representation == 0 or data_representation == 1 or data_representation == 2):
+            if not (-1 < data_representation < 3):
                 data_representation = 1
         except ValueError:
             data_representation = 1
@@ -281,7 +281,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("hours_average_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("hours_average_" + interface_or_chart, new_line)
 
                         data[
                             (
@@ -309,7 +309,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("hours_total_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("hours_total_" + interface_or_chart, new_line)
 
                         data[
                             (
@@ -374,7 +374,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("days_average_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("days_average_" + interface_or_chart, new_line)
 
                         data[
                             (
@@ -402,7 +402,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("days_total_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("days_total_" + interface_or_chart, new_line)
 
                         data[
                             ("days_total_" + interface + "_day" + str(hash(day[0]))[1:])
@@ -465,7 +465,7 @@ class Service(ExecutableService):
                             "lines"
                         ].append(new_line)
 
-                        self.add_chart_dimension("months_average_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("months_average_" + interface_or_chart, new_line)
 
                         data[
                             (
@@ -493,7 +493,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("months_total_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("months_total_" + interface_or_chart, new_line)
 
                         data[
                             (
@@ -561,7 +561,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("years_average_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("years_average_" + interface_or_chart, new_line)
 
                         data[
                             (
@@ -589,7 +589,7 @@ class Service(ExecutableService):
                             new_line
                         )
 
-                        self.add_chart_dimension("years_total_" + interface_or_chart , new_line)
+                        self.add_chart_dimension("years_total_" + interface_or_chart, new_line)
 
                         data[
                             (
