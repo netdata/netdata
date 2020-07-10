@@ -875,16 +875,16 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
         return;
     }
 
-    if (prefix <= 64) {
+    if (prefix < 64) {
         out->addr64[1] = 0xFFFFFFFFFFFFFFFF;
-        mask = (out->addr64[1] >> (64 - prefix));
+        mask = (0xFFFFFFFFFFFFFFFFULL >> (64 - prefix));
 
         out->addr64[0] &= ~mask;
         return;
     }
 
     prefix = 128 - prefix;
-    mask = (0xFFFFFFFFFFFFFFFF >> (64 - prefix));
+    mask = (0xFFFFFFFFFFFFFFFFULL >> (64 - prefix));
     out->addr64[1] &= ~mask;
 }
 
