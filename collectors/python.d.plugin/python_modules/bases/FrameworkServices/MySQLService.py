@@ -50,6 +50,8 @@ class MySQLService(SimpleService):
             elif conf.get('host'):
                 properties['host'] = conf['host']
                 properties['port'] = int(conf.get('port', 3306))
+            elif conf.get('my.cnf'):
+                properties['read_default_file'] = conf['my.cnf']
 
             if conf.get('ssl'):
                 properties['ssl'] = conf['ssl']
