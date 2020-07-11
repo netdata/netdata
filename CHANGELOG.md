@@ -22,6 +22,7 @@
 - Fixes error in Swagger Documentation [\#9417](https://github.com/netdata/netdata/pull/9417) ([underhood](https://github.com/underhood))
 - Added missing caps letters [\#9379](https://github.com/netdata/netdata/pull/9379) ([Jiab77](https://github.com/Jiab77))
 - Fixed typo in the streaming readme [\#9378](https://github.com/netdata/netdata/pull/9378) ([Jiab77](https://github.com/Jiab77))
+- adds support for multiple ACLK query processing threads [\#9355](https://github.com/netdata/netdata/pull/9355) ([underhood](https://github.com/underhood))
 - ipfs-plugin: change HTTP method to make it compatible with ipfs 0.5.0+ [\#9248](https://github.com/netdata/netdata/pull/9248) ([RubenKelevra](https://github.com/RubenKelevra))
 - UrlService add support get headers [\#9236](https://github.com/netdata/netdata/pull/9236) ([vsc55](https://github.com/vsc55))
 - Add infiniband monitoring to collector proc.plugin [\#9091](https://github.com/netdata/netdata/pull/9091) ([Saruspete](https://github.com/Saruspete))
@@ -187,7 +188,6 @@
 - health: fix mdstat `failed devices` alarm [\#8794](https://github.com/netdata/netdata/pull/8794) ([ilyam8](https://github.com/ilyam8))
 - dashboard v0.4.18 [\#8786](https://github.com/netdata/netdata/pull/8786) ([jacekkolasa](https://github.com/jacekkolasa))
 - fix\_lock: Add the missing lock [\#8780](https://github.com/netdata/netdata/pull/8780) ([thiagoftsm](https://github.com/thiagoftsm))
-- Added JSON-C dependency handling to instlal and packaging. [\#8776](https://github.com/netdata/netdata/pull/8776) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
