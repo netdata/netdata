@@ -536,11 +536,13 @@ RRDSET *rrdset_create_custom(
 
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if (st) {
+        int changed_from_archived_to_active = 0;
         int mark_rebuild = 0;
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+            changed_from_archived_to_active = 1;
             mark_rebuild |= META_CHART_ACTIVATED;
         }
         char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
@@ -659,19 +661,28 @@ RRDSET *rrdset_create_custom(
             metalog_commit_update_chart(st);
         }
 #endif
-        return st;
+        /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
+        if (!changed_from_archived_to_active)
+            return st;
     }
 
     rrdhost_wrlock(host);
 
     st = rrdset_find_on_create(host, fullid);
     if(st) {
+        if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+            rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
+            rrdsetcalc_link_matching(st);
+            rrdcalctemplate_link_matching(st);
+        }
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-        }
         return st;
     }
 
@@ -895,7 +906,7 @@ RRDSET *rrdset_create_custom(
     st->next = host->rrdset_root;
     host->rrdset_root = st;
 
-    if(host->health_enabled) {
+    if(host->health_enabled && !is_archived) {
         rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
@@ -906,8 +917,10 @@ RRDSET *rrdset_create_custom(
     if(unlikely(rrdset_index_add(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
 
-    rrdsetcalc_link_matching(st);
-    rrdcalctemplate_link_matching(st);
+    if (!is_archived) {
+        rrdsetcalc_link_matching(st);
+        rrdcalctemplate_link_matching(st);
+    }
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         int replace_instead_of_generate = 0;
@@ -1894,6 +1907,9 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_DBENGINE
                     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                         rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
+                        while(rd->variables)
+                            rrddimvar_free(rd->variables);
+
                         rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
                         /* only a collector can mark a chart as obsolete, so we must remove the reference */
                         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
