@@ -199,6 +199,8 @@ void health_reload_host(RRDHOST *host) {
     // link the loaded alarms to their charts
     RRDDIM *rd;
     rrdset_foreach_write(st, host) {
+        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
+            continue;
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
 
