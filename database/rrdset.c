@@ -533,10 +533,10 @@ RRDSET *rrdset_create_custom(
 
     char fullid[RRD_ID_LENGTH_MAX + 1];
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
-    int changed_from_archived_to_active = 0;
 
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if (st) {
+        int changed_from_archived_to_active = 0;
         int mark_rebuild = 0;
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
