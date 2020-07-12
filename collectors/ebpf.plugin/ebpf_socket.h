@@ -122,4 +122,46 @@ typedef struct ebpf_network_viewer_options {
 
 extern ebpf_network_viewer_options_t network_viewer_opt;
 
+/**
+ * Structure to store socket information
+ */
+typedef struct netdata_socket {
+    __u64 recv;         //Bytes received
+    __u64 sent;         //Bytes sent
+    __u64 first;        //First timestamp
+    __u64 ct;           //Current timestamp
+    __u16 retransmit;   //It is never used with UDP
+    __u8 protocol;      //Should this to be in the index?
+    __u8 removeme;      //Flag to remove a socket
+    __u32 reserved;     //Alignment
+} netdata_socket_t; __attribute__((__aligned__(8)));
+
+/**
+ * Index used together previous structure
+ */
+typedef struct netdata_socket_idx {
+    union netdata_ip saddr;
+    union netdata_ip daddr;
+    uint32_t pid;
+    uint16_t dport;
+    uint16_t sport;
+} netdata_socket_idx_t __attribute__((__aligned__(8)));
+
+/**
+ * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
+ * in the long term, on the other had it is faster.
+ */
+typedef struct netdata_socket_plot {
+    //Search
+    avl avl;
+    netdata_socket_idx_t index;
+
+    //Data updated
+    netdata_socket_t socket;
+
+    char *resolved_name;            //Resolve only in the first call
+
+    char *dimension;
+} netdata_socket_plot_t;
+
 #endif
