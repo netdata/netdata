@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 #ifndef NETDATA_EBPF_SOCKET_H
-#define NETDATA_EBPF_SOCKET_H 1
+# define NETDATA_EBPF_SOCKET_H 1
+# include <stdint.h>
+# include "libnetdata/avl/avl.h"
+# define NETDATA_SOCKET_COUNTER 13
 
 #define NETDATA_SOCKET_COUNTER 13
 
@@ -60,6 +62,7 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t publish_recv;
 } ebpf_socket_publish_apps_t;
 
+<<<<<<< HEAD
 typedef struct ebpf_network_viewer_dimension_names {
     char *name;
     uint32_t hash;
@@ -79,6 +82,12 @@ typedef struct ebpf_network_viewer_port_list {
 } ebpf_network_viewer_port_list_t;
 
 union netdata_ip_t {
+=======
+/**
+ * Union used to store ip addresses
+ */
+union netdata_ip {
+>>>>>>> 497736ab... ebpf_read_socket: Name resolution and dimension names
     uint8_t  addr8[16];
     uint16_t addr16[8];
     uint32_t addr32[4];
@@ -126,14 +135,14 @@ extern ebpf_network_viewer_options_t network_viewer_opt;
  * Structure to store socket information
  */
 typedef struct netdata_socket {
-    __u64 recv;         //Bytes received
-    __u64 sent;         //Bytes sent
-    __u64 first;        //First timestamp
-    __u64 ct;           //Current timestamp
-    __u16 retransmit;   //It is never used with UDP
-    __u8 protocol;      //Should this to be in the index?
-    __u8 removeme;      //Flag to remove a socket
-    __u32 reserved;     //Alignment
+    uint64_t recv;         //Bytes received
+    uint64_t sent;         //Bytes sent
+    uint64_t first;        //First timestamp
+    uint64_t ct;           //Current timestamp
+    uint16_t retransmit;   //It is never used with UDP
+    uint8_t  protocol;      //Should this to be in the index?
+    uint8_t  removeme;      //Flag to remove a socket
+    uint32_t reserved;     //Alignment
 } netdata_socket_t; __attribute__((__aligned__(8)));
 
 /**
@@ -147,6 +156,11 @@ typedef struct netdata_socket_idx {
     uint16_t sport;
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
 
+//Next values were defined according getnameinfo(3)
+# define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
+# define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
+# define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
+
 /**
  * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
  * in the long term, on the other had it is faster.
@@ -157,11 +171,14 @@ typedef struct netdata_socket_plot {
     netdata_socket_idx_t index;
 
     //Data updated
-    netdata_socket_t socket;
+    netdata_socket_t sock;
 
+    int family;                     //AF_INET or AF_INET6
     char *resolved_name;            //Resolve only in the first call
+    unsigned char resolved;
 
-    char *dimension;
+    char *dimension_sent;
+    char *dimension_recv;
 } netdata_socket_plot_t;
 
 #endif
