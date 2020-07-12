@@ -296,6 +296,125 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
  *****************************************************************/
 
 /**
+ * Build dimension name
+ *
+ * Fill dimension name vector with values given
+ *
+ * @param dimname       the output vector
+ * @param hostname      the hostname for the socket.
+ * @param service_name  the service used to connect.
+ * @param is_inbound    is this an inbound connection.
+ *
+ * @return  it returns the size of the data copied on success and -1 otherwise.
+ */
+static inline int build_dimension_name(char *dimname, char *hostname, char *service_name,
+                                       int is_inbound, netdata_socket_t *sock)
+{
+    int size;
+    if (!is_inbound) {
+        size = snprintf(dimname, CONFIG_MAX_NAME - 1, "%s:%s:%s_",
+                        service_name, (sock->protocol == IPPROTO_UDP) ? "UDP" : "TCP",
+                        hostname);
+
+    } else {
+        size = snprintf(dimname, CONFIG_MAX_NAME -1, "%s:%s_", service_name,
+                        (sock->protocol == IPPROTO_UDP)?"UDP":"TCP");
+
+    }
+
+    return size;
+}
+
+/**
+ * Fill Resolved Name
+ *
+ * Fill the resolved name structure with the value given.
+ * The hostname is the largest value possible, if it is necessary to cut some value, it must be cut.
+ *
+ * @param ptr       the output vector
+ * @param hostname  the hostname resolved or IP.
+ * @param length    the length for the hostname.
+ */
+static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname, size_t length)
+{
+    if (length < NETDATA_MAX_NETWORK_COMBINED_LENGTH)
+        ptr->resolved_name = strdupz(hostname);
+    else {
+        length = NETDATA_MAX_NETWORK_COMBINED_LENGTH;
+        ptr->resolved_name = mallocz(NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL + 1);
+        memcpy(ptr->resolved_name, hostname, NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL);
+        ptr->resolved_name[length] = '\0';
+    }
+}
+
+/**
+ * Mount dimension names
+ *
+ * Fill the vector names after to resolve the addresses
+ *
+ * @param ptr a pointer to the structure where the values are stored.
+ * @param is_inbound is a inbound ptr value?
+ */
+void fill_names(netdata_socket_plot_t *ptr, int is_inbound)
+{
+    if (ptr->resolved)
+        return;
+
+    netdata_socket_idx_t *idx = &ptr->index;
+    netdata_socket_t *sock = &ptr->sock;
+
+    char *errname = { "Not resolved" };
+    char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
+    // Resolve Name
+    if (ptr->family == AF_INET) { //IPV4
+        struct sockaddr_in myaddr;
+        memset(&myaddr, 0 , sizeof(myaddr));
+
+        myaddr.sin_family = ptr->family;
+        myaddr.sin_port = idx->dport;
+        myaddr.sin_addr.s_addr = (!is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
+
+        if (getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
+                         sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
+            //I cannot resolve the name, I will use the IP
+            if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST))
+                memcpy(hostname, errname, 12);
+        }
+    } else { //IPV6
+        struct sockaddr_in6 myaddr6;
+        memset(&myaddr6, 0 , sizeof(myaddr6));
+
+        myaddr6.sin6_family = AF_INET6;
+        myaddr6.sin6_port =  idx->dport;
+        memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr32:idx->saddr.addr32, sizeof(union netdata_ip));
+        if (getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
+                        sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
+            //I cannot resolve the name, I will use the IP
+            if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST))
+                memcpy(hostname, errname, 12);
+        }
+    }
+
+    fill_resolved_name(ptr, hostname,  strlen(hostname) + strlen(service_name)+ NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH);
+
+    char dimname[CONFIG_MAX_NAME];
+    int size = build_dimension_name(dimname, hostname, service_name, is_inbound, sock);
+    if (size > 0) {
+        strcpy(&dimname[size], "sent");
+        dimname[size + 1] = '\0';
+        ptr->dimension_sent = strdupz(dimname);
+
+        strcpy(&dimname[size], "recv");
+        ptr->dimension_recv = strdupz(dimname);
+    }
+
+    ptr->resolved++;
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("The dimensions will be added Sent(%s) Recv(%s)", ptr->dimension_sent, ptr->dimension_recv);
+#endif
+}
+
+/**
  * Read the hash table and store data to allocated vectors.
  */
 static void read_hash_global_tables()
