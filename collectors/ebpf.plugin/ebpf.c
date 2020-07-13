@@ -1003,7 +1003,7 @@ static void parse_ip_list(void **out, char *ip)
  * Parse the port ranges given and create Network Viewer Port Structure
  *
  * @param out is the output link list
- * @param ptr is a pointer with the text to parser.
+ * @param ptr is a pointer with the text to parse.
  * @param valid_char the function from ctype.h used to find the first valid value
  */
 static void parse_values(void **out,
@@ -1206,7 +1206,7 @@ static void parse_service_name_section()
         }
     }
 
-    link_dimension_name("Netdata", simple_hash("Netdata"), "19999");
+    link_dimension_name("19999", simple_hash("19999"), "Netdata");
 }
 
 /**
