@@ -310,9 +310,9 @@ IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
     # ${ELF_INCLUDE_DIRS}
     IF(ELF_LIBRARIES)
         list(APPEND NETDATA_COMMON_CFLAGS ${ELF_CFLAGS_OTHER})
-        list(APPEND NETDATA_COMMON_LIBRARIES
-            ${ELF_LIBRARIES}
-            ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a)
+        list(INSERT NETDATA_COMMON_LIBRARIES 0
+            ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a
+            ${ELF_LIBRARIES})
         list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${ELF_INCLUDE_DIRS})
         include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include)
         set(ENABLE_PLUGIN_EBPF True)
