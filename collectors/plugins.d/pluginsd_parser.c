@@ -627,6 +627,33 @@ PARSER_RC pluginsd_tombstone(char **words, void *user, PLUGINSD_ACTION *plugins_
     return PARSER_RC_OK;
 }
 
+PARSER_RC metalog_pluginsd_host(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    char *machine_guid = words[1];
+    char *hostname = words[2];
+    char *registry_hostname = words[3];
+    char *update_every_s = words[4];
+    char *os = words[5];
+    char *timezone = words[6];
+    char *tags = words[7];
+
+    int update_every = 1;
+    if (likely(update_every_s && *update_every_s))
+        update_every = str2i(update_every_s);
+    if (unlikely(!update_every))
+        update_every = 1;
+
+    debug(D_PLUGINSD, "HOST PARSED: guid=%s, hostname=%s, reg_host=%s, update=%d, os=%s, timezone=%s, tags=%s",
+         machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
+
+    if (plugins_action->host_action) {
+        return plugins_action->host_action(
+            user, machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
+    }
+
+    return PARSER_RC_OK;
+}
+
 // New plugins.d parser
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations)
