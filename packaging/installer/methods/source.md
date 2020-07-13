@@ -1,8 +1,6 @@
 <!--
----
 title: "Manually build Netdata from source"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
----
 -->
 
 # Manually build Netdata from source
