@@ -703,7 +703,7 @@ copy_libbpf() {
 }
 
 bundle_libbpf() {
-  if ([ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]) || [ "$(uname -s)" != Linux ]; then
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
 

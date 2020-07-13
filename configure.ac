@@ -959,6 +959,7 @@ AC_MSG_CHECKING([if ebpf.plugin should be enabled])
 if test "${build_target}" == "linux" -a "${have_libelf}" = "yes" -a -f externaldeps/libbpf/libbpf.a; then
     OPTIONAL_BPF_CFLAGS="${OPTIONAL_BPF_CFLAGS} -I externaldeps/libbpf/include"
     OPTIONAL_BPF_LIBS="${OPTIONAL_BPF_LIBS} externaldeps/libbpf/libbpf.a"
+    AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
     enable_ebpf="yes"
 else
     enable_ebpf="no"
