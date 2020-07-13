@@ -107,7 +107,18 @@
  }
 
  static const struct btf_member *
-@@ -7612,6 +7703,88 @@ static int perf_event_open_probe(bool uprobe, bool retprobe, const char *name,
+@@ -3239,6 +3330,10 @@ int bpf_map__resize(struct bpf_map *map, __u32 max_entries)
+ static int
+ bpf_object__probe_loading(struct bpf_object *obj)
+ {
++	// Don't probe loading for very old kernels. CentOS 7 can't load this probe.
++	if (obj->kern_version <= KERNEL_VERSION(3, 10, 0))
++		return 0;
++
+ 	struct bpf_load_program_attr attr;
+ 	char *cp, errmsg[STRERR_BUFSIZE];
+ 	struct bpf_insn insns[] = {
+@@ -7612,6 +7707,88 @@ static int perf_event_open_probe(bool uprobe, bool retprobe, const char *name,
  	return pfd;
  }
 
@@ -196,7 +207,7 @@
  struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
  					    bool retprobe,
  					    const char *func_name)
-@@ -7627,7 +7800,15 @@ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
+@@ -7627,7 +7804,15 @@ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
  			bpf_program__title(prog, false),
  			retprobe ? "kretprobe" : "kprobe", func_name,
  			libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
