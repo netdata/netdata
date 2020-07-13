@@ -204,7 +204,7 @@ You can configure the information shown on `outbund` and `inbound` charts with t
     included hostnames = netdata.cloud netdata.io
     excluded hostnames = example.com
     excluded ips = 127.0.0.1 192.168.0.1-192.168.0.5
-    included ips = 192.168.0.0/24 2804:14c:5b72:888d:6ee2:1aee:9b62:cbb5
+    included ips = 192.168.0.0/24 0001:0000:0000:0000:0000:0000:0000:0000/32 
 ```
 
 When you define an `included` setting, Netdat will collect network metrics for that specific port. For example, if you
