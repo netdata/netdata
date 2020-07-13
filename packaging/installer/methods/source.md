@@ -80,10 +80,10 @@ Netdata Cloud functionality. To prepare this library for the build system:
 #### libwebsockets
 
 Netdata uses the standard upstream version of libwebsockets located at
-https://github.com/warmcat/libwebsockets, but requires a custom build
-including an option that is not enabled by most pre-built versions of
-libwebsockets. Currently, we do not support using a system copy of
-libwebsockets. To prepare this library for the build system:
+https://github.com/warmcat/libwebsockets, but requires a build with SOCKS5
+support, which is not enabled by most pre-built versions. Currently,
+we do not support using a system copy of libwebsockets. To prepare this
+library for the build system:
 
 1. Verify the tag that Netdata expects to be used by checking the contents
    of `packaging/libwebsockets.version` in your Netdata sources.
