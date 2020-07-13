@@ -114,6 +114,24 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     }
 
+    struct mount_point_metadata mp = {
+        .do_space = do_space,
+        .do_inodes = do_inodes,
+        .shown_error = 0,
+        .updated = 0,
+
+        .collected = 0,
+
+        .st_space = NULL,
+        .rd_space_avail = NULL,
+        .rd_space_used = NULL,
+        .rd_space_reserved = NULL,
+
+        .st_inodes = NULL,
+        .rd_inodes_avail = NULL,
+        .rd_inodes_used = NULL,
+        .rd_inodes_reserved = NULL
+    };
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
     if(unlikely(!m)) {
         char var_name[4096 + 1];
@@ -162,25 +180,6 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
         do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
-
-        struct mount_point_metadata mp = {
-                .do_space = do_space,
-                .do_inodes = do_inodes,
-                .shown_error = 0,
-                .updated = 0,
-
-                .collected = 0,
-
-                .st_space = NULL,
-                .rd_space_avail = NULL,
-                .rd_space_used = NULL,
-                .rd_space_reserved = NULL,
-
-                .st_inodes = NULL,
-                .rd_inodes_avail = NULL,
-                .rd_inodes_used = NULL,
-                .rd_inodes_reserved = NULL
-        };
 
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
