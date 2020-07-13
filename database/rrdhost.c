@@ -296,8 +296,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
             return host;
         }
-        if (is_localhost)
-            compute_multidb_diskspace(host);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
