@@ -7,7 +7,8 @@ description: "Package maintainers and power users may be interested in manually 
 # Manually build Netdata from source
 
 These instructions are for advanced users and distribution package
-maintainers. You almost certainly want to [install Netdata from a Git
+maintainers. Unless this describes you, you almost certainly want
+to follow [our guide for manually installing Netdata from a git
 checkout](/packaging/installer/methods/manual.md) instead.
 
 ## Required Dependencies
