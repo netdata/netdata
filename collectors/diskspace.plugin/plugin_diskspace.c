@@ -115,8 +115,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     }
 
     struct mount_point_metadata mp = {
-        .do_space = do_space,
-        .do_inodes = do_inodes,
+        .do_space = 0,
+        .do_inodes = 0,
         .shown_error = 0,
         .updated = 0,
 
@@ -132,6 +132,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         .rd_inodes_used = NULL,
         .rd_inodes_reserved = NULL
     };
+
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
     if(unlikely(!m)) {
         char var_name[4096 + 1];
@@ -180,6 +181,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
         do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+
+        mp.do_space = do_space;
+        mp.do_inodes = do_inodes;
 
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
