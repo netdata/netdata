@@ -3,6 +3,8 @@
 # define NETDATA_EBPF_SOCKET_H 1
 # include <stdint.h>
 # include "libnetdata/avl/avl.h"
+
+//Vector indexes
 # define NETDATA_SOCKET_COUNTER 13
 
 #define NETDATA_SOCKET_COUNTER 13
@@ -10,6 +12,9 @@
 #define NETDATA_MAX_SOCKET_VECTOR 5
 
 #define NETDATA_UDP_START 3
+
+# define NETDATA_SOCKET_APPS_HASH_TABLE 0
+# define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -143,7 +148,7 @@ typedef struct netdata_socket {
     uint8_t  protocol;      //Should this to be in the index?
     uint8_t  removeme;      //Flag to remove a socket
     uint32_t reserved;     //Alignment
-} netdata_socket_t; __attribute__((__aligned__(8)));
+} netdata_socket_t __attribute__((__aligned__(8)));
 
 /**
  * Index used together previous structure
@@ -151,7 +156,6 @@ typedef struct netdata_socket {
 typedef struct netdata_socket_idx {
     union netdata_ip saddr;
     union netdata_ip daddr;
-    uint32_t pid;
     uint16_t dport;
     uint16_t sport;
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
@@ -180,5 +184,16 @@ typedef struct netdata_socket_plot {
     char *dimension_sent;
     char *dimension_recv;
 } netdata_socket_plot_t;
+
+//TODO: REMOVE THIS DEFINITION AFTER 9495 TO BE MERGED
+#define REMOVE_THIS_DEFAULT 500
+typedef struct netdata_vector_plot {
+    netdata_socket_plot_t *plot;
+
+    avl_tree_lock tree;
+    uint32_t last;
+    uint32_t next;
+
+} netdata_vector_plot_t;
 
 #endif
