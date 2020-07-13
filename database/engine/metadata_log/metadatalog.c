@@ -419,7 +419,7 @@ void error_with_guid(uuid_t *uuid, char *reason)
 int count_legacy_children(char *dbfiles_path)
 {
     int ret;
-    unsigned tier, no, matched_files, i,failed_to_load;
+    unsigned matched_files;
     static uv_fs_t req;
     uv_dirent_t dent;
 
@@ -433,9 +433,11 @@ int count_legacy_children(char *dbfiles_path)
 
     uuid_t uuid;
     int legacy_engines = 0;
-    for (matched_files = 0; UV_EOF != uv_fs_scandir_next(&req, &dent); matched_files++) {
+
+    while(UV_EOF != uv_fs_scandir_next(&req, &dent)) {
+//    for (matched_files = 0; UV_EOF != uv_fs_scandir_next(&req, &dent); matched_files++) {
         if (dent.type == UV_DIRENT_DIR) {
-            if (!uuid_parse(dent.name, &uuid)) {
+            if (!uuid_parse(dent.name, uuid)) {
                 info("Found legacy engine folder \"%s/%s\"", dbfiles_path, dent.name);
                 legacy_engines++;
             } else
@@ -447,4 +449,43 @@ int count_legacy_children(char *dbfiles_path)
     uv_fs_req_cleanup(&req);
 
     return legacy_engines;
+}
+
+void compute_multidb_diskspace(RRDHOST *host)
+{
+    char multidb_disk_space_file[FILENAME_MAX + 1];
+    FILE *fp;
+    default_rrdeng_multidb_disk_quota_mb = -1;
+
+    snprintfz(multidb_disk_space_file, FILENAME_MAX, "%s/dbengine_multihost_size", host->varlib_dir);
+    fp = fopen(multidb_disk_space_file, "r");
+    if (likely(fp)) {
+        int rc = fscanf(fp, "%d", &default_rrdeng_multidb_disk_quota_mb);
+        fclose(fp);
+        if (rc == 1)
+            info("Setting computed default multidb storage size to %dMB", default_rrdeng_multidb_disk_quota_mb);
+        else {
+            errno = 0;
+            error("File '%s' contains invalid input, it will be rebuild", multidb_disk_space_file);
+            default_rrdeng_multidb_disk_quota_mb = -1;
+        }
+    }
+
+    if (default_rrdeng_multidb_disk_quota_mb == -1) {
+        int rc = count_legacy_children(host->cache_dir);
+        if (likely(rc >= 0)) {
+            default_rrdeng_multidb_disk_quota_mb = (rc + 1) * default_rrdeng_disk_quota_mb;
+            info(
+                "Found %d legacy dbengine folders, setting multidb diskspace to %dMB", rc,
+                default_rrdeng_multidb_disk_quota_mb);
+            fp = fopen(multidb_disk_space_file, "w");
+            if (likely(fp)) {
+                fprintf(fp, "%d", rc * default_rrdeng_disk_quota_mb);
+                info("Created file '%s' to store the computed value", multidb_disk_space_file);
+                fclose(fp);
+            } else
+                error("Failed to store the default multidb disk quota size on '%s'", multidb_disk_space_file);
+        } else
+            error("Failed to detect legacy dbengine folders");
+    }
 }
