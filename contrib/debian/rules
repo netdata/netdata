@@ -76,6 +76,8 @@ override_dh_install:
 		ln -s "/usr/share/netdata/www/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
+	packaging/bundle-ebpf.sh . ${TOP}/usr/libexec/netdata/plugins.d
+
 	# Install go
 	#
 	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata $(TOP)/usr/libexec/netdata
@@ -92,6 +94,9 @@ override_dh_installdocs:
 		--parents \
 		--target $(TOP)/usr/share/doc/netdata/ \
 		{} \;
+
+override_dh_shlibdeps:
+	dh_shlibdeps -X libnetdata_ebpf
 
 override_dh_fixperms:
 	dh_fixperms
