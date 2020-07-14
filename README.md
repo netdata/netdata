@@ -224,8 +224,8 @@ archived simultaneously, which caused segmentation faults. We're grateful to [ma
 first reported the issue, and other members of the Netdata community who contributed their insights and valuable log
 information, which we used to diagnose and fix the bug.
 
-PR [#9428] fixed a significant issue with duplicate alarm IDs, which caused issues in how alarms were sent and displayed
-in Netdata Cloud.
+PR [#9428](https://github.com/netdata/netdata/pull/9428) fixed a significant issue with duplicate alarm IDs, which
+caused issues in how alarms were sent and displayed in Netdata Cloud.
 
 This release also contains a few additional bug fixes that were not fully reviewed before the release of v1.23.0.
 
