@@ -600,6 +600,8 @@ static void read_socket_hash_table(int fd)
  */
 void *ebpf_socket_read_hash(void *ptr)
 {
+    UNUSED(ptr);
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
@@ -608,7 +610,9 @@ void *ebpf_socket_read_hash(void *ptr)
         (void)dt;
 
         read_socket_hash_table(NETDATA_SOCKET_IPV4_HASH_TABLE);
+        /*
         read_socket_hash_table(NETDATA_SOCKET_IPV6_HASH_TABLE);
+         */
     }
 
     return NULL;
