@@ -732,10 +732,9 @@ static void parse_port_list(void **out, char *range)
     }
 
     if (first > last) {
-        info("The specified order [%d, %d] is inverted, Netdata is fixing it!", first, last);
-        int tmp = first;
-        first = last;
-        last = tmp;
+        info("The specified order %s is wrong, the smallest value is always the first!", copied);
+        freez(copied);
+        return;
     }
 
     ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
