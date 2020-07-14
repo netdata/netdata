@@ -121,7 +121,7 @@ check_symbol_exists("JudyLLast" "Judy.h" HAVE_JUDY)
 IF(HAVE_JUDY)
     message(STATUS "Judy library found")
 ELSE()
-#    message( FATAL_ERROR "libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'." )
+    message( FATAL_ERROR "libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'." )
 ENDIF()
 
 # -----------------------------------------------------------------------------
