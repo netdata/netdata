@@ -6,10 +6,12 @@ on:
     branches:
       - master
     paths:
+      - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
   pull_request:
     paths:
+      - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
 jobs:

@@ -658,11 +658,11 @@ set(BACKENDS_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         claim/claim.c
         claim/claim.h
+        aclk/aclk_common.c
+        aclk/aclk_common.h
         )
 
 set(ACLK_PLUGIN_FILES
-        aclk/aclk_common.c
-        aclk/aclk_common.h
         aclk/agent_cloud_link.c
         aclk/agent_cloud_link.h
         aclk/aclk_query.c
