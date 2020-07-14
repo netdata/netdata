@@ -44,7 +44,7 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
 
 //Port range
-# define NETDATA_MINIMUM_PORT_VALUE 0
+# define NETDATA_MINIMUM_PORT_VALUE 1
 # define NETDATA_MAXIMUM_PORT_VALUE 65535
 
 # define NETDATA_MINIMUM_IPV4_CIDR 0

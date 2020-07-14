@@ -701,36 +701,48 @@ static void parse_port_list(void **out, char *range)
 {
     ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
 
+    char *copied = strdupz(range);
     char *end = range;
     //Move while I cannot find a separator
     while (*end && *end != ':' && *end != '-') end++;
 
     //It has a range
+    int first, last;
     if (likely(*end)) {
         *end++ = '\0';
+        last = str2i((const char *)end);
+    } else {
+        last = 0;
     }
 
-    int test;
-    test = str2i((const char *)range);
-    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
-        info("The port %d is invalid and it will be ignored!", test);
+    first = str2i((const char *)range);
+    if (first < NETDATA_MINIMUM_PORT_VALUE || first > NETDATA_MAXIMUM_PORT_VALUE) {
+        info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
+        freez(copied);
         return;
+    }
+
+    if (!last)
+        last = first;
+
+    if (last < NETDATA_MINIMUM_PORT_VALUE || last > NETDATA_MAXIMUM_PORT_VALUE) {
+        info("The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
+        freez(copied);
+        return;
+    }
+
+    if (first > last) {
+        info("The specified order [%d, %d] is inverted, Netdata is fixing it!", first, last);
+        int tmp = first;
+        first = last;
+        last = tmp;
     }
 
     ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    w->value = strdup(range);
-    w->hash = simple_hash(range);
-
-    w->first = (uint16_t)htons((uint16_t)test);
-    test = ((likely(*end)))?str2i((const char *)end):test;
-    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
-        info("The second port %d of the range is invalid and the whole range will be ignored!", test);
-        freez(w->value);
-        freez(w);
-        return;
-    }
-
-    w->last = (uint16_t)htons((uint16_t)test);
+    w->value = strdup(copied);
+    w->hash = simple_hash(copied);
+    w->first = (uint16_t)htons((uint16_t)first);
+    w->last = (uint16_t)htons((uint16_t)last);
 
     fill_port_list(list, w);
 }
@@ -1158,7 +1170,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     w->name = strdupz(value);
     w->hash = hash;
 
-    w->port = (uint16_t) test;
+    w->port = (uint16_t) htons(test);
 
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
     if (unlikely(!names)) {
@@ -1166,7 +1178,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
-                error("Dupplicated definition for the service '%u', the name %s will be ignored. ", hash, names->name);
+                info("Dupplicated definition for a service, the name %s will be ignored. ", names->name);
                 freez(names->name);
                 names->name = w->name;
                 names->hash = w->hash;
@@ -1178,7 +1190,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u) to dimension name list used on network viewer",w->name, w->port);
+    info("Adding values %s( %u) to dimension name list used on network viewer", w->name, w->port);
 #endif
 }
 
