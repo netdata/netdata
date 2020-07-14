@@ -37,7 +37,6 @@ jobs:
           - 'debian:jessie'
           - 'fedora:32'
           - 'fedora:31'
-          - 'fedora:30'
           - 'opensuse/leap:15.2'
           - 'opensuse/leap:15.1'
           - 'opensuse/tumbleweed:latest'
@@ -78,8 +77,6 @@ jobs:
           - distro: 'fedora:32'
             rmjsonc: 'dnf remove -y json-c-devel'
           - distro: 'fedora:31'
-            rmjsonc: 'dnf remove -y json-c-devel'
-          - distro: 'fedora:30'
             rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'opensuse/leap:15.2'
