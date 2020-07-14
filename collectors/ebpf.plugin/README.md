@@ -193,7 +193,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
 
 ### `[network viewer]`
 
-You can configure the information shown on `outbund` and `inbound` charts with the settings in this section. 
+You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
 
 ```conf
 [network viewer]
