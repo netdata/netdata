@@ -440,8 +440,10 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         if (getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                          sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
             //I cannot resolve the name, I will use the IP
-            if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST))
+            if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
                 memcpy(hostname, errname, 12);
+                hostname[12] = '\0';
+            }
         }
     } else { //IPV6
         struct sockaddr_in6 myaddr6;
@@ -453,8 +455,10 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         if (getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                         sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
             //I cannot resolve the name, I will use the IP
-            if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST))
+            if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
                 memcpy(hostname, errname, 12);
+                hostname[12] = '\0';
+            }
         }
     }
 
@@ -470,7 +474,18 @@ laststep:
 #endif
 }
 
-static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t *lvalues, netdata_socket_idx_t *lindex)
+/**
+ * Store socket inside avl
+ *
+ * Store the socket values inside the avl tree.
+ *
+ * @param out     the structure with information used to plot charts.
+ * @param lvalues Values read from socket ring.
+ * @param lindex  the index information, the real socket.
+ * @param family  the family associated to the socket
+ */
+static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t *lvalues,
+                                    netdata_socket_idx_t *lindex, int family)
 {
     netdata_socket_plot_t test, *ret ;
 
@@ -486,12 +501,11 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         uint32_t curr = out->next;
         uint32_t last = out->last;
 
-
         netdata_socket_plot_t *w = &out->plot[curr];
 
         if (curr == last) {
             if (!w->resolved) {
-                fill_names(w, !(out == (netdata_vector_plot_t *)&inbound_vectors), 1);
+                fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 1);
             }
 
             netdata_socket_t *sock = &w->sock;
@@ -501,8 +515,9 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         } else {
             memcpy(&w->sock, lvalues, sizeof(*lvalues));
             memcpy(&w->index, lindex, sizeof(*lindex));
+            w->family = family;
 
-            fill_names(w, !(out == (netdata_vector_plot_t *)&inbound_vectors), 0);
+            fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 0);
         }
 
         netdata_socket_plot_t *check ;
@@ -534,9 +549,9 @@ int read_socket_hash_table(int fd)
     int removesock = 0;
 
     netdata_socket_t *values = socket_values;
-    netdata_socket_t avl_value;
     int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
 
+    int family = (fd == NETDATA_SOCKET_IPV4_HASH_TABLE)?AF_INET:AF_INET6;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -551,7 +566,7 @@ int read_socket_hash_table(int fd)
         sent = recv = 0;
         removesock = 0;
         int i;
-        for (i = 0; i < end; i++) {
+        for (i = 1; i < end; i++) {
             netdata_socket_t *w = &values[i];
 
             sent += w->sent;
@@ -560,10 +575,11 @@ int read_socket_hash_table(int fd)
             removesock += (int)w->removeme;
         }
 
-        avl_value.recv = recv;
-        avl_value.sent = sent;
+        values[0].recv += recv;
+        values[0].sent += sent;
+        values[0].removeme += removesock;
 
-        store_socket_inside_avl(&inbound_vectors, &avl_value, &key);
+        store_socket_inside_avl(&inbound_vectors, values, &key, family);
 
         if (removesock)
             removeme = key;
