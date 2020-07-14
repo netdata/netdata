@@ -541,7 +541,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-int read_socket_hash_table(int fd)
+static void read_socket_hash_table(int fd)
 {
     netdata_socket_idx_t key = { };
     netdata_socket_idx_t next_key;
@@ -586,8 +586,32 @@ int read_socket_hash_table(int fd)
 
         key = next_key;
     }
+}
 
-    return 0;
+/**
+ * Socket read hash
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_socket_read_hash(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
+    while (!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        read_socket_hash_table(NETDATA_SOCKET_IPV4_HASH_TABLE);
+        read_socket_hash_table(NETDATA_SOCKET_IPV6_HASH_TABLE);
+    }
+
+    return NULL;
 }
 
 /**
@@ -724,6 +748,14 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     UNUSED(step);
     heartbeat_t hb;
     heartbeat_init(&hb);
+
+    struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
+                                                    NULL, NULL, 1, NULL,
+                                                    NULL, ebpf_socket_read_hash };
+    socket_threads.thread = mallocz(sizeof(netdata_thread_t));;
+
+    netdata_thread_create(socket_threads.thread, socket_threads.name,
+                          NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
 
     int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
     int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
