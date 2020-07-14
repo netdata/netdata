@@ -192,6 +192,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
     bandwidth consumed by each.
 
 ### `[network viewer]`
+
 You can configure the information shown on `outbund` and `inbound` charts with the settings in this section. 
 
 ```conf
@@ -207,13 +208,15 @@ You can configure the information shown on `outbund` and `inbound` charts with t
     included ips = 192.168.0.0/24 0001:0000:0000:0000:0000:0000:0000:0000/32 
 ```
 
-When you define an `included` setting, Netdat will collect network metrics for that specific port. For example, if you
+When you define an `included` setting, Netdata will collect network metrics for that specific port. For example, if you
 write `included ports = 19999`, Netdata will collect only connections for itself. If you list values in the `excluded`
 setting, Netdata will collect metrics on all included ports except those values.
+
 In the above example, Netdata will collect metrics for all ports between 100 and 1024, with the exception of 145 and
 139.
 
 The following pairs of `included` and `excluded` are available:
+
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `services`: If you do not know which port number you want to monitor, you can list the service. Netdata will resolve
     the service name to its associated port to monitor the connection.
@@ -230,6 +233,7 @@ dimensions` setting.
 
 Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
+
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
 service in network viewer charts, and thus see the name of the service instead of its port, define it:
 
