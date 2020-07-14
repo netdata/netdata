@@ -225,7 +225,7 @@ The following pairs of `included` and `excluded` are available:
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
     range of IPs, or use CIDR values.
     
-By default, Netdata displayes up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
+By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
 will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
 
