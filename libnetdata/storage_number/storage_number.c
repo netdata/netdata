@@ -61,7 +61,7 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
             m++;
         }
 
-        if (unlikely(n > (calculated_number) (0xffffff))) {
+        if (unlikely(n > (calculated_number) (0x00ffffff))) {
             n /= 10;
             m--;
         }
