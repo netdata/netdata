@@ -208,9 +208,9 @@ You can configure the information shown on `outbound` and `inbound` charts with 
     included ips = 192.168.0.0/24 0001:0000:0000:0000:0000:0000:0000:0000/32 
 ```
 
-When you define an `included` setting, Netdata will collect network metrics for that specific port. For example, if you
+When you define an `included ports` setting, Netdata will collect network metrics for that specific port. For example, if you
 write `included ports = 19999`, Netdata will collect only connections for itself. If you list values in the `excluded`
-setting, Netdata will collect metrics on all included ports except those values.
+setting, Netdata will collect metrics on all included ports except those values. Other included options have a similar behavior.
 
 In the above example, Netdata will collect metrics for all ports between 100 and 1024, with the exception of 145 and
 139.
