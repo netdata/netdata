@@ -28,7 +28,7 @@ jobs:
           - 'alpine:3.10'
           - 'alpine:3.9'
           - 'archlinux:latest'
-          - 'centos:8'
+            #- 'centos:8'
           - 'centos:7'
           - 'clearlinux:latest'
           - 'debian:bullseye'
@@ -61,8 +61,8 @@ jobs:
           - distro: 'archlinux:latest'
             pre: 'pacman --noconfirm -Sy grep libffi'
 
-          - distro: 'centos:8'
-            rmjsonc: 'dnf remove -y json-c-devel'
+            #- distro: 'centos:8'
+            #rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'debian:bullseye'
             pre: 'apt-get update'
