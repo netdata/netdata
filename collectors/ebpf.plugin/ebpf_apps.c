@@ -764,7 +764,7 @@ static inline void link_all_processes_to_their_parents(void) {
         }
         else {
             p->parent = NULL;
-            error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+            debug_log("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
         }
     }
 }

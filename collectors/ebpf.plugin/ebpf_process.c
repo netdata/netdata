@@ -877,18 +877,6 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * Clean the allocated process stat structure
- */
-static void clean_process_stat()
-{
-    size_t i;
-    for (i = 0 ; i < all_pids_count ; i++) {
-        ebpf_process_stat_t *w = local_process_stats[pid_index[i]];
-        freez(w);
-    }
-}
-
-/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -901,7 +889,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
-    clean_process_stat();
     freez(local_process_stats);
 
     if (process_functions.libnetdata) {
@@ -936,7 +923,7 @@ static void ebpf_process_allocate_global_vectors(size_t length) {
     prev_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
 }
 
-static void change_collector_event() {
+void change_process_event() {
     int i;
     if (running_on_kernel < NETDATA_KERNEL_V5_3)
         process_probes[EBPF_SYS_CLONE_IDX].name = NULL;
@@ -956,7 +943,7 @@ static void change_syscalls() {
  * Set local variables
  *
  */
-static void set_local_pointers(ebpf_module_t *em) {
+static void set_local_pointers() {
 #ifndef STATIC
     bpf_map_lookup_elem = process_functions.bpf_map_lookup_elem;
 
@@ -964,10 +951,6 @@ static void set_local_pointers(ebpf_module_t *em) {
 #endif
 
     map_fd = process_functions.map_fd;
-
-    if (em->mode == MODE_ENTRY) {
-        change_collector_event();
-    }
 
     if (process_functions.isrh >= NETDATA_MINIMUM_RH_VERSION && process_functions.isrh < NETDATA_RH_8)
         change_syscalls();
@@ -1032,7 +1015,7 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
-    set_local_pointers(em);
+    set_local_pointers();
     if (ebpf_load_program(ebpf_plugin_dir, em->thread_id, em->mode, kernel_string,
                       em->thread_name, process_functions.map_fd, process_functions.load_bpf_file) ) {
         pthread_mutex_unlock(&lock);

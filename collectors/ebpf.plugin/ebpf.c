@@ -86,13 +86,14 @@ netdata_ebpf_events_t process_probes[] = {
 };
 
 netdata_ebpf_events_t socket_probes[] = {
-    { .type = 'r', .name = "tcp_sendmsg" },
     { .type = 'p', .name = "tcp_cleanup_rbuf" },
     { .type = 'p', .name = "tcp_close" },
     { .type = 'p', .name = "udp_recvmsg" },
     { .type = 'r', .name = "udp_recvmsg" },
     { .type = 'r', .name = "udp_sendmsg" },
     { .type = 'p', .name = "do_exit" },
+    { .type = 'p', .name = "tcp_sendmsg" },
+    { .type = 'r', .name = "tcp_sendmsg" },
     { .type = 0, .name = NULL }
 };
 
@@ -114,6 +115,15 @@ ebpf_process_stat_t *global_process_stat = NULL;
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
  *
  *****************************************************************/
+
+static void change_events()
+{
+    if (ebpf_modules[0].mode == MODE_ENTRY)
+        change_process_event();
+
+    if (ebpf_modules[1].mode == MODE_ENTRY)
+        change_socket_event();
+}
 
 /**
  * Clean Loaded Events
@@ -166,8 +176,8 @@ static void ebpf_exit(int sig)
 
         int sid = setsid();
         if(sid >= 0) {
-            sleep(1);
             debug(D_EXIT, "Wait for father %d die", getpid());
+            sleep_usec(200000); //Sleep 200 miliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
@@ -816,10 +826,10 @@ static void parse_args(int argc, char **argv)
     }
 
     if (load_collector_config(ebpf_user_config_dir, &disable_apps)) {
-        error("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
+        info("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
               ebpf_user_config_dir);
         if (load_collector_config(ebpf_stock_config_dir, &disable_apps)) {
-            error("Does not have a stock file. It is starting with default options.");
+            info("Does not have a stock file. It is starting with default options.");
         } else {
             enabled = 1;
         }
@@ -920,6 +930,7 @@ int main(int argc, char **argv)
         {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
     };
 
+    change_events();
     clean_loaded_events();
 
     int i;

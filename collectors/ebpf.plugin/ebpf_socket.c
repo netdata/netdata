@@ -515,9 +515,11 @@ static void ebpf_socket_allocate_global_vectors(size_t length) {
     bandwidth_vector = callocz((size_t) ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 }
 
-static void change_collector_event() {
+void change_socket_event() {
     socket_probes[0].type = 'p';
+    socket_probes[4].type = 'p';
     socket_probes[5].type = 'p';
+    socket_probes[7].name = NULL;
 }
 
 /**
@@ -533,7 +535,7 @@ static void set_local_pointers(ebpf_module_t *em) {
     map_fd = socket_functions.map_fd;
 
     if (em->mode == MODE_ENTRY) {
-        change_collector_event();
+        change_socket_event();
     }
 }
 
