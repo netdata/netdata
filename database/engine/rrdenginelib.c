@@ -250,11 +250,11 @@ int count_legacy_children(char *dbfiles_path)
     return legacy_engines;
 }
 
-void compute_multidb_diskspace()
+int compute_multidb_diskspace()
 {
     char multidb_disk_space_file[FILENAME_MAX + 1];
     FILE *fp;
-    computed_multidb_disk_quota_mb = -1;
+    int computed_multidb_disk_quota_mb = -1;
 
     snprintfz(multidb_disk_space_file, FILENAME_MAX, "%s/dbengine_multihost_size", netdata_configured_varlib_dir);
     fp = fopen(multidb_disk_space_file, "r");
@@ -283,8 +283,9 @@ void compute_multidb_diskspace()
 //            } else
 //                error("Failed to store the default multidb disk quota size on '%s'", multidb_disk_space_file);
         }
+        else
+            computed_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
     }
 
-    if (unlikely(computed_multidb_disk_quota_mb == - 1))
-        computed_multidb_disk_quota_mb = 256;
+    return computed_multidb_disk_quota_mb;
 }

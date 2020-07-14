@@ -14,7 +14,6 @@
 
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_disk_quota_mb;
-extern int computed_multidb_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
 extern uint8_t rrdeng_drop_metrics_under_page_cache_pressure;
 

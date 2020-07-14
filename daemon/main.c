@@ -543,8 +543,6 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    compute_multidb_diskspace();
-
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
@@ -560,7 +558,7 @@ static void get_netdata_configured_variables() {
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "multidb disk space", computed_multidb_disk_quota_mb);
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "multidb disk space", compute_multidb_diskspace());
     if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
