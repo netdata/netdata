@@ -37,6 +37,9 @@ static void test_number_pinting(void **state)
 
     print_calculated_number(value, -9999.9999999);
     assert_string_equal(value, "-9999.9999999");
+
+    print_calculated_number(value, 16.777218L);
+    assert_string_equal(value, "16.777218");
 }
 
 int main(void)
