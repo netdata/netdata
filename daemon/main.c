@@ -543,7 +543,7 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    compute_multidb_diskspace(netdata_configured_varlib_dir, netdata_configured_cache_dir);
+    compute_multidb_diskspace();
 
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
