@@ -3,6 +3,21 @@
 
 #include "metadatalog.h"
 
+static inline struct metalog_instance *get_metalog_ctx(RRDHOST *host)
+{
+    if (!host->rrdeng_ctx) {
+        if (host != localhost && !localhost->rrdeng_ctx)
+            return NULL;
+        else {
+            if (localhost->rrdeng_ctx)
+                return localhost->rrdeng_ctx->metalog_ctx;
+            else
+                return NULL;
+        }
+    }
+    return host->rrdeng_ctx->metalog_ctx;
+}
+
 static inline int metalog_is_initialized(struct metalog_instance *ctx)
 {
     return ctx->rrdeng_ctx->metalog_ctx != NULL;
@@ -62,10 +77,7 @@ void metalog_commit_update_host(RRDHOST *host)
     BUFFER *buffer;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx)
-        return;
-
-    ctx = host->rrdeng_ctx->metalog_ctx;
+    ctx = get_metalog_ctx(host);
     if (!ctx) /* metadata log has not been initialized yet */
         return;
 
@@ -157,13 +169,12 @@ void metalog_commit_update_chart(RRDSET *st)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
-    RRDHOST *host = st->rrdhost;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
+    ctx = get_metalog_ctx(st->rrdhost);
     if (!ctx) /* metadata log has not been initialized yet */
         return;
 
@@ -176,14 +187,13 @@ void metalog_commit_delete_chart(RRDSET *st)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
-    RRDHOST *host = st->rrdhost;
     char uuid_str[37];
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
+    ctx = get_metalog_ctx(st->rrdhost);
     if (!ctx) /* metadata log has not been initialized yet */
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
@@ -228,13 +238,12 @@ void metalog_commit_update_dimension(RRDDIM *rd)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
+    ctx = get_metalog_ctx(st->rrdhost);
     if (!ctx) /* metadata log has not been initialized yet */
         return;
 
@@ -248,14 +257,13 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
     char uuid_str[37];
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
+    ctx = get_metalog_ctx(st->rrdhost);
     if (!ctx) /* metadata log has not been initialized yet */
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
@@ -311,7 +319,10 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
 
 RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
+    UNUSED(ctx);
+
     GUID_TYPE ret;
+    char uuid_str[37];
     char dim_object[49], chart_object[33], id_str[PLUGINSD_LINE_MAX], chart_fullid[RRD_ID_LENGTH_MAX + 1];
     uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
 
@@ -320,7 +331,8 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
         return NULL;
 
     machine_guid = (uuid_t *)dim_object;
-    RRDHOST *host = ctx->rrdeng_ctx->host;
+    uuid_unparse_lower(*machine_guid, uuid_str);
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str, 0);
     if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
         error("Metadata host machine GUID does not match the one assosiated with the dimension");
         return NULL;
