@@ -54,6 +54,9 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     int replace_instead_of_generate = 0;
 
     ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+        ctx = localhost->rrdeng_ctx;
+
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
@@ -171,6 +174,10 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
+    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+            ctx = localhost->rrdeng_ctx;
+    if (unlikely(!ctx))
+        return;
     descr = handle->descr;
     if (unlikely(NULL == descr)) {
         return;
@@ -221,6 +228,8 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
+    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+        ctx = localhost->rrdeng_ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
 
@@ -371,6 +380,8 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     uint8_t is_first_region_initialized;
 
     ctx = st->rrdhost->rrdeng_ctx;
+    if (ctx == NULL && st->rrdhost != localhost)
+        ctx = localhost->rrdeng_ctx;
     regions = 1;
     *max_intervalp = max_interval = 0;
     region_info_array = NULL;
@@ -533,6 +544,8 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     unsigned pages_nr;
 
     ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+        ctx = localhost->rrdeng_ctx;
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
     handle = &rrdimm_handle->rrdeng;
@@ -801,6 +814,9 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
  */
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
+    if (ctx == NULL)
+        return;
+
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     array[0] = (uint64_t)ctx->stats.metric_API_producers;
