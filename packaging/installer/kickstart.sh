@@ -281,7 +281,7 @@ export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 # ---------------------------------------------------------------------------------------------------------------------
 # look for an existing install and try to update that instead if it exists
 
-ndpath="$(command -v netdata)"
+ndpath="$(command -v netdata 2>/dev/null)"
 if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
     ndpath="/opt/netdata/bin/netdata"
 fi
@@ -297,26 +297,13 @@ if [ -n "$ndpath" ] ; then
 
   if [ -r "${ndprefix}/etc/netdata/.environment" ] ; then
     if [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
-      # the crazy statement below pulls the value of a single variable out of the environment file without polluting the runtime environment
-      is_static="$(env "$(cat "${ndprefix}/etc/netdata/.environment") /bin/sh -c 'echo ${IS_NETDATA_STATIC_BINARY}'")"
-      if [ -n "${is_static}" ] ; then
-        progress "Attempting to update existing static install instead of creating a new one"
-        if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
-          progress "Updated existing static install at ${ndpath}"
-          exit 0
-        else
-          fatal "Failed to update existing Netdata install"
-          exit 1
-        fi
+      progress "Attempting to update existing install instead of creating a new one"
+      if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
+        progress "Updated existing install at ${ndpath}"
+        exit 0
       else
-        progress "Attempting to update existing kickstart install instead of creating a new one"
-        if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
-          progress "Updated existing kickstart install at ${ndpath}"
-          exit 0
-        else
-          fatal "Failed to update existing Netdata install"
-          exit 1
-        fi
+        fatal "Failed to update existing Netdata install"
+        exit 1
       fi
     else
       if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
