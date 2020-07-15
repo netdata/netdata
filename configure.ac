@@ -952,8 +952,6 @@ PKG_CHECK_MODULES(
     [have_libelf=yes],
     [have_libelf=no]
 )
-OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS}"
-OPTIONAL_BPF_LIBS="${LIBELF_LIBS}"
 
 AC_CHECK_TYPE(
     [struct bpf_prog_info],
@@ -963,12 +961,12 @@ AC_CHECK_TYPE(
 )
 
 AC_MSG_CHECKING([if ebpf.plugin should be enabled])
-if test "${build_target}" == "linux" -a \
+if test "${build_target}" = "linux" -a \
         "${have_libelf}" = "yes" -a \
         "${have_bpf}" = "yes" -a \
         -f externaldeps/libbpf/libbpf.a; then
-    OPTIONAL_BPF_CFLAGS="${OPTIONAL_BPF_CFLAGS} -I externaldeps/libbpf/include"
-    OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${OPTIONAL_BPF_LIBS}"
+    OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
+    OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
     AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
     enable_ebpf="yes"
 else
