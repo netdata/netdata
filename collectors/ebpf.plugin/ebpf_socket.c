@@ -316,7 +316,9 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
 /**
  * Compare sockets
  *
- * Compare sockets
+ * Compare destination address and destination port.
+ * We do not compare source port, because it is random.
+ * We also do not compare source address, because inbound and outbound connections are stored in separated AVL trees.
  *
  * @param a pointer to netdata_socket_plot
  * @param b pointer  to netdata_socket_plot
@@ -325,12 +327,24 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
  */
 static int compare_sockets(void *a, void *b)
 {
-    //Source port is constant in few situations, so we need to exclude it.
-    static size_t length = sizeof(netdata_socket_idx_t) - sizeof(uint16_t);
     struct netdata_socket_plot *val1 = a;
     struct netdata_socket_plot *val2 = b;
+    int cmp;
 
-    return memcmp(&val1->index, &val2->index, length);
+    //We do not need to compare val2 family, because data inside hash table is always from the same family
+    if (val1->family == AF_INET) { //IPV4
+        cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
+        if (!cmp) {
+            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        }
+    } else {
+        cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
+        if (!cmp) {
+            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        }
+    }
+
+    return cmp;
 }
 
 /**
@@ -497,7 +511,6 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
     if (inet_ntop(family, lindex->daddr.addr8, removeme_dst, sizeof(removeme_dst)))
         inet_ntop(family, lindex->saddr.addr8, removeme_src, sizeof(removeme_src));
 
-    error("KILLME (%u, %u): %s:%u,  %s:%u", out->next, out->last, removeme_dst, htons(test.index.dport), removeme_src, htons(test.index.sport));
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
         netdata_socket_t *sock = &ret->sock;
@@ -619,14 +632,13 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
     int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
+    int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         read_socket_hash_table(fd_ipv4, AF_INET);
-        /*
         read_socket_hash_table(fd_ipv6, AF_INET6);
-         */
     }
 
     return NULL;
