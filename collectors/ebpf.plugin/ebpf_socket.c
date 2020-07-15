@@ -325,10 +325,12 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
  */
 static int compare_sockets(void *a, void *b)
 {
+    //Source port is constant in few situations, so we need to exclude it.
+    static size_t length = sizeof(netdata_socket_idx_t) - sizeof(uint16_t);
     struct netdata_socket_plot *val1 = a;
     struct netdata_socket_plot *val2 = b;
 
-    return memcmp(&val1->index, &val2->index, sizeof(netdata_socket_idx_t));
+    return memcmp(&val1->index, &val2->index, length);
 }
 
 /**
@@ -389,7 +391,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     int size = build_dimension_name(dimname, hostname, service_name, is_inbound, &ptr->sock);
     if (size > 0) {
         strcpy(&dimname[size], "sent");
-        dimname[size + 1] = '\0';
+        dimname[size + 4] = '\0';
         ptr->dimension_sent = strdupz(dimname);
 
         strcpy(&dimname[size], "recv");
@@ -491,6 +493,11 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     memcpy(&test.index, lindex, sizeof(*lindex));
 
+    char removeme_src[INET6_ADDRSTRLEN],  removeme_dst[INET6_ADDRSTRLEN];
+    if (inet_ntop(family, lindex->daddr.addr8, removeme_dst, sizeof(removeme_dst)))
+        inet_ntop(family, lindex->saddr.addr8, removeme_src, sizeof(removeme_src));
+
+    error("KILLME (%u, %u): %s:%u,  %s:%u", out->next, out->last, removeme_dst, htons(test.index.dport), removeme_src, htons(test.index.sport));
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
         netdata_socket_t *sock = &ret->sock;
@@ -525,6 +532,12 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         if (check != w)
             error("Internal error, cannot insert the AVL tree.");
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        char iptext[INET6_ADDRSTRLEN];
+        if (inet_ntop(family, &w->index.daddr.addr8, iptext, sizeof(iptext)))
+            info("New dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu, RECEIVED = %lu",
+                 curr, iptext, w->resolved_name, w->dimension_recv, w->dimension_sent, w->sock.sent, w->sock.recv);
+#endif
         curr++;
         if (curr > last)
             curr = last;
@@ -538,10 +551,11 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  * Read data from hash tables created on kernel ring.
  *
  * @param fd  the hash table with data.
+ * @param family the family associated to the hash table
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void read_socket_hash_table(int fd)
+static void read_socket_hash_table(int fd, int family)
 {
     netdata_socket_idx_t key = { };
     netdata_socket_idx_t next_key;
@@ -551,7 +565,6 @@ static void read_socket_hash_table(int fd)
     netdata_socket_t *values = socket_values;
     int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
 
-    int family = (fd == NETDATA_SOCKET_IPV4_HASH_TABLE)?AF_INET:AF_INET6;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -605,13 +618,14 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
+    int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        read_socket_hash_table(NETDATA_SOCKET_IPV4_HASH_TABLE);
+        read_socket_hash_table(fd_ipv4, AF_INET);
         /*
-        read_socket_hash_table(NETDATA_SOCKET_IPV6_HASH_TABLE);
+        read_socket_hash_table(fd_ipv6, AF_INET6);
          */
     }
 
