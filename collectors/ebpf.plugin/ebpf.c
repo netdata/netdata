@@ -1189,7 +1189,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u) to dimension name list used on network viewer", w->name, w->port);
+    info("Adding values %s( %u) to dimension name list used on network viewer", w->name, htons(w->port));
 #endif
 }
 
@@ -1210,14 +1210,18 @@ static void parse_service_name_section()
 
     //Always associated the default port to Netdata
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
-    uint16_t default_port = htons(19999);
-    for (; names->next; names = names->next) {
-        if (names->port == default_port) {
-            return;
+    if (names) {
+        uint16_t default_port = htons(19999);
+        for (; names->next; names = names->next) {
+            if (names->port == default_port) {
+                return;
+            }
         }
     }
 
-    link_dimension_name("19999", simple_hash("19999"), "Netdata");
+    char *port_string = getenv("NETDATA_LISTEN_PORT");
+    if (port_string)
+        link_dimension_name(port_string, simple_hash(port_string), "Netdata");
 }
 
 /**
