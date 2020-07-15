@@ -633,6 +633,13 @@ class Service(ExecutableService):
         raw_output = str(self._get_raw_data()[0]).strip()
         output = json.loads(raw_output)
 
+        # Check for version compatibility and return None if incompatible:
+        try:
+            if (not int(output['jsonversion']) >= 2):
+                return
+        except ValueError:
+            return
+
         allowed_interfaces = self.configuration.get("interface", "all").split()
 
         interfaces = []
