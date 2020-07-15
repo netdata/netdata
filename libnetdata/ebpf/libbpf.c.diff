@@ -207,12 +207,15 @@
  struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
  					    bool retprobe,
  					    const char *func_name)
-@@ -7627,7 +7804,15 @@ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
- 			bpf_program__title(prog, false),
- 			retprobe ? "kretprobe" : "kprobe", func_name,
- 			libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
+@@ -7623,11 +7800,14 @@ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
+ 	pfd = perf_event_open_probe(false /* uprobe */, retprobe, func_name,
+ 				    0 /* offset */, -1 /* pid */);
+ 	if (pfd < 0) {
+-		pr_warn("program '%s': failed to create %s '%s' perf event: %s\n",
+-			bpf_program__title(prog, false),
+-			retprobe ? "kretprobe" : "kprobe", func_name,
+-			libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
 -		return ERR_PTR(pfd);
-+		pr_warn("fall back on old 'kprobe_events' interface...");
 +		pfd = perf_event_open_old_kprobe(retprobe, func_name);
 +		if (pfd < 0) {
 +			pr_warn("program '%s': failed to create %s '%s' perf event: %s\n",
