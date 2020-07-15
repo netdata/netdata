@@ -127,10 +127,9 @@ RRDHOST *rrdhost_create(const char *hostname,
                         int is_archived
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
-    int  is_legacy = 1;
 
-    if (strcmp(guid,"535767b4-83c9-11ea-a908-525400201d9b") == 0)
-        is_legacy = 0;
+    int is_legacy = is_archived ? 0 : is_legacy_child(guid);
+    info("STEL: Creating host %s (GUID = %s) with legacy mode = %d", hostname, guid, is_legacy);
 
     rrd_check_wrlock();
 
@@ -192,7 +191,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         info("Host %s is created in archived mode", hostname);
     }
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
-        rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);// TODO: if archived do not set the flag
+        rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
@@ -837,7 +836,8 @@ void rrdhost_free(RRDHOST *host) {
 
 void rrdhost_free_all(void) {
     rrd_wrlock();
-    while(localhost) rrdhost_free(localhost);
+    while(localhost->next) rrdhost_free(localhost->next);
+    rrdhost_free(localhost);
     rrd_unlock();
 }
 

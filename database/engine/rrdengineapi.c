@@ -136,6 +136,8 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     struct pg_cache_page_index *page_index;
 
     ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+        ctx = localhost->rrdeng_ctx;
     handle = &rd->state->handle.rrdeng;
     handle->ctx = ctx;
 
@@ -313,6 +315,8 @@ int rrdeng_store_metric_finalize(RRDDIM *rd)
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
+    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+        ctx = rd->rrdset->rrdhost->rrdeng_ctx;
     page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
     if (handle->prev_descr) {

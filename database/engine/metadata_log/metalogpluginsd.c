@@ -39,8 +39,8 @@ PARSER_RC metalog_pluginsd_host_action(
         , update_every
         , 3600
         , RRD_MEMORY_MODE_DBENGINE
-        , 1   // health enabled
-        , 0   // Push enabled
+        , default_health_enabled    // health enabled
+        , default_rrdpush_enabled   // Push enabled
         , NULL
         , NULL
         , NULL
