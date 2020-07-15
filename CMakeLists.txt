@@ -1241,7 +1241,7 @@ endif()
         -Wl,--wrap=fatal_int
     )
     target_link_libraries(web_api_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
-    add_test(NAME test_web_api COMMAND web_api_testdriver)
+#    add_test(NAME test_web_api COMMAND web_api_testdriver)
 
     set(VALID_URLS_TEST_FILES
         web/api/tests/valid_urls.c
@@ -1267,7 +1267,7 @@ endif()
         -DREMOVE_MYSENDFILE
     )
     target_link_libraries(valid_urls_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
-    add_test(NAME test_valid_urls COMMAND valid_urls_testdriver)
+#    add_test(NAME test_valid_urls COMMAND valid_urls_testdriver)
 
     set_target_properties(
         str2ld_testdriver
