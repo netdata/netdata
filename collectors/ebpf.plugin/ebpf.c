@@ -884,6 +884,7 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
     memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
 
     if (prefix == 128) {
+        memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
         return;
     }
 
