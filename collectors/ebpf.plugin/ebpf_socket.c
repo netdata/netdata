@@ -356,15 +356,16 @@ static int compare_sockets(void *a, void *b)
  * @param hostname      the hostname for the socket.
  * @param service_name  the service used to connect.
  * @param is_inbound    is this an inbound connection.
+ * @param family        is this IPV4(AF_INET) or IPV6(AF_INET6)
  *
  * @return  it returns the size of the data copied on success and -1 otherwise.
  */
 static inline int build_dimension_name(char *dimname, char *hostname, char *service_name,
-                                       int is_inbound, netdata_socket_t *sock)
+                                       int is_inbound, netdata_socket_t *sock, int family)
 {
     int size;
     if (!is_inbound) {
-        size = snprintf(dimname, CONFIG_MAX_NAME - 1, "%s:%s:%s_",
+        size = snprintf(dimname, CONFIG_MAX_NAME - 1, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
                         service_name, (sock->protocol == IPPROTO_UDP) ? "UDP" : "TCP",
                         hostname);
 
@@ -402,7 +403,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     }
 
     char dimname[CONFIG_MAX_NAME];
-    int size = build_dimension_name(dimname, hostname, service_name, is_inbound, &ptr->sock);
+    int size = build_dimension_name(dimname, hostname, service_name, is_inbound, &ptr->sock, ptr->family);
     if (size > 0) {
         strcpy(&dimname[size], "sent");
         dimname[size + 4] = '\0';
@@ -485,9 +486,6 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 laststep:
 
     ptr->resolved++;
-#ifdef NETDATA_INTERNAL_CHECKS
-    info("The dimensions will be added Sent(%s) Recv(%s)", ptr->dimension_sent, ptr->dimension_recv);
-#endif
 }
 
 /**
@@ -525,7 +523,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         if (curr == last) {
             if (!w->resolved) {
-                fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 1);
+                fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 1);
             }
 
             netdata_socket_t *sock = &w->sock;
@@ -537,7 +535,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             memcpy(&w->index, lindex, sizeof(*lindex));
             w->family = family;
 
-            fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 0);
+            fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 0);
         }
 
         netdata_socket_plot_t *check ;
@@ -556,6 +554,40 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             curr = last;
         out->next = curr;
     }
+}
+
+/**
+ * Compare Vector to store
+ *
+ * Compare input values with local address to select table to store.
+ *
+ * @param cmp     index read from hash table.
+ * @param family  the family read from kernel ring to select the IPs to do comparison.
+ *
+ * @return It returns the structure with address to compare.
+ */
+netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int family)
+{
+    ebpf_network_viewer_ip_list_t *move;
+    if (family == AF_INET) {
+        move = ipv4_local_ip;
+        while (move) {
+            if (cmp->daddr.addr32[0] == move->first.addr32[0])
+                return &inbound_vectors;
+
+            move = move->next;
+        }
+    } else {
+        move = ipv6_local_ip;
+        while (move) {
+            if (!memcmp(cmp->daddr.addr32, move->first.addr32, sizeof(union netdata_ip_t)))
+                return &inbound_vectors;
+
+            move = move->next;
+        }
+    }
+
+    return &outbound_vectors;
 }
 
 /**
@@ -605,7 +637,8 @@ static void read_socket_hash_table(int fd, int family)
         values[0].sent += sent;
         values[0].removeme += removesock;
 
-        store_socket_inside_avl(&inbound_vectors, values, &key, family);
+        netdata_vector_plot_t *table = select_vector_to_store(&key, family);
+        store_socket_inside_avl(table, values, &key, family);
 
         if (removesock)
             removeme = key;
