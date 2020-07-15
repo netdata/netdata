@@ -120,8 +120,8 @@ ebpf_process_stat_t *global_process_stat = NULL;
 ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL,
                                                      .names = NULL };
 //Move these two variables inside ebpf_network_viewer_options_t when 9495 is merged
-ebpf_network_viewer_ip_list_t *ipv4_local_ip;
-ebpf_network_viewer_ip_list_t *ipv6_local_ip;
+ebpf_network_viewer_ip_list_t *ipv4_local_ip = NULL;
+ebpf_network_viewer_ip_list_t *ipv6_local_ip = NULL;
 
 /*****************************************************************
  *
@@ -621,6 +621,57 @@ void ebpf_print_help()
  *
  *****************************************************************/
 
+
+/**
+ * Fill IP list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_ip_list_t *move = *out;
+        for (; move->next ; move = move->next ) {
+            if (!memcmp(move->first.addr8,
+                        in->first.addr8,
+                        sizeof(union netdata_ip_t)) &&
+                !memcmp(move->last.addr8,
+                        in->last.addr8,
+                        sizeof(union netdata_ip_t))
+                ) {
+                info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
+                     in->value, move->value);
+                freez(in->value);
+                freez(in);
+                return;
+            }
+        }
+
+        move->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char first[512], last[512];
+    if (in->ver == AF_INET) {
+        if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
+            inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
+            info("Adding values %s - %s to IP list used on network viewer", first, last);
+    } else {
+        if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
+            inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
+            info("Adding values %s - %s to IP list used on network viewer", first, last);
+    }
+#endif
+}
+
+/**
+ * Read Local addresseses
+ *
+ * Read the local address from the interfaces.
+ */
 static void read_local_addresses()
 {
     struct ifaddrs *ifaddr, *ifa;
@@ -629,6 +680,7 @@ static void read_local_addresses()
         return;
     }
 
+    char *notext = { "No text reporesentation" };
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr == NULL)
             continue;
@@ -636,12 +688,40 @@ static void read_local_addresses()
         if ((ifa->ifa_addr->sa_family != AF_INET) && (ifa->ifa_addr->sa_family != AF_INET6))
             continue;
 
+        ebpf_network_viewer_ip_list_t *w = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
+
         int family = ifa->ifa_addr->sa_family;
+        w->ver = (uint8_t) family;
+        char text[INET6_ADDRSTRLEN];
         if (family == AF_INET) {
             struct sockaddr_in *in = (struct sockaddr_in*) ifa->ifa_addr;
+
+            w->first.addr32[0] = in->sin_addr.s_addr;
+            w->last.addr32[0] = in->sin_addr.s_addr;
+
+            if (inet_ntop(AF_INET, w->first.addr8, text, INET_ADDRSTRLEN)) {
+                w->value = strdupz(text);
+                w->hash = simple_hash(text);
+            } else {
+                w->value = strdupz(notext);
+                w->hash = simple_hash(notext);
+            }
         } else {
             struct sockaddr_in6 *in6 = (struct sockaddr_in6*) ifa->ifa_addr;
+
+            memcpy(w->first.addr8, (void *)&in6->sin6_addr, sizeof(struct in6_addr));
+            memcpy(w->last.addr8, (void *)&in6->sin6_addr, sizeof(struct in6_addr));
+
+            if (inet_ntop(AF_INET6, w->first.addr8, text, INET_ADDRSTRLEN)) {
+                w->value = strdupz(text);
+                w->hash = simple_hash(text);
+            } else {
+                w->value = strdupz(notext);
+                w->hash = simple_hash(notext);
+            }
         }
+
+        fill_ip_list((family == AF_INET)?&ipv4_local_ip:&ipv6_local_ip, w);
     }
 
     freeifaddrs(ifaddr);
@@ -1828,6 +1908,8 @@ int main(int argc, char **argv)
     }
 
     ebpf_allocate_common_vectors();
+
+    read_local_addresses();
 
     struct netdata_static_thread ebpf_threads[] = {
         {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},

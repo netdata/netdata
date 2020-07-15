@@ -154,8 +154,8 @@ typedef struct netdata_socket {
  * Index used together previous structure
  */
 typedef struct netdata_socket_idx {
-    union netdata_ip saddr;
-    union netdata_ip daddr;
+    union netdata_ip_t saddr;
+    union netdata_ip_t daddr;
     uint16_t dport;
     uint16_t sport;
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
