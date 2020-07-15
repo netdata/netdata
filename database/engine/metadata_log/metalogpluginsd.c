@@ -25,7 +25,7 @@ PARSER_RC metalog_pluginsd_host_action(
 
     // Ignore HOST command for now
     // TODO: Remove when the next task is completed ie. accept new children in the lcoalhost / multidb
-    return PARSER_RC_OK;
+    //return PARSER_RC_OK;
 
     host = rrdhost_create(
         hostname
@@ -39,7 +39,7 @@ PARSER_RC metalog_pluginsd_host_action(
         , update_every
         , 3600
         , RRD_MEMORY_MODE_DBENGINE
-        , 0   // health enabled
+        , 1   // health enabled
         , 0   // Push enabled
         , NULL
         , NULL
@@ -57,7 +57,7 @@ write_replay:
         uuid_copy(record.uuid, host->host_uuid);
         mlf_record_insert(metalogfile, &record);
     }
-
+    ((PARSER_USER_OBJECT *) user)->host = host;
     return PARSER_RC_OK;
 }
 
@@ -172,7 +172,8 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
             break;
         case GUID_TYPE_CHART:
         case GUID_TYPE_DIMENSION:
-            host = ctx->rrdeng_ctx->host;
+            //host = ctx->rrdeng_ctx->host;
+            host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
             switch (ret) {
                 case GUID_TYPE_CHART:
                     chart_char_guid = (uuid_t *)(object + 16);
@@ -205,6 +206,7 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
             break;
         case GUID_TYPE_HOST:
             /* Ignore for now */
+            error_with_guid(uuid, "Found HOST but ignoring in CONTEXT ACTION");
             break;
         case GUID_TYPE_NOSPACE:
             error_with_guid(uuid, "Not enough space for object retrieval");
