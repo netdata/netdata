@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fixed stored number accuracy [\#9540](https://github.com/netdata/netdata/pull/9540) ([stelfrag](https://github.com/stelfrag))
+- Add eBPF bundling script to `make dist`. [\#9539](https://github.com/netdata/netdata/pull/9539) ([Ferroin](https://github.com/Ferroin))
+- Fixes cmake build failing if ACLK is disabled [\#9537](https://github.com/netdata/netdata/pull/9537) ([underhood](https://github.com/underhood))
+- Fix transition from archived to active charts not generating alarms. [\#9536](https://github.com/netdata/netdata/pull/9536) ([mfundul](https://github.com/mfundul))
 - mysql: respect `my.cnf` parameter using PyMySQL library [\#9526](https://github.com/netdata/netdata/pull/9526) ([anirudhdggl](https://github.com/anirudhdggl))
 - Remove health from archived metrics [\#9520](https://github.com/netdata/netdata/pull/9520) ([mfundul](https://github.com/mfundul))
 - charts.d: loopsleepms: fix now\_ms [\#9510](https://github.com/netdata/netdata/pull/9510) ([ilyam8](https://github.com/ilyam8))
@@ -15,6 +19,7 @@
 - fix ACLK protocol version always parsed as 0 [\#9502](https://github.com/netdata/netdata/pull/9502) ([underhood](https://github.com/underhood))
 - Fix broken link in Kavenegar notification doc [\#9492](https://github.com/netdata/netdata/pull/9492) ([joelhans](https://github.com/joelhans))
 - fixes vulnerability in JSON parsing [\#9491](https://github.com/netdata/netdata/pull/9491) ([underhood](https://github.com/underhood))
+- Fix potential memory leak in ebpf.plugin [\#9484](https://github.com/netdata/netdata/pull/9484) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add guide for monitoring a k8s cluster with Netdata [\#9466](https://github.com/netdata/netdata/pull/9466) ([joelhans](https://github.com/joelhans))
 - Bring code owner for missing directory [\#9465](https://github.com/netdata/netdata/pull/9465) ([thiagoftsm](https://github.com/thiagoftsm))
 - Read the prefix option from instance config sections [\#9463](https://github.com/netdata/netdata/pull/9463) ([vlvkobal](https://github.com/vlvkobal))
@@ -149,7 +154,6 @@
 - Update step-10.md [\#9000](https://github.com/netdata/netdata/pull/9000) ([Jelmerrevers](https://github.com/Jelmerrevers))
 - Fix suid bits on plugin for debian packaging [\#8996](https://github.com/netdata/netdata/pull/8996) ([MrFreezeex](https://github.com/MrFreezeex))
 - Fix incorrect issue link URL in install-required-packages.sh [\#8911](https://github.com/netdata/netdata/pull/8911) ([prologic](https://github.com/prologic))
-- Improve PR Guidelines for Developers and Contributors. [\#8809](https://github.com/netdata/netdata/pull/8809) ([prologic](https://github.com/prologic))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
@@ -185,8 +189,6 @@
 - Add CI check for building against LibreSSL [\#8842](https://github.com/netdata/netdata/pull/8842) ([prologic](https://github.com/prologic))
 - Removed old function call in netdata-installer.sh [\#8824](https://github.com/netdata/netdata/pull/8824) ([Ferroin](https://github.com/Ferroin))
 - Fix build and add bundle-dashbaord.sh to dist\_noinst\_DATA [\#8823](https://github.com/netdata/netdata/pull/8823) ([prologic](https://github.com/prologic))
-- Docs: Add instructions to persist metrics and restart policy [\#8813](https://github.com/netdata/netdata/pull/8813) ([joelhans](https://github.com/joelhans))
-- Fix typo in netdata-installer [\#8811](https://github.com/netdata/netdata/pull/8811) ([adamwolf](https://github.com/adamwolf))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
