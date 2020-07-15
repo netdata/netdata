@@ -49,7 +49,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     struct rrdengine_instance *ctx;
     uuid_t legacy_uuid;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
+    struct pg_cache_page_index *page_index = NULL;
     int replace_instead_of_generate = 0;
 
     ctx = rd->rrdset->rrdhost->rrdeng_ctx;
@@ -555,7 +555,7 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     struct rrdeng_page_descr *descr;
     storage_number *page, ret;
     unsigned position, entries;
-    usec_t next_page_time, current_position_time, page_end_time;
+    usec_t next_page_time = 0, current_position_time, page_end_time = 0;
     uint32_t page_length;
 
     handle = &rrdimm_handle->rrdeng;
