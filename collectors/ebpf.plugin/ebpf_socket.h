@@ -71,7 +71,6 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t publish_recv;
 } ebpf_socket_publish_apps_t;
 
-<<<<<<< HEAD
 typedef struct ebpf_network_viewer_dimension_names {
     char *name;
     uint32_t hash;
@@ -90,13 +89,10 @@ typedef struct ebpf_network_viewer_port_list {
     struct ebpf_network_viewer_port_list *next;
 } ebpf_network_viewer_port_list_t;
 
-union netdata_ip_t {
-=======
 /**
  * Union used to store ip addresses
  */
-union netdata_ip {
->>>>>>> 497736ab... ebpf_read_socket: Name resolution and dimension names
+union netdata_ip_t {
     uint8_t  addr8[16];
     uint16_t addr16[8];
     uint32_t addr32[4];

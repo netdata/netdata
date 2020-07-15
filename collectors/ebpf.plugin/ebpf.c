@@ -2,6 +2,7 @@
 
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <ifaddrs.h>
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
@@ -118,6 +119,9 @@ ebpf_process_stat_t *global_process_stat = NULL;
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL,
                                                      .names = NULL };
+//Move these two variables inside ebpf_network_viewer_options_t when 9495 is merged
+ebpf_network_viewer_ip_list_t *ipv4_local_ip;
+ebpf_network_viewer_ip_list_t *ipv6_local_ip;
 
 /*****************************************************************
  *
@@ -616,6 +620,32 @@ void ebpf_print_help()
  *  AUXILIAR FUNCTIONS USED DURING INITIALIZATION
  *
  *****************************************************************/
+
+static void read_local_addresses()
+{
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) == -1) {
+        error("Cannot get the local IP addresses, it is no possible to do separation between inbound and outbound connections");
+        return;
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL)
+            continue;
+
+        if ((ifa->ifa_addr->sa_family != AF_INET) && (ifa->ifa_addr->sa_family != AF_INET6))
+            continue;
+
+        int family = ifa->ifa_addr->sa_family;
+        if (family == AF_INET) {
+            struct sockaddr_in *in = (struct sockaddr_in*) ifa->ifa_addr;
+        } else {
+            struct sockaddr_in6 *in6 = (struct sockaddr_in6*) ifa->ifa_addr;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+}
 
 /**
  * Start Ptherad Variable
