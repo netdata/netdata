@@ -196,4 +196,7 @@ typedef struct netdata_vector_plot {
 
 } netdata_vector_plot_t;
 
+extern ebpf_network_viewer_ip_list_t *ipv4_local_ip;
+extern ebpf_network_viewer_ip_list_t *ipv6_local_ip;
+
 #endif
