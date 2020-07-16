@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.23.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.23.1...v1.23.2)
 
 **Merged pull requests:**
 
+- Fix SHA256 handling in eBPF bundling code. [\#9546](https://github.com/netdata/netdata/pull/9546) ([Ferroin](https://github.com/Ferroin))
 - Disable failing unit tests in CMake build [\#9545](https://github.com/netdata/netdata/pull/9545) ([vlvkobal](https://github.com/vlvkobal))
 - Fix compilation warnings [\#9544](https://github.com/netdata/netdata/pull/9544) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed stored number accuracy [\#9540](https://github.com/netdata/netdata/pull/9540) ([stelfrag](https://github.com/stelfrag))
