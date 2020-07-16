@@ -938,12 +938,12 @@ static void parse_ip_list(void **out, char *ip)
         if (!select) { //CIDR
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
 
             select = (int) str2i(end);
             if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
                 info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
-                return;
+                goto cleanipdup;
             }
 
             in_addr_t myip = inet_addr(ip);
@@ -953,17 +953,23 @@ static void parse_ip_list(void **out, char *ip)
         } else { //Range
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
 
             select = ip2nl(last.addr8, end, AF_INET, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
+        }
+
+        if (htonl(first.addr32[0]) > htonl(last.addr32[0])) {
+            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+                 ipdup);
+            goto cleanipdup;
         }
     } else if (is_ipv6) { //IPV6
         if (!*end) { // unique
             select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
 
             memcpy(last.addr8, first.addr8, sizeof(first.addr8));
         } else if (*end == '-') {
@@ -971,30 +977,38 @@ static void parse_ip_list(void **out, char *ip)
 
             select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
 
             select = ip2nl(last.addr8, end, AF_INET6, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
         } else { //CIDR
             *end++ = 0x00;
             select = str2i(end);
             if (select < 0 || select > 128) {
                 info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
-                return;
+                goto cleanipdup;
             }
 
             uint64_t prefix = (uint64_t)select;
             select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
             if (select)
-                return;
+                goto cleanipdup;
 
             get_ipv6_last_addr(&last, &first, prefix);
+        }
+
+        if ((be64toh(*(uint64_t *)&first.addr32[2]) > be64toh(*(uint64_t *)&last.addr32[2]) &&
+            !memcmp(first.addr32, last.addr32, 2*sizeof(uint32_t))) ||
+            (be64toh(*(uint64_t *)&first.addr32) > be64toh(*(uint64_t *)&last.addr32)) ) {
+            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+                 ipdup);
+            goto cleanipdup;
         }
     } else { //Unique ip
         select = ip2nl(first.addr8, ip, AF_INET, ipdup);
         if (select)
-            return;
+            goto cleanipdup;
 
         memcpy(last.addr8, first.addr8, sizeof(first.addr8));
     }
@@ -1007,6 +1021,10 @@ static void parse_ip_list(void **out, char *ip)
     memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
 
     fill_ip_list(list, store);
+    return;
+
+cleanipdup:
+    freez(ipdup);
 }
 
 /**
@@ -1035,6 +1053,13 @@ static void parse_values(void **out,
         return;
 
     while (likely(ptr)) {
+        //Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        //No valid value found
+        if (unlikely(!*ptr))
+            return;
+
         //Find space that ends the list
         char *end = strchr(ptr, ' ');
         if (end) {
@@ -1213,10 +1238,11 @@ static void parse_service_name_section()
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
     if (names) {
         uint16_t default_port = htons(19999);
-        for (; names->next; names = names->next) {
-            if (names->port == default_port) {
+        while (names) {
+            if (names->port == default_port)
                 return;
-            }
+
+            names = names->next;
         }
     }
 
