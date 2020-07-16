@@ -680,6 +680,72 @@ bundle_jsonc() {
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
+
+build_libbpf() {
+  pushd "${1}/src" > /dev/null || exit 1
+  run env CFLAGS= CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
+  popd > /dev/null || exit 1
+}
+
+copy_libbpf() {
+  target_dir="${PWD}/externaldeps/libbpf"
+
+  if [ "$(uname -m)" = x86_64 ]; then
+    lib_subdir="lib64"
+  else
+    lib_subdir="lib"
+  fi
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/usr/${lib_subdir}/libbpf.a" "${target_dir}/libbpf.a" || return 1
+  run cp -r "${1}/usr/include" "${target_dir}" || return 1
+}
+
+bundle_libbpf() {
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+    return 0
+  fi
+
+  progress "Prepare libbpf"
+
+  LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf.version)"
+
+  tmp="$(mktemp -d -t netdata-libbpf-XXXXXX)"
+  LIBBPF_PACKAGE_BASENAME="v${LIBBPF_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "libbpf" \
+    "https://github.com/libbpf/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
+    "${LIBBPF_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBBPF}"; then
+    if run tar -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
+      run git apply --directory="${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" --unsafe-paths libnetdata/ebpf/libbpf.c.diff &&
+      build_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
+      copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "libbpf built and prepared."
+    else
+      run_failed "Failed to build libbpf."
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build libbpf. You may not be able to use eBPF plugin."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libbpf."
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libbpf. You may not be able to use eBPF plugin."
+    fi
+  fi
+}
+
+bundle_libbpf
+
+# -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
 if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then

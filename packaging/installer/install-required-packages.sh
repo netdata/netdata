@@ -32,6 +32,7 @@ PACKAGES_UPDATE_IPSETS=${PACKAGES_UPDATE_IPSETS-0}
 PACKAGES_NETDATA_DEMO_SITE=${PACKAGES_NETDATA_DEMO_SITE-0}
 PACKAGES_NETDATA_SENSORS=${PACKAGES_NETDATA_SENSORS-0}
 PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-0}
+PACKAGES_NETDATA_EBPF=${PACKAGES_NETDATA_EBPF-0}
 
 # needed commands
 lsb_release=$(command -v lsb_release 2> /dev/null)
@@ -1182,6 +1183,27 @@ declare -A pkg_zip=(
   ['default']="zip"
 )
 
+declare -A pkg_libelf=(
+  ['alpine']="elfutils-dev"
+  ['arch']="libelf"
+  ['gentoo']="dev-libs/libelf"
+  ['debian']="libelf-dev"
+  ['ubuntu']="libelf-dev"
+  ['fedora']="elfutils-libelf-devel"
+  ['centos']="elfutils-libelf-devel"
+  ['rhel']="elfutils-libelf-devel"
+  ['clearlinux']="devpkg-elfutils"
+  ['suse']="libelf-devel"
+  ['macos']="NOTREQUIRED"
+  ['freebsd']="NOTREQUIRED"
+  ['default']="libelf-devel"
+
+  # exceptions
+  ['alpine-3.5']="libelf-dev"
+  ['alpine-3.4']="libelf-dev"
+  ['alpine-3.3']="libelf-dev"
+)
+
 validate_package_trees() {
   if type -t validate_tree_${tree} > /dev/null; then
     validate_tree_${tree}
@@ -1317,12 +1339,18 @@ packages() {
   fi
 
   # -------------------------------------------------------------------------
-  # sensors
+  # netdata database
   if [ "${PACKAGES_NETDATA_DATABASE}" -ne 0 ]; then
     suitable_package libuv
     suitable_package lz4
     suitable_package openssl
     suitable_package judy
+  fi
+
+  # -------------------------------------------------------------------------
+  # ebpf plugin
+  if [ "${PACKAGES_NETDATA_EBPF}" -ne 0 ]; then
+    suitable_package libelf
   fi
 
   # -------------------------------------------------------------------------
@@ -1860,7 +1888,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&nodejs=${PACKAGES_NETDATA_NODEJS}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&mysql=${PACKAGES_NETDATA_PYTHON_MYSQL}&postgres=${PACKAGES_NETDATA_PYTHON_POSTGRES}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -1935,12 +1963,14 @@ while [ -n "${1}" ]; do
       fi
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
+      PACKAGES_NETDATA_EBPF=1
       ;;
 
     netdata)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_DATABASE=1
+      PACKAGES_NETDATA_EBPF=1
       ;;
 
     python | netdata-python)
@@ -2023,6 +2053,7 @@ while [ -n "${1}" ]; do
       PACKAGES_UPDATE_IPSETS=1
       PACKAGES_NETDATA_DEMO_SITE=1
       PACKAGES_NETDATA_DATABASE=1
+      PACKAGES_NETDATA_EBPF=1
       ;;
 
     help | -h | --help)

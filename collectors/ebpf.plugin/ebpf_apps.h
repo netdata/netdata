@@ -1,19 +1,21 @@
-#ifndef _NETDATA_EBPF_APPS_H
-# define _NETDATA_EBPF_APPS_H 1
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-# include "libnetdata/threads/threads.h"
-# include "libnetdata/locks/locks.h"
-# include "libnetdata/avl/avl.h"
-# include "libnetdata/clocks/clocks.h"
-# include "libnetdata/config/appconfig.h"
-# include "libnetdata/ebpf/ebpf.h"
+#ifndef NETDATA_EBPF_APPS_H
+#define NETDATA_EBPF_APPS_H 1
 
-# define NETDATA_APPS_FAMILY "apps"
-# define NETDATA_APPS_SYSCALL_GROUP "ebpf syscall"
-# define NETDATA_APPS_NET_GROUP "ebpf net"
+#include "libnetdata/threads/threads.h"
+#include "libnetdata/locks/locks.h"
+#include "libnetdata/avl/avl.h"
+#include "libnetdata/clocks/clocks.h"
+#include "libnetdata/config/appconfig.h"
+#include "libnetdata/ebpf/ebpf.h"
 
-# define MAX_COMPARE_NAME 100
-# define MAX_NAME 100
+#define NETDATA_APPS_FAMILY "apps"
+#define NETDATA_APPS_SYSCALL_GROUP "ebpf syscall"
+#define NETDATA_APPS_NET_GROUP "ebpf net"
+
+#define MAX_COMPARE_NAME 100
+#define MAX_NAME 100
 
 // ----------------------------------------------------------------------------
 // process_pid_stat
@@ -21,10 +23,10 @@
 // Fields read from the kernel ring for a specific PID
 //
 typedef struct process_pid_stat {
-    uint64_t pid_tgid;                     //Unique identifier
-    uint32_t pid;                          //process id
+    uint64_t pid_tgid; // Unique identifier
+    uint32_t pid;      // process id
 
-    //Count number of calls done for specific function
+    // Count number of calls done for specific function
     uint32_t open_call;
     uint32_t write_call;
     uint32_t writev_call;
@@ -37,13 +39,13 @@ typedef struct process_pid_stat {
     uint32_t clone_call;
     uint32_t close_call;
 
-    //Count number of bytes written or read
+    // Count number of bytes written or read
     uint64_t write_bytes;
     uint64_t writev_bytes;
     uint64_t readv_bytes;
     uint64_t read_bytes;
 
-    //Count number of errors for the specified function
+    // Count number of errors for the specified function
     uint32_t open_err;
     uint32_t write_err;
     uint32_t writev_err;
@@ -67,7 +69,6 @@ typedef struct socket_bandwidth {
     uint64_t received;
     unsigned char removed;
 } socket_bandwidth_t;
-
 
 // ----------------------------------------------------------------------------
 // pid_stat
@@ -157,12 +158,12 @@ struct target {
     int hidden;             // if set, we set the hidden flag on the dimension
     int debug_enabled;
     int ends_with;
-    int starts_with;        // if set, the compare string matches only the
-                            // beginning of the command
+    int starts_with; // if set, the compare string matches only the
+                     // beginning of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
-    struct target *target;  // the one that will be reported to netdata
+    struct target *target; // the one that will be reported to netdata
     struct target *next;
 };
 
@@ -268,24 +269,24 @@ struct pid_stat {
     // kernel_uint_t io_cancelled_write_bytes;
      */
 
-    struct pid_fd *fds;             // array of fds it uses
-    size_t fds_size;                   // the size of the fds array
+    struct pid_fd *fds; // array of fds it uses
+    size_t fds_size;    // the size of the fds array
 
-    int children_count;             // number of processes directly referencing this
-    unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
-    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
-    unsigned char updated:1;        // 1 when the process is currently running
-    unsigned char updated_twice:1;  // 1 when the process was running in the previous iteration
-    unsigned char merged:1;         // 1 when it has been merged to its parent
-    unsigned char read:1;           // 1 when we have already read this process for this iteration
+    int children_count;              // number of processes directly referencing this
+    unsigned char keep : 1;          // 1 when we need to keep this process in memory even after it exited
+    int keeploops;                   // increases by 1 every time keep is 1 and updated 0
+    unsigned char updated : 1;       // 1 when the process is currently running
+    unsigned char updated_twice : 1; // 1 when the process was running in the previous iteration
+    unsigned char merged : 1;        // 1 when it has been merged to its parent
+    unsigned char read : 1;          // 1 when we have already read this process for this iteration
 
-    int sortlist;                   // higher numbers = top on the process tree
+    int sortlist; // higher numbers = top on the process tree
 
     // each process gets a unique number
 
-    struct target *target;          // app_groups.conf targets
-    struct target *user_target;     // uid based targets
-    struct target *group_target;    // gid based targets
+    struct target *target;       // app_groups.conf targets
+    struct target *user_target;  // uid based targets
+    struct target *group_target; // gid based targets
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
@@ -295,7 +296,7 @@ struct pid_stat {
 
     kernel_uint_t uptime;
 
-    char *fds_dirname;              // the full directory name in /proc/PID/fd
+    char *fds_dirname; // the full directory name in /proc/PID/fd
 
     char *stat_filename;
     char *status_filename;
@@ -362,11 +363,11 @@ typedef struct ebpf_process_stat {
 typedef struct ebpf_bandwidth {
     uint32_t pid;
 
-    uint64_t first;                 //First timestamp
-    uint64_t ct;                    //Last timestamp
-    uint64_t sent;                  //Bytes sent
-    uint64_t received;              //Bytes received
-    unsigned char removed;          //Remove the PID from table
+    uint64_t first;        //First timestamp
+    uint64_t ct;           //Last timestamp
+    uint64_t sent;         //Bytes sent
+    uint64_t received;     //Bytes received
+    unsigned char removed; //Remove the PID from table
 } ebpf_bandwidth_t;
 
 /**
@@ -375,13 +376,14 @@ typedef struct ebpf_bandwidth {
  * @param fmt   the format to create the message.
  * @param ...   the arguments to fill the format.
  */
-static inline void debug_log_int(const char *fmt, ... ) {
+static inline void debug_log_int(const char *fmt, ...)
+{
     va_list args;
 
-    fprintf( stderr, "apps.plugin: ");
-    va_start( args, fmt );
-    vfprintf( stderr, fmt, args );
-    va_end( args );
+    fprintf(stderr, "apps.plugin: ");
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
 
     fputc('\n', stderr);
 }
@@ -391,9 +393,10 @@ static inline void debug_log_int(const char *fmt, ... ) {
 //
 extern struct pid_stat **all_pids;
 
-
 extern int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
-                                      struct target **apps_groups_root_target, const char *path, const char *file);
+                                      struct target **apps_groups_root_target,
+                                      const char *path,
+                                      const char *file);
 
 extern void clean_apps_groups_target(struct target *apps_groups_root_target);
 
@@ -403,30 +406,14 @@ extern int am_i_running_as_root();
 
 extern void cleanup_exited_pids(ebpf_process_stat_t **out);
 
-#ifndef STATIC
-extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid,
-                           int (*bpf_map_lookup_elem)(int, const void *, void *));
+extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
-extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd, ebpf_functions_t *ef,
+extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
+                                                           int fd,
                                                            struct pid_on_target *pids);
 
-extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd,
-                                                           ebpf_functions_t *ef, struct pid_on_target *pids);
+extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids);
 
-extern void collect_data_for_all_processes(ebpf_process_stat_t **out,
-                                          pid_t *index,
-                                          int (*bpf_map_lookup_elem)(int, const void *, void *),
-                                          int tbl_pid_stats_fd);
+extern void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int tbl_pid_stats_fd);
 
-#else
-extern int ebpf_read_hash_table(void *ep, int fd, pid_t pid);
-
-extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep, int fd,struct pid_on_target *pids);
-
-extern void collect_data_for_all_processes(ebpf_process_stat_t **out,
-                                          pid_t *index,
-                                          int tbl_pid_stats_fd);
-
-#endif
-
-#endif
+#endif /* NETDATA_EBPF_APPS_H */

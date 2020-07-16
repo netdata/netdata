@@ -1,0 +1,229 @@
+--- a/src/libbpf.c
++++ b/src/libbpf.c
+@@ -620,6 +620,93 @@ bpf_object__init_prog_names(struct bpf_object *obj)
+ 	return 0;
+ }
+
++static __u32 choose_specific_version0(int fd, __u32 current)
++{
++    char ver[256];
++    __u32 v_major, v_minor, v_patch;
++    ssize_t len = read(fd, ver, sizeof(ver));
++    if (len < 0) {
++        return 0;
++    }
++    ver[len] = '\0';
++
++    char *first = strchr(ver, ' ');
++    if (!first) {
++        return 0;
++    }
++
++    first++;
++    char *version = strchr(first, ' ');
++    if (!version) {
++        return 0;
++    }
++
++    version++;
++    if (sscanf(version, "%u.%u.%u", &v_major, &v_minor, &v_patch) != 3)
++        return current;
++
++    return KERNEL_VERSION(v_major, v_minor, v_patch);
++}
++
++static __u32 choose_kernel_version(__u32 current)
++{
++    FILE *fp_d = fopen("/etc/debian_version","r");
++    int fp_u = open("/proc/version_signature", O_RDONLY);
++    FILE *fp_rh = fopen("/etc/redhat-release","r");
++    char tmp[32];
++    int de = 0;
++    __u32 ret;
++
++    if (!fp_d && !fp_rh && fp_u == -1)
++        return current;
++
++    struct utsname u;
++    uname(&u);
++
++    if (fp_d) {
++        fclose(fp_d);
++        de = 1;
++    }
++
++    if (fp_rh) {
++        fclose(fp_rh);
++        de = 0;
++    }
++
++    if ( fp_u > 0 ) {
++        ret = choose_specific_version0(fp_u, current);
++        close(fp_u);
++        return (!ret)?current:ret;
++    }
++
++    __u32 v_kernel,v_major, v_minor, v_patch;
++    __u32 r_kernel,r_major, r_minor, r_patch;
++
++    if (sscanf(u.release, "%u.%u.%u-%u", &v_kernel, &v_major, &v_minor, &v_patch) != 4)
++        return current;
++
++    int length = snprintf(tmp, 31, "%u.%u", v_kernel, v_major);
++    tmp[length] = '\0';
++
++    char *parse = strstr(u.version, tmp);
++    if (!parse) {
++        return current;
++    }
++
++    char *space = strchr(parse, ' ');
++    if(space) {
++        length = (int)(space - parse);
++        strncpy(tmp, parse, (size_t)length);
++        tmp[length] = '\0';
++    }
++
++    if (sscanf(tmp, "%u.%u.%u-%u", &r_kernel, &r_major, &r_minor, &r_patch) != 4)
++        return current;
++
++    ret = (de)?KERNEL_VERSION(r_kernel, r_major, r_minor):KERNEL_VERSION(r_kernel, r_major, r_minor) + r_patch;
++    return (ret > current)?ret:current;
++}
++
+ static __u32 get_kernel_version(void)
+ {
+ 	__u32 major, minor, patch;
+@@ -628,7 +715,11 @@ static __u32 get_kernel_version(void)
+ 	uname(&info);
+ 	if (sscanf(info.release, "%u.%u.%u", &major, &minor, &patch) != 3)
+ 		return 0;
+-	return KERNEL_VERSION(major, minor, patch);
++
++	if (major < 5)
++		return choose_kernel_version(KERNEL_VERSION(major, minor, patch));
++	else
++		return KERNEL_VERSION(major, minor, patch);
+ }
+
+ static const struct btf_member *
+@@ -3239,6 +3330,10 @@ int bpf_map__resize(struct bpf_map *map, __u32 max_entries)
+ static int
+ bpf_object__probe_loading(struct bpf_object *obj)
+ {
++	// Don't probe loading for very old kernels. CentOS 7 can't load this probe.
++	if (obj->kern_version <= KERNEL_VERSION(3, 10, 0))
++		return 0;
++
+ 	struct bpf_load_program_attr attr;
+ 	char *cp, errmsg[STRERR_BUFSIZE];
+ 	struct bpf_insn insns[] = {
+@@ -7612,6 +7707,88 @@ static int perf_event_open_probe(bool uprobe, bool retprobe, const char *name,
+ 	return pfd;
+ }
+
++static int perf_event_open_old_kprobe(bool retprobe, const char *name)
++{
++#define DEBUG_FS "/sys/kernel/debug/tracing/"
++	struct perf_event_attr attr = {};
++	char errmsg[STRERR_BUFSIZE];
++	int kfd = -1, ret = -1, err;
++	char event_alias[256], buf[PATH_MAX];
++	const char *event_prefix = "";
++	bool event_was_written = false;
++
++	kfd = open(DEBUG_FS "kprobe_events", O_WRONLY | O_APPEND, 0);
++	if (kfd < 0) {
++		pr_warn("failed to open '%s%s': %s\n",
++			DEBUG_FS,
++			"kprobe_events",
++			libbpf_strerror_r(kfd, errmsg, sizeof(errmsg)));
++		return kfd;
++	}
++
++	char type = retprobe ? 'r' : 'p';
++	snprintf(event_alias, sizeof(event_alias), "%c_netdata_%s_%d", type, name, getpid());
++
++#ifdef __x86_64__
++	if (strncmp(name, "sys_", 4) == 0) {
++		snprintf(buf, sizeof(buf), "%c:__x64_%s __x64_%s",
++			type, event_alias, name);
++		ret = write(kfd, buf, strlen(buf));
++
++		if (ret >= 0) {
++			event_was_written = true;
++			event_prefix = "__x64_";
++		}
++	}
++#endif
++
++	if (!event_was_written) {
++		snprintf(buf, sizeof(buf), "%c:%s %s",
++			type, event_alias, name);
++		ret = write(kfd, buf, strlen(buf));
++		if (ret < 0) {
++			pr_warn("failed to create kprobe '%s': %s\n",
++				name,
++				libbpf_strerror_r(ret, errmsg, sizeof(errmsg)));
++			close(kfd);
++			return ret;
++		}
++	}
++
++	close(kfd);
++
++	snprintf(buf, sizeof(buf), DEBUG_FS "events/kprobes/%s%s/id",
++		event_prefix,
++		event_alias);
++
++	ret = parse_uint_from_file(buf, "%d\n");
++	if (ret < 0) {
++		pr_warn("failed to determine event id: %s\n",
++			libbpf_strerror_r(ret, errmsg, sizeof(errmsg)));
++		return ret;
++	}
++	attr.config = ret;
++
++	attr.size = sizeof(attr);
++	attr.type = PERF_TYPE_TRACEPOINT;
++	attr.config1 = ptr_to_u64(name); /* kprobe_func */
++	attr.config2 = 0;		 /* kprobe_addr */
++
++	/* pid filter is meaningful only for uprobes */
++	kfd = syscall(__NR_perf_event_open, &attr,
++		      -1 /* pid */,
++		      0 /* cpu */,
++		      -1 /* group_fd */, PERF_FLAG_FD_CLOEXEC);
++	if (kfd < 0) {
++		err = -errno;
++		pr_warn("%s perf_event_open_old_kprobe() failed: %s\n",
++			"kprobe",
++			libbpf_strerror_r(err, errmsg, sizeof(errmsg)));
++		return err;
++	}
++	return kfd;
++}
++
+ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
+ 					    bool retprobe,
+ 					    const char *func_name)
+@@ -7623,11 +7800,14 @@ struct bpf_link *bpf_program__attach_kprobe(struct bpf_program *prog,
+ 	pfd = perf_event_open_probe(false /* uprobe */, retprobe, func_name,
+ 				    0 /* offset */, -1 /* pid */);
+ 	if (pfd < 0) {
+-		pr_warn("program '%s': failed to create %s '%s' perf event: %s\n",
+-			bpf_program__title(prog, false),
+-			retprobe ? "kretprobe" : "kprobe", func_name,
+-			libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
+-		return ERR_PTR(pfd);
++		pfd = perf_event_open_old_kprobe(retprobe, func_name);
++		if (pfd < 0) {
++			pr_warn("program '%s': failed to create %s '%s' perf event: %s\n",
++				bpf_program__title(prog, false),
++				retprobe ? "kretprobe" : "kprobe", func_name,
++				libbpf_strerror_r(pfd, errmsg, sizeof(errmsg)));
++			return ERR_PTR(pfd);
++		}
+ 	}
+ 	link = bpf_program__attach_perf_event(prog, pfd);
+ 	if (IS_ERR(link)) {

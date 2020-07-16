@@ -300,6 +300,30 @@ find_package(libmongoc-1.0)
 
 
 # -----------------------------------------------------------------------------
+# Detect libbpf
+IF(LINUX AND EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
+    message(STATUS "libbpf library found")
+    pkg_check_modules(ELF REQUIRED libelf)
+    # later we use:
+    # ${ELF_LIBRARIES}
+    # ${ELF_CFLAGS_OTHER}
+    # ${ELF_INCLUDE_DIRS}
+    IF(ELF_LIBRARIES)
+        list(APPEND NETDATA_COMMON_CFLAGS ${ELF_CFLAGS_OTHER})
+        list(INSERT NETDATA_COMMON_LIBRARIES 0
+            ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a
+            ${ELF_LIBRARIES})
+        list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${ELF_INCLUDE_DIRS})
+        include_directories(BEFORE ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include)
+        set(ENABLE_PLUGIN_EBPF True)
+    ELSE(ELF_LIBRARIES)
+        set(ENABLE_PLUGIN_EBPF False)
+        message(STATUS "ebpf plugin: disabled (requires libelf)")
+    ENDIF(ELF_LIBRARIES)
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
 # netdata files
 
 set(LIBNETDATA_FILES
@@ -315,8 +339,6 @@ set(LIBNETDATA_FILES
         libnetdata/clocks/clocks.h
         libnetdata/dictionary/dictionary.c
         libnetdata/dictionary/dictionary.h
-        libnetdata/ebpf/ebpf.c
-        libnetdata/ebpf/ebpf.h
         libnetdata/eval/eval.c
         libnetdata/eval/eval.h
         libnetdata/inlined.h
@@ -356,6 +378,12 @@ set(LIBNETDATA_FILES
         libnetdata/socket/security.h
         libnetdata/circular_buffer/circular_buffer.c
         libnetdata/circular_buffer/circular_buffer.h)
+
+IF(ENABLE_PLUGIN_EBPF)
+    list(APPEND LIBNETDATA_FILES
+        libnetdata/ebpf/ebpf.c
+        libnetdata/ebpf/ebpf.h)
+ENDIF()
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
@@ -928,7 +956,6 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
-    SET(ENABLE_PLUGIN_EBPF True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})

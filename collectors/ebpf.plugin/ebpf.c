@@ -11,33 +11,35 @@
  *
  *****************************************************************/
 
-
 // callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
+int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result)
+{
+    UNUSED(variable);
+    UNUSED(hash);
+    UNUSED(rc);
+    UNUSED(result);
     return 0;
 };
 
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
+void send_statistics(const char *action, const char *action_result, const char *action_data)
+{
+    UNUSED(action);
+    UNUSED(action_result);
+    UNUSED(action_data);
     return;
 }
 
 // callbacks required by popen()
-void signals_block(void) {};
-void signals_unblock(void) {};
-void signals_reset(void) {};
+void signals_block(void){};
+void signals_unblock(void){};
+void signals_reset(void){};
 
 // required by get_system_cpus()
 char *netdata_configured_host_prefix = "";
 
 // callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
+void netdata_cleanup_and_exit(int ret)
+{
     exit(ret);
 }
 
@@ -56,9 +58,11 @@ static char *ebpf_configured_log_dir = LOG_DIR;
 int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
-struct config collector_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
-                                    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-                                               .rwlock = AVL_LOCK_INITIALIZER } };
+struct config collector_config = { .first_section = NULL,
+                                   .last_section = NULL,
+                                   .mutex = NETDATA_MUTEX_INITIALIZER,
+                                   .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                              .rwlock = AVL_LOCK_INITIALIZER } };
 
 int running_on_kernel = 0;
 char kernel_string[64];
@@ -106,7 +110,7 @@ ebpf_module_t ebpf_modules[] = {
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
 };
 
-//Link with apps.plugin
+// Link with apps.plugin
 pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
@@ -146,7 +150,7 @@ static void ebpf_exit(int sig)
 {
     close_ebpf_plugin = 1;
 
-    //When both threads were not finished case I try to go in front this address, the collector will crash
+    // When both threads were not finished case I try to go in front this address, the collector will crash
     if (!thread_finished) {
         return;
     }
@@ -157,32 +161,32 @@ static void ebpf_exit(int sig)
     freez(global_process_stat);
 
     int ret = fork();
-    if (ret < 0) //error
+    if (ret < 0) // error
         error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
-    else if (!ret) { //child
+    else if (!ret) { // child
         int i;
-        for ( i=getdtablesize(); i>=0; --i)
+        for (i = getdtablesize(); i >= 0; --i)
             close(i);
 
-        int fd = open("/dev/null",O_RDWR, 0);
+        int fd = open("/dev/null", O_RDWR, 0);
         if (fd != -1) {
-            dup2 (fd, STDIN_FILENO);
-            dup2 (fd, STDOUT_FILENO);
-            dup2 (fd, STDERR_FILENO);
+            dup2(fd, STDIN_FILENO);
+            dup2(fd, STDOUT_FILENO);
+            dup2(fd, STDERR_FILENO);
         }
 
         if (fd > 2)
-            close (fd);
+            close(fd);
 
         int sid = setsid();
-        if(sid >= 0) {
+        if (sid >= 0) {
             debug(D_EXIT, "Wait for father %d die", getpid());
             sleep_usec(200000); //Sleep 200 miliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
         }
-    } else { //parent
+    } else { // parent
         exit(0);
     }
 
@@ -195,7 +199,6 @@ static void ebpf_exit(int sig)
  *
  *****************************************************************/
 
-
 /**
  * Get a value from a structure.
  *
@@ -205,10 +208,10 @@ static void ebpf_exit(int sig)
  */
 collected_number get_value_from_structure(char *basis, size_t offset)
 {
-    collected_number *value =  (collected_number *)(basis + offset);
+    collected_number *value = (collected_number *)(basis + offset);
 
-    collected_number ret =  (collected_number)llabs(*value);
-    //this reset is necessary to avoid keep a constant value while processing is not executing a task
+    collected_number ret = (collected_number)llabs(*value);
+    // this reset is necessary to avoid keep a constant value while processing is not executing a task
     *value = 0;
 
     return ret;
@@ -222,9 +225,7 @@ collected_number get_value_from_structure(char *basis, size_t offset)
  */
 void write_begin_chart(char *family, char *name)
 {
-    printf( "BEGIN %s.%s\n"
-           , family
-           , name);
+    printf("BEGIN %s.%s\n", family, name);
 }
 
 /**
@@ -244,7 +245,7 @@ inline void write_end_chart()
 void write_chart_dimension(char *dim, long long value)
 {
     int ret = printf("SET %s = %lld\n", dim, value);
-    (void)ret;
+    UNUSED(ret);
 }
 
 /**
@@ -257,7 +258,8 @@ void write_chart_dimension(char *dim, long long value)
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
-void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end) {
+void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end)
+{
     write_begin_chart(family, name);
 
     uint32_t i = 0;
@@ -279,7 +281,8 @@ void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move
  * @param move    the pointer with the values that will be published
  * @param end     the number of values that will be written on standard output
  */
-void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end)
+{
     write_begin_chart(family, name);
 
     int i = 0;
@@ -293,7 +296,6 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
     write_end_chart();
 }
 
-
 /**
  * Call the necessary functions to create a chart.
  *
@@ -302,10 +304,11 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
-void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc) {
+void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc)
+{
     write_begin_chart(family, chart);
 
-    write_chart_dimension(dwrite, (long long) pvc->write);
+    write_chart_dimension(dwrite, (long long)pvc->write);
     write_chart_dimension(dread, (long long)pvc->read);
 
     write_end_chart();
@@ -377,15 +380,15 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param move   a pointer for a structure that has the dimensions
  * @param end    number of dimensions for the chart created
  */
-void ebpf_create_chart(char *type
-    , char *id
-    , char *title
-    , char *units
-    , char *family
-    , int order
-    , void (*ncd)(void *, int)
-    , void *move
-    , int end)
+void ebpf_create_chart(char *type,
+                       char *id,
+                       char *title,
+                       char *units,
+                       char *family,
+                       int order,
+                       void (*ncd)(void *, int),
+                       void *move,
+                       int end)
 {
     ebpf_write_chart_cmd(type, id, title, units, family, "line", order);
 
@@ -407,8 +410,8 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
     struct target *w;
     ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", order);
 
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 }
@@ -428,20 +431,21 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
  * @param name a pointer for the tensor with the name of the functions.
  * @param end  the number of elements in the previous 4 arguments.
  */
-void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end) {
+void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end)
+{
     int i;
 
     netdata_syscall_stat_t *prev = NULL;
     netdata_publish_syscall_t *publish_prev = NULL;
     for (i = 0; i < end; i++) {
-        if(prev) {
+        if (prev) {
             prev->next = &is[i];
         }
         prev = &is[i];
 
         pio[i].dimension = dim[i];
         pio[i].name = name[i];
-        if(publish_prev) {
+        if (publish_prev) {
             publish_prev->next = &pio[i];
         }
         publish_prev = &pio[i];
@@ -453,9 +457,10 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
  *
  * @param lmode  the mode that will be used for them.
  */
-static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
-    int i ;
-    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].mode = lmode;
     }
 }
@@ -466,7 +471,8 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode) {
  * @param em      the structure that will be changed
  * @param enable the status about the apps charts.
  */
-static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int enable) {
+static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int enable)
+{
     em->enabled = 1;
     if (!enable) {
         em->apps_charts = 1;
@@ -479,9 +485,10 @@ static inline void ebpf_enable_specific_chart(struct  ebpf_module *em, int enabl
  *
  * @param apps what is the current status of apps
  */
-static inline void ebpf_enable_all_charts(int apps) {
-    int i ;
-    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+static inline void ebpf_enable_all_charts(int apps)
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_enable_specific_chart(&ebpf_modules[i], apps);
     }
 }
@@ -492,9 +499,10 @@ static inline void ebpf_enable_all_charts(int apps) {
  * @param idx            the index of ebpf_modules that I am enabling
  * @param disable_apps   should I keep apps charts?
  */
-static inline void ebpf_enable_chart(int idx, int disable_apps) {
-    int i ;
-    for (i = 0 ; ebpf_modules[i].thread_name ; i++ ) {
+static inline void ebpf_enable_chart(int idx, int disable_apps)
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
         if (i == idx) {
             ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps);
             break;
@@ -507,9 +515,10 @@ static inline void ebpf_enable_chart(int idx, int disable_apps) {
  *
  * Disable charts for apps loading only global charts.
  */
-static inline void ebpf_disable_apps() {
-    int i ;
-    for (i = 0 ;ebpf_modules[i].thread_name ; i++ ) {
+static inline void ebpf_disable_apps()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].apps_charts = 0;
     }
 }
@@ -517,7 +526,8 @@ static inline void ebpf_disable_apps() {
 /**
  * Print help on standard error for user knows how to use the collector.
  */
-void ebpf_print_help() {
+void ebpf_print_help()
+{
     const time_t t = time(NULL);
     struct tm ct;
     struct tm *test = localtime_r(&t, &ct);
@@ -553,10 +563,9 @@ void ebpf_print_help() {
             " --process or -p   Enable charts related to process run time.\n"
             "\n"
             " --return or -r    Run the collector in return mode.\n"
-            "\n"
-            , VERSION
-            , (year >= 116)?year + 1900: 2020
-    );
+            "\n",
+            VERSION,
+            (year >= 116) ? year + 1900 : 2020);
 }
 
 /*****************************************************************
@@ -591,18 +600,19 @@ int ebpf_start_pthread_variables()
  */
 static void ebpf_allocate_common_vectors()
 {
-    all_pids = callocz((size_t) pid_max, sizeof(struct pid_stat *));
+    all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat *));
     pid_index = callocz((size_t)pid_max, sizeof(pid_t));
     global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
 }
 
 /**
- * Fill the ebpf_functions structure with default values
+ * Fill the ebpf_data structure with default values
  *
  * @param ef the pointer to set default values
  */
-void fill_ebpf_functions(ebpf_functions_t *ef) {
-    memset(ef, 0, sizeof(ebpf_functions_t));
+void fill_ebpf_data(ebpf_data_t *ef)
+{
+    memset(ef, 0, sizeof(ebpf_data_t));
     ef->kernel_string = kernel_string;
     ef->running_on_kernel = running_on_kernel;
     ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
@@ -648,10 +658,11 @@ static inline int parse_disable_apps(char *ptr)
  *
  * @param disable_apps variable to store information related to apps.
  */
-static void read_collector_values(int *disable_apps) {
+static void read_collector_values(int *disable_apps)
+{
     // Read global section
     char *value;
-    if (appconfig_exists(&collector_config,  EBPF_GLOBAL_SECTION, "load")) //Backward compatibility
+    if (appconfig_exists(&collector_config, EBPF_GLOBAL_SECTION, "load")) // Backward compatibility
         value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load", "entry");
     else
         value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
@@ -662,16 +673,14 @@ static void read_collector_values(int *disable_apps) {
     *disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
-                                             ebpf_modules[0].config_name, 1);
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name, 1);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
         started++;
     }
 
-    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
-                                    ebpf_modules[1].config_name, 1);
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name, 1);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
         started++;
@@ -679,7 +688,6 @@ static void read_collector_values(int *disable_apps) {
 
     if (!started)
         ebpf_enable_all_charts(*disable_apps);
-
 }
 
 /**
@@ -690,10 +698,11 @@ static void read_collector_values(int *disable_apps) {
  *
  * @return 0 on success and -1 otherwise.
  */
-static int load_collector_config(char *path, int *disable_apps) {
+static int load_collector_config(char *path, int *disable_apps)
+{
     char lpath[4096];
 
-    snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf" );
+    snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf");
 
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return -1;
@@ -706,22 +715,23 @@ static int load_collector_config(char *path, int *disable_apps) {
 /**
  * Set global variables reading environment variables
  */
-void set_global_variables() {
-    //Get environment variables
+void set_global_variables()
+{
+    // Get environment variables
     ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
-    if(!ebpf_plugin_dir)
+    if (!ebpf_plugin_dir)
         ebpf_plugin_dir = PLUGINS_DIR;
 
     ebpf_user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if(!ebpf_user_config_dir)
+    if (!ebpf_user_config_dir)
         ebpf_user_config_dir = CONFIG_DIR;
 
     ebpf_stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if(!ebpf_stock_config_dir)
+    if (!ebpf_stock_config_dir)
         ebpf_stock_config_dir = LIBCONFIG_DIR;
 
     ebpf_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if(!ebpf_configured_log_dir)
+    if (!ebpf_configured_log_dir)
         ebpf_configured_log_dir = LOG_DIR;
 
     ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
@@ -730,7 +740,7 @@ void set_global_variables() {
     }
 
     isrh = get_redhat_release();
-    pid_max =  get_system_pid_max();
+    pid_max = get_system_pid_max();
 }
 
 /**
@@ -758,13 +768,13 @@ static void parse_args(int argc, char **argv)
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
-        if(n > 0) {
+        if (n > 0) {
             freq = n;
         }
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvganpr",long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvganpr", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -781,7 +791,8 @@ static void parse_args(int argc, char **argv)
                 disable_apps = 1;
                 ebpf_disable_apps();
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF running with global chart group, because it was started with the option \"--global\" or \"-g\".");
+                info(
+                    "EBPF running with global chart group, because it was started with the option \"--global\" or \"-g\".");
 #endif
                 break;
             }
@@ -804,7 +815,8 @@ static void parse_args(int argc, char **argv)
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"--process\" or \"-p\".");
+                info(
+                    "EBPF enabling \"PROCESS\" charts, because it was started with the option \"--process\" or \"-p\".");
 #endif
                 break;
             }
@@ -826,8 +838,9 @@ static void parse_args(int argc, char **argv)
     }
 
     if (load_collector_config(ebpf_user_config_dir, &disable_apps)) {
-        info("Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
-              ebpf_user_config_dir);
+        info(
+            "Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
+            ebpf_user_config_dir);
         if (load_collector_config(ebpf_stock_config_dir, &disable_apps)) {
             info("Does not have a stock file. It is starting with default options.");
         } else {
@@ -847,22 +860,23 @@ static void parse_args(int argc, char **argv)
     if (disable_apps)
         return;
 
-    //Load apps_groups.conf
-    if (ebpf_read_apps_groups_conf(&apps_groups_default_target, &apps_groups_root_target,
-                                   ebpf_user_config_dir, "groups") ) {
-        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
-             ebpf_user_config_dir, ebpf_stock_config_dir);
-        if (ebpf_read_apps_groups_conf(&apps_groups_default_target, &apps_groups_root_target,
-                                       ebpf_stock_config_dir, "groups") ) {
-            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
-                  ebpf_stock_config_dir);
+    // Load apps_groups.conf
+    if (ebpf_read_apps_groups_conf(
+            &apps_groups_default_target, &apps_groups_root_target, ebpf_user_config_dir, "groups")) {
+        info(
+            "Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
+            ebpf_user_config_dir, ebpf_stock_config_dir);
+        if (ebpf_read_apps_groups_conf(
+                &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
+            error(
+                "Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
+                ebpf_stock_config_dir);
             thread_finished++;
             ebpf_exit(1);
         }
     } else
         info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
 }
-
 
 /*****************************************************************
  *
@@ -883,30 +897,30 @@ int main(int argc, char **argv)
     set_global_variables();
     parse_args(argc, argv);
 
-    running_on_kernel =  get_kernel_version(kernel_string, 63);
-    if(!has_condition_to_run(running_on_kernel)) {
+    running_on_kernel = get_kernel_version(kernel_string, 63);
+    if (!has_condition_to_run(running_on_kernel)) {
         error("The current collector cannot run on this kernel.");
         return 2;
     }
 
-    if(!am_i_running_as_root()) {
-        error("ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
-              (unsigned int)getuid(), (unsigned int)geteuid()
-              );
+    if (!am_i_running_as_root()) {
+        error(
+            "ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
+            (unsigned int)getuid(), (unsigned int)geteuid());
         return 3;
     }
 
-    //set name
+    // set name
     program_name = "ebpf.plugin";
 
-    //disable syslog
+    // disable syslog
     error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("Setrlimit(RLIMIT_MEMLOCK)");
         return 4;
@@ -925,16 +939,16 @@ int main(int argc, char **argv)
     ebpf_allocate_common_vectors();
 
     struct netdata_static_thread ebpf_threads[] = {
-        {"EBPF PROCESS",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[0].start_routine},
-        {"EBPF SOCKET",             NULL,                    NULL,         1, NULL, NULL,  ebpf_modules[1].start_routine},
-        {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
+        {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},
+        {"EBPF SOCKET" , NULL, NULL, 1, NULL, NULL, ebpf_modules[1].start_routine},
+        {NULL          , NULL, NULL, 0, NULL, NULL, NULL}
     };
 
     change_events();
     clean_loaded_events();
 
     int i;
-    for (i = 0; ebpf_threads[i].name != NULL ; i++) {
+    for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
         st->thread = mallocz(sizeof(netdata_thread_t));
 
@@ -943,7 +957,7 @@ int main(int argc, char **argv)
         netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
     }
 
-    for (i = 0; ebpf_threads[i].name != NULL ; i++) {
+    for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
         netdata_thread_join(*st->thread, NULL);
     }
