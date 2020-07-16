@@ -129,7 +129,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
     int is_legacy = is_archived ? 0 : is_legacy_child(guid);
-    info("STEL: Creating host %s (GUID = %s) with legacy mode = %d", hostname, guid, is_legacy);
+    info("STEL: Creating host %s (GUID = %s) with legacy mode = %d (mode = %u)", hostname, guid, is_legacy, memory_mode);
 
     rrd_check_wrlock();
 
@@ -234,8 +234,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
         host->cache_dir = strdupz(filename);
 
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
-           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
+           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (is_localhost || is_legacy)) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->cache_dir);

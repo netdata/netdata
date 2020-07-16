@@ -4,10 +4,20 @@
 #include "metadatalog.h"
 #include "metalogpluginsd.h"
 
+extern struct config stream_config;
+
 PARSER_RC metalog_pluginsd_host_action(
     void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone,
     char *tags)
 {
+    int history = default_rrd_history_entries;
+    RRD_MEMORY_MODE mode = default_rrd_memory_mode;
+    int health_enabled = default_health_enabled;
+    int rrdpush_enabled = default_rrdpush_enabled;
+    char *rrdpush_destination = default_rrdpush_destination;
+    char *rrdpush_api_key = default_rrdpush_api_key;
+    char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
+
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
@@ -27,6 +37,33 @@ PARSER_RC metalog_pluginsd_host_action(
     // TODO: Remove when the next task is completed ie. accept new children in the lcoalhost / multidb
     //return PARSER_RC_OK;
 
+    // Fetch configuration options from streaming config
+    update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
+    if(update_every < 0) update_every = 1;
+
+    //history = (int)appconfig_get_number(&stream_config, rpt->key, "default history", history);
+    history = (int)appconfig_get_number(&stream_config, machine_guid, "history", history);
+    if(history < 5) history = 5;
+
+    //mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "default memory mode", rrd_memory_mode_name(mode)));
+    mode = rrd_memory_mode_id(appconfig_get(&stream_config, machine_guid, "memory mode", rrd_memory_mode_name(mode)));
+
+    //health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", health_enabled);
+    health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
+
+    //rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rrdpush_enabled);
+    rrdpush_enabled = appconfig_get_boolean(&stream_config, machine_guid, "proxy enabled", rrdpush_enabled);
+
+    //rrdpush_destination = appconfig_get(&stream_config, rpt->key, "default proxy destination", rrdpush_destination);
+    rrdpush_destination = appconfig_get(&stream_config, machine_guid, "proxy destination", rrdpush_destination);
+
+    //rrdpush_api_key = appconfig_get(&stream_config, rpt->key, "default proxy api key", rrdpush_api_key);
+    rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
+
+    //rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
+    rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+
+
     host = rrdhost_create(
         hostname
         , registry_hostname
@@ -37,13 +74,13 @@ PARSER_RC metalog_pluginsd_host_action(
         , NULL
         , NULL
         , update_every
-        , 3600
-        , RRD_MEMORY_MODE_DBENGINE
+        , history   // entries
+        , mode
         , default_health_enabled    // health enabled
         , default_rrdpush_enabled   // Push enabled
-        , NULL
-        , NULL
-        , NULL
+        , rrdpush_destination  //destination
+        , rrdpush_api_key  // api key
+        , rrdpush_send_charts_matching  // charts matching
         , callocz(1, sizeof(struct rrdhost_system_info))
         , 0     // localhost
         , 1     // archived
