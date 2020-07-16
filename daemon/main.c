@@ -557,6 +557,13 @@ static void get_netdata_configured_variables() {
         error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
     }
+
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "multidb disk space", compute_multidb_diskspace());
+    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+    }
+
 #endif
     // ------------------------------------------------------------------------
 
