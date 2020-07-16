@@ -818,7 +818,6 @@ static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
 {
     if (inet_pton(domain, ip, dst) <= 0) {
         error("The address specified (%s) is invalid ", source);
-        freez(source);
         return -1;
     }
 
