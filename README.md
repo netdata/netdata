@@ -215,6 +215,18 @@ metrics, but also troubleshoot complex performance problems.
 
 ## News
 
+`July 16, 2020` - **[Netdata v1.23.2 released!](https://github.com/netdata/netdata/releases/tag/v1.23.2)**
+
+Release v1.23.2 of the Netdata Agent is a patch for one significant issue.
+
+PR [#9491](https://github.com/netdata/netdata/pull/9491) fixed a buffer overrun vulnerability in Netdata's JSON parsing
+code. This vulnerability could be used to crash Agents remotely, and in some circumstances, could be used in an
+arbitrary code execution (ACE) exploit.
+
+We strongly encourage all Netdata users to update their nodes to v1.23.2 as soon as possible.
+
+This release also contains additional bug fixes and improvements.
+
 `July 1, 2020` - **[Netdata v1.23.1 released!](https://github.com/netdata/netdata/releases/tag/v1.23.1)**
 
 Release v1.23.1 of the Netdata Agent is a patch for two significant issues.
