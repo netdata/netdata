@@ -125,6 +125,25 @@ ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_p
  *
  *****************************************************************/
 
+/**
+ * Clean IP Structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_ip_structure(ebpf_network_viewer_port_list_t **clean)
+{
+    ebpf_network_viewer_port_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
 static void change_events()
 {
     if (ebpf_modules[0].mode == MODE_ENTRY)
@@ -709,15 +728,15 @@ static void parse_port_list(void **out, char *range)
     int first, last;
     ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
 
-    if (*range == '*') {
+    char *copied = strdupz(range);
+    if (*range == '*' && *(range+1) == '\0') {
         first = 1;
         last = 65535;
-        //Remove all previous allocated here
 
+        clean_ip_structure(list);
         goto fillenvpl;
     }
 
-    char *copied = strdupz(range);
     char *end = range;
     //Move while I cannot find a separator
     while (*end && *end != ':' && *end != '-') end++;
@@ -1053,9 +1072,9 @@ cleanipdup:
  *
  * Parse the port ranges given and create Network Viewer Port Structure
  *
- * @param ptr          is a pointer with the text to parse.
+ * @param ptr  is a pointer with the text to parse.
  */
-static void parse_values(char *ptr)
+static void parse_ports(char *ptr)
 {
     //No value
     if (unlikely(!ptr))
@@ -1082,11 +1101,14 @@ static void parse_values(char *ptr)
         }
 
         if (isdigit(*ptr)) { //Parse port
-            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port, ptr);
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                            ptr);
         } else if (isalpha(*ptr)) { //Parse service
-            parse_service_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port, ptr);
+            parse_service_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                               ptr);
         } else if (*ptr == '*') { //All
-            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port, ptr);
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                            ptr);
         }
 
         ptr = end;
@@ -1169,7 +1191,7 @@ static void parse_network_viewer_section()
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                                 "ports", NULL);
-    parse_values(value);
+    parse_ports(value);
 
     /*
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included hostnames", NULL);
