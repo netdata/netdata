@@ -667,25 +667,32 @@ static inline int parse_disable_apps(char *ptr)
 static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
 {
     if (likely(*out)) {
-        ebpf_network_viewer_port_list_t *move = *out;
-        for (; move->next ; move = move->next ) {
-            if (move->first <= in->first && move->last >= in->first &&
-                move->first <= in->last && move->last >= in->last) {
+        ebpf_network_viewer_port_list_t *move = *out, *store = *out;
+        uint16_t first = ntohs(in->first);
+        uint16_t last = ntohs(in->last);
+        while (move) {
+            if (ntohs(move->first) <= first && ntohs(move->last) >= first &&
+                ntohs(move->first) <= last && ntohs(move->last) >= last) {
                 info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
                      ntohs(in->first), ntohs(in->last), ntohs(move->first), ntohs(move->last));
                 freez(in->value);
                 freez(in);
                 return;
             }
+
+            store = move;
+            move = move->next;
         }
 
-        move->next = in;
+        store->next = in;
     } else {
         *out = in;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u, %u) to port list used on network viewer",in->value, ntohs(in->first), ntohs(in->last));
+    info("Adding values %s( %u, %u) to %s port list used on network viewer",
+         in->value, ntohs(in->first), ntohs(in->last),
+         (*out == network_viewer_opt.included_port)?"included":"excluded");
 #endif
 }
 
@@ -699,7 +706,16 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
  */
 static void parse_port_list(void **out, char *range)
 {
+    int first, last;
     ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+
+    if (*range == '*') {
+        first = 1;
+        last = 65535;
+        //Remove all previous allocated here
+
+        goto fillenvpl;
+    }
 
     char *copied = strdupz(range);
     char *end = range;
@@ -707,9 +723,13 @@ static void parse_port_list(void **out, char *range)
     while (*end && *end != ':' && *end != '-') end++;
 
     //It has a range
-    int first, last;
     if (likely(*end)) {
         *end++ = '\0';
+        if (*end == '!') {
+            info("The exclusion cannot be in the second part of the range %s, it will be ignored.", copied);
+            freez(copied);
+            return;
+        }
         last = str2i((const char *)end);
     } else {
         last = 0;
@@ -732,12 +752,14 @@ static void parse_port_list(void **out, char *range)
     }
 
     if (first > last) {
-        info("The specified order %s is wrong, the smallest value is always the first!", copied);
+        info("The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
         freez(copied);
         return;
     }
 
-    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    ebpf_network_viewer_port_list_t *w;
+fillenvpl:
+    w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
     w->value = strdup(copied);
     w->hash = simple_hash(copied);
     w->first = (uint16_t)htons((uint16_t)first);
@@ -1031,24 +1053,12 @@ cleanipdup:
  *
  * Parse the port ranges given and create Network Viewer Port Structure
  *
- * @param out is the output link list
- * @param ptr is a pointer with the text to parse.
- * @param valid_char the function from ctype.h used to find the first valid value
+ * @param ptr          is a pointer with the text to parse.
  */
-static void parse_values(void **out,
-                             char *ptr,
-                             int (*valid_char)(int),
-                             void (*fill_struct)(void **, char *))
+static void parse_values(char *ptr)
 {
     //No value
     if (unlikely(!ptr))
-        return;
-
-    //Find the first valid value
-    while (!valid_char(*ptr)) ptr++;
-
-    //No valid value found
-    if (unlikely(!*ptr))
         return;
 
     while (likely(ptr)) {
@@ -1065,7 +1075,19 @@ static void parse_values(void **out,
             *end++ = '\0';
         }
 
-        fill_struct(out, ptr);
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isdigit(*ptr)) { //Parse port
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port, ptr);
+        } else if (isalpha(*ptr)) { //Parse service
+            parse_service_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port, ptr);
+        } else if (*ptr == '*') { //All
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port, ptr);
+        }
 
         ptr = end;
     }
@@ -1146,18 +1168,10 @@ static void parse_network_viewer_section()
                                                       500);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
-                                "included ports", NULL);
-    parse_values((void **)&network_viewer_opt.included_port, value, isdigit, parse_port_list);
+                                "ports", NULL);
+    parse_values(value);
 
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ports", NULL);
-    parse_values((void **)&network_viewer_opt.excluded_port, value, isdigit, parse_port_list);
-
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included services", NULL);
-    parse_values((void **)&network_viewer_opt.included_port, value, isalpha, parse_service_list);
-
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded services", NULL);
-    parse_values((void **)&network_viewer_opt.excluded_port, value, isalpha, parse_service_list);
-
+    /*
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included hostnames", NULL);
     link_hostnames(&network_viewer_opt.included_hostnames, value);
 
@@ -1169,6 +1183,7 @@ static void parse_network_viewer_section()
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ips", NULL);
     parse_values((void **)&network_viewer_opt.excluded_ips, value, isascii, parse_ip_list);
+     */
 }
 
 /**
