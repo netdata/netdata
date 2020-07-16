@@ -916,11 +916,16 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-    error = metalog_init(ctx);
-    if(error) {
-        error("Failed to initialize metadata log file event loop.");
-        goto error_after_rrdeng_worker;
+    if ((strcmp(host->machine_guid, registry_get_this_machine_guid()) == 0) || (!rrdhost_flag_check(host, RRDHOST_FLAG_MULTIHOST))) {
+        info("Metadatalog init for host %s starting...", host->hostname);
+        error = metalog_init(ctx);
+        if (error) {
+            error("Failed to initialize metadata log file event loop.");
+            goto error_after_rrdeng_worker;
+        }
     }
+    else
+        info("No metadatalog init for host %s", host->hostname);
     return 0;
 
 error_after_rrdeng_worker:

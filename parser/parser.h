@@ -35,6 +35,8 @@ typedef struct pluginsd_action {
     PARSER_RC (*guid_action)(void *user, uuid_t *uuid);
     PARSER_RC (*context_action)(void *user, uuid_t *uuid);
     PARSER_RC (*tombstone_action)(void *user, uuid_t *uuid);
+    PARSER_RC (*host_action)(void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os,
+        char *timezone, char *tags);
 } PLUGINSD_ACTION;
 
 typedef enum parser_input_type {

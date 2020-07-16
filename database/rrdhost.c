@@ -123,7 +123,8 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
                         struct rrdhost_system_info *system_info,
-                        int is_localhost
+                        int is_localhost,
+                        int is_archived
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
@@ -182,6 +183,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
     avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
 
+    if (is_archived) {
+        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+        info("Host %s is created in archived mode", hostname);
+    }
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
@@ -276,6 +281,10 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
             error("Host machine GUID is not valid.");
         }
+        if (unlikely(find_or_generate_guid((void *) host, &host->host_uuid, GUID_TYPE_HOST, 1)))
+            error("Failed to store machine GUID to global map");
+        else
+            info("Added %s to global map for host %s", host->machine_guid, host->hostname);
         host->objects_nr = 1;
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
@@ -367,7 +376,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrd_hosts_available++;
 
 #ifdef ENABLE_DBENGINE
-    if (likely(!is_localhost && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+    if (likely(!is_localhost && !is_archived && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
             metalog_commit_update_host(host);
 #endif
     return host;
@@ -494,6 +503,7 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_send_charts_matching
                 , system_info
                 , 0
+                , 0
         );
     }
     else {
@@ -590,6 +600,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , default_rrdpush_send_charts_matching
             , system_info
             , 1
+            , 0
     );
     rrd_unlock();
 	web_client_api_v1_management_init();

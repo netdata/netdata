@@ -79,10 +79,10 @@ static void compaction_test_quota(struct metalog_worker_config *wc)
 static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
 {
     GUID_TYPE ret;
-    RRDHOST *host = ctx->rrdeng_ctx->host;
     RRDSET *st;
     RRDDIM *rd;
     BUFFER *buffer;
+    RRDHOST *host = ctx->rrdeng_ctx->host;
 
     ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
@@ -92,6 +92,11 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
         case GUID_TYPE_CHART:
             st = metalog_get_chart_from_uuid(ctx, uuid);
             if (st) {
+                if (ctx->current_compaction_id > st->rrdhost->compaction_id) {
+                    error("Forcing compaction of HOST %s from CHART %s", st->rrdhost->hostname, st->id);
+                    compact_record_by_uuid(ctx, &st->rrdhost->host_uuid);
+                }
+
                 if (ctx->current_compaction_id > st->compaction_id) {
                     st->compaction_id = ctx->current_compaction_id;
                     buffer = metalog_update_chart_buffer(st, ctx->current_compaction_id);
@@ -106,11 +111,13 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
         case GUID_TYPE_DIMENSION:
             rd = metalog_get_dimension_from_uuid(ctx, uuid);
             if (rd) {
+                if (ctx->current_compaction_id > rd->rrdset->rrdhost->compaction_id) {
+                    error("Forcing compaction of HOST %s", rd->rrdset->rrdhost->hostname);
+                    compact_record_by_uuid(ctx, &rd->rrdset->rrdhost->host_uuid);
+                }
                 if (ctx->current_compaction_id > rd->rrdset->compaction_id) {
-                    error("Forcing compaction of chart %s", rd->rrdset->id);
-                    rd->rrdset->compaction_id = ctx->current_compaction_id;
-                    buffer = metalog_update_chart_buffer(rd->rrdset, ctx->current_compaction_id);
-                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, rd->rrdset->chart_uuid, 1);
+                    error("Forcing compaction of CHART %s", rd->rrdset->id);
+                    compact_record_by_uuid(ctx, rd->rrdset->chart_uuid);
                 } else if (ctx->current_compaction_id > rd->state->compaction_id) {
                     rd->state->compaction_id = ctx->current_compaction_id;
                     buffer = metalog_update_dimension_buffer(rd);
@@ -123,6 +130,8 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
             }
             break;
         case GUID_TYPE_HOST:
+            //TODO: will be enabled when multidb is activated
+            //RRDHOST *host = metalog_get_host_from_uuid(ctx, uuid);
             if (ctx->current_compaction_id > host->compaction_id) {
                 host->compaction_id = ctx->current_compaction_id;
                 buffer = metalog_update_host_buffer(host);

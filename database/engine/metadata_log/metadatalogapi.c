@@ -266,6 +266,22 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
     metalog_commit_deletion_record(ctx, buffer);
 }
 
+RRDHOST *metalog_get_host_from_uuid(struct metalog_instance *ctx, uuid_t *host_guid)
+{
+    UNUSED(ctx);
+    GUID_TYPE ret;
+    char machine_guid[37];
+
+    uuid_unparse_lower(*host_guid, machine_guid);
+    ret = find_object_by_guid(host_guid, NULL, 0);
+    if (unlikely(GUID_TYPE_HOST != ret)) {
+        error("Host with GUID %s not found in the global map", machine_guid);
+        return NULL;
+    }
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+    return host;
+}
+
 RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_uuid)
 {
     GUID_TYPE ret;
