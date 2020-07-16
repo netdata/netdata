@@ -167,7 +167,8 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
             "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
-            snprintf(dim_name, MAX_DIM_NAME, "Query %d", i);
+            if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
+                error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
     } else
