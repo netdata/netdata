@@ -152,6 +152,8 @@ configure any of these collectors according to your setup and infrastructure.
     memory usage, garbage collection statistics, and more.
 -   [OpenVPN status logs](/collectors/python.d.plugin/ovpn_status_log/): Parse server log files and provide summary
     (client, traffic) metrics.
+-   [Squid web server logs](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/squidlog/): Tail Squid
+    access logs to return the volume of requests, types of requests, bandwidth, and much more.
 -   [Web server logs (Go version for Apache,
     NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/): Tail access logs and provide
     very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
