@@ -1140,7 +1140,9 @@ static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_networ
         *out = in;
     }
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding value %s to hostname list used on network viewer", in->value);
+    info("Adding value %s to %s hostname list used on network viewer",
+         in->value,
+         (*out == network_viewer_opt.included_hostnames)?"included":"excluded");
 #endif
 }
 
@@ -1148,24 +1150,35 @@ static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_networ
  * Link Hostnames
  *
  * Parse the list of hostnames to create the link list.
+ * This is not associated with the IP, because simple patterns like *example* cannot be resolved to IP.
  *
  * @param out is the output link list
  * @param parse is a pointer with the text to parser.
  */
-static void link_hostnames(ebpf_network_viewer_hostname_list_t **out, char *parse)
+static void link_hostnames(char *parse)
 {
     //No value
     if (unlikely(!parse))
         return;
 
-    //Find the first valid value
-    while (isspace(*parse)) parse++;
-
     while (likely(parse)) {
+        //Find the first valid value
+        while (isspace(*parse)) parse++;
+
+        //No valid value found
+        if (unlikely(!*parse))
+            return;
+
         //Find space that ends the list
         char *end = strchr(parse, ' ');
         if (end) {
             *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*parse == '!') {
+            neg++;
+            parse++;
         }
 
         ebpf_network_viewer_hostname_list_t *hostname = callocz(1 , sizeof(ebpf_network_viewer_hostname_list_t));
@@ -1173,7 +1186,8 @@ static void link_hostnames(ebpf_network_viewer_hostname_list_t **out, char *pars
         hostname->hash = simple_hash(parse);
         hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT);
 
-        link_hostname(out, hostname);
+        link_hostname((!neg)?&network_viewer_opt.included_hostnames:&network_viewer_opt.excluded_hostnames,
+                      hostname);
 
         parse = end;
     }
@@ -1193,18 +1207,15 @@ static void parse_network_viewer_section()
                                 "ports", NULL);
     parse_ports(value);
 
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
+    link_hostnames(value);
+
     /*
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included hostnames", NULL);
-    link_hostnames(&network_viewer_opt.included_hostnames, value);
-
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded hostnames", NULL);
-    link_hostnames(&network_viewer_opt.excluded_hostnames, value);
-
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "included ips", NULL);
-    parse_values((void **)&network_viewer_opt.included_ips, value, isascii, parse_ip_list);
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "ips", NULL);
+    parse_ips((void **)&network_viewer_opt.included_ips, value, isascii, parse_ip_list);
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ips", NULL);
-    parse_values((void **)&network_viewer_opt.excluded_ips, value, isascii, parse_ip_list);
+    parse_ips((void **)&network_viewer_opt.excluded_ips, value, isascii, parse_ip_list);
      */
 }
 
