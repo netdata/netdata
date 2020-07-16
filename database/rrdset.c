@@ -543,10 +543,11 @@ RRDSET *rrdset_create_custom(
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
             changed_from_archived_to_active = 1;
-            if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ARCHIVED)) {
-                rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
-                info("Host %s is not in archived mode anymore", st->rrdhost->hostname);
-            }
+//            if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ARCHIVED)) {
+//                rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
+//                rrd_hosts_available++;
+//                info("Host %s is not in archived mode anymore", st->rrdhost->hostname);
+//            }
             mark_rebuild |= META_CHART_ACTIVATED;
         }
         char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
@@ -684,12 +685,17 @@ RRDSET *rrdset_create_custom(
             rrdsetcalc_link_matching(st);
             rrdcalctemplate_link_matching(st);
         }
+        if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ARCHIVED)) {
+            rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
+            rrd_hosts_available++;
+            info("Host %s is not in archived mode anymore", st->rrdhost->hostname);
+        }
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-            rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
+            //rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
         }
         return st;
     }

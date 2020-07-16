@@ -382,7 +382,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         );
     }
 
-    rrd_hosts_available++;
+    if (!is_archived)
+        rrd_hosts_available++;
 
 #ifdef ENABLE_DBENGINE
     if (likely(!is_localhost && !is_archived && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
