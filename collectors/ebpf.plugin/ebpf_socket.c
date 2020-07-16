@@ -505,10 +505,6 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     memcpy(&test.index, lindex, sizeof(*lindex));
 
-    char removeme_src[INET6_ADDRSTRLEN],  removeme_dst[INET6_ADDRSTRLEN];
-    if (inet_ntop(family, lindex->daddr.addr8, removeme_dst, sizeof(removeme_dst)))
-        inet_ntop(family, lindex->saddr.addr8, removeme_src, sizeof(removeme_src));
-
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
         netdata_socket_t *sock = &ret->sock;
