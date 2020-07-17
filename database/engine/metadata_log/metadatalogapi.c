@@ -323,7 +323,6 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     UNUSED(ctx);
 
     GUID_TYPE ret;
-    char uuid_str[37];
     char dim_object[49], chart_object[33], id_str[PLUGINSD_LINE_MAX], chart_fullid[RRD_ID_LENGTH_MAX + 1];
     uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
 

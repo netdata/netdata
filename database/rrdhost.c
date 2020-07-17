@@ -128,9 +128,11 @@ RRDHOST *rrdhost_create(const char *hostname,
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
+#ifdef ENABLE_DBENGINE
     int is_legacy = is_archived ? 0 : is_legacy_child(guid);
-    info("STEL: Creating host %s (GUID = %s) with legacy mode = %d (mode = %u)", hostname, guid, is_legacy, memory_mode);
-
+#else
+    int is_legacy = 1;
+#endif
     rrd_check_wrlock();
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
@@ -234,8 +236,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
         host->cache_dir = strdupz(filename);
 
-        if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
-           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (is_localhost || is_legacy)) {
+        if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || (
+           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->cache_dir);
@@ -616,17 +618,21 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (unlikely(!localhost))
         return 1;
 
-    char dbenginepath[FILENAME_MAX + 1];
-    int ret;
-    snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
-    ret = rrdeng_init(
-        localhost, &localhost->rrdeng_ctx, dbenginepath, localhost->page_cache_mb, localhost->disk_space_mb);
-    if (ret) {
-        error(
-            "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-            localhost->hostname, localhost->machine_guid, localhost->cache_dir);
-        rrdhost_free(localhost);
-        localhost = NULL;
+    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        char dbenginepath[FILENAME_MAX + 1];
+        int ret;
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
+        ret = rrdeng_init(
+            localhost, &localhost->rrdeng_ctx, dbenginepath, localhost->page_cache_mb, localhost->disk_space_mb);
+        if (ret) {
+            error(
+                "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+                localhost->hostname, localhost->machine_guid, localhost->cache_dir);
+            rrdhost_free(localhost);
+            localhost = NULL;
+        }
+#endif
     }
 
     web_client_api_v1_management_init();
