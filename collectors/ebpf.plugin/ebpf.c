@@ -798,7 +798,7 @@ static void parse_port_list(void **out, char *range)
     ebpf_network_viewer_port_list_t *w;
 fillenvpl:
     w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    w->value = strdup(copied);
+    w->value = copied;
     w->hash = simple_hash(copied);
     w->first = (uint16_t)htons((uint16_t)first);
     w->last = (uint16_t)htons((uint16_t)last);
