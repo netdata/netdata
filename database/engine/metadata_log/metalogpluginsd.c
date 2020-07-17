@@ -20,9 +20,6 @@ PARSER_RC metalog_pluginsd_host_action(
 
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
-//    if (is_legacy_child(machine_guid))
-//        return PARSER_RC_OK;
-
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (host)
         goto write_replay;
@@ -35,10 +32,6 @@ PARSER_RC metalog_pluginsd_host_action(
         mlf_record_insert(metalogfile, &record);
         return PARSER_RC_OK;
     }
-
-    // Ignore HOST command for now
-    // TODO: Remove when the next task is completed ie. accept new children in the localhost / multidb
-    //return PARSER_RC_OK;
 
     // Fetch configuration options from streaming config
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
