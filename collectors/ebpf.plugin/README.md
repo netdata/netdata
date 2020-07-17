@@ -198,32 +198,26 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 ```conf
 [network viewer]
     maximum dimensions = 500
-    included ports = 19999 100-1024
-    excluded ports = 145 139
-    included services = ssh http
-    excluded services = ftp
-    included hostnames = netdata.cloud netdata.io
-    excluded hostnames = example.com
-    excluded ips = 127.0.0.1 192.168.0.1-192.168.0.5
-    included ips = 192.168.0.0/24 2001:DB8::/32 
+    ports = 1-1024 !145 !domain
+    hostnames = !example.com
+    ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
 ```
 
-When you define an `included ports` setting, Netdata will collect network metrics for that specific port. For example, if you
-write `included ports = 19999`, Netdata will collect only connections for itself. If you list values in the `excluded`
-setting, Netdata will collect metrics on all included ports except those values. Other included options have a similar behavior.
+When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
+write `ports = 19999`, Netdata will collect only connections for itself. Except for `maximum dimensions`, 
+all options have a similar behavior.
 
-In the above example, Netdata will collect metrics for all ports between 100 and 1024, with the exception of 145 and
-139.
+In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain) 
+and 145.
 
-The following pairs of `included` and `excluded` are available:
+The following options are available:
 
 -   `ports`: Define the destination ports for Netdata to monitor.
--   `services`: If you do not know which port number you want to monitor, you can list the service. Netdata will resolve
-    the service name to its associated port to monitor the connection.
--   `hostnames`: The list of hostnames that can be resolved to an IP address. This option accept [simple
-    patterns](/libnetdata/simple_pattern/README.md).
+-   `hostnames`: The list of hostnames that can be resolved to an IP address. 
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
     range of IPs, or use CIDR values.
+    
+ All options accept accept [simple patterns](/libnetdata/simple_pattern/README.md).   
     
 By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
 will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
