@@ -906,7 +906,7 @@ static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rl
             return 1;
     } else {
         if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
-            memcmp(rlast->addr8, cmplast->addr8, sizeof(union netdata_ip_t) >= 0)) {
+            memcmp(rlast->addr8, cmplast->addr8, sizeof(union netdata_ip_t)) >= 0) {
             return 1;
         }
 
@@ -981,7 +981,7 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
         ret[1] = 0xFFFFFFFFFFFFFFFFULL;
 
         tmp = be64toh(ret[0]);
-        if (prefix != 64) {
+        if (prefix > 0) {
             mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
             tmp |= ~mask;
         }
