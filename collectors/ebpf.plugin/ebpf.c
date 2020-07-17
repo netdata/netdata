@@ -885,6 +885,36 @@ static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
 }
 
 /**
+ * Is ip inside the range
+ *
+ * Check if the ip is inside a IP range
+ *
+ * @param rfirst    the first ip address of the range
+ * @param rlast     the last ip address of the range
+ * @param cmpfirst  the first ip to compare
+ * @param cmplast   the last ip to compare
+ * @param family    the IP family
+ *
+ * @return It returns 1 if the IP is inside the range and 0 otherwise
+ */
+static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
+                              union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
+{
+    if (family == AF_INET) {
+        if (ntohl(rfirst->addr32[0]) <= ntohl(cmpfirst->addr32[0]) &&
+            ntohl(rlast->addr32[0]) >= ntohl(cmplast->addr32[0]))
+            return 1;
+    } else {
+        if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+            memcmp(rlast->addr8, cmplast->addr8, sizeof(union netdata_ip_t) >= 0)) {
+            return 1;
+        }
+
+    }
+    return 0;
+}
+
+/**
  * Fill IP list
  *
  * @param out a pointer to the link list.
@@ -893,24 +923,20 @@ static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
 static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in)
 {
     if (likely(*out)) {
-        ebpf_network_viewer_ip_list_t *move = *out;
-        for (; move->next ; move = move->next ) {
-            if (!memcmp(move->first.addr8,
-                        in->first.addr8,
-                        sizeof(union netdata_ip_t)) &&
-                !memcmp(move->last.addr8,
-                        in->last.addr8,
-                        sizeof(union netdata_ip_t))
-                ) {
+        ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
+        while (move) {
+            if (in->ver == move->ver && is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
                 info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
                      in->value, move->value);
                 freez(in->value);
                 freez(in);
                 return;
             }
+            store = move;
+            move = move->next;
         }
 
-        move->next = in;
+        store->next = in;
     } else {
         *out = in;
     }
@@ -1024,8 +1050,7 @@ static void parse_ip_list(void **out, char *ip)
                 goto cleanipdup;
             }
 
-            in_addr_t myip = inet_addr(ip);
-            last.addr32[0] = (uint32_t)htonl(broadcast(htonl(myip), select));
+            last.addr32[0] = htonl(broadcast(ntohl(first.addr32[0]), select));
             //This was added to remove https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
             UNUSED(last.addr32[0]);
         } else { //Range
