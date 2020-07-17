@@ -20,6 +20,9 @@ PARSER_RC metalog_pluginsd_host_action(
 
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
+//    if (is_legacy_child(machine_guid))
+//        return PARSER_RC_OK;
+
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (host)
         goto write_replay;
@@ -34,7 +37,7 @@ PARSER_RC metalog_pluginsd_host_action(
     }
 
     // Ignore HOST command for now
-    // TODO: Remove when the next task is completed ie. accept new children in the lcoalhost / multidb
+    // TODO: Remove when the next task is completed ie. accept new children in the localhost / multidb
     //return PARSER_RC_OK;
 
     // Fetch configuration options from streaming config
@@ -244,6 +247,8 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
         case GUID_TYPE_HOST:
             /* Ignore for now */
             error_with_guid(uuid, "Found HOST but ignoring in CONTEXT ACTION");
+            ((PARSER_USER_OBJECT *)user)->host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
+            info("Host detected = %s", ((PARSER_USER_OBJECT *)user)->host->hostname);
             break;
         case GUID_TYPE_NOSPACE:
             error_with_guid(uuid, "Not enough space for object retrieval");

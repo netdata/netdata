@@ -281,12 +281,15 @@ RRDHOST *metalog_get_host_from_uuid(struct metalog_instance *ctx, uuid_t *host_g
     char machine_guid[37];
 
     uuid_unparse_lower(*host_guid, machine_guid);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     ret = find_object_by_guid(host_guid, NULL, 0);
     if (unlikely(GUID_TYPE_HOST != ret)) {
-        error("Host with GUID %s not found in the global map", machine_guid);
-        return NULL;
+        errno = 0;
+        if (unlikely(!host))
+            error("Host with GUID %s not found in the global map or in the list of hosts", machine_guid);
+        else
+            error("Host with GUID %s not found in the global map", machine_guid);
     }
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     return host;
 }
 
@@ -301,9 +304,11 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
         return NULL;
 
     machine_guid = (uuid_t  *)chart_object;
-    //RRDHOST *host = ctx->rrdeng_ctx->host;
     RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
+    if (unlikely(!host))
+        return NULL;
     if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+        errno = 0;
         error("Metadata host machine GUID does not match the one assosiated with the chart");
         return NULL;
     }
@@ -333,7 +338,10 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
     machine_guid = (uuid_t *)dim_object;
 
     RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
+    if (unlikely(!host))
+        return NULL;
     if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+        errno = 0;
         error("Metadata host machine GUID does not match the one assosiated with the dimension");
         return NULL;
     }

@@ -281,6 +281,14 @@ RRDHOST *rrdhost_create(const char *hostname,
         health_alarm_log_open(host);
     }
 
+    RRDHOST *t = rrdhost_index_add(host);
+
+    if(t != host) {
+        error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", host->hostname, host->machine_guid, t->hostname, t->machine_guid);
+        rrdhost_free(host);
+        return NULL;
+    }
+
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
@@ -336,53 +344,45 @@ RRDHOST *rrdhost_create(const char *hostname,
         else localhost = host;
     }
 
-    RRDHOST *t = rrdhost_index_add(host);
-
-    if(t != host) {
-        error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", host->hostname, host->machine_guid, t->hostname, t->machine_guid);
-        rrdhost_free(host);
-        host = NULL;
-    }
-    else {
-        info("Host '%s' (at registry as '%s') with guid '%s' initialized"
-                     ", os '%s'"
-                     ", timezone '%s'"
-                     ", tags '%s'"
-                     ", program_name '%s'"
-                     ", program_version '%s'"
-                     ", update every %d"
-                     ", memory mode %s"
-                     ", history entries %ld"
-                     ", streaming %s"
-                     " (to '%s' with api key '%s')"
-                     ", health %s"
-                     ", cache_dir '%s'"
-                     ", varlib_dir '%s'"
-                     ", health_log '%s'"
-                     ", alarms default handler '%s'"
-                     ", alarms default recipient '%s'"
-             , host->hostname
-             , host->registry_hostname
-             , host->machine_guid
-             , host->os
-             , host->timezone
-             , (host->tags)?host->tags:""
-             , host->program_name
-             , host->program_version
-             , host->rrd_update_every
-             , rrd_memory_mode_name(host->rrd_memory_mode)
-             , host->rrd_history_entries
-             , host->rrdpush_send_enabled?"enabled":"disabled"
-             , host->rrdpush_send_destination?host->rrdpush_send_destination:""
-             , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
-             , host->health_enabled?"enabled":"disabled"
-             , host->cache_dir
-             , host->varlib_dir
-             , host->health_log_filename
-             , host->health_default_exec
-             , host->health_default_recipient
-        );
-    }
+    info("Host '%s' (at registry as '%s') with guid '%s' initialized"
+                 ", os '%s'"
+                 ", timezone '%s'"
+                 ", tags '%s'"
+                 ", program_name '%s'"
+                 ", program_version '%s'"
+                 ", update every %d"
+                 ", memory mode %s"
+                 ", history entries %ld"
+                 ", streaming %s"
+                 " (to '%s' with api key '%s')"
+                 ", health %s"
+                 ", cache_dir '%s'"
+                 ", varlib_dir '%s'"
+                 ", health_log '%s'"
+                 ", alarms default handler '%s'"
+                 ", alarms default recipient '%s'"
+         , host->hostname
+         , host->registry_hostname
+         , host->machine_guid
+         , host->os
+         , host->timezone
+         , (host->tags)?host->tags:""
+         , host->program_name
+         , host->program_version
+         , host->rrd_update_every
+         , rrd_memory_mode_name(host->rrd_memory_mode)
+         , host->rrd_history_entries
+         , host->rrdpush_send_enabled?"enabled":"disabled"
+         , host->rrdpush_send_destination?host->rrdpush_send_destination:""
+         , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
+         , host->health_enabled?"enabled":"disabled"
+         , host->cache_dir
+         , host->varlib_dir
+         , host->health_log_filename
+         , host->health_default_exec
+         , host->health_default_recipient
+    );
+    //}
 
     if (!is_archived)
         rrd_hosts_available++;
