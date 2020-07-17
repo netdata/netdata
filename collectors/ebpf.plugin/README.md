@@ -204,10 +204,10 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 ```
 
 When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
-write `ports = 19999`, Netdata will collect only connections for itself. Except for `maximum dimensions`, 
-all options have a similar behavior.
+write `ports = 19999`, Netdata will collect only connections for itself. The `ports`, `hostnames`, and `ips` settings
+all accept [simple patterns](/libnetdata/simple_pattern/README.md).
 
-In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain) 
+In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
 and 145.
 
 The following options are available:
@@ -215,9 +215,8 @@ The following options are available:
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address. 
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values.
-    
- All options accept accept [simple patterns](/libnetdata/simple_pattern/README.md).   
+    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
+    can be changed with the `ips` setting.
     
 By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
 will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
