@@ -492,8 +492,10 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
     if (ret) {
         netdata_socket_t *sock = &ret->sock;
 
-        sock->sent += lvalues->sent;
-        sock->recv += lvalues->recv;
+        sock->recv_packets += lvalues->recv_packets;
+        sock->sent_packets += lvalues->sent_packets;
+        sock->recv_bytes   += lvalues->recv_bytes;
+        sock->sent_bytes   += lvalues->sent_bytes;
     } else {
         uint32_t curr = out->next;
         uint32_t last = out->last;
@@ -506,8 +508,10 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             }
 
             netdata_socket_t *sock = &w->sock;
-            sock->sent += lvalues->sent;
-            sock->recv += lvalues->recv;
+            sock->recv_packets += lvalues->recv_bytes;
+            sock->sent_packets += lvalues->sent_bytes;
+            sock->recv_bytes   += lvalues->recv_bytes;
+            sock->sent_bytes   += lvalues->sent_bytes;
             return;
         } else {
             memcpy(&w->sock, lvalues, sizeof(*lvalues));
@@ -525,8 +529,9 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 #ifdef NETDATA_INTERNAL_CHECKS
         char iptext[INET6_ADDRSTRLEN];
         if (inet_ntop(family, &w->index.daddr.addr8, iptext, sizeof(iptext)))
-            info("New dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu, RECEIVED = %lu",
-                 curr, iptext, w->resolved_name, w->dimension_recv, w->dimension_sent, w->sock.sent, w->sock.recv);
+            info("New dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu(%lu), RECEIVED = %lu(%lu)",
+                 curr, iptext, w->resolved_name, w->dimension_recv, w->dimension_sent,
+                 w->sock.sent_bytes, w->sock.sent_packets, w->sock.recv_bytes, w->sock.recv_packets);
 #endif
         curr++;
         if (curr > last)
@@ -599,22 +604,25 @@ static void read_socket_hash_table(int fd, int family)
         if (removesock)
             bpf_map_delete_elem(fd, &removeme);
 
-        uint64_t sent,recv;
-        sent = recv = 0;
+        uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
         removesock = 0;
         int i;
         for (i = 1; i < end; i++) {
             netdata_socket_t *w = &values[i];
 
-            sent += w->sent;
-            recv += w->recv;
+            precv += w->recv_packets;
+            psent += w->sent_packets;
+            brecv += w->recv_bytes;
+            bsent += w->sent_bytes;
 
             removesock += (int)w->removeme;
         }
 
-        values[0].recv += recv;
-        values[0].sent += sent;
-        values[0].removeme += removesock;
+        values[0].recv_packets += brecv;
+        values[0].sent_packets += bsent;
+        values[0].recv_bytes   += brecv;
+        values[0].sent_bytes   += bsent;
+        values[0].removeme     += removesock;
 
         netdata_vector_plot_t *table = select_vector_to_store(&key, family);
         store_socket_inside_avl(table, values, &key, family);

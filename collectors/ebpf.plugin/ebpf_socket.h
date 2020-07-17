@@ -140,14 +140,16 @@ extern ebpf_network_viewer_options_t network_viewer_opt;
  * Structure to store socket information
  */
 typedef struct netdata_socket {
-    uint64_t recv;         //Bytes received
-    uint64_t sent;         //Bytes sent
-    uint64_t first;        //First timestamp
-    uint64_t ct;           //Current timestamp
-    uint16_t retransmit;   //It is never used with UDP
-    uint8_t  protocol;      //Should this to be in the index?
-    uint8_t  removeme;      //Flag to remove a socket
-    uint32_t reserved;     //Alignment
+    uint64_t recv_packets;
+    uint64_t sent_packets;
+    uint64_t recv_bytes;
+    uint64_t sent_bytes;
+    uint64_t first; //First timestamp
+    uint64_t ct;   //Current timestamp
+    uint16_t retransmit; //It is never used with UDP
+    uint8_t protocol; //Should this to be in the index?
+    uint8_t removeme;
+    uint32_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
 /**
