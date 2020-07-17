@@ -1303,7 +1303,8 @@ static void parse_network_viewer_section()
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
     link_hostnames(value);
 
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "ips", NULL);
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
+                          "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7");
     parse_ips(value);
 }
 
