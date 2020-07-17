@@ -10,6 +10,14 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
+struct rrdengine_instance *get_multihost_db_ctx(RRDSET *st)
+{
+    struct rrdengine_instance *ctx = st->rrdhost->rrdeng_ctx;
+    if (ctx == NULL && st->rrdhost != localhost)
+        ctx = localhost->rrdeng_ctx;
+    return ctx;
+}
+
 /* This UUID is not unique across hosts */
 void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret_uuid)
 {
@@ -53,10 +61,14 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     struct pg_cache_page_index *page_index = NULL;
     int replace_instead_of_generate = 0;
 
-    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
-    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-        ctx = localhost->rrdeng_ctx;
-
+//    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+//        ctx = localhost->rrdeng_ctx;
+    ctx = get_multihost_db_ctx(rd->rrdset);
+    if (unlikely(!ctx)) {
+        error("Failed to fetch multidb context");
+        return;
+    }
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
@@ -135,9 +147,10 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
 
-    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
-    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-        ctx = localhost->rrdeng_ctx;
+//    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+//        ctx = localhost->rrdeng_ctx;
+    ctx = get_multihost_db_ctx(rd->rrdset);
     handle = &rd->state->handle.rrdeng;
     handle->ctx = ctx;
 
@@ -176,8 +189,6 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
-    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-            ctx = localhost->rrdeng_ctx;
     if (unlikely(!ctx))
         return;
     descr = handle->descr;
@@ -230,8 +241,8 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
-    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-        ctx = localhost->rrdeng_ctx;
+//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+//        ctx = localhost->rrdeng_ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
 
@@ -315,8 +326,8 @@ int rrdeng_store_metric_finalize(RRDDIM *rd)
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
-    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-        ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+//        ctx = rd->rrdset->rrdhost->rrdeng_ctx;
     page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
     if (handle->prev_descr) {
@@ -383,9 +394,10 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     struct rrdeng_region_info *region_info_array;
     uint8_t is_first_region_initialized;
 
-    ctx = st->rrdhost->rrdeng_ctx;
-    if (ctx == NULL && st->rrdhost != localhost)
-        ctx = localhost->rrdeng_ctx;
+//    ctx = st->rrdhost->rrdeng_ctx;
+//    if (ctx == NULL && st->rrdhost != localhost)
+//        ctx = localhost->rrdeng_ctx;
+    ctx = get_multihost_db_ctx(st);
     regions = 1;
     *max_intervalp = max_interval = 0;
     region_info_array = NULL;
@@ -547,9 +559,10 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     struct rrdengine_instance *ctx;
     unsigned pages_nr;
 
-    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
-    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-        ctx = localhost->rrdeng_ctx;
+//    ctx = rd->rrdset->rrdhost->rrdeng_ctx;
+//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
+//        ctx = localhost->rrdeng_ctx;
+    ctx = get_multihost_db_ctx(rd->rrdset);
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
     handle = &rrdimm_handle->rrdeng;
