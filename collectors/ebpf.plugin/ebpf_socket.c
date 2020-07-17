@@ -27,24 +27,10 @@ static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 
-<<<<<<< HEAD
-=======
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = (REMOVE_THIS_DEFAULT - 1) };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = (REMOVE_THIS_DEFAULT -1 ) };
 netdata_socket_t *socket_values;
 
-
-#ifndef STATIC
-/**
- * Pointers used when collector is dynamically linked
- */
-
-//Libbpf (It is necessary to have at least kernel 4.10)
-static int (*bpf_map_lookup_elem)(int, const void *, void *);
-static int (*bpf_map_delete_elem)(int fd, const void *key);
-static int (*bpf_map_get_next_key)(int fd, const void *key, void *next_key);
-
->>>>>>> 561d2baf... ebpf_read_socket: Auxiliar functions to read the information from socket
 static int *map_fd = NULL;
 
 /*****************************************************************
@@ -431,14 +417,13 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
     if (is_last) {
         char *other = { "Other" };
-        strncpy(hostname, other, 4);
-        hostname[4] = '\0';
-        strncpy(service_name, other, 4);
-        service_name[4] = '\0';
+        //We are also copying the NULL bytes to avoid warnings in new compilers
+        strncpy(hostname, other, 6);
+        strncpy(service_name, other, 6);
 
         ptr->family = AF_INET;
 
-        fill_resolved_name(ptr, hostname,  8 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
+        fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
         goto laststep;
     }
 
@@ -458,8 +443,7 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
                          sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
-                memcpy(hostname, errname, 12);
-                hostname[12] = '\0';
+                strncpy(hostname, errname, 13);
             }
         }
     } else { //IPV6
@@ -473,8 +457,7 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
                         sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
-                memcpy(hostname, errname, 12);
-                hostname[12] = '\0';
+                strncpy(hostname, errname, 13);
             }
         }
     }
@@ -682,13 +665,8 @@ static void read_hash_global_tables()
     netdata_idx_t res[NETDATA_SOCKET_COUNTER];
 
     netdata_idx_t *val = socket_hash_values;
-<<<<<<< HEAD
-    int fd = map_fd[4];
-    for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
-=======
     int fd = map_fd[NETDATA_SOCKET_GLOBAL_HASH_TABLE];
     for (idx = 0; idx < NETDATA_SOCKET_COUNTER ; idx++) {
->>>>>>> 561d2baf... ebpf_read_socket: Auxiliar functions to read the information from socket
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
             int i;
@@ -957,15 +935,11 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-<<<<<<< HEAD
-    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
-=======
     bandwidth_vector = callocz((size_t) ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
     socket_values = callocz((size_t) ebpf_nprocs, sizeof(netdata_socket_t));
     inbound_vectors.plot = callocz(REMOVE_THIS_DEFAULT, sizeof(netdata_socket_plot_t));
     outbound_vectors.plot = callocz(REMOVE_THIS_DEFAULT, sizeof(netdata_socket_plot_t));
->>>>>>> 561d2baf... ebpf_read_socket: Auxiliar functions to read the information from socket
 }
 
 void change_socket_event()
@@ -979,22 +953,9 @@ void change_socket_event()
 /**
  * Set local function pointers, this function will never be compiled with static libraries
  */
-<<<<<<< HEAD
 static void set_local_pointers(ebpf_module_t *em)
 {
     map_fd = socket_data.map_fd;
-=======
-static void set_local_pointers(ebpf_module_t *em) {
-#ifndef STATIC
-    bpf_map_lookup_elem = socket_functions.bpf_map_lookup_elem;
-    (void) bpf_map_lookup_elem;
-    bpf_map_delete_elem = socket_functions.bpf_map_delete_elem;
-    (void) bpf_map_delete_elem;
-    bpf_map_get_next_key = socket_functions.bpf_map_get_next_key;
-    (void) bpf_map_get_next_key;
-#endif
-    map_fd = socket_functions.map_fd;
->>>>>>> 561d2baf... ebpf_read_socket: Auxiliar functions to read the information from socket
 
     if (em->mode == MODE_ENTRY) {
         change_socket_event();
