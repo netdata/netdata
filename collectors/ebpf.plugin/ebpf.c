@@ -126,17 +126,36 @@ ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_p
  *****************************************************************/
 
 /**
- * Clean IP Structure
+ * Clean port Structure
  *
  * Clean the allocated list.
  *
  * @param clean the list that will be cleaned
  */
-static void clean_ip_structure(ebpf_network_viewer_port_list_t **clean)
+static void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
 {
     ebpf_network_viewer_port_list_t *move = *clean;
     while (move) {
         ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Clean IP structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
+{
+    ebpf_network_viewer_ip_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_ip_list_t *next = move->next;
         freez(move);
 
         move = next;
@@ -733,7 +752,7 @@ static void parse_port_list(void **out, char *range)
         first = 1;
         last = 65535;
 
-        clean_ip_structure(list);
+        clean_port_structure(list);
         goto fillenvpl;
     }
 
@@ -901,11 +920,15 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
     if (in->ver == AF_INET) {
         if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
             inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
-            info("Adding values %s - %s to IP list used on network viewer", first, last);
+            info("Adding values %s - %s to %s IP list used on network viewer",
+                 first, last,
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
             inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
-            info("Adding values %s - %s to IP list used on network viewer", first, last);
+            info("Adding values %s - %s to %s IP list used on network viewer",
+                 first, last,
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
     }
 #endif
 }
@@ -959,21 +982,36 @@ static void parse_ip_list(void **out, char *ip)
 {
     ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
 
+    char *ipdup = strdupz(ip);
+    union netdata_ip_t first = { };
+    union netdata_ip_t last = { };
+    char *is_ipv6;
+    if (*ip == '*' && *(ip+1) == '\0') {
+        memset(first.addr8, 0, sizeof(first.addr8));
+        memset(last.addr8, 0xFF, sizeof(last.addr8));
+
+        is_ipv6 = ip;
+
+        clean_ip_structure(list);
+        goto storethisip;
+    }
+
     char *end = ip;
     //Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-') end++;
 
     //We will use only the classic IPV6 for while, but we could consider the base 85 in a near future
     //https://tools.ietf.org/html/rfc1924
-    char *is_ipv6 = strchr(ip, ':');
+    is_ipv6 = strchr(ip, ':');
 
-    union netdata_ip_t first;
-    union netdata_ip_t last = { };
-    char *ipdup = strdupz(ip);
     int select;
     if (*end && !is_ipv6) { //IPV4 range
         select = (*end == '/') ? 0 : 1;
         *end++ = '\0';
+        if (*end == '!') {
+            info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+            goto cleanipdup;
+        }
 
         if (!select) { //CIDR
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
@@ -1014,6 +1052,10 @@ static void parse_ip_list(void **out, char *ip)
             memcpy(last.addr8, first.addr8, sizeof(first.addr8));
         } else if (*end == '-') {
             *end++ = 0x00;
+            if (*end == '!') {
+                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                goto cleanipdup;
+            }
 
             select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
             if (select)
@@ -1024,6 +1066,11 @@ static void parse_ip_list(void **out, char *ip)
                 goto cleanipdup;
         } else { //CIDR
             *end++ = 0x00;
+            if (*end == '!') {
+                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                goto cleanipdup;
+            }
+
             select = str2i(end);
             if (select < 0 || select > 128) {
                 info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
@@ -1053,7 +1100,10 @@ static void parse_ip_list(void **out, char *ip)
         memcpy(last.addr8, first.addr8, sizeof(first.addr8));
     }
 
-    ebpf_network_viewer_ip_list_t *store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
+    ebpf_network_viewer_ip_list_t *store;
+
+storethisip:
+    store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
     store->value = ipdup;
     store->hash = simple_hash(ipdup);
     store->ver = (uint8_t)(!is_ipv6)?AF_INET:AF_INET6;
@@ -1066,6 +1116,49 @@ static void parse_ip_list(void **out, char *ip)
 cleanipdup:
     freez(ipdup);
 }
+
+/**
+ * Parse IP Range
+ *
+ * Parse the IP ranges given and create Network Viewer IP Structure
+ *
+ * @param ptr  is a pointer with the text to parse.
+ */
+static void parse_ips(char *ptr)
+{
+    //No value
+    if (unlikely(!ptr))
+        return;
+
+    while (likely(ptr)) {
+        //Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        //No valid value found
+        if (unlikely(!*ptr))
+            return;
+
+        //Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isascii(*ptr)) { //Parse port
+            parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:(void **)&network_viewer_opt.excluded_ips,
+                            ptr);
+        }
+
+        ptr = end;
+    }
+}
+
 
 /**
  * Parse Port Range
@@ -1210,13 +1303,8 @@ static void parse_network_viewer_section()
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
     link_hostnames(value);
 
-    /*
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "ips", NULL);
-    parse_ips((void **)&network_viewer_opt.included_ips, value, isascii, parse_ip_list);
-
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "excluded ips", NULL);
-    parse_ips((void **)&network_viewer_opt.excluded_ips, value, isascii, parse_ip_list);
-     */
+    parse_ips(value);
 }
 
 /**
