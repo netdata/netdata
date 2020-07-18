@@ -382,7 +382,6 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->health_default_exec
          , host->health_default_recipient
     );
-    //}
 
     if (!is_archived)
         rrd_hosts_available++;
