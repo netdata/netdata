@@ -341,27 +341,34 @@ static int compare_sockets(void *a, void *b)
  * @param dimname       the output vector
  * @param hostname      the hostname for the socket.
  * @param service_name  the service used to connect.
- * @param is_inbound    is this an inbound connection.
+ * @param proto         the protocol used in this connection
  * @param family        is this IPV4(AF_INET) or IPV6(AF_INET6)
  *
  * @return  it returns the size of the data copied on success and -1 otherwise.
  */
-static inline int build_dimension_name(char *dimname, char *hostname, char *service_name,
-                                       int is_inbound, netdata_socket_t *sock, int family)
+static inline int build_inbound_dimension_name(char *dimname, char *hostname, char *service_name,
+                                               char *proto, int family)
 {
-    int size;
-    if (!is_inbound) {
-        size = snprintf(dimname, CONFIG_MAX_NAME - 1, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
-                        service_name, (sock->protocol == IPPROTO_UDP) ? "UDP" : "TCP",
-                        hostname);
+    return snprintf(dimname, CONFIG_MAX_NAME - 1, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
+                    service_name, proto,
+                    hostname);
+}
 
-    } else {
-        size = snprintf(dimname, CONFIG_MAX_NAME -1, "%s:%s_", service_name,
-                        (sock->protocol == IPPROTO_UDP)?"UDP":"TCP");
-
-    }
-
-    return size;
+/**
+ * Fill Outbound dimension name
+ *
+ * Mount the dimension name with the input given
+ *
+ * @param dimname       the output vector
+ * @param service_name  the service used to connect.
+ * @param proto         the protocol used in this connection
+ *
+ * @return  it returns the size of the data copied on success and -1 otherwise.
+ */
+static inline int build_outbound_dimension_name(char *dimname, char *service_name, char *proto)
+{
+    return snprintf(dimname, CONFIG_MAX_NAME -1, "%s:%s_", service_name,
+                    proto);
 }
 
 /**
@@ -384,12 +391,18 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     else {
         length = NETDATA_MAX_NETWORK_COMBINED_LENGTH;
         ptr->resolved_name = mallocz(NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL + 1);
-        memcpy(ptr->resolved_name, hostname, NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL);
+        memcpy(ptr->resolved_name, hostname, length);
         ptr->resolved_name[length] = '\0';
     }
 
     char dimname[CONFIG_MAX_NAME];
-    int size = build_dimension_name(dimname, hostname, service_name, is_inbound, &ptr->sock, ptr->family);
+    int size;
+    char *protocol = (ptr->sock.protocol == IPPROTO_UDP) ? "UDP" : "TCP";
+    if (is_inbound)
+        size = build_inbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
+    else
+        size = build_outbound_dimension_name(dimname,service_name, protocol);
+
     if (size > 0) {
         strcpy(&dimname[size], "sent");
         dimname[size + 4] = '\0';
@@ -445,6 +458,8 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
             if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
+
+            snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr.sin_port));
         }
     } else { //IPV6
         struct sockaddr_in6 myaddr6;
@@ -452,13 +467,14 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
         myaddr6.sin6_family = AF_INET6;
         myaddr6.sin6_port =  idx->dport;
-        memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr32:idx->saddr.addr32, sizeof(union netdata_ip_t));
+        memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
         if (getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                         sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
+            snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr6.sin6_port));
         }
     }
 
@@ -508,8 +524,8 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             }
 
             netdata_socket_t *sock = &w->sock;
-            sock->recv_packets += lvalues->recv_bytes;
-            sock->sent_packets += lvalues->sent_bytes;
+            sock->recv_packets += lvalues->recv_packets;
+            sock->sent_packets += lvalues->sent_packets;
             sock->recv_bytes   += lvalues->recv_bytes;
             sock->sent_bytes   += lvalues->sent_bytes;
             return;
@@ -529,9 +545,10 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 #ifdef NETDATA_INTERNAL_CHECKS
         char iptext[INET6_ADDRSTRLEN];
         if (inet_ntop(family, &w->index.daddr.addr8, iptext, sizeof(iptext)))
-            info("New dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu(%lu), RECEIVED = %lu(%lu)",
-                 curr, iptext, w->resolved_name, w->dimension_recv, w->dimension_sent,
-                 w->sock.sent_bytes, w->sock.sent_packets, w->sock.recv_bytes, w->sock.recv_packets);
+            info("New %s dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu(%lu), RECV = %lu(%lu)",
+                 (out == &inbound_vectors)?"inbound":"outbound", curr, iptext, w->resolved_name,
+                 w->dimension_recv, w->dimension_sent, w->sock.sent_bytes, w->sock.sent_packets,
+                 w->sock.recv_bytes, w->sock.recv_packets);
 #endif
         curr++;
         if (curr > last)
@@ -618,8 +635,8 @@ static void read_socket_hash_table(int fd, int family)
             removesock += (int)w->removeme;
         }
 
-        values[0].recv_packets += brecv;
-        values[0].sent_packets += bsent;
+        values[0].recv_packets += precv;
+        values[0].sent_packets += psent;
         values[0].recv_bytes   += brecv;
         values[0].sent_bytes   += bsent;
         values[0].removeme     += removesock;
