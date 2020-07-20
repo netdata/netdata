@@ -59,6 +59,7 @@ dist_noinst_DATA = \
     netdata.spec \
     package.json \
     docs \
+    libnetdata/ebpf/libbpf.c.diff \
     packaging/version \
     packaging/dashboard.version \
     packaging/dashboard.checksums \
