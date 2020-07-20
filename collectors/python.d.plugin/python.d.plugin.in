@@ -94,6 +94,7 @@ def dirs():
     )
     locks = os.getenv(
         ENV_NETDATA_LOCKS_DIR,
+        # TODO: add '@locksdir_POST@
     )
     modules_user_config = os.path.join(plugin_user_config, 'python.d')
     modules_stock_config = os.path.join(plugin_stock_config, 'python.d')
