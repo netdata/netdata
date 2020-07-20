@@ -12,16 +12,6 @@ if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
 fi
 
 echo "Netdata entrypoint script starting"
-if [ ${RESCRAMBLE+x} ] && [ "$(uname -m)" == "x86_64" ]; then
-  echo "Injecting packages from Polymorphic Linux"
-  apk update && apk upgrade
-  curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io
-  # shellcheck disable=SC2181
-  if [ $? -eq 0 ]; then
-    apk update && apk upgrade --available --no-cache && sed -in 's/^#//g' /etc/apk/repositories
-  fi
-fi
-
 if [ -n "${PGID}" ]; then
   echo "Creating docker group ${PGID}"
   addgroup -g "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
