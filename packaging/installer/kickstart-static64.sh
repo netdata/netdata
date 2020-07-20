@@ -4,12 +4,13 @@
 # shellcheck disable=SC1117,SC2039,SC2059,SC2086
 #
 #  Options to run
-#  --dont-wait              do not wait for input
-#  --non-interactive        do not wait for input
-#  --dont-start-it          do not start netdata after install
-#  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
-#  --disable-telemetry      Opt-out of anonymous telemetry program (DO_NOT_TRACK=1)
-#  --local-files            Use a manually provided tarball for the installation
+#  --dont-wait                do not wait for input
+#  --non-interactive          do not wait for input
+#  --dont-start-it            do not start netdata after install
+#  --stable-channel           Use the stable release channel, rather than the nightly to fetch sources
+#  --disable-telemetry        Opt-out of anonymous telemetry program (DO_NOT_TRACK=1)
+#  --local-files              Use a manually provided tarball for the installation
+#  --allow-duplicate-install  do not bail if we detect a duplicate install
 #
 # Environment options:
 #
@@ -179,6 +180,52 @@ sudo=""
 [ -z "${UID}" ] && UID="$(id -u)"
 [ "${UID}" -ne "0" ] && sudo="sudo"
 
+# ---------------------------------------------------------------------------------------------------------------------
+# look for an existing install and try to update that instead if it exists
+
+ndpath="$(command -v netdata 2>/dev/null)"
+if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
+    ndpath="/opt/netdata/bin/netdata"
+fi
+
+if [ -n "$ndpath" ] ; then
+  ndprefix="$(dirname "$(dirname "${ndpath}")")"
+
+  if [ "${ndprefix}" = /usr ] ; then
+    ndprefix="/"
+  fi
+
+  progress "Found existing install of Netdata under: ${ndprefix}"
+
+  if [ -r "${ndprefix}/etc/netdata/.environment" ] ; then
+    if [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
+      progress "Attempting to update existing install instead of creating a new one"
+      if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
+        progress "Updated existing install at ${ndpath}"
+        exit 0
+      else
+        fatal "Failed to update existing Netdata install"
+        exit 1
+      fi
+    else
+      if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+        fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
+        exit 1
+      else
+        progress "User explicitly requested duplicate install, proceeding."
+      fi
+    fi
+  else
+    progress "Existing install appears to be handled manually or through the system package manager."
+    if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+      fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
+      exit 1
+    else
+      progress "User explicitly requested duplicate install, proceeding."
+    fi
+  fi
+fi
+
 # ----------------------------------------------------------------------------
 if [ "$(uname -m)" != "x86_64" ]; then
   fatal "Static binary versions of netdata are available only for 64bit Intel/AMD CPUs (x86_64), but yours is: $(uname -m)."
@@ -227,6 +274,9 @@ while [ -n "${1}" ]; do
     fi
 
     NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
+    shift 1
+  elif [ "${1}" = "--allow-duplicate-install" ]; then
+    NETDATA_ALLOW_DUPLICATE_INSTALL=1
     shift 1
   else
     echo >&2 "Unknown option '${1}' or invalid number of arguments. Please check the README for the available arguments of ${0} and try again"
