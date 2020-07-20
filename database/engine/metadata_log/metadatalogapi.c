@@ -399,9 +399,8 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
 
     rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
     if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
-        uuid_t multihost_uuid;
-
         // TODO: Check what to do since we have no host
+        // uuid_t multihost_uuid;
         //rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->host->machine_guid, metric_uuid, &multihost_uuid);
         //rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
     }

@@ -316,7 +316,10 @@ RRDHOST *rrdhost_create(const char *hostname,
                 error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
             else {
                 if (!is_localhost || init_multihost) {
-                    ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+                    if (init_multihost)
+                        ret = rrdeng_init(host, &multidb_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+                    else
+                        ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
                     if (ret) {
                         error(
                             "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
@@ -642,7 +645,12 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     {
         char dbenginepath[FILENAME_MAX + 1];
         snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
-        rrdeng_init(NULL, &multidb_ctx, dbenginepath, default_rrdeng_page_cache_mb, default_rrdeng_disk_quota_mb);
+
+        uv_fs_t stat_req;
+        int rc = uv_fs_stat(NULL, &stat_req, dbenginepath, NULL);
+        if (likely(rc == 0 && ((stat_req.statbuf.st_mode & S_IFMT) == S_IFDIR))) {
+            rrdeng_init(NULL, &multidb_ctx, dbenginepath, default_rrdeng_page_cache_mb, default_rrdeng_disk_quota_mb);
+        }
     }
 #endif
 
