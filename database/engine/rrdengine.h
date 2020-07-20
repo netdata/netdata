@@ -176,7 +176,6 @@ extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of dele
 #define QUIESCED    (2) /* is set after all threads have finished running */
 
 struct rrdengine_instance {
-    RRDHOST *host;
     struct metalog_instance *metalog_ctx;
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;

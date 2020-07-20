@@ -3,6 +3,7 @@
 
 /* Default global database instance */
 static struct rrdengine_instance default_global_ctx;
+struct rrdengine_instance *multidb_ctx = NULL;
 
 int default_rrdeng_page_cache_mb = 32;
 int default_rrdeng_disk_quota_mb = 256;
@@ -13,8 +14,8 @@ uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 struct rrdengine_instance *get_multihost_db_ctx(RRDSET *st)
 {
     struct rrdengine_instance *ctx = st->rrdhost->rrdeng_ctx;
-    if (ctx == NULL && st->rrdhost != localhost)
-        ctx = localhost->rrdeng_ctx;
+    if (ctx == NULL)
+        ctx = localhost->rrdeng_ctx ? localhost->rrdeng_ctx : multidb_ctx;
     return ctx;
 }
 
@@ -929,7 +930,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->metric_API_max_producers = 0;
     ctx->quiesce = NO_QUIESCE;
     ctx->metalog_ctx = NULL; /* only set this after the metadata log has finished initializing */
-    ctx->host = host;
+//    ctx->host = host;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->worker_config.ctx = ctx;
@@ -949,16 +950,16 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-    if ((strcmp(host->machine_guid, registry_get_this_machine_guid()) == 0) || (!rrdhost_flag_check(host, RRDHOST_FLAG_MULTIHOST))) {
-        info("Metadatalog init for host %s starting...", host->hostname);
+    //if ((strcmp(host->machine_guid, registry_get_this_machine_guid()) == 0) || (!rrdhost_flag_check(host, RRDHOST_FLAG_MULTIHOST))) {
+        //info("Metadatalog init for host %s starting...", host->hostname);
         error = metalog_init(ctx);
         if (error) {
             error("Failed to initialize metadata log file event loop.");
             goto error_after_rrdeng_worker;
         }
-    }
-    else
-        info("No metadatalog init for host %s", host->hostname);
+    //}
+    //else
+    //    info("No metadatalog init for host %s", host->hostname);
     return 0;
 
 error_after_rrdeng_worker:

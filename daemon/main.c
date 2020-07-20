@@ -42,6 +42,9 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
         rrdhost_free_all();
+#ifdef ENABLE_DBENGINE
+        rrdeng_prepare_exit(multidb_ctx);
+#endif
     }
 
     // unlink the pid

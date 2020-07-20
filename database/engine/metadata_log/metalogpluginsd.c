@@ -188,8 +188,8 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
     GUID_TYPE ret;
-    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
+    //struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
+    //struct metalog_instance *ctx = state->ctx;
     char object[49], chart_object[33], id_str[1024];
     uuid_t *chart_guid, *chart_char_guid;
     RRDHOST *host;
@@ -197,16 +197,16 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {
         case GUID_TYPE_NOTFOUND:
-            if (unlikely(ctx->rrdeng_ctx->host && uuid_compare(ctx->rrdeng_ctx->host->host_uuid, *uuid)))
-                error_with_guid(uuid, "Failed to find valid context");
+            error_with_guid(uuid, "Failed to find valid context");
             break;
         case GUID_TYPE_CHAR:
             error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
             break;
         case GUID_TYPE_CHART:
         case GUID_TYPE_DIMENSION:
-            //host = ctx->rrdeng_ctx->host;
             host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
+            if (unlikely(!host))
+                break;
             switch (ret) {
                 case GUID_TYPE_CHART:
                     chart_char_guid = (uuid_t *)(object + 16);
@@ -238,10 +238,7 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
             }
             break;
         case GUID_TYPE_HOST:
-            /* Ignore for now */
-            error_with_guid(uuid, "Found HOST but ignoring in CONTEXT ACTION");
             ((PARSER_USER_OBJECT *)user)->host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
-            info("Host detected = %s", ((PARSER_USER_OBJECT *)user)->host->hostname);
             break;
         case GUID_TYPE_NOSPACE:
             error_with_guid(uuid, "Not enough space for object retrieval");
@@ -259,7 +256,7 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
     GUID_TYPE ret;
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
     struct metalog_instance *ctx = state->ctx;
-    RRDHOST *host = ctx->rrdeng_ctx->host;
+    RRDHOST *host = NULL;
     RRDSET *st;
     RRDDIM *rd;
 
@@ -269,13 +266,18 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
             fatal_assert(0);
             break;
         case GUID_TYPE_CHART:
-            st = metalog_get_chart_from_uuid(ctx, uuid);
-            if (st) {
-                rrdhost_wrlock(host);
-                rrdset_free(st);
-                rrdhost_unlock(host);
+            host = metalog_get_host_from_uuid(NULL, uuid);
+            if (host) {
+                st = metalog_get_chart_from_uuid(ctx, uuid);
+                if (st) {
+                    rrdhost_wrlock(host);
+                    rrdset_free(st);
+                    rrdhost_unlock(host);
+                } else {
+                    debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
+                }
             } else {
-                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
+                debug(D_METADATALOG, "Ignoring nonexistent host metadata record.");
             }
             break;
         case GUID_TYPE_DIMENSION:

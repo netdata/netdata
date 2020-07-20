@@ -392,7 +392,8 @@ void rrdset_free(RRDSET *st) {
             break;
     }
 #ifdef ENABLE_DBENGINE
-    rrd_atomic_fetch_add(&host->objects_nr, -1);
+    //rrd_atomic_fetch_add(&host->objects_nr, -1);
+    metalog_upd_objcount(host, -1);
 #endif
 
 }
@@ -966,7 +967,8 @@ RRDSET *rrdset_create_custom(
     }
 #endif
 #ifdef ENABLE_DBENGINE
-    rrd_atomic_fetch_add(&st->rrdhost->objects_nr, 1);
+    //rrd_atomic_fetch_add(&st->rrdhost->objects_nr, 1);
+    metalog_upd_objcount(host, 1);
     metalog_commit_update_chart(st);
 #endif
 

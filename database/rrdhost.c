@@ -135,6 +135,8 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
     rrd_check_wrlock();
 
+    int init_multihost = (!is_legacy && !is_localhost && localhost &&
+                     localhost->rrd_memory_mode != memory_mode && memory_mode == RRD_MEMORY_MODE_DBENGINE);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
     host->rrd_update_every    = (update_every > 0)?update_every:1;
@@ -232,9 +234,13 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
         // this is not localhost - append our GUID to localhost path
-
-        snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
-        host->cache_dir = strdupz(filename);
+        if (init_multihost) {
+            host->cache_dir  = strdupz(netdata_configured_cache_dir);
+        }
+        else {
+            snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
+            host->cache_dir = strdupz(filename);
+        }
 
         if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || (
            host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
@@ -298,18 +304,18 @@ RRDHOST *rrdhost_create(const char *hostname,
             error("Failed to store machine GUID to global map");
         else
             info("Added %s to global map for host %s", host->machine_guid, host->hostname);
-        host->objects_nr = 1;
+//        host->objects_nr = 1;
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
-        if (is_localhost || is_legacy) {
+        if (is_localhost || is_legacy || init_multihost) {
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
             ret = mkdir(dbenginepath, 0775);
             if (ret != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
             else {
-                if (!is_localhost) {
+                if (!is_localhost || init_multihost) {
                     ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
                     if (ret) {
                         error(
@@ -617,8 +623,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (unlikely(!localhost))
         return 1;
 
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
+    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
         snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
@@ -631,8 +637,14 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             rrdhost_free(localhost);
             localhost = NULL;
         }
-#endif
     }
+    else
+    {
+        char dbenginepath[FILENAME_MAX + 1];
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
+        rrdeng_init(NULL, &multidb_ctx, dbenginepath, default_rrdeng_page_cache_mb, default_rrdeng_disk_quota_mb);
+    }
+#endif
 
     web_client_api_v1_management_init();
     return localhost==NULL;
