@@ -666,7 +666,7 @@ class Plugin:
                 job.status = JOB_STATUS_DROPPED
                 continue
             except Exception as error:
-                self.log.info('{0}[{1}] : registration failed: {2}, skipping the job'.format(
+                self.log.warning('{0}[{1}] : registration failed: {2}, skipping the job'.format(
                     job.module_name, job.real_name, error))
                 job.status = JOB_STATUS_DROPPED
                 continue
