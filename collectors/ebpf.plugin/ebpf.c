@@ -764,7 +764,7 @@ static void parse_port_list(void **out, char *range)
     if (likely(*end)) {
         *end++ = '\0';
         if (*end == '!') {
-            info("The exclusion cannot be in the second part of the range %s, it will be ignored.", copied);
+            info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
             freez(copied);
             return;
         }
