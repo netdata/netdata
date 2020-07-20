@@ -652,14 +652,6 @@ class Plugin:
             self.log.info('{0}[{1}] : check success'.format(job.module_name, job.real_name))
 
             try:
-                job.create()
-            except Exception as error:
-                self.log.warning("{0}[{1}] : unhandled exception on create : {2}, skipping the job".format(
-                    job.module_name, job.real_name, repr(error)))
-                job.status = JOB_STATUS_DROPPED
-                continue
-
-            try:
                 self.registry.register(job.full_name())
             except filelock.Timeout as error:
                 self.log.info('{0}[{1}] : already registered by another process, skipping the job ({2})'.format(
@@ -670,6 +662,19 @@ class Plugin:
                 self.log.warning('{0}[{1}] : registration failed: {2}, skipping the job'.format(
                     job.module_name, job.real_name, error))
                 job.status = JOB_STATUS_DROPPED
+                continue
+
+            try:
+                job.create()
+            except Exception as error:
+                self.log.warning("{0}[{1}] : unhandled exception on create : {2}, skipping the job".format(
+                    job.module_name, job.real_name, repr(error)))
+                job.status = JOB_STATUS_DROPPED
+                try:
+                    self.registry.unregister(job.full_name())
+                except Exception as error:
+                    self.log.warning('{0}[{1}] : deregistration failed: {2}'.format(
+                        job.module_name, job.real_name, error))
                 continue
 
             self.started_jobs[job.module_name] = job.actual_name
