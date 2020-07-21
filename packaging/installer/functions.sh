@@ -345,6 +345,19 @@ iscontainer() {
   return 1
 }
 
+get_os_key() {
+  if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release || return 1
+    echo "${ID}-${VERSION_ID}"
+
+  elif [ -f /etc/redhat-release ]; then
+    echo "$(< /etc/redhat-release)"
+  else
+    echo "unknown"
+  fi
+}
+
 issystemd() {
   local pids p myns ns systemctl
 
@@ -379,18 +392,31 @@ issystemd() {
   return 1
 }
 
+systemd_unit_dir() {
+  local SYSTEMD_DIRECTORY=""
+  local key
+  key="$(get_os_key)"
+
+  if [ -w "/lib/systemd/system" ]; then
+    SYSTEMD_DIRECTORY="/lib/systemd/system"
+  elif [ -w "/usr/lib/systemd/system" ]; then
+    SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+  elif [ -w "/etc/systemd/system" ]; then
+    SYSTEMD_DIRECTORY="/etc/systemd/system"
+  fi
+
+  if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+    SYSTEMD_DIRECTORY="/etc/systemd/system"
+  fi
+
+  echo "${SYSTEMD_DIRECTORY}"
+}
+
 install_non_systemd_init() {
   [ "${UID}" != 0 ] && return 1
 
-  local key="unknown"
-  if [ -f /etc/os-release ]; then
-    # shellcheck disable=SC1091
-    source /etc/os-release || return 1
-    key="${ID}-${VERSION_ID}"
-
-  elif [ -f /etc/redhat-release ]; then
-    key=$(< /etc/redhat-release)
-  fi
+  local key
+  key="$(get_os_key)"
 
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
     if [[ ${key} =~ ^(gentoo|alpine).* ]]; then
@@ -438,16 +464,6 @@ install_netdata_service() {
   local uname
   uname="$(uname 2> /dev/null)"
 
-  local key="unknown"
-  if [ -f /etc/os-release ]; then
-    # shellcheck disable=SC1091
-    source /etc/os-release || return 1
-    key="${ID}-${VERSION_ID}"
-
-  elif [ -f /etc/redhat-release ]; then
-    key=$(< /etc/redhat-release)
-  fi
-
   if [ "${UID}" -eq 0 ]; then
     if [ "${uname}" = "Darwin" ]; then
 
@@ -486,19 +502,7 @@ install_netdata_service() {
       NETDATA_STOP_CMD="systemctl stop netdata"
       NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
 
-      SYSTEMD_DIRECTORY=""
-
-      if [ -w "/lib/systemd/system" ]; then
-        SYSTEMD_DIRECTORY="/lib/systemd/system"
-      elif [ -w "/usr/lib/systemd/system" ]; then
-        SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
-      elif [ -w "/etc/systemd/system" ]; then
-        SYSTEMD_DIRECTORY="/etc/systemd/system"
-      fi
-
-      if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
-        SYSTEMD_DIRECTORY="/etc/systemd/system"
-      fi
+      SYSTEMD_DIRECTORY="$(systemd_service_path)"
 
       if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
         ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
@@ -898,23 +902,24 @@ safe_sha256sum() {
   fi
 }
 
-_get_crondir() {
+_get_scheduler_type() {
+  if issystemd ; then
+    echo 'systemd'
+  elif _get_intervaldir > /dev/null ; then
+    echo 'interval'
+  elif [ -d /etc/cron.d ] ; then
+    echo 'crontab'
+  else
+    echo 'none'
+  fi
+}
+
+_get_intervaldir() {
   if [ -d /etc/cron.daily ]; then
     echo /etc/cron.daily
   elif [ -d /etc/periodic/daily ]; then
     echo /etc/periodic/daily
   else
-    echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
-    return 1
-  fi
-
-  return 0
-}
-
-_check_crondir_permissions() {
-  if [ "${UID}" -ne "0" ]; then
-    # We cant touch cron if we are not running as root
-    echo >&2 "You need to run the installer as root for auto-updating via cron"
     return 1
   fi
 
@@ -928,6 +933,11 @@ install_netdata_updater() {
 
   if [ "${NETDATA_SOURCE_DIR}" ] && [ -f "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" ]; then
     cat "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
+  fi
+
+  if issystemd && [ -n "$(systemd_service_dir)" ]; then
+    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.timer" > "$(systemd_service_dir)/netdata-updater.timer"
+    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.service" > "$(systemd_service_dir)/netdata-updater.service"
   fi
 
   sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
@@ -945,49 +955,87 @@ cleanup_old_netdata_updater() {
     rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
   fi
 
-  crondir="$(_get_crondir)" || return 1
-  _check_crondir_permissions "${crondir}" || return 1
+  if issystemd && [ -n "$(systemd_service_dir)" ] ; then
+    systemctl disable netdata-updater.timer
+    rm -f "$(systemd_service_dir)/netdata-updater.timer"
+    rm -f "$(systemd_service_dir)/netdata-updater.service"
+  fi
 
-  if [ -f "${crondir}/netdata-updater.sh" ]; then
-    echo >&2 "Removing incorrect netdata-updater filename in cron"
-    rm -f "${crondir}/netdata-updater.sh"
+  if [ -d /etc/cron.daily ]; then
+    rm -f /etc/cron.daily/netdata-updater.sh
+    rm -f /etc/cron.daily/netdata-updater
+  fi
+
+  if [ -d /etc/periodic/daily ]; then
+    rm -f /etc/periodic/daily/netdata-updater.sh
+    rm -f /etc/periodic/daily/netdata-updater
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    rm -f /etc/cron.d/netdata
   fi
 
   return 0
 }
 
 enable_netdata_updater() {
-  crondir="$(_get_crondir)" || return 1
-  _check_crondir_permissions "${crondir}" || return 1
+  case "$(_get_scheduler_type)" in
+    "systemd")
+      systemctl enable netdata-updater.timer
 
-  echo >&2 "Adding to cron"
+      echo >&2 "Auto-updating has been enabled using a systemd timer unit."
+      echo >&2
+      echo >&2 "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
+      echo >&2 "Successful updates should produce empty logs."
+      echo >&2
+      ;;
+    "interval")
+      ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_interval_dir)/netdata-updater"
 
-  rm -f "${crondir}/netdata-updater"
-  ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "${crondir}/netdata-updater"
+      echo >&2 "Auto-updating has been enabled through cron, updater script linked to ${TPUT_RED}${TPUT_BOLD}$(_get_interval_dir)/netdata-updater${TPUT_RESET}"
+      echo >&2
+      echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
+      echo >&2 "Successful updates will not send an email."
+      echo >&2
+      ;;
+    "crontab")
+      cat "${NETDATA_SOURCE_DIR}/system/netdata.crontab" > "/etc/cron.d/netdata"
 
-  echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
-  echo >&2
-  echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
-  echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
-  echo >&2
+      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata${TPUT_RESET}"
+      echo >&2
+      echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
+      echo >&2 "Successful updates will not send an email."
+      echo >&2
+      ;;
+    *)
+      echo >&2 "Unable to determine what type of auto-update scheduling to use, not enabling auto-updates."
+      echo >&2
+      return 1
+  esac
 
   return 0
 }
 
 disable_netdata_updater() {
-  crondir="$(_get_crondir)" || return 1
-  _check_crondir_permissions "${crondir}" || return 1
-
   echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
   echo >&2
 
-  if [ -f "${crondir}/netdata-updater" ]; then
-    echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
-    echo >&2
-    rm -f "${crondir}/netdata-updater"
-  else
-    echo >&2 "Did not find any cron entries to remove"
-    echo >&2
+  if issystemd && [ -n "$(systemd_service_dir)" ] ; then
+    systemctl disable netdata-updater.timer
+  fi
+
+  if [ -d /etc/cron.daily ]; then
+    rm -f /etc/cron.daily/netdata-updater.sh
+    rm -f /etc/cron.daily/netdata-updater
+  fi
+
+  if [ -d /etc/periodic/daily ]; then
+    rm -f /etc/periodic/daily/netdata-updater.sh
+    rm -f /etc/periodic/daily/netdata-updater
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    rm -f /etc/cron.d/netdata
   fi
 
   return 0
