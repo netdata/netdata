@@ -1046,7 +1046,7 @@ static void get_ipv6_first_addr(union netdata_ip_t *out, union netdata_ip_t *in,
         return;
     } else if (!prefix) {
         ret[0] = ret[1] = 0;
-        memcpy(in->addr32, ret, sizeof(union netdata_ip_t));
+        memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
         return;
     } else if (prefix <= 64) {
         ret[1] = 0ULL;
