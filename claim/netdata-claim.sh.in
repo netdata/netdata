@@ -146,7 +146,7 @@ if [ -r "${MACHINE_GUID_FILE}" ]; then
         ID="$(cat "${MACHINE_GUID_FILE}")"
         MGUID=$ID
 else
-        echo >&2 "netdata.public.unique.id is not generated yet. Please run agent at least once before attempting to claim. Agent generates this file on first startup."
+        echo >&2 "netdata.public.unique.id is not generated yet or not readable. Please run agent at least once before attempting to claim. Agent generates this file on first startup. If the ID is generated already make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
         exit 18
 fi
 
