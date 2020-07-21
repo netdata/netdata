@@ -888,7 +888,7 @@ static inline in_addr_t broadcast(in_addr_t addr, int prefix)
  *
  * @return It returns the first address of the range.
  */
-static inline in_addr_t network(in_addr_t addr, int prefix)
+static inline in_addr_t ipv4_network(in_addr_t addr, int prefix)
 {
     return (addr & netmask(prefix));
 }
@@ -1005,15 +1005,10 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
         memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
         return;
     } else if (!prefix) {
-        ret[0] = ret[1] = 0;
-        memcpy(in->addr32, ret, sizeof(union netdata_ip_t));
-
         ret[0] = ret[1] = 0xFFFFFFFFFFFFFFFF;
         memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
         return;
-    }
-
-    if (prefix <= 64) {
+    } else if (prefix <= 64) {
         ret[1] = 0xFFFFFFFFFFFFFFFFULL;
 
         tmp = be64toh(ret[0]);
@@ -1026,6 +1021,46 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
         mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
         tmp = be64toh(ret[1]);
         tmp |= ~mask;
+        ret[1] = htobe64(tmp);
+    }
+
+    memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+}
+
+/**
+ * Calculate ipv6 first address
+ *
+ * @param out the address to store the first address.
+ * @param in the address used to do the math.
+ * @param prefix number of bits used to calculate the address
+ */
+static void get_ipv6_first_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
+{
+    uint64_t mask,tmp;
+    uint64_t ret[2];
+
+    memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
+
+    if (prefix == 128) {
+        memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
+        return;
+    } else if (!prefix) {
+        ret[0] = ret[1] = 0;
+        memcpy(in->addr32, ret, sizeof(union netdata_ip_t));
+        return;
+    } else if (prefix <= 64) {
+        ret[1] = 0ULL;
+
+        tmp = be64toh(ret[0]);
+        if (prefix > 0) {
+            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+            tmp &= mask;
+        }
+        ret[0] = htobe64(tmp);
+    } else {
+        mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
+        tmp = be64toh(ret[1]);
+        tmp &= mask;
         ret[1] = htobe64(tmp);
     }
 
@@ -1090,14 +1125,14 @@ static void parse_ip_list(void **out, char *ip)
             //This was added to remove https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
             UNUSED(last.addr32[0]);
 
-            uint32_t test = htonl(network(ntohl(first.addr32[0]), select));
-            if (first.addr32[0] != test) {
-                first.addr32[0] = test;
-                struct in_addr convert;
-                convert.s_addr = test;
-                char ip_msg[INET_ADDRSTRLEN];
-                if(inet_ntop(AF_INET, &convert, ip_msg, INET_ADDRSTRLEN))
-                    info("The network value of CIDR %s was updated for %s .", ipdup, ip_msg);
+            uint32_t ipv4_test = htonl(ipv4_network(ntohl(first.addr32[0]), select));
+            if (first.addr32[0] != ipv4_test) {
+                first.addr32[0] = ipv4_test;
+                struct in_addr ipv4_convert;
+                ipv4_convert.s_addr = ipv4_test;
+                char ipv4_msg[INET_ADDRSTRLEN];
+                if(inet_ntop(AF_INET, &ipv4_convert, ipv4_msg, INET_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
             }
         } else { //Range
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
@@ -1154,6 +1189,20 @@ static void parse_ip_list(void **out, char *ip)
                 goto cleanipdup;
 
             get_ipv6_last_addr(&last, &first, prefix);
+
+            union netdata_ip_t ipv6_test;
+            get_ipv6_first_addr(&ipv6_test, &first, prefix);
+
+            if (memcmp(first.addr8, ipv6_test.addr8, sizeof(union netdata_ip_t)) != 0) {
+                memcpy(first.addr8, ipv6_test.addr8, sizeof(union netdata_ip_t));
+
+                struct in6_addr ipv6_convert;
+                memcpy(ipv6_convert.s6_addr,  ipv6_test.addr8, sizeof(union netdata_ip_t));
+
+                char ipv6_msg[INET6_ADDRSTRLEN];
+                if(inet_ntop(AF_INET6, &ipv6_convert, ipv6_msg, INET6_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv6_msg);
+            }
         }
 
         if ((be64toh(*(uint64_t *)&first.addr32[2]) > be64toh(*(uint64_t *)&last.addr32[2]) &&
