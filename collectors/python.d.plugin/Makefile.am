@@ -141,6 +141,7 @@ dist_third_party_DATA = \
     python_modules/third_party/mcrcon.py \
     python_modules/third_party/boinc_client.py \
     python_modules/third_party/monotonic.py \
+    python_modules/third_party/filelock.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
