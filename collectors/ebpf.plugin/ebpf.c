@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 
 #include "ebpf.h"
+#include "ebpf_socket.h"
 
 /*****************************************************************
  *
@@ -114,11 +115,53 @@ ebpf_module_t ebpf_modules[] = {
 pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
+//Network viewer
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL,
+                                                     .names = NULL };
+
 /*****************************************************************
  *
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
  *
  *****************************************************************/
+
+/**
+ * Clean port Structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+{
+    ebpf_network_viewer_port_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Clean IP structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
+{
+    ebpf_network_viewer_ip_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_ip_list_t *next = move->next;
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
 
 static void change_events()
 {
@@ -654,6 +697,817 @@ static inline int parse_disable_apps(char *ptr)
 }
 
 /**
+ * Fill Port list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_port_list_t *move = *out, *store = *out;
+        uint16_t first = ntohs(in->first);
+        uint16_t last = ntohs(in->last);
+        while (move) {
+            uint16_t cmp_first = ntohs(move->first);
+            uint16_t cmp_last = ntohs(move->last);
+            if (cmp_first <= first && first <= cmp_last  &&
+                cmp_first <= last && last <= cmp_last ) {
+                info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
+                     first, last, cmp_first, cmp_last);
+                freez(in->value);
+                freez(in);
+                return;
+            } else if (first <= cmp_first && cmp_first <= last  &&
+                       first <= cmp_last && cmp_last <= last) {
+                info("The range (%u, %u) is bigger than previous range (%u, %u) already inserted, the previous will be ignored.",
+                     first, last, cmp_first, cmp_last);
+                freez(move->value);
+                move->value = in->value;
+                move->first = in->first;
+                move->last = in->last;
+                freez(in);
+                return;
+            }
+
+            store = move;
+            move = move->next;
+        }
+
+        store->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding values %s( %u, %u) to %s port list used on network viewer",
+         in->value, ntohs(in->first), ntohs(in->last),
+         (*out == network_viewer_opt.included_port)?"included":"excluded");
+#endif
+}
+
+/**
+ * Fill port list
+ *
+ * Fill an allocated port list with the range given
+ *
+ * @param out a pointer to store the link list
+ * @param range the informed range for the user.
+ */
+static void parse_port_list(void **out, char *range)
+{
+    int first, last;
+    ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+
+    char *copied = strdupz(range);
+    if (*range == '*' && *(range+1) == '\0') {
+        first = 1;
+        last = 65535;
+
+        clean_port_structure(list);
+        goto fillenvpl;
+    }
+
+    char *end = range;
+    //Move while I cannot find a separator
+    while (*end && *end != ':' && *end != '-') end++;
+
+    //It has a range
+    if (likely(*end)) {
+        *end++ = '\0';
+        if (*end == '!') {
+            info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
+            freez(copied);
+            return;
+        }
+        last = str2i((const char *)end);
+    } else {
+        last = 0;
+    }
+
+    first = str2i((const char *)range);
+    if (first < NETDATA_MINIMUM_PORT_VALUE || first > NETDATA_MAXIMUM_PORT_VALUE) {
+        info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
+        freez(copied);
+        return;
+    }
+
+    if (!last)
+        last = first;
+
+    if (last < NETDATA_MINIMUM_PORT_VALUE || last > NETDATA_MAXIMUM_PORT_VALUE) {
+        info("The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
+        freez(copied);
+        return;
+    }
+
+    if (first > last) {
+        info("The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
+        freez(copied);
+        return;
+    }
+
+    ebpf_network_viewer_port_list_t *w;
+fillenvpl:
+    w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = copied;
+    w->hash = simple_hash(copied);
+    w->first = (uint16_t)htons((uint16_t)first);
+    w->last = (uint16_t)htons((uint16_t)last);
+
+    fill_port_list(list, w);
+}
+
+/**
+ * Parse Service List
+ *
+ * @param out a pointer to store the link list
+ * @param service the service used to create the structure that will be linked.
+ */
+static void parse_service_list(void **out, char *service)
+{
+    ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+    struct servent *serv = getservbyname((const char *)service, "tcp");
+    if (!serv)
+        serv = getservbyname((const char *)service, "udp");
+
+    if (!serv) {
+        info("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        return;
+    }
+
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = strdupz(service);
+    w->hash = simple_hash(service);
+
+    w->first = w->last = (uint16_t)serv->s_port;
+
+    fill_port_list(list, w);
+}
+
+/**
+ * Netmask
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param prefix create the netmask based in the CIDR value.
+ *
+ * @return
+ */
+static inline in_addr_t netmask(int prefix) {
+
+    if (prefix == 0)
+        return (~((in_addr_t) - 1));
+    else
+        return (in_addr_t)(~((1 << (32 - prefix)) - 1));
+
+}
+
+/**
+ * Broadcast
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param addr is the ip address
+ * @param prefix is the CIDR value.
+ *
+ * @return It returns the last address of the range
+ */
+static inline in_addr_t broadcast(in_addr_t addr, int prefix)
+{
+    return (addr | ~netmask(prefix));
+}
+
+/**
+ * Network
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param addr is the ip address
+ * @param prefix is the CIDR value.
+ *
+ * @return It returns the first address of the range.
+ */
+static inline in_addr_t ipv4_network(in_addr_t addr, int prefix)
+{
+    return (addr & netmask(prefix));
+}
+
+/**
+ * IP to network long
+ *
+ * @param dst the vector to store the result
+ * @param ip the source ip given by our users.
+ * @param domain the ip domain (IPV4 or IPV6)
+ * @param source the original string
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
+{
+    if (inet_pton(domain, ip, dst) <= 0) {
+        error("The address specified (%s) is invalid ", source);
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Is ip inside the range
+ *
+ * Check if the ip is inside a IP range
+ *
+ * @param rfirst    the first ip address of the range
+ * @param rlast     the last ip address of the range
+ * @param cmpfirst  the first ip to compare
+ * @param cmplast   the last ip to compare
+ * @param family    the IP family
+ *
+ * @return It returns 1 if the IP is inside the range and 0 otherwise
+ */
+static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
+                              union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
+{
+    if (family == AF_INET) {
+        if (ntohl(rfirst->addr32[0]) <= ntohl(cmpfirst->addr32[0]) &&
+            ntohl(rlast->addr32[0]) >= ntohl(cmplast->addr32[0]))
+            return 1;
+    } else {
+        if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+            memcmp(rlast->addr8, cmplast->addr8, sizeof(union netdata_ip_t)) >= 0) {
+            return 1;
+        }
+
+    }
+    return 0;
+}
+
+/**
+ * Fill IP list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
+        while (move) {
+            if (in->ver == move->ver && is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
+                info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
+                     in->value, move->value);
+                freez(in->value);
+                freez(in);
+                return;
+            }
+            store = move;
+            move = move->next;
+        }
+
+        store->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char first[512], last[512];
+    if (in->ver == AF_INET) {
+        if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
+            inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
+            info("Adding values %s - %s to %s IP list used on network viewer",
+                 first, last,
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
+    } else {
+        if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
+            inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
+            info("Adding values %s - %s to %s IP list used on network viewer",
+                 first, last,
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
+    }
+#endif
+}
+
+/**
+ * Get IPV6 Last Address
+ *
+ * @param out the address to store the last address.
+ * @param in the address used to do the math.
+ * @param prefix number of bits used to calculate the address
+ */
+static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
+{
+    uint64_t mask,tmp;
+    uint64_t ret[2];
+    memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
+
+    if (prefix == 128) {
+        memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
+        return;
+    } else if (!prefix) {
+        ret[0] = ret[1] = 0xFFFFFFFFFFFFFFFF;
+        memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+        return;
+    } else if (prefix <= 64) {
+        ret[1] = 0xFFFFFFFFFFFFFFFFULL;
+
+        tmp = be64toh(ret[0]);
+        if (prefix > 0) {
+            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+            tmp |= ~mask;
+        }
+        ret[0] = htobe64(tmp);
+    } else {
+        mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
+        tmp = be64toh(ret[1]);
+        tmp |= ~mask;
+        ret[1] = htobe64(tmp);
+    }
+
+    memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+}
+
+/**
+ * Calculate ipv6 first address
+ *
+ * @param out the address to store the first address.
+ * @param in the address used to do the math.
+ * @param prefix number of bits used to calculate the address
+ */
+static void get_ipv6_first_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
+{
+    uint64_t mask,tmp;
+    uint64_t ret[2];
+
+    memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
+
+    if (prefix == 128) {
+        memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
+        return;
+    } else if (!prefix) {
+        ret[0] = ret[1] = 0;
+        memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+        return;
+    } else if (prefix <= 64) {
+        ret[1] = 0ULL;
+
+        tmp = be64toh(ret[0]);
+        if (prefix > 0) {
+            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+            tmp &= mask;
+        }
+        ret[0] = htobe64(tmp);
+    } else {
+        mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
+        tmp = be64toh(ret[1]);
+        tmp &= mask;
+        ret[1] = htobe64(tmp);
+    }
+
+    memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+}
+
+/**
+ * Parse IP List
+ *
+ * Parse IP list and link it.
+ *
+ * @param out a pointer to store the link list
+ * @param ip the value given as parameter
+ */
+static void parse_ip_list(void **out, char *ip)
+{
+    ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
+
+    char *ipdup = strdupz(ip);
+    union netdata_ip_t first = { };
+    union netdata_ip_t last = { };
+    char *is_ipv6;
+    if (*ip == '*' && *(ip+1) == '\0') {
+        memset(first.addr8, 0, sizeof(first.addr8));
+        memset(last.addr8, 0xFF, sizeof(last.addr8));
+
+        is_ipv6 = ip;
+
+        clean_ip_structure(list);
+        goto storethisip;
+    }
+
+    char *end = ip;
+    //Move while I cannot find a separator
+    while (*end && *end != '/' && *end != '-') end++;
+
+    //We will use only the classic IPV6 for while, but we could consider the base 85 in a near future
+    //https://tools.ietf.org/html/rfc1924
+    is_ipv6 = strchr(ip, ':');
+
+    int select;
+    if (*end && !is_ipv6) { //IPV4 range
+        select = (*end == '/') ? 0 : 1;
+        *end++ = '\0';
+        if (*end == '!') {
+            info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+            goto cleanipdup;
+        }
+
+        if (!select) { //CIDR
+            select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            select = (int) str2i(end);
+            if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
+                info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
+                goto cleanipdup;
+            }
+
+            last.addr32[0] = htonl(broadcast(ntohl(first.addr32[0]), select));
+            //This was added to remove https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
+            UNUSED(last.addr32[0]);
+
+            uint32_t ipv4_test = htonl(ipv4_network(ntohl(first.addr32[0]), select));
+            if (first.addr32[0] != ipv4_test) {
+                first.addr32[0] = ipv4_test;
+                struct in_addr ipv4_convert;
+                ipv4_convert.s_addr = ipv4_test;
+                char ipv4_msg[INET_ADDRSTRLEN];
+                if(inet_ntop(AF_INET, &ipv4_convert, ipv4_msg, INET_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
+            }
+        } else { //Range
+            select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            select = ip2nl(last.addr8, end, AF_INET, ipdup);
+            if (select)
+                goto cleanipdup;
+        }
+
+        if (htonl(first.addr32[0]) > htonl(last.addr32[0])) {
+            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+                 ipdup);
+            goto cleanipdup;
+        }
+    } else if (is_ipv6) { //IPV6
+        if (!*end) { // unique
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            memcpy(last.addr8, first.addr8, sizeof(first.addr8));
+        } else if (*end == '-') {
+            *end++ = 0x00;
+            if (*end == '!') {
+                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                goto cleanipdup;
+            }
+
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            select = ip2nl(last.addr8, end, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+        } else { //CIDR
+            *end++ = 0x00;
+            if (*end == '!') {
+                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                goto cleanipdup;
+            }
+
+            select = str2i(end);
+            if (select < 0 || select > 128) {
+                info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
+                goto cleanipdup;
+            }
+
+            uint64_t prefix = (uint64_t)select;
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            get_ipv6_last_addr(&last, &first, prefix);
+
+            union netdata_ip_t ipv6_test;
+            get_ipv6_first_addr(&ipv6_test, &first, prefix);
+
+            if (memcmp(first.addr8, ipv6_test.addr8, sizeof(union netdata_ip_t)) != 0) {
+                memcpy(first.addr8, ipv6_test.addr8, sizeof(union netdata_ip_t));
+
+                struct in6_addr ipv6_convert;
+                memcpy(ipv6_convert.s6_addr,  ipv6_test.addr8, sizeof(union netdata_ip_t));
+
+                char ipv6_msg[INET6_ADDRSTRLEN];
+                if(inet_ntop(AF_INET6, &ipv6_convert, ipv6_msg, INET6_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv6_msg);
+            }
+        }
+
+        if ((be64toh(*(uint64_t *)&first.addr32[2]) > be64toh(*(uint64_t *)&last.addr32[2]) &&
+            !memcmp(first.addr32, last.addr32, 2*sizeof(uint32_t))) ||
+            (be64toh(*(uint64_t *)&first.addr32) > be64toh(*(uint64_t *)&last.addr32)) ) {
+            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+                 ipdup);
+            goto cleanipdup;
+        }
+    } else { //Unique ip
+        select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+        if (select)
+            goto cleanipdup;
+
+        memcpy(last.addr8, first.addr8, sizeof(first.addr8));
+    }
+
+    ebpf_network_viewer_ip_list_t *store;
+
+storethisip:
+    store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
+    store->value = ipdup;
+    store->hash = simple_hash(ipdup);
+    store->ver = (uint8_t)(!is_ipv6)?AF_INET:AF_INET6;
+    memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
+    memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
+
+    fill_ip_list(list, store);
+    return;
+
+cleanipdup:
+    freez(ipdup);
+}
+
+/**
+ * Parse IP Range
+ *
+ * Parse the IP ranges given and create Network Viewer IP Structure
+ *
+ * @param ptr  is a pointer with the text to parse.
+ */
+static void parse_ips(char *ptr)
+{
+    //No value
+    if (unlikely(!ptr))
+        return;
+
+    while (likely(ptr)) {
+        //Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        //No valid value found
+        if (unlikely(!*ptr))
+            return;
+
+        //Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isascii(*ptr)) { //Parse port
+            parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:(void **)&network_viewer_opt.excluded_ips,
+                            ptr);
+        }
+
+        ptr = end;
+    }
+}
+
+
+/**
+ * Parse Port Range
+ *
+ * Parse the port ranges given and create Network Viewer Port Structure
+ *
+ * @param ptr  is a pointer with the text to parse.
+ */
+static void parse_ports(char *ptr)
+{
+    //No value
+    if (unlikely(!ptr))
+        return;
+
+    while (likely(ptr)) {
+        //Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        //No valid value found
+        if (unlikely(!*ptr))
+            return;
+
+        //Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isdigit(*ptr)) { //Parse port
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                            ptr);
+        } else if (isalpha(*ptr)) { //Parse service
+            parse_service_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                               ptr);
+        } else if (*ptr == '*') { //All
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                            ptr);
+        }
+
+        ptr = end;
+    }
+}
+
+/**
+ * Link hostname
+ *
+ * @param out is the output link list
+ * @param in the hostname to add to list.
+ */
+static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_network_viewer_hostname_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_hostname_list_t *move = *out;
+        for (; move->next ; move = move->next ) {
+            if (move->hash == in->hash && !strcmp(move->value, in->value)) {
+                info("The hostname %s was already inserted, it will be ignored.", in->value);
+                freez(in->value);
+                simple_pattern_free(in->value_pattern);
+                freez(in);
+                return;
+            }
+        }
+
+        move->next = in;
+    } else {
+        *out = in;
+    }
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding value %s to %s hostname list used on network viewer",
+         in->value,
+         (*out == network_viewer_opt.included_hostnames)?"included":"excluded");
+#endif
+}
+
+/**
+ * Link Hostnames
+ *
+ * Parse the list of hostnames to create the link list.
+ * This is not associated with the IP, because simple patterns like *example* cannot be resolved to IP.
+ *
+ * @param out is the output link list
+ * @param parse is a pointer with the text to parser.
+ */
+static void link_hostnames(char *parse)
+{
+    //No value
+    if (unlikely(!parse))
+        return;
+
+    while (likely(parse)) {
+        //Find the first valid value
+        while (isspace(*parse)) parse++;
+
+        //No valid value found
+        if (unlikely(!*parse))
+            return;
+
+        //Find space that ends the list
+        char *end = strchr(parse, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*parse == '!') {
+            neg++;
+            parse++;
+        }
+
+        ebpf_network_viewer_hostname_list_t *hostname = callocz(1 , sizeof(ebpf_network_viewer_hostname_list_t));
+        hostname->value = strdupz(parse);
+        hostname->hash = simple_hash(parse);
+        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT);
+
+        link_hostname((!neg)?&network_viewer_opt.included_hostnames:&network_viewer_opt.excluded_hostnames,
+                      hostname);
+
+        parse = end;
+    }
+}
+
+/**
+ * Parse network viewer section
+ */
+static void parse_network_viewer_section()
+{
+    network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
+                                                      EBPF_NETWORK_VIEWER_SECTION,
+                                                      "maximum dimensions",
+                                                      500);
+
+    char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
+                                "ports", NULL);
+    parse_ports(value);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
+    link_hostnames(value);
+
+    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
+                          "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7");
+    parse_ips(value);
+}
+
+/**
+ * Link dimension name
+ *
+ * Link user specified names inside a link list.
+ *
+ * @param port the port number associated to the dimension name.
+ * @param hash the calculated hash for the dimension name.
+ * @param name the dimension name.
+ */
+static void link_dimension_name(char *port, uint32_t hash, char *value)
+{
+    int test = str2i(port);
+    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
+        error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
+        return;
+    }
+
+    ebpf_network_viewer_dim_name_t *w;
+    w = callocz(1, sizeof(ebpf_network_viewer_dim_name_t));
+
+    w->name = strdupz(value);
+    w->hash = hash;
+
+    w->port = (uint16_t) htons(test);
+
+    ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
+    if (unlikely(!names)) {
+        network_viewer_opt.names = w;
+    } else {
+        for (; names->next; names = names->next) {
+            if (names->port == w->port) {
+                info("Dupplicated definition for a service, the name %s will be ignored. ", names->name);
+                freez(names->name);
+                names->name = w->name;
+                names->hash = w->hash;
+                freez(w);
+                return;
+            }
+        }
+        names->next = w;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding values %s( %u) to dimension name list used on network viewer", w->name, htons(w->port));
+#endif
+}
+
+/**
+ * Parse service Name section.
+ *
+ * This function gets the values that will be used to overwrite dimensions.
+ */
+static void parse_service_name_section()
+{
+    struct section *co = appconfig_get_section(&collector_config, EBPF_SERVICE_NAME_SECTION);
+    if (co) {
+        struct config_option *cv;
+        for (cv = co->values; cv ; cv = cv->next) {
+            link_dimension_name(cv->name, cv->hash, cv->value);
+        }
+    }
+
+    //Always associated the default port to Netdata
+    ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
+    if (names) {
+        uint16_t default_port = htons(19999);
+        while (names) {
+            if (names->port == default_port)
+                return;
+
+            names = names->next;
+        }
+    }
+
+    char *port_string = getenv("NETDATA_LISTEN_PORT");
+    if (port_string)
+        link_dimension_name(port_string, simple_hash(port_string), "Netdata");
+}
+
+/**
  * Read collector values
  *
  * @param disable_apps variable to store information related to apps.
@@ -683,11 +1537,18 @@ static void read_collector_values(int *disable_apps)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name, 1);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
+        //Read network viewer section if network viewer is enabled
+        parse_network_viewer_section();
+        parse_service_name_section();
         started++;
     }
 
-    if (!started)
+    if (!started){
         ebpf_enable_all_charts(*disable_apps);
+        //Read network viewer section
+        parse_network_viewer_section();
+        parse_service_name_section();
+    }
 }
 
 /**

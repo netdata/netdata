@@ -191,6 +191,51 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
 
+### `[network viewer]`
+
+You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
+
+```conf
+[network viewer]
+    maximum dimensions = 500
+    ports = 1-1024 !145 !domain
+    hostnames = !example.com
+    ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
+```
+
+When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
+write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts  
+[simple patterns](/libnetdata/simple_pattern/README.md).  The `ports`, and `ips` settings accept negation (`!`) to
+ deny specific values or asterisk alone to define all values.
+
+In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
+and 145.
+
+The following options are available:
+
+-   `ports`: Define the destination ports for Netdata to monitor.
+-   `hostnames`: The list of hostnames that can be resolved to an IP address. 
+-   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
+    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
+    can be changed with the `ips` setting.
+    
+By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
+will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
+dimensions` setting.
+
+### `[service name]`
+
+Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
+name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
+
+For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
+service in network viewer charts, and thus see the name of the service instead of its port, define it:
+
+```conf
+[service name]
+    19999 = Netdata
+```
+
 ## Troubleshooting
 
 If the eBPF collector does not work, you can troubleshoot it by running the `ebpf.plugin` command and investigating its

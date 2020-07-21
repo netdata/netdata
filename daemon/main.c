@@ -696,6 +696,17 @@ void set_global_environment() {
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
+    char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
+    int clean = 0;
+    if (!default_port) {
+        default_port = strdupz("19999");
+        clean = 1;
+    }
+
+    setenv("NETDATA_LISTEN_PORT"      , default_port, 1);
+    if(clean)
+        freez(default_port);
+
     get_system_timezone();
 
     // set the path we need

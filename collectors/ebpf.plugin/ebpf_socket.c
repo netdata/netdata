@@ -459,6 +459,63 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
  *****************************************************************/
 
 /**
+ * Clean netowrk ports allocated during initializaion.
+ *
+ * @param ptr a pointer to the link list.
+ */
+static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
+{
+    if (unlikely(!ptr))
+        return;
+
+    while (ptr) {
+        ebpf_network_viewer_port_list_t *next = ptr->next;
+        freez(ptr->value);
+        freez(ptr);
+        ptr = next;
+    }
+}
+
+/**
+ * Clean service names
+ *
+ * Clean the allocated link list that stores names.
+ *
+ * @param names the link list.
+ */
+static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
+{
+    if (unlikely(!names))
+        return;
+
+    while (names) {
+        ebpf_network_viewer_dim_name_t *next = names->next;
+        freez(names->name);
+        freez(names);
+        names = next;
+    }
+}
+
+/**
+ * Clean hostnames
+ *
+ * @param hostnames the hostnames to clean
+ */
+static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
+{
+    if (unlikely(!hostnames))
+        return;
+
+    while (hostnames) {
+        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
+        freez(hostnames->value);
+        simple_pattern_free(hostnames->value_pattern);
+        freez(hostnames);
+        hostnames = next;
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -476,6 +533,12 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(bandwidth_vector);
 
     ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
+
+    clean_network_ports(network_viewer_opt.included_port);
+    clean_network_ports(network_viewer_opt.excluded_port);
+    clean_service_names(network_viewer_opt.names);
+    clean_hostnames(network_viewer_opt.included_hostnames);
+    clean_hostnames(network_viewer_opt.excluded_hostnames);
 }
 
 /*****************************************************************
