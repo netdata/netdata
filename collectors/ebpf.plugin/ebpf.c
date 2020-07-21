@@ -1004,6 +1004,13 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
     if (prefix == 128) {
         memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
         return;
+    } else if (!prefix) {
+        ret[0] = ret[1] = 0;
+        memcpy(in->addr32, ret, sizeof(union netdata_ip_t));
+
+        ret[0] = ret[1] = 0xFFFFFFFFFFFFFFFF;
+        memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+        return;
     }
 
     if (prefix <= 64) {
