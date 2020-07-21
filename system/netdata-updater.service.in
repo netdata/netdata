@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily auto-updates for Netdata
+RefuseManualStart=no
+RefuseManualStop=yes
+
+[Service]
+Type=oneshot
+ExecStart=@pkglibexecdir_POST@/netdata-updater.sh
