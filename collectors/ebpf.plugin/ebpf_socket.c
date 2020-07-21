@@ -313,6 +313,130 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
  *****************************************************************/
 
 /**
+ * Is specific ip inside the range
+ *
+ * Check if the ip is inside a IP range previously defined
+ *
+ * @param cmp       the IP to compare
+ * @param family    the IP family
+ *
+ * @return It returns 1 if the IP is inside the range and 0 otherwise
+static int is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
+{
+    //THIS NEEDS TO BE USED ONLY DURING IP COMPARISON, THE PREVIOUS FUNCTTION IS BETTER TO CREATE RANGE
+    if (!network_viewer_opt.excluded_ips && !network_viewer_opt.included_ips)
+        return 1;
+
+    uint32_t ipv4_test = ntohl(cmp->addr32[0]);
+    ebpf_network_viewer_ip_list_t *move = network_viewer_opt.excluded_ips;
+    while (move) {
+        if (family == AF_INET) {
+            if (ntohl(move->first.addr32[0]) <= ipv4_test &&
+                ntohl(move->last.addr32[0]) >= ipv4_test)
+                return 0;
+        } else {
+            if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+                memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
+                return 0;
+            }
+        }
+        move = move->next;
+    }
+
+    move = network_viewer_opt.included_ips;
+    while (move) {
+        if (family == AF_INET) {
+            if (ntohl(move->first.addr32[0]) <= ipv4_test &&
+                ntohl(move->last.addr32[0]) >= ipv4_test)
+                return 1;
+        } else {
+            if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+                memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
+                return 1;
+            }
+        }
+        move = move->next;
+    }
+
+    return 0;
+}
+ */
+
+/**
+ * Is port inside range
+ *
+ * Verify if the cmp port is inside the range [first, last].
+ * This function expects only the last parameter as big endian.
+ *
+ * @param cmp    the value to compare
+ *
+ * @return It returns 1 when cmp is inside and 0 otherwise.
+ */
+static int is_port_inside_range(uint16_t cmp)
+{
+    //We do not have restrictions for ports.
+    if (!network_viewer_opt.excluded_port && !network_viewer_opt.included_port)
+        return 1;
+
+    //Test if port is excluded
+    ebpf_network_viewer_port_list_t *move = network_viewer_opt.excluded_port;
+    cmp = htons(cmp);
+    while (move) {
+        if (move->cmp_first <= cmp && cmp <= move->cmp_last)
+            return 0;
+
+        move = move->next;
+    }
+
+    //Test if the port is inside allowed range
+    move = network_viewer_opt.included_port;
+    while (move) {
+        if (move->cmp_first <= cmp && cmp <= move->cmp_last)
+            return 1;
+
+        move = move->next;
+    }
+
+    return 0;
+}
+
+/**
+ * Hostname matches pattern
+ *
+ * @param list the simple pattern list.
+ * @param cmp  the value to compare
+ *
+ * @return It returns 1 when the value matches and zero otherwise.
+ */
+int hostname_matches_pattern(SIMPLE_PATTERN *list, char *cmp)
+{
+    return simple_pattern_matches(list, cmp);
+}
+
+/**
+ * Is socket allowed?
+ *
+ * Compare destination addresses and destination ports to define next steps
+ *
+ * @param key     the socket read from kernel ring
+ * @param family  the family used to compare IPs (AF_INET and AF_INET6)
+ *
+ * @return It returns 1 if this socket is inside the ranges and 0 otherwise.
+ */
+int is_socket_allowed(netdata_socket_idx_t *key, int family)
+{
+    if (!is_port_inside_range(key->dport))
+        return 0;
+
+    /*
+    if (!is_ip_inside_range(&key->daddr, family))
+        return 0;
+    */
+
+    return 1;
+}
+
+/**
  * Compare sockets
  *
  * Compare destination address and destination port.
@@ -541,6 +665,12 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             sock->sent_packets += lvalues->sent_packets;
             sock->recv_bytes   += lvalues->recv_bytes;
             sock->sent_bytes   += lvalues->sent_bytes;
+#ifdef NETDATA_INTERNAL_CHECKS
+            info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu(%lu), RECV = %lu(%lu)",
+                 (out == &inbound_vectors)?"inbound":"outbound", curr, w->resolved_name,
+                 w->dimension_recv, w->dimension_sent, w->sock.sent_bytes, w->sock.sent_packets,
+                 w->sock.recv_bytes, w->sock.recv_packets);
+#endif
             return;
         } else {
             memcpy(&w->sock, lvalues, sizeof(*lvalues));

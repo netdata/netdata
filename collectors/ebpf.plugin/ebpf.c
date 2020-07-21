@@ -952,6 +952,8 @@ fillenvpl:
     w->hash = simple_hash(copied);
     w->first = (uint16_t)htons((uint16_t)first);
     w->last = (uint16_t)htons((uint16_t)last);
+    w->cmp_first = (uint16_t)first;
+    w->cmp_last = (uint16_t)last;
 
     fill_port_list(list, w);
 }
