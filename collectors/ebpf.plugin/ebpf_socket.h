@@ -87,6 +87,9 @@ typedef struct ebpf_network_viewer_port_list {
 
     uint16_t first;
     uint16_t last;
+
+    uint16_t cmp_first;
+    uint16_t cmp_last;
     struct ebpf_network_viewer_port_list *next;
 } ebpf_network_viewer_port_list_t;
 
