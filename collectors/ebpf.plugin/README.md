@@ -223,6 +223,17 @@ By default, Netdata displays up to 500 dimensions on network viewer charts. If t
 will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
 
+#### Network traffic chart
+
+Netdata monitors network connections established for hosts, which are shown according the package final destination.
+
+You can visualize the most common destinations for `outbound connections` and measure the bandwidth utilized with 
+connections for local services. All these information are grouped using:
+
+-   `bytes`: Bytes sent and received for a destination.
+-   `packets`: Packets sent per period of time.
+-   `retransmission`: Number of TCP packages retransmitted 
+
 ### `[service name]`
 
 Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
