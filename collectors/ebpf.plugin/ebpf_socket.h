@@ -5,13 +5,9 @@
 # include "libnetdata/avl/avl.h"
 
 //Vector indexes
-# define NETDATA_SOCKET_COUNTER 13
-
-#define NETDATA_SOCKET_COUNTER 13
-
-#define NETDATA_MAX_SOCKET_VECTOR 5
-
-#define NETDATA_UDP_START 3
+# define NETDATA_MAX_SOCKET_VECTOR 6
+# define NETDATA_UDP_START 3
+# define NETDATA_RETRANSMIT_START 5
 
 # define NETDATA_SOCKET_APPS_HASH_TABLE 0
 # define NETDATA_SOCKET_IPV4_HASH_TABLE 1
@@ -37,7 +33,11 @@ typedef enum ebpf_socket_idx {
 
     NETDATA_KEY_CALLS_UDP_SENDMSG,
     NETDATA_KEY_ERROR_UDP_SENDMSG,
-    NETDATA_KEY_BYTES_UDP_SENDMSG
+    NETDATA_KEY_BYTES_UDP_SENDMSG,
+
+    NETDATA_KEY_TCP_RETRANSMIT,
+
+    NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
 #define NETDATA_SOCKET_GROUP "Socket"
@@ -46,6 +46,7 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
 #define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
 #define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
+#define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
 #define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
 #define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
 #define NETDATA_UDP_FUNCTION_ERROR "udp_error"

@@ -3123,6 +3123,11 @@ netdataDashboard.context = {
         info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>.'
     },
 
+    'ebpf.tcp_retransmit': {
+        title : 'TCP retransmit',
+        info: 'Number of packets retransmitted for function <code>tcp_retranstmit_skb</code>.'
+    },
+
     'ebpf.tcp_error': {
         title : 'TCP errors',
         info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
