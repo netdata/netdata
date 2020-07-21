@@ -204,8 +204,9 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 ```
 
 When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
-write `ports = 19999`, Netdata will collect only connections for itself. The `ports`, `hostnames`, and `ips` settings
-all accept [simple patterns](/libnetdata/simple_pattern/README.md).
+write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts  
+[simple patterns](/libnetdata/simple_pattern/README.md).  The `ports`, and `ips` settings accept negation (`!`) to
+ deny specific values or asterisk alone to define all values.
 
 In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
 and 145.
