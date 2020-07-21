@@ -142,6 +142,10 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
         ID="$(cat "${MACHINE_GUID_FILE}")"
+        MGUID=$ID
+else
+        echo >&2 "netdata.public.unique.id is not generated yet. Please run agent at least once before attempting to claim. Agent generates this file on first startup."
+        exit 22
 fi
 
 # get token from file
@@ -236,7 +240,8 @@ cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
     },
     "token": "$TOKEN",
     "rooms" : [ $ROOMS ],
-    "publicKey" : "$KEY"
+    "publicKey" : "$KEY",
+    "mGUID" : "$MGUID"
 }
 EMBED_JSON
 
