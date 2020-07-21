@@ -709,11 +709,23 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
         uint16_t first = ntohs(in->first);
         uint16_t last = ntohs(in->last);
         while (move) {
-            if (ntohs(move->first) <= first && ntohs(move->last) >= first &&
-                ntohs(move->first) <= last && ntohs(move->last) >= last) {
+            uint16_t cmp_first = ntohs(move->first);
+            uint16_t cmp_last = ntohs(move->last);
+            if (cmp_first <= first && first <= cmp_last  &&
+                cmp_first <= last && last <= cmp_last ) {
                 info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
-                     ntohs(in->first), ntohs(in->last), ntohs(move->first), ntohs(move->last));
+                     first, last, cmp_first, cmp_last);
                 freez(in->value);
+                freez(in);
+                return;
+            } else if (first <= cmp_first && cmp_first <= last  &&
+                       first <= cmp_last && cmp_last <= last) {
+                info("The range (%u, %u) is bigger than previous range (%u, %u) already inserted, the previous will be ignored.",
+                     first, last, cmp_first, cmp_last);
+                freez(move->value);
+                move->value = in->value;
+                move->first = in->first;
+                move->last = in->last;
                 freez(in);
                 return;
             }
@@ -859,9 +871,26 @@ static inline in_addr_t netmask(int prefix) {
  * @param addr is the ip address
  * @param prefix is the CIDR value.
  *
+ * @return It returns the last address of the range
  */
-static inline in_addr_t broadcast(in_addr_t addr, int prefix) {
+static inline in_addr_t broadcast(in_addr_t addr, int prefix)
+{
     return (addr | ~netmask(prefix));
+}
+
+/**
+ * Network
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param addr is the ip address
+ * @param prefix is the CIDR value.
+ *
+ * @return It returns the first address of the range.
+ */
+static inline in_addr_t network(in_addr_t addr, int prefix)
+{
+    return (addr & netmask(prefix));
 }
 
 /**
@@ -1053,6 +1082,16 @@ static void parse_ip_list(void **out, char *ip)
             last.addr32[0] = htonl(broadcast(ntohl(first.addr32[0]), select));
             //This was added to remove https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
             UNUSED(last.addr32[0]);
+
+            uint32_t test = htonl(network(ntohl(first.addr32[0]), select));
+            if (first.addr32[0] != test) {
+                first.addr32[0] = test;
+                struct in_addr convert;
+                convert.s_addr = test;
+                char ip_msg[INET_ADDRSTRLEN];
+                if(inet_ntop(AF_INET, &convert, ip_msg, INET_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ip_msg);
+            }
         } else { //Range
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
