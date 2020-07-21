@@ -13,6 +13,7 @@ CLEANFILES = \
     netdata-freebsd \
     netdata.plist \
     netdata.crontab \
+    netdata-updater.service \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -36,6 +37,7 @@ nodist_noinst_DATA = \
     netdata-freebsd \
     netdata.plist \
     netdata.crontab \
+    netdata-updater.service \
     $(NULL)
 
 dist_noinst_DATA = \
@@ -50,4 +52,6 @@ dist_noinst_DATA = \
     netdata.plist.in \
     netdata.conf \
     netdata.crontab.in \
+    netdata-updater.service.in \
+    netdata-updater.timer \
     $(NULL)
