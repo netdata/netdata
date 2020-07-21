@@ -11,9 +11,10 @@
  *
  *****************************************************************/
 
-static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent", "received" };
+static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent",
+                                                                   "received", "retransmitted" };
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close",
-                                                            "udp_sendmsg", "udp_recvmsg" };
+                                                            "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
 
 static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t *socket_aggregated_data = NULL;
@@ -116,6 +117,8 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
         write_err_chart(
           NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
     }
+    write_count_chart(
+        NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_RETRANSMIT_START], 1);
 
     write_count_chart(
         NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
@@ -234,11 +237,21 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
     }
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
+                      NETDATA_TCP_RETRANSMIT,
+                      "Packages retransmitted",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_SOCKET_GROUP,
+                      21073,
+                      ebpf_create_global_dimension,
+                      &socket_publish_aggregated[NETDATA_RETRANSMIT_START],
+                      1);
+
+    ebpf_create_chart(NETDATA_EBPF_FAMILY,
                       NETDATA_UDP_FUNCTION_COUNT,
                       "UDP calls",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_SOCKET_GROUP,
-                      21073,
+                      21074,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_UDP_START],
                       2);
@@ -248,7 +261,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "UDP bandwidth",
                       EBPF_COMMON_DIMENSION_BYTESS,
                       NETDATA_SOCKET_GROUP,
-                      21074,
+                      21075,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_UDP_START],
                       2);
@@ -259,7 +272,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "UDP errors",
                           EBPF_COMMON_DIMENSION_CALL,
                           NETDATA_SOCKET_GROUP,
-                          21075,
+                          21076,
                           ebpf_create_global_dimension,
                           &socket_publish_aggregated[NETDATA_UDP_START],
                           2);
@@ -710,6 +723,7 @@ static void read_hash_global_tables()
     socket_aggregated_data[2].call = res[NETDATA_KEY_CALLS_TCP_CLOSE];
     socket_aggregated_data[3].call = res[NETDATA_KEY_CALLS_UDP_RECVMSG];
     socket_aggregated_data[4].call = res[NETDATA_KEY_CALLS_UDP_SENDMSG];
+    socket_aggregated_data[5].call = res[NETDATA_KEY_TCP_RETRANSMIT];
 
     socket_aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_TCP_SENDMSG];
     socket_aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_TCP_CLEANUP_RBUF];
