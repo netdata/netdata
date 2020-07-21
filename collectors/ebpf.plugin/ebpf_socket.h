@@ -132,6 +132,9 @@ typedef struct ebpf_network_viewer_options {
 
     ebpf_network_viewer_hostname_list_t *excluded_hostnames;
     ebpf_network_viewer_hostname_list_t *included_hostnames;
+
+    ebpf_network_viewer_ip_list_t *ipv4_local_ip;
+    ebpf_network_viewer_ip_list_t *ipv6_local_ip;
 } ebpf_network_viewer_options_t;
 
 extern ebpf_network_viewer_options_t network_viewer_opt;
@@ -188,7 +191,6 @@ typedef struct netdata_socket_plot {
 } netdata_socket_plot_t;
 
 //TODO: REMOVE THIS DEFINITION AFTER 9495 TO BE MERGED
-#define REMOVE_THIS_DEFAULT 500
 typedef struct netdata_vector_plot {
     netdata_socket_plot_t *plot;
 
@@ -198,7 +200,6 @@ typedef struct netdata_vector_plot {
 
 } netdata_vector_plot_t;
 
-extern ebpf_network_viewer_ip_list_t *ipv4_local_ip;
-extern ebpf_network_viewer_ip_list_t *ipv6_local_ip;
+extern ebpf_network_viewer_options_t network_viewer_opt;
 
 #endif

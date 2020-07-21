@@ -27,8 +27,8 @@ static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 
-netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = (REMOVE_THIS_DEFAULT - 1) };
-netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = (REMOVE_THIS_DEFAULT -1 ) };
+netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
+netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
 
 static int *map_fd = NULL;
@@ -571,7 +571,7 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int fa
 {
     ebpf_network_viewer_ip_list_t *move;
     if (family == AF_INET) {
-        move = ipv4_local_ip;
+        move = network_viewer_opt.ipv4_local_ip;
         while (move) {
             if (cmp->daddr.addr32[0] == move->first.addr32[0])
                 return &inbound_vectors;
@@ -579,7 +579,7 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int fa
             move = move->next;
         }
     } else {
-        move = ipv6_local_ip;
+        move = network_viewer_opt.ipv6_local_ip;
         while (move) {
             if (!memcmp(cmp->daddr.addr32, move->first.addr32, sizeof(union netdata_ip_t)))
                 return &inbound_vectors;
@@ -963,8 +963,8 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
     bandwidth_vector = callocz((size_t) ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
     socket_values = callocz((size_t) ebpf_nprocs, sizeof(netdata_socket_t));
-    inbound_vectors.plot = callocz(REMOVE_THIS_DEFAULT, sizeof(netdata_socket_plot_t));
-    outbound_vectors.plot = callocz(REMOVE_THIS_DEFAULT, sizeof(netdata_socket_plot_t));
+    inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+    outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
 }
 
 void change_socket_event()
@@ -1008,6 +1008,9 @@ void *ebpf_socket_thread(void *ptr)
 
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
+
+    inbound_vectors.last = network_viewer_opt.max_dim - 1;
+    outbound_vectors.last = inbound_vectors.last;
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&socket_data);

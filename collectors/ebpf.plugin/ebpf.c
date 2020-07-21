@@ -118,10 +118,7 @@ ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL,
-                                                     .names = NULL };
-//Move these two variables inside ebpf_network_viewer_options_t when 9495 is merged
-ebpf_network_viewer_ip_list_t *ipv4_local_ip = NULL;
-ebpf_network_viewer_ip_list_t *ipv6_local_ip = NULL;
+                                                     .names = NULL, .ipv4_local_ip = NULL, .ipv6_local_ip = NULL };
 
 /*****************************************************************
  *
@@ -752,7 +749,7 @@ static void read_local_addresses()
             }
         }
 
-        fill_ip_list((family == AF_INET)?&ipv4_local_ip:&ipv6_local_ip, w);
+        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip, w);
     }
 
     freeifaddrs(ifaddr);
