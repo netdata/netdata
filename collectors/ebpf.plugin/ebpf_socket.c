@@ -403,14 +403,33 @@ static int is_port_inside_range(uint16_t cmp)
 /**
  * Hostname matches pattern
  *
- * @param list the simple pattern list.
  * @param cmp  the value to compare
  *
  * @return It returns 1 when the value matches and zero otherwise.
  */
-int hostname_matches_pattern(SIMPLE_PATTERN *list, char *cmp)
+int hostname_matches_pattern(char *cmp)
 {
-    return simple_pattern_matches(list, cmp);
+    if (!network_viewer_opt.included_hostnames && !network_viewer_opt.excluded_hostnames)
+        return 1;
+
+    ebpf_network_viewer_hostname_list_t *move = network_viewer_opt.excluded_hostnames;
+    while (move) {
+        if (simple_pattern_matches(move->value_pattern, cmp))
+            return 0;
+
+        move = move->next;
+    }
+
+    move = network_viewer_opt.included_hostnames;
+    while (move) {
+        if (simple_pattern_matches(move->value_pattern, cmp))
+            return 1;
+
+        move = move->next;
+    }
+
+
+    return 0;
 }
 
 /**
@@ -558,13 +577,16 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
  * @param ptr a pointer to the structure where the values are stored.
  * @param is_inbound is a inbound ptr value?
  * @param is_last is this the last value possible?
+ *
+ * @return It returns 1 if the name is valid and 0 otherwise.
  */
-void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
+int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 {
     char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
     if (ptr->resolved)
-        return;
+        return 1;
 
+    int ret;
     if (is_last) {
         char *other = { "Other" };
         //We are also copying the NULL bytes to avoid warnings in new compilers
@@ -574,6 +596,7 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         ptr->family = AF_INET;
 
         fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
+        ret = 1;
         goto laststep;
     }
 
@@ -589,14 +612,16 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         myaddr.sin_port = idx->dport;
         myaddr.sin_addr.s_addr = (!is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
 
-        if (getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
-                         sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
+        ret = getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
+                          sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
+        if (ret) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
 
             snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr.sin_port));
+            ret = 1;
         }
     } else { //IPV6
         struct sockaddr_in6 myaddr6;
@@ -605,13 +630,15 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         myaddr6.sin6_family = AF_INET6;
         myaddr6.sin6_port =  idx->dport;
         memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
-        if (getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
-                        sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD)) {
+        ret = getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
+                          sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
+        if (ret) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
             snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr6.sin6_port));
+            ret = 1;
         }
     }
 
@@ -621,7 +648,28 @@ void fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
 laststep:
 
+    if (!ret)
+        ret = hostname_matches_pattern(hostname);
+
     ptr->resolved++;
+
+    return ret;
+}
+
+/**
+ * Update Socket Data
+ *
+ * Update the socket information with last collected data
+ *
+ * @param sock
+ * @param lvalues
+ */
+static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *lvalues)
+{
+    sock->recv_packets += lvalues->recv_packets;
+    sock->sent_packets += lvalues->sent_packets;
+    sock->recv_bytes   += lvalues->recv_bytes;
+    sock->sent_bytes   += lvalues->sent_bytes;
 }
 
 /**
@@ -643,41 +691,43 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
-        netdata_socket_t *sock = &ret->sock;
-
-        sock->recv_packets += lvalues->recv_packets;
-        sock->sent_packets += lvalues->sent_packets;
-        sock->recv_bytes   += lvalues->recv_bytes;
-        sock->sent_bytes   += lvalues->sent_bytes;
+        update_socket_data(&ret->sock, lvalues);
     } else {
         uint32_t curr = out->next;
         uint32_t last = out->last;
 
         netdata_socket_plot_t *w = &out->plot[curr];
 
+        int resolved;
         if (curr == last) {
             if (!w->resolved) {
-                fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 1);
+                resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 1);
+                UNUSED(resolved);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s",
+                     (out == &inbound_vectors)?"inbound":"outbound", curr, w->resolved_name,
+                     w->dimension_recv, w->dimension_sent);
+#endif
             }
 
-            netdata_socket_t *sock = &w->sock;
-            sock->recv_packets += lvalues->recv_packets;
-            sock->sent_packets += lvalues->sent_packets;
-            sock->recv_bytes   += lvalues->recv_bytes;
-            sock->sent_bytes   += lvalues->sent_bytes;
-#ifdef NETDATA_INTERNAL_CHECKS
-            info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu(%lu), RECV = %lu(%lu)",
-                 (out == &inbound_vectors)?"inbound":"outbound", curr, w->resolved_name,
-                 w->dimension_recv, w->dimension_sent, w->sock.sent_bytes, w->sock.sent_packets,
-                 w->sock.recv_bytes, w->sock.recv_packets);
-#endif
+            update_socket_data(&w->sock, lvalues);
             return;
         } else {
             memcpy(&w->sock, lvalues, sizeof(*lvalues));
             memcpy(&w->index, lindex, sizeof(*lindex));
             w->family = family;
 
-            fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 0);
+            resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 0);
+        }
+
+        if (!resolved) {
+            freez(w->resolved_name);
+            freez(w->dimension_sent);
+            freez(w->dimension_recv);
+
+            memset(w, 0, sizeof(netdata_socket_plot_t));
+
+            return;
         }
 
         netdata_socket_plot_t *check ;
@@ -784,8 +834,10 @@ static void read_socket_hash_table(int fd, int family)
         values[0].sent_bytes   += bsent;
         values[0].removeme     += removesock;
 
-        netdata_vector_plot_t *table = select_vector_to_store(&key, family);
-        store_socket_inside_avl(table, values, &key, family);
+        if (is_socket_allowed(&key, family)) {
+            netdata_vector_plot_t *table = select_vector_to_store(&key, family);
+            store_socket_inside_avl(table, values, &key, family);
+        }
 
         if (removesock)
             removeme = key;

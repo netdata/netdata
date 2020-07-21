@@ -204,6 +204,4 @@ typedef struct netdata_vector_plot {
 
 } netdata_vector_plot_t;
 
-extern ebpf_network_viewer_options_t network_viewer_opt;
-
 #endif
