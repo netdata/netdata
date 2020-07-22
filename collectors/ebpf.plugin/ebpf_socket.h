@@ -126,7 +126,7 @@ typedef struct ebpf_network_viewer_hostname_list {
 typedef struct ebpf_network_viewer_options {
     uint32_t max_dim;   //Store value read from 'maximum dimensions'
 
-    uint32_t name_resolution_enabled;
+    int name_resolution_enabled;
 
     ebpf_network_viewer_port_list_t *excluded_port;
     ebpf_network_viewer_port_list_t *included_port;
@@ -161,6 +161,19 @@ typedef struct netdata_socket {
     uint32_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
+typedef struct netdata_plot_values {
+    //Values used in the previous iteration
+    uint64_t recv_packets;
+    uint64_t sent_packets;
+    uint64_t recv_bytes;
+    uint64_t sent_bytes;
+
+    uint64_t plot_recv_packets;
+    uint64_t plot_sent_packets;
+    uint64_t plot_recv_bytes;
+    uint64_t plot_sent_bytes;
+} netdata_plot_values_t;
+
 /**
  * Index used together previous structure
  */
@@ -185,8 +198,11 @@ typedef struct netdata_socket_plot {
     avl avl;
     netdata_socket_idx_t index;
 
-    //Data updated
+    //Current data
     netdata_socket_t sock;
+
+    //Previous values and values used to write on chart.
+    netdata_plot_values_t plot;
 
     int family;                     //AF_INET or AF_INET6
     char *resolved_name;            //Resolve only in the first call
@@ -203,6 +219,7 @@ typedef struct netdata_vector_plot {
     avl_tree_lock tree;
     uint32_t last;
     uint32_t next;
+    uint32_t max_plot;
 
 } netdata_vector_plot_t;
 

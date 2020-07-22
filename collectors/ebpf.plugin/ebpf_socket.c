@@ -87,6 +87,56 @@ static void ebpf_update_global_publish(
 }
 
 /**
+ * Update Network Viewer plot data
+ *
+ * @param plot  the structure where the data will be stored
+ * @param sock  the last update from the socket
+ */
+static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
+{
+    plot->plot_recv_packets = sock->recv_packets - plot->recv_packets;
+    plot->recv_packets = sock->recv_packets;
+
+    plot->plot_sent_packets = sock->sent_packets - plot->sent_packets;
+    plot->sent_packets = sock->sent_packets;
+
+    plot->plot_recv_bytes = sock->recv_bytes - plot->recv_bytes;
+    plot->recv_bytes = sock->recv_bytes;
+
+    plot->plot_sent_bytes = sock->sent_bytes - plot->sent_bytes;
+    plot->sent_bytes = sock->sent_bytes;
+}
+
+/**
+ * Calculate Network Viewer Plot
+ *
+ * Do math with collected values before to plot data.
+ */
+static inline void calculate_nv_plot()
+{
+    uint32_t i;
+    uint32_t end = inbound_vectors.next;
+    for (i = 0; i < end; i++) {
+        update_nv_plot_data(&inbound_vectors.plot[i].plot, &inbound_vectors.plot[i].sock);
+    }
+    inbound_vectors.max_plot = end;
+
+    //The 'Other' dimension is always calculated for the chart to have at least one dimension
+    update_nv_plot_data(&inbound_vectors.plot[inbound_vectors.last].plot,
+                        &inbound_vectors.plot[inbound_vectors.last].sock);
+
+    end = outbound_vectors.next;
+    for (i = 0; i < end; i++) {
+        update_nv_plot_data(&outbound_vectors.plot[i].plot, &outbound_vectors.plot[i].sock);
+    }
+    outbound_vectors.max_plot = end;
+
+    //The 'Other' dimension is always calculated for the chart to have at least one dimension
+    update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
+                        &outbound_vectors.plot[outbound_vectors.last].sock);
+}
+
+/**
  * Update the publish strctures to create the dimenssions
  *
  * @param curr   Last values read from memory.
@@ -547,7 +597,15 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
 
     char dimname[CONFIG_MAX_NAME];
     int size;
-    char *protocol = (ptr->sock.protocol == IPPROTO_UDP) ? "UDP" : "TCP";
+    char *protocol;
+    if (ptr->sock.protocol == IPPROTO_UDP) {
+        protocol = "UDP";
+    } else if (ptr->sock.protocol == IPPROTO_TCP)  {
+        protocol = "TCP";
+    } else {
+        protocol = "ALL";
+    }
+
     if (is_inbound)
         size = build_inbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
@@ -570,11 +628,10 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
  *
  * @param ptr a pointer to the structure where the values are stored.
  * @param is_inbound is a inbound ptr value?
- * @param is_last is this the last value possible?
  *
  * @return It returns 1 if the name is valid and 0 otherwise.
  */
-int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
+int fill_names(netdata_socket_plot_t *ptr, int is_inbound)
 {
     char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
     if (ptr->resolved)
@@ -584,19 +641,6 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
     static int resolve_name = -1;
     if (resolve_name == -1)
         resolve_name = network_viewer_opt.name_resolution_enabled;
-
-    if (is_last) {
-        char *other = { "Other" };
-        //We are also copying the NULL bytes to avoid warnings in new compilers
-        strncpy(hostname, other, 6);
-        strncpy(service_name, other, 6);
-
-        ptr->family = AF_INET;
-
-        fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
-        ret = 1;
-        goto laststep;
-    }
 
     netdata_socket_idx_t *idx = &ptr->index;
 
@@ -644,14 +688,40 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
                        strlen(hostname) + strlen(service_name)+ NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH,
                        service_name, is_inbound);
 
-laststep:
-
     if (resolve_name && !ret)
         ret = hostname_matches_pattern(hostname);
 
     ptr->resolved++;
 
     return ret;
+}
+
+/**
+ * Fill last Network Viewer Dimension
+ *
+ * Fill the unique dimension that is always plotted.
+ *
+ * @param ptr           the pointer for the last dimension
+ * @param is_inbound    is this an inbound structure?
+ */
+static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_inbound)
+{
+    char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
+    char *other = { "other" };
+    //We are also copying the NULL bytes to avoid warnings in new compilers
+    strncpy(hostname, other, 6);
+    strncpy(service_name, other, 6);
+
+    ptr->family = AF_INET;
+    ptr->sock.protocol = 255;
+
+    fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s",
+         (is_inbound)?"inbound":"outbound", network_viewer_opt.max_dim - 1, ptr->resolved_name,
+         ptr->dimension_recv, ptr->dimension_sent);
+#endif
 }
 
 /**
@@ -698,16 +768,6 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         int resolved;
         if (curr == last) {
-            if (!w->resolved) {
-                resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 1);
-                UNUSED(resolved);
-#ifdef NETDATA_INTERNAL_CHECKS
-                info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s",
-                     (out == &inbound_vectors)?"inbound":"outbound", curr, w->resolved_name,
-                     w->dimension_recv, w->dimension_sent);
-#endif
-            }
-
             update_socket_data(&w->sock, lvalues);
             return;
         } else {
@@ -715,7 +775,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             memcpy(&w->index, lindex, sizeof(*lindex));
             w->family = family;
 
-            resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 0);
+            resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors);
         }
 
         if (!resolved) {
@@ -1025,6 +1085,8 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
+        calculate_nv_plot();
+
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
@@ -1045,6 +1107,44 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
+
+/**
+ * Clean internal socket plot
+ *
+ * Clean all structures allocated with strdupz.
+ *
+ * @param ptr the pointer with addresses to clean.
+ */
+static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
+{
+    freez(ptr->dimension_recv);
+    freez(ptr->dimension_sent);
+    freez(ptr->resolved_name);
+}
+
+/**
+ * Clean socket plot
+ *
+ * Clean the allocated data for inbound and outbound vectors.
+ */
+static void clean_allocated_socket_plot()
+{
+    uint32_t i;
+    uint32_t end = inbound_vectors.max_plot;
+    netdata_socket_plot_t *plot = inbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+
+    clean_internal_socket_plot(&plot[inbound_vectors.last]);
+
+    end = outbound_vectors.max_plot;
+    plot = outbound_vectors.plot;
+    for (i = 0; i< end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+    clean_internal_socket_plot(&plot[outbound_vectors.last]);
+}
 
 /**
  * Clean netowrk ports allocated during initializaion.
@@ -1121,6 +1221,7 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(bandwidth_vector);
 
     freez(socket_values);
+    clean_allocated_socket_plot();
     freez(inbound_vectors.plot);
     freez(outbound_vectors.plot);
 
@@ -1181,6 +1282,19 @@ static void set_local_pointers(ebpf_module_t *em)
     }
 }
 
+/**
+ * Initialize Inbound and Outbound
+ *
+ * Initialize the common outbound and inbound sockets.
+ */
+static void initialize_inbound_outbound()
+{
+    inbound_vectors.last = network_viewer_opt.max_dim - 1;
+    outbound_vectors.last = inbound_vectors.last;
+    fill_last_nv_dimension(&inbound_vectors.plot[inbound_vectors.last], 1);
+    fill_last_nv_dimension(&outbound_vectors.plot[outbound_vectors.last], 0);
+}
+
 /*****************************************************************
  *
  *  EBPF SOCKET THREAD
@@ -1203,9 +1317,6 @@ void *ebpf_socket_thread(void *ptr)
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 
-    inbound_vectors.last = network_viewer_opt.max_dim - 1;
-    outbound_vectors.last = inbound_vectors.last;
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&socket_data);
 
@@ -1215,6 +1326,7 @@ void *ebpf_socket_thread(void *ptr)
     pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
+    initialize_inbound_outbound();
 
     if (ebpf_update_kernel(&socket_data)) {
         pthread_mutex_unlock(&lock);
