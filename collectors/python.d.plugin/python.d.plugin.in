@@ -464,7 +464,7 @@ class FileLockRegistry:
     def register(self, name):
         if name in self.locks:
             return
-        file = os.path.join(self.path, name)
+        file = os.path.join(self.path, '{0}.collector.lock'.format(name))
         lock = filelock.FileLock(file)
         lock.acquire(timeout=0)
         self.locks[name] = lock
