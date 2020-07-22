@@ -32,12 +32,6 @@ directive, not a COMMAND directive. Please adapt your execution scripts accordin
 ENTRYPOINT vs COMMAND in the [Docker
 documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 
-### Package scrambling in runtime (x86_64 only)
-
-Our x86_64 Docker images provide support for using [Polymorphic Polyverse Linux package
-scrambling](https://polyverse.com/products/polymorphing-linux-security/) to protect against buffer overflow errors. To
-activate this, set the environemnt variable `RESCRAMBLE=true` while starting Netdata with a Docker container.
-
 ## Run the Agent with the Docker command
 
 Quickly start a new Agent with the `docker run` command.
