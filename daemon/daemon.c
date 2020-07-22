@@ -63,11 +63,12 @@ void clean_directory(char *dirname)
     DIR *dir = opendir(dirname);
     if(!dir) return;
 
+    int dir_fd = dirfd(dir);
     struct dirent *de = NULL;
 
     while((de = readdir(dir)))
         if(de->d_type == DT_REG)
-            unlink(de->d_name);
+            unlinkat(dir_fd, de->d_name, 0);
 
     closedir(dir);
 }
