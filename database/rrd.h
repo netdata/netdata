@@ -812,7 +812,6 @@ struct rrdhost {
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
     uuid_t  host_uuid;                              // Global GUID for this host
-    //unsigned long objects_nr;                       // Number of charts and dimensions in this host
     uint32_t compaction_id;                         // The last metadata log compaction procedure that has processed
                                                     // this object.
 #endif

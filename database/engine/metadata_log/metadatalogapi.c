@@ -8,7 +8,7 @@ static inline struct metalog_instance *get_metalog_ctx(RRDHOST *host)
     if (host->rrdeng_ctx)
         return host->rrdeng_ctx->metalog_ctx;
 
-    if (host != localhost && localhost->rrdeng_ctx)
+    if (host != localhost && localhost->rrdeng_ctx) /*TODO: remove me */
         return localhost->rrdeng_ctx->metalog_ctx;
 
     if (multidb_ctx)
@@ -400,9 +400,10 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
     if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
         // TODO: Check what to do since we have no host
-        // uuid_t multihost_uuid;
-        //rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->host->machine_guid, metric_uuid, &multihost_uuid);
-        //rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
+        uuid_t multihost_uuid;
+
+        rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->machine_guid, metric_uuid, &multihost_uuid);
+        rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
     }
     if(!rd) {
         info("Rotated unknown archived metric.");
@@ -440,7 +441,7 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
 
     ctx = callocz(1, sizeof(*ctx));
     ctx->records_nr = 0;
-    ctx->objects_nr = 1;
+    ctx->objects_nr = 0;
     ctx->current_compaction_id = 0;
     ctx->quiesce = NO_QUIESCE;
     ctx->initialized = 0;

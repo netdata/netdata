@@ -144,7 +144,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_memory_mode     = memory_mode;
 #ifdef ENABLE_DBENGINE
     host->page_cache_mb       = default_rrdeng_page_cache_mb;
-    host->disk_space_mb       = default_rrdeng_disk_quota_mb;
+    if (init_multihost)
+        host->disk_space_mb   = default_multidb_disk_quota_mb;
+    else
+        host->disk_space_mb   = default_rrdeng_disk_quota_mb;
 #endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
 
@@ -304,7 +307,6 @@ RRDHOST *rrdhost_create(const char *hostname,
             error("Failed to store machine GUID to global map");
         else
             info("Added %s to global map for host %s", host->machine_guid, host->hostname);
-//        host->objects_nr = 1;
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
@@ -333,6 +335,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                 }
             }
         }
+        metalog_upd_objcount(host, 1);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif

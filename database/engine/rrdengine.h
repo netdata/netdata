@@ -184,7 +184,8 @@ struct rrdengine_instance {
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
     struct rrdengine_datafile_list datafiles;
-    char dbfiles_path[FILENAME_MAX+1];
+    char dbfiles_path[FILENAME_MAX + 1];
+    char machine_guid[GUID_LEN + 1]; // the unique ID of the corresponding host, or localhost for multihost DB
     uint64_t disk_space;
     uint64_t max_disk_space;
     unsigned last_fileno; /* newest index of datafile and journalfile */
