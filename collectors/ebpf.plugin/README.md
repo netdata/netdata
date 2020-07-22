@@ -198,6 +198,7 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 ```conf
 [network viewer]
     maximum dimensions = 500
+    resolve hostname ips = no
     ports = 1-1024 !145 !domain
     hostnames = !example.com
     ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
@@ -222,6 +223,10 @@ The following options are available:
 By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
 will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
+
+The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
+changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
+the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 ### `[service name]`
 
