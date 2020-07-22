@@ -117,7 +117,8 @@ pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .excluded_port = NULL, .included_port = NULL,
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .name_resolution_enabled = 0,
+                                                     .excluded_port = NULL, .included_port = NULL,
                                                      .names = NULL, .ipv4_local_ip = NULL, .ipv6_local_ip = NULL };
 
 /*****************************************************************
@@ -1480,6 +1481,11 @@ static void parse_network_viewer_section()
                                                       EBPF_NETWORK_VIEWER_SECTION,
                                                       "maximum dimensions",
                                                       500);
+
+    network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
+                                                                       EBPF_NETWORK_VIEWER_SECTION,
+                                                                       "resolve hostname ips",
+                                                                       0);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                                 "ports", NULL);
