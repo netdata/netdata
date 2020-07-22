@@ -53,7 +53,7 @@ libwebsockets.
 
 #### libmosquitto
 
-Netdata maintains a csutom fork of libmosquitto at
+Netdata maintains a custom fork of libmosquitto at
 https://github.com/netdata/mosquitto with patches to allow for proper
 integration with libwebsockets, which is needed for correct operation of
 Netdata Cloud functionality. To prepare this library for the build system:
