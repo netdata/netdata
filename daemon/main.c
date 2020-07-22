@@ -434,6 +434,14 @@ static void log_init(void) {
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", ""), 1);
 }
 
+char *initialize_lock_directory_path(char *prefix)
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
+
+    return config_get(CONFIG_SECTION_GLOBAL, "lock directory", filename);
+}
+
 static void backwards_compatible_config() {
     // move [global] options to the [web] section
     config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",
@@ -528,6 +536,8 @@ static void get_netdata_configured_variables() {
     netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
     netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
+
+    netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
 
     {
         pluginsd_initialize_plugin_directories();
@@ -692,6 +702,7 @@ void set_global_environment() {
     setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
     setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
     setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
+    setenv("NETDATA_LOCK_DIR"         , netdata_configured_lock_dir, 1);
     setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);

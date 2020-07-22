@@ -72,6 +72,7 @@ int become_user(const char *username, int pid_fd) {
 
     create_needed_dir(netdata_configured_cache_dir, uid, gid);
     create_needed_dir(netdata_configured_varlib_dir, uid, gid);
+    create_needed_dir(netdata_configured_lock_dir, uid, gid);
     create_needed_dir(claimingdirectory, uid, gid);
 
     if(pidfile[0]) {
@@ -469,6 +470,7 @@ int become_daemon(int dont_fork, const char *user)
     else {
         create_needed_dir(netdata_configured_cache_dir, getuid(), getgid());
         create_needed_dir(netdata_configured_varlib_dir, getuid(), getgid());
+        create_needed_dir(netdata_configured_lock_dir, getuid(), getgid());
         create_needed_dir(claimingdirectory, getuid(), getgid());
     }
 
