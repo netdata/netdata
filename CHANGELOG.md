@@ -6,13 +6,17 @@
 
 **Merged pull requests:**
 
+- Fixes mempcpy-\>memcpy [\#9575](https://github.com/netdata/netdata/pull/9575) ([underhood](https://github.com/underhood))
 - Added libbpf patch to make dist. [\#9571](https://github.com/netdata/netdata/pull/9571) ([Ferroin](https://github.com/Ferroin))
 - Added CAP\_SYS\_RESOURCE to capability bounding set. [\#9569](https://github.com/netdata/netdata/pull/9569) ([Ferroin](https://github.com/Ferroin))
+- charts.d.plugin: never use `-t` option for `timeout` [\#9568](https://github.com/netdata/netdata/pull/9568) ([ilyam8](https://github.com/ilyam8))
+- python.d: add job file lock registry [\#9564](https://github.com/netdata/netdata/pull/9564) ([ilyam8](https://github.com/ilyam8))
 - Adding pihole to the dns app group [\#9557](https://github.com/netdata/netdata/pull/9557) ([bmatheny](https://github.com/bmatheny))
 - health/megacli: change all instances of alarm to template [\#9553](https://github.com/netdata/netdata/pull/9553) ([tinyhammers](https://github.com/tinyhammers))
 - Revert the eBPF package bundling that breaks the release and DEB packages. [\#9552](https://github.com/netdata/netdata/pull/9552) ([prologic](https://github.com/prologic))
 - Suppress warning -Wformat-truncation in ACLK [\#9547](https://github.com/netdata/netdata/pull/9547) ([underhood](https://github.com/underhood))
 - Implemented default disk space size calculation for multihost db [\#9504](https://github.com/netdata/netdata/pull/9504) ([stelfrag](https://github.com/stelfrag))
+- Network Viewer options [\#9495](https://github.com/netdata/netdata/pull/9495) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use the libbpf library for the eBPF plugin [\#9490](https://github.com/netdata/netdata/pull/9490) ([vlvkobal](https://github.com/vlvkobal))
 - Implemented the HOST command in metadata log replay [\#9489](https://github.com/netdata/netdata/pull/9489) ([stelfrag](https://github.com/stelfrag))
 - Add better checks for existing installs to the kickstart scripts. [\#9408](https://github.com/netdata/netdata/pull/9408) ([Ferroin](https://github.com/Ferroin))
@@ -205,7 +209,6 @@
 - Update Running-behind-nginx.md [\#8880](https://github.com/netdata/netdata/pull/8880) ([slavaGanzin](https://github.com/slavaGanzin))
 - Added docmentation about workaround for clang build errors. [\#8867](https://github.com/netdata/netdata/pull/8867) ([Ferroin](https://github.com/Ferroin))
 - correct typo [\#8861](https://github.com/netdata/netdata/pull/8861) ([carehart](https://github.com/carehart))
-- Fix command name for getting postfix queue [\#8857](https://github.com/netdata/netdata/pull/8857) ([ghasrfakhri](https://github.com/ghasrfakhri))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
