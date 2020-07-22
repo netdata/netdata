@@ -581,6 +581,10 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         return 1;
 
     int ret;
+    static int resolve_name = -1;
+    if (resolve_name == -1)
+        resolve_name = network_viewer_opt.name_resolution_enabled;
+
     if (is_last) {
         char *other = { "Other" };
         //We are also copying the NULL bytes to avoid warnings in new compilers
@@ -606,8 +610,8 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         myaddr.sin_port = idx->dport;
         myaddr.sin_addr.s_addr = (!is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
 
-        ret = getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
-                          sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
+        ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
+                                              sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
@@ -624,8 +628,8 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
         myaddr6.sin6_family = AF_INET6;
         myaddr6.sin6_port =  idx->dport;
         memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
-        ret = getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
-                          sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
+        ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
+                                              sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
             //I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
@@ -642,7 +646,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
 laststep:
 
-    if (!ret)
+    if (resolve_name && !ret)
         ret = hostname_matches_pattern(hostname);
 
     ptr->resolved++;
