@@ -8,12 +8,6 @@ static inline struct metalog_instance *get_metalog_ctx(RRDHOST *host)
     if (host->rrdeng_ctx)
         return host->rrdeng_ctx->metalog_ctx;
 
-    if (host != localhost && localhost->rrdeng_ctx) /*TODO: remove me */
-        return localhost->rrdeng_ctx->metalog_ctx;
-
-    if (multidb_ctx)
-        return multidb_ctx->metalog_ctx;
-
     return NULL;
 }
 

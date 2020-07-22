@@ -129,26 +129,18 @@ RRDHOST *rrdhost_create(const char *hostname,
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
 #ifdef ENABLE_DBENGINE
-    int is_legacy = is_archived ? 0 : is_legacy_child(guid);
+    int is_legacy = is_archived ? 0 : (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
 #else
     int is_legacy = 1;
 #endif
     rrd_check_wrlock();
 
-    int init_multihost = (!is_legacy && !is_localhost && localhost &&
-                     localhost->rrd_memory_mode != memory_mode && memory_mode == RRD_MEMORY_MODE_DBENGINE);
+    int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
     host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
-#ifdef ENABLE_DBENGINE
-    host->page_cache_mb       = default_rrdeng_page_cache_mb;
-    if (init_multihost)
-        host->disk_space_mb   = default_multidb_disk_quota_mb;
-    else
-        host->disk_space_mb   = default_rrdeng_disk_quota_mb;
-#endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
 
     host->sender = mallocz(sizeof(*host->sender));
@@ -237,10 +229,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
         // this is not localhost - append our GUID to localhost path
-        if (init_multihost) {
+        if (is_in_multihost) { // don't append to cache dir in multihost
             host->cache_dir  = strdupz(netdata_configured_cache_dir);
-        }
-        else {
+        } else {
             snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
             host->cache_dir = strdupz(filename);
         }
@@ -311,30 +302,27 @@ RRDHOST *rrdhost_create(const char *hostname,
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
-        if (is_localhost || is_legacy || init_multihost) {
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
-            ret = mkdir(dbenginepath, 0775);
-            if (ret != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
-            else {
-                if (!is_localhost || init_multihost) {
-                    if (init_multihost)
-                        ret = rrdeng_init(host, &multidb_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
-                    else
-                        ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
-                    if (ret) {
-                        error(
-                            "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-                            host->hostname, host->machine_guid, host->cache_dir);
-                        rrdhost_free(host);
-                        host = NULL;
-                        //rrd_hosts_available++; //TODO: maybe we want this?
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+        ret = mkdir(dbenginepath, 0775);
+        if (ret != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
+        else ret = 0; // succeed
+        if (is_legacy) // initialize legacy dbengine instance as needed
+            ret = rrdeng_init(host, &host->rrdeng_ctx, dbenginepath, default_rrdeng_page_cache_mb,
+                              default_rrdeng_disk_quota_mb); // may fail here for legacy dbengine initialization
+        else
+            host->rrdeng_ctx = &multidb_ctx;
+        if (ret) { // check legacy or multihost initialization success
+            error(
+                "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+                host->hostname, host->machine_guid, host->cache_dir);
+            rrdhost_free(host);
+            host = NULL;
+            //rrd_hosts_available++; //TODO: maybe we want this?
 
-                        return host;
-                    }
-                }
-            }
+            return host;
         }
+
         metalog_upd_objcount(host, 1);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
@@ -630,30 +618,18 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         return 1;
 
 #ifdef ENABLE_DBENGINE
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        char dbenginepath[FILENAME_MAX + 1];
-        int ret;
-        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
-        ret = rrdeng_init(
-            localhost, &localhost->rrdeng_ctx, dbenginepath, localhost->page_cache_mb, localhost->disk_space_mb);
-        if (ret) {
-            error(
-                "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-                localhost->hostname, localhost->machine_guid, localhost->cache_dir);
-            rrdhost_free(localhost);
-            localhost = NULL;
-        }
-    }
-    else
-    {
-        char dbenginepath[FILENAME_MAX + 1];
-        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
-
-        uv_fs_t stat_req;
-        int rc = uv_fs_stat(NULL, &stat_req, dbenginepath, NULL);
-        if (likely(rc == 0 && ((stat_req.statbuf.st_mode & S_IFMT) == S_IFDIR))) {
-            rrdeng_init(NULL, &multidb_ctx, dbenginepath, default_rrdeng_page_cache_mb, default_rrdeng_disk_quota_mb);
-        }
+    char dbenginepath[FILENAME_MAX + 1];
+    int ret;
+    snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", localhost->cache_dir);
+    ret = rrdeng_init( // Unconditionally create multihost db to support on demand host creation
+        localhost, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb);
+    if (ret) {
+        error(
+            "Host '%s' with machine guid '%s' failed to initialize multi-host DB engine instance at '%s'.",
+            localhost->hostname, localhost->machine_guid, localhost->cache_dir);
+        rrdhost_free(localhost);
+        localhost = NULL;
+        return 1;
     }
 #endif
 

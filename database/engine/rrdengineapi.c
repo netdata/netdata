@@ -2,8 +2,7 @@
 #include "rrdengine.h"
 
 /* Default global database instance */
-static struct rrdengine_instance default_global_ctx;
-struct rrdengine_instance *multidb_ctx = NULL;
+struct rrdengine_instance multidb_ctx;
 
 int default_rrdeng_page_cache_mb = 32;
 int default_rrdeng_disk_quota_mb = 256;
@@ -11,12 +10,9 @@ int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
 uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
-struct rrdengine_instance *get_multihost_db_ctx(RRDHOST *host)
+static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host)
 {
-    struct rrdengine_instance *ctx = host->rrdeng_ctx;
-    if (ctx == NULL)
-        ctx = localhost->rrdeng_ctx ? localhost->rrdeng_ctx : multidb_ctx;
-    return ctx;
+    return host->rrdeng_ctx;
 }
 
 /* This UUID is not unique across hosts */
@@ -62,7 +58,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     struct pg_cache_page_index *page_index = NULL;
     int replace_instead_of_generate = 0;
 
-    ctx = get_multihost_db_ctx(rd->rrdset->rrdhost);
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
     if (unlikely(!ctx)) {
         error("Failed to fetch multidb context");
         return;
@@ -145,7 +141,7 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
 
-    ctx = get_multihost_db_ctx(rd->rrdset->rrdhost);
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
     handle = &rd->state->handle.rrdeng;
     handle->ctx = ctx;
 
@@ -389,7 +385,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     struct rrdeng_region_info *region_info_array;
     uint8_t is_first_region_initialized;
 
-    ctx = get_multihost_db_ctx(st->rrdhost);
+    ctx = get_rrdeng_ctx_from_host(st->rrdhost);
     regions = 1;
     *max_intervalp = max_interval = 0;
     region_info_array = NULL;
@@ -551,7 +547,7 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     struct rrdengine_instance *ctx;
     unsigned pages_nr;
 
-    ctx = get_multihost_db_ctx(rd->rrdset->rrdhost);
+    ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
     handle = &rrdimm_handle->rrdeng;
@@ -897,8 +893,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     }
 
     if (NULL == ctxp) {
-        /* for testing */
-        ctx = &default_global_ctx;
+        ctx = &multidb_ctx;
         memset(ctx, 0, sizeof(*ctx));
     } else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
@@ -958,7 +953,7 @@ error_after_rrdeng_worker:
     finalize_rrd_files(ctx);
 error_after_init_rrd_files:
     free_page_cache(ctx);
-    if (ctx != &default_global_ctx) {
+    if (ctx != &multidb_ctx) {
         freez(ctx);
         *ctxp = NULL;
     }
@@ -987,7 +982,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
-    if (ctx != &default_global_ctx) {
+    if (ctx != &multidb_ctx) {
         freez(ctx);
     }
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
