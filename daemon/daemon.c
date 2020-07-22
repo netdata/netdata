@@ -68,7 +68,8 @@ void clean_directory(char *dirname)
 
     while((de = readdir(dir)))
         if(de->d_type == DT_REG)
-            unlinkat(dir_fd, de->d_name, 0);
+            if (unlinkat(dir_fd, de->d_name, 0))
+                error("Cannot delete %s/%s", dirname, de->d_name);
 
     closedir(dir);
 }
