@@ -531,10 +531,10 @@ static inline int build_outbound_dimension_name(char *dimname, char *service_nam
  * @param hostname     the hostname resolved or IP.
  * @param length       the length for the hostname.
  * @param service_name the service name associated to the connection
- * @param is_inboud    the is this an ibound connection
+ * @param is_outbound    the is this an outbound connection
  */
 static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname, size_t length,
-                                      char *service_name, int is_inbound)
+                                      char *service_name, int is_outbound)
 {
     if (length < NETDATA_MAX_NETWORK_COMBINED_LENGTH)
         ptr->resolved_name = strdupz(hostname);
@@ -548,7 +548,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     char dimname[CONFIG_MAX_NAME];
     int size;
     char *protocol = (ptr->sock.protocol == IPPROTO_UDP) ? "UDP" : "TCP";
-    if (is_inbound)
+    if (is_outbound)
         size = build_inbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
         size = build_outbound_dimension_name(dimname,service_name, protocol);
@@ -608,13 +608,13 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
         myaddr.sin_family = ptr->family;
         myaddr.sin_port = idx->dport;
-        myaddr.sin_addr.s_addr = (!is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
+        myaddr.sin_addr.s_addr = (is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
 
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
             //I cannot resolve the name, I will use the IP
-            if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
+            if (!inet_ntop(AF_INET, &myaddr.sin_addr.s_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
 
@@ -627,7 +627,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
         myaddr6.sin6_family = AF_INET6;
         myaddr6.sin6_port =  idx->dport;
-        memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
+        memcpy(myaddr6.sin6_addr.s6_addr, (is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
@@ -699,7 +699,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         int resolved;
         if (curr == last) {
             if (!w->resolved) {
-                resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 1);
+                resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 1);
                 UNUSED(resolved);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s",
@@ -715,7 +715,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             memcpy(&w->index, lindex, sizeof(*lindex));
             w->family = family;
 
-            resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors, 0);
+            resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 0);
         }
 
         if (!resolved) {
