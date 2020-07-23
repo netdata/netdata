@@ -847,13 +847,13 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound)
 
         myaddr.sin_family = ptr->family;
         myaddr.sin_port = idx->dport;
-        myaddr.sin_addr.s_addr = (!is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
+        myaddr.sin_addr.s_addr = (is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
 
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
             //I cannot resolve the name, I will use the IP
-            if (!inet_ntop(AF_INET, &myaddr.sin_addr, hostname, NI_MAXHOST)) {
+            if (!inet_ntop(AF_INET, &myaddr.sin_addr.s_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
 
@@ -866,7 +866,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound)
 
         myaddr6.sin6_family = AF_INET6;
         myaddr6.sin6_port =  idx->dport;
-        memcpy(myaddr6.sin6_addr.s6_addr, (!is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
+        memcpy(myaddr6.sin6_addr.s6_addr, (is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
