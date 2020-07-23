@@ -266,18 +266,14 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
             fatal_assert(0);
             break;
         case GUID_TYPE_CHART:
-            host = metalog_get_host_from_uuid(NULL, uuid);
-            if (host) {
-                st = metalog_get_chart_from_uuid(ctx, uuid);
-                if (st) {
-                    rrdhost_wrlock(host);
-                    rrdset_free(st);
-                    rrdhost_unlock(host);
-                } else {
-                    debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
-                }
+            st = metalog_get_chart_from_uuid(ctx, uuid);
+            if (st) {
+                host = st->rrdhost;
+                rrdhost_wrlock(host);
+                rrdset_free(st);
+                rrdhost_unlock(host);
             } else {
-                debug(D_METADATALOG, "Ignoring nonexistent host metadata record.");
+                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
             }
             break;
         case GUID_TYPE_DIMENSION:

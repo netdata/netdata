@@ -81,9 +81,9 @@ void metalog_commit_update_host(RRDHOST *host)
 
     /* Metadata are only available with dbengine */
     ctx = get_metalog_ctx(host);
-    if (!ctx) /* metadata log has not been initialized yet */
+    if (!ctx)
         return;
-    if (ctx && !ctx->initialized)
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
 
     buffer = metalog_update_host_buffer(host);
@@ -180,9 +180,9 @@ void metalog_commit_update_chart(RRDSET *st)
         return;
 
     ctx = get_metalog_ctx(st->rrdhost);
-    if (!ctx) /* metadata log has not been initialized yet */
+    if (!ctx)
         return;
-    if (ctx && !ctx->initialized)
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
 
     buffer = metalog_update_chart_buffer(st, 0);
@@ -201,9 +201,9 @@ void metalog_commit_delete_chart(RRDSET *st)
         return;
 
     ctx = get_metalog_ctx(st->rrdhost);
-    if (!ctx) /* metadata log has not been initialized yet */
+    if (!ctx)
         return;
-    if (ctx && !ctx->initialized)
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
@@ -253,9 +253,9 @@ void metalog_commit_update_dimension(RRDDIM *rd)
         return;
 
     ctx = get_metalog_ctx(st->rrdhost);
-    if (!ctx) /* metadata log has not been initialized yet */
+    if (!ctx)
         return;
-    if (ctx && !ctx->initialized)
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
 
     buffer = metalog_update_dimension_buffer(rd);
@@ -275,9 +275,9 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
         return;
 
     ctx = get_metalog_ctx(st->rrdhost);
-    if (!ctx) /* metadata log has not been initialized yet */
+    if (!ctx)
         return;
-    if (ctx && !ctx->initialized)
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
@@ -459,7 +459,6 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-    //rrdeng_parent_ctx->metalog_ctx = ctx; /* notify dbengine that the metadata log has finished initializing */
     ctx->initialized = 1; /* notify dbengine that the metadata log has finished initializing */
     return 0;
 
