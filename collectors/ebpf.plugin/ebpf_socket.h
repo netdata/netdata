@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #ifndef NETDATA_EBPF_SOCKET_H
-# define NETDATA_EBPF_SOCKET_H 1
-# include <stdint.h>
-# include "libnetdata/avl/avl.h"
+#define NETDATA_EBPF_SOCKET_H 1
+#include <stdint.h>
+#include "libnetdata/avl/avl.h"
 
 //Vector indexes
-# define NETDATA_MAX_SOCKET_VECTOR 6
-# define NETDATA_UDP_START 3
-# define NETDATA_RETRANSMIT_START 5
+#define NETDATA_MAX_SOCKET_VECTOR 6
+#define NETDATA_UDP_START 3
+#define NETDATA_RETRANSMIT_START 5
 
-# define NETDATA_SOCKET_APPS_HASH_TABLE 0
-# define NETDATA_SOCKET_IPV4_HASH_TABLE 1
-# define NETDATA_SOCKET_IPV6_HASH_TABLE 2
-# define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
+#define NETDATA_SOCKET_APPS_HASH_TABLE 0
+#define NETDATA_SOCKET_IPV4_HASH_TABLE 1
+#define NETDATA_SOCKET_IPV6_HASH_TABLE 2
+#define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
 
-# define NETDATA_SOCKET_READ_SLEEP_MS 400000
+#define NETDATA_SOCKET_READ_SLEEP_MS 400000
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -56,11 +56,11 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
 
 //Port range
-# define NETDATA_MINIMUM_PORT_VALUE 1
-# define NETDATA_MAXIMUM_PORT_VALUE 65535
+#define NETDATA_MINIMUM_PORT_VALUE 1
+#define NETDATA_MAXIMUM_PORT_VALUE 65535
 
-# define NETDATA_MINIMUM_IPV4_CIDR 0
-# define NETDATA_MAXIMUM_IPV4_CIDR 32
+#define NETDATA_MINIMUM_IPV4_CIDR 0
+#define NETDATA_MAXIMUM_IPV4_CIDR 32
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
@@ -172,20 +172,20 @@ typedef struct netdata_socket_idx {
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
 
 //Next values were defined according getnameinfo(3)
-# define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
-# define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
-# define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
+#define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
+#define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
+#define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
 
 /**
  * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
  * in the long term, on the other had it is faster.
  */
 typedef struct netdata_socket_plot {
-    //Search
+    // Search
     avl avl;
     netdata_socket_idx_t index;
 
-    //Data updated
+    // Updated data
     netdata_socket_t sock;
 
     int family;                     //AF_INET or AF_INET6
@@ -196,7 +196,6 @@ typedef struct netdata_socket_plot {
     char *dimension_recv;
 } netdata_socket_plot_t;
 
-//TODO: REMOVE THIS DEFINITION AFTER 9495 TO BE MERGED
 typedef struct netdata_vector_plot {
     netdata_socket_plot_t *plot;
 
