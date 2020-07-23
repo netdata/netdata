@@ -174,11 +174,13 @@ typedef struct netdata_plot_values {
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
+    uint16_t retransmit;
 
     uint64_t plot_recv_packets;
     uint64_t plot_sent_packets;
     uint64_t plot_recv_bytes;
     uint64_t plot_sent_bytes;
+    uint16_t plot_retransmit;
 } netdata_plot_values_t;
 
 /**

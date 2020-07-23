@@ -105,6 +105,9 @@ static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_sock
 
     plot->plot_sent_bytes = sock->sent_bytes - plot->sent_bytes;
     plot->sent_bytes = sock->sent_bytes;
+
+    plot->plot_retransmit = sock->retransmit - plot->retransmit;
+    plot->retransmit = sock->retransmit;
 }
 
 /**
@@ -239,6 +242,110 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     write_end_chart();
 }
 
+/**
+ * Network viewer send bytes
+ *
+ * @param ptr   the structure with values to plot
+ * @param chart the chart name.
+ */
+static inline void ebpf_socket_nv_send_bytes(netdata_vector_plot_t *ptr, char *chart)
+{
+    uint32_t i;
+    uint32_t end = ptr->max_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    collected_number value;
+
+    write_begin_chart(NETDATA_EBPF_FAMILY, chart);
+    for (i = 0; i < end; i++) {
+        value = - ((collected_number) w[i].plot.plot_sent_bytes);
+        write_chart_dimension(w[i].dimension_sent, value);
+        value = (collected_number) w[i].plot.plot_recv_bytes;
+        write_chart_dimension(w[i].dimension_recv, value);
+    }
+
+    i = ptr->last;
+    value = - ((collected_number) w[i].plot.plot_sent_bytes);
+    write_chart_dimension(w[i].dimension_sent, value);
+    value = (collected_number) w[i].plot.plot_recv_bytes;
+    write_chart_dimension(w[i].dimension_recv, value);
+    write_end_chart();
+}
+
+/**
+ * Network Viewer Send packets
+ *
+ * @param ptr   the structure with values to plot
+ * @param chart the chart name.
+ */
+static inline void ebpf_socket_nv_send_packets(netdata_vector_plot_t *ptr, char *chart)
+{
+    uint32_t i;
+    uint32_t end = ptr->max_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    collected_number value;
+
+    write_begin_chart(NETDATA_EBPF_FAMILY, chart);
+    for (i = 0; i < end; i++) {
+        value = -((collected_number)w[i].plot.plot_sent_packets);
+        write_chart_dimension(w[i].dimension_sent, value);
+        value = (collected_number) w[i].plot.plot_recv_packets;
+        write_chart_dimension(w[i].dimension_recv, value);
+    }
+
+    i = ptr->last;
+    value = - ((collected_number)w[i].plot.plot_sent_packets);
+    write_chart_dimension(w[i].dimension_sent, value);
+    value = (collected_number)w[i].plot.plot_recv_packets;
+    write_chart_dimension(w[i].dimension_recv, value);
+    write_end_chart();
+}
+
+/**
+ * Network Viewer Send Retransmit
+ *
+ * @param ptr   the structure with values to plot
+ * @param chart the chart name.
+ */
+static inline void ebpf_socket_nv_send_retransmit(netdata_vector_plot_t *ptr, char *chart)
+{
+    uint32_t i;
+    uint32_t end = ptr->max_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    collected_number value;
+
+    write_begin_chart(NETDATA_EBPF_FAMILY, chart);
+    for (i = 0; i < end; i++) {
+        value = (collected_number) w[i].plot.plot_retransmit;
+        write_chart_dimension(w[i].dimension_sent, value);
+    }
+
+    i = ptr->last;
+    value = (collected_number)w[i].plot.plot_retransmit;
+    write_chart_dimension(w[i].dimension_sent, value);
+    write_end_chart();
+}
+
+/**
+ *
+ * @param ptr
+ */
+static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
+{
+    if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
+        ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_OUTBOUND_BYTES);
+
+        ebpf_socket_nv_send_packets(ptr, NETDATA_NV_OUTBOUND_PACKETS);
+
+        ebpf_socket_nv_send_retransmit(ptr,  NETDATA_NV_OUTBOUND_RETRANSMIT);
+    } else {
+        ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_INBOUND_BYTES);
+
+        ebpf_socket_nv_send_packets(ptr, NETDATA_NV_INBOUND_PACKETS);
+    }
+
+    ptr->last_plot = ptr->max_plot;
+}
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CREATE CHARTS
@@ -357,13 +464,16 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
 }
 
 /**
+ *  Create network viewer chart
  *
- * @param id
- * @param title
- * @param units
- * @param family
- * @param order
- * @param ptr
+ *  Create a specific chart.
+ *
+ * @param id        the chart id
+ * @param title     the chart title
+ * @param units     the units label
+ * @param family    the group name used to attach the chart on dashaboard
+ * @param order     the chart order
+ * @param ptr       the plot structure with values.
  */
 void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                                  char *family, int order, netdata_vector_plot_t *ptr)
@@ -438,8 +548,6 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                     21085,
                                     ptr);
     }
-
-    ptr->last_plot = ptr->max_plot;
 }
 
 /*****************************************************************
@@ -1181,7 +1289,10 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
         ebpf_socket_create_nv_charts(&inbound_vectors);
+        ebpf_socket_send_nv_data(&inbound_vectors);
+
         ebpf_socket_create_nv_charts(&outbound_vectors);
+        ebpf_socket_send_nv_data(&outbound_vectors);
 
         pthread_mutex_unlock(&collect_data_mutex);
 
