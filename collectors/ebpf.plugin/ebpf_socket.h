@@ -171,7 +171,7 @@ typedef struct netdata_socket_idx {
     uint16_t sport;
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
 
-//Next values were defined according getnameinfo(3)
+// Next values were defined according getnameinfo(3)
 #define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
 #define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
 #define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
