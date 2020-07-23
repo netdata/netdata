@@ -278,6 +278,14 @@ jobs:
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
 
+    - name: "Build & Publish DEB package for ubuntu/focal"
+      <<: *DEB_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="focal" BUILD_STRING="ubuntu/focal"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
     - name: "Build & Publish DEB package for debian/buster"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Debian)?\]/
