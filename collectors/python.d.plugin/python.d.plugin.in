@@ -52,7 +52,7 @@ ENV_NETDATA_STOCK_CONFIG_DIR = 'NETDATA_STOCK_CONFIG_DIR'
 ENV_NETDATA_PLUGINS_DIR = 'NETDATA_PLUGINS_DIR'
 ENV_NETDATA_LIB_DIR = 'NETDATA_LIB_DIR'
 ENV_NETDATA_UPDATE_EVERY = 'NETDATA_UPDATE_EVERY'
-ENV_NETDATA_LOCKS_DIR = 'NETDATA_LOCKS_DIR'
+ENV_NETDATA_LOCK_DIR = 'NETDATA_LOCK_DIR'
 
 
 def add_pythond_packages():
@@ -93,8 +93,8 @@ def dirs():
         os.path.dirname(__file__),
     )
     locks = os.getenv(
-        ENV_NETDATA_LOCKS_DIR,
-        # TODO: add '@locksdir_POST@
+        ENV_NETDATA_LOCK_DIR,
+        os.path.join('@varlibdir_POST@', 'lock')
     )
     modules_user_config = os.path.join(plugin_user_config, 'python.d')
     modules_stock_config = os.path.join(plugin_stock_config, 'python.d')
@@ -464,7 +464,7 @@ class FileLockRegistry:
     def register(self, name):
         if name in self.locks:
             return
-        file = os.path.join(self.path, name)
+        file = os.path.join(self.path, '{0}.collector.lock'.format(name))
         lock = filelock.FileLock(file)
         lock.acquire(timeout=0)
         self.locks[name] = lock
@@ -485,22 +485,16 @@ class DummyRegistry:
         pass
 
 
-def create_jobs_registry():
-    if not DIRS.locks:
-        return DummyRegistry()
-    return FileLockRegistry(DIRS.locks)
-
-
 class Plugin:
     config_name = 'python.d.conf'
     jobs_status_dump_name = 'pythond-jobs-statuses.json'
 
-    def __init__(self, modules_to_run, min_update_every):
+    def __init__(self, modules_to_run, min_update_every, registry):
         self.modules_to_run = modules_to_run
         self.min_update_every = min_update_every
         self.config = PluginConfig(PLUGIN_BASE_CONF)
         self.log = PythonDLogger()
-        self.registry = create_jobs_registry()
+        self.registry = registry
         self.started_jobs = collections.defaultdict(dict)
         self.jobs = list()
         self.saver = None
@@ -748,6 +742,7 @@ def parse_command_line():
 
     debug = False
     trace = False
+    nolock = False
     update_every = 1
     modules_to_run = list()
 
@@ -764,6 +759,9 @@ def parse_command_line():
     if 'trace' in opts:
         trace = True
         opts.remove('trace')
+    if 'nolock' in opts:
+        nolock = True
+        opts.remove('nolock')
     if opts:
         modules_to_run = list(opts)
 
@@ -773,13 +771,15 @@ def parse_command_line():
             'update_every',
             'debug',
             'trace',
+            'nolock',
             'modules_to_run',
         ])
     return cmd(
         update_every,
         debug,
         trace,
-        modules_to_run
+        nolock,
+        modules_to_run,
     )
 
 
@@ -827,9 +827,15 @@ def main():
             log.info('probably you meant : \n{0}'.format(pprint.pformat(guessed, width=1)))
         return
 
+    if DIRS.locks and not cmd.nolock:
+        registry = FileLockRegistry(DIRS.locks)
+    else:
+        registry = DummyRegistry()
+
     p = Plugin(
         cmd.modules_to_run or AVAILABLE_MODULES,
         cmd.update_every,
+        registry,
     )
 
     try:

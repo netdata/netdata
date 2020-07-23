@@ -92,6 +92,7 @@ extern char *netdata_configured_primary_plugins_dir;
 extern char *netdata_configured_web_dir;
 extern char *netdata_configured_cache_dir;
 extern char *netdata_configured_varlib_dir;
+extern char *netdata_configured_lock_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;

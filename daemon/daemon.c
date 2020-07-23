@@ -58,6 +58,22 @@ void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
         error("Cannot create directory '%s'", dir);
 }
 
+void clean_directory(char *dirname)
+{
+    DIR *dir = opendir(dirname);
+    if(!dir) return;
+
+    int dir_fd = dirfd(dir);
+    struct dirent *de = NULL;
+
+    while((de = readdir(dir)))
+        if(de->d_type == DT_REG)
+            if (unlinkat(dir_fd, de->d_name, 0))
+                error("Cannot delete %s/%s", dirname, de->d_name);
+
+    closedir(dir);
+}
+
 int become_user(const char *username, int pid_fd) {
     int am_i_root = (getuid() == 0)?1:0;
 
@@ -72,7 +88,10 @@ int become_user(const char *username, int pid_fd) {
 
     create_needed_dir(netdata_configured_cache_dir, uid, gid);
     create_needed_dir(netdata_configured_varlib_dir, uid, gid);
+    create_needed_dir(netdata_configured_lock_dir, uid, gid);
     create_needed_dir(claimingdirectory, uid, gid);
+
+    clean_directory(netdata_configured_lock_dir);
 
     if(pidfile[0]) {
         if(chown(pidfile, uid, gid) == -1)
@@ -469,7 +488,10 @@ int become_daemon(int dont_fork, const char *user)
     else {
         create_needed_dir(netdata_configured_cache_dir, getuid(), getgid());
         create_needed_dir(netdata_configured_varlib_dir, getuid(), getgid());
+        create_needed_dir(netdata_configured_lock_dir, getuid(), getgid());
         create_needed_dir(claimingdirectory, getuid(), getgid());
+
+        clean_directory(netdata_configured_lock_dir);
     }
 
     if(pidfd != -1)
