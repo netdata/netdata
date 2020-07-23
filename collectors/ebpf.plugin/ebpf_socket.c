@@ -347,13 +347,99 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
-                               "bytes received",
+                               "Bytes received",
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20081,
                                root);
 
     socket_apps_created = 1;
+}
+
+/**
+ *
+ * @param id
+ * @param title
+ * @param units
+ * @param family
+ * @param order
+ * @param ptr
+ */
+void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
+                                 char *family, int order, netdata_vector_plot_t *ptr)
+{
+    ebpf_write_chart_cmd(NETDATA_EBPF_FAMILY,
+                         id,
+                         title,
+                         units,
+                         family,
+                         "line",
+                         order);
+
+    uint32_t i;
+    uint32_t end = ptr->max_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    for (i = 0; i < end; i++) {
+        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[i].dimension_sent);
+        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[i].dimension_recv);
+    }
+
+    end = ptr->last;
+    fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[end].dimension_sent);
+    fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[end].dimension_recv);
+}
+
+/**
+ * Create Network Viewer charts
+ *
+ * Recreate the charts when new sockets are created.
+ *
+ * @param ptr a pointer for inbound or outbound vectors.
+ */
+static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
+{
+    //We do not have new sockets, we do not need move forward
+    if (ptr->max_plot == ptr->last_plot)
+        return;
+
+    if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
+        ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
+                                    "Outbound bytes.",
+                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    NETDATA_SOCKET_GROUP,
+                                    21080,
+                                    ptr);
+
+        ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_PACKETS,
+                                    "Outbound packets",
+                                    EBPF_COMMON_DIMENSION_CALL,
+                                    NETDATA_SOCKET_GROUP,
+                                    21082,
+                                    ptr);
+
+        ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_RETRANSMIT,
+                                    "Retransmitted packets",
+                                    EBPF_COMMON_DIMENSION_CALL,
+                                    NETDATA_SOCKET_GROUP,
+                                    21083,
+                                    ptr);
+    } else {
+        ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
+                                    "Inbound bytes",
+                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    NETDATA_SOCKET_GROUP,
+                                    21084,
+                                    ptr);
+
+        ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_PACKETS,
+                                    "Inbound packets",
+                                    EBPF_COMMON_DIMENSION_CALL,
+                                    NETDATA_SOCKET_GROUP,
+                                    21085,
+                                    ptr);
+    }
+
+    ptr->last_plot = ptr->max_plot;
 }
 
 /*****************************************************************
@@ -581,10 +667,10 @@ static inline int build_outbound_dimension_name(char *dimname, char *service_nam
  * @param hostname     the hostname resolved or IP.
  * @param length       the length for the hostname.
  * @param service_name the service name associated to the connection
- * @param is_inboud    the is this an ibound connection
+ * @param is_inboud    the is this an outound connection
  */
 static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname, size_t length,
-                                      char *service_name, int is_inbound)
+                                      char *service_name, int is_outbound)
 {
     if (length < NETDATA_MAX_NETWORK_COMBINED_LENGTH)
         ptr->resolved_name = strdupz(hostname);
@@ -606,7 +692,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
         protocol = "ALL";
     }
 
-    if (is_inbound)
+    if (is_outbound)
         size = build_inbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
         size = build_outbound_dimension_name(dimname,service_name, protocol);
@@ -704,7 +790,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound)
  * @param ptr           the pointer for the last dimension
  * @param is_inbound    is this an inbound structure?
  */
-static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_inbound)
+static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
 {
     char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
     char *other = { "other" };
@@ -715,11 +801,11 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_inbound)
     ptr->family = AF_INET;
     ptr->sock.protocol = 255;
 
-    fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
+    fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_outbound);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s",
-         (is_inbound)?"inbound":"outbound", network_viewer_opt.max_dim - 1, ptr->resolved_name,
+         (is_outbound)?"outbound":"inbound", network_viewer_opt.max_dim - 1, ptr->resolved_name,
          ptr->dimension_recv, ptr->dimension_sent);
 #endif
 }
@@ -775,7 +861,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             memcpy(&w->index, lindex, sizeof(*lindex));
             w->family = family;
 
-            resolved = fill_names(w, out == (netdata_vector_plot_t *)&inbound_vectors);
+            resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors);
         }
 
         if (!resolved) {
@@ -1094,9 +1180,13 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
+        ebpf_socket_create_nv_charts(&inbound_vectors);
+        ebpf_socket_create_nv_charts(&outbound_vectors);
+
         pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_unlock(&lock);
+
 
         fflush(stdout);
     }
@@ -1291,8 +1381,8 @@ static void initialize_inbound_outbound()
 {
     inbound_vectors.last = network_viewer_opt.max_dim - 1;
     outbound_vectors.last = inbound_vectors.last;
-    fill_last_nv_dimension(&inbound_vectors.plot[inbound_vectors.last], 1);
-    fill_last_nv_dimension(&outbound_vectors.plot[outbound_vectors.last], 0);
+    fill_last_nv_dimension(&inbound_vectors.plot[inbound_vectors.last], 0);
+    fill_last_nv_dimension(&outbound_vectors.plot[outbound_vectors.last], 1);
 }
 
 /*****************************************************************

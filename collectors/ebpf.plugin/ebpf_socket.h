@@ -40,20 +40,27 @@ typedef enum ebpf_socket_idx {
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
-#define NETDATA_SOCKET_GROUP "Socket"
+# define NETDATA_SOCKET_GROUP "Socket"
 
 // Global chart name
-#define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
-#define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
-#define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
-#define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
-#define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
-#define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
-#define NETDATA_UDP_FUNCTION_ERROR "udp_error"
+# define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
+# define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
+# define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
+# define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
+# define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
+# define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
+# define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
 // Charts created on Apps submenu
-#define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
-#define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+# define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
+# define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+
+// Network viewer charts
+# define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
+# define NETDATA_NV_OUTBOUND_PACKETS "outbound_packets"
+# define NETDATA_NV_OUTBOUND_RETRANSMIT "outbound_retransmit"
+# define NETDATA_NV_INBOUND_BYTES "inbound_bytes"
+# define NETDATA_NV_INBOUND_PACKETS "inbound_packets"
 
 //Port range
 # define NETDATA_MINIMUM_PORT_VALUE 1
@@ -214,12 +221,13 @@ typedef struct netdata_socket_plot {
 
 //TODO: REMOVE THIS DEFINITION AFTER 9495 TO BE MERGED
 typedef struct netdata_vector_plot {
-    netdata_socket_plot_t *plot;
+    netdata_socket_plot_t *plot;    //Vector used to plot charts
 
-    avl_tree_lock tree;
-    uint32_t last;
-    uint32_t next;
-    uint32_t max_plot;
+    avl_tree_lock tree;             //AVL tree to speed up search
+    uint32_t last;                  //The 'other' dimension, the last chart accepted.
+    uint32_t next;                  //The next position to store in the vector.
+    uint32_t max_plot;              //Max number of elements to plot.
+    uint32_t last_plot;             //Last element plot
 
 } netdata_vector_plot_t;
 
