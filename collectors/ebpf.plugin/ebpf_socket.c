@@ -1046,6 +1046,45 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
  *
  *****************************************************************/
 
+
+/**
+ * Clean internal socket plot
+ *
+ * Clean all structures allocated with strdupz.
+ *
+ * @param ptr the pointer with addresses to clean.
+ */
+static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
+{
+    freez(ptr->dimension_recv);
+    freez(ptr->dimension_sent);
+    freez(ptr->resolved_name);
+}
+
+/**
+ * Clean socket plot
+ *
+ * Clean the allocated data for inbound and outbound vectors.
+ */
+static void clean_allocated_socket_plot()
+{
+    uint32_t i;
+    uint32_t end = inbound_vectors.last;
+    netdata_socket_plot_t *plot = inbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+
+    clean_internal_socket_plot(&plot[inbound_vectors.last]);
+
+    end = outbound_vectors.last;
+    plot = outbound_vectors.plot;
+    for (i = 0; i < end; i++) {
+        clean_internal_socket_plot(&plot[i]);
+    }
+    clean_internal_socket_plot(&plot[outbound_vectors.last]);
+}
+
 /**
  * Clean netowrk ports allocated during initializaion.
  *
@@ -1121,6 +1160,7 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(bandwidth_vector);
 
     freez(socket_values);
+    clean_allocated_socket_plot();
     freez(inbound_vectors.plot);
     freez(outbound_vectors.plot);
 
