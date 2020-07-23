@@ -276,7 +276,7 @@ int compute_multidb_diskspace()
 
             fp = fopen(multidb_disk_space_file, "w");
             if (likely(fp)) {
-                fprintf(fp, "%d", rc * default_rrdeng_disk_quota_mb);
+                fprintf(fp, "%d", computed_multidb_disk_quota_mb);
                 info("Created file '%s' to store the computed value", multidb_disk_space_file);
                 fclose(fp);
             } else
