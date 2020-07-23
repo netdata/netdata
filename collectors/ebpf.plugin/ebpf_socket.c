@@ -31,6 +31,7 @@ static int socket_apps_created = 0;
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
+pthread_mutex_t nv_mutex;
 
 static int *map_fd = NULL;
 
@@ -251,7 +252,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
 static inline void ebpf_socket_nv_send_bytes(netdata_vector_plot_t *ptr, char *chart)
 {
     uint32_t i;
-    uint32_t end = ptr->max_plot;
+    uint32_t end = ptr->last_plot;
     netdata_socket_plot_t *w = ptr->plot;
     collected_number value;
 
@@ -280,7 +281,7 @@ static inline void ebpf_socket_nv_send_bytes(netdata_vector_plot_t *ptr, char *c
 static inline void ebpf_socket_nv_send_packets(netdata_vector_plot_t *ptr, char *chart)
 {
     uint32_t i;
-    uint32_t end = ptr->max_plot;
+    uint32_t end = ptr->last_plot;
     netdata_socket_plot_t *w = ptr->plot;
     collected_number value;
 
@@ -309,7 +310,7 @@ static inline void ebpf_socket_nv_send_packets(netdata_vector_plot_t *ptr, char 
 static inline void ebpf_socket_nv_send_retransmit(netdata_vector_plot_t *ptr, char *chart)
 {
     uint32_t i;
-    uint32_t end = ptr->max_plot;
+    uint32_t end = ptr->last_plot;
     netdata_socket_plot_t *w = ptr->plot;
     collected_number value;
 
@@ -342,8 +343,6 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 
         ebpf_socket_nv_send_packets(ptr, NETDATA_NV_INBOUND_PACKETS);
     }
-
-    ptr->last_plot = ptr->max_plot;
 }
 
 /*****************************************************************
@@ -487,7 +486,7 @@ void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                          order);
 
     uint32_t i;
-    uint32_t end = ptr->max_plot;
+    uint32_t end = ptr->last_plot;
     netdata_socket_plot_t *w = ptr->plot;
     for (i = 0; i < end; i++) {
         fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[i].dimension_sent);
@@ -511,6 +510,8 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
     //We do not have new sockets, we do not need move forward
     if (ptr->max_plot == ptr->last_plot)
         return;
+
+    ptr->last_plot = ptr->max_plot;
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
@@ -1121,8 +1122,10 @@ void *ebpf_socket_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        pthread_mutex_lock(&nv_mutex);
         read_socket_hash_table(fd_ipv4, AF_INET);
         read_socket_hash_table(fd_ipv6, AF_INET6);
+        pthread_mutex_unlock(&nv_mutex);
     }
 
     return NULL;
@@ -1288,11 +1291,13 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
+        pthread_mutex_lock(&nv_mutex);
         ebpf_socket_create_nv_charts(&inbound_vectors);
         ebpf_socket_send_nv_data(&inbound_vectors);
 
         ebpf_socket_create_nv_charts(&outbound_vectors);
         ebpf_socket_send_nv_data(&outbound_vectors);
+        pthread_mutex_unlock(&nv_mutex);
 
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1494,6 +1499,8 @@ static void initialize_inbound_outbound()
     outbound_vectors.last = inbound_vectors.last;
     fill_last_nv_dimension(&inbound_vectors.plot[inbound_vectors.last], 0);
     fill_last_nv_dimension(&outbound_vectors.plot[outbound_vectors.last], 1);
+
+    pthread_mutex_init(&nv_mutex, NULL);
 }
 
 /*****************************************************************
