@@ -332,6 +332,9 @@ static inline void ebpf_socket_nv_send_retransmit(netdata_vector_plot_t *ptr, ch
  */
 static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 {
+    if (!ptr->flags)
+        return;
+
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_OUTBOUND_BYTES);
 
@@ -512,6 +515,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
         return;
 
     ptr->last_plot = ptr->max_plot;
+    ptr->flags |= NETWORK_VIEWER_CHARTS_CREATED;
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,

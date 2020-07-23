@@ -221,6 +221,7 @@ typedef struct netdata_socket_plot {
     char *dimension_recv;
 } netdata_socket_plot_t;
 
+#define NETWORK_VIEWER_CHARTS_CREATED 1
 typedef struct netdata_vector_plot {
     netdata_socket_plot_t *plot;    //Vector used to plot charts
 
@@ -229,6 +230,8 @@ typedef struct netdata_vector_plot {
     uint32_t next;                  //The next position to store in the vector.
     uint32_t max_plot;              //Max number of elements to plot.
     uint32_t last_plot;             //Last element plot
+
+    uint32_t flags;                 //Flags
 } netdata_vector_plot_t;
 
 #endif
