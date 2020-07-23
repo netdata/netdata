@@ -613,9 +613,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , 1
             , 0
     );
-    rrd_unlock();
-    if (unlikely(!localhost))
+    if (unlikely(!localhost)) {
+        rrd_unlock();
         return 1;
+    }
 
 #ifdef ENABLE_DBENGINE
     char dbenginepath[FILENAME_MAX + 1];
@@ -632,9 +633,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             localhost->hostname, localhost->machine_guid, localhost->cache_dir);
         rrdhost_free(localhost);
         localhost = NULL;
+        rrd_unlock();
         return 1;
     }
 #endif
+    rrd_unlock();
 
     web_client_api_v1_management_init();
     return localhost==NULL;
