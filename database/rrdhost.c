@@ -753,7 +753,8 @@ void rrdhost_free(RRDHOST *host) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    rrdeng_prepare_exit(host->rrdeng_ctx);
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
+        rrdeng_prepare_exit(host->rrdeng_ctx);
 #endif
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
@@ -785,11 +786,10 @@ void rrdhost_free(RRDHOST *host) {
 
     health_alarm_log_free(host);
 
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
         rrdeng_exit(host->rrdeng_ctx);
 #endif
-    }
 
     // ------------------------------------------------------------------------
     // remove it from the indexes
