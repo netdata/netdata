@@ -566,7 +566,12 @@ restart_after_removal:
         if(rrdhost_should_be_removed(host, protected, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
-            if(rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST))
+            if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
+#ifdef ENABLE_DBENGINE
+                /* don't delete multi-host DB host files */
+                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx == &multidb_ctx)
+#endif
+            )
                 rrdhost_delete_charts(host);
             else
                 rrdhost_save_charts(host);
@@ -1433,7 +1438,12 @@ void rrdhost_cleanup_all(void) {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if(host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST) && !host->receiver)
+        if (host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST) && !host->receiver
+#ifdef ENABLE_DBENGINE
+            /* don't delete multi-host DB host files */
+            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx == &multidb_ctx)
+#endif
+        )
             rrdhost_delete_charts(host);
         else
             rrdhost_cleanup_charts(host);
