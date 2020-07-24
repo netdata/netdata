@@ -190,6 +190,7 @@ extern void write_end_chart();
 # define EBPF_SERVICE_NAME_SECTION "service name"
 
 #define EBPF_COMMON_DIMENSION_CALL "Calls"
+#define EBPF_COMMON_DIMENSION_PACKETS "Packets"
 #define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "Difference"
 

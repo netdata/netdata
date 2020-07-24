@@ -519,15 +519,15 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
-                                    "Outbound bytes.",
+                                    "Outbound connections (bytes).",
                                     EBPF_COMMON_DIMENSION_BYTESS,
                                     NETDATA_SOCKET_GROUP,
                                     21080,
                                     ptr);
 
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_PACKETS,
-                                    "Outbound packets",
-                                    EBPF_COMMON_DIMENSION_CALL,
+                                    "Outbound connections (packets)",
+                                    EBPF_COMMON_DIMENSION_PACKETS,
                                     NETDATA_SOCKET_GROUP,
                                     21082,
                                     ptr);
@@ -540,15 +540,15 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                     ptr);
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
-                                    "Inbound bytes",
+                                    "Inbound connections (bytes)",
                                     EBPF_COMMON_DIMENSION_BYTESS,
                                     NETDATA_SOCKET_GROUP,
                                     21084,
                                     ptr);
 
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_PACKETS,
-                                    "Inbound packets",
-                                    EBPF_COMMON_DIMENSION_CALL,
+                                    "Inbound connections (packets)",
+                                    EBPF_COMMON_DIMENSION_PACKETS,
                                     NETDATA_SOCKET_GROUP,
                                     21085,
                                     ptr);
