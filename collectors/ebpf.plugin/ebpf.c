@@ -658,6 +658,9 @@ static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rl
  */
 static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
 {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(table);
+#endif
     if (likely(*out)) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
         while (move) {
