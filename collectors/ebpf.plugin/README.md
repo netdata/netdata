@@ -219,9 +219,8 @@ The following options are available:
     range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
-will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
-dimensions` setting.
+By default, Netdata displays up to 50 dimensions pairs on network viewer charts. If your dashboard becomes slow, you
+ can change the number of pairs using `maximum dimensions` setting.
 
 #### Network traffic chart
 
@@ -232,7 +231,7 @@ connections for local services. All these information are grouped using:
 
 -   `bytes`: Bytes sent and received for a destination.
 -   `packets`: Packets sent per period of time.
--   `retransmission`: Number of TCP packages retransmitted 
+-   `retransmission`: Number of TCP packages retransmitted. This is available only for `outbound connections`. 
 
 ### `[service name]`
 
