@@ -219,6 +219,7 @@ typedef struct netdata_socket_plot {
 
     char *dimension_sent;
     char *dimension_recv;
+    char *dimension_retransmit;
 } netdata_socket_plot_t;
 
 #define NETWORK_VIEWER_CHARTS_CREATED 1
