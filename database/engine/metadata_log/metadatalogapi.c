@@ -392,7 +392,7 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     uint8_t empty_chart;
 
     rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
-    if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
+    if (!rd) { /* in 8the case of legacy UUID convert to multihost and try again */
         // TODO: Check what to do since we have no host
         uuid_t multihost_uuid;
 
@@ -405,6 +405,10 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     }
     st = rd->rrdset;
     host = st->rrdhost;
+
+    /* In case there are active metrics in a different database engine do not delete the dimension object */
+    if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE))
+        return;
 
     /* Since the metric has no writer it will not be commited to the metadata log by rrddim_free_custom().
      * It must be commited explicitly before calling rrddim_free_custom(). */
