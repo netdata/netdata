@@ -496,16 +496,16 @@ static int compare_sockets(void *a, void *b)
  *
  * @return  it returns the size of the data copied on success and -1 otherwise.
  */
-static inline int build_inbound_dimension_name(char *dimname, char *hostname, char *service_name,
+static inline int build_outbound_dimension_name(char *dimname, char *hostname, char *service_name,
                                                char *proto, int family)
 {
-    return snprintf(dimname, CONFIG_MAX_NAME - 1, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
+    return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
                     service_name, proto,
                     hostname);
 }
 
 /**
- * Fill Outbound dimension name
+ * Fill inbound dimension name
  *
  * Mount the dimension name with the input given
  *
@@ -515,9 +515,9 @@ static inline int build_inbound_dimension_name(char *dimname, char *hostname, ch
  *
  * @return  it returns the size of the data copied on success and -1 otherwise.
  */
-static inline int build_outbound_dimension_name(char *dimname, char *service_name, char *proto)
+static inline int build_inbound_dimension_name(char *dimname, char *service_name, char *proto)
 {
-    return snprintf(dimname, CONFIG_MAX_NAME -1, "%s:%s_", service_name,
+    return snprintf(dimname, CONFIG_MAX_NAME - 7, "%s:%s_", service_name,
                     proto);
 }
 
@@ -549,9 +549,9 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     int size;
     char *protocol = (ptr->sock.protocol == IPPROTO_UDP) ? "UDP" : "TCP";
     if (is_outbound)
-        size = build_inbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
+        size = build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
-        size = build_outbound_dimension_name(dimname,service_name, protocol);
+        size = build_inbound_dimension_name(dimname,service_name, protocol);
 
     if (size > 0) {
         strcpy(&dimname[size], "sent");
@@ -569,12 +569,12 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
  * Fill the vector names after to resolve the addresses
  *
  * @param ptr a pointer to the structure where the values are stored.
- * @param is_inbound is a inbound ptr value?
+ * @param is_outbound is a outbound ptr value?
  * @param is_last is this the last value possible?
  *
  * @return It returns 1 if the name is valid and 0 otherwise.
  */
-int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
+int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
 {
     char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
     if (ptr->resolved)
@@ -593,7 +593,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
         ptr->family = AF_INET;
 
-        fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_inbound);
+        fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_outbound);
         ret = 1;
         goto laststep;
     }
@@ -608,7 +608,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
         myaddr.sin_family = ptr->family;
         myaddr.sin_port = idx->dport;
-        myaddr.sin_addr.s_addr = (is_inbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
+        myaddr.sin_addr.s_addr = (is_outbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
 
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
@@ -627,7 +627,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
         myaddr6.sin6_family = AF_INET6;
         myaddr6.sin6_port =  idx->dport;
-        memcpy(myaddr6.sin6_addr.s6_addr, (is_inbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
+        memcpy(myaddr6.sin6_addr.s6_addr, (is_outbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
@@ -642,7 +642,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_inbound, uint32_t is_last)
 
     fill_resolved_name(ptr, hostname,
                        strlen(hostname) + strlen(service_name)+ NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH,
-                       service_name, is_inbound);
+                       service_name, is_outbound);
 
 laststep:
 
@@ -884,7 +884,7 @@ static void read_hash_global_tables()
 
     netdata_idx_t *val = socket_hash_values;
     int fd = map_fd[NETDATA_SOCKET_GLOBAL_HASH_TABLE];
-    for (idx = 0; idx < NETDATA_SOCKET_COUNTER ; idx++) {
+    for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
             int i;
@@ -1194,9 +1194,9 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-    bandwidth_vector = callocz((size_t) ebpf_nprocs, sizeof(ebpf_bandwidth_t));
+    bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
-    socket_values = callocz((size_t) ebpf_nprocs, sizeof(netdata_socket_t));
+    socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
     outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
 }
