@@ -1480,7 +1480,14 @@ static void parse_network_viewer_section()
     network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
                                                       EBPF_NETWORK_VIEWER_SECTION,
                                                       "maximum dimensions",
-                                                      500);
+                                                      MAX_ALLOWED_DIMENSIONS);
+
+    if (network_viewer_opt.max_dim > MAX_ALLOWED_DIMENSIONS) {
+        info("You selected an invalid or unsafe number for maximum dimensions (%u). Netdata will use the maximum allowed %u.",
+             network_viewer_opt.max_dim,
+             MAX_ALLOWED_DIMENSIONS);
+        network_viewer_opt.max_dim = MAX_ALLOWED_DIMENSIONS;
+    }
 
     network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
