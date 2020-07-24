@@ -656,7 +656,7 @@ static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rl
  * @param out a pointer to the link list.
  * @param in the structure that will be linked.
  */
-static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in)
+static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
 {
     if (likely(*out)) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
@@ -682,15 +682,17 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
     if (in->ver == AF_INET) {
         if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
             inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list used on network viewer",
+            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
                  first, last,
-                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
+                 table);
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
             inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list used on network viewer",
+            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
                  first, last,
-                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
+                 table);
     }
 #endif
 }
@@ -750,7 +752,9 @@ static void read_local_addresses()
             }
         }
 
-        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip, w);
+        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
+                     w,
+                     "selector");
     }
 
     freeifaddrs(ifaddr);
@@ -1296,7 +1300,7 @@ storethisip:
     memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
     memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
 
-    fill_ip_list(list, store);
+    fill_ip_list(list, store, "socket");
     return;
 
 cleanipdup:
@@ -1480,7 +1484,7 @@ static void parse_network_viewer_section()
     network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
                                                       EBPF_NETWORK_VIEWER_SECTION,
                                                       "maximum dimensions",
-                                                      500);
+                                                      50);
 
     network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
