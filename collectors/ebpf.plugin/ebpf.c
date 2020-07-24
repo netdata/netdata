@@ -709,7 +709,7 @@ static void read_local_addresses()
         return;
     }
 
-    char *notext = { "No text reporesentation" };
+    char *notext = { "No text representation" };
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr == NULL)
             continue;
