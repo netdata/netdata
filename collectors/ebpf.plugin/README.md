@@ -219,8 +219,28 @@ The following options are available:
     range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 50 dimensions pairs on network viewer charts. If your dashboard becomes slow, you
- can change the number of pairs using `maximum dimensions` setting.
+By default, Netdata displays up to 50 dimensions on network viewer charts. If there are more possible dimensions, they
+will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
+dimensions` setting.
+
+The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
+changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
+the `hostnames` every time that is possible to resolve IPs to their hostnames.    
+
+#### Default values
+
+When the file `/etc/netdata/ebpf.conf` is not created, `ebpf.plugin` will start with the following default values
+
+```conf
+[network viewer]
+    maximum dimensions = 50
+    ports = *
+    hostnames = *
+    ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
+```
+
+that will allow the collector to show connections for all ports and all hostnames on your network, on the other hand,
+ these settings also restricted the IP monitoring only for `private` IPs. 
 
 #### Network traffic chart
 
