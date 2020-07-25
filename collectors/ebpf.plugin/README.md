@@ -219,9 +219,9 @@ The following options are available:
     range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 50 dimensions on network viewer charts. If there are more possible dimensions, they
-will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
-dimensions` setting.
+By default, Netdata `1.24.x` displays up to 49 older sockets (dimensions) on network viewer charts. If there are more
+ possible  dimensions, they will be bundled into the `other` dimension. You can increase the number of shown
+  dimensions by changing the `maximum dimensions` setting. 
 
 The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
 changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
@@ -229,7 +229,7 @@ the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 #### Default values
 
-When the file `/etc/netdata/ebpf.conf` is not created, `ebpf.plugin` will start with the following default values
+When the file `/etc/netdata/ebpf.conf` is missing, `ebpf.plugin` will start with the following default values
 
 ```conf
 [network viewer]
