@@ -3198,27 +3198,27 @@ netdataDashboard.context = {
 
     'ebpf.outbound_bytes': {
         title : 'Outbound bytes',
-        info: 'Bytes sent to specific destination using TCP or UDP ports. It shows the first 50 outbound connections collected for the plugin, if there are more connections they will be bundled into the `other` dimension.'
+        info: 'Bytes sent to specific destination using TCP or UDP ports. It shows the oldest outbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
     },
 
     'ebpf.outbound_packets': {
         title : 'Outbound packets',
-        info: 'Number of packets sent per period of time using TCP or UDP ports. It shows the first 50 outbound connections collected for the plugin, if there are more connections they will be bundled into the `other` dimension.'
+        info: 'Number of packets sent per period of time using TCP or UDP ports. It shows the oldest outbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
     },
 
     'ebpf.outbound_retransmits': {
         title : 'Outbound retransmits',
-        info: 'Number of TCP packages retransmitted per period of time. It shows the first 50 outbound connections collected for the plugin, if there are more connections they will be bundled into the `other` dimension.'
+        info: 'Number of TCP packages retransmitted per period of time. It shows the oldest outbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>>other</b> dimension.'
     },
 
     'ebpf.inbound_bytes': {
         title : 'Inbound bytes',
-        info: 'Bytes received for a local service. It shows the first 50 inbound connections collected for the plugin, if there are more connections they will be bundled into the `other` dimension.'
+        info: 'Bytes received for a local service. It shows the oldest inbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
     },
 
     'ebpf.inbound_packets': {
         title : 'Inbound bytes',
-        info: 'Number of packets received for a local service per period of time. It shows the first 50 inbound connections collected for the plugin, if there are more connections they will be bundled into the `other` dimension.'
+        info: 'Number of packets received for a local service per period of time. It shows the oldest inbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
     },
 
     // ------------------------------------------------------------------------
