@@ -1498,8 +1498,12 @@ static void parse_network_viewer_section()
                                 "ports", NULL);
     parse_ports(value);
 
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
-    link_hostnames(value);
+    if (network_viewer_opt.name_resolution_enabled) {
+        value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
+        link_hostnames(value);
+    } else {
+        info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
+    }
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                           "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7");
