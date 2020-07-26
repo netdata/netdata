@@ -211,7 +211,6 @@
 - Updates main copyright and links for the year 2020 [\#8937](https://github.com/netdata/netdata/pull/8937) ([zack-shoylev](https://github.com/zack-shoylev))
 - Docs: Add custom label to collectors frontmatter to fix sidebar titles [\#8936](https://github.com/netdata/netdata/pull/8936) ([joelhans](https://github.com/joelhans))
 - Fix missing NETDATA\_STOP\_CMD in netdata-installer.sh [\#8897](https://github.com/netdata/netdata/pull/8897) ([prologic](https://github.com/prologic))
-- Update Running-behind-nginx.md [\#8880](https://github.com/netdata/netdata/pull/8880) ([slavaGanzin](https://github.com/slavaGanzin))
 
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
