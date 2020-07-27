@@ -664,10 +664,10 @@ laststep:
  */
 static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *lvalues)
 {
-    sock->recv_packets += lvalues->recv_packets;
-    sock->sent_packets += lvalues->sent_packets;
-    sock->recv_bytes   += lvalues->recv_bytes;
-    sock->sent_bytes   += lvalues->sent_bytes;
+    sock->recv_packets = lvalues->recv_packets;
+    sock->sent_packets = lvalues->sent_packets;
+    sock->recv_bytes   = lvalues->recv_bytes;
+    sock->sent_bytes   = lvalues->sent_bytes;
 }
 
 /**
