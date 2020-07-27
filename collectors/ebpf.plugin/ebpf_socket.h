@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
-//Vector indexes
+// Vector indexes
 #define NETDATA_MAX_SOCKET_VECTOR 6
 #define NETDATA_UDP_START 3
 #define NETDATA_RETRANSMIT_START 5
@@ -55,7 +55,7 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
 #define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
 
-//Port range
+// Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
 
@@ -103,20 +103,20 @@ union netdata_ip_t {
 };
 
 typedef struct ebpf_network_viewer_ip_list {
-    char *value;            //IP value
-    uint32_t hash;          //IP hash
+    char *value;            // IP value
+    uint32_t hash;          // IP hash
 
-    uint8_t ver;            //IP version
+    uint8_t ver;            // IP version
 
-    union netdata_ip_t first;        //The IP address informed
-    union netdata_ip_t last;        //The IP address informed
+    union netdata_ip_t first;        // The IP address informed
+    union netdata_ip_t last;        // The IP address informed
 
     struct ebpf_network_viewer_ip_list *next;
 } ebpf_network_viewer_ip_list_t;
 
 typedef struct ebpf_network_viewer_hostname_list {
-    char *value;            //IP value
-    uint32_t hash;          //IP hash
+    char *value;            // IP value
+    uint32_t hash;          // IP hash
 
     SIMPLE_PATTERN *value_pattern;
 
@@ -124,7 +124,7 @@ typedef struct ebpf_network_viewer_hostname_list {
 } ebpf_network_viewer_hostname_list_t;
 
 typedef struct ebpf_network_viewer_options {
-    uint32_t max_dim;   //Store value read from 'maximum dimensions'
+    uint32_t max_dim;   // Store value read from 'maximum dimensions'
 
     uint32_t name_resolution_enabled;
 
@@ -153,10 +153,10 @@ typedef struct netdata_socket {
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
-    uint64_t first; //First timestamp
-    uint64_t ct;   //Current timestamp
-    uint16_t retransmit; //It is never used with UDP
-    uint8_t protocol; //Should this to be in the index?
+    uint64_t first; // First timestamp
+    uint64_t ct;   // Current timestamp
+    uint16_t retransmit; // It is never used with UDP
+    uint8_t protocol; // Should this to be in the index?
     uint8_t removeme;
     uint32_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
@@ -188,8 +188,8 @@ typedef struct netdata_socket_plot {
     // Updated data
     netdata_socket_t sock;
 
-    int family;                     //AF_INET or AF_INET6
-    char *resolved_name;            //Resolve only in the first call
+    int family;                     // AF_INET or AF_INET6
+    char *resolved_name;            // Resolve only in the first call
     unsigned char resolved;
 
     char *dimension_sent;
