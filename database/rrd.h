@@ -984,6 +984,14 @@ static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, cons
 
 extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 #define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
+/* This will not return charts that are archived */
+static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
+{
+    RRDSET *st = rrdset_find_byname_localhost(name);
+    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
+        return NULL;
+    return st;
+}
 
 extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
