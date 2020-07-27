@@ -1388,7 +1388,7 @@ static void clean_allocated_socket_plot()
 
     end = outbound_vectors.max_plot;
     plot = outbound_vectors.plot;
-    for (i = 0; i< end; i++) {
+    for (i = 0; i < end; i++) {
         clean_internal_socket_plot(&plot[i]);
     }
     clean_internal_socket_plot(&plot[outbound_vectors.last]);
