@@ -1111,6 +1111,7 @@ static void read_socket_hash_table(int fd, int family)
         uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
         removesock = 0;
         int i;
+        uint8_t protocol = values[0].protocol;
         for (i = 1; i < end; i++) {
             netdata_socket_t *w = &values[i];
 
@@ -1118,6 +1119,9 @@ static void read_socket_hash_table(int fd, int family)
             psent += w->sent_packets;
             brecv += w->recv_bytes;
             bsent += w->sent_bytes;
+
+            if (!protocol)
+                protocol = w->protocol;
 
             removesock += (int)w->removeme;
         }
@@ -1127,6 +1131,7 @@ static void read_socket_hash_table(int fd, int family)
         values[0].recv_bytes   += brecv;
         values[0].sent_bytes   += bsent;
         values[0].removeme     += removesock;
+        values[0].protocol = protocol;
 
         if (is_socket_allowed(&key, family)) {
             netdata_vector_plot_t *table = select_vector_to_store(&key, family);
