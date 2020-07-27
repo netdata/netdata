@@ -21,8 +21,15 @@ PARSER_RC metalog_pluginsd_host_action(
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
-    if (host)
+    if (host) {
+        if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
+            error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Ignoring archived state.",
+                  host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+            ((PARSER_USER_OBJECT *) user)->host = NULL; /* Ignore objects if memory mode is not dbengine */
+            return PARSER_RC_OK;
+        }
         goto write_replay;
+    }
 
     if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
         struct metalog_record record;
@@ -30,6 +37,7 @@ PARSER_RC metalog_pluginsd_host_action(
 
         uuid_parse(machine_guid, record.uuid);
         mlf_record_insert(metalogfile, &record);
+        ((PARSER_USER_OBJECT *) user)->host = localhost;
         return PARSER_RC_OK;
     }
 
@@ -103,6 +111,10 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     uuid_t *chart_uuid;
 
+    if (unlikely(!host)) {
+        debug(D_METADATALOG, "Ignoring chart belonging to missing or ignored host.");
+        return PARSER_RC_OK;
+    }
     chart_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
     st = rrdset_create_custom(
         host, type, id, name, family, context, title, units,
@@ -150,6 +162,10 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
     UNUSED(algorithm);
     uuid_t *dim_uuid;
 
+    if (unlikely(!st)) {
+        debug(D_METADATALOG, "Ignoring dimension belonging to missing or ignored chart.");
+        return PARSER_RC_OK;
+    }
     dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
 
     RRDDIM *rd = rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1,

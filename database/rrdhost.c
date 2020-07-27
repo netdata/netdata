@@ -523,7 +523,7 @@ RRDHOST *rrdhost_find_or_create(
     RRDHOST *host = rrdhost_find_by_guid(guid, 0);
     if (unlikely(RRD_MEMORY_MODE_DBENGINE != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
-        error("Arcived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
+        error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
               host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
         rrdhost_free(host);
         host = NULL;

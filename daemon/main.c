@@ -1437,7 +1437,8 @@ int main(int argc, char **argv) {
     // Load host labels
     reload_host_labels();
 #ifdef ENABLE_DBENGINE
-    metalog_commit_update_host(localhost);
+    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        metalog_commit_update_host(localhost);
 #endif
 
     // ------------------------------------------------------------------------
