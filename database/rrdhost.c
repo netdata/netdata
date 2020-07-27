@@ -141,7 +141,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
-    host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
+    host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE) || is_archived) ? 0 : health_enabled;
 
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
@@ -246,7 +246,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
         host->varlib_dir = strdupz(filename);
 
-        if(host->health_enabled) {
+        if(!is_archived && host->health_enabled) {
             int r = mkdir(host->varlib_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
@@ -254,7 +254,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     }
 
-    if(host->health_enabled) {
+    if(!is_archived && host->health_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
         int r = mkdir(filename, 0775);
         if(r != 0 && errno != EEXIST)
@@ -272,7 +272,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     // ------------------------------------------------------------------------
     // load health configuration
 
-    if(host->health_enabled) {
+    if(!is_archived && host->health_enabled) {
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
@@ -419,7 +419,7 @@ void rrdhost_update(RRDHOST *host
     UNUSED(rrdpush_api_key);
     UNUSED(rrdpush_send_charts_matching);
 
-    host->health_enabled = health_enabled;
+    host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
     //host->stream_version = STREAMING_PROTOCOL_CURRENT_VERSION;        Unused?
 
     rrdhost_system_info_free(host->system_info);
@@ -467,6 +467,27 @@ void rrdhost_update(RRDHOST *host
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
+        if(host->health_enabled) {
+            int r;
+            char filename[FILENAME_MAX + 1];
+
+            if (host != localhost) {
+                r = mkdir(host->varlib_dir, 0775);
+                if (r != 0 && errno != EEXIST)
+                    error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
+            }
+            snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+            r = mkdir(filename, 0775);
+            if(r != 0 && errno != EEXIST)
+                error("Host '%s': cannot create directory '%s'", host->hostname, filename);
+
+            rrdhost_wrlock(host);
+            health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
+            rrdhost_unlock(host);
+
+            health_alarm_log_load(host);
+            health_alarm_log_open(host);
+        }
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
     }
