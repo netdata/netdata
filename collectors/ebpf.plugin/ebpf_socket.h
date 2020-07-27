@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #ifndef NETDATA_EBPF_SOCKET_H
-# define NETDATA_EBPF_SOCKET_H 1
-# include <stdint.h>
-# include "libnetdata/avl/avl.h"
+#define NETDATA_EBPF_SOCKET_H 1
+#include <stdint.h>
+#include "libnetdata/avl/avl.h"
 
-//Vector indexes
-# define NETDATA_MAX_SOCKET_VECTOR 6
-# define NETDATA_UDP_START 3
-# define NETDATA_RETRANSMIT_START 5
+// Vector indexes
+#define NETDATA_MAX_SOCKET_VECTOR 6
+#define NETDATA_UDP_START 3
+#define NETDATA_RETRANSMIT_START 5
 
-# define NETDATA_SOCKET_APPS_HASH_TABLE 0
-# define NETDATA_SOCKET_IPV4_HASH_TABLE 1
-# define NETDATA_SOCKET_IPV6_HASH_TABLE 2
-# define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
+#define NETDATA_SOCKET_APPS_HASH_TABLE 0
+#define NETDATA_SOCKET_IPV4_HASH_TABLE 1
+#define NETDATA_SOCKET_IPV6_HASH_TABLE 2
+#define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
 
-# define NETDATA_SOCKET_READ_SLEEP_MS 400000
+#define NETDATA_SOCKET_READ_SLEEP_MS 400000
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -40,34 +40,34 @@ typedef enum ebpf_socket_idx {
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
-# define NETDATA_SOCKET_GROUP "Socket"
+#define NETDATA_SOCKET_GROUP "Socket"
 
 // Global chart name
-# define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
-# define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
-# define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
-# define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
-# define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
-# define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
-# define NETDATA_UDP_FUNCTION_ERROR "udp_error"
+#define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
+#define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
+#define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
+#define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
+#define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
+#define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
+#define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
 // Charts created on Apps submenu
-# define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
-# define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
+#define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
 
 // Network viewer charts
-# define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
-# define NETDATA_NV_OUTBOUND_PACKETS "outbound_packets"
-# define NETDATA_NV_OUTBOUND_RETRANSMIT "outbound_retransmit"
-# define NETDATA_NV_INBOUND_BYTES "inbound_bytes"
-# define NETDATA_NV_INBOUND_PACKETS "inbound_packets"
+#define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
+#define NETDATA_NV_OUTBOUND_PACKETS "outbound_packets"
+#define NETDATA_NV_OUTBOUND_RETRANSMIT "outbound_retransmit"
+#define NETDATA_NV_INBOUND_BYTES "inbound_bytes"
+#define NETDATA_NV_INBOUND_PACKETS "inbound_packets"
 
 //Port range
-# define NETDATA_MINIMUM_PORT_VALUE 1
-# define NETDATA_MAXIMUM_PORT_VALUE 65535
+#define NETDATA_MINIMUM_PORT_VALUE 1
+#define NETDATA_MAXIMUM_PORT_VALUE 65535
 
-# define NETDATA_MINIMUM_IPV4_CIDR 0
-# define NETDATA_MAXIMUM_IPV4_CIDR 32
+#define NETDATA_MINIMUM_IPV4_CIDR 0
+#define NETDATA_MAXIMUM_IPV4_CIDR 32
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
@@ -160,22 +160,23 @@ typedef struct netdata_socket {
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
-    uint64_t first; //First timestamp
-    uint64_t ct;   //Current timestamp
-    uint16_t retransmit; //It is never used with UDP
-    uint8_t protocol; //Should this to be in the index?
+    uint64_t first; // First timestamp
+    uint64_t ct;   // Current timestamp
+    uint16_t retransmit; // It is never used with UDP
+    uint8_t protocol; // Should this to be in the index?
     uint8_t removeme;
     uint32_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
 typedef struct netdata_plot_values {
-    //Values used in the previous iteration
+    // Values used in the previous iteration
     uint64_t recv_packets;
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
     uint16_t retransmit;
 
+    // Values used to plot
     uint64_t plot_recv_packets;
     uint64_t plot_sent_packets;
     uint64_t plot_recv_bytes;
@@ -198,25 +199,23 @@ typedef struct netdata_socket_idx {
 # define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
 # define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
 
-
-#define MAX_ALLOWED_DIMENSIONS (uint32_t)50
 /**
  * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
  * in the long term, on the other had it is faster.
  */
 typedef struct netdata_socket_plot {
-    //Search
+    // Search
     avl avl;
     netdata_socket_idx_t index;
 
-    //Current data
+    // Current data
     netdata_socket_t sock;
 
-    //Previous values and values used to write on chart.
+    // Previous values and values used to write on chart.
     netdata_plot_values_t plot;
 
-    int family;                     //AF_INET or AF_INET6
-    char *resolved_name;            //Resolve only in the first call
+    int family;                     // AF_INET or AF_INET6
+    char *resolved_name;            // Resolve only in the first call
     unsigned char resolved;
 
     char *dimension_sent;
@@ -226,15 +225,15 @@ typedef struct netdata_socket_plot {
 
 #define NETWORK_VIEWER_CHARTS_CREATED 1
 typedef struct netdata_vector_plot {
-    netdata_socket_plot_t *plot;    //Vector used to plot charts
+    netdata_socket_plot_t *plot;    // Vector used to plot charts
 
-    avl_tree_lock tree;             //AVL tree to speed up search
-    uint32_t last;                  //The 'other' dimension, the last chart accepted.
-    uint32_t next;                  //The next position to store in the vector.
-    uint32_t max_plot;              //Max number of elements to plot.
-    uint32_t last_plot;             //Last element plot
+    avl_tree_lock tree;             // AVL tree to speed up search
+    uint32_t last;                  // The 'other' dimension, the last chart accepted.
+    uint32_t next;                  // The next position to store in the vector.
+    uint32_t max_plot;              // Max number of elements to plot.
+    uint32_t last_plot;             // Last element plot
 
-    uint32_t flags;                 //Flags
+    uint32_t flags;                 // Flags
 } netdata_vector_plot_t;
 
 #endif

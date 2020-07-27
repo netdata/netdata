@@ -56,7 +56,7 @@ static void ebpf_update_global_publish(
     netdata_publish_syscall_t *move = publish;
     while (move) {
         if (input->call != move->pcall) {
-            //This condition happens to avoid initial values with dimensions higher than normal values.
+            // This condition happens to avoid initial values with dimensions higher than normal values.
             if (move->pcall) {
                 move->ncall = (input->call > move->pcall) ? input->call - move->pcall : move->pcall - input->call;
                 move->nbyte = (input->bytes > move->pbyte) ? input->bytes - move->pbyte : move->pbyte - input->bytes;
@@ -125,7 +125,7 @@ static inline void calculate_nv_plot()
     }
     inbound_vectors.max_plot = end;
 
-    //The 'Other' dimension is always calculated for the chart to have at least one dimension
+    // The 'Other' dimension is always calculated for the chart to have at least one dimension
     update_nv_plot_data(&inbound_vectors.plot[inbound_vectors.last].plot,
                         &inbound_vectors.plot[inbound_vectors.last].sock);
 
@@ -135,7 +135,7 @@ static inline void calculate_nv_plot()
     }
     outbound_vectors.max_plot = end;
 
-    //The 'Other' dimension is always calculated for the chart to have at least one dimension
+    // The 'Other' dimension is always calculated for the chart to have at least one dimension
     update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
                         &outbound_vectors.plot[outbound_vectors.last].sock);
 }
@@ -656,11 +656,11 @@ static int is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
  */
 static int is_port_inside_range(uint16_t cmp)
 {
-    //We do not have restrictions for ports.
+    // We do not have restrictions for ports.
     if (!network_viewer_opt.excluded_port && !network_viewer_opt.included_port)
         return 1;
 
-    //Test if port is excluded
+    // Test if port is excluded
     ebpf_network_viewer_port_list_t *move = network_viewer_opt.excluded_port;
     cmp = htons(cmp);
     while (move) {
@@ -670,7 +670,7 @@ static int is_port_inside_range(uint16_t cmp)
         move = move->next;
     }
 
-    //Test if the port is inside allowed range
+    // Test if the port is inside allowed range
     move = network_viewer_opt.included_port;
     while (move) {
         if (move->cmp_first <= cmp && cmp <= move->cmp_last)
@@ -750,7 +750,7 @@ static int compare_sockets(void *a, void *b)
     struct netdata_socket_plot *val2 = b;
     int cmp;
 
-    //We do not need to compare val2 family, because data inside hash table is always from the same family
+    // We do not need to compare val2 family, because data inside hash table is always from the same family
     if (val1->family == AF_INET) { //IPV4
         cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
         if (!cmp) {
@@ -893,7 +893,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound)
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
-            //I cannot resolve the name, I will use the IP
+            // I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET, &myaddr.sin_addr.s_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
@@ -901,7 +901,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound)
             snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr.sin_port));
             ret = 1;
         }
-    } else { //IPV6
+    } else { // IPV6
         struct sockaddr_in6 myaddr6;
         memset(&myaddr6, 0 , sizeof(myaddr6));
 
@@ -911,7 +911,7 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound)
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
-            //I cannot resolve the name, I will use the IP
+            // I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
@@ -944,7 +944,7 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
 {
     char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
     char *other = { "other" };
-    //We are also copying the NULL bytes to avoid warnings in new compilers
+    // We are also copying the NULL bytes to avoid warnings in new compilers
     strncpy(hostname, other, 6);
     strncpy(service_name, other, 6);
 

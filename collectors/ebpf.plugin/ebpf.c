@@ -28,7 +28,6 @@ void send_statistics(const char *action, const char *action_result, const char *
     UNUSED(action);
     UNUSED(action_result);
     UNUSED(action_data);
-    return;
 }
 
 // callbacks required by popen()
@@ -226,7 +225,7 @@ static void ebpf_exit(int sig)
         int sid = setsid();
         if (sid >= 0) {
             debug(D_EXIT, "Wait for father %d die", getpid());
-            sleep_usec(200000); //Sleep 200 miliseconds to father dies.
+            sleep_usec(200000); // Sleep 200 miliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
@@ -656,8 +655,11 @@ static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rl
  * @param out a pointer to the link list.
  * @param in the structure that will be linked.
  */
-static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in)
+static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
 {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(table);
+#endif
     if (likely(*out)) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
         while (move) {
@@ -682,15 +684,17 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
     if (in->ver == AF_INET) {
         if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
             inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list used on network viewer",
+            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
                  first, last,
-                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
+                 table);
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
             inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list used on network viewer",
+            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
                  first, last,
-                 (*out == network_viewer_opt.included_ips)?"included":"excluded");
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
+                 table);
     }
 #endif
 }
@@ -750,7 +754,9 @@ static void read_local_addresses()
             }
         }
 
-        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip, w);
+        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
+                     w,
+                     "selector");
     }
 
     freeifaddrs(ifaddr);
@@ -828,7 +834,7 @@ static inline int parse_disable_apps(char *ptr)
     if (!strcasecmp(ptr, "yes")) {
         ebpf_disable_apps();
         return 1;
-    } else if (strcasecmp(ptr, "no")) {
+    } else if (strcasecmp(ptr, "no") != 0) {
         error("The option %s for \"disable apps\" is not a valid option.", ptr);
     }
 
@@ -1160,15 +1166,15 @@ static void parse_ip_list(void **out, char *ip)
     }
 
     char *end = ip;
-    //Move while I cannot find a separator
+    // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-') end++;
 
-    //We will use only the classic IPV6 for while, but we could consider the base 85 in a near future
-    //https://tools.ietf.org/html/rfc1924
+    // We will use only the classic IPV6 for while, but we could consider the base 85 in a near future
+    // https://tools.ietf.org/html/rfc1924
     is_ipv6 = strchr(ip, ':');
 
     int select;
-    if (*end && !is_ipv6) { //IPV4 range
+    if (*end && !is_ipv6) { // IPV4 range
         select = (*end == '/') ? 0 : 1;
         *end++ = '\0';
         if (*end == '!') {
@@ -1176,7 +1182,7 @@ static void parse_ip_list(void **out, char *ip)
             goto cleanipdup;
         }
 
-        if (!select) { //CIDR
+        if (!select) { // CIDR
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
                 goto cleanipdup;
@@ -1188,7 +1194,8 @@ static void parse_ip_list(void **out, char *ip)
             }
 
             last.addr32[0] = htonl(broadcast(ntohl(first.addr32[0]), select));
-            //This was added to remove https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
+            // This was added to remove
+            // https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
             UNUSED(last.addr32[0]);
 
             uint32_t ipv4_test = htonl(ipv4_network(ntohl(first.addr32[0]), select));
@@ -1200,7 +1207,7 @@ static void parse_ip_list(void **out, char *ip)
                 if(inet_ntop(AF_INET, &ipv4_convert, ipv4_msg, INET_ADDRSTRLEN))
                     info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
             }
-        } else { //Range
+        } else { // Range
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
                 goto cleanipdup;
@@ -1215,8 +1222,8 @@ static void parse_ip_list(void **out, char *ip)
                  ipdup);
             goto cleanipdup;
         }
-    } else if (is_ipv6) { //IPV6
-        if (!*end) { // unique
+    } else if (is_ipv6) { // IPV6
+        if (!*end) { // Unique
             select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
             if (select)
                 goto cleanipdup;
@@ -1236,7 +1243,7 @@ static void parse_ip_list(void **out, char *ip)
             select = ip2nl(last.addr8, end, AF_INET6, ipdup);
             if (select)
                 goto cleanipdup;
-        } else { //CIDR
+        } else { // CIDR
             *end++ = 0x00;
             if (*end == '!') {
                 info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
@@ -1278,7 +1285,7 @@ static void parse_ip_list(void **out, char *ip)
                  ipdup);
             goto cleanipdup;
         }
-    } else { //Unique ip
+    } else { // Unique ip
         select = ip2nl(first.addr8, ip, AF_INET, ipdup);
         if (select)
             goto cleanipdup;
@@ -1296,7 +1303,7 @@ storethisip:
     memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
     memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
 
-    fill_ip_list(list, store);
+    fill_ip_list(list, store, "socket");
     return;
 
 cleanipdup:
@@ -1312,19 +1319,19 @@ cleanipdup:
  */
 static void parse_ips(char *ptr)
 {
-    //No value
+    // No value
     if (unlikely(!ptr))
         return;
 
     while (likely(ptr)) {
-        //Move forward until next valid character
+        // Move forward until next valid character
         while (isspace(*ptr)) ptr++;
 
-        //No valid value found
+        // No valid value found
         if (unlikely(!*ptr))
             return;
 
-        //Find space that ends the list
+        // Find space that ends the list
         char *end = strchr(ptr, ' ');
         if (end) {
             *end++ = '\0';
@@ -1336,7 +1343,7 @@ static void parse_ips(char *ptr)
             ptr++;
         }
 
-        if (isascii(*ptr)) { //Parse port
+        if (isascii(*ptr)) { // Parse port
             parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:(void **)&network_viewer_opt.excluded_ips,
                             ptr);
         }
@@ -1355,19 +1362,19 @@ static void parse_ips(char *ptr)
  */
 static void parse_ports(char *ptr)
 {
-    //No value
+    // No value
     if (unlikely(!ptr))
         return;
 
     while (likely(ptr)) {
-        //Move forward until next valid character
+        // Move forward until next valid character
         while (isspace(*ptr)) ptr++;
 
-        //No valid value found
+        // No valid value found
         if (unlikely(!*ptr))
             return;
 
-        //Find space that ends the list
+        // Find space that ends the list
         char *end = strchr(ptr, ' ');
         if (end) {
             *end++ = '\0';
@@ -1379,13 +1386,13 @@ static void parse_ports(char *ptr)
             ptr++;
         }
 
-        if (isdigit(*ptr)) { //Parse port
+        if (isdigit(*ptr)) { // Parse port
             parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
                             ptr);
-        } else if (isalpha(*ptr)) { //Parse service
+        } else if (isalpha(*ptr)) { // Parse service
             parse_service_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
                                ptr);
-        } else if (*ptr == '*') { //All
+        } else if (*ptr == '*') { // All
             parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
                             ptr);
         }
@@ -1436,19 +1443,19 @@ static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_networ
  */
 static void link_hostnames(char *parse)
 {
-    //No value
+    // No value
     if (unlikely(!parse))
         return;
 
     while (likely(parse)) {
-        //Find the first valid value
+        // Find the first valid value
         while (isspace(*parse)) parse++;
 
-        //No valid value found
+        // No valid value found
         if (unlikely(!*parse))
             return;
 
-        //Find space that ends the list
+        // Find space that ends the list
         char *end = strchr(parse, ' ');
         if (end) {
             *end++ = '\0';
@@ -1480,14 +1487,7 @@ static void parse_network_viewer_section()
     network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
                                                       EBPF_NETWORK_VIEWER_SECTION,
                                                       "maximum dimensions",
-                                                      MAX_ALLOWED_DIMENSIONS);
-
-    if (network_viewer_opt.max_dim > MAX_ALLOWED_DIMENSIONS) {
-        info("You selected an invalid or unsafe number for maximum dimensions (%u). Netdata will use the maximum allowed %u.",
-             network_viewer_opt.max_dim,
-             MAX_ALLOWED_DIMENSIONS);
-        network_viewer_opt.max_dim = MAX_ALLOWED_DIMENSIONS;
-    }
+                                                      50);
 
     network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
@@ -1498,8 +1498,12 @@ static void parse_network_viewer_section()
                                 "ports", NULL);
     parse_ports(value);
 
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
-    link_hostnames(value);
+    if (network_viewer_opt.name_resolution_enabled) {
+        value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
+        link_hostnames(value);
+    } else {
+        info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
+    }
 
     value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                           "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7");
@@ -1568,7 +1572,7 @@ static void parse_service_name_section()
         }
     }
 
-    //Always associated the default port to Netdata
+    // Always associated the default port to Netdata
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
     if (names) {
         uint16_t default_port = htons(19999);
@@ -1615,7 +1619,7 @@ static void read_collector_values(int *disable_apps)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name, 1);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
-        //Read network viewer section if network viewer is enabled
+        // Read network viewer section if network viewer is enabled
         parse_network_viewer_section();
         parse_service_name_section();
         started++;
@@ -1623,7 +1627,7 @@ static void read_collector_values(int *disable_apps)
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
-        //Read network viewer section
+        // Read network viewer section
         parse_network_viewer_section();
         parse_service_name_section();
     }
