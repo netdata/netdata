@@ -665,7 +665,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (ret != 0 && errno != EEXIST)
         error("Host '%s': cannot create directory '%s'", localhost->hostname, dbenginepath);
     else  // Unconditionally create multihost db to support on demand host creation
-        ret = rrdeng_init(localhost, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb);
+        ret = rrdeng_init(NULL, NULL, dbenginepath, default_rrdeng_page_cache_mb, default_multidb_disk_quota_mb);
     if (ret) {
         error(
             "Host '%s' with machine guid '%s' failed to initialize multi-host DB engine instance at '%s'.",

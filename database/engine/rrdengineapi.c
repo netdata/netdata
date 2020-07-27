@@ -232,8 +232,6 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
-//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-//        ctx = localhost->rrdeng_ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
 
@@ -317,8 +315,6 @@ int rrdeng_store_metric_finalize(RRDDIM *rd)
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
-//    if (ctx == NULL && rd->rrdset->rrdhost != localhost)
-//        ctx = rd->rrdset->rrdhost->rrdeng_ctx;
     page_index = rd->state->page_index;
     rrdeng_store_metric_flush_current_page(rd);
     if (handle->prev_descr) {

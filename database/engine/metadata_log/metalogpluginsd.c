@@ -10,8 +10,8 @@ PARSER_RC metalog_pluginsd_host_action(
     void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone,
     char *tags)
 {
-    int history = default_rrd_history_entries;
-    RRD_MEMORY_MODE mode = default_rrd_memory_mode;
+    int history = 5;
+    RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
     int health_enabled = default_health_enabled;
     int rrdpush_enabled = default_rrdpush_enabled;
     char *rrdpush_destination = default_rrdpush_destination;
@@ -23,8 +23,9 @@ PARSER_RC metalog_pluginsd_host_action(
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (host) {
         if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
-            error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Ignoring archived state.",
-                  host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+            error("Archived host '%s' has memory mode '%s', but the archived one is '%s'. Ignoring archived state.",
+                  host->hostname, rrd_memory_mode_name(host->rrd_memory_mode),
+                  rrd_memory_mode_name(RRD_MEMORY_MODE_DBENGINE));
             ((PARSER_USER_OBJECT *) user)->host = NULL; /* Ignore objects if memory mode is not dbengine */
             return PARSER_RC_OK;
         }
@@ -37,20 +38,16 @@ PARSER_RC metalog_pluginsd_host_action(
 
         uuid_parse(machine_guid, record.uuid);
         mlf_record_insert(metalogfile, &record);
-        ((PARSER_USER_OBJECT *) user)->host = localhost;
+        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            ((PARSER_USER_OBJECT *) user)->host = localhost;
+        else
+            ((PARSER_USER_OBJECT *) user)->host = NULL;
         return PARSER_RC_OK;
     }
 
     // Fetch configuration options from streaming config
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
-
-    //history = (int)appconfig_get_number(&stream_config, rpt->key, "default history", history);
-    history = (int)appconfig_get_number(&stream_config, machine_guid, "history", history);
-    if(history < 5) history = 5;
-
-    //mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "default memory mode", rrd_memory_mode_name(mode)));
-    mode = rrd_memory_mode_id(appconfig_get(&stream_config, machine_guid, "memory mode", rrd_memory_mode_name(mode)));
 
     //health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
@@ -80,8 +77,8 @@ PARSER_RC metalog_pluginsd_host_action(
         , update_every
         , history   // entries
         , mode
-        , default_health_enabled    // health enabled
-        , default_rrdpush_enabled   // Push enabled
+        , health_enabled    // health enabled
+        , rrdpush_enabled   // Push enabled
         , rrdpush_destination  //destination
         , rrdpush_api_key  // api key
         , rrdpush_send_charts_matching  // charts matching

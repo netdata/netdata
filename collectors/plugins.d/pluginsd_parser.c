@@ -379,10 +379,6 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
         debug(D_PLUGINSD, "Ignoring dimension belonging to missing or ignored host.");
         return PARSER_RC_OK;
     }
-    if (unlikely(!st)) {
-        debug(D_PLUGINSD, "Ignoring dimension belonging to missing or ignored chart.");
-        return PARSER_RC_OK;
-    }
 
     if (unlikely(!id)) {
         error(
