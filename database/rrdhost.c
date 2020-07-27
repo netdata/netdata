@@ -464,6 +464,12 @@ void rrdhost_update(RRDHOST *host
 
     // update host tags
     rrdhost_init_tags(host, tags);
+
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
+        rrd_hosts_available++;
+        info("Host %s is not in archived mode anymore", host->hostname);
+    }
 #ifdef ENABLE_DBENGINE
     if (likely(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
         metalog_commit_update_host(host);

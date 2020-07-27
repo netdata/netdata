@@ -680,11 +680,6 @@ RRDSET *rrdset_create_custom(
             rrdsetcalc_link_matching(st);
             rrdcalctemplate_link_matching(st);
         }
-        if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ARCHIVED)) {
-            rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
-            rrd_hosts_available++;
-            info("Host %s is not in archived mode anymore", st->rrdhost->hostname);
-        }
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
