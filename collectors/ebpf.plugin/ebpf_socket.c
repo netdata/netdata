@@ -802,6 +802,38 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int fa
     return &outbound_vectors;
 }
 
+static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
+{
+    uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
+    int i;
+    uint8_t protocol = values[0].protocol;
+    for (i = 1; i < end; i++) {
+        netdata_socket_t *w = &values[i];
+
+        precv += w->recv_packets;
+        psent += w->sent_packets;
+        brecv += w->recv_bytes;
+        bsent += w->sent_bytes;
+
+        if (!protocol)
+            protocol = w->protocol;
+
+        *removesock += (int)w->removeme;
+    }
+
+    values[0].recv_packets += precv;
+    values[0].sent_packets += psent;
+    values[0].recv_bytes   += brecv;
+    values[0].sent_bytes   += bsent;
+    values[0].removeme     += *removesock;
+    values[0].protocol = protocol;
+
+    if (is_socket_allowed(key, family)) {
+        netdata_vector_plot_t *table = select_vector_to_store(key, family);
+        store_socket_inside_avl(table, values, key, family);
+    }
+}
+
 /**
  * Read socket hash table
  *
@@ -814,16 +846,16 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int fa
  */
 static void read_socket_hash_table(int fd, int family)
 {
-    netdata_socket_idx_t key = { };
+    netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key;
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
     netdata_socket_t *values = socket_values;
-    int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+    int test, end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        int test = bpf_map_lookup_elem(fd, &key, values);
+        test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
             key = next_key;
             continue;
@@ -832,41 +864,28 @@ static void read_socket_hash_table(int fd, int family)
         if (removesock)
             bpf_map_delete_elem(fd, &removeme);
 
-        uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
         removesock = 0;
-        int i;
-        uint8_t protocol = values[0].protocol;
-        for (i = 1; i < end; i++) {
-            netdata_socket_t *w = &values[i];
-
-            precv += w->recv_packets;
-            psent += w->sent_packets;
-            brecv += w->recv_bytes;
-            bsent += w->sent_bytes;
-
-            if (!protocol)
-                protocol = w->protocol;
-
-            removesock += (int)w->removeme;
-        }
-
-        values[0].recv_packets += precv;
-        values[0].sent_packets += psent;
-        values[0].recv_bytes   += brecv;
-        values[0].sent_bytes   += bsent;
-        values[0].removeme     += removesock;
-        values[0].protocol = protocol;
-
-        if (is_socket_allowed(&key, family)) {
-            netdata_vector_plot_t *table = select_vector_to_store(&key, family);
-            store_socket_inside_avl(table, values, &key, family);
-        }
+        hash_accumulator(values, &key, &removesock, family, end);
 
         if (removesock)
             removeme = key;
 
         key = next_key;
     }
+
+    if (removesock)
+        bpf_map_delete_elem(fd, &removeme);
+
+    test = bpf_map_lookup_elem(fd, &next_key, values);
+    if (test < 0) {
+        return;
+    }
+
+    removesock = 0;
+    hash_accumulator(values, &next_key, &removesock, family, end);
+
+    if (removesock)
+        bpf_map_delete_elem(fd, &next_key);
 }
 
 /**
