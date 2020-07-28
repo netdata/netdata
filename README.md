@@ -416,6 +416,8 @@ You can also check all the other directories. Most of them have plenty of docume
 
 ## Community
 
+Join the discussion on our [Community](https://community.netdata.cloud/) forums!
+
 We welcome [contributions](/CONTRIBUTING.md). Feel free to join the team!
 
 To report bugs or get help, use [GitHub's issues](https://github.com/netdata/netdata/issues).
