@@ -32,6 +32,8 @@ netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
 
+ebpf_network_viewer_port_list_t *listen_ports = NULL;
+
 static int *map_fd = NULL;
 
 /*****************************************************************
@@ -760,6 +762,24 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  */
 netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int family)
 {
+    if (!listen_ports)
+        return &outbound_vectors;
+
+    ebpf_network_viewer_port_list_t *move_ports = listen_ports;
+    uint16_t test = 0;
+    while (move_ports) {
+
+        if (move_ports->first == cmp->dport) {
+            test = move_ports->first;
+            break;
+        }
+
+        move_ports = move_ports->next;
+    }
+
+    if (!test)
+        return &outbound_vectors;
+
     ebpf_network_viewer_ip_list_t *move;
     if (family == AF_INET) {
         move = network_viewer_opt.ipv4_local_ip;
@@ -850,6 +870,66 @@ static void read_socket_hash_table(int fd, int family)
 }
 
 /**
+ * Update listen table
+ *
+ * Update link list when it is necessary.
+ *
+ * @param value the ports we are listen to.
+ */
+void update_listen_table(uint16_t value)
+{
+    ebpf_network_viewer_port_list_t *w;
+    if (likely(listen_ports)) {
+        ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
+        while (move) {
+            if (move->first == value)
+                return;
+
+            store = move;
+            move = move->next;
+        }
+
+        w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+        w->first = value;
+        store->next = w;
+    } else {
+        w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+        w->first = value;
+
+        listen_ports = w;
+    }
+
+}
+
+/**
+ * Read listen table
+ *
+ * Read the table with all ports that we are listen on host.
+ */
+static void read_listen_table()
+{
+    uint16_t key = 0;
+    uint16_t next_key;
+
+    int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
+    uint8_t value;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        int test = bpf_map_lookup_elem(fd, &key, &value);
+        if (test < 0) {
+            key = next_key;
+            continue;
+        }
+
+        update_listen_table(htons(key));
+
+        key = next_key;
+    }
+
+    if (next_key)
+        update_listen_table(htons(next_key));
+}
+
+/**
  * Socket read hash
  *
  * This is the thread callback.
@@ -872,6 +952,7 @@ void *ebpf_socket_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        read_listen_table();
         read_socket_hash_table(fd_ipv4, AF_INET);
         read_socket_hash_table(fd_ipv6, AF_INET6);
     }
@@ -1168,6 +1249,8 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_allocated_socket_plot();
     freez(inbound_vectors.plot);
     freez(outbound_vectors.plot);
+
+    clean_port_structure(&listen_ports);
 
     ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
 

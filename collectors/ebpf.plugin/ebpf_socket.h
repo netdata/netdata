@@ -13,6 +13,7 @@
 #define NETDATA_SOCKET_IPV4_HASH_TABLE 1
 #define NETDATA_SOCKET_IPV6_HASH_TABLE 2
 #define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
+#define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 400000
 
@@ -204,5 +205,7 @@ typedef struct netdata_vector_plot {
     uint32_t next;
 
 } netdata_vector_plot_t;
+
+extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 
 #endif
