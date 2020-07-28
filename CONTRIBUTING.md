@@ -30,7 +30,7 @@ Community growth allows the project to attract new talent willing to contribute.
 
 ### Provide feedback
 
-Is there anything that bothers you about Netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know by making a post at [at the Netdata Community](https://community.netdata.cloud/category/4/feedback) to discuss it or [open a github issue](https://github.com/netdata/netdata/issues). Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences [our road-map](https://community.netdata.cloud/category/1/announcements-and-roadmap) significantly. **We rely on your feedback to make Netdata better**.
+Is there anything that bothers you about Netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to match your requirements? Let us know by making a post at [at the Netdata Community](https://community.netdata.cloud/category/4/feedback) to discuss it or [open a github issue](https://github.com/netdata/netdata/issues). Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences [our roadmap](https://community.netdata.cloud/category/1/announcements-and-roadmap) significantly. **We rely on your feedback to make Netdata better**.
 
 ### Translate some documentation
 
@@ -52,7 +52,7 @@ Netdata is all about simplicity and meaningful presentation. A "sponsor" for a c
 
 #### Sponsor a backend
 
-We already support various [backends](backends) and we intend to support more. A "sponsor" for a backend:
+We already support various [backends](backends), and we intend to support more. A "sponsor" for a backend:
 
 -   Suggests ways in which the information in Netdata could best be exposed to the particular backend, to facilitate meaningful presentation.
 -   When the implementation passes QA, tests the implementation in production.
