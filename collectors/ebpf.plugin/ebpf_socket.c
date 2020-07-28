@@ -609,8 +609,13 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
         memset(&myaddr, 0 , sizeof(myaddr));
 
         myaddr.sin_family = ptr->family;
-        myaddr.sin_port = idx->dport;
-        myaddr.sin_addr.s_addr = (is_outbound)?idx->daddr.addr32[0]:idx->saddr.addr32[0];
+        if (is_outbound) {
+            myaddr.sin_port = idx->dport;
+            myaddr.sin_addr.s_addr = idx->daddr.addr32[0];
+        } else {
+            myaddr.sin_port = idx->sport;
+            myaddr.sin_addr.s_addr = idx->saddr.addr32[0];
+        }
 
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
@@ -628,8 +633,14 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
         memset(&myaddr6, 0 , sizeof(myaddr6));
 
         myaddr6.sin6_family = AF_INET6;
-        myaddr6.sin6_port =  idx->dport;
-        memcpy(myaddr6.sin6_addr.s6_addr, (is_outbound)?idx->daddr.addr8:idx->saddr.addr8, sizeof(union netdata_ip_t));
+        if (is_outbound) {
+            myaddr6.sin6_port =  idx->dport;
+            memcpy(myaddr6.sin6_addr.s6_addr, idx->daddr.addr8, sizeof(union netdata_ip_t));
+        } else {
+            myaddr6.sin6_port =  idx->sport;
+            memcpy(myaddr6.sin6_addr.s6_addr, idx->saddr.addr8, sizeof(union netdata_ip_t));
+        }
+
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
         if (ret) {
@@ -766,37 +777,12 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int fa
         return &outbound_vectors;
 
     ebpf_network_viewer_port_list_t *move_ports = listen_ports;
-    uint16_t test = 0;
     while (move_ports) {
-
-        if (move_ports->first == cmp->dport) {
-            test = move_ports->first;
-            break;
+        if (move_ports->first == cmp->sport) {
+            return &inbound_vectors;
         }
 
         move_ports = move_ports->next;
-    }
-
-    if (!test)
-        return &outbound_vectors;
-
-    ebpf_network_viewer_ip_list_t *move;
-    if (family == AF_INET) {
-        move = network_viewer_opt.ipv4_local_ip;
-        while (move) {
-            if (cmp->daddr.addr32[0] == move->first.addr32[0])
-                return &inbound_vectors;
-
-            move = move->next;
-        }
-    } else {
-        move = network_viewer_opt.ipv6_local_ip;
-        while (move) {
-            if (!memcmp(cmp->daddr.addr32, move->first.addr32, sizeof(union netdata_ip_t)))
-                return &inbound_vectors;
-
-            move = move->next;
-        }
     }
 
     return &outbound_vectors;
@@ -918,6 +904,9 @@ void update_listen_table(uint16_t value)
         listen_ports = w;
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("The network viewer is monitoring inbound connections for port %u", ntohs(value));
+#endif
 }
 
 /**

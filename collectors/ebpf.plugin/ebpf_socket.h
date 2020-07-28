@@ -101,6 +101,7 @@ union netdata_ip_t {
     uint8_t  addr8[16];
     uint16_t addr16[8];
     uint32_t addr32[4];
+    uint64_t addr64[2];
 };
 
 typedef struct ebpf_network_viewer_ip_list {
@@ -167,9 +168,9 @@ typedef struct netdata_socket {
  */
 typedef struct netdata_socket_idx {
     union netdata_ip_t saddr;
+    uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
-    uint16_t sport;
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
 
 // Next values were defined according getnameinfo(3)
