@@ -13,6 +13,7 @@
 #define NETDATA_SOCKET_IPV4_HASH_TABLE 1
 #define NETDATA_SOCKET_IPV6_HASH_TABLE 2
 #define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
+#define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 400000
 
@@ -110,20 +111,20 @@ union netdata_ip_t {
 };
 
 typedef struct ebpf_network_viewer_ip_list {
-    char *value;            //IP value
-    uint32_t hash;          //IP hash
+    char *value;            // IP value
+    uint32_t hash;          // IP hash
 
-    uint8_t ver;            //IP version
+    uint8_t ver;            // IP version
 
-    union netdata_ip_t first;        //The IP address informed
-    union netdata_ip_t last;        //The IP address informed
+    union netdata_ip_t first;        // The IP address informed
+    union netdata_ip_t last;        // The IP address informed
 
     struct ebpf_network_viewer_ip_list *next;
 } ebpf_network_viewer_ip_list_t;
 
 typedef struct ebpf_network_viewer_hostname_list {
-    char *value;            //IP value
-    uint32_t hash;          //IP hash
+    char *value;            // IP value
+    uint32_t hash;          // IP hash
 
     SIMPLE_PATTERN *value_pattern;
 
@@ -131,7 +132,7 @@ typedef struct ebpf_network_viewer_hostname_list {
 } ebpf_network_viewer_hostname_list_t;
 
 typedef struct ebpf_network_viewer_options {
-    uint32_t max_dim;   //Store value read from 'maximum dimensions'
+    uint32_t max_dim;   // Store value read from 'maximum dimensions'
 
     int name_resolution_enabled;
 
@@ -235,5 +236,7 @@ typedef struct netdata_vector_plot {
 
     uint32_t flags;                 // Flags
 } netdata_vector_plot_t;
+
+extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 
 #endif

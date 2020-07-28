@@ -33,6 +33,8 @@ netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
 pthread_mutex_t nv_mutex;
 
+ebpf_network_viewer_port_list_t *listen_ports = NULL;
+
 static int *map_fd = NULL;
 
 /*****************************************************************
@@ -1056,6 +1058,24 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  */
 netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int family)
 {
+    if (!listen_ports)
+        return &outbound_vectors;
+
+    ebpf_network_viewer_port_list_t *move_ports = listen_ports;
+    uint16_t test = 0;
+    while (move_ports) {
+
+        if (move_ports->first == cmp->dport) {
+            test = move_ports->first;
+            break;
+        }
+
+        move_ports = move_ports->next;
+    }
+
+    if (!test)
+        return &outbound_vectors;
+
     ebpf_network_viewer_ip_list_t *move;
     if (family == AF_INET) {
         move = network_viewer_opt.ipv4_local_ip;
@@ -1079,6 +1099,47 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int fa
 }
 
 /**
+ * Hash accumulator
+ *
+ * @param values        the values used to calculate the data.
+ * @param key           the key to store  data.
+ * @param removesock    check if this socket must be removed .
+ * @param family        the connection family
+ * @param end           the values size.
+ */
+static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
+{
+    uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
+    int i;
+    uint8_t protocol = values[0].protocol;
+    for (i = 1; i < end; i++) {
+        netdata_socket_t *w = &values[i];
+
+        precv += w->recv_packets;
+        psent += w->sent_packets;
+        brecv += w->recv_bytes;
+        bsent += w->sent_bytes;
+
+        if (!protocol)
+            protocol = w->protocol;
+
+        *removesock += (int)w->removeme;
+    }
+
+    values[0].recv_packets += precv;
+    values[0].sent_packets += psent;
+    values[0].recv_bytes   += brecv;
+    values[0].sent_bytes   += bsent;
+    values[0].removeme     += *removesock;
+    values[0].protocol = protocol;
+
+    if (is_socket_allowed(key, family)) {
+        netdata_vector_plot_t *table = select_vector_to_store(key, family);
+        store_socket_inside_avl(table, values, key, family);
+    }
+}
+
+/**
  * Read socket hash table
  *
  * Read data from hash tables created on kernel ring.
@@ -1096,10 +1157,10 @@ static void read_socket_hash_table(int fd, int family)
     int removesock = 0;
 
     netdata_socket_t *values = socket_values;
-    int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+    int test, end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        int test = bpf_map_lookup_elem(fd, &key, values);
+        test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
             key = next_key;
             continue;
@@ -1108,41 +1169,87 @@ static void read_socket_hash_table(int fd, int family)
         if (removesock)
             bpf_map_delete_elem(fd, &removeme);
 
-        uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
-        removesock = 0;
-        int i;
-        uint8_t protocol = values[0].protocol;
-        for (i = 1; i < end; i++) {
-            netdata_socket_t *w = &values[i];
-
-            precv += w->recv_packets;
-            psent += w->sent_packets;
-            brecv += w->recv_bytes;
-            bsent += w->sent_bytes;
-
-            if (!protocol)
-                protocol = w->protocol;
-
-            removesock += (int)w->removeme;
-        }
-
-        values[0].recv_packets += precv;
-        values[0].sent_packets += psent;
-        values[0].recv_bytes   += brecv;
-        values[0].sent_bytes   += bsent;
-        values[0].removeme     += removesock;
-        values[0].protocol = protocol;
-
-        if (is_socket_allowed(&key, family)) {
-            netdata_vector_plot_t *table = select_vector_to_store(&key, family);
-            store_socket_inside_avl(table, values, &key, family);
-        }
+        hash_accumulator(values, &key, &removesock, family, end);
 
         if (removesock)
             removeme = key;
 
         key = next_key;
     }
+
+    if (removesock)
+        bpf_map_delete_elem(fd, &removeme);
+
+    test = bpf_map_lookup_elem(fd, &next_key, values);
+    if (test < 0) {
+        return;
+    }
+
+    removesock = 0;
+    hash_accumulator(values, &next_key, &removesock, family, end);
+
+    if (removesock)
+        bpf_map_delete_elem(fd, &next_key);
+}
+
+/**
+ * Update listen table
+ *
+ * Update link list when it is necessary.
+ *
+ * @param value the ports we are listen to.
+ */
+void update_listen_table(uint16_t value)
+{
+    ebpf_network_viewer_port_list_t *w;
+    if (likely(listen_ports)) {
+        ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
+        while (move) {
+            if (move->first == value)
+                return;
+
+            store = move;
+            move = move->next;
+        }
+
+        w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+        w->first = value;
+        store->next = w;
+    } else {
+        w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+        w->first = value;
+
+        listen_ports = w;
+    }
+
+}
+
+/**
+ * Read listen table
+ *
+ * Read the table with all ports that we are listen on host.
+ */
+static void read_listen_table()
+{
+    uint16_t key = 0;
+    uint16_t next_key;
+
+    int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
+    uint8_t value;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        int test = bpf_map_lookup_elem(fd, &key, &value);
+        if (test < 0) {
+            key = next_key;
+            continue;
+        }
+
+        update_listen_table(htons(key));
+
+        key = next_key;
+    }
+
+    if (next_key)
+        update_listen_table(htons(next_key));
 }
 
 /**
@@ -1169,6 +1276,7 @@ void *ebpf_socket_read_hash(void *ptr)
         (void)dt;
 
         pthread_mutex_lock(&nv_mutex);
+        read_listen_table();
         read_socket_hash_table(fd_ipv4, AF_INET);
         read_socket_hash_table(fd_ipv6, AF_INET6);
         pthread_mutex_unlock(&nv_mutex);

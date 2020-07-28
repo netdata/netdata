@@ -133,7 +133,7 @@ ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .name_resol
  *
  * @param clean the list that will be cleaned
  */
-static void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
 {
     ebpf_network_viewer_port_list_t *move = *clean;
     while (move) {
