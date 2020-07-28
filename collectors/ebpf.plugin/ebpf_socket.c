@@ -767,11 +767,10 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  * Compare input values with local address to select table to store.
  *
  * @param cmp     index read from hash table.
- * @param family  the family read from kernel ring to select the IPs to do comparison.
  *
  * @return It returns the structure with address to compare.
  */
-netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp, int family)
+netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp)
 {
     if (!listen_ports)
         return &outbound_vectors;
@@ -815,7 +814,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].protocol = protocol;
 
     if (is_socket_allowed(key, family)) {
-        netdata_vector_plot_t *table = select_vector_to_store(key, family);
+        netdata_vector_plot_t *table = select_vector_to_store(key);
         store_socket_inside_avl(table, values, key, family);
     }
 }
