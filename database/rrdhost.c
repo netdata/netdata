@@ -886,6 +886,7 @@ void rrdhost_free(RRDHOST *host) {
 
 void rrdhost_free_all(void) {
     rrd_wrlock();
+    /* Make sure child-hosts are released before the localhost. */
     while(localhost->next) rrdhost_free(localhost->next);
     rrdhost_free(localhost);
     rrd_unlock();
