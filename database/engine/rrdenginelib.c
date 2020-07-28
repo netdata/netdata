@@ -272,16 +272,15 @@ int compute_multidb_diskspace()
         int rc = count_legacy_children(netdata_configured_cache_dir);
         if (likely(rc >= 0)) {
             computed_multidb_disk_quota_mb = (rc + 1) * default_rrdeng_disk_quota_mb;
-            //info("Found %d legacy dbengines, setting multidb diskspace to %dMB", rc, computed_multidb_disk_quota_mb);
+            info("Found %d legacy dbengines, setting multidb diskspace to %dMB", rc, computed_multidb_disk_quota_mb);
 
-            // TODO: will activate the next block of code when multidb is in place
-//            fp = fopen(multidb_disk_space_file, "w");
-//            if (likely(fp)) {
-//                fprintf(fp, "%d", rc * default_rrdeng_disk_quota_mb);
-//                info("Created file '%s' to store the computed value", multidb_disk_space_file);
-//                fclose(fp);
-//            } else
-//                error("Failed to store the default multidb disk quota size on '%s'", multidb_disk_space_file);
+            fp = fopen(multidb_disk_space_file, "w");
+            if (likely(fp)) {
+                fprintf(fp, "%d", computed_multidb_disk_quota_mb);
+                info("Created file '%s' to store the computed value", multidb_disk_space_file);
+                fclose(fp);
+            } else
+                error("Failed to store the default multidb disk quota size on '%s'", multidb_disk_space_file);
         }
         else
             computed_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;

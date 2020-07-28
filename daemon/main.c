@@ -41,7 +41,13 @@ void netdata_cleanup_and_exit(int ret) {
 
         // free the database
         info("EXIT: freeing database memory...");
+#ifdef ENABLE_DBENGINE
+        rrdeng_prepare_exit(&multidb_ctx);
+#endif
         rrdhost_free_all();
+#ifdef ENABLE_DBENGINE
+        rrdeng_exit(&multidb_ctx);
+#endif
     }
 
     // unlink the pid
@@ -568,10 +574,10 @@ static void get_netdata_configured_variables() {
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "multidb disk space", compute_multidb_diskspace());
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space", compute_multidb_diskspace());
     if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
+        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
     }
 
 #endif
@@ -1456,7 +1462,8 @@ int main(int argc, char **argv) {
     // Load host labels
     reload_host_labels();
 #ifdef ENABLE_DBENGINE
-    metalog_commit_update_host(localhost);
+    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        metalog_commit_update_host(localhost);
 #endif
 
     // ------------------------------------------------------------------------

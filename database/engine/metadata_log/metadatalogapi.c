@@ -3,6 +3,14 @@
 
 #include "metadatalog.h"
 
+static inline struct metalog_instance *get_metalog_ctx(RRDHOST *host)
+{
+    if (host->rrdeng_ctx)
+        return host->rrdeng_ctx->metalog_ctx;
+
+    return NULL;
+}
+
 static inline int metalog_is_initialized(struct metalog_instance *ctx)
 {
     return ctx->rrdeng_ctx->metalog_ctx != NULL;
@@ -16,6 +24,16 @@ static inline void metalog_commit_creation_record(struct metalog_instance *ctx, 
 static inline void metalog_commit_deletion_record(struct metalog_instance *ctx, BUFFER *buffer)
 {
     metalog_commit_record(ctx, buffer, METALOG_COMMIT_DELETION_RECORD, NULL, 0);
+}
+
+void metalog_upd_objcount(RRDHOST *host, int count)
+{
+    struct metalog_instance *ctx = get_metalog_ctx(host);
+
+    if (unlikely(!ctx))
+        return;
+
+    rrd_atomic_fetch_add(&ctx->objects_nr, count);
 }
 
 BUFFER *metalog_update_host_buffer(RRDHOST *host)
@@ -62,11 +80,10 @@ void metalog_commit_update_host(RRDHOST *host)
     BUFFER *buffer;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx)
+    ctx = get_metalog_ctx(host);
+    if (!ctx)
         return;
-
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
 
     buffer = metalog_update_host_buffer(host);
@@ -157,14 +174,15 @@ void metalog_commit_update_chart(RRDSET *st)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
-    RRDHOST *host = st->rrdhost;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
+    ctx = get_metalog_ctx(st->rrdhost);
+    if (!ctx)
+        return;
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
 
     buffer = metalog_update_chart_buffer(st, 0);
@@ -176,15 +194,16 @@ void metalog_commit_delete_chart(RRDSET *st)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
-    RRDHOST *host = st->rrdhost;
     char uuid_str[37];
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
+    ctx = get_metalog_ctx(st->rrdhost);
+    if (!ctx)
+        return;
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
@@ -228,14 +247,15 @@ void metalog_commit_update_dimension(RRDDIM *rd)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
+    ctx = get_metalog_ctx(st->rrdhost);
+    if (!ctx)
+        return;
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
 
     buffer = metalog_update_dimension_buffer(rd);
@@ -248,15 +268,16 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
     char uuid_str[37];
 
     /* Metadata are only available with dbengine */
-    if (!host->rrdeng_ctx || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
 
-    ctx = host->rrdeng_ctx->metalog_ctx;
-    if (!ctx) /* metadata log has not been initialized yet */
+    ctx = get_metalog_ctx(st->rrdhost);
+    if (!ctx)
+        return;
+    if (!ctx->initialized) /* metadata log has not been initialized yet */
         return;
     buffer = buffer_create(64); /* This will be freed after it has been committed to the metadata log buffer */
 
@@ -273,12 +294,15 @@ RRDHOST *metalog_get_host_from_uuid(struct metalog_instance *ctx, uuid_t *host_g
     char machine_guid[37];
 
     uuid_unparse_lower(*host_guid, machine_guid);
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     ret = find_object_by_guid(host_guid, NULL, 0);
     if (unlikely(GUID_TYPE_HOST != ret)) {
-        error("Host with GUID %s not found in the global map", machine_guid);
-        return NULL;
+        errno = 0;
+        if (unlikely(!host))
+            error("Host with GUID %s not found in the global map or in the list of hosts", machine_guid);
+        else
+            error("Host with GUID %s not found in the global map", machine_guid);
     }
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     return host;
 }
 
@@ -292,9 +316,12 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
     if (unlikely(GUID_TYPE_CHART != ret))
         return NULL;
 
-    machine_guid = (uuid_t *)chart_object;
-    RRDHOST *host = ctx->rrdeng_ctx->host;
+    machine_guid = (uuid_t  *)chart_object;
+    RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
+    if (unlikely(!host))
+        return NULL;
     if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+        errno = 0;
         error("Metadata host machine GUID does not match the one assosiated with the chart");
         return NULL;
     }
@@ -311,6 +338,8 @@ RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_
 
 RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
+    UNUSED(ctx);
+
     GUID_TYPE ret;
     char dim_object[49], chart_object[33], id_str[PLUGINSD_LINE_MAX], chart_fullid[RRD_ID_LENGTH_MAX + 1];
     uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
@@ -320,8 +349,12 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
         return NULL;
 
     machine_guid = (uuid_t *)dim_object;
-    RRDHOST *host = ctx->rrdeng_ctx->host;
+
+    RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
+    if (unlikely(!host))
+        return NULL;
     if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+        errno = 0;
         error("Metadata host machine GUID does not match the one assosiated with the dimension");
         return NULL;
     }
@@ -359,10 +392,11 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     uint8_t empty_chart;
 
     rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
-    if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
+    if (!rd) { /* in 8the case of legacy UUID convert to multihost and try again */
+        // TODO: Check what to do since we have no host
         uuid_t multihost_uuid;
 
-        rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->host->machine_guid, metric_uuid, &multihost_uuid);
+        rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->machine_guid, metric_uuid, &multihost_uuid);
         rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
     }
     if(!rd) {
@@ -371,6 +405,10 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     }
     st = rd->rrdset;
     host = st->rrdhost;
+
+    /* In case there are active metrics in a different database engine do not delete the dimension object */
+    if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE))
+        return;
 
     /* Since the metric has no writer it will not be commited to the metadata log by rrddim_free_custom().
      * It must be commited explicitly before calling rrddim_free_custom(). */
@@ -401,8 +439,11 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
 
     ctx = callocz(1, sizeof(*ctx));
     ctx->records_nr = 0;
+    ctx->objects_nr = 0;
     ctx->current_compaction_id = 0;
     ctx->quiesce = NO_QUIESCE;
+    ctx->initialized = 0;
+    rrdeng_parent_ctx->metalog_ctx = ctx;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->rrdeng_ctx = rrdeng_parent_ctx;
@@ -422,7 +463,7 @@ int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx)
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-    rrdeng_parent_ctx->metalog_ctx = ctx; /* notify dbengine that the metadata log has finished initializing */
+    ctx->initialized = 1; /* notify dbengine that the metadata log has finished initializing */
     return 0;
 
 error_after_rrdeng_worker:

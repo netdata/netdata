@@ -698,10 +698,6 @@ struct rrdhost {
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
-#ifdef ENABLE_DBENGINE
-    unsigned page_cache_mb;                         // Database Engine page cache size in MiB
-    unsigned disk_space_mb;                         // Database Engine disk space quota in MiB
-#endif
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     char *cache_dir;                                // the directory to save RRD cache files
@@ -812,7 +808,6 @@ struct rrdhost {
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
     uuid_t  host_uuid;                              // Global GUID for this host
-    unsigned long objects_nr;                       // Number of charts and dimensions in this host
     uint32_t compaction_id;                         // The last metadata log compaction procedure that has processed
                                                     // this object.
 #endif

@@ -82,7 +82,7 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
     RRDSET *st;
     RRDDIM *rd;
     BUFFER *buffer;
-    RRDHOST *host = ctx->rrdeng_ctx->host;
+    RRDHOST *host = NULL;
 
     ret = find_object_by_guid(uuid, NULL, 0);
     switch (ret) {
@@ -130,8 +130,9 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
             }
             break;
         case GUID_TYPE_HOST:
-            //TODO: will be enabled when multidb is activated
-            //RRDHOST *host = metalog_get_host_from_uuid(ctx, uuid);
+            host = metalog_get_host_from_uuid(ctx, uuid);
+            if (unlikely(!host))
+                break;
             if (ctx->current_compaction_id > host->compaction_id) {
                 host->compaction_id = ctx->current_compaction_id;
                 buffer = metalog_update_host_buffer(host);
