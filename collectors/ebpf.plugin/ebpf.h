@@ -189,10 +189,10 @@ extern void write_end_chart();
 #define EBPF_NETWORK_VIEWER_SECTION "network viewer"
 #define EBPF_SERVICE_NAME_SECTION "service name"
 
-#define EBPF_COMMON_DIMENSION_CALL "Calls"
-#define EBPF_COMMON_DIMENSION_PACKETS "Packets"
+#define EBPF_COMMON_DIMENSION_CALL "calls"
 #define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
-#define EBPF_COMMON_DIMENSION_DIFFERENCE "Difference"
+#define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
+#define EBPF_COMMON_DIMENSION_PACKETS "packets"
 
 // Common variables
 extern char *ebpf_user_config_dir;

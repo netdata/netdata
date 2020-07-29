@@ -63,7 +63,7 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NV_INBOUND_BYTES "inbound_bytes"
 #define NETDATA_NV_INBOUND_PACKETS "inbound_packets"
 
-//Port range
+// Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
 
@@ -108,6 +108,7 @@ union netdata_ip_t {
     uint8_t  addr8[16];
     uint16_t addr16[8];
     uint32_t addr32[4];
+    uint64_t addr64[2];
 };
 
 typedef struct ebpf_network_viewer_ip_list {
@@ -134,7 +135,7 @@ typedef struct ebpf_network_viewer_hostname_list {
 typedef struct ebpf_network_viewer_options {
     uint32_t max_dim;   // Store value read from 'maximum dimensions'
 
-    int name_resolution_enabled;
+    uint32_t name_resolution_enabled;
 
     ebpf_network_viewer_port_list_t *excluded_port;
     ebpf_network_viewer_port_list_t *included_port;
@@ -164,7 +165,7 @@ typedef struct netdata_socket {
     uint64_t first; // First timestamp
     uint64_t ct;   // Current timestamp
     uint16_t retransmit; // It is never used with UDP
-    uint8_t protocol; // Should this to be in the index?
+    uint8_t protocol;
     uint8_t removeme;
     uint32_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
@@ -190,15 +191,15 @@ typedef struct netdata_plot_values {
  */
 typedef struct netdata_socket_idx {
     union netdata_ip_t saddr;
+    uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
-    uint16_t sport;
 } netdata_socket_idx_t __attribute__((__aligned__(8)));
 
-//Next values were defined according getnameinfo(3)
-# define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
-# define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
-# define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
+// Next values were defined according getnameinfo(3)
+#define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
+#define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
+#define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
 
 /**
  * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
@@ -224,7 +225,7 @@ typedef struct netdata_socket_plot {
     char *dimension_retransmit;
 } netdata_socket_plot_t;
 
-#define NETWORK_VIEWER_CHARTS_CREATED 1
+#define NETWORK_VIEWER_CHARTS_CREATED (uint32_t)1
 typedef struct netdata_vector_plot {
     netdata_socket_plot_t *plot;    // Vector used to plot charts
 
