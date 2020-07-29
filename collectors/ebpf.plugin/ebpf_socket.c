@@ -1089,6 +1089,7 @@ netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp)
 static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
 {
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
+    uint16_t retransmit = 0;
     int i;
     uint8_t protocol = values[0].protocol;
     for (i = 1; i < end; i++) {
@@ -1098,6 +1099,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         psent += w->sent_packets;
         brecv += w->recv_bytes;
         bsent += w->sent_bytes;
+        retransmit += w->retransmit;
 
         if (!protocol)
             protocol = w->protocol;
@@ -1109,6 +1111,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].sent_packets += psent;
     values[0].recv_bytes   += brecv;
     values[0].sent_bytes   += bsent;
+    values[0].retransmit   += retransmit;
     values[0].removeme     += *removesock;
     values[0].protocol = protocol;
 
