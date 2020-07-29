@@ -402,6 +402,7 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
 //TODO both aclk_execute_query() and aclk_execute_query_v2() are not pretty :/
     int retval = 0;
     usec_t t;
+    BUFFER *local_buffer = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
@@ -505,11 +506,11 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     now_realtime_timeval(&w->tv_ready);
     w->response.data->date = w->tv_ready.tv_sec;
     web_client_build_http_header(w);
-    BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
     aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0, aclk_shared_state.version_neg);
-    buffer_sprintf(local_buffer, ",\"t-exec\": %llu,\"t-rx\": %llu", t, this_query->created);
+    buffer_sprintf(local_buffer, ",\"t-exec\": %llu,\"t-rx\": %llu,\"http-code\": %d", t, this_query->created, w->response.code);
     buffer_strcat(local_buffer, "}\x0D\x0A\x0D\x0A");
     buffer_strcat(local_buffer, w->response.header_output->buffer);
 
