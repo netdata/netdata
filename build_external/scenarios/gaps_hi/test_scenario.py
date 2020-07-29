@@ -21,6 +21,8 @@ def get_data(prefix, chart):
         return None
 
 def cmp_data(direct_data, remote_data, remote_name):
+    #print(f"Direct: {direct_data}")
+    #print(f"Remote: {remote_data}")
     # Work out time ranges
     times_ds = [ d[0] for d in direct_data ]
     times_rs = [ r[0] for r in remote_data ]
@@ -83,7 +85,7 @@ def BaselineMiddleFirst(state):
     state.wait_connected("child", "middle")
     print("  Measure baseline for 60s...")
     time.sleep(60)
-    state.post_checks.append( lambda: state.check_sync("child","middle") )
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_norep() )
 
 def BaselineChildFirst(state):
@@ -91,8 +93,87 @@ def BaselineChildFirst(state):
     state.wait_up("child")
     state.start("middle")
     state.wait_up("middle")
+    state.wait_connected("child", "middle")
+    print("  Measure baseline for 60s...")
     time.sleep(60)
-    state.post_checks.append( lambda: state.check_sync("child","middle") )
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
+
+def ShortChildDisconnect(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
+    time.sleep(3)
+    sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
+    time.sleep(5)
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def LongChildDisconnect(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
+    time.sleep(30)
+    sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
+    time.sleep(5)
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def ShortMiddleDisconnect(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
+    time.sleep(3)
+    sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
+    time.sleep(5)
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def LongMiddleDisconnect(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
+    time.sleep(30)
+    sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def MiddleRestart(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker kill gaps_hi_agent_middle_1")
+    time.sleep(3)
+    sh("docker start gaps_hi_agent_middle_1")
+    time.sleep(10)
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
 
 class Node(object):
     def __init__(self, name, cname):
@@ -113,23 +194,26 @@ class TestState(object):
 
     def wipe(self):
         sh(f"docker-compose -f {base}/child-compose.yml -f {base}/middle-compose.yml -f {base}/parent-compose.yml down --remove-orphans")
-        self.post_checks = []
+        self.end_checks = []    # Before the containers are killed
+        self.post_checks = []   # After the containers are killed (and the logs are final)
         self.nodes           = {}
         self.nodes['child']  = Node("child", self.prefix + "_agent_child_1")
         self.nodes['middle'] = Node("middle", self.prefix + "_agent_middle_1")
         self.nodes['parent'] = Node("parent", self.prefix + "_agent_parent_1")
 
     def wrap(self, case):
-        print(f"Wipe test state: {case.__name__}")
+        print(f"\n---------------> Wipe test state: {case.__name__}\n")
         self.wipe()
         case(self)
-        for c in self.post_checks:
+        for c in self.end_checks:
             c()
         for n in self.nodes.values():
             if n.started:
                 sh(f"docker kill {n.container_name}")
                 n.log = f"{case.__name__}-{n.name}.log"
                 sh(f"docker logs {n.container_name} >{n.log} 2>&1")
+        for c in self.post_checks:
+            c()
 
 
     def start(self, node):
@@ -180,6 +264,15 @@ class TestState(object):
         if not failed:
             print(f"  PASSED no replication detected on {n.name}")
 
+    def check_rep(self):
+        '''Check that replication did occur during the test by scanning the logs for debug.'''
+        for n in self.nodes.values():
+            if n.started and len(sh(f"grep -i replic {n.log}"))>0:
+                print(f"  PASSED {n.name} was involved in replication")
+                return True
+        print(f"  FAILED no replication detected on nodes")
+        return False
+
 
     def check_sync(self, source, target):
         print(f"  check_sync {source} {target}")
@@ -209,50 +302,20 @@ class TestState(object):
 
 
 cases = [
+    ShortChildDisconnect,
+    LongChildDisconnect,
+    ShortMiddleDisconnect,
+    LongMiddleDisconnect,
+    MiddleRestart,
+
     BaselineMiddleFirst,
-    BaselineChildFirst
+    BaselineChildFirst,
 ]
 
 state = TestState()
 for c in cases:
     state.wrap(c)
 
-#
-#
-#
-#class BaselineParentFirst(object):
-#    def body(self):
-#        time.sleep(60)
-#
-#class Baseline(object):
-#    def body(self):
-#        time.sleep(60)
-#
-#class ShortChildDisconnect(object):
-#    def body(self):
-#        time.sleep(10)
-#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
-#        time.sleep(3)
-#        sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
-#
-#class LongChildDisconnect(object):
-#    def body(self):
-#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
-#        time.sleep(30)
-#        sh("docker network connect gaps_hi_default gaps_hi_agent_child_1")
-#
-#class ShortMiddleDisconnect(object):
-#    def body(self):
-#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
-#        time.sleep(3)
-#        sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
-#
-#class LongMiddleDisconnect(object):
-#    def body(self):
-#        sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
-#        time.sleep(30)
-#        sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
-#
 #class ShortParentDisconnect(object):
 #    def body(self):
 #        sh("docker network disconnect gaps_hi_default gaps_hi_agent_parent_1")
