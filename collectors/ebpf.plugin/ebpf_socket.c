@@ -237,14 +237,19 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_OUTBOUND_BYTES);
+        fflush(stdout);
 
         ebpf_socket_nv_send_packets(ptr, NETDATA_NV_OUTBOUND_PACKETS);
+        fflush(stdout);
 
         ebpf_socket_nv_send_retransmit(ptr,  NETDATA_NV_OUTBOUND_RETRANSMIT);
+        fflush(stdout);
     } else {
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_INBOUND_BYTES);
+        fflush(stdout);
 
         ebpf_socket_nv_send_packets(ptr, NETDATA_NV_INBOUND_PACKETS);
+        fflush(stdout);
     }
 }
 
@@ -1457,20 +1462,23 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
-        pthread_mutex_unlock(&collect_data_mutex);
-
-        pthread_mutex_unlock(&lock);
-
         fflush(stdout);
 
+        // We are calling fflush many times, because when we have a lot of dimensions
+        // we began to have not expected outputs and Netdata closed the plugin.
         pthread_mutex_lock(&nv_mutex);
         ebpf_socket_create_nv_charts(&inbound_vectors);
+        fflush(stdout);
         ebpf_socket_send_nv_data(&inbound_vectors);
 
         ebpf_socket_create_nv_charts(&outbound_vectors);
+        fflush(stdout);
         ebpf_socket_send_nv_data(&outbound_vectors);
         pthread_mutex_unlock(&nv_mutex);
-        fflush(stdout);
+
+        pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
+
     }
 }
 
