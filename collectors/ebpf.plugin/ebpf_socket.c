@@ -756,14 +756,30 @@ static int compare_sockets(void *a, void *b)
 
     // We do not need to compare val2 family, because data inside hash table is always from the same family
     if (val1->family == AF_INET) { //IPV4
-        cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
-        if (!cmp) {
-            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
+            if (val1->index.sport == val2->index.sport)
+                cmp = 0;
+            else {
+                cmp = (val1->index.sport > val2->index.sport)?1:-1;
+            }
+        } else {
+            cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
+            if (!cmp) {
+                cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+            }
         }
     } else {
-        cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
-        if (!cmp) {
-            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
+            if (val1->index.sport == val2->index.sport)
+                cmp = 0;
+            else {
+                cmp = (val1->index.sport > val2->index.sport)?1:-1;
+            }
+        } else {
+            cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
+            if (!cmp) {
+                cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+            }
         }
     }
 
@@ -993,13 +1009,15 @@ static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *
  * @param lvalues Values read from socket ring.
  * @param lindex  the index information, the real socket.
  * @param family  the family associated to the socket
+ * @param flags   the connection flags
  */
 static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t *lvalues,
-                                    netdata_socket_idx_t *lindex, int family)
+                                    netdata_socket_idx_t *lindex, int family, uint32_t flags)
 {
     netdata_socket_plot_t test, *ret ;
 
     memcpy(&test.index, lindex, sizeof(*lindex));
+    test.flags = flags;
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
@@ -1057,24 +1075,29 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  *
  * Compare input values with local address to select table to store.
  *
- * @param cmp     index read from hash table.
+ * @param direction  store inbound and outbound direction.
+ * @param cmp        index read from hash table.
  *
  * @return It returns the structure with address to compare.
  */
-netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp)
+netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_socket_idx_t *cmp)
 {
-    if (!listen_ports)
+    if (!listen_ports) {
+        *direction = NETDATA_OUTBOUND_DIRECTION;
         return &outbound_vectors;
+    }
 
     ebpf_network_viewer_port_list_t *move_ports = listen_ports;
     while (move_ports) {
         if (move_ports->first == cmp->sport) {
+            *direction = NETDATA_INBOUND_DIRECTION;
             return &inbound_vectors;
         }
 
         move_ports = move_ports->next;
     }
 
+    *direction = NETDATA_OUTBOUND_DIRECTION;
     return &outbound_vectors;
 }
 
@@ -1117,8 +1140,9 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].protocol = protocol;
 
     if (is_socket_allowed(key, family)) {
-        netdata_vector_plot_t *table = select_vector_to_store(key);
-        store_socket_inside_avl(table, values, key, family);
+        uint32_t dir;
+        netdata_vector_plot_t *table = select_vector_to_store(&dir, key);
+        store_socket_inside_avl(table, values, key, family, dir);
     }
 }
 

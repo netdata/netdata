@@ -201,6 +201,8 @@ typedef struct netdata_socket_idx {
 #define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
 #define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
 
+#define NETDATA_INBOUND_DIRECTION (uint32_t)1
+#define NETDATA_OUTBOUND_DIRECTION (uint32_t)2
 /**
  * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
  * in the long term, on the other had it is faster.
@@ -223,6 +225,8 @@ typedef struct netdata_socket_plot {
     char *dimension_sent;
     char *dimension_recv;
     char *dimension_retransmit;
+
+    uint32_t flags;
 } netdata_socket_plot_t;
 
 #define NETWORK_VIEWER_CHARTS_CREATED (uint32_t)1
