@@ -488,7 +488,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                          title,
                          units,
                          family,
-                         "line",
+                         "stacked",
                          order);
 
     uint32_t i;
