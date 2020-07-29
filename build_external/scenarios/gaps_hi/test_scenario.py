@@ -10,11 +10,14 @@ def sh(x):
 
 def get_data(prefix, chart):
     url = f"http://{prefix}/api/v1/data?chart={chart}"
-    r = requests.get(url)
     try:
-        return requests.get(url).json()
-    except json.decoder.JSONDecodeError as e:
+        r = requests.get(url)
+        return r.json()
+    except json.decoder.JSONDecodeError:
         print(f"  Fetch failed {url} -> {r.text}")
+        return None
+    except requests.exceptions.ConnectionError:
+        print(f"  Fetch failed {url} -> connection refused")
         return None
 
 def cmp_data(direct_data, remote_data, remote_name):
@@ -71,41 +74,6 @@ def cmp_data(direct_data, remote_data, remote_name):
     print(f"Below sync thresholds: {uniques} unique and {shared} shared")
     return "retry"
 
-def check_sync():
-    for i in range(5):
-        print("  Waiting for sync...")
-        time.sleep(3)
-
-        direct_json = get_data("localhost:21002", "system.cpu")
-        if not direct_json:
-            continue
-        middle_json = get_data("localhost:21001/host/child", "system.cpu")
-        if not middle_json:
-            continue
-        parent_json = get_data("localhost:21000/host/child", "system.cpu")
-        if not parent_json:
-            continue
-
-        if direct_json["labels"] != middle_json["labels"] or middle_json["labels"] != parent_json["labels"]:
-            print(f"  Mismatch in chart labels: direct={direct_json['labels']} middle={middle_json['labels']} parent={parent_json['labels']}")
-            continue
-
-        direct_data = direct_json["data"]
-        middle_data = middle_json["data"]
-        parent_data = parent_json["data"]
-
-        d_m = cmp_data(direct_data, middle_data, "middle")
-        d_p = cmp_data(direct_data, parent_data, "parent")
-        print(f"  Child/middle = {d_m}  Child/parent = {d_p}")
-        if "fail" in (d_m,d_p):
-            return False
-        if "retry" in (d_m,d_p):
-            continue
-
-        print("  Child/middle/parent in sync")
-        return True
-    print("  Could not establish sync within max number of trials")
-    return False
 
 def BaselineMiddleFirst(state):
     state.start("middle")
@@ -121,10 +89,10 @@ def BaselineMiddleFirst(state):
 def BaselineChildFirst(state):
     state.start("child")
     state.wait_up("child")
-    state.start("parent")
-    state.wait_up("parent")
+    state.start("middle")
+    state.wait_up("middle")
     time.sleep(60)
-    #self.check_sync("child","parent")
+    state.post_checks.append( lambda: state.check_sync("child","middle") )
 
 class Node(object):
     def __init__(self, name, cname):
@@ -133,6 +101,7 @@ class Node(object):
         self.port = None
         self.guid = None
         self.log = None
+        self.started = False
 
 
 class TestState(object):
@@ -154,17 +123,20 @@ class TestState(object):
         print(f"Wipe test state: {case.__name__}")
         self.wipe()
         case(self)
-        for n in self.nodes.values():
-            sh(f"docker kill {n.container_name}")
-            n.log = f"{case.__name__}-{n.name}.log"
-            sh(f"docker logs {n.container_name} >{n.log} 2>&1")
         for c in self.post_checks:
             c()
+        for n in self.nodes.values():
+            if n.started:
+                sh(f"docker kill {n.container_name}")
+                n.log = f"{case.__name__}-{n.name}.log"
+                sh(f"docker logs {n.container_name} >{n.log} 2>&1")
+
 
     def start(self, node):
         sh(f"docker-compose -f {base}/{node}-compose.yml up -d")
         container = json.loads(sh(f"docker inspect {self.nodes[node].container_name}"))
         self.nodes[node].port = container[0]["NetworkSettings"]["Ports"]["19999/tcp"][0]["HostPort"]
+        self.nodes[node].started = True
 
     def wait_up(self, node):
         url = f"http://localhost:{self.nodes[node].port}/api/v1/info"
@@ -198,19 +170,47 @@ class TestState(object):
             print(f"  {receiver} mirrors {info['mirrored_hosts']}...")
             time.sleep(1)
 
+    def check_norep(self):
+        '''Check that replication did not occur during the test by scanning the logs for debug.'''
+        failed = False
+        for n in self.nodes.values():
+            if n.started and len(sh(f"grep -i replic {n.log}"))>0:
+                print(f"  FAILED {n.name} was involved in replication")
+                failed = True
+        if not failed:
+            print(f"  PASSED no replication detected on {n.name}")
+
+
     def check_sync(self, source, target):
         print(f"  check_sync {source} {target}")
+        source_json = get_data(f"localhost:{self.nodes[source].port}", "system.cpu")
+        if not source_json:
+            print(f"  FAILED to check sync looking at http://localhost:{self.nodes[source].port}")
+            return
+        target_json = get_data(f"localhost:{self.nodes[source].port}", "system.cpu")
+        if not target_json:
+            print(f"  FAILED to check sync looking at http://localhost:{self.nodes[target].port}")
+            return
+        if source_json["labels"] != target_json["labels"]:
+            print(f"  Mismatch in chart labels: source={source_json['labels']} target={target_json['labels']}")
+        source_data = source_json["data"]
+        target_data = target_json["data"]
 
-    def check_norep(self):
-        for n in self.nodes.values():
-            if len(sh(f"grep -i replic {n.log}"))>0:
-                print(f"  FAILED {n.name} was involved in replication")
+        cmp = cmp_data(source_data, target_data, target)
+        if cmp == "fail":
+            print("  FAILED in compare")
+            print(source_data)
+            print(target_data)
+        if cmp == "retry":
+            print("  RETRY?")
+            print(source_data)
+            print(target_data)
 
 
 
 cases = [
     BaselineMiddleFirst,
-    #BaselineChildFirst
+    BaselineChildFirst
 ]
 
 state = TestState()
