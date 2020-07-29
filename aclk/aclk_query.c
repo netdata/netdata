@@ -509,7 +509,7 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
     aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0, aclk_shared_state.version_neg);
-    buffer_sprintf(local_buffer, ",\"t-exec\": %llu,\"t-rcvd\": %llu", t, this_query->created);
+    buffer_sprintf(local_buffer, ",\"t-exec\": %llu,\"t-rx\": %llu", t, this_query->created);
     buffer_strcat(local_buffer, "}\x0D\x0A\x0D\x0A");
     buffer_strcat(local_buffer, w->response.header_output->buffer);
 
