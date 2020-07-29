@@ -170,6 +170,7 @@ typedef struct netdata_socket {
     uint32_t reserved;
 } netdata_socket_t __attribute__((__aligned__(8)));
 
+
 typedef struct netdata_plot_values {
     // Values used in the previous iteration
     uint64_t recv_packets;
@@ -212,6 +213,7 @@ typedef struct netdata_socket_plot {
     avl avl;
     netdata_socket_idx_t index;
 
+
     // Current data
     netdata_socket_t sock;
 
@@ -240,6 +242,7 @@ typedef struct netdata_vector_plot {
     uint32_t last_plot;             // Last element plot
 
     uint32_t flags;                 // Flags
+
 } netdata_vector_plot_t;
 
 extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);

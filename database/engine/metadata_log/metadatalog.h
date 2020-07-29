@@ -112,6 +112,8 @@ struct metalog_instance {
     uint32_t current_compaction_id; /* Every compaction run increments this by 1 */
     unsigned long disk_space;
     unsigned long records_nr;
+    unsigned long objects_nr; /* total objects (hosts, charts, dimensions) monitored in this context */
+    uint8_t initialized; /* set to 1 to mark context initialized */
     unsigned last_fileno; /* newest index of metadata log file */
 
     uint8_t quiesce; /*

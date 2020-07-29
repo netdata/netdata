@@ -274,6 +274,10 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
 PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    if (unlikely(!host)) {
+        debug(D_PLUGINSD, "Ignoring chart belonging to missing or ignored host.");
+        return PARSER_RC_OK;
+    }
 
     char *type = words[1];
     char *name = words[2];
@@ -371,6 +375,10 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    if (unlikely(!host)) {
+        debug(D_PLUGINSD, "Ignoring dimension belonging to missing or ignored host.");
+        return PARSER_RC_OK;
+    }
 
     if (unlikely(!id)) {
         error(

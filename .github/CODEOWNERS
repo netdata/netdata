@@ -37,6 +37,7 @@ libnetdata/ @thiagofsm @mfundul @amoss
 packaging/ @amoss @Ferroin @prologic
 registry/ @jacekkolasa @amoss
 streaming/ @thiagoftsm @vlvkobal @amoss
+system/ @prologic @Ferroin @amoss
 web/ @thiagoftsm @mfundul @vlvkobal @amoss
 web/gui/ @jacekkolasa @amoss
 

@@ -32,35 +32,64 @@ section of your `netdata.conf`. The Agent ignores the `history` setting when usi
 ```conf
 [global]
     page cache size = 32
-    dbengine disk space = 256
+    dbengine multihost disk space = 256
 ```
 
-The above values are the default and minimum values for Page Cache size and DB engine disk space quota. Both numbers are
+The above values are the default values for Page Cache size and DB engine disk space quota. Both numbers are
 in **MiB**.
 
 The `page cache size` option determines the amount of RAM in **MiB** dedicated to caching Netdata metric values. The
 actual page cache size will be slightly larger than this figure—see the [memory requirements](#memory-requirements)
 section for details.
 
-The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
-metric values and all related metadata describing them.
+The `dbengine multihost disk space` option determines the amount of disk space in **MiB** that is dedicated to storing
+Netdata metric values and all related metadata describing them.
+
+### Legacy configuration
+
+The deprecated `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing
+Netdata metric values per legacy database engine instance (see [below](#Streaming-metrics-to-the-database-engine)).
+
+```conf
+[global]
+    dbengine disk space = 256
+```
 
 Use the  [**database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to correctly set
-`dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many child nodes
-you have, how many metrics your Agent collects, and more.
+`dbengine disk space`(**deprecated**) based on your needs. The calculator gives an accurate estimate based on how many
+child nodes you have, how many metrics your Agent collects, and more.
 
 ### Streaming metrics to the database engine
 
-When streaming metrics, the Agent on the parent node creates one instance of the database engine for itself, and another
-instance for every child node it receives metrics from. If you have four streaming nodes, you will have five instances
-in total (`1 parent + 4 child nodes = 5 instances`).
+##### Legacy mode
 
-The Agent allocates resources for each instance separately using the `dbengine disk space` setting. If `dbengine disk
-space` is set to the default `256`, each instance is given 256 MiB in disk space, which means the total disk space
-required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`. 
+When streaming metrics, the Agent on the parent node used to create one instance (legacy, version <= 1.23.2) of the
+database engine for itself, and another instance for every child node it receives metrics from. If you had four
+streaming nodes, you would have five instances in total (`1 parent + 4 child nodes = 5 instances`).
+
+The Agent allocated resources for each instance separately using the `dbengine disk space`(**deprecated**) setting. If
+`dbengine disk space`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space, which
+means the total disk space required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`. 
 
 See the [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to help you correctly
-set `dbengine disk space` and undertand the toal disk space required based on your streaming setup.
+set `dbengine disk space`(**deprecated**) and understand the total disk space required based on your streaming setup.
+
+##### Multi host DB mode
+
+In the newer agent versions the parent and child nodes all share `page cache size` and `dbengine multihost disk space`
+in a single dbengine multi-host instance.
+
+##### Backward compatibility
+
+All existing metrics belonging to child nodes are automatically converted to legacy dbengine instances and the localhost
+metrics are transferred to the multi-host dbengine instance.
+
+All new child nodes are automatically transferred to the mult-host dbengine instance and share its page cache and disk
+space. If you want to migrate a child node from its legacy dbengine instance to the multi-host dbengine instance you
+must delete the instance's directory located in `/var/cache/netdata/MACHINE_GUID/dbengine` after stopping the netdata
+agent.
+
+##### Information
 
 For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
 [streaming](/streaming/README.md).
@@ -70,8 +99,7 @@ For more information about setting `memory mode` on your nodes, in addition to o
 Using memory mode `dbengine` we can overcome most memory restrictions and store a dataset that is much larger than the
 available memory.
 
-There are explicit memory requirements **per** DB engine **instance**, meaning **per** Netdata **node** (e.g. localhost
-and streaming recipient nodes):
+There are explicit memory requirements **per** DB engine **instance**:
 
 -   The total page cache memory footprint will be an additional `#dimensions-being-collected x 4096 x 2` bytes over what
     the user configured with `page cache size`.
@@ -83,10 +111,11 @@ and streaming recipient nodes):
     -   for very highly compressible data (compression ratio > 90%) this RAM overhead is comparable to the disk space
         footprint.
 
-An important observation is that RAM usage depends on both the `page cache size` and the `dbengine disk space` options.
+An important observation is that RAM usage depends on both the `page cache size` and the `dbengine multihost disk space`
+options.
 
 You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
-validate the memory requirements for your particular system(s) and configuration.
+validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
 
 ### File descriptor requirements
 

@@ -83,6 +83,8 @@ ERROR_MESSAGES[16]="Gateway Timeout"
 ERROR_KEYS[17]="ErrServiceUnavailable"
 ERROR_MESSAGES[17]="Service Unavailable"
 
+# Exit code: 18 - Agent unique id is not generated yet.
+
 get_config_value() {
     conf_file="${1}"
     section="${2}"
@@ -142,6 +144,10 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
         ID="$(cat "${MACHINE_GUID_FILE}")"
+        MGUID=$ID
+else
+        echo >&2 "netdata.public.unique.id is not generated yet or not readable. Please run agent at least once before attempting to claim. Agent generates this file on first startup. If the ID is generated already make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
+        exit 18
 fi
 
 # get token from file
@@ -236,7 +242,8 @@ cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
     },
     "token": "$TOKEN",
     "rooms" : [ $ROOMS ],
-    "publicKey" : "$KEY"
+    "publicKey" : "$KEY",
+    "mGUID" : "$MGUID"
 }
 EMBED_JSON
 

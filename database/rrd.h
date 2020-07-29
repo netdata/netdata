@@ -698,10 +698,6 @@ struct rrdhost {
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
-#ifdef ENABLE_DBENGINE
-    unsigned page_cache_mb;                         // Database Engine page cache size in MiB
-    unsigned disk_space_mb;                         // Database Engine disk space quota in MiB
-#endif
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     char *cache_dir;                                // the directory to save RRD cache files
@@ -812,7 +808,6 @@ struct rrdhost {
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
     uuid_t  host_uuid;                              // Global GUID for this host
-    unsigned long objects_nr;                       // Number of charts and dimensions in this host
     uint32_t compaction_id;                         // The last metadata log compaction procedure that has processed
                                                     // this object.
 #endif
@@ -984,6 +979,14 @@ static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, cons
 
 extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 #define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
+/* This will not return charts that are archived */
+static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
+{
+    RRDSET *st = rrdset_find_byname_localhost(name);
+    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
+        return NULL;
+    return st;
+}
 
 extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);

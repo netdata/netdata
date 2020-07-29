@@ -61,6 +61,8 @@ ProtectHome=read-only
 #PrivateTmp=true
 ProtectControlGroups=true
 PrivateMounts=true
+# We whitelist this because it's the standard location to listen on a UNIX socket.
+ReadWriteDirectories=/run/netdata
 
 [Install]
 WantedBy=multi-user.target

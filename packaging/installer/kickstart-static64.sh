@@ -200,7 +200,7 @@ if [ -n "$ndpath" ] ; then
   if [ -r "${ndprefix}/etc/netdata/.environment" ] ; then
     if [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
       progress "Attempting to update existing install instead of creating a new one"
-      if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ; then
+      if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" --not-running-from-cron ; then
         progress "Updated existing install at ${ndpath}"
         exit 0
       else

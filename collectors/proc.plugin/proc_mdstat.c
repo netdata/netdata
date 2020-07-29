@@ -68,7 +68,7 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier) {
 
     if(likely(name && id_modifier)) {
         snprintfz(id, 50, "mdstat.%s_%s", name, id_modifier);
-        st = rrdset_find_byname_localhost(id);
+        st = rrdset_find_active_byname_localhost(id);
         if(likely(st)) rrdset_is_obsolete(st);
     }
 }
@@ -414,7 +414,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             if(likely(do_disks)) {
                 snprintfz(id, 50, "%s_disks", raid->name);
 
-                if(unlikely(!raid->st_disks && !(raid->st_disks = rrdset_find_byname_localhost(id)))) {
+                if(unlikely(!raid->st_disks && !(raid->st_disks = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
 
                     raid->st_disks = rrdset_create_localhost(
@@ -453,7 +453,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             if(likely(do_mismatch)) {
                 snprintfz(id, 50, "%s_mismatch", raid->name);
 
-                if(unlikely(!raid->st_mismatch_cnt && !(raid->st_mismatch_cnt = rrdset_find_byname_localhost(id)))) {
+                if(unlikely(!raid->st_mismatch_cnt && !(raid->st_mismatch_cnt = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
 
                     raid->st_mismatch_cnt = rrdset_create_localhost(
@@ -489,7 +489,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             if(likely(do_operations)) {
                 snprintfz(id, 50, "%s_operation", raid->name);
 
-                if(unlikely(!raid->st_operation && !(raid->st_operation = rrdset_find_byname_localhost(id)))) {
+                if(unlikely(!raid->st_operation && !(raid->st_operation = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
 
                     raid->st_operation = rrdset_create_localhost(
@@ -532,7 +532,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
                 snprintfz(id, 50, "%s_finish", raid->name);
 
-                if(unlikely(!raid->st_finish && !(raid->st_finish = rrdset_find_byname_localhost(id)))) {
+                if(unlikely(!raid->st_finish && !(raid->st_finish = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
 
                     raid->st_finish = rrdset_create_localhost(
@@ -566,7 +566,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
                 snprintfz(id, 50, "%s_speed", raid->name);
 
-                if(unlikely(!raid->st_speed && !(raid->st_speed = rrdset_find_byname_localhost(id)))) {
+                if(unlikely(!raid->st_speed && !(raid->st_speed = rrdset_find_active_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
 
                     raid->st_speed = rrdset_create_localhost(

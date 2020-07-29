@@ -330,6 +330,7 @@ int create_metadata_logfile(struct metadata_logfile *metalogfile)
     if (unlikely(ret)) {
         fatal("posix_memalign:%s", strerror(ret));
     }
+    memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_METALOG_MAGIC, RRDENG_MAGIC_SZ);
     superblock->version = RRDENG_METALOG_VER;
 

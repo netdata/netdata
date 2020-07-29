@@ -642,7 +642,6 @@ declare -A pkg_autogen=(
   # exceptions
   ['centos-6']="WARNING|"
   ['rhel-6']="WARNING|"
-  ['ubuntu-18']="WARNING|"
 )
 
 declare -A pkg_automake=(

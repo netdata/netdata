@@ -644,7 +644,7 @@ static void delete_old_data(void *arg)
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
             can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
-            if (unlikely(can_delete_metric && ctx->metalog_ctx)) {
+            if (unlikely(can_delete_metric && ctx->metalog_ctx->initialized)) {
                 /*
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
                  * attempt to delete the corresponding netdata dimension.
@@ -821,7 +821,7 @@ void timer_cb(uv_timer_t* handle)
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    if (unlikely(!ctx->metalog_ctx))
+    if (unlikely(!ctx->metalog_ctx->initialized))
         return; /* Wait for the metadata log to initialize */
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);

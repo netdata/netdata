@@ -392,7 +392,7 @@ void rrdset_free(RRDSET *st) {
             break;
     }
 #ifdef ENABLE_DBENGINE
-    rrd_atomic_fetch_add(&host->objects_nr, -1);
+    metalog_upd_objcount(host, -1);
 #endif
 
 }
@@ -543,10 +543,6 @@ RRDSET *rrdset_create_custom(
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
             changed_from_archived_to_active = 1;
-            if (rrdhost_flag_check(st->rrdhost, RRDHOST_FLAG_ARCHIVED)) {
-                rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
-                info("Host %s is not in archived mode anymore", st->rrdhost->hostname);
-            }
             mark_rebuild |= META_CHART_ACTIVATED;
         }
         char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
@@ -689,7 +685,6 @@ RRDSET *rrdset_create_custom(
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-            rrdhost_flag_clear(st->rrdhost, RRDHOST_FLAG_ARCHIVED);
         }
         return st;
     }
@@ -960,7 +955,7 @@ RRDSET *rrdset_create_custom(
     }
 #endif
 #ifdef ENABLE_DBENGINE
-    rrd_atomic_fetch_add(&st->rrdhost->objects_nr, 1);
+    metalog_upd_objcount(host, 1);
     metalog_commit_update_chart(st);
 #endif
 

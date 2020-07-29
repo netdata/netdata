@@ -189,7 +189,7 @@ them `/var/lib/netdata/registry/netdata.unique.id`). So, metrics for Netdata `A`
 any number of other Netdata, will have the same `MACHINE_GUID`.
 
 You can also use `default memory mode = dbengine` for an API key or `memory mode = dbengine` for
- a single host. The additional `page cache size` and `dbengine disk space` configuration options
+ a single host. The additional `page cache size` and `dbengine multihost disk space` configuration options
  are inherited from the global Netdata configuration.
 
 ##### allow from

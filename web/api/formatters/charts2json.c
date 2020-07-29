@@ -111,7 +111,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
         size_t found = 0;
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now)) {
+            if(!rrdhost_should_be_removed(h, host, now) && !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED)) {
                 buffer_sprintf(wb
                                , "%s\n\t\t{"
                                  "\n\t\t\t\"hostname\": \"%s\""
