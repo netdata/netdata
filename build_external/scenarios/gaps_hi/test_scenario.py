@@ -1,4 +1,4 @@
-import functools, json, math, operator, os, requests, sys, time
+import functools, json, math, operator, os, re, requests, sys, time
 
 me   = os.path.abspath(sys.argv[0])
 base = os.path.dirname(me)
@@ -140,6 +140,7 @@ def ShortMiddleDisconnect(state):
     sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
     time.sleep(3)
     sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
+    state.wait_isparent("middle")
     time.sleep(5)
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
@@ -155,7 +156,7 @@ def LongMiddleDisconnect(state):
     sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1")
     time.sleep(30)
     sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
-    state.wait_connected("child", "middle")
+    state.wait_isparent("middle")
     time.sleep(5)
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
@@ -238,6 +239,9 @@ class TestState(object):
             time.sleep(1)
 
     def wait_connected(self, sender, receiver):
+        '''This will detect the *first time* connection of a child to a parent. It looks in the mirrored
+           hosts array so on reconnections it will return instantly because the child database already
+           exists on the parent.'''
         url = f"http://localhost:{self.nodes[receiver].port}/api/v1/info"
         print(f"  Waiting for {sender} to connect to {receiver}")
         while True:
@@ -252,6 +256,25 @@ class TestState(object):
                print(f"  {sender} in mirrored_hosts on {receiver}")
                return
             print(f"  {receiver} mirrors {info['mirrored_hosts']}...")
+            time.sleep(1)
+
+    def wait_isparent(self, node):
+        '''This will detect the connection of some child to a parent. It cannot check which one connected
+           in scenarios with multiple children of a parent.'''
+        url = f"http://localhost:{self.nodes[node].port}/api/v1/info"
+        print(f"  Waiting for {node} to become parent")
+        while True:
+            try:
+                r = requests.get(url)
+                info = requests.get(url).json()
+            except requests.ConnectionError:
+                print(f"  {node} not responding...")
+                time.sleep(1)
+                continue
+            if info['host_labels']['_is_parent'] == 'true':
+               print(f"  {node} has child connected")
+               return
+            print(f"  {node} has host labels {info['host_labels']}...")
             time.sleep(1)
 
     def check_norep(self):
@@ -311,10 +334,19 @@ cases = [
     BaselineMiddleFirst,
     BaselineChildFirst,
 ]
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('pattern', nargs='?', default=None)
+args = parser.parse_args()
 
 state = TestState()
 for c in cases:
-    state.wrap(c)
+    if args.pattern is not None:
+        print(f"Checking {args.pattern} against {c.__name__}")
+        if re.match(args.pattern, c.__name__):
+            state.wrap(c)
+    else:
+        state.wrap(c)
 
 #class ShortParentDisconnect(object):
 #    def body(self):
