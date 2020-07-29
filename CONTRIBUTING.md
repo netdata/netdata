@@ -22,7 +22,7 @@ This is the minimum open-source users should contribute back to the projects the
 
 ### Join the Netdata Community
 
-We have launched a discussion board where you can find many of us.
+We have launched a [discussion board](https://community.netdata.cloud) where you can find many of us.
 
 ### Spread the word
 
