@@ -856,7 +856,15 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
 
     char dimname[CONFIG_MAX_NAME];
     int size;
-    char *protocol = (ptr->sock.protocol == IPPROTO_UDP) ? "UDP" : "TCP";
+    char *protocol;
+    if (ptr->sock.protocol == IPPROTO_UDP) {
+        protocol = "UDP";
+    } else if (ptr->sock.protocol == IPPROTO_TCP) {
+        protocol = "TCP";
+    } else {
+        protocol = "ALL";
+    }
+
     if (is_outbound)
         size = build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
@@ -979,6 +987,7 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
 
     ptr->family = AF_INET;
     ptr->sock.protocol = 255;
+    ptr->flags = (!is_outbound)?NETDATA_INBOUND_DIRECTION:NETDATA_OUTBOUND_DIRECTION;
 
     fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_outbound);
 
@@ -1022,7 +1031,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 {
     netdata_socket_plot_t test, *ret ;
 
-    memcpy(&test.index, lindex, sizeof(*lindex));
+    memcpy(&test.index, lindex, sizeof(netdata_socket_idx_t));
     test.flags = flags;
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
@@ -1039,8 +1048,8 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             update_socket_data(&w->sock, lvalues);
             return;
         } else {
-            memcpy(&w->sock, lvalues, sizeof(*lvalues));
-            memcpy(&w->index, lindex, sizeof(*lindex));
+            memcpy(&w->sock, lvalues, sizeof(netdata_socket_t));
+            memcpy(&w->index, lindex, sizeof(netdata_socket_idx_t));
             w->family = family;
 
             resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors);
@@ -1057,6 +1066,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             return;
         }
 
+        w->flags = flags;
         netdata_socket_plot_t *check ;
         check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl *)w);
         if (check != w)
@@ -1142,8 +1152,8 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].recv_bytes   += brecv;
     values[0].sent_bytes   += bsent;
     values[0].retransmit   += retransmit;
-    values[0].removeme     += *removesock;
-    values[0].protocol = protocol;
+    values[0].removeme     += (uint8_t)*removesock;
+    values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
 
     if (is_socket_allowed(key, family)) {
         uint32_t dir;

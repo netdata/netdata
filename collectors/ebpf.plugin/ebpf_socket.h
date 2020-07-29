@@ -213,7 +213,6 @@ typedef struct netdata_socket_plot {
     avl avl;
     netdata_socket_idx_t index;
 
-
     // Current data
     netdata_socket_t sock;
 
