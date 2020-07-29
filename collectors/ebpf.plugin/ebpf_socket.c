@@ -27,6 +27,7 @@ static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
+pthread_mutex_t nv_mutex;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -1286,9 +1287,11 @@ void *ebpf_socket_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        pthread_mutex_lock(&nv_mutex);
         read_listen_table();
         read_socket_hash_table(fd_ipv4, AF_INET);
         read_socket_hash_table(fd_ipv6, AF_INET6);
+        pthread_mutex_unlock(&nv_mutex);
     }
 
     return NULL;
@@ -1458,12 +1461,15 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
         pthread_mutex_unlock(&lock);
 
+        fflush(stdout);
+
+        pthread_mutex_lock(&nv_mutex);
         ebpf_socket_create_nv_charts(&inbound_vectors);
         ebpf_socket_send_nv_data(&inbound_vectors);
 
         ebpf_socket_create_nv_charts(&outbound_vectors);
         ebpf_socket_send_nv_data(&outbound_vectors);
-
+        pthread_mutex_unlock(&nv_mutex);
         fflush(stdout);
     }
 }
@@ -1602,6 +1608,8 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_service_names(network_viewer_opt.names);
     clean_hostnames(network_viewer_opt.included_hostnames);
     clean_hostnames(network_viewer_opt.excluded_hostnames);
+
+    pthread_mutex_destroy(&nv_mutex);
 }
 
 /*****************************************************************
@@ -1693,6 +1701,10 @@ void *ebpf_socket_thread(void *ptr)
     if (!em->enabled)
         goto endsocket;
 
+    if (pthread_mutex_init(&nv_mutex, NULL)) {
+        error("Cannot initialize local mutex");
+        goto endsocket;
+    }
     pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
