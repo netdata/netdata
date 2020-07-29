@@ -331,7 +331,7 @@ This module will produce following charts (if data is available):
 2.  **Commands** in commands/s
 
     -   select
-    -   updater
+    -   update
     -   other
 
 ## Configuration
