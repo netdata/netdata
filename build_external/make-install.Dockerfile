@@ -9,3 +9,4 @@ WORKDIR /opt/netdata/latest
 RUN while read -r f; do cp -p "$f" "../source/$f"; done <../manifest
 WORKDIR /opt/netdata/source
 RUN make install
+RUN chown -R netdata:netdata /usr/share/netdata/*
