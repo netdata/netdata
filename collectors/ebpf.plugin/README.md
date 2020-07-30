@@ -266,7 +266,7 @@ The eBPF collector only works on Linux systems and with specific Linux kernels. 
 You can run our helper script to determine whether your system can support eBPF monitoring.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh | sudo sh
+curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh | sudo bash
 ```
 
 If this script returns no output, your system is ready to compile and run the eBPF collector.
