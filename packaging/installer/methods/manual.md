@@ -1,11 +1,11 @@
 <!--
 ---
-title: "Install Netdata on Linux manually"
+title: "Install Netdata on Linux from a Git checkout"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
 ---
 -->
 
-# Install Netdata on Linux manually
+# Install Netdata on Linux from a Git checkout
 
 To install the latest git version of Netdata, please follow these 2 steps:
 
