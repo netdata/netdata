@@ -464,13 +464,13 @@ class GPU:
         for p in p_nodes:
             pid = int(p.find('pid').text)
             proc_stat_file =  
-                if isDocker():
+                if(isDocker()):
                     os.stat("/proc/%d" % pid)
                 else: 
                     os.path.join(host, 'proc', pid)
             uid = proc_stat_file.st_uid
             username =  
-                if isDocker():
+                if(isDocker()):
                     getpwuid(uid).name
                 else:
                     pwd.getpwuid(uid)[0]
