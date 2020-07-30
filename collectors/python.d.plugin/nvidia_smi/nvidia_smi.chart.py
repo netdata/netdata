@@ -154,11 +154,6 @@ def __read_passwd_file():
 def getpwuid(uid):
     u, n = __read_passwd_file()
     return u[uid]
-
-# return the passwd database entry by passwd name
-def getpwnam(name):
-    u, n = __read_passwd_file()
-    return n[name]
 ###
 
 NVIDIA_SMI = 'nvidia-smi'
@@ -474,8 +469,11 @@ class GPU:
                 else: 
                     os.path.join(host, 'proc', pid)
             uid = proc_stat_file.st_uid
-            username =  getpwuid(uid)
-            #pwd.getpwuid(uid)[0]
+            username =  
+                if isDocker():
+                    getpwuid(uid).name
+                else:
+                    pwd.getpwuid(uid)[0]
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
