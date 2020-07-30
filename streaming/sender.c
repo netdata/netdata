@@ -556,7 +556,7 @@ int ret;
 
 void execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
     time_t now = now_realtime_sec();
-    debug(D_REPLICATION, "Replication request started @%ld: %s %ld - %ld @ %ld", now, st_id, start_t, end_t);
+    debug(D_REPLICATION, "Replication request started: %s %ld - %ld @ %ld", st_id, (long)start_t, (long)end_t, (long)now);
     RRDSET *st = rrdset_find(s->host, st_id);
     if (!st) {
         errno = 0;
