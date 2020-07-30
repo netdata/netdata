@@ -75,7 +75,7 @@ def __get_field_sep(record):
     if fs:
         return fs
     else:
-        raise KeyError, '>> passwd database fields not delimited <<'
+        raise KeyError
 
 # class to match the new record field name accessors.
 # the resulting object is intended to behave like a read-only tuple,
@@ -122,7 +122,7 @@ def __read_passwd_file():
     if passwd_file:
         passwd = open(passwd_file, 'r')
     else:
-        raise KeyError, '>> no password database <<'
+        raise KeyError
     uidx = {}
     namx = {}
     sep = None
@@ -463,17 +463,17 @@ class GPU:
         ps = []
         for p in p_nodes:
             pid = int(p.find('pid').text)
-            proc_stat_file =  
-                if(isDocker()):
-                    os.stat("/proc/%d" % pid)
-                else: 
-                    os.path.join(host, 'proc', pid)
+            proc_stat_file =  ""
+            if(is_docker()):
+                    proc_stat_file = os.stat("/proc/%d" % pid)
+            else: 
+                    proc_stat_file = os.path.join(host, 'proc', pid)
             uid = proc_stat_file.st_uid
-            username =  
-                if(isDocker()):
-                    getpwuid(uid).name
-                else:
-                    pwd.getpwuid(uid)[0]
+            username =  ""
+            if(is_docker()):
+                    username = getpwuid(uid)[0]
+            else:
+                    username = pwd.getpwuid(uid)[0]
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
