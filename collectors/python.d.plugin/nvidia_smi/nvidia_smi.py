@@ -127,7 +127,9 @@ def gpu_charts(gpu):
         },
         USER_NUM: {
             'options': [None, 'Number of User on GPU', 'Nr', fam, 'nvidia_smi.user_num', 'stacked'],
-            'lines': []
+            'lines': [
+                ['nr', 'nr'],
+            ]
         },
     }
 
@@ -357,11 +359,12 @@ class GPU:
         for p in processes:
             if 'user_mem_{0}'.format(p['user_name']) in data:
                 data['user_mem_{0}'.format(p['user_name'])] += p['used_memory']
-            else:
-                data['user_mem_{0}'.format(p['user_name'])] = p['used_memory']
-            users.add(p['user_name'])
+            else :
+                data['user_mem_{0}'.format(p['user_name'])] = p['used_memory'] 
+            if 'user_mem_{0}'.format(p['user_name']) not in users:
+                users.add(p['user_name'])
 
-        data['user_num'] = len(users)
+        data['user_num_user_num'] = len(users)
 
         return dict(
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
@@ -442,6 +445,12 @@ class Service(SimpleService):
         for dim in chart:
             if dim.id not in active_dim_ids:
                 chart.del_dimension(dim.id, hide=False)
+
+    def update_user_num_chart(self, gpu):
+        chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_NUM)]
+        dim_id = 'gpu{0}_user_num_{1}'.format(gpu.num, 'user_num')
+        if dim_id not in chart:
+            chart.add_dimension([dim_id, 'user_num'])
 
     def check(self):
         if not self.poller.has_smi():
