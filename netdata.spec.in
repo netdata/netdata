@@ -456,7 +456,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sysconfdir}/rc.d/init.d/netdata
 %endif
 
-%defattr(4750,root,netdata,0750)
+%defattr(0750,root,netdata,0750)
 
 %dir %{_libexecdir}/%{name}/python.d
 %dir %{_libexecdir}/%{name}/charts.d
