@@ -17,11 +17,7 @@ disabled_by_default = True
 
 ####
 def is_docker():
-    path = '/proc/self/cgroup'
-    return (
-        os.path.exists('/.dockerenv') or
-        os.path.isfile(path) and any('docker' in line for line in open(path))
-    )
+    os.environ.has_key('NETDATA_HOST_PREFIX')
 
 # try and find the passwd file
 __passwd_path = []
