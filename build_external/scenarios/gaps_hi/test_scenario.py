@@ -6,7 +6,7 @@ base = os.path.dirname(me)
 print(sys.argv)
 
 def sh(x):
-    return os.popen(x).read() # eslint-disable-line no-eval
+    return os.popen(x).read() # nosec
 
 def get_data(prefix, chart):
     url = f"http://{prefix}/api/v1/data?chart={chart}"
@@ -111,6 +111,7 @@ def BaselineChildFirst(state):
     state.wait_connected("child", "middle")
     print("  Measure baseline for 60s...")
     time.sleep(60)
+    # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
 
@@ -126,6 +127,7 @@ def ShortChildDisconnect(state):
     time.sleep(3)
     sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1")
     time.sleep(5)
+    # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
 
@@ -141,6 +143,7 @@ def LongChildDisconnect(state):
     time.sleep(30)
     sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_child_1")
     time.sleep(5)
+    # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
 
@@ -157,6 +160,7 @@ def ShortMiddleDisconnect(state):
     sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1")
     state.wait_isparent("middle")
     time.sleep(5)
+    # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
 
@@ -173,6 +177,7 @@ def LongMiddleDisconnect(state):
     sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1")
     state.wait_isparent("middle")
     time.sleep(90)              # Takes a long time for DNS to reappear in the child container
+    # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
 
@@ -188,6 +193,7 @@ def MiddleRestart(state):
     time.sleep(3)
     sh("docker start gaps_hi_agent_middle_1")
     time.sleep(10)
+    # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
 
