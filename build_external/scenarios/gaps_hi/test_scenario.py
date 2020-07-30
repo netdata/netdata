@@ -102,6 +102,7 @@ def BaselineMiddleFirst(state):
     time.sleep(60)
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_norep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 def BaselineChildFirst(state):
     state.start("child")
@@ -114,6 +115,7 @@ def BaselineChildFirst(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 def ShortChildDisconnect(state):
     state.start("middle")
@@ -130,6 +132,7 @@ def ShortChildDisconnect(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 def LongChildDisconnect(state):
     state.start("middle")
@@ -146,6 +149,7 @@ def LongChildDisconnect(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 def ShortMiddleDisconnect(state):
     state.start("middle")
@@ -163,6 +167,7 @@ def ShortMiddleDisconnect(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 def LongMiddleDisconnect(state):
     state.start("middle")
@@ -176,10 +181,11 @@ def LongMiddleDisconnect(state):
     time.sleep(30)
     sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1")
     state.wait_isparent("middle")
-    time.sleep(90)              # Takes a long time for DNS to reappear in the child container
+    time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 def MiddleRestart(state):
     state.start("middle")
@@ -196,15 +202,17 @@ def MiddleRestart(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
 class Node(object):
-    def __init__(self, name, cname):
+    def __init__(self, name, cname, parser):
         self.name = name
         self.container_name = cname
         self.port = None
         self.guid = None
         self.log = None
         self.started = False
+        self.parser = parser
 
 
 class TestState(object):
@@ -220,6 +228,14 @@ class TestState(object):
                                            "data rx"      : "RECEIVER",
                                            "data tx"      : "STREAM: Sending data. Buffer",
                                            "replication"  : "REPLIC" })
+        # Suppress DNS failures in two node scenario on the top level
+        self.parser2         = LogParser({ "child connect": "client willing",
+                                           "child disconnect" : "STREAM child.*disconnected \(completed",
+                                           "connect failed (port closed)" : "connection refused",
+                                           "gap detect"   : "Gap detect",
+                                           "data rx"      : "RECEIVER",
+                                           "data tx"      : "STREAM: Sending data. Buffer",
+                                           "replication"  : "REPLIC" })
 
 
     def wipe(self):
@@ -227,9 +243,9 @@ class TestState(object):
         self.end_checks = []    # Before the containers are killed
         self.post_checks = []   # After the containers are killed (and the logs are final)
         self.nodes           = {}
-        self.nodes['child']  = Node("child", self.prefix + "_agent_child_1")
-        self.nodes['middle'] = Node("middle", self.prefix + "_agent_middle_1")
-        self.nodes['parent'] = Node("parent", self.prefix + "_agent_parent_1")
+        self.nodes['child']  = Node("child", self.prefix + "_agent_child_1", self.parser)
+        self.nodes['middle'] = Node("middle", self.prefix + "_agent_middle_1", self.parser)
+        self.nodes['parent'] = Node("parent", self.prefix + "_agent_parent_1", self.parser)
 
     def wrap(self, case):
         print(f"\n---------------> Wipe test state: {case.__name__}\n")
@@ -246,7 +262,7 @@ class TestState(object):
             c()
         for n in self.nodes.values():
             if n.started:
-                ev = self.parser.parse(n.log)
+                ev = n.parser.parse(n.log)
                 for e in ev:
                     print(n.name, e)
 
