@@ -13,9 +13,9 @@ fi
 # macOS 'date' doesnt support '%N' precision
 # echo $(/bin/date +"%N") is "N"
 if [ "$($LOOPSLEEP_DATE +"%N")" = "N" ]; then
-  DATE_FORMAT="%s * 1000"
+  LOOPSLEEP_DATE_FORMAT="%s * 1000"
 else
-  DATE_FORMAT="%s * 1000 + 10#%-N / 1000000"
+  LOOPSLEEP_DATE_FORMAT="%s * 1000 + 10#%-N / 1000000"
 fi
 
 now_ms=
@@ -26,7 +26,7 @@ current_time_ms_from_date() {
   if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]; then
     now_ms="$($LOOPSLEEP_DATE +'%s')000"
   else
-    now_ms="$(($($LOOPSLEEP_DATE +"$DATE_FORMAT")))"
+    now_ms="$(($($LOOPSLEEP_DATE +"$LOOPSLEEP_DATE_FORMAT")))"
   fi
 }
 
