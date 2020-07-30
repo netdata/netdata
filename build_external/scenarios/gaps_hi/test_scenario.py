@@ -144,8 +144,9 @@ def LongChildDisconnect(state):
     time.sleep(5)
     sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1")
     time.sleep(30)
-    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_child_1")
-    time.sleep(5)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1")
+    state.wait_isparent("middle")
+    time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
@@ -187,7 +188,7 @@ def LongMiddleDisconnect(state):
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def MiddleRestart(state):
+def MiddleFastRestart(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -198,7 +199,26 @@ def MiddleRestart(state):
     sh("docker kill gaps_hi_agent_middle_1")
     time.sleep(3)
     sh("docker start gaps_hi_agent_middle_1")
+    state.wait_isparent("middle")
     time.sleep(10)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
+
+def MiddleSlowRestart(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker kill gaps_hi_agent_middle_1")
+    time.sleep(30)
+    sh("docker start gaps_hi_agent_middle_1")
+    state.wait_isparent("middle")
+    time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
@@ -379,7 +399,8 @@ cases = [
     LongChildDisconnect,
     ShortMiddleDisconnect,
     LongMiddleDisconnect,
-    MiddleRestart,
+    MiddleFastRestart,
+    MiddleSlowRestart,
 
     BaselineMiddleFirst,
     BaselineChildFirst,
