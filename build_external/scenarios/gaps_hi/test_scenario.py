@@ -172,7 +172,7 @@ def LongMiddleDisconnect(state):
     time.sleep(30)
     sh("docker network connect gaps_hi_default gaps_hi_agent_middle_1")
     state.wait_isparent("middle")
-    time.sleep(5)
+    time.sleep(90)              # Takes a long time for DNS to reappear in the child container
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
 
@@ -207,8 +207,12 @@ class TestState(object):
         self.prefix          = prefix
         self.nodes           = {}
         self.parser          = LogParser({ "child connect": "client willing",
+                                           "child disconnect" : "STREAM child.*disconnected \(completed",
+                                           "connect failed (DNS)" : "Cannot resolve host",
+                                           "connect failed (port closed)" : "connection refused",
                                            "gap detect"   : "Gap detect",
                                            "data rx"      : "RECEIVER",
+                                           "data tx"      : "STREAM: Sending data. Buffer",
                                            "replication"  : "REPLIC" })
 
 
