@@ -39,7 +39,7 @@ def cmp_data(direct_data, remote_data, remote_name):
         all_rs = functools.reduce( operator.add, [ r[1:] for r in remote_data ], [])
         max_d, min_d = max(all_ds), min(all_ds)
         max_r, min_r = max(all_rs), min(all_rs)
-    except e:
+    except TypeError as e:
         print(f"{e} occurred on {all_ds} and {all_rs}")
         return False
     print(f"  Range estimates: Direct={min_d}-{max_d}@{start_d}-{end_d} {remote_name}={min_r}-{max_r}@{start_r}-{end_r}")
@@ -75,6 +75,21 @@ def cmp_data(direct_data, remote_data, remote_name):
         return "success"
     print(f"Below sync thresholds: {uniques} unique and {shared} shared")
     return "retry"
+
+class LogParser(object):
+    def __init__(self, events):
+        self.events = []
+        self.matchers = dict([(name,re.compile(regex)) for (name,regex) in events.items()])
+
+    def parse(self, filename):
+        self.lines = open(filename).readlines()
+        self.events = [f"{self.lines[0][:19]} start"]
+        for line in self.lines:
+            for n,r in self.matchers.items():
+                if r.search(line):
+                    self.events.append(f"{line[:19]} {n}")
+        self.events.append(f"{self.lines[-1][:19]} end")
+        return sorted(set(self.events))
 
 
 def BaselineMiddleFirst(state):
@@ -191,6 +206,10 @@ class TestState(object):
         self.network         = prefix + network
         self.prefix          = prefix
         self.nodes           = {}
+        self.parser          = LogParser({ "child connect": "client willing",
+                                           "gap detect"   : "Gap detect",
+                                           "data rx"      : "RECEIVER",
+                                           "replication"  : "REPLIC" })
 
 
     def wipe(self):
@@ -215,6 +234,11 @@ class TestState(object):
                 sh(f"docker logs {n.container_name} >{n.log} 2>&1")
         for c in self.post_checks:
             c()
+        for n in self.nodes.values():
+            if n.started:
+                ev = self.parser.parse(n.log)
+                for e in ev:
+                    print(n.name, e)
 
 
     def start(self, node):

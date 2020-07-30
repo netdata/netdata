@@ -242,9 +242,7 @@ static void on_pipe_read(uv_stream_t *pipe, ssize_t nread, const uv_buf_t *buf)
 {
     if (0 == nread) {
         fprintf(stderr, "SERVER %s: Zero bytes read from spawn pipe.\n", __func__);
-    } else if (UV_EOF == nread) {
-        fprintf(stderr, "EOF found in spawn pipe.\n");
-    } else if (nread < 0) {
+    }  else if (nread < 0) {
         fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
     }
 
