@@ -6,7 +6,7 @@ base = os.path.dirname(me)
 print(sys.argv)
 
 def sh(x):
-    return os.popen(x).read()
+    return os.popen(x).read() # eslint-disable-line no-eval
 
 def get_data(prefix, chart):
     url = f"http://{prefix}/api/v1/data?chart={chart}"
