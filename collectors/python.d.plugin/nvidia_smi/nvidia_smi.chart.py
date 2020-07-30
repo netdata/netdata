@@ -17,7 +17,7 @@ disabled_by_default = True
 
 ####
 def is_docker():
-    os.environ.has_key('NETDATA_HOST_PREFIX')
+    return os.environ.has_key('NETDATA_HOST_PREFIX')
 
 # try and find the passwd file
 __passwd_path = []
@@ -75,7 +75,7 @@ def __get_field_sep(record):
     if fs:
         return fs
     else:
-        raise KeyError
+        raiseKeyError("passwd database fields not delimited")
 
 # class to match the new record field name accessors.
 # the resulting object is intended to behave like a read-only tuple,
@@ -122,7 +122,7 @@ def __read_passwd_file():
     if passwd_file:
         passwd = open(passwd_file, 'r')
     else:
-        raise KeyError
+        raise KeyError("no password database")
     uidx = {}
     namx = {}
     sep = None
@@ -466,7 +466,7 @@ class GPU:
             proc_stat_file =  ""
             if(is_docker()):
                     proc_stat_file = os.stat("/proc/%d" % pid)
-            else: 
+            else:
                     proc_stat_file = os.path.join(host, 'proc', pid)
             uid = proc_stat_file.st_uid
             username =  ""
