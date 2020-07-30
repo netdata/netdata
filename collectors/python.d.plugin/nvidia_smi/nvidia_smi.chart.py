@@ -267,8 +267,8 @@ def gpu_charts(gpu):
             'lines': []
         },
         USER_NUM: {
-            'options': [None, 'Number of User on GPU', 'Nr', fam, 'nvidia_smi.user_num', 'stacked'],
-            'lines': []
+            'options': [None, 'Number of User on GPU', 'num', fam, 'nvidia_smi.user_num', 'stacked'],
+            'lines': ['user_num', 'users']
         },
     }
 
@@ -463,7 +463,7 @@ class GPU:
         ps = []
         for p in p_nodes:
             pid = int(p.find('pid').text)
-            proc_stat_file = 
+            proc_stat_file =  
                 if isDocker():
                     os.stat("/proc/%d" % pid)
                 else: 
