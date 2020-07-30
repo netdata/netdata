@@ -165,6 +165,46 @@ jobs:
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
+    - name: DEB package test
+      git:
+        depth: false
+      before_install:
+        - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
+      before_script:
+        - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+      script:
+        - echo "GIT Branch:" && git branch
+        - echo "Last commit:" && git log -1
+        - echo "GIT Describe:" && git describe
+        - echo "packaging/version:" && cat packaging/version
+        - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
+        - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
+        - sudo chown -R root:travis "/var/lib/lxc"
+        - sudo chmod -R 750 "/var/lib/lxc"
+        - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+
+    - name: RPM package test
+      git:
+        depth: false
+      before_install:
+        - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
+      before_script:
+        - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+      script:
+        - echo "GIT Branch:" && git branch
+        - echo "Last commit:" && git log -1
+        - echo "GIT Describe:" && git describe
+        - echo "packaging/version:" && cat packaging/version
+        - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
+        - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
+        - sudo chmod -R 755 "/var/lib/lxc"
+        - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
 
     - stage: Support activities on main branch
       name: Generate changelog for release (only on special and tagged commit msg)
@@ -180,7 +220,6 @@ jobs:
       git:
         depth: false
       if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
-
 
     # ###### Packaging workflow section ######
     # References:

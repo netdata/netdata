@@ -960,11 +960,17 @@ AC_CHECK_TYPE(
     [#include <linux/bpf.h>]
 )
 
+AC_CHECK_FILE(
+    externaldeps/libbpf/libbpf.a,
+    [have_libbpf=yes],
+    [have_libbpf=no]
+)
+
 AC_MSG_CHECKING([if ebpf.plugin should be enabled])
 if test "${build_target}" = "linux" -a \
         "${have_libelf}" = "yes" -a \
         "${have_bpf}" = "yes" -a \
-        -f externaldeps/libbpf/libbpf.a; then
+        "${have_libbpf}" = "yes"; then
     OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
     OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
     AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])

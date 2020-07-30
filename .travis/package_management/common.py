@@ -51,7 +51,7 @@ def replace_tag(tag_name, spec, new_tag_content):
 
 def run_command(container, command):
     print("Running command: %s" % command)
-    command_result = container.attach_wait(lxc.attach_run_command, command)
+    command_result = container.attach_wait(lxc.attach_run_command, command, stdout=sys.stdout.buffer, stderr=sys.stdout.buffer)
 
     if command_result != 0:
         raise Exception("Command failed with exit code %d" % command_result)
