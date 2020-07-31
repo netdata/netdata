@@ -15,7 +15,7 @@
 #define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
 #define NETDATA_SOCKET_LISTEN_TABLE 5
 
-#define NETDATA_SOCKET_READ_SLEEP_MS 400000
+#define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -178,6 +178,8 @@ typedef struct netdata_plot_values {
     uint64_t recv_bytes;
     uint64_t sent_bytes;
     uint16_t retransmit;
+
+    uint64_t last_time;
 
     // Values used to plot
     uint64_t plot_recv_packets;

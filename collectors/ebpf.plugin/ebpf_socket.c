@@ -28,6 +28,7 @@ static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
+int wait_to_plot = 0;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -97,20 +98,20 @@ static void ebpf_update_global_publish(
  */
 static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
 {
-    plot->plot_recv_packets = sock->recv_packets - plot->recv_packets;
-    plot->recv_packets = sock->recv_packets;
+    if (sock->ct > plot->last_time) {
+        plot->last_time         = sock->ct;
+        plot->plot_recv_packets = sock->recv_packets;
+        plot->plot_sent_packets = sock->sent_packets;
+        plot->plot_recv_bytes   = sock->recv_bytes;
+        plot->plot_sent_bytes   = sock->sent_bytes;
+        plot->plot_retransmit   = sock->retransmit;
+    }
 
-    plot->plot_sent_packets = sock->sent_packets - plot->sent_packets;
-    plot->sent_packets = sock->sent_packets;
-
-    plot->plot_recv_bytes = sock->recv_bytes - plot->recv_bytes;
-    plot->recv_bytes = sock->recv_bytes;
-
-    plot->plot_sent_bytes = sock->sent_bytes - plot->sent_bytes;
-    plot->sent_bytes = sock->sent_bytes;
-
-    plot->plot_retransmit = sock->retransmit - plot->retransmit;
-    plot->retransmit = sock->retransmit;
+    sock->recv_packets = 0;
+    sock->sent_packets = 0;
+    sock->recv_bytes   = 0;
+    sock->sent_bytes   = 0;
+    sock->retransmit   = 0;
 }
 
 /**
@@ -157,14 +158,14 @@ static inline void ebpf_socket_nv_send_bytes(netdata_vector_plot_t *ptr, char *c
 
     write_begin_chart(NETDATA_EBPF_FAMILY, chart);
     for (i = 0; i < end; i++) {
-        value = - ((collected_number) w[i].plot.plot_sent_bytes);
+        value = ((collected_number) w[i].plot.plot_sent_bytes);
         write_chart_dimension(w[i].dimension_sent, value);
         value = (collected_number) w[i].plot.plot_recv_bytes;
         write_chart_dimension(w[i].dimension_recv, value);
     }
 
     i = ptr->last;
-    value = - ((collected_number) w[i].plot.plot_sent_bytes);
+    value = ((collected_number) w[i].plot.plot_sent_bytes);
     write_chart_dimension(w[i].dimension_sent, value);
     value = (collected_number) w[i].plot.plot_recv_bytes;
     write_chart_dimension(w[i].dimension_recv, value);
@@ -186,14 +187,14 @@ static inline void ebpf_socket_nv_send_packets(netdata_vector_plot_t *ptr, char 
 
     write_begin_chart(NETDATA_EBPF_FAMILY, chart);
     for (i = 0; i < end; i++) {
-        value = -((collected_number)w[i].plot.plot_sent_packets);
+        value = ((collected_number)w[i].plot.plot_sent_packets);
         write_chart_dimension(w[i].dimension_sent, value);
         value = (collected_number) w[i].plot.plot_recv_packets;
         write_chart_dimension(w[i].dimension_recv, value);
     }
 
     i = ptr->last;
-    value = - ((collected_number)w[i].plot.plot_sent_packets);
+    value = ((collected_number)w[i].plot.plot_sent_packets);
     write_chart_dimension(w[i].dimension_sent, value);
     value = (collected_number)w[i].plot.plot_recv_packets;
     write_chart_dimension(w[i].dimension_recv, value);
@@ -501,13 +502,13 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
     uint32_t end = ptr->last_plot;
     netdata_socket_plot_t *w = ptr->plot;
     for (i = 0; i < end; i++) {
-        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[i].dimension_sent);
-        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[i].dimension_recv);
+        fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[i].dimension_sent);
+        fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[i].dimension_recv);
     }
 
     end = ptr->last;
-    fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[end].dimension_sent);
-    fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[end].dimension_recv);
+    fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[end].dimension_sent);
+    fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[end].dimension_recv);
 }
 
 /**
@@ -537,11 +538,11 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
     uint32_t end = ptr->last_plot;
     netdata_socket_plot_t *w = ptr->plot;
     for (i = 0; i < end; i++) {
-        fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[i].dimension_retransmit);
+        fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[i].dimension_retransmit);
     }
 
     end = ptr->last;
-    fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w[end].dimension_retransmit);
+    fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[end].dimension_retransmit);
 }
 
 /**
@@ -769,9 +770,9 @@ static int compare_sockets(void *a, void *b)
                 cmp = (val1->index.sport > val2->index.sport)?1:-1;
             }
         } else {
-            cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
+            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
             if (!cmp) {
-                cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+                cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
             }
         }
     } else {
@@ -782,9 +783,9 @@ static int compare_sockets(void *a, void *b)
                 cmp = (val1->index.sport > val2->index.sport)?1:-1;
             }
         } else {
-            cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
+            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
             if (!cmp) {
-                cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+                cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
             }
         }
     }
@@ -1013,6 +1014,9 @@ static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *
     sock->recv_bytes   += lvalues->recv_bytes;
     sock->sent_bytes   += lvalues->sent_bytes;
     sock->retransmit   += lvalues->retransmit;
+
+    if (lvalues->ct > sock->ct)
+        sock->ct = lvalues->ct;
 }
 
 /**
@@ -1036,7 +1040,9 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
-        update_socket_data(&ret->sock, lvalues);
+        if (lvalues->ct > ret->plot.last_time) {
+            update_socket_data(&ret->sock, lvalues);
+        }
     } else {
         uint32_t curr = out->next;
         uint32_t last = out->last;
@@ -1045,7 +1051,9 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         int resolved;
         if (curr == last) {
-            update_socket_data(&w->sock, lvalues);
+            if (lvalues->ct > w->plot.last_time) {
+                update_socket_data(&w->sock, lvalues);
+            }
             return;
         } else {
             memcpy(&w->sock, lvalues, sizeof(netdata_socket_t));
@@ -1132,6 +1140,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     uint16_t retransmit = 0;
     int i;
     uint8_t protocol = values[0].protocol;
+    uint64_t ct = values[0].ct;
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -1144,6 +1153,9 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         if (!protocol)
             protocol = w->protocol;
 
+        if (w->ct > ct)
+            ct = w->ct;
+
         *removesock += (int)w->removeme;
     }
 
@@ -1154,11 +1166,12 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].retransmit   += retransmit;
     values[0].removeme     += (uint8_t)*removesock;
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
+    values[0].ct           = ct;
 
     if (is_socket_allowed(key, family)) {
         uint32_t dir;
         netdata_vector_plot_t *table = select_vector_to_store(&dir, key);
-        store_socket_inside_avl(table, values, key, family, dir);
+        store_socket_inside_avl(table, &values[0], key, family, dir);
     }
 }
 
@@ -1174,6 +1187,9 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  */
 static void read_socket_hash_table(int fd, int family)
 {
+    if (wait_to_plot)
+        return;
+
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key;
     netdata_socket_idx_t removeme;
@@ -1306,6 +1322,7 @@ void *ebpf_socket_read_hash(void *ptr)
         read_listen_table();
         read_socket_hash_table(fd_ipv4, AF_INET);
         read_socket_hash_table(fd_ipv6, AF_INET6);
+        wait_to_plot = 1;
         pthread_mutex_unlock(&nv_mutex);
     }
 
@@ -1484,6 +1501,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         ebpf_socket_create_nv_charts(&outbound_vectors);
         fflush(stdout);
         ebpf_socket_send_nv_data(&outbound_vectors);
+        wait_to_plot = 0;
         pthread_mutex_unlock(&nv_mutex);
 
         pthread_mutex_unlock(&collect_data_mutex);
