@@ -215,33 +215,82 @@ metrics, but also troubleshoot complex performance problems.
 
 ## News
 
-`May 11, 2020` - **[Netdata v1.22.0 released!](https://github.com/netdata/netdata/releases)**
+`July 16, 2020` - **[Netdata v1.23.2 released!](https://github.com/netdata/netdata/releases/tag/v1.23.2)**
 
-Release v1.22.0 marks the official launch of our rearchitected Netdata Cloud! This Agent release contains both backend and interface changes necessary to connect your distributed nodes to this dramatically improved experience.
+Release v1.23.2 of the Netdata Agent is a patch for one significant issue.
 
-Netdata Cloud builds on top of our open source monitoring Agent to give you real-time visibility for your entire infrastructure. Once you've connected your Agents to Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface. When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
+PR [#9491](https://github.com/netdata/netdata/pull/9491) fixed a buffer overrun vulnerability in Netdata's JSON parsing
+code. This vulnerability could be used to crash Agents remotely, and in some circumstances, could be used in an
+arbitrary code execution (ACE) exploit.
 
-![Animated GIF of Netdata Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
+We strongly encourage all Netdata users to update their nodes to v1.23.2 as soon as possible.
 
-**[Sign in to Cloud](https://app.netdata.cloud)** and read our [Get started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started/) guide for details on updating your nodes, claiming them, and navigating the new Cloud.
+This release also contains additional bug fixes and improvements.
 
-While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or centralized in any way. Metrics data remains with your nodes and is only streamed to your browser through Cloud.
+`July 1, 2020` - **[Netdata v1.23.1 released!](https://github.com/netdata/netdata/releases/tag/v1.23.1)**
 
-In addition, Cloud only expands on the functionality of the wildly popular free and open source Agent. We will never make any of our open source Agent features Cloud-exclusive, and we will actively continue to develop the Agent so that we can integrate new features with Netdata Cloud.
+Release v1.23.1 of the Netdata Agent is a patch for two significant issues.
 
-We added a new collector called `whoisquery` that helps you **monitor a domain name's expiration date**. You can track as many domains as you'd like, and set custom warning and critical thresholds for each. For more information on setup and configuration, see the [Whois domain expiry monitoring documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/whoisquery/).
+PR [#9436](https://github.com/netdata/netdata/pull/9436) fixed an issue where dimensions were marked obsolete and
+archived simultaneously, which caused segmentation faults. We're grateful to [marioem](https://github.com/marioem), who
+first reported the issue, and other members of the Netdata community who contributed their insights and valuable log
+information, which we used to diagnose and fix the bug.
 
-We added a new connector to our experimental exporting engine: **[Prometheus remote write](https://learn.netdata.cloud/docs/agent/exporting/prometheus/remote_write/)**. You can use this connector to send Netdata metrics to your choice of more than 20 external storage providers for long-term archiving and further analysis.
+PR [#9428](https://github.com/netdata/netdata/pull/9428) fixed a significant issue with duplicate alarm IDs, which
+caused issues in how alarms were sent and displayed in Netdata Cloud.
 
-Our new documentation experience is now available at **[Netdata Learn](https://learn.netdata.cloud)**! We encourage you to try it out and give us feedback or ask questions in our [GitHub issues](https://github.com/netdata/netdata/issues/new/choose). Learn features documentation for both the Agent and Cloud in separate-but-connected vaults, which streamlines the experience of learning about both products.
+This release also contains a few additional bug fixes that were not fully reviewed before the release of v1.23.0.
 
-While Learn only features documentation for now, we plan on releasing more types of educational content serving the Agent's open-source community of developers, sysadmins, and DevOps folks. We'll have more to announce soon, but in the meantime, we hope you enjoy what we believe is a smoother (and prettier) docs experience.
+`June 24, 2020` - **[Netdata v1.23.0 released!](https://github.com/netdata/netdata/releases/tag/v1.23.0)**
 
-As part of the ongoing work to polish our **eBPF collector tech preview**, we've now proven the collector's performance is very good, and have vastly expanded the number of operating system versions the collector works on. Learn how to [enable it](https://docs.netdata.cloud/collectors/ebpf.plugin/) in our documentation. We've also extensively stress-tested the eBPF collector and found that it's impressively fast given the depth of metrics it collects! Read up on our benchmarking analysis [on GitHub](https://github.com/netdata/netdata/issues/8195).
+The v1.23.0 release of the Netdata Agent is all about unlocking new depths of visibility for your applications,
+services, and systems. We have Kubernetes service discovery, new eBPF metrics like virtual filesystem switch and
+bandwidth per process out of the Linux kernel at _event frequency_, more interoperability with your monitoring stack
+thanks to a new exporting engine, and much more.
+
+This release contains 2 new collectors, 1 new exporting connector, 1 new alarm notification method, 55 improvements, 45
+documentation updates, and 40 bug fixes.
+
+Our [service discovery collector](https://github.com/netdata/agent-service-discovery/) **detects Kubernetes (k8s) pods
+and immediately collects metrics from _22 different services_** as the associated pods are created, destroyed, and
+scaled. Service discovery is installed when you use our [Helm chart](https://github.com/netdata/helmchart), which means
+you can now collect and visualize service-, pod-, Kubelet-, kube-proxy-, and node-level k8s metrics with one `helm
+install` command and zero configuration. All our Kubernetes monitoring components are open source and free for clusters
+of any size.
+
+Our low-level [Linux kernel monitoring via eBPF](https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin/) is now
+supercharged. Thanks to an integration with
+[`apps.plugin`](https://learn.netdata.cloud/docs/agent/collectors/apps.plugin), you can now **monitor how a specific
+application interacts with the Linux kernel**. This update also includes new metrics, such as virtual filesystem switch,
+bandwidth per process, and much more. Netdata collects these metrics at an event frequency, even better than our famous
+1s granularity, so that you can debug applications or anomalies with pinpoint accuracy. The eBPF collector is also now
+installed and enabled by default except on [static
+builds](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart-64).
+
+Read our [guide on troubleshooting apps with eBPF
+metrics](https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf/) for more details.
+
+Netdata is now more interoperable with your existing monitoring stack thanks to the [**exporting
+engine**](https://learn.netdata.cloud/docs/agent/exporting/), which replaces the backends system. You can now export to
+multiple external databases through Graphite, Google Cloud Pub/Sub, Prometheus remote write, MongoDB, and JSON
+connectors, plus others. Send metrics as soon as they're collected to enrich single pane of glass views or analyze
+Netdata's metrics with machine learning.
+
+Read our guide on [exporting metrics to
+Graphite](https://learn.netdata.cloud/guides/export/export-netdata-metrics-graphite) for specifics on just one of many
+pipelines you can set up to archive your Netdata metrics.
+
+We're also releasing an improvement for the availability of your monitoring and metrics: **persistent metadata**. The
+Agent now writes metadata to disk alongside metrics to allow access to non-active charts from Netdata Cloud and enable
+future features.
+
+We added some enhancements to our documentation site, including a new [guides
+section](https://learn.netdata.cloud/guides). We'll continue to populate with more use case- and scenario-based content
+to help you monitor, troubleshoot, visualize, and export your Netdata metrics.
 
 ---
 
-See more news and previous releases at our [blog](https://blog.netdata.cloud) or our [releases
+See more news and previous releases at our [blog](https://www.netdata.cloud/blog/) or our [releases
 page](https://github.com/netdata/netdata/releases).
 
 ## How it works
