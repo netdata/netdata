@@ -53,6 +53,9 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 // Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
 // the last entry times as the metric updates, but let's see if it is a problem first.
+/*
+    FIRST APPROACH - NOT USED BUT LEFT FOR REFERENCE
+
 time_t rrdhost_last_entry_t(RRDHOST *h) {
     rrdhost_rdlock(h);
     RRDSET *st;
@@ -74,18 +77,19 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
             }
         }
         netdata_rwlock_unlock(&st->rrdset_rwlock);
-        /*if (st_last > now)
-            info("Skipping %s -> future update! %ld is %ld ahead", st->name, st_last-now);
-        else {
-            info("Chart %s last %ld global %ld gap=%ld", st->name, st_last, result, now-st_last);
-            if (st_last < result)
-                result = st_last;
-        }*/
+        //if (st_last > now)
+        //    info("Skipping %s -> future update! %ld is %ld ahead", st->name, st_last-now);
+        //else {
+        //    info("Chart %s last %ld global %ld gap=%ld", st->name, st_last, result, now-st_last);
+        //    if (st_last < result)
+        //        result = st_last;
     }
     rrdhost_unlock(h);
     return result;
 }
+*/
 
+// LEFTOVER FROM FIRST APPROACH - REMOVING ALL OF THIS
 PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugins_action)
 {
     PARSER_USER_OBJECT *user = user_v;
@@ -102,10 +106,11 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
     }
     if (remote_time_txt && *remote_time_txt) {
         remote_time = str2ull(remote_time_txt);
-        time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
+        //time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
         time_t gap = 0;
         rpt->gap_start = 0;
         rpt->gap_end = 0;
+        /*
         if (prev == 0)
             info("STREAM %s from %s: Initial connection (no gap to check), remote=%ld local=%ld slew=%ld",
                  host->hostname, cd->cmd, remote_time, now, now-remote_time);
@@ -118,26 +123,8 @@ PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugi
             }
             info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
                  host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
- /*           if (gap > 0) {
-                rpt->gap_start = remote_time - gap;
-                rpt->gap_end = remote_time;
-                char message[128];
-                sprintf(message,"REPLICATE %ld %ld\n", rpt->gap_start, rpt->gap_end);
-                int ret;
-#ifdef ENABLE_HTTPS
-                SSL *conn = host->stream_ssl.conn ;
-                if(conn && !host->stream_ssl.flags) {
-                    ret = SSL_write(conn, message, strlen(message));
-                } else {
-                    ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-                }
-#else
-                ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-#endif
-                if (ret != (int)strlen(message))
-                    error("Failed to send initial timestamp - gaps may appear in charts");
-            }*/
         }
+        */
         return PARSER_RC_OK;
     }
     return PARSER_RC_ERROR;
@@ -166,8 +153,6 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
 
 PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
     PARSER_USER_OBJECT *user = user_v;
-    if (!strcmp(user->st->name,"system.io"))
-        error("BEGIN on system.io %llu %llu", microseconds, remote_clock);
     netdata_mutex_lock(&st->shared_flags_lock);
     // TODO: we should supress this on the other side and use this as an indicator that the two sides are out of
     //       sync so that we can trigger recovery.
@@ -178,11 +163,14 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     }
     if (st->last_updated.tv_sec == 0) {
         netdata_mutex_unlock(&st->shared_flags_lock);
+        debug(D_REPLICATION, "First data value for %s , remote=%llu offset=%llu last_collected=%ld", user->st->name, remote_clock, microseconds, (long)st->last_collected_time.tv_sec);
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     }
     time_t now = now_realtime_sec();
     time_t expected_t = st->last_updated.tv_sec + st->update_every;
     time_t remote_t = (time_t)remote_clock;
+    debug(D_REPLICATION, "BEGIN on %s, last_updated=%ld remote=%llu offset=%llu", st->name, (long)st->last_updated.tv_sec,
+          remote_clock, microseconds);
     // There are two cases to drop into replication mode:
     //   - the data is old, this is probably a stale buffer that arrived as part of a reconnection
     //   - the data contains a gap, either the connection dropped or this node restarted

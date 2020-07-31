@@ -2,7 +2,7 @@ version: '3.3'
 services:
   agent_middle:
     image: debian_10_dev
-    command: /usr/sbin/netdata -D -W set global "debug flags" 0xc0000000 -W set global hostname "middle"
+    command: /usr/sbin/netdata -D -W set global "debug flags" 0xc0020000 -W set global hostname "middle"
     ports:
       - 21001:19999
     volumes:

@@ -691,6 +691,10 @@ RRDSET *rrdset_create_custom(
         st->sflag_replicating_down = 0;
         // Leave replicating_up in current side - req on both sides is independent
         netdata_mutex_unlock(&st->shared_flags_lock);
+
+        debug(D_REPLICATION, "Chart %s found, last_collected=%ld last_updated=%ld", st->name,
+            st->last_collected_time.tv_sec, st->last_updated.tv_sec);
+
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
