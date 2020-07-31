@@ -564,35 +564,35 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
                                     "Outbound connections (bytes).",
                                     EBPF_COMMON_DIMENSION_BYTESS,
-                                    NETDATA_SOCKET_GROUP,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21080,
                                     ptr);
 
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_PACKETS,
                                     "Outbound connections (packets)",
                                     EBPF_COMMON_DIMENSION_PACKETS,
-                                    NETDATA_SOCKET_GROUP,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21082,
                                     ptr);
 
         ebpf_socket_create_nv_retransmit(NETDATA_NV_OUTBOUND_RETRANSMIT,
                                          "Retransmitted packets",
                                          EBPF_COMMON_DIMENSION_CALL,
-                                         NETDATA_SOCKET_GROUP,
+                                         NETDATA_NETWORK_CONNECTIONS_GROUP,
                                          21083,
                                          ptr);
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
                                     "Inbound connections (bytes)",
                                     EBPF_COMMON_DIMENSION_BYTESS,
-                                    NETDATA_SOCKET_GROUP,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21084,
                                     ptr);
 
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_PACKETS,
                                     "Inbound connections (packets)",
                                     EBPF_COMMON_DIMENSION_PACKETS,
-                                    NETDATA_SOCKET_GROUP,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21085,
                                     ptr);
     }
