@@ -1514,12 +1514,12 @@ static void parse_network_viewer_section()
 
     network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
-                                                                       "resolve hostname ips",
+                                                                       "resolve hostnames",
                                                                        0);
 
     network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                            EBPF_NETWORK_VIEWER_SECTION,
-                                                                           "resolve service name",
+                                                                           "resolve service names",
                                                                            0);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
