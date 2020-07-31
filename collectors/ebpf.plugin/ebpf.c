@@ -1494,7 +1494,7 @@ static void adjust_max_dimension()
 
     curr /= 2;
     if (!curr) {
-        info("The number of dimensions is too small (%u), we are setting it to minimum 50", network_viewer_opt.max_dim);
+        info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
         network_viewer_opt.max_dim = 1;
     }
 
