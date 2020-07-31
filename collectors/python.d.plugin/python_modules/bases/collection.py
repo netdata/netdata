@@ -77,7 +77,7 @@ def find_binary(binary):
     :return:
     """
     for directory in PATH:
-        binary_name = '/'.join([directory, binary])
+        binary_name = os.path.join(directory, binary)
         if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
             return binary_name
     return None
