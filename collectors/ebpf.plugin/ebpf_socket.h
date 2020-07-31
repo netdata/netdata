@@ -135,7 +135,8 @@ typedef struct ebpf_network_viewer_hostname_list {
 typedef struct ebpf_network_viewer_options {
     uint32_t max_dim;   // Store value read from 'maximum dimensions'
 
-    uint32_t name_resolution_enabled;
+    uint32_t hostname_resolution_enabled;
+    uint32_t service_resolution_enabled;
 
     ebpf_network_viewer_port_list_t *excluded_port;
     ebpf_network_viewer_port_list_t *included_port;

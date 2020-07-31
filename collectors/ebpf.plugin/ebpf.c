@@ -116,9 +116,10 @@ pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 50, .name_resolution_enabled = 0,
-                                                     .excluded_port = NULL, .included_port = NULL,
-                                                     .names = NULL, .ipv4_local_ip = NULL, .ipv6_local_ip = NULL };
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 50, .hostname_resolution_enabled = 0,
+                                                     .service_resolution_enabled = 0, .excluded_port = NULL,
+                                                     .included_port = NULL, .names = NULL, .ipv4_local_ip = NULL,
+                                                     .ipv6_local_ip = NULL };
 
 /*****************************************************************
  *
@@ -1506,16 +1507,21 @@ static void parse_network_viewer_section()
                                                       50);
     adjust_max_dimension();
 
-    network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
+    network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
                                                                        "resolve hostname ips",
                                                                        0);
+
+    network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(&collector_config,
+                                                                           EBPF_NETWORK_VIEWER_SECTION,
+                                                                           "resolve service name",
+                                                                           0);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                                 "ports", NULL);
     parse_ports(value);
 
-    if (network_viewer_opt.name_resolution_enabled) {
+    if (network_viewer_opt.hostname_resolution_enabled) {
         value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
         link_hostnames(value);
     } else {
