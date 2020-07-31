@@ -1201,7 +1201,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void read_socket_hash_table(int fd, int family)
+static void read_socket_hash_table(int fd, int family, int network_connection)
 {
     if (wait_to_plot)
         return;
@@ -1224,8 +1224,10 @@ static void read_socket_hash_table(int fd, int family)
         if (removesock)
             bpf_map_delete_elem(fd, &removeme);
 
-        removesock = 0;
-        hash_accumulator(values, &key, &removesock, family, end);
+        if (network_connection) {
+            removesock = 0;
+            hash_accumulator(values, &key, &removesock, family, end);
+        }
 
         if (removesock)
             removeme = key;
@@ -1241,8 +1243,10 @@ static void read_socket_hash_table(int fd, int family)
         return;
     }
 
-    removesock = 0;
-    hash_accumulator(values, &next_key, &removesock, family, end);
+    if (network_connection) {
+        removesock = 0;
+        hash_accumulator(values, &next_key, &removesock, family, end);
+    }
 
     if (removesock)
         bpf_map_delete_elem(fd, &next_key);
@@ -1335,14 +1339,12 @@ void *ebpf_socket_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        if (network_connection) {
-            pthread_mutex_lock(&nv_mutex);
-            read_listen_table();
-            read_socket_hash_table(fd_ipv4, AF_INET);
-            read_socket_hash_table(fd_ipv6, AF_INET6);
-            wait_to_plot = 1;
-            pthread_mutex_unlock(&nv_mutex);
-        }
+        pthread_mutex_lock(&nv_mutex);
+        read_listen_table();
+        read_socket_hash_table(fd_ipv4, AF_INET, network_connection);
+        read_socket_hash_table(fd_ipv6, AF_INET6, network_connection);
+        wait_to_plot = 1;
+        pthread_mutex_unlock(&nv_mutex);
     }
 
     return NULL;
