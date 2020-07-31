@@ -16,11 +16,11 @@ from bases.collection import find_binary
 disabled_by_default = True
 
 ####
-def is_set(s): 
-    if s in os.environ:
-        return True
-    else:
-        return False
+#def is_set(s): 
+#    if s in os.environ:
+#        return True
+#    else:
+#        return False
 
 def is_docker():
     path = '/proc/self/cgroup'
@@ -127,7 +127,6 @@ def __read_passwd_file():
     else:
         raise KeyError("no password database")
     uidx = {}
-    namx = {}
     sep = None
     while 1:
         entry = passwd.readline().strip()
@@ -142,8 +141,6 @@ def __read_passwd_file():
             record = Passwd(*fields)
             if not (fields[2] in uidx):
                 uidx[fields[2]] = record
-            if not (fields[0] in namx):
-                namx[fields[0]] = record
         elif len(entry) > 0:
             pass                         # skip empty or malformed records
         else:
@@ -151,11 +148,11 @@ def __read_passwd_file():
     passwd.close()
     if len(uidx) == 0:
         raise KeyError
-    return (uidx, namx)
+    return (uidx)
 
 # return the passwd database entry by UID
 def getpwuid(uid):
-    u, n = __read_passwd_file()
+    u = __read_passwd_file()
     return u[uid]
 ###
 
