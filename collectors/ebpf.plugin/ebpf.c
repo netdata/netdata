@@ -1493,7 +1493,7 @@ static void adjust_max_dimension()
     uint32_t curr = network_viewer_opt.max_dim / 2;
     if (!curr) {
         info("The number of dimensions is too small (%u), we are setting it to minimum 50", network_viewer_opt.max_dim);
-        network_viewer_opt.max_dim = 25;
+        network_viewer_opt.max_dim = 1;
     }
 
     network_viewer_opt.max_dim = curr;
