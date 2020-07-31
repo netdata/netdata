@@ -116,7 +116,7 @@ pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .name_resolution_enabled = 0,
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 50, .name_resolution_enabled = 0,
                                                      .excluded_port = NULL, .included_port = NULL,
                                                      .names = NULL, .ipv4_local_ip = NULL, .ipv6_local_ip = NULL };
 
@@ -1480,6 +1480,22 @@ static void link_hostnames(char *parse)
 }
 
 /**
+ * Adjust max dimension.
+ *
+ * Netdata plot two dimensions per connection, so it is necessary to adjust the values.
+ */
+static void adjust_max_dimension()
+{
+    uint32_t curr = network_viewer_opt.max_dim / 2;
+    if (!curr) {
+        info("The number of dimensions is too small (%u), we are setting it to minimum 50", network_viewer_opt.max_dim);
+        network_viewer_opt.max_dim = 25;
+    }
+
+    network_viewer_opt.max_dim = curr;
+}
+
+/**
  * Parse network viewer section
  */
 static void parse_network_viewer_section()
@@ -1488,6 +1504,7 @@ static void parse_network_viewer_section()
                                                       EBPF_NETWORK_VIEWER_SECTION,
                                                       "maximum dimensions",
                                                       50);
+    adjust_max_dimension();
 
     network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
