@@ -23,7 +23,14 @@ def is_set(s):
         return False
 
 def is_docker():
-    return is_set('NETDATA_HOST_PREFIX')
+    path = '/proc/self/cgroup'
+    return (
+        os.path.exists('/.dockerenv') or
+        os.path.isfile(path) and any('docker' in line for line in open(path))
+    )
+
+#def is_docker():
+#    return is_set('NETDATA_HOST_PREFIX')
 
 # try and find the passwd file
 __passwd_path = []
@@ -264,7 +271,9 @@ def gpu_charts(gpu):
         },
         USER_NUM: {
             'options': [None, 'Number of User on GPU', 'num', fam, 'nvidia_smi.user_num', 'stacked'],
-            'lines': ['user_num', 'users']
+            'lines': [
+                ['user_num', 'users'],
+            ]
         },
     }
 
@@ -459,17 +468,17 @@ class GPU:
         ps = []
         for p in p_nodes:
             pid = int(p.find('pid').text)
-            proc_stat_file = None #os.stat("/proc/%d" % pid)
+            proc_stat_file = os.stat("/proc/%d" % pid)
             if(is_docker()):
-                    proc_stat_file = os.path.join(host, 'proc', pid)
+                    proc_stat_file = os.stat(os.path.join('host', 'proc', pid))
             else:
                     proc_stat_file = os.stat("/proc/%d" % pid)
             uid = proc_stat_file.st_uid
-            username = "" #pwd.getpwuid(uid)[0]
+            username = pwd.getpwuid(uid)[0]
             if(is_docker()):
                     username = getpwuid(uid)[0]
             else:
-                    pwd.getpwuid(uid)[0]
+                    username = pwd.getpwuid(uid)[0]
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
@@ -554,7 +563,6 @@ class Service(SimpleService):
             data.update(gpu.data())
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)
-            self.update_user_num_chart(gpu)
 
         return data or None
 
