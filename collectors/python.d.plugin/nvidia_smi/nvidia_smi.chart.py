@@ -16,20 +16,22 @@ from bases.collection import find_binary
 disabled_by_default = True
 
 ####
+def is_set(s): 
+    if s in os.environ:
+        return True
+    else:
+        return False
+
 def is_docker():
-    #return os.environ.has_key('NETDATA_HOST_PREFIX')
-    return false
+    return is_set('NETDATA_HOST_PREFIX')
 
 # try and find the passwd file
 __passwd_path = []
 if(is_docker()):
     __passwd_path.append('/host/etc/passwd')
-if os.environ.has_key('ETC_PASSWD'):
-    __passwd_path.append(os.environ['ETC_PASSWD'])
-if os.environ.has_key('ETC'):
-    __passwd_path.append('%s/passwd' % os.environ['ETC'])
-if os.environ.has_key('PYTHONHOME'):
-    __passwd_path.append('%s/Etc/passwd' % os.environ['PYTHONHOME'])
+else:
+    __passwd_path.append('/etc/passwd')
+
 
 passwd_file = None
 for __i in __passwd_path:
@@ -46,14 +48,7 @@ def __nullpathconv(path):
     return path.replace(os.altsep, os.sep)
 
 def __unixpathconv(path):
-    # two known drive letter variations: "x;" and "$x"
-    if path[0] == '$':
-        conv = path[1] + ':' + path[2:]
-    elif path[1] == ';':
-        conv = path[0] + ':' + path[2:]
-    else:
-        conv = path
-    return conv.replace(os.altsep, os.sep)
+    return path
 
 # decide what field separator we can try to use - Unix standard, with
 # the platform's path separator as an option.  No special field conversion
@@ -76,7 +71,7 @@ def __get_field_sep(record):
     if fs:
         return fs
     else:
-        raiseKeyError("passwd database fields not delimited")
+        raise KeyError("passwd database fields not delimited")
 
 # class to match the new record field name accessors.
 # the resulting object is intended to behave like a read-only tuple,
@@ -138,9 +133,9 @@ def __read_passwd_file():
             for i in (5, 6):
                 fields[i] = __field_sep[sep](fields[i])
             record = Passwd(*fields)
-            if not uidx.has_key(fields[2]):
+            if not (fields[2] in uidx):
                 uidx[fields[2]] = record
-            if not namx.has_key(fields[0]):
+            if not (fields[0] in namx):
                 namx[fields[0]] = record
         elif len(entry) > 0:
             pass                         # skip empty or malformed records
@@ -464,17 +459,17 @@ class GPU:
         ps = []
         for p in p_nodes:
             pid = int(p.find('pid').text)
-            proc_stat_file = os.stat("/proc/%d" % pid)
-            #if(is_docker()):
-            #        proc_stat_file = os.path.join(host, 'proc', pid)
-            #else:
-            #        proc_stat_file = os.stat("/proc/%d" % pid)
+            proc_stat_file = None #os.stat("/proc/%d" % pid)
+            if(is_docker()):
+                    proc_stat_file = os.path.join(host, 'proc', pid)
+            else:
+                    proc_stat_file = os.stat("/proc/%d" % pid)
             uid = proc_stat_file.st_uid
-            username = pwd.getpwuid(uid)[0]
-            #if(is_docker()):
-            #        username = getpwuid(uid)[0]
-            #else:
-            #        username = pwd.getpwuid(uid)[0]
+            username = "" #pwd.getpwuid(uid)[0]
+            if(is_docker()):
+                    username = getpwuid(uid)[0]
+            else:
+                    pwd.getpwuid(uid)[0]
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
