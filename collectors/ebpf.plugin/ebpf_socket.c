@@ -158,7 +158,7 @@ static inline void ebpf_socket_nv_send_bytes(netdata_vector_plot_t *ptr, char *c
 
     write_begin_chart(NETDATA_EBPF_FAMILY, chart);
     for (i = 0; i < end; i++) {
-        value = ((collected_number) w[i].plot.plot_sent_bytes);
+        value = - ((collected_number) w[i].plot.plot_sent_bytes);
         write_chart_dimension(w[i].dimension_sent, value);
         value = (collected_number) w[i].plot.plot_recv_bytes;
         write_chart_dimension(w[i].dimension_recv, value);
