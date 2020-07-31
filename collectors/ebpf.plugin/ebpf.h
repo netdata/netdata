@@ -85,6 +85,7 @@ typedef struct ebpf_module {
     netdata_run_mode_t mode;
     netdata_ebpf_events_t *probes;
     uint32_t thread_id;
+    int optional;
 } ebpf_module_t;
 
 extern ebpf_module_t ebpf_modules[];

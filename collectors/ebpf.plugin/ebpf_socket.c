@@ -1323,23 +1323,26 @@ static void read_listen_table()
  */
 void *ebpf_socket_read_hash(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
     int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
     int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
+    int network_connection = em->optional;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        pthread_mutex_lock(&nv_mutex);
-        read_listen_table();
-        read_socket_hash_table(fd_ipv4, AF_INET);
-        read_socket_hash_table(fd_ipv6, AF_INET6);
-        wait_to_plot = 1;
-        pthread_mutex_unlock(&nv_mutex);
+        if (network_connection) {
+            pthread_mutex_lock(&nv_mutex);
+            read_listen_table();
+            read_socket_hash_table(fd_ipv4, AF_INET);
+            read_socket_hash_table(fd_ipv6, AF_INET6);
+            wait_to_plot = 1;
+            pthread_mutex_unlock(&nv_mutex);
+        }
     }
 
     return NULL;
@@ -1486,6 +1489,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
     int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
     int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
+    int network_connection = em->optional;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -1507,18 +1511,21 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
         fflush(stdout);
 
-        // We are calling fflush many times, because when we have a lot of dimensions
-        // we began to have not expected outputs and Netdata closed the plugin.
-        pthread_mutex_lock(&nv_mutex);
-        ebpf_socket_create_nv_charts(&inbound_vectors);
-        fflush(stdout);
-        ebpf_socket_send_nv_data(&inbound_vectors);
+        if (network_connection) {
+            // We are calling fflush many times, because when we have a lot of dimensions
+            // we began to have not expected outputs and Netdata closed the plugin.
+            pthread_mutex_lock(&nv_mutex);
+            ebpf_socket_create_nv_charts(&inbound_vectors);
+            fflush(stdout);
+            ebpf_socket_send_nv_data(&inbound_vectors);
 
-        ebpf_socket_create_nv_charts(&outbound_vectors);
-        fflush(stdout);
-        ebpf_socket_send_nv_data(&outbound_vectors);
-        wait_to_plot = 0;
-        pthread_mutex_unlock(&nv_mutex);
+            ebpf_socket_create_nv_charts(&outbound_vectors);
+            fflush(stdout);
+            ebpf_socket_send_nv_data(&outbound_vectors);
+            wait_to_plot = 0;
+            pthread_mutex_unlock(&nv_mutex);
+
+        }
 
         pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&lock);

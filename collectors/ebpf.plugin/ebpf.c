@@ -104,11 +104,14 @@ netdata_ebpf_events_t socket_probes[] = {
 
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes,
+      .optional = 0 },
     { .thread_name = "socket", .config_name = "network viewer", .enabled = 0, .start_routine = ebpf_socket_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes,
+      .optional = 0  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
-      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
+      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL,
+      .optional = 0 },
 };
 
 // Link with apps.plugin
@@ -1632,7 +1635,8 @@ static void read_collector_values(int *disable_apps)
     *disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name, 1);
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name,
+                                             1);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
@@ -1647,6 +1651,10 @@ static void read_collector_values(int *disable_apps)
         parse_service_name_section();
         started++;
     }
+
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
+                                    0);
+    ebpf_modules[1].optional = enabled;
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
