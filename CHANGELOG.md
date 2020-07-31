@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Added eBPF collector support to DEB and RPM packages. [\#9628](https://github.com/netdata/netdata/pull/9628) ([Ferroin](https://github.com/Ferroin))
+- Fixed RPM default permissions for /usr/libexec/netdata [\#9621](https://github.com/netdata/netdata/pull/9621) ([Saruspete](https://github.com/Saruspete))
 - Added sandboxing exception for `/run/netdata`. [\#9613](https://github.com/netdata/netdata/pull/9613) ([Ferroin](https://github.com/Ferroin))
 - python.d/gearmand: handle func prefixes in `status\n` response [\#9610](https://github.com/netdata/netdata/pull/9610) ([ilyam8](https://github.com/ilyam8))
 - Removed delay in updater script for non-interactive runs from install scripts. [\#9589](https://github.com/netdata/netdata/pull/9589) ([Ferroin](https://github.com/Ferroin))
@@ -29,6 +31,7 @@
 - Network Viewer options [\#9495](https://github.com/netdata/netdata/pull/9495) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use the libbpf library for the eBPF plugin [\#9490](https://github.com/netdata/netdata/pull/9490) ([vlvkobal](https://github.com/vlvkobal))
 - Implemented the HOST command in metadata log replay [\#9489](https://github.com/netdata/netdata/pull/9489) ([stelfrag](https://github.com/stelfrag))
+- Add documentation to provide a comprehensive guide for package maintainers [\#9467](https://github.com/netdata/netdata/pull/9467) ([Ferroin](https://github.com/Ferroin))
 - Add better checks for existing installs to the kickstart scripts. [\#9408](https://github.com/netdata/netdata/pull/9408) ([Ferroin](https://github.com/Ferroin))
 - enable simple sandboxing on systemd service [\#9234](https://github.com/netdata/netdata/pull/9234) ([Izorkin](https://github.com/Izorkin))
 
