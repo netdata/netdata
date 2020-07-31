@@ -17,11 +17,12 @@ disabled_by_default = True
 
 ####
 def is_docker():
-    return os.environ.has_key('NETDATA_HOST_PREFIX')
+    #return os.environ.has_key('NETDATA_HOST_PREFIX')
+    return false
 
 # try and find the passwd file
 __passwd_path = []
-if is_docker():
+if(is_docker()):
     __passwd_path.append('/host/etc/passwd')
 if os.environ.has_key('ETC_PASSWD'):
     __passwd_path.append(os.environ['ETC_PASSWD'])
@@ -463,17 +464,17 @@ class GPU:
         ps = []
         for p in p_nodes:
             pid = int(p.find('pid').text)
-            proc_stat_file =  ""
-            if(is_docker()):
-                    proc_stat_file = os.stat("/proc/%d" % pid)
-            else:
-                    proc_stat_file = os.path.join(host, 'proc', pid)
+            proc_stat_file = os.stat("/proc/%d" % pid)
+            #if(is_docker()):
+            #        proc_stat_file = os.path.join(host, 'proc', pid)
+            #else:
+            #        proc_stat_file = os.stat("/proc/%d" % pid)
             uid = proc_stat_file.st_uid
-            username =  ""
-            if(is_docker()):
-                    username = getpwuid(uid)[0]
-            else:
-                    username = pwd.getpwuid(uid)[0]
+            username = pwd.getpwuid(uid)[0]
+            #if(is_docker()):
+            #        username = getpwuid(uid)[0]
+            #else:
+            #        username = pwd.getpwuid(uid)[0]
             ps.append({
                 'pid': p.find('pid').text,
                 'process_name': p.find('process_name').text,
