@@ -365,8 +365,11 @@ class GPU:
     @handle_attr_error
     def processes(self):
         processes_info = self.root.find('processes').findall('process_info')
-        processes = list()
+        if not processes_info:
+            return list()
+
         passwd_file = read_passwd_file_safe()
+        processes = list()
 
         for info in processes_info:
             pid = info.find('pid').text
