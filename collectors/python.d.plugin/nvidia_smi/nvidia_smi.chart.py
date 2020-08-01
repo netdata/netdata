@@ -6,155 +6,14 @@
 
 import subprocess
 import threading
-import xml.etree.ElementTree as et
 import os
-import pwd
+
+import xml.etree.ElementTree as et
 
 from bases.FrameworkServices.SimpleService import SimpleService
 from bases.collection import find_binary
 
 disabled_by_default = True
-
-####
-#def is_set(s): 
-#    if s in os.environ:
-#        return True
-#    else:
-#        return False
-
-def is_docker():
-    path = '/proc/self/cgroup'
-    return (
-        os.path.exists('/.dockerenv') or
-        os.path.isfile(path) and any('docker' in line for line in open(path))
-    )
-
-#def is_docker():
-#    return is_set('NETDATA_HOST_PREFIX')
-
-# try and find the passwd file
-__passwd_path = []
-if(is_docker()):
-    __passwd_path.append('/host/etc/passwd')
-else:
-    __passwd_path.append('/etc/passwd')
-
-
-passwd_file = None
-for __i in __passwd_path:
-    try:
-        __f = open(__i, 'r')
-        __f.close()
-        passwd_file = __i
-        break
-    except:
-        pass
-
-# path conversion handlers
-def __nullpathconv(path):
-    return path.replace(os.altsep, os.sep)
-
-def __unixpathconv(path):
-    return path
-
-# decide what field separator we can try to use - Unix standard, with
-# the platform's path separator as an option.  No special field conversion
-# handler is required when using the platform's path separator as field
-# separator, but are required for the home directory and shell fields when
-# using the standard Unix (":") field separator.
-__field_sep = {':': __unixpathconv}
-if os.pathsep:
-    if os.pathsep != ':':
-        __field_sep[os.pathsep] = __nullpathconv
-
-# helper routine to identify which separator character is in use
-def __get_field_sep(record):
-    fs = None
-    for c in __field_sep.keys():
-        # there should be 6 delimiter characters (for 7 fields)
-        if record.count(c) == 6:
-            fs = c
-            break
-    if fs:
-        return fs
-    else:
-        raise KeyError("passwd database fields not delimited")
-
-# class to match the new record field name accessors.
-# the resulting object is intended to behave like a read-only tuple,
-# with each member also accessible by a field name.
-class Passwd:
-    def __init__(self, name, passwd, uid, gid, gecos, dir, shell):
-        self.__dict__['pw_name'] = name
-        self.__dict__['pw_passwd'] = passwd
-        self.__dict__['pw_uid'] = uid
-        self.__dict__['pw_gid'] = gid
-        self.__dict__['pw_gecos'] = gecos
-        self.__dict__['pw_dir'] = dir
-        self.__dict__['pw_shell'] = shell
-        self.__dict__['_record'] = (self.pw_name, self.pw_passwd,
-                                    self.pw_uid, self.pw_gid,
-                                    self.pw_gecos, self.pw_dir,
-                                    self.pw_shell)
-
-    def __len__(self):
-        return 7
-
-    def __getitem__(self, key):
-        return self._record[key]
-
-    def __setattr__(self, name, value):
-        raise AttributeError('attribute read-only: %s' % name)
-
-    def __repr__(self):
-        return str(self._record)
-
-    def __cmp__(self, other):
-        this = str(self._record)
-        if this == other:
-            return 0
-        elif this < other:
-            return -1
-        else:
-            return 1
-
-
-# read the whole file, parsing each entry into tuple form
-# with dictionaries to speed recall by UID or passwd name
-def __read_passwd_file():
-    if passwd_file:
-        passwd = open(passwd_file, 'r')
-    else:
-        raise KeyError("no password database")
-    uidx = {}
-    sep = None
-    while 1:
-        entry = passwd.readline().strip()
-        if len(entry) > 6:
-            if sep is None:
-                sep = __get_field_sep(entry)
-            fields = entry.split(sep)
-            for i in (2, 3):
-                fields[i] = int(fields[i])
-            for i in (5, 6):
-                fields[i] = __field_sep[sep](fields[i])
-            record = Passwd(*fields)
-            if not (fields[2] in uidx):
-                uidx[fields[2]] = record
-        elif len(entry) > 0:
-            pass                         # skip empty or malformed records
-        else:
-            break
-    passwd.close()
-    if len(uidx) == 0:
-        raise KeyError
-    return (uidx)
-
-# return the passwd database entry by UID
-def getpwuid(uid):
-    u = __read_passwd_file()
-    return u[uid]
-###
 
 NVIDIA_SMI = 'nvidia-smi'
 
@@ -267,7 +126,7 @@ def gpu_charts(gpu):
             'lines': []
         },
         USER_NUM: {
-            'options': [None, 'Number of User on GPU', 'num', fam, 'nvidia_smi.user_num', 'stacked'],
+            'options': [None, 'Number of User on GPU', 'num', fam, 'nvidia_smi.user_num', 'line'],
             'lines': [
                 ['user_num', 'users'],
             ]
@@ -384,6 +243,50 @@ def handle_value_error(method):
     return on_call
 
 
+HOST_PREFIX = os.getenv('NETDATA_HOST_PREFIX')
+ETC_PASSWD_PATH = '/etc/passwd'
+PROC_PATH = '/proc'
+
+if HOST_PREFIX:
+    ETC_PASSWD_PATH = os.path.join(HOST_PREFIX, ETC_PASSWD_PATH[1:])
+    PROC_PATH = os.path.join(HOST_PREFIX, PROC_PATH[1:])
+
+
+def read_passwd_file():
+    data = dict()
+    with open(ETC_PASSWD_PATH, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("#"):
+                continue
+            fields = line.split(":")
+            # name, passwd, uid, gid, comment, home_dir, shell
+            if len(fields) != 7:
+                continue
+            # uid, guid
+            fields[2], fields[3] = int(fields[2]), int(fields[3])
+            data[fields[2]] = fields
+    return data
+
+
+def read_passwd_file_safe():
+    try:
+        return read_passwd_file()
+    except (OSError, IOError):
+        return dict()
+
+
+def get_username_by_pid_safe(pid, passwd_file):
+    if not passwd_file:
+        return ''
+    path = os.path.join(PROC_PATH, pid)
+    try:
+        uid = os.stat(path).st_uid
+        return passwd_file[uid][0]
+    except (OSError, IOError, KeyError):
+        return ''
+
+
 class GPU:
     def __init__(self, num, root):
         self.num = num
@@ -461,26 +364,19 @@ class GPU:
 
     @handle_attr_error
     def processes(self):
-        p_nodes = self.root.find('processes').findall('process_info')
-        ps = []
-        for p in p_nodes:
-            pid = int(p.find('pid').text)
-            if(is_docker()):
-                    proc_stat_file = os.stat(os.path.join('host', 'proc', pid))
-            else:
-                    proc_stat_file = os.stat("/proc/%d" % pid)
-            uid = proc_stat_file.st_uid
-            if(is_docker()):
-                    username = getpwuid(uid)[0]
-            else:
-                    username = pwd.getpwuid(uid)[0]
-            ps.append({
-                'pid': p.find('pid').text,
-                'process_name': p.find('process_name').text,
-                'used_memory': int(p.find('used_memory').text.split()[0]),
-                'user_name': username,
+        processes_info = self.root.find('processes').findall('process_info')
+        processes = list()
+        passwd_file = read_passwd_file_safe()
+
+        for info in processes_info:
+            pid = info.find('pid').text
+            processes.append({
+                'pid': int(pid),
+                'process_name': info.find('process_name').text,
+                'used_memory': int(info.find('used_memory').text.split()[0]),
+                'username': get_username_by_pid_safe(pid, passwd_file),
             })
-        return ps
+        return processes
 
     def data(self):
         data = {
@@ -501,15 +397,16 @@ class GPU:
             'power_draw': self.power_draw(),
         }
         processes = self.processes() or []
-        data.update({'process_mem_{0}'.format(p['pid']): p['used_memory'] for p in processes})
         users = set()
         for p in processes:
-            if 'user_mem_{0}'.format(p['user_name']) in data:
-                data['user_mem_{0}'.format(p['user_name'])] += p['used_memory']
-            else:
-                data['user_mem_{0}'.format(p['user_name'])] = p['used_memory']
-            users.add(p['user_name'])
-
+            data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
+            if p['username']:
+                users.add(p['username'])
+                key = 'user_mem_{0}'.format(p['username'])
+                if key in data:
+                    data[key] += p['used_memory']
+                else:
+                    data[key] = p['used_memory']
         data['user_num'] = len(users)
 
         return dict(
@@ -583,10 +480,13 @@ class Service(SimpleService):
         chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_MEM)]
         active_dim_ids = []
         for p in ps:
-            dim_id = 'gpu{0}_user_mem_{1}'.format(gpu.num, p['user_name'])
+            if not p.get('username'):
+                continue
+            dim_id = 'gpu{0}_user_mem_{1}'.format(gpu.num, p['username'])
             active_dim_ids.append(dim_id)
             if dim_id not in chart:
-                chart.add_dimension([dim_id, '{0}'.format(p['user_name'])])
+                chart.add_dimension([dim_id, '{0}'.format(p['username'])])
+
         for dim in chart:
             if dim.id not in active_dim_ids:
                 chart.del_dimension(dim.id, hide=False)
