@@ -214,10 +214,6 @@
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.21.1...v1.22.0)
 
-**Merged pull requests:**
-
-- Updates main copyright and links for the year 2020 [\#8937](https://github.com/netdata/netdata/pull/8937) ([zack-shoylev](https://github.com/zack-shoylev))
-
 ## [v1.21.1](https://github.com/netdata/netdata/tree/v1.21.1) (2020-04-13)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.21.0...v1.21.1)
