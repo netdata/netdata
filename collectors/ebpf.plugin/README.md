@@ -250,7 +250,7 @@ You can visualize the most common destinations for `outbound connections` and me
 connections for local services. All these information are grouped using:
 
 -   `bytes`: Bytes sent and received for a destination.
--   `packets`: Packets sent per period of time.
+-   `Calls`: Number of calls for `TCP` and `UDP` functions to send data packets.
 -   `retransmission`: Number of TCP packages retransmitted. This is available only for `outbound connections`. 
 
 ### `[service name]`

@@ -3203,7 +3203,7 @@ netdataDashboard.context = {
 
     'ebpf.outbound_packets': {
         title : 'Outbound packets',
-        info: 'Number of packets sent per period of time using TCP or UDP ports. It shows the oldest outbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
+        info: 'Number of calls for internal functions per period of time to send TCP or UDP packets. It shows the oldest outbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
     },
 
     'ebpf.outbound_retransmits': {
@@ -3217,8 +3217,8 @@ netdataDashboard.context = {
     },
 
     'ebpf.inbound_packets': {
-        title : 'Inbound bytes',
-        info: 'Number of packets received for a local service per period of time. It shows the oldest inbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
+        title : 'Inbound packets',
+        info: 'Number of calls for internal functions to deliver data to a local service per period of time. It shows the oldest inbound connections collected for the plugin respecting <code>maximum dimensions</code> defined inside <code>/etc/netdata/ebpf.conf</code>, if there are more connections they will be bundled into the <b>other</b> dimension.'
     },
 
     // ------------------------------------------------------------------------
