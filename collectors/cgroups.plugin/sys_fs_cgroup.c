@@ -379,7 +379,7 @@ void read_cgroup_plugin_configuration() {
                     " !/libvirt "
                     " !/lxc "
                     " !/lxc/*/* "                          //  #1397 #2649
-                    " !/lxc.monitor "
+                    " !/lxc.monitor* "
                     " !/lxc.pivot "
                     " !/lxc.payload "
                     " !/machine "
@@ -403,6 +403,7 @@ void read_cgroup_plugin_configuration() {
                     " !/lxc/*/* "                          //  #2161 #2649
                     " !/lxc.monitor "
                     " !/lxc.payload/*/* "
+                    " !/lxc.payload.* "
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
 
