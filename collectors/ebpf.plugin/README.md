@@ -198,6 +198,8 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 ```conf
 [network viewer]
     maximum dimensions = 500
+    resolve hostname ips = yes
+    resolve service name = yes
     ports = 1-1024 !145 !domain
     hostnames = !example.com
     ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
@@ -225,7 +227,8 @@ By default, Netdata `1.24.x` displays up to 49 sockets (dimensions) on network v
 
 The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
 changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
-the `hostnames` every time that is possible to resolve IPs to their hostnames.    
+the `hostnames` every time that is possible to resolve IPs to their hostnames. You can also resolve port numbers to
+ service name setting `resolve service name = yes`.
 
 #### Default values
 
@@ -234,6 +237,8 @@ When the file `/etc/netdata/ebpf.conf` is missing, `ebpf.plugin` will start with
 ```conf
 [network viewer]
     maximum dimensions = 50
+    resolve hostname ips = no
+    resolve service name = no
     ports = *
     hostnames = *
     ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
