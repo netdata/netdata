@@ -1211,7 +1211,7 @@ govercomp() {
   for ((i = 0; i < ${#ver1[@]}; i++)); do
     if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
       return 1
-    elif [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
+    elif [ "${ver2[i]}" -gt "${ver1[i]}" ]; then
       return 2
     fi
   done
