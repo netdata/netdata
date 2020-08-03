@@ -542,7 +542,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
         ptr->resolved_name = strdupz(hostname);
     else {
         length = NETDATA_MAX_NETWORK_COMBINED_LENGTH;
-        ptr->resolved_name = mallocz(NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL + 1);
+        ptr->resolved_name = mallocz( NETDATA_MAX_NETWORK_COMBINED_LENGTH + 1);
         memcpy(ptr->resolved_name, hostname, length);
         ptr->resolved_name[length] = '\0';
     }
