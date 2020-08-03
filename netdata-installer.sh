@@ -1367,6 +1367,12 @@ detect_libc() {
 }
 
 should_install_ebpf() {
+  if [ -n "$EUID" ] && [ $EUID -ne 0 ]; then
+    run_failed "Not running as root (euid=0), not installing eBPF..."
+    defer_error "eBPF disabled in non-root (euid=0) installation"
+    return 1
+  fi
+
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
     run_failed "eBPF explicitly disabled."
     defer_error "eBPF explicitly disabled."
