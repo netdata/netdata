@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
-#include <linux/version.h>
 
 #include "../libnetdata.h"
 
@@ -150,7 +149,7 @@ int get_redhat_release()
 static int has_ebpf_kernel_version(int version)
 {
     // Check for a buggy Ubuntu kernel (#9634)
-    if (version == KERNEL_VERSION(4, 18, 0)) {
+    if (version == NETDATA_EBPF_KERNEL_4_18) {
         int fd = open("/proc/version_signature", O_RDONLY);
         if (fd > 0) {
             char buf[VERSION_STRING_LEN + 1];
