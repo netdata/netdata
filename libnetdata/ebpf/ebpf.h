@@ -52,6 +52,8 @@
  */
 #define NETDATA_EBPF_KERNEL_4_11 264960
 
+#define VERSION_STRING_LEN 256
+
 typedef struct netdata_ebpf_events {
     char type;
     char *name;

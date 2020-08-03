@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <linux/version.h>
 
 #include "../libnetdata.h"
 
@@ -61,7 +62,7 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 int get_kernel_version(char *out, int size)
 {
     char major[16], minor[16], patch[16];
-    char ver[256];
+    char ver[VERSION_STRING_LEN];
     char *version = ver;
 
     out[0] = '\0';
@@ -107,14 +108,14 @@ int get_kernel_version(char *out, int size)
 
 int get_redhat_release()
 {
-    char buffer[256];
+    char buffer[VERSION_STRING_LEN + 1];
     int major, minor;
     FILE *fp = fopen("/etc/redhat-release", "r");
 
     if (fp) {
         major = 0;
         minor = -1;
-        size_t length = fread(buffer, sizeof(char), 255, fp);
+        size_t length = fread(buffer, sizeof(char), VERSION_STRING_LEN, fp);
         if (length > 4) {
             buffer[length] = '\0';
             char *end = strchr(buffer, '.');
@@ -148,6 +149,26 @@ int get_redhat_release()
 
 static int has_ebpf_kernel_version(int version)
 {
+    // Check for a buggy Ubuntu kernel (#9634)
+    if (version == KERNEL_VERSION(4, 18, 0)) {
+        int fd = open("/proc/version_signature", O_RDONLY);
+        if (fd > 0) {
+            char buf[VERSION_STRING_LEN + 1];
+            char version_with_bug[] = "Ubuntu 4.18.0-13.";
+            ssize_t version_string_len = (ssize_t)sizeof(version_with_bug) - 1;
+
+            ssize_t len = read(fd, buf, VERSION_STRING_LEN);
+            close(fd);
+
+            if (len >= version_string_len) {
+                if (!strncmp(buf, version_with_bug, version_string_len)) {
+                    error("A buggy kernel is detected");
+                    return 0;
+                }
+            }
+        }
+    }
+
     // Kernel 4.11.0 or RH > 7.5
     return (version >= NETDATA_MINIMUM_EBPF_KERNEL || get_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
 }
