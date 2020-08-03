@@ -715,12 +715,11 @@ bundle_libbpf() {
   LIBBPF_PACKAGE_BASENAME="v${LIBBPF_PACKAGE_VERSION}.tar.gz"
 
   if fetch_and_verify "libbpf" \
-    "https://github.com/libbpf/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
+    "https://github.com/netdata/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
     "${LIBBPF_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBBPF}"; then
     if run tar -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
-      run git apply --directory="${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" --unsafe-paths libnetdata/ebpf/libbpf.c.diff &&
       build_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
