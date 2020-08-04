@@ -143,6 +143,54 @@ class LogParser(object):
         self.events.append(f"{self.lines[-1][:19]} end")
         return sorted(set(self.events))
 
+# Two-node test scenarios. This should be an exhaustive list of the sequences of events that can happen.
+
+#  P:  +-^-----         BaselineParentFirst
+#  C:   +^-----              no replication
+
+#  P:   +^-----         BaselineChildFirst
+#  C:  +-^-----              no replication
+
+#  P:  +-^---  ^r--     ShortChildRestart (few seconds, socket will reconnect)
+#  C:   +^--x +^r--         will produce gap, verify test validity
+
+#  P:  +-^---    ^r--   LongChildRestart  (multiple minutes, allow timeouts)
+#  C:   +^--x    +^r--       will produce gap, verify test validity
+
+#  P:  +-^---  ^r--     ShortChildDisconnect (few seconds, socket will reconnect)
+#  C:   +^--v  ^r--
+
+#  P:  +-^---    ^r--   LongChildDisconnect (multiple minutes, allow timeouts)
+#  C:   +^--v    ^r--
+
+#  P:  +-^--x +^r--     ShortMiddleRestart (few seconds, socket will reconnect)
+#  C:   +^---  ^r--
+
+#  P:  +-^--x   +^r--   LongMiddleRestart (multiple minutes, allow timeouts)
+#  C:   +^---    ^r--
+
+#  P:  +-^--v  ^r--    ShortMiddleDisconnect (few seconds, socket will reconnect)
+#  C:   +^---  ^r--
+
+#  P:  +-^--v    ^r--  LongMiddleDisconnect (multiple minutes, allow timeouts)
+#  C:   +^---    ^r--
+
+# Overlapping network disconnetion windows
+
+#  P:  +-^--v    ^ -r-
+#  C:   +^---  v   ^r-
+
+#  P:  +-^--v      ^r-
+#  C:   +^---  v ^  r-
+
+#  P:  +-^--   v ^ -r-
+#  C:   +^--v      ^r-
+
+#  P:  +-^--   v   ^r-
+#  C:   +^--v    ^  r-
+
+# Restarting middle while child is disconnected
+# Restarting child while middle is disconnected
 
 def BaselineMiddleFirst(state):
     state.start("middle")
