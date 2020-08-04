@@ -52,13 +52,6 @@
  */
 #define NETDATA_EBPF_KERNEL_4_11 264960
 
-/**
- *  Kernel 4.18
- *
- *  266752 = 4*65536 + 18*256
- */
-#define NETDATA_EBPF_KERNEL_4_18 266752
-
 #define VERSION_STRING_LEN 256
 #define EBPF_KERNEL_REJECT_LIST_FILE "ebpf_kernel_reject_list.txt"
 
