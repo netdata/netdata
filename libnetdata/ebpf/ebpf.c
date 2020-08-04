@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <sys/utsname.h>
 
 #include "../libnetdata.h"
 
@@ -146,27 +147,80 @@ int get_redhat_release()
     }
 }
 
-static int has_ebpf_kernel_version(int version)
+/**
+ * Check if the kernel is in a list of rejected ones
+ *
+ * @return Returns 1 if the kernel is rejected, 0 otherwise.
+ */
+static int kernel_is_rejected()
 {
-    // Check for a buggy Ubuntu kernel (#9634)
-    if (version == NETDATA_EBPF_KERNEL_4_18) {
-        int fd = open("/proc/version_signature", O_RDONLY);
-        if (fd > 0) {
-            char buf[VERSION_STRING_LEN + 1];
-            char version_with_bug[] = "Ubuntu 4.18.0-13.";
-            ssize_t version_string_len = (ssize_t)sizeof(version_with_bug) - 1;
+    // Get kernel version from system
+    char version_string[VERSION_STRING_LEN + 1];
+    int version_string_len = 0;
 
-            ssize_t len = read(fd, buf, VERSION_STRING_LEN);
-            close(fd);
+    if (read_file("/proc/version_signature", version_string, VERSION_STRING_LEN)) {
+        if (read_file("/proc/version", version_string, VERSION_STRING_LEN)) {
+            struct utsname uname_buf;
+            if (!uname(&uname_buf)) {
+                info("Cannot check kernel version");
+                return 0;
+            }
+            version_string_len =
+                snprintfz(version_string, VERSION_STRING_LEN, "%s %s", uname_buf.release, uname_buf.version);
+        }
+    }
 
-            if (len >= version_string_len) {
-                if (!strncmp(buf, version_with_bug, version_string_len)) {
-                    error("A buggy kernel is detected");
-                    return 0;
-                }
+    if (!version_string_len)
+        version_string_len = strlen(version_string);
+
+    // Open a file with a list of rejected kernels
+    char *config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if (config_dir == NULL) {
+        config_dir = CONFIG_DIR;
+    }
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+    FILE *kernel_reject_list = fopen(filename, "r");
+
+    if (!kernel_reject_list) {
+        config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+        if (config_dir == NULL) {
+            config_dir = LIBCONFIG_DIR;
+        }
+
+        snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+        kernel_reject_list = fopen(filename, "r");
+
+        if (!kernel_reject_list)
+            return 0;
+    }
+
+    // Find if the kernel is in the reject list
+    char *reject_string = NULL;
+    size_t buf_len = 0;
+    ssize_t reject_string_len;
+    while ((reject_string_len = getline(&reject_string, &buf_len, kernel_reject_list) -1) > 0) {
+        if (version_string_len >= reject_string_len) {
+            if (!strncmp(version_string, reject_string, reject_string_len)) {
+                info("A buggy kernel is detected");
+                fclose(kernel_reject_list);
+                freez(reject_string);
+                return 1;
             }
         }
     }
+
+    fclose(kernel_reject_list);
+    freez(reject_string);
+
+    return 0;
+}
+
+static int has_ebpf_kernel_version(int version)
+{
+    if (kernel_is_rejected())
+        return 0;
 
     // Kernel 4.11.0 or RH > 7.5
     return (version >= NETDATA_MINIMUM_EBPF_KERNEL || get_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
