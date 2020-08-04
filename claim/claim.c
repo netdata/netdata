@@ -24,7 +24,7 @@ static char *claiming_errors[] = {
         "processing claiming",                          // 14
         "Internal Server Error",                        // 15
         "Gateway Timeout",                              // 16
-        "Service Unavailable"                           // 17
+        "Service Unavailable",                          // 17
         "Agent Unique Id Not Readable"                  // 18
 };
 static netdata_mutex_t claim_mutex = NETDATA_MUTEX_INITIALIZER;
