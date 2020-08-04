@@ -200,7 +200,7 @@ static int kernel_is_rejected()
     char *reject_string = NULL;
     size_t buf_len = 0;
     ssize_t reject_string_len;
-    while ((reject_string_len = getline(&reject_string, &buf_len, kernel_reject_list) -1) > 0) {
+    while ((reject_string_len = getline(&reject_string, &buf_len, kernel_reject_list) - 1) > 0) {
         if (version_string_len >= reject_string_len) {
             if (!strncmp(version_string, reject_string, reject_string_len)) {
                 info("A buggy kernel is detected");
