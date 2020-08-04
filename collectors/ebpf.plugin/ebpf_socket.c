@@ -124,6 +124,9 @@ static inline void calculate_nv_plot()
     uint32_t i;
     uint32_t end = inbound_vectors.next;
     for (i = 0; i < end; i++) {
+        error("KILLME_IN %s: %lu %lu %lu %lu |  %lu %lu %lu %lu", inbound_vectors.plot[i].dimension_sent,
+              inbound_vectors.plot[i].plot.plot_recv_bytes, inbound_vectors.plot[i].plot.plot_recv_packets, inbound_vectors.plot[i].plot.plot_sent_bytes, inbound_vectors.plot[i].plot.plot_sent_packets,
+              inbound_vectors.plot[i].sock.recv_bytes, inbound_vectors.plot[i].sock.recv_packets, inbound_vectors.plot[i].sock.sent_bytes, inbound_vectors.plot[i].sock.sent_packets);
         update_nv_plot_data(&inbound_vectors.plot[i].plot, &inbound_vectors.plot[i].sock);
     }
     inbound_vectors.max_plot = end;
@@ -237,6 +240,7 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
         return;
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
+        /*
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_OUTBOUND_BYTES);
         fflush(stdout);
 
@@ -245,6 +249,7 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 
         ebpf_socket_nv_send_retransmit(ptr,  NETDATA_NV_OUTBOUND_RETRANSMIT);
         fflush(stdout);
+         */
     } else {
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_INBOUND_BYTES);
         fflush(stdout);
@@ -522,7 +527,6 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
  * @param family    the group name used to attach the chart on dashaboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
- */
 static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
                                              char *family, int order, netdata_vector_plot_t *ptr)
 {
@@ -544,6 +548,7 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
     end = ptr->last;
     fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[end].dimension_retransmit);
 }
+ */
 
 /**
  * Create Network Viewer charts
@@ -561,6 +566,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
     ptr->last_plot = ptr->max_plot;
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
+        /*
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
                                     "Outbound connections (bytes).",
                                     EBPF_COMMON_DIMENSION_BYTESS,
@@ -581,6 +587,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                          NETDATA_NETWORK_CONNECTIONS_GROUP,
                                          21083,
                                          ptr);
+                                         */
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
                                     "Inbound connections (bytes)",

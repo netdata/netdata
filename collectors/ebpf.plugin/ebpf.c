@@ -703,6 +703,44 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
 #endif
 }
 
+/**
+ *  Read Local Ports
+ *
+ *  Parse /proc/net/{tcp,udp} and get the ports Linux is listening.
+ *
+ *  @param filename the proc file to parse.
+ */
+static void read_local_ports(char *filename)
+{
+    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff)
+        return;
+
+    ff = procfile_readall(ff);
+    if (!ff)
+        return;
+
+    size_t lines = procfile_lines(ff), l;
+    size_t words;
+
+    for(l = 0; l < lines ;l++) {
+        words = procfile_linewords(ff, l);
+        // This is header or end of file
+        if (unlikely(words < 14))
+            continue;
+
+        // https://elixir.bootlin.com/linux/v5.7.8/source/include/net/tcp_states.h
+        // 0A = TCP_LISTEN
+        if (strcmp("0A", procfile_lineword(ff, l, 5)))
+            continue;
+
+        // Read local port
+        uint16_t port = (uint16_t)strtol(procfile_lineword(ff, l, 2), NULL, 16);
+        update_listen_table(htons(port));
+    }
+
+    procfile_close(ff);
+}
 
 /**
  * Read Local addresseses
@@ -1915,6 +1953,10 @@ int main(int argc, char **argv)
     ebpf_allocate_common_vectors();
 
     read_local_addresses();
+    read_local_ports("/proc/net/tcp");
+    read_local_ports("/proc/net/tcp6");
+    read_local_ports("/proc/net/udp");
+    read_local_ports("/proc/net/udp6");
 
     struct netdata_static_thread ebpf_threads[] = {
         {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},

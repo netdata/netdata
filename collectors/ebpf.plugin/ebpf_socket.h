@@ -249,5 +249,7 @@ typedef struct netdata_vector_plot {
 } netdata_vector_plot_t;
 
 extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
+extern ebpf_network_viewer_port_list_t *listen_ports;
+extern void update_listen_table(uint16_t value);
 
 #endif
