@@ -21,4 +21,5 @@ dist_noinst_DATA = \
 
 dist_libconfig_DATA = \
     ebpf.conf \
+    ebpf_kernel_reject_list.txt \
     $(NULL)
