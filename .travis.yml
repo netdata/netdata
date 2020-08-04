@@ -262,7 +262,7 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-    - name: "Build & Publish DEB package for ubuntu/bionic"
+      name: "Build & Publish DEB package for ubuntu/bionic"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
       env:
