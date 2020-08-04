@@ -72,14 +72,14 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
         memory += rd->memsize;
 
-        buffer_sprintf(
-                wb
-                , "%s"
-                  "\t\t\t\t\"%s\": { \"name\": \"%s\" }"
-                , dimensions ? ",\n" : ""
-                , rd->id
-                , rd->name
-        );
+        if (dimensions)
+            buffer_strcat(wb, ",\n\t\t\t\t\"");
+        else
+            buffer_strcat(wb, "\t\t\t\t\"");
+        buffer_strcat_jsonescape(wb, rd->id);
+        buffer_strcat(wb, "\": { \"name\": \"");
+        buffer_strcat_jsonescape(wb, rd->name);
+        buffer_strcat(wb, "\" }");
 
         dimensions++;
     }
