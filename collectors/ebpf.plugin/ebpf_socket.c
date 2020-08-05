@@ -124,11 +124,6 @@ static inline void calculate_nv_plot()
     uint32_t i;
     uint32_t end = inbound_vectors.next;
     for (i = 0; i < end; i++) {
-        /*
-        error("KILLME_IN %s: %lu %lu %lu %lu |  %lu %lu %lu %lu", inbound_vectors.plot[i].dimension_sent,
-              inbound_vectors.plot[i].plot.plot_recv_bytes, inbound_vectors.plot[i].plot.plot_recv_packets, inbound_vectors.plot[i].plot.plot_sent_bytes, inbound_vectors.plot[i].plot.plot_sent_packets,
-              inbound_vectors.plot[i].sock.recv_bytes, inbound_vectors.plot[i].sock.recv_packets, inbound_vectors.plot[i].sock.sent_bytes, inbound_vectors.plot[i].sock.sent_packets);
-              */
         update_nv_plot_data(&inbound_vectors.plot[i].plot, &inbound_vectors.plot[i].sock);
     }
     inbound_vectors.max_plot = end;
@@ -242,7 +237,6 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
         return;
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
-        /*
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_OUTBOUND_BYTES);
         fflush(stdout);
 
@@ -251,7 +245,6 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 
         ebpf_socket_nv_send_retransmit(ptr,  NETDATA_NV_OUTBOUND_RETRANSMIT);
         fflush(stdout);
-         */
     } else {
         ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_INBOUND_BYTES);
         fflush(stdout);
