@@ -144,53 +144,69 @@ class LogParser(object):
         return sorted(set(self.events))
 
 # Two-node test scenarios. This should be an exhaustive list of the sequences of events that can happen.
+# Ascii art is ugly but it shows the target scenario timelines
+#   + node restart
+#   ^ node network up
+#   v node network down
+#   - node connected / ready for connection
+#   r replication sequence
 
-#  P:  +-^-----         BaselineParentFirst
+#  P:  +-^-----         BaselineMiddleFirst
 #  C:   +^-----              no replication
 
 #  P:   +^-----         BaselineChildFirst
 #  C:  +-^-----              no replication
 
-#  P:  +-^---  ^r--     ShortChildRestart (few seconds, socket will reconnect)
+#  P:  +-^---  ^r--     ChildShortRestart (few seconds, socket will reconnect)
 #  C:   +^--x +^r--         will produce gap, verify test validity
 
-#  P:  +-^---    ^r--   LongChildRestart  (multiple minutes, allow timeouts)
+#  P:  +-^---    ^r--   ChildLongRestart  (multiple minutes, allow timeouts)
 #  C:   +^--x    +^r--       will produce gap, verify test validity
 
-#  P:  +-^---  ^r--     ShortChildDisconnect (few seconds, socket will reconnect)
+#  P:  +-^---  ^r--     ChildShortDisconnect (few seconds, socket will reconnect)
 #  C:   +^--v  ^r--
 
-#  P:  +-^---    ^r--   LongChildDisconnect (multiple minutes, allow timeouts)
+#  P:  +-^---    ^r--   ChildLongDisconnect (multiple minutes, allow timeouts)
 #  C:   +^--v    ^r--
 
-#  P:  +-^--x +^r--     ShortMiddleRestart (few seconds, socket will reconnect)
+#  P:  +-^--x +^r--     MiddleShortRestart (few seconds, socket will reconnect)
 #  C:   +^---  ^r--
 
-#  P:  +-^--x   +^r--   LongMiddleRestart (multiple minutes, allow timeouts)
+#  P:  +-^--x   +^r--   MiddleLongRestart (multiple minutes, allow timeouts)
 #  C:   +^---    ^r--
 
-#  P:  +-^--v  ^r--    ShortMiddleDisconnect (few seconds, socket will reconnect)
+#  P:  +-^--v  ^r--    MiddleShortDisconnect (few seconds, socket will reconnect)
 #  C:   +^---  ^r--
 
-#  P:  +-^--v    ^r--  LongMiddleDisconnect (multiple minutes, allow timeouts)
+#  P:  +-^--v    ^r--  MiddleLongDisconnect (multiple minutes, allow timeouts)
 #  C:   +^---    ^r--
 
-# Overlapping network disconnetion windows
+# Overlapping network disconnection windows
 
-#  P:  +-^--v    ^ -r-
+#  P:  +-^--v    ^ -r-  ChildDropOverMiddleReconnect
 #  C:   +^---  v   ^r-
 
-#  P:  +-^--v      ^r-
+#  P:  +-^--v      ^r-  ChildDropInsideMiddleReconnect
 #  C:   +^---  v ^  r-
 
-#  P:  +-^--   v ^ -r-
+#  P:  +-^--   v ^ -r-  MiddleDropInsideChildReconnect
 #  C:   +^--v      ^r-
 
-#  P:  +-^--   v   ^r-
+# TODO: Cases with drops inside restart intervals ?
+
+#  P:  +-^--   v   ^r-  MiddleDropOverChildReconnect
 #  C:   +^--v    ^  r-
 
-# Restarting middle while child is disconnected
-# Restarting child while middle is disconnected
+# TODO: Need long and short variants to check different behaviour on socket reuse....
+
+# Restarts during reconnections
+
+#  P:  +-^--   + ^ -r-  MiddleRestartDuringChildReconnect
+#  C:   +^--v      ^r-
+
+#  P:  +-^--v     ^r-  ChildRestartDuringMiddleReconnect
+#  C:   +^--   + ^-r-
+
 
 def BaselineMiddleFirst(state):
     state.start("middle")
@@ -217,7 +233,7 @@ def BaselineChildFirst(state):
     state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def ShortChildDisconnect(state):
+def ChildShortDisconnect(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -234,7 +250,7 @@ def ShortChildDisconnect(state):
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def LongChildDisconnect(state):
+def ChildLongDisconnect(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -252,7 +268,45 @@ def LongChildDisconnect(state):
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def ShortMiddleDisconnect(state):
+def ChildShortRestart(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker kill -s INT gaps_hi_agent_child_1", state.output)
+    time.sleep(3)
+    sh("docker start gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(10)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+    # TODO: expect difference in charts - test validity check
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
+
+def ChildLongRestart(state):
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker kill -s INT gaps_hi_agent_child_1", state.output)
+    time.sleep(30)
+    sh("docker start gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+    # TODO: expect difference in charts - test validity check
+    state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
+
+def MiddleShortDisconnect(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -270,7 +324,7 @@ def ShortMiddleDisconnect(state):
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def LongMiddleDisconnect(state):
+def MiddleLongDisconnect(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -288,7 +342,7 @@ def LongMiddleDisconnect(state):
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def MiddleFastRestart(state):
+def MiddleShortRestart(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -306,7 +360,7 @@ def MiddleFastRestart(state):
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
 
-def MiddleSlowRestart(state):
+def MiddleLongRestart(state):
     state.start("middle")
     state.wait_up("middle")
     time.sleep(4)
@@ -323,6 +377,27 @@ def MiddleSlowRestart(state):
     state.end_checks.append( lambda: state.check_sync("child","middle") )
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['middle'].parser = state.parser2    # Suppress DNS errors
+
+def ChildDropInsideMiddleReconnect(state):
+#  P:  +-^--v      ^r-  ChildDropInsideMiddleReconnect
+#  C:   +^---  v ^  r-
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(3)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+
 
 class Node(object):
     def __init__(self, name, cname, parser):
@@ -375,8 +450,13 @@ class TestState(object):
         with open(f"{case.__name__}.log","w") as f:
             self.output = f
             self.wipe()
-            case(self)
             passed = True
+            try:
+                case(self)
+            except Exception as e:
+                passed = False
+                print(f"{case.__name__} -> exception during test: {str(e)}")
+
             for c in self.end_checks:
                 passed = c() and passed         # Shortcut logic, left to right
             for n in self.nodes.values():
@@ -442,8 +522,10 @@ class TestState(object):
            in scenarios with multiple children of a parent.'''
         url = f"http://localhost:{self.nodes[node].port}/api/v1/info"
         print(f"  Waiting for {node} to become parent", file=self.output)
-        while True:
+        attempts = 0
+        while attempts < 30:
             try:
+                attempts += 1
                 r = requests.get(url)
                 info = requests.get(url).json()
             except json.decoder.JSONDecodeError:
@@ -459,6 +541,7 @@ class TestState(object):
                return
             print(f"  {node} has host labels {info['host_labels']}...", file=self.output)
             time.sleep(1)
+        raise Exception(f"Node {node} did not become parent when expected")
 
     def check_norep(self):
         '''Check that replication did not occur during the test by scanning the logs for debug.'''
@@ -506,16 +589,24 @@ class TestState(object):
 
 
 
-cases = [
-    ShortChildDisconnect,
-    LongChildDisconnect,
-    ShortMiddleDisconnect,
-    LongMiddleDisconnect,
-    MiddleFastRestart,
-    MiddleSlowRestart,
 
-    BaselineMiddleFirst,
+cases = [
     BaselineChildFirst,
+    BaselineMiddleFirst,
+    ChildDropInsideMiddleReconnect,
+#    ChildDropOverMiddleReconnect,
+    ChildLongDisconnect,
+    ChildLongRestart,
+    MiddleLongDisconnect,
+    MiddleLongRestart,
+#    MiddleDropInsideChildReconnect,
+#    MiddleDropOverChildReconnect,
+#    RestartChildDuringMiddleReconnect,
+#    RestartMiddleDuringChildReconnect,
+    ChildShortDisconnect,
+    ChildShortRestart,
+    MiddleShortDisconnect,
+    MiddleShortRestart
 ]
 import argparse
 parser = argparse.ArgumentParser()
