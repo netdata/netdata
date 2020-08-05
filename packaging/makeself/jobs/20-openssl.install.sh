@@ -13,6 +13,7 @@ export PKG_CONFIG="pkg-config --static"
 if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
   run git clone --branch "${version}" --single-branch git://git.openssl.org/openssl.git "${NETDATA_MAKESELF_PATH}/tmp/openssl"
 fi
+
 cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
 
 run ./config no-shared no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
