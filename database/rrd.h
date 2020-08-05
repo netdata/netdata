@@ -965,6 +965,14 @@ extern void rrdset_update_heterogeneous_flag(RRDSET *st);
 
 extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
+/* This will not return charts that are archived */
+static inline RRDSET *rrdset_find_active_localhost(const char *id)
+{
+    RRDSET *st = rrdset_find_localhost(id);
+    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
+        return NULL;
+    return st;
+}
 
 extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
 #define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)

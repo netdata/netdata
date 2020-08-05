@@ -604,7 +604,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             if(likely(do_nonredundant)) {
                 snprintfz(id, 50, "%s_availability", raid->name);
 
-                if(unlikely(!raid->st_nonredundant && !(raid->st_nonredundant = rrdset_find_localhost(id)))) {
+                if(unlikely(!raid->st_nonredundant && !(raid->st_nonredundant = rrdset_find_active_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
 
                     raid->st_nonredundant = rrdset_create_localhost(
