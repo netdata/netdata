@@ -195,8 +195,6 @@ class LogParser(object):
 #  P:  +-^--   v   ^r-  MiddleDropOverChildReconnect
 #  C:   +^--v    ^  r-
 
-
-# TODO: Cases with drops inside restart intervals ?
 # TODO: Need long and short variants to check different behaviour on socket reuse....
 
 # Restarts during reconnections
@@ -207,6 +205,11 @@ class LogParser(object):
 #  P:  +-^--v     ^r-  ChildRestartDuringMiddleReconnect
 #  C:   +^--   + ^-r-
 
+#  P:  +-^-- v ^  r---  MiddleDropDuringChildRestart
+#  C:   +^--+++++^r---
+
+#  P:  +-^--+++++^r---  ChildDropDuringMiddleRestart
+#  C:   +^-- v ^  r---
 
 def BaselineMiddleFirst(state):
     state.start("middle")
@@ -517,6 +520,53 @@ def ChildRestartDuringMiddleReconnect(state):
     # Expect gaps (when child is not collecting) but not differences
     state.post_checks.append( lambda: state.check_rep() )
 
+def MiddleDropDuringChildRestart(state):
+#  P:  +-^-- v ^  r---  MiddleDropDuringChildRestart
+#  C:   +^--+++++^r---
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker kill -s INT gaps_hi_agent_child_1", state.output)
+    time.sleep(3)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(3)
+    sh("docker start gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    # Expect gaps (when child is not collecting) but not differences
+    state.post_checks.append( lambda: state.check_rep() )
+
+def ChildDropDuringMiddleRestart(state):
+#  P:  +-^--+++++^r---  ChildDropDuringMiddleRestart
+#  C:   +^-- v ^  r---
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker kill -s INT gaps_hi_agent_middle_1", state.output)
+    time.sleep(3)
+    sh("docker start gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(3)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
 class Node(object):
     def __init__(self, name, cname, parser):
         self.name = name
@@ -711,20 +761,22 @@ class TestState(object):
 cases = [
     BaselineChildFirst,
     BaselineMiddleFirst,
+    ChildDropDuringMiddleRestart,
     ChildDropInsideMiddleReconnect,
     ChildDropOverMiddleReconnect,
     ChildLongDisconnect,
     ChildLongRestart,
-    MiddleLongDisconnect,
-    MiddleLongRestart,
-    MiddleDropInsideChildReconnect,
-    MiddleDropOverChildReconnect,
     ChildRestartDuringMiddleReconnect,
-    MiddleRestartDuringChildReconnect,
     ChildShortDisconnect,
     ChildShortRestart,
+    MiddleDropDuringChildRestart,
+    MiddleDropInsideChildReconnect,
+    MiddleDropOverChildReconnect,
+    MiddleLongDisconnect,
+    MiddleLongRestart,
+    MiddleRestartDuringChildReconnect,
     MiddleShortDisconnect,
-    MiddleShortRestart
+    MiddleShortRestart,
 ]
 import argparse
 parser = argparse.ArgumentParser()
