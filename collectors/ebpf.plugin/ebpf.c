@@ -119,7 +119,7 @@ pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 50, .hostname_resolution_enabled = 0,
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = NETDATA_NV_CAP_VALUE, .hostname_resolution_enabled = 0,
                                                      .service_resolution_enabled = 0, .excluded_port = NULL,
                                                      .included_port = NULL, .names = NULL, .ipv4_local_ip = NULL,
                                                      .ipv6_local_ip = NULL };
@@ -1521,21 +1521,30 @@ static void link_hostnames(char *parse)
 }
 
 /**
- * Adjust max dimension.
+ * Read max dimension.
  *
  * Netdata plot two dimensions per connection, so it is necessary to adjust the values.
  */
-static void adjust_max_dimension()
+static void read_max_dimension()
 {
-    uint32_t curr = network_viewer_opt.max_dim;
+    int maxdim ;
+    maxdim = (int) appconfig_get_number(&collector_config,
+                                        EBPF_NETWORK_VIEWER_SECTION,
+                                        "maximum dimensions",
+                                        NETDATA_NV_CAP_VALUE);
+    if (maxdim < 0) {
+        error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
+              maxdim, NETDATA_NV_CAP_VALUE);
+        maxdim = NETDATA_NV_CAP_VALUE;
+    }
 
-    curr /= 2;
-    if (!curr) {
+    maxdim /= 2;
+    if (!maxdim) {
         info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
         network_viewer_opt.max_dim = 1;
     }
 
-    network_viewer_opt.max_dim = curr;
+    network_viewer_opt.max_dim = (uint32_t)maxdim;
 }
 
 /**
@@ -1543,11 +1552,7 @@ static void adjust_max_dimension()
  */
 static void parse_network_viewer_section()
 {
-    network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
-                                                      EBPF_NETWORK_VIEWER_SECTION,
-                                                      "maximum dimensions",
-                                                      50);
-    adjust_max_dimension();
+    read_max_dimension();
 
     network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
