@@ -124,9 +124,11 @@ static inline void calculate_nv_plot()
     uint32_t i;
     uint32_t end = inbound_vectors.next;
     for (i = 0; i < end; i++) {
+        /*
         error("KILLME_IN %s: %lu %lu %lu %lu |  %lu %lu %lu %lu", inbound_vectors.plot[i].dimension_sent,
               inbound_vectors.plot[i].plot.plot_recv_bytes, inbound_vectors.plot[i].plot.plot_recv_packets, inbound_vectors.plot[i].plot.plot_sent_bytes, inbound_vectors.plot[i].plot.plot_sent_packets,
               inbound_vectors.plot[i].sock.recv_bytes, inbound_vectors.plot[i].sock.recv_packets, inbound_vectors.plot[i].sock.sent_bytes, inbound_vectors.plot[i].sock.sent_packets);
+              */
         update_nv_plot_data(&inbound_vectors.plot[i].plot, &inbound_vectors.plot[i].sock);
     }
     inbound_vectors.max_plot = end;
@@ -1124,10 +1126,11 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  *
  * @param direction  store inbound and outbound direction.
  * @param cmp        index read from hash table.
+ * @param proto      the protocol read.
  *
  * @return It returns the structure with address to compare.
  */
-netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_socket_idx_t *cmp)
+netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_socket_idx_t *cmp, uint8_t proto)
 {
     if (!listen_ports) {
         *direction = NETDATA_OUTBOUND_DIRECTION;
@@ -1136,7 +1139,7 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
 
     ebpf_network_viewer_port_list_t *move_ports = listen_ports;
     while (move_ports) {
-        if (move_ports->first == cmp->sport) {
+        if (move_ports->protocol == proto && move_ports->first == cmp->sport) {
             *direction = NETDATA_INBOUND_DIRECTION;
             return &inbound_vectors;
         }
@@ -1164,6 +1167,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     int i;
     uint8_t protocol = values[0].protocol;
     uint64_t ct = values[0].ct;
+    error("KILLME_FIRST %u (%u)", protocol, ntohs(key->sport));
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -1182,6 +1186,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         *removesock += (int)w->removeme;
     }
 
+    error("KILLME_LAST %u (%u)", protocol, ntohs(key->sport));
     values[0].recv_packets += precv;
     values[0].sent_packets += psent;
     values[0].recv_bytes   += brecv;
@@ -1193,7 +1198,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
 
     if (is_socket_allowed(key, family)) {
         uint32_t dir;
-        netdata_vector_plot_t *table = select_vector_to_store(&dir, key);
+        netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
         store_socket_inside_avl(table, &values[0], key, family, dir);
     }
 }
@@ -1219,9 +1224,15 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
     int removesock = 0;
 
     netdata_socket_t *values = socket_values;
+    size_t length = ebpf_nprocs*sizeof(netdata_socket_t);
     int test, end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        // We need to reset the values when we are working on kernel 4.15 or newer, because kernel does not create
+        // values for specific processor unless it is used to store data. As result of this behavior one the next socket
+        // can have values from the previous one.
+        memset(values, 0, length);
+        error("KILLME_READ %u %u %u %u (%u)", values[0].protocol, values[1].protocol, values[2].protocol, values[3].protocol, ntohs(key.sport));
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
             key = next_key;
@@ -1265,14 +1276,15 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
  * Update link list when it is necessary.
  *
  * @param value the ports we are listen to.
+ * @param proto the protocol used with port connection.
  */
-void update_listen_table(uint16_t value)
+void update_listen_table(uint16_t value, uint8_t proto)
 {
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
         while (move) {
-            if (move->first == value)
+            if (move->protocol == proto && move->first == value)
                 return;
 
             store = move;
@@ -1281,10 +1293,12 @@ void update_listen_table(uint16_t value)
 
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
         w->first = value;
+        w->protocol = proto;
         store->next = w;
     } else {
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
         w->first = value;
+        w->protocol = proto;
 
         listen_ports = w;
     }
@@ -1313,13 +1327,16 @@ static void read_listen_table()
             continue;
         }
 
-        update_listen_table(htons(key));
+        // The correct protocol must come from kernel
+        update_listen_table(htons(key), (key == 53)?IPPROTO_UDP:IPPROTO_TCP);
 
         key = next_key;
     }
 
-    if (next_key)
-        update_listen_table(htons(next_key));
+    if (next_key) {
+        // The correct protocol must come from kernel
+        update_listen_table(htons(next_key), (key == 53)?IPPROTO_UDP:IPPROTO_TCP);
+    }
 }
 
 /**

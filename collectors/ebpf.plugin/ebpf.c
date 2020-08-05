@@ -709,8 +709,9 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
  *  Parse /proc/net/{tcp,udp} and get the ports Linux is listening.
  *
  *  @param filename the proc file to parse.
+ *  @param proto is the magic number associated to the protocol file we are reading.
  */
-static void read_local_ports(char *filename)
+static void read_local_ports(char *filename, uint8_t proto)
 {
     procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
     if (!ff)
@@ -736,7 +737,7 @@ static void read_local_ports(char *filename)
 
         // Read local port
         uint16_t port = (uint16_t)strtol(procfile_lineword(ff, l, 2), NULL, 16);
-        update_listen_table(htons(port));
+        update_listen_table(htons(port), proto);
     }
 
     procfile_close(ff);
@@ -1953,10 +1954,10 @@ int main(int argc, char **argv)
     ebpf_allocate_common_vectors();
 
     read_local_addresses();
-    read_local_ports("/proc/net/tcp");
-    read_local_ports("/proc/net/tcp6");
-    read_local_ports("/proc/net/udp");
-    read_local_ports("/proc/net/udp6");
+    read_local_ports("/proc/net/tcp", IPPROTO_TCP);
+    read_local_ports("/proc/net/tcp6", IPPROTO_TCP);
+    read_local_ports("/proc/net/udp", IPPROTO_UDP);
+    read_local_ports("/proc/net/udp6", IPPROTO_UDP);
 
     struct netdata_static_thread ebpf_threads[] = {
         {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},
