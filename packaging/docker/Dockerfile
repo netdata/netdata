@@ -60,6 +60,7 @@ FROM netdata/base:${ARCH}
 # Copy files over
 RUN mkdir -p /opt/src
 COPY --from=builder /app /
+COPY --from=builder /wheels /wheels
 COPY packaging/docker/health.sh /health.sh
 
 # Configure system
@@ -102,6 +103,9 @@ RUN \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/debug.log && \
     ln -sf /dev/stderr /var/log/netdata/error.log
+
+# Install any Python wheels
+RUN pip install /wheels/*
 
 ENV NETDATA_PORT 19999
 EXPOSE $NETDATA_PORT
