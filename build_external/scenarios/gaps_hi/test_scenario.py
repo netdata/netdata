@@ -192,11 +192,11 @@ class LogParser(object):
 #  P:  +-^--   v ^ -r-  MiddleDropInsideChildReconnect
 #  C:   +^--v      ^r-
 
-# TODO: Cases with drops inside restart intervals ?
-
 #  P:  +-^--   v   ^r-  MiddleDropOverChildReconnect
 #  C:   +^--v    ^  r-
 
+
+# TODO: Cases with drops inside restart intervals ?
 # TODO: Need long and short variants to check different behaviour on socket reuse....
 
 # Restarts during reconnections
@@ -397,7 +397,125 @@ def ChildDropInsideMiddleReconnect(state):
     sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
     state.wait_isparent("middle")
     time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
 
+def MiddleDropInsideChildReconnect(state):
+#  P:  +-^--   v ^ -r-  MiddleDropInsideChildReconnect
+#  C:   +^--v      ^r-
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(3)
+    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def ChildDropOverMiddleReconnect(state):
+#  P:  +-^--v    ^ -r-  ChildDropOverMiddleReconnect
+#  C:   +^---  v   ^r-
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(3)
+    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def MiddleDropOverChildReconnect(state):
+#  P:  +-^--   v   ^r-  MiddleDropOverChildReconnect
+#  C:   +^--v    ^  r-
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(3)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def MiddleRestartDuringChildReconnect(state):
+#  P:  +-^--   + ^ -r-  MiddleRestartDuringChildReconnect
+#  C:   +^--v      ^r-
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_child_1", state.output)
+    time.sleep(5)
+    sh("docker kill -s INT gaps_hi_agent_middle_1", state.output)
+    time.sleep(3)
+    sh("docker start gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_child gaps_hi_default gaps_hi_agent_child_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    state.post_checks.append( lambda: state.check_rep() )
+
+def ChildRestartDuringMiddleReconnect(state):
+#  P:  +-^--v     ^r-  ChildRestartDuringMiddleReconnect
+#  C:   +^--   + ^-r-
+    state.start("middle")
+    state.wait_up("middle")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "middle")
+    time.sleep(5)
+    sh("docker network disconnect gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    time.sleep(5)
+    sh("docker kill -s INT gaps_hi_agent_child_1", state.output)
+    time.sleep(3)
+    sh("docker start gaps_hi_agent_child_1", state.output)
+    time.sleep(5)
+    sh("docker network connect --alias agent_middle gaps_hi_default gaps_hi_agent_middle_1", state.output)
+    state.wait_isparent("middle")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","middle") )
+    # Expect gaps (when child is not collecting) but not differences
+    state.post_checks.append( lambda: state.check_rep() )
 
 class Node(object):
     def __init__(self, name, cname, parser):
@@ -594,15 +712,15 @@ cases = [
     BaselineChildFirst,
     BaselineMiddleFirst,
     ChildDropInsideMiddleReconnect,
-#    ChildDropOverMiddleReconnect,
+    ChildDropOverMiddleReconnect,
     ChildLongDisconnect,
     ChildLongRestart,
     MiddleLongDisconnect,
     MiddleLongRestart,
-#    MiddleDropInsideChildReconnect,
-#    MiddleDropOverChildReconnect,
-#    RestartChildDuringMiddleReconnect,
-#    RestartMiddleDuringChildReconnect,
+    MiddleDropInsideChildReconnect,
+    MiddleDropOverChildReconnect,
+    ChildRestartDuringMiddleReconnect,
+    MiddleRestartDuringChildReconnect,
     ChildShortDisconnect,
     ChildShortRestart,
     MiddleShortDisconnect,
