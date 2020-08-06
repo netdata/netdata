@@ -255,8 +255,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef SQLITE_POC
     if (is_archived) {
         int rc = sql_store_dimension(dim_uuid, st->chart_uuid, id, name, multiplier, divisor, algorithm);
-        rrdset_unlock(st);
-        return NULL;
+        //if (strcmp(st->name, "netdata.statsd_events")) {
+            rrdset_unlock(st);
+            return NULL;
+        //}
+        //is_archived = 0;
+        //sql_dimension_archive(dim_uuid, 0);
     }
 #endif
 
