@@ -11,6 +11,7 @@ class Node(object):
         self.parser = parser
         self.stream_target = None
         self.receiver = False
+        self.db_mode = "dbengine"
 
     def stream_to(self, target):
         self.stream_target = target
@@ -43,6 +44,7 @@ class Node(object):
             print(f"    debug flags = 0x00000000c0020000", file=f)
             print(f"    errors flood protection period = 0", file=f)
             print(f"    hostname = {self.name}", file=f)
+            print(f"    memory mode = {self.db_mode}", file=f)
             print(f"[web]", file=f)
             print(f"    ssl key = /etc/netdata/ssl/key.pem", file=f)
             print(f"    ssl certificate = /etc/netdata/ssl/cert.pem", file=f)
@@ -69,8 +71,11 @@ class Node(object):
                 print(f"    default postpone alarms on connect seconds = 60", file=f)
                 print(f"    multiple connections = allow", file=f)
 
-    def get_data(self, chart):
-        url = f"http://localhost:{self.port}/api/v1/data?chart={chart}"
+    def get_data(self, chart, host=None):
+        if host is None:
+            url = f"http://localhost:{self.port}/api/v1/data?chart={chart}"
+        else:
+            url = f"http://localhost:{self.port}/host/{host}/api/v1/data?chart={chart}"
         try:
             r = requests.get(url)
             return r.json()

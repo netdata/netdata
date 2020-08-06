@@ -53,10 +53,12 @@ class LogParser(object):
         return sorted(set(self.events))
 
 class State(object):
-    def __init__(self, working, prefix="agent_test", network="_default"):
+    def __init__(self, working, config, config_label, prefix="agent_test", network="_default"):
         self.working         = working
         if not os.path.isdir(working):
             os.mkdir(working)
+        self.config    = config                     # Used in directory name
+        self.config_label    = config_label         # Human readable
         self.network         = prefix + network
         self.prefix          = prefix
         self.nodes           = {}
@@ -87,12 +89,12 @@ class State(object):
 
     def wrap(self, case):
         # Clean any old data from working
-        self.test_base = os.path.join(self.working, case.__name__)
+        self.test_base = os.path.join(self.working, f"{case.__name__}_{self.config}")
         if os.path.isdir(self.test_base):
             shutil.rmtree(self.test_base)
         os.mkdir(self.test_base)
 
-        print(f"\n---------------> Wipe test state: {case.__name__}\n")
+        print(f"\n---------------> Wipe test state: {case.__name__} in {self.config_label}\n")
         with open(os.path.join(self.test_base,"test.log"),"w") as f:
             self.output = f
             # Setup initial node state and generate config
@@ -116,7 +118,7 @@ class State(object):
             for n in self.nodes.values():
                 if n.started:
                     sh(f"docker kill {n.container_name}", output=f)
-                    n.log = f"{case.__name__}-{n.name}.log"
+                    n.log = os.path.join(self.test_base, f"{case.__name__}-{n.name}.log")
                     sh(f"docker logs {n.container_name} >{n.log} 2>&1", output=f)
             for c in self.post_checks:
                 passed = c() and passed         # Shortcut logic, left to right
@@ -221,13 +223,16 @@ class State(object):
 
 
     # TODO: Check on a larger set of charts, include disk.io
-    def check_sync(self, source, target):
+    def check_sync(self, source, target, max_pre=0, max_post=0):
+        if self.nodes[source].stream_target != self.nodes[target]:
+            print(f"  TEST ERROR cannot check sync as {source} does not stream to {target}")
+            return False
         print(f"  check_sync {source} {target}", file=self.output)
         source_json = self.nodes[source].get_data("system.cpu")
         if not source_json:
             print(f"  FAILED to check sync looking at http://localhost:{self.nodes[source].port}", file=self.output)
             return
-        target_json = self.nodes[target].get_data("system.cpu")
+        target_json = self.nodes[target].get_data("system.cpu",host=source)
         if not target_json:
             print(f"  FAILED to check sync looking at http://localhost:{self.nodes[target].port}", file=self.output)
             return
@@ -236,10 +241,11 @@ class State(object):
         source_data = source_json["data"]
         target_data = target_json["data"]
 
-        if compare_data(source_data, target_data, self.output):
+        if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post):
             print("  PASSED in compare", file=self.output)
             return True
         else:
             print("  FAILED in compare", file=self.output)
             print(source_data, file=self.output)
+            print(target_data, file=self.output)
             return False

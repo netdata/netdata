@@ -129,6 +129,7 @@ def fuzzy_cmp_data(direct_data, remote_data, remote_name):
 #  P:  +-^--+++++^r---  ChildDropDuringParentRestart
 #  C:   +^-- v ^  r---
 
+# TODO: max_pre should be 0 for this case when the receiver queries history on first connection
 def BaselineParentFirst(state):
     state.start("parent")
     state.wait_up("parent")
@@ -137,7 +138,7 @@ def BaselineParentFirst(state):
     state.wait_connected("child", "parent")
     print("  Measure baseline for 60s...", file=state.output)
     time.sleep(60)
-    state.end_checks.append( lambda: state.check_sync("child","parent") )
+    state.end_checks.append( lambda: state.check_sync("child","parent", max_pre=5) )
     state.post_checks.append( lambda: state.check_norep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -150,7 +151,7 @@ def BaselineChildFirst(state):
     print("  Measure baseline for 60s...", file=state.output)
     time.sleep(60)
     # pylint: disable-msg=W0622
-    state.end_checks.append( lambda: state.check_sync("child","parent") )
+    state.end_checks.append( lambda: state.check_sync("child","parent",max_pre=10) )
     state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -515,20 +516,26 @@ parser = argparse.ArgumentParser()
 parser.add_argument('pattern', nargs='?', default=None)
 args = parser.parse_args()
 
-state = AgentTest.State(os.path.join(base,"working"))
-c = state.add_node("child")
-c.port = 20000
-c.guid = "22222222-2222-2222-2222-222222222222"
-p = state.add_node("parent")
-p.port = 20001
-p.guid = "11111111-1111-1111-1111-111111111111"
-c.stream_to(p)
+configurations = []
+for (cdb,pdb) in [("dbengine","dbengine"), ("dbengine","save"), ("save","dbengine"), ("save","save")] :
+    state = AgentTest.State(os.path.join(base,"working"), f"{cdb}_{pdb}", f"child={cdb} parent={pdb}")
+    c = state.add_node("child")
+    c.port = 20000
+    c.guid = "22222222-2222-2222-2222-222222222222"
+    c.db_mode = cdb
+    p = state.add_node("parent")
+    p.port = 20001
+    p.guid = "11111111-1111-1111-1111-111111111111"
+    p.db_mode = pdb
+    c.stream_to(p)
+    configurations.append(state)
 
-for c in cases:
+for case in cases:
     if args.pattern is not None:
-        print(f"Checking {args.pattern} against {c.__name__}")
-        if re.match(args.pattern, c.__name__):
-            state.wrap(c)
+        print(f"Checking {args.pattern} against {case.__name__}")
+        if re.match(args.pattern, case.__name__):
+            for state in configurations:
+                state.wrap(case)
     else:
-        state.wrap(c)
-
+        for state in configurations:
+            state.wrap(case)
