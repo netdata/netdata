@@ -84,6 +84,38 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         dimensions++;
     }
 
+#ifdef SQLITE_POC
+     if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+//        char *id;
+//        char *name;
+//        uuid_t dim_uuid;
+        struct dimension *dimension_list = NULL, *tmp_dimension_list;
+        sql_select_dimension(st->chart_uuid, &dimension_list);
+        while (dimension_list) {
+            //char *dim_str[37];
+            if (dimensions)
+                buffer_strcat(wb, ",\n\t\t\t\t\"");
+            else
+                buffer_strcat(wb, "\t\t\t\t\"");
+            buffer_strcat_jsonescape(wb, dimension_list->id);
+            buffer_strcat(wb, "\": { \"name\": \"");
+            buffer_strcat_jsonescape(wb, dimension_list->name);
+            buffer_strcat(wb, " (");
+            //uuid_unparse_lower(dimension_list->dim_uuid, dim_str);
+            buffer_strcat(wb, dimension_list->dim_str);
+            buffer_strcat(wb, ")");
+            buffer_strcat(wb, "\" }");
+
+            tmp_dimension_list = dimension_list->next;
+            freez(dimension_list->id);
+            freez(dimension_list->name);
+            freez(dimension_list);
+            dimension_list = tmp_dimension_list;
+            dimensions++;
+        }
+    }
+#endif
+
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;
 
