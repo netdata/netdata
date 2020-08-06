@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Hide archived chart from mdstat collector. [\#9667](https://github.com/netdata/netdata/pull/9667) ([mfundul](https://github.com/mfundul))
 - Fix missing comma. [\#9656](https://github.com/netdata/netdata/pull/9656) ([mfundul](https://github.com/mfundul))
 - Fix Travis config [\#9655](https://github.com/netdata/netdata/pull/9655) ([prologic](https://github.com/prologic))
 - Fix warning when compiled with gcc-10.1 [\#9651](https://github.com/netdata/netdata/pull/9651) ([thiagoftsm](https://github.com/thiagoftsm))
