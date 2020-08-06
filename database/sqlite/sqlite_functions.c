@@ -14,7 +14,7 @@ int sql_init_database()
 
     info("SQLITE Database initialized (rc = %d)", rc);
 
-    char *sql = "PRAGMA synchronous=0 ; CREATE TABLE IF NOT EXISTS dimension(dim_uuid text PRIMARY KEY, chart_uuid text, id text, name text, archived int);";
+    char *sql = "PRAGMA synchronous=0 ; CREATE TABLE IF NOT EXISTS dimension(dim_uuid text PRIMARY KEY, chart_uuid text, id text, name text, multiplier int, divisor int , algorithm int, archived int);";
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
 
@@ -50,8 +50,8 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
     uuid_unparse_lower(*dim_uuid, dim_str);
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "INSERT into dimension (dim_uuid, chart_uuid, id, name, archived) values ('%s','%s','%s','%s', 1) ;",
-            dim_str, chart_str, id, name);
+    sprintf(sql, "INSERT into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values ('%s','%s','%s','%s', %d, %d, %d, 1) ;",
+            dim_str, chart_str, id, name, multiplier, divisor, algorithm);
     //info("%s", sql);
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
