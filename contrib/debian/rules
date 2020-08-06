@@ -96,9 +96,6 @@ override_dh_installdocs:
 		--target $(TOP)/usr/share/doc/netdata/ \
 		{} \;
 
-override_dh_shlibdeps:
-	dh_shlibdeps -X libnetdata_ebpf
-
 override_dh_fixperms:
 	dh_fixperms
 
