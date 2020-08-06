@@ -162,7 +162,7 @@ def storage_charts_template(name):
 
     charts = {
         order[0]: {
-            'options': [None, 'Storage "{0}" Usage'.format(name), 'KiB', 'Storage usage', 'varnish.storage_usage', 'stacked'],
+            'options': [None, 'Storage "{0}" Usage'.format(name), 'KiB', 'storage usage', 'varnish.storage_usage', 'stacked'],
             'lines': [
                 ['{0}.g_space'.format(name), 'free', 'absolute', 1, 1 << 10],
                 ['{0}.g_bytes'.format(name), 'allocated', 'absolute', 1, 1 << 10]
