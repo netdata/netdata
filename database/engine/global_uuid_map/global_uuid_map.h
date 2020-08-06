@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include <Judy.h>
 #include "../../rrd.h"
+#include "../../sqlite/sqlite_functions.h"
 
 typedef enum guid_type {
     GUID_TYPE_CHAR,

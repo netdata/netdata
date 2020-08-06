@@ -3,6 +3,8 @@
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
+#define SQLITE_POC
+
 // forward typedefs
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
@@ -1009,9 +1011,9 @@ extern void rrdset_is_obsolete(RRDSET *st);
 extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_backends(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
-#define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && (st)->dimensions)
+#define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
 
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))

@@ -30,6 +30,8 @@ void netdata_cleanup_and_exit(int ret) {
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
+    // Shutdown SQLITE
+    sql_close_database();
     rrdhost_cleanup_all();
 
     if(!ret) {

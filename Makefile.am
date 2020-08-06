@@ -404,6 +404,8 @@ if ENABLE_DBENGINE
         database/engine/metadata_log/compaction.h \
         database/engine/global_uuid_map/global_uuid_map.c \
         database/engine/global_uuid_map/global_uuid_map.h \
+        database/sqlite/sqlite_functions.c \
+        database/sqlite/sqlite_functions.h \
         $(NULL)
 endif
 
@@ -690,6 +692,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_SQLITE_LIBS) \
     $(NULL)
 
 if LINK_STATIC_JSONC

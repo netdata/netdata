@@ -161,8 +161,11 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
     }
     dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
 
-    RRDDIM *rd = rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1,
-                                   dim_uuid);
+    RRDDIM *rd =
+        rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1, dim_uuid);
+#ifdef SQLITE_POC
+    return PARSER_RC_OK;
+#else
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
     rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
@@ -183,6 +186,7 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
         uuid_clear(state->uuid); /* Consume UUID */
     }
     return PARSER_RC_OK;
+#endif
 }
 
 PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)

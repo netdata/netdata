@@ -251,6 +251,15 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         return rd;
     }
 
+    // If we attempt to create archived dimension then send it to the SQLITE
+#ifdef SQLITE_POC
+    if (is_archived) {
+        int rc = sql_store_dimension(dim_uuid, st->chart_uuid, id, name, multiplier, divisor, algorithm);
+        rrdset_unlock(st);
+        return NULL;
+    }
+#endif
+
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
