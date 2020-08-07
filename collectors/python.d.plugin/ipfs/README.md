@@ -34,7 +34,7 @@ Calls to the following endpoints are disabled due to `IPFS` bugs:
 -   `/api/v0/stats/repo` (https://github.com/ipfs/go-ipfs/issues/3874)
 -   `/api/v0/pin/ls` (https://github.com/ipfs/go-ipfs/issues/7528)
 
-Can enabled in the collector configuration file.
+Can be enabled in the collector configuration file.
 
 The configuration needs only `url` to `IPFS` server, here is an example for 2 `IPFS` instances:
 
