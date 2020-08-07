@@ -91,6 +91,10 @@ if str(os.environ["BUILD_STRING"]).count("debian/buster") == 1:
     common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.buster', 'contrib/debian/control'])
 
 ### Ubuntu
+if str(os.environ["BUILD_STRING"]).count("ubuntu/focal") == 1:
+    print("5.1 We are building for Xenial, adjusting control file")
+    common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
+    common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.focal', 'contrib/debian/control'])
 if str(os.environ["BUILD_STRING"]).count("ubuntu/xenial") == 1:
     print("5.1 We are building for Xenial, adjusting control file")
     common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
