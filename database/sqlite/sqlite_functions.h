@@ -21,5 +21,9 @@ extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char 
                         collected_number divisor, int algorithm);
 extern int sql_select_dimension(uuid_t *chart_uuid, struct dimension **dimension_list);
 extern int sql_dimension_archive(uuid_t *dim_uuid, int archive);
+extern int sql_dimension_options(uuid_t *dim_uuid, char *options);
+extern int sql_load_dimension(char *dim_str, RRDSET *st);
+extern int sql_load_chart_dimensions(RRDSET *st, char *dimensions);
+
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

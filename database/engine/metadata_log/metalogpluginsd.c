@@ -164,6 +164,8 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
     RRDDIM *rd =
         rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1, dim_uuid);
 #ifdef SQLITE_POC
+    sql_dimension_options(dim_uuid, options);
+    uuid_clear(state->uuid);
     return PARSER_RC_OK;
 #else
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);

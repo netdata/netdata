@@ -264,6 +264,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     }
 #endif
 
+//    if (dim_uuid)
+//        sql_dimension_archive(dim_uuid, 0);
+
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 

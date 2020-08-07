@@ -1557,6 +1557,9 @@ RRDR *rrd2rrdr(
 ) {
     int rrd_update_every;
     int absolute_period_requested;
+    if (st->dimensions == NULL)
+        sql_load_chart_dimensions(st, dimensions);
+
     time_t first_entry_t = rrdset_first_entry_t(st);
     time_t last_entry_t  = rrdset_last_entry_t(st);
 
@@ -1568,6 +1571,9 @@ RRDR *rrd2rrdr(
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         struct rrdeng_region_info *region_info_array;
         unsigned regions, max_interval;
+
+//        if (st->dimensions == NULL)
+//            sql_load_chart_dimensions(st, dimensions);
 
         /* This call takes the chart read-lock */
         regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
