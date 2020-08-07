@@ -74,7 +74,7 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
     uuid_unparse_lower(*dim_uuid, dim_str);
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "INSERT into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values ('%s','%s','%s','%s', %d, %d, %d, 1) ;",
+    sprintf(sql, "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values ('%s','%s','%s','%s', %d, %d, %d, 1) ;",
             dim_str, chart_str, id, name, multiplier, divisor, algorithm);
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
