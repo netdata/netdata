@@ -45,6 +45,19 @@ CHARTS = {
     }
 }
 
+POOL_CIDR = "CIDR"
+POOL_IP_RANGE = "IP_RANGE"
+POOL_UNKNOWN = "UNKNOWN"
+
+def detect_ip_type(ip):
+    ip_type = ip.split("-")
+    if len(ip_type) == 1:
+        return POOL_CIDR
+    elif len(ip_type) == 2:
+        return POOL_IP_RANGE
+    else:
+        return POOL_UNKNOWN
+
 
 class DhcpdLeasesFile:
     def __init__(self, path):
@@ -92,30 +105,20 @@ class Pool:
             if not network:
                 continue
 
-            ip_type = self.detect_ip_type(ip=network)
-            if ip_type == "CIDR":
+            ip_type = detect_ip_type(ip=network)
+            if ip_type == POOL_CIDR:
                 self.networks.append(PoolCIDR(network=network))
-            elif ip_type == "IP_RANGE":
+            elif ip_type == POOL_IP_RANGE:
                 self.networks.append(PoolIPRange(ip_range=network))
             else:
-                raise ValueError('Network ({0}) syntaxis error!'.format(network))
-
-    @staticmethod
-    def detect_ip_type(ip):
-        ip_type = ip.split("-")
-        if len(ip_type) == 1:
-            return "CIDR"
-        elif len(ip_type) == 2:
-            return "IP_RANGE"
-        else:
-            return "UNKNOWN"
+                raise ValueError('Network ({0}) incorrect syntax, expect CIDR or IPRange format.'.format(network))
 
     def num_hosts(self):
         return sum([network.num_hosts() for network in self.networks])
 
     def __contains__(self, item):
         for network in self.networks:
-            if network.__contains__(item):
+            if item in network:
                 return True
         return False
 

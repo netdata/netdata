@@ -44,10 +44,10 @@ Sample:
 local:
   leases_path: '/var/lib/dhcp/dhcpd.leases'
   pools:
-    office:         '192.168.2.0/24'
-    wifi:           '192.168.3.10-192.168.3.20'
-    192.168.4.0/24: '192.168.4.0/24'
-    wifi-guest:     '192.168.5.0/24 192.168.6.10-192.168.6.20'
+    office:         '192.168.2.0/24'                            # name(dimension): pool in CIDR format
+    wifi:           '192.168.3.10-192.168.3.20'                 # name(dimension): pool in IP Range format
+    192.168.4.0/24: '192.168.4.0/24'                            # name(dimension): pool in CIDR format
+    wifi-guest:     '192.168.5.0/24 192.168.6.10-192.168.6.20'  # name(dimension): pool in CIDR + IP Range format
 ```
 
 The module will not work If no configuration is given.
