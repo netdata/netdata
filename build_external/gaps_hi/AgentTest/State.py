@@ -29,6 +29,8 @@ def compare_data(source, replica, output, max_pre=0, max_post=0):
     common_end  = min(source_end,replica_end)
 
     for t in range(common_start, common_end+1):
+        if not t in source_by_time:
+            continue      # Range won't be dense if update_every>1 or child restarted
         if not t in replica_by_time:
             print(f"{t} is missing from replica!", file=output)
             passed = False
@@ -222,30 +224,33 @@ class State(object):
         return False
 
 
-    # TODO: Check on a larger set of charts, include disk.io
     def check_sync(self, source, target, max_pre=0, max_post=0):
         if self.nodes[source].stream_target != self.nodes[target]:
             print(f"  TEST ERROR cannot check sync as {source} does not stream to {target}")
             return False
-        print(f"  check_sync {source} {target}", file=self.output)
-        source_json = self.nodes[source].get_data("system.cpu")
-        if not source_json:
-            print(f"  FAILED to check sync looking at http://localhost:{self.nodes[source].port}", file=self.output)
-            return
-        target_json = self.nodes[target].get_data("system.cpu",host=source)
-        if not target_json:
-            print(f"  FAILED to check sync looking at http://localhost:{self.nodes[target].port}", file=self.output)
-            return
-        if source_json["labels"] != target_json["labels"]:
-            print(f"  Mismatch in chart labels: source={source_json['labels']} target={target_json['labels']}", file=self.output)
-        source_data = source_json["data"]
-        target_data = target_json["data"]
+        charts = ("system.cpu", "system.load", "system.io", "system.ram", "system.ip", "system.processes")
+        passed = True
+        for ch in charts:
+            print(f"  check_sync {source} {target} {ch}", file=self.output)
+            source_json = self.nodes[source].get_data(ch)
+            if not source_json:
+                print(f"  FAILED to check sync looking at http://localhost:{self.nodes[source].port}", file=self.output)
+                passed = False
+                continue
+            target_json = self.nodes[target].get_data(ch,host=source)
+            if not target_json:
+                print(f"  FAILED to check sync looking at http://localhost:{self.nodes[target].port}", file=self.output)
+                passed = False
+                continue
+            if source_json["labels"] != target_json["labels"]:
+                print(f"  Mismatch in chart labels on {ch}: source={source_json['labels']} target={target_json['labels']}", file=self.output)
+            source_data = source_json["data"]
+            target_data = target_json["data"]
 
-        if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post):
-            print("  PASSED in compare", file=self.output)
-            return True
-        else:
-            print("  FAILED in compare", file=self.output)
-            print(source_data, file=self.output)
-            print(target_data, file=self.output)
-            return False
+            if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post):
+                print(f"  {ch} data matches", file=self.output)
+            else:
+                print(f"  {ch} data does not match", file=self.output)
+                passed = False
+        print(f'  {"PASSED" if passed else "FAILED"} check_sync', file=self.output)
+        return passed

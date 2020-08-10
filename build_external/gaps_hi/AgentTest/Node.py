@@ -1,4 +1,4 @@
-import os.path, requests
+import json, os.path, requests
 
 class Node(object):
     def __init__(self, name, cname, parser):
