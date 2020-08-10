@@ -291,15 +291,17 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     if (entries > 1)
         dt = ((descr->end_time - descr->start_time) / USEC_PER_SEC) / (entries - 1);
     for (int i=0; i < entries; i++, start_time += dt) {
-        snprintf(sql, 256, "insert into metric (dim_uuid, date_created, value) values ('%s', %llu, %d);", dim_str,
+        snprintf(sql, 256, "insert into metric (dim_uuid, date_created, value) values ('%s', %ld, %d);", dim_str,
                  start_time, metric[i]);
         buffer_strcat(wb, sql);
     }
     info("SQL STORE: %s entries %lu from (%llu to %llu)", dim_str, descr->page_length / sizeof(storage_number), descr->start_time / USEC_PER_SEC, descr->end_time / USEC_PER_SEC);
     info("SQL DETAIL: %s", buffer_tostring(wb));
-    info("SQL ADD");
     rc = sqlite3_exec(db, buffer_tostring(wb), 0, 0, &err_msg);
-    info("SQL END");
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
     buffer_free(wb);
     return;
 }
