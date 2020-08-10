@@ -101,10 +101,10 @@ function k8s_get_name() {
 			fi
 			if kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces >/dev/null 2>&1; then
 				#shellcheck disable=SC2086
-				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' | 
-				jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)")' | 
-				grep "$id" | 
-				cut -d' ' -f1 
+				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' |
+				jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)")' |
+				grep "$id" |
+				cut -d' ' -f1
 				)"
 			else
 				warning "kubectl cannot get pod list, check for configuration file in $KUBE_CONFIG, or set this path to env \$KUBE_CONFIG"
@@ -227,6 +227,9 @@ if [ -z "${NAME}" ]; then
 		else
 			error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
 		fi
+	elif [[ ${CGROUP} =~ lxc.payload.* ]]; then
+		# LXC 4.0
+		NAME="$(echo "${CGROUP}" | sed 's/lxc\.payload\.\(.*\)/\1/g')"
 	fi
 
 	[ -z "${NAME}" ] && NAME="${CGROUP}"
