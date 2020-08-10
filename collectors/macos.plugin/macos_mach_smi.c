@@ -109,7 +109,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             error("DISABLED: mem.pgfaults");
         } else {
             if (likely(do_ram)) {
-                st = rrdset_find_localhost("system.ram");
+                st = rrdset_find_active_localhost("system.ram");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "system"
@@ -156,7 +156,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_swapio)) {
-                st = rrdset_find_localhost("system.swapio");
+                st = rrdset_find_active_localhost("system.swapio");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "system"
@@ -187,7 +187,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_pgfaults)) {
-                st = rrdset_find_localhost("mem.pgfaults");
+                st = rrdset_find_active_localhost("mem.pgfaults");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "mem"
