@@ -2,9 +2,82 @@ import json, os, os.path, re, requests, shutil, time, traceback
 from AgentTest.misc import sh
 from AgentTest.Node import Node
 
-def compare_data(source, replica, output, max_pre=0, max_post=0):
+class DSlice(object):
+    def __init__(self, raw_json, skew):
+        data = sorted(raw_json["data"])   # Timestamps ascending
+        self.name = "+".join(raw_json["labels"][1:])
+        self.start = data[0][0] + skew
+        self.skew = skew
+        # Remove sparseness when update_every>1, fill empty slots with None
+        self.points = []
+        self.blank = [None] * (len(data[0])-1)
+        next = self.start
+        for d in data:
+            if d[0] != next:
+                self.points.extend( [self.blank]*(d[0]-next) )
+            self.points.append( d[1:] )
+            next = d[0]+1
+
+    def __str__(self):
+        return f"{self.name}@{self.start}={self.points}"
+
+    def score(self, other):
+        self_end = self.start + len(self.points)
+        other_end = other.start + len(other.points)
+        common_start = max(self.start, other.start)
+        common_end  = min(self_end, self_end)
+
+        self_in_common = self.points[common_start-self.start:common_end-self.start]
+        other_in_common = other.points[common_start-other.start:common_end-other.start]
+
+        count = 0
+        for s,o in zip(self_in_common, other_in_common):
+            if s!=o:
+                count += 1
+
+        return count, abs(other.start-self.start), abs(other_end-self_end)
+
+    def get(self, timestamp):
+        if timestamp < self.start or timestamp >= self.start + len(self.points):
+            return self.blank
+        return self.points[ timestamp - self.start ]
+
+def show_mismatch(source, target):
+    end = max(source.start + len(source.points), target.start + len(target.points))
+    for t in range(source.start, end+1):
+        print(f"  source {source.get(t)} target {target.get(t)}")
+
+
+def cmp_dimension(source, target, max_pre=0, max_post=0):
+    msgs = []
+    source_end = source.start + len(source.points)
+    target_end = target.start + len(target.points)
+
+    common_start = max(source.start, target.start)
+    common_end  = min(source_end,target_end)
+
     passed = True
-    source_times = [ x[0] for x in source ]
+    if abs(target.start-source.start)>max_pre:
+        msgs.append(f"  Mismatch in start times {source.start} -> {target.start} ({abs(target.start-source.start)} > max_pre={max_pre})")
+        passed = False
+    if abs(target_end-source_end)>max_post:
+        msgs.append(f"  Mismatch in end times {source_end} -> {target_end} ({abs(target_end-source_end)} > max_post={max_post})")
+        passed = False
+
+    source_in_common = source.points[common_start-source.start:common_end-source.start]
+    target_in_common = target.points[common_start-target.start:common_end-target.start]
+
+    if source_in_common != target_in_common:
+        passed = False
+        msgs.append(f"  Mismatch in {source.name} between {common_start} and {common_end}")
+        msgs.append(f"  source: {source}")
+        msgs.append(f"  target: {target}")
+    return passed, msgs
+
+
+def compare_data(source, replica, output, max_pre=0, max_post=0, skew=0):
+    passed = True
+    source_times = [ x[0]-skew for x in source ]
     source_start = min(source_times)
     source_end   = max(source_times)
     source_by_time = dict([(d[0],d[1:]) for d in source])
@@ -31,11 +104,11 @@ def compare_data(source, replica, output, max_pre=0, max_post=0):
     for t in range(common_start, common_end+1):
         if not t in source_by_time:
             continue      # Range won't be dense if update_every>1 or child restarted
-        if not t in replica_by_time:
-            print(f"{t} is missing from replica!", file=output)
+        if not (t+skew) in replica_by_time:
+            print(f"{t} is missing from replica (skew={skew})!", file=output)
             passed = False
-        if source_by_time[t] != replica_by_time[t]:
-            print(f"@{t} {source_by_time[t]} != {replica_by_time[t]})", file=output)
+        if source_by_time[t] != replica_by_time[t+skew]:
+            print(f"@{t} skew={skew} {source_by_time[t]} != {replica_by_time[t+skew]}", file=output)
             passed = False
     return passed
 
@@ -228,10 +301,16 @@ class State(object):
         if self.nodes[source].stream_target != self.nodes[target]:
             print(f"  TEST ERROR cannot check sync as {source} does not stream to {target}")
             return False
+        chart_info = self.nodes[source].get_charts()
+        if not chart_info:
+            print(f"  FAILED to retrieve charts from child")
+            return False
         charts = ("system.cpu", "system.load", "system.io", "system.ram", "system.ip", "system.processes")
         passed = True
         for ch in charts:
-            print(f"  check_sync {source} {target} {ch}", file=self.output)
+            update_every = chart_info["charts"][ch]["update_every"]
+            print(f"  check_sync {source} {target} {ch} {update_every}", file=self.output)
+
             source_json = self.nodes[source].get_data(ch)
             if not source_json:
                 print(f"  FAILED to check sync looking at http://localhost:{self.nodes[source].port}", file=self.output)
@@ -244,13 +323,34 @@ class State(object):
                 continue
             if source_json["labels"] != target_json["labels"]:
                 print(f"  Mismatch in chart labels on {ch}: source={source_json['labels']} target={target_json['labels']}", file=self.output)
+
+            source_sl = DSlice(source_json,0)
+            best_match, best_score = None, None
+            for skew in (-update_every, 0, update_every):
+                target_sl = DSlice(target_json,skew)
+                score, pre, post = source_sl.score(target_sl)
+                if best_match is None or score < best_score:
+                    best_match, best_score = target_sl, score
+
+            if best_score == 0:
+                print(f"  Data match {ch} with skew={best_match.skew}")
+            else:
+                print(f"  Data mismatch {ch}, closest with skew={best_match.skew}")
+                show_mismatch(source_sl, best_match)
+
+
             source_data = source_json["data"]
             target_data = target_json["data"]
 
             if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post):
                 print(f"  {ch} data matches", file=self.output)
             else:
-                print(f"  {ch} data does not match", file=self.output)
-                passed = False
+                if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post, skew=1):
+                    print(f"  {ch} data matches (one-second skew)", file=self.output)
+                else:
+                    print(f"  {ch} data does not match", file=self.output)
+                    passed = False
+                    print(f"Source: {source_json}", file=self.output)
+                    print(f"Target: {target_json}", file=self.output)
         print(f'  {"PASSED" if passed else "FAILED"} check_sync', file=self.output)
         return passed

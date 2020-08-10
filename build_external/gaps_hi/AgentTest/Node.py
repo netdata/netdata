@@ -85,3 +85,15 @@ class Node(object):
         except requests.exceptions.ConnectionError:
             print(f"  Fetch failed {url} -> connection refused")
             return None
+
+    def get_charts(self):
+        url = f"http://localhost:{self.port}/api/v1/charts"
+        try:
+            r = requests.get(url)
+            return r.json()
+        except json.decoder.JSONDecodeError:
+            print(f"  Fetch failed {url} -> {r.text}")
+            return None
+        except requests.exceptions.ConnectionError:
+            print(f"  Fetch failed {url} -> connection refused")
+            return None
