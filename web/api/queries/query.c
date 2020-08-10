@@ -1572,9 +1572,6 @@ RRDR *rrd2rrdr(
         struct rrdeng_region_info *region_info_array;
         unsigned regions, max_interval;
 
-//        if (st->dimensions == NULL)
-//            sql_load_chart_dimensions(st, dimensions);
-
         /* This call takes the chart read-lock */
         regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
                                                   &region_info_array, &max_interval);
