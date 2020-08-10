@@ -29,6 +29,7 @@ fi
 # Pull in OpenSSL properly if on macOS
 if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
   export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+  export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib"
 fi
 
 # -----------------------------------------------------------------------------
