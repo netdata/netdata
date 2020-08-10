@@ -77,9 +77,8 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         page_index = *PValue;
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (is_multihost_child || NULL == PValue) {
-        /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
-         * Drop legacy support, normal path */
+    if (NULL == PValue) {
+        /* First time we see the legacy UUID, drop legacy support, normal path */
 
         if (NULL != dim_uuid) {
             replace_instead_of_generate = 1;
@@ -216,6 +215,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
 /*          rrdeng_page_descr_mutex_lock(ctx, descr);
             ret = pg_cache_try_get_unsafe(descr, 0);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
+            fatal_assert(1 == ret);
             fatal_assert(1 == ret);*/
 
             sql_add_metric_page(rd->state->metric_uuid, descr);

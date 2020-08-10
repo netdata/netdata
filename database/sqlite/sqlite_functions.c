@@ -21,8 +21,7 @@ int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
         if (i == 2)
             ((DIMENSION *)dimension_result)->name = strdupz(argv[i]);
     }
-    info(
-        "STEL: [%s] [%s] [%s]", ((DIMENSION *)dimension_result)->dim_str, ((DIMENSION *)dimension_result)->id,
+    info("[%s] [%s] [%s]", ((DIMENSION *)dimension_result)->dim_str, ((DIMENSION *)dimension_result)->id,
         ((DIMENSION *)dimension_result)->name);
     struct dimension **dimension_root = (void *)dim_ptr;
     dimension_result->next = *dimension_root;
@@ -287,9 +286,13 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     uuid_unparse_lower(*dim_uuid, dim_str);
     int entries =  descr->page_length / sizeof(storage_number);
     int *metric = descr->pg_cache_descr->page;
-    for (int i=0, loc=0; i < entries; i++, loc=loc+sizeof(storage_number)) {
+    int dt = 0;
+    time_t start_time = descr->start_time/ USEC_PER_SEC;
+    if (entries > 1)
+        dt = ((descr->end_time - descr->start_time) / USEC_PER_SEC) / (entries - 1);
+    for (int i=0; i < entries; i++, start_time += dt) {
         snprintf(sql, 256, "insert into metric (dim_uuid, date_created, value) values ('%s', %llu, %d);", dim_str,
-            descr->start_time, metric[i]);
+                 start_time, metric[i]);
         buffer_strcat(wb, sql);
     }
     info("SQL STORE: %s entries %lu from (%llu to %llu)", dim_str, descr->page_length / sizeof(storage_number), descr->start_time / USEC_PER_SEC, descr->end_time / USEC_PER_SEC);
