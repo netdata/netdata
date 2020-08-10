@@ -45,7 +45,10 @@ class DSlice(object):
 def show_mismatch(source, target):
     end = max(source.start + len(source.points), target.start + len(target.points))
     for t in range(source.start, end+1):
-        print(f"  source {source.get(t)} target {target.get(t)}")
+        source_sample = source.get(t)
+        target_sample = target.get(t)
+        if source_sample != target_sample:
+            print(f"  {source.name}@{t} source {source_sample} target {target_sample}")
 
 
 def cmp_dimension(source, target, max_pre=0, max_post=0):
@@ -326,7 +329,7 @@ class State(object):
 
             source_sl = DSlice(source_json,0)
             best_match, best_score = None, None
-            for skew in (-update_every, 0, update_every):
+            for skew in (-2*update_every, -update_every, 0, update_every, 2*update_every):
                 target_sl = DSlice(target_json,skew)
                 score, pre, post = source_sl.score(target_sl)
                 if best_match is None or score < best_score:
@@ -337,20 +340,21 @@ class State(object):
             else:
                 print(f"  Data mismatch {ch}, closest with skew={best_match.skew}")
                 show_mismatch(source_sl, best_match)
+                passed = False
 
 
-            source_data = source_json["data"]
-            target_data = target_json["data"]
+            #source_data = source_json["data"]
+            #target_data = target_json["data"]
 
-            if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post):
-                print(f"  {ch} data matches", file=self.output)
-            else:
-                if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post, skew=1):
-                    print(f"  {ch} data matches (one-second skew)", file=self.output)
-                else:
-                    print(f"  {ch} data does not match", file=self.output)
-                    passed = False
-                    print(f"Source: {source_json}", file=self.output)
-                    print(f"Target: {target_json}", file=self.output)
+            #if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post):
+            #    print(f"  {ch} data matches", file=self.output)
+            #else:
+            #    if compare_data(source_data, target_data, self.output, max_pre=max_pre, max_post=max_post, skew=1):
+            #        print(f"  {ch} data matches (one-second skew)", file=self.output)
+            #    else:
+            #        print(f"  {ch} data does not match", file=self.output)
+            #        passed = False
+            #        print(f"Source: {source_json}", file=self.output)
+            #        print(f"Target: {target_json}", file=self.output)
         print(f'  {"PASSED" if passed else "FAILED"} check_sync', file=self.output)
         return passed
