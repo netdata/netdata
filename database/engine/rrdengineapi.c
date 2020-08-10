@@ -218,6 +218,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             rrdeng_page_descr_mutex_unlock(ctx, descr);
             fatal_assert(1 == ret);*/
 
+            sql_add_metric_page(rd->state->metric_uuid, descr);
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
             /* handle->prev_descr = descr;*/
         }
