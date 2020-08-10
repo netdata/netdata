@@ -36,6 +36,7 @@ dist_nodeconfig_DATA = \
 dist_node_DATA = \
     $(NULL)
 
+include bigbluebutton/Makefile.inc
 include fronius/Makefile.inc
 include named/Makefile.inc
 include sma_webbox/Makefile.inc
