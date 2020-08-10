@@ -421,11 +421,11 @@ static void attempt_to_connect(struct sender_state *state)
 void attempt_to_send(struct sender_state *s, char *chunk, size_t outstanding) {
     rrdpush_send_labels(s->host);
 
-    struct circular_buffer *cb = s->host->sender->buffer;
+    struct circular_buffer *cb = s->buffer;
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
     netdata_thread_disable_cancelability();
-    netdata_mutex_lock(&s->host->sender->mutex);
+    netdata_mutex_lock(&s->mutex);
 
     ssize_t ret;
 #ifdef ENABLE_HTTPS
@@ -439,7 +439,7 @@ void attempt_to_send(struct sender_state *s, char *chunk, size_t outstanding) {
     ret = send(s->host->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #endif
     if (likely(ret > 0)) {
-        cbuffer_remove_unsafe(s->host->sender->buffer, ret);
+        cbuffer_remove_unsafe(s->buffer, ret);
         s->sent_bytes_on_this_connection += ret;
         s->sent_bytes += ret;
         debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", s->host->hostname, s->connected_to, ret);
@@ -457,7 +457,7 @@ void attempt_to_send(struct sender_state *s, char *chunk, size_t outstanding) {
         debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
     }
 
-    netdata_mutex_unlock(&s->host->sender->mutex);
+    netdata_mutex_unlock(&s->mutex);
     netdata_thread_enable_cancelability();
 }
 
