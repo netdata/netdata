@@ -209,8 +209,6 @@
 - Change backends to exporting engine in general documentation pages [\#9045](https://github.com/netdata/netdata/pull/9045) ([vlvkobal](https://github.com/vlvkobal))
 - Missing checks exporting [\#9034](https://github.com/netdata/netdata/pull/9034) ([thiagoftsm](https://github.com/thiagoftsm))
 - Move nc backend [\#9030](https://github.com/netdata/netdata/pull/9030) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fixes enable/start of netdata service in debian package [\#9005](https://github.com/netdata/netdata/pull/9005) ([MrFreezeex](https://github.com/MrFreezeex))
-- Update step-10.md [\#9000](https://github.com/netdata/netdata/pull/9000) ([Jelmerrevers](https://github.com/Jelmerrevers))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
