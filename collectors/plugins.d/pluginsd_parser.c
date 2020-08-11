@@ -517,6 +517,11 @@ PARSER_RC pluginsd_disable(char **words, void *user, PLUGINSD_ACTION  *plugins_a
 PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     char *store;
+
+    if (!words[1] || !words[2] || !words[3]) {
+        error("Ignoring malformed or empty LABEL command.");
+        return PARSER_RC_OK;
+    }
     if (!words[4])
         store = words[3];
     else {
