@@ -244,7 +244,10 @@ while [ -n "${1}" ]; do
     "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi" ;;
     "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi" ;;
     "--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https" ;;
-    "--disable-dbengine") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-dbengine/} --disable-dbengine" ;;
+    "--disable-dbengine")
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-dbengine/} --disable-dbengine"
+      NETDATA_DISABLE_DBENGINE=1
+      ;;
     "--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct" ;;
     "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct" ;;
     "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat" ;;
@@ -280,6 +283,9 @@ while [ -n "${1}" ]; do
       ;;
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1
+      ;;
+    "--build-judy")
+      NETDATA_BUILD_JUDY=1
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
@@ -625,6 +631,74 @@ bundle_libwebsockets() {
 }
 
 bundle_libwebsockets
+
+# -----------------------------------------------------------------------------
+
+build_judy() {
+  local env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+  fi
+
+  pushd "${1}" > /dev/null || exit 1
+  run ${env_cmd} autoreconf -ivf
+  run ${env_cmd} ./configure
+  run ${env_cmd} make -C src
+  popd > /dev/null || exit 1
+}
+
+copy_judy() {
+  target_dir="${PWD}/externaldeps/libjudy"
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/src/libJudy.a" "${target_dir}/libJudy.a" || return 1
+  run cp "${1}/src/Judy.h" "${target_dir}/Judy.h" || return 1
+}
+
+bundle_judy() {
+  # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
+  if [ -n "${NETDATA_DISABLE_DBENGINE}" ] && [ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ] ; then
+    return 0
+  fi
+
+  progress "Prepare libJudy"
+
+  JUDY_PACKAGE_VERSION="$(cat packaging/judy.version)"
+
+  tmp="$(mktemp -d -t netdata-judy-XXXXXX)"
+  JUDY_PACKAGE_BASENAME="v${JUDY_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "judy" \
+    "https://github.com/netdata/libjudy/archive/${JUDY_PACKAGE_BASENAME}" \
+    "${JUDY_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_JUDY}"; then
+    if run tar -xf "${tmp}/${JUDY_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
+      copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "libJudy built and prepared."
+    else
+      run_failed "Failed to build libJudy."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build libJudy. dbengine support will be disabled."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libJudy."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libJudy. dbengine support will be disabled."
+    fi
+  fi
+}
+
+bundle_judy
 
 # -----------------------------------------------------------------------------
 
