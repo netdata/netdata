@@ -13,10 +13,10 @@ class DSlice(object):
         self.blank = [None] * (len(data[0])-1)
         next = self.start
         for d in data:
-            if d[0] != next:
-                self.points.extend( [self.blank]*(d[0]-next) )
+            if d[0]+skew != next:
+                self.points.extend( [self.blank]*(d[0]+skew-next) )
             self.points.append( d[1:] )
-            next = d[0]+1
+            next = d[0]+skew+1
 
     def __str__(self):
         return f"{self.name}@{self.start}={self.points}"
@@ -25,7 +25,7 @@ class DSlice(object):
         self_end = self.start + len(self.points)
         other_end = other.start + len(other.points)
         common_start = max(self.start, other.start)
-        common_end  = min(self_end, self_end)
+        common_end  = min(self_end, other_end)
 
         self_in_common = self.points[common_start-self.start:common_end-self.start]
         other_in_common = other.points[common_start-other.start:common_end-other.start]
@@ -44,6 +44,7 @@ class DSlice(object):
 
 def show_mismatch(source, target):
     end = max(source.start + len(source.points), target.start + len(target.points))
+    print(f"  source {source.start}-{source.start+len(source.points)} target {target.start}-{target.start + len(target.points)}")
     for t in range(source.start, end+1):
         source_sample = source.get(t)
         target_sample = target.get(t)
@@ -332,6 +333,8 @@ class State(object):
             for skew in (-2*update_every, -update_every, 0, update_every, 2*update_every):
                 target_sl = DSlice(target_json,skew)
                 score, pre, post = source_sl.score(target_sl)
+                #print(f"  skew={skew} score={score} pre={pre} post={post}")
+                #show_mismatch(source_sl, target_sl)
                 if best_match is None or score < best_score:
                     best_match, best_score = target_sl, score
 
