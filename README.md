@@ -215,6 +215,10 @@ metrics, but also troubleshoot complex performance problems.
 
 ## News
 
+`August 10, 2020`- **[Netdata v1.24.0 released!](https://github.com/netdata/netdata/releases/tag/v1.24.0)**
+
+The v1.24.0 release of the Netdata Agent brings enhancements to the breadth of metrics we collect with a new Prometheus/OpenMetrics collector and enhanced storage and querying with a new multi-host database mode.
+
 `July 16, 2020` - **[Netdata v1.23.2 released!](https://github.com/netdata/netdata/releases/tag/v1.23.2)**
 
 Release v1.23.2 of the Netdata Agent is a patch for one significant issue.
