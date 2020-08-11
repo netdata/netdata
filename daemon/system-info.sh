@@ -30,6 +30,9 @@ if [ -z "${VIRTUALIZATION}" ]; then
                     VIRTUALIZATION="none"
             fi
     fi
+    if [ -z "${VIRTUALIZATION}" ]; then
+      VIRTUALIZATION="unknown"
+    fi
 else
     # Passed from outside - probably in docker run
     VIRT_DETECTION="provided"
