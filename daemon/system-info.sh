@@ -31,6 +31,7 @@ if [ -z "${VIRTUALIZATION}" ]; then
             fi
     fi
     if [ -z "${VIRTUALIZATION}" ]; then
+      # Output from the command is outside of spec
       VIRTUALIZATION="unknown"
     fi
 else
