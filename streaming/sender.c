@@ -418,15 +418,17 @@ static void attempt_to_connect(struct sender_state *state)
 }
 
 // TCP window is open and we have data to transmit.
-void attempt_to_send(struct sender_state *s, char *chunk, size_t outstanding) {
+void attempt_to_send(struct sender_state *s) {
+
     rrdpush_send_labels(s->host);
 
     struct circular_buffer *cb = s->buffer;
-    debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
     netdata_thread_disable_cancelability();
     netdata_mutex_lock(&s->mutex);
-
+    char *chunk;
+    size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
+    debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
     ssize_t ret;
 #ifdef ENABLE_HTTPS
     SSL *conn = s->host->ssl.conn ;
@@ -635,8 +637,11 @@ void *rrdpush_sender_thread(void *ptr) {
         fds[Socket].revents = 0;
         fds[Socket].fd = s->host->rrdpush_sender_socket;
 
+        netdata_mutex_lock(&s->mutex);
         char *chunk;
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, &chunk);
+        chunk = NULL;   // Do not cache pointer outside of region - could be invalidated
+        netdata_mutex_unlock(&s->mutex);
         if(outstanding) {
             s->send_attempts++;
             fds[Socket].events = POLLIN | POLLOUT;
@@ -679,7 +684,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
         if (outstanding && fds[Socket].revents & POLLOUT)
-            attempt_to_send(s, chunk, outstanding);
+            attempt_to_send(s);
 
         // TODO-GAPS - why do we only check this on the socket, not the pipe?
         if (outstanding) {
