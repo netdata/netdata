@@ -19,7 +19,7 @@ static inline void calc_link_to_rrddim(RRDDIM *rd)
             } else if (hostlocked != EBUSY) {
                 error("Cannot lock host to create an alarm for the dimension.");
             }
-            usleep(200000);
+            sleep_usec(USEC_PER_MS * 200);
         }
 
         if (count == 5) {
