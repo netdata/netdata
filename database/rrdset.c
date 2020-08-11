@@ -679,6 +679,11 @@ RRDSET *rrdset_create_custom(
             rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
             rrdsetcalc_link_matching(st);
             rrdcalctemplate_link_matching(st);
+
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                rrdcalc_link_to_rrddim(rd, st, host);
+            }
         }
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
