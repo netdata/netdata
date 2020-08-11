@@ -733,7 +733,8 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
+                    hash_authorization = 0, hash_host = 0, hash_forwarded_proto = 0, hash_forwarded_host = 0;
 #ifdef NETDATA_WITH_ZLIB
     static uint32_t hash_accept_encoding = 0;
 #endif
@@ -748,6 +749,8 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
         hash_host = simple_uhash("Host");
+        hash_forwarded_proto = simple_uhash("X-Forwarded-Proto");
+        hash_forwarded_host = simple_uhash("X-Forwarded-Host");
     }
 
     char *e = s;
@@ -809,6 +812,13 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         }
     }
 #endif /* NETDATA_WITH_ZLIB */
+    else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
+        if(strcasestr(v, "https"))
+            w->ssl.flags |= NETDATA_SSL_PROXY_HTTPS;
+    }
+    else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")){
+        strncpyz(w->forwarded_host, v, ((size_t)(ve - v) < sizeof(w->server_host)-1 ? (size_t)(ve - v) : sizeof(w->server_host)-1));
+    }
 
     *e = ':';
     *ve = '\r';
@@ -1345,7 +1355,10 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
         if(!url) { //no delim found
             debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
-            buffer_sprintf(w->response.header, "Location: http://%s%s/\r\n", w->server_host, w->last_url);
+            char *protocol, *url_host;
+            protocol = ((w->ssl.conn && !w->ssl.flags) || w->ssl.flags & NETDATA_SSL_PROXY_HTTPS) ? "https" : "http";
+            url_host = (!w->forwarded_host[0])?w->server_host:w->forwarded_host;
+            buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, w->last_url);
             buffer_strcat(w->response.data, "Permanent redirect");
             return HTTP_RESP_REDIR_PERM;
         }

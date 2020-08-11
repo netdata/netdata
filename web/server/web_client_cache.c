@@ -188,7 +188,7 @@ struct web_client *web_client_get_from_cache_or_allocate() {
 #ifdef ENABLE_HTTPS
         w->ssl.conn = ssl;
         w->ssl.flags = NETDATA_SSL_START;
-        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %d)",w->ssl.flags);
+        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
 #endif
     }
     else {
@@ -196,7 +196,7 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         w = web_client_alloc();
 #ifdef ENABLE_HTTPS
         w->ssl.flags = NETDATA_SSL_START;
-        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %d)",w->ssl.flags);
+        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %u)", w->ssl.flags);
 #endif
         web_clients_cache.allocated++;
     }

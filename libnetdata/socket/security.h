@@ -10,6 +10,7 @@
 # define NETDATA_SSL_FORCE 32                //We only accepts HTTPS request
 # define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
 # define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
+# define NETDATA_SSL_PROXY_HTTPS 256        //Proxy is using HTTPS
 
 #define NETDATA_SSL_CONTEXT_SERVER 0
 #define NETDATA_SSL_CONTEXT_STREAMING 1
@@ -30,7 +31,7 @@
 
 struct netdata_ssl{
     SSL *conn; //SSL connection
-    int flags; //The flags for SSL connection
+    uint32_t flags; //The flags for SSL connection
 };
 
 extern SSL_CTX *netdata_opentsdb_ctx;
