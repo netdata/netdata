@@ -53,6 +53,7 @@ CapabilityBoundingSet=CAP_SYS_ADMIN       # is required for perf plugin
 CapabilityBoundingSet=CAP_SYS_PTRACE      # is required for apps plugin
 CapabilityBoundingSet=CAP_SYS_RESOURCE    # is required for ebpf plugin
 CapabilityBoundingSet=CAP_NET_RAW         # is required for fping app
+CapabilityBoundingSet=CAP_SYS_CHROOT      # is required for cgroups plugin
 
 # Sandboxing
 ProtectSystem=full
