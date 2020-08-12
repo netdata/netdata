@@ -487,7 +487,6 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 #endif
         }
     }
-//    freez(rd->state);
 
     if(rd == st->dimensions)
         st->dimensions = rd->next;
