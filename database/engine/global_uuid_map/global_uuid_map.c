@@ -13,15 +13,11 @@ MAP_STORE   *guid_map_store = NULL;
 void add_to_guid_store(uuid_t *uuid)
 {
     MAP_STORE *tmp_guid_map_store;
-    //return;
 
     if (!guid_map_store)
         guid_map_store = callocz(1, sizeof(*guid_map_store));
 
     uuid_copy(guid_map_store->list[guid_map_store->index++], *uuid);
-    char uuid_str[37];
-    uuid_unparse_lower(guid_map_store->list[guid_map_store->index-1], uuid_str);
-    //info("Adding UUID %d = %s", guid_map_store->index-1, uuid_str);
     if (guid_map_store->index == MAP_STORE_SIZE) {
         tmp_guid_map_store = callocz(1, sizeof(*guid_map_store));
         tmp_guid_map_store->next = guid_map_store;
