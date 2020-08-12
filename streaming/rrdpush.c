@@ -682,6 +682,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     w->ssl.conn = NULL;
     w->ssl.flags = NETDATA_SSL_START;
 #endif
+    rpt->max_gap           = 60;
+    rpt->gap_history       = 60;
+
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');

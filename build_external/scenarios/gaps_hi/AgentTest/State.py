@@ -336,9 +336,17 @@ class State(object):
                 print(f"  FAILED to check sync looking at http://localhost:{self.nodes[source].port}", file=self.output)
                 passed = False
                 continue
+            if len(source_json["data"])==0:
+                print(f"  FAILED to retrieve {ch} from {source} - response has zero rows", file=self.output)
+                passed = False
+                continue
             target_json = self.nodes[target].get_data(ch,host=source)
             if not target_json:
                 print(f"  FAILED to check sync looking at http://localhost:{self.nodes[target].port}", file=self.output)
+                passed = False
+                continue
+            if len(target_json["data"])==0:
+                print(f"  FAILED to retrieve {ch} from {target} - response has zero rows", file=self.output)
                 passed = False
                 continue
             if source_json["labels"] != target_json["labels"]:

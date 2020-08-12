@@ -89,47 +89,6 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
 }
 */
 
-// LEFTOVER FROM FIRST APPROACH - REMOVING ALL OF THIS
-PARSER_RC streaming_timestamp(char **words, void *user_v, PLUGINSD_ACTION *plugins_action)
-{
-    PARSER_USER_OBJECT *user = user_v;
-    UNUSED(plugins_action);
-    char *remote_time_txt = words[1];
-    time_t remote_time = 0;
-    RRDHOST *host = user->host;
-    struct plugind *cd = user->cd;
-    struct receiver_state *rpt = user->opaque;
-    if (cd->version < VERSION_GAP_FILLING ) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", host->hostname, cd->cmd,
-               cd->version);
-        return PARSER_RC_OK;    // Ignore error and continue stream
-    }
-    if (remote_time_txt && *remote_time_txt) {
-        remote_time = str2ull(remote_time_txt);
-        //time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
-        time_t gap = 0;
-        rpt->gap_start = 0;
-        rpt->gap_end = 0;
-        /*
-        if (prev == 0)
-            info("STREAM %s from %s: Initial connection (no gap to check), remote=%ld local=%ld slew=%ld",
-                 host->hostname, cd->cmd, remote_time, now, now-remote_time);
-        else {
-            gap = now - prev;
-            if (gap < 0) {
-                info("STREAM %s from %s: Clock error! last_entry %ld -> %ld secs in future. Cannot detect gaps",
-                     host->hostname, cd->cmd, prev, now - prev);
-                return PARSER_RC_OK;
-            }
-            info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
-                 host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
-        }
-        */
-        return PARSER_RC_OK;
-    }
-    return PARSER_RC_ERROR;
-}
-
 // TODO-GAPS: we can't drop the message here, with the chart in replication mode it will kill the
 //            link. Probably ened to put a proper poll() / buffer in the parser main loop....
 void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) {
@@ -210,7 +169,7 @@ PARSER_RC streaming_end_action(void *user_v, RRDSET *st) {
 
 PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
     PARSER_USER_OBJECT *user = user_v;
-    struct receiver_state *rpt = user->opaque;
+    //struct receiver_state *rpt = user->opaque;
     UNUSED(plugins_action);
     char *id = words[1];
     char *start_txt = words[2];
@@ -280,7 +239,7 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     rd->last_stored_value = strtod(last_stored_str, NULL);
     rd->calculated_value = strtod(last_stored_str, NULL);
     rd->last_calculated_value = strtod(last_stored_str, NULL);
-    debug(D_REPLICATION, "Replication of %s.%s: last_col_val=%ld col_val=%ld col_val_max=%ld last_store=" CALCULATED_NUMBER_FORMAT " calc_val=" CALCULATED_NUMBER_FORMAT " last_calc_val=" CALCULATED_NUMBER_FORMAT,
+    debug(D_REPLICATION, "Replication of %s.%s: last_col_val=" COLLECTED_NUMBER_FORMAT " col_val=" COLLECTED_NUMBER_FORMAT " col_val_max=" COLLECTED_NUMBER_FORMAT " last_store=" CALCULATED_NUMBER_FORMAT " calc_val=" CALCULATED_NUMBER_FORMAT " last_calc_val=" CALCULATED_NUMBER_FORMAT,
           user->st->id, id, rd->last_collected_value, rd->collected_value, rd->collected_value_max,
           rd->last_stored_value, rd->calculated_value, rd->last_calculated_value);
     return PARSER_RC_OK;
@@ -299,10 +258,10 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     if (!num_points_txt)
         goto disable;
     size_t num_points = str2ull(num_points_txt);
-    struct receiver_state *rpt = user->opaque;
+    //struct receiver_state *rpt = user->opaque;
 
     debug(D_REPLICATION, "Replication finished on %s: %zu points transferred last_col_time->%ld last_up_time->%ld",
-          user->st->name, user->st->last_collected_time.tv_sec, user->st->last_updated.tv_sec);
+          user->st->name, num_points, user->st->last_collected_time.tv_sec, user->st->last_updated.tv_sec);
 
     user->st->last_collected_time.tv_sec += num_points * user->st->update_every;
     //user->st->last_collected_time.tv_usec = 0;          // Spikes?
@@ -352,7 +311,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     size_t idx = str2ul(idx_txt);
 
     RRDDIM *rd = rrddim_find(user->st, id);
-    time_t st_last = rrdset_last_entry_t(user->st);
+    //time_t st_last = rrdset_last_entry_t(user->st);  UNUSED?
     if (rd == NULL) {
         errno = 0;
         error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
@@ -438,7 +397,6 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
         user->usec_semantics = PLUGINSD_USEC_TRUST;
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
-    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "REPBEGIN", streaming_rep_begin);
     parser_add_keyword(parser, "REPDIM", streaming_rep_dim);
     parser_add_keyword(parser, "REPEND", streaming_rep_end);
@@ -522,6 +480,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+
+    rpt->gap_history = appconfig_get_number(&stream_config, rpt->key, "history gap replication", rpt->gap_history);
+    rpt->gap_history = appconfig_get_number(&stream_config, rpt->machine_guid, "history gap replication", rpt->gap_history);
+
+    rpt->max_gap = appconfig_get_number(&stream_config, rpt->key, "max gap replication", rpt->max_gap);
+    rpt->max_gap = appconfig_get_number(&stream_config, rpt->machine_guid, "max gap replication", rpt->max_gap);
 
     rpt->tags = (char*)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
     if(rpt->tags && !*rpt->tags) rpt->tags = NULL;
