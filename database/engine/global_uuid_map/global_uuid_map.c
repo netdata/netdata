@@ -244,10 +244,12 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type, int
         uv_rwlock_wrunlock(&global_lock);
         return rc;
     }
-    //uv_rwlock_wrunlock(&global_lock);
+    else {
 #ifdef NETDATA_INTERNAL_CHECKS
-    dump_object(uuid, target_object);
+        dump_object(uuid, target_object);
 #endif
+        freez(target_object);
+    }
     return 0;
 }
 
