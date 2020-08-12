@@ -267,9 +267,11 @@ void cancel_main_threads() {
     else
         info("All threads finished.");
 
+#ifdef ENABLE_DBENGINE
     info("Cleanup global GUID map");
     destroy_store_map();
     info("Cleanup global GUID map done");
+#endif
 }
 
 struct option_def option_definitions[] = {

@@ -527,7 +527,9 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
+#ifdef ENABLE_DBENGINE
             freez(rd->state->metric_uuid);
+#endif
             freez(rd->state);
             freez(rd);
             break;
