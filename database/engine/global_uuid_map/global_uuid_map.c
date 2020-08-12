@@ -153,34 +153,6 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
 }
 
 
-inline int guid_store(uuid_t *uuid, char *object, GUID_TYPE object_type)
-{
-    uv_rwlock_wrlock(&global_lock);
-    int rc = guid_store_nolock(uuid, object, object_type);
-    uv_rwlock_wrunlock(&global_lock);
-    return rc;
-}
-
-/*
- * This can be used to bulk load entries into the global map
- *
- * A lock must be aquired since it will call guid_store_nolock
- * with a "no lock" parameter.
- *
- * Note: object memory must be allocated by caller and not released
- */
-int guid_bulk_load(char *uuid, char *object)
-{
-    uuid_t target_uuid;
-    if (likely(!uuid_parse(uuid, target_uuid))) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        debug(D_GUIDLOG,"Mapping GUID [%s] on [%s]", uuid, object);
-#endif
-        return guid_store_nolock(&target_uuid, object, GUID_TYPE_CHAR);
-    }
-    return 1;
-}
-
 /*
  * Given a GUID, find if an object is stored
  *   - Optionally return the object
@@ -317,12 +289,6 @@ void init_global_guid_map()
     fatal_assert(0 == uv_rwlock_init(&guid_lock));
     fatal_assert(0 == uv_rwlock_init(&object_lock));
     fatal_assert(0 == uv_rwlock_init(&global_lock));
-
-//    int rc = guid_bulk_load("6fc56a64-05d7-47a7-bc82-7f3235d8cbda","d6b37186-74db-11ea-88b2-0bf5095b1f9e/cgroup_qemu_ubuntu18.04.cpu_per_core/cpu3");
-//    rc = guid_bulk_load("75c6fa02-97cc-40c1-aacd-a0132190472e","d6b37186-74db-11ea-88b2-0bf5095b1f9e/services.throttle_io_ops_write/system.slice_setvtrgb.service");
-//    if (rc == 0)
-//        info("BULK GUID load successful");
-
     return;
 }
 

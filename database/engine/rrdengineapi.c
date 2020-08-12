@@ -983,9 +983,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
         freez(ctx);
     }
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
-    info("Cleanup global GUID map");
-    destroy_store_map();
-    info("Cleanup global GUID map done");
     return 0;
 }
 

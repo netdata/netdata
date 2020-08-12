@@ -266,6 +266,10 @@ void cancel_main_threads() {
     }
     else
         info("All threads finished.");
+
+    info("Cleanup global GUID map");
+    destroy_store_map();
+    info("Cleanup global GUID map done");
 }
 
 struct option_def option_definitions[] = {
