@@ -110,9 +110,19 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
         error("Failed to send replication request for %s!", st_id);
 }
 
+/* Streaming has its own parsing of the BEGIN to allow detection of gaps in the data and trigger replication
+   of the missing data from the child node. There are two relevant configuration options in stream.conf that
+   can be set at the API_KEY or MGUID level:
+       max gap replication -> limits the replication to the last n seconds
+       history gap replication -> limits the replication on initial connection to the last n seconds
+   For data at expected times drop into the pluginsd parser to process.
+*/
 PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, usec_t remote_clock) {
     PARSER_USER_OBJECT *user = user_v;
+    struct receiver_state *rpt = user->opaque;
+    time_t remote_t = (time_t)remote_clock;
     netdata_mutex_lock(&st->shared_flags_lock);
+    time_t now = now_realtime_sec();
     // TODO: we should supress this on the other side and use this as an indicator that the two sides are out of
     //       sync so that we can trigger recovery.
     if (st->sflag_replicating_down) {
@@ -120,33 +130,43 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
         netdata_mutex_unlock(&st->shared_flags_lock);
         return PARSER_RC_OK;
     }
-    if (st->last_updated.tv_sec == 0) {
+    if (st->last_updated.tv_sec == 0 && rpt->gap_history==0) {
         netdata_mutex_unlock(&st->shared_flags_lock);
-        debug(D_REPLICATION, "First data value for %s , remote=%llu offset=%llu last_collected=%ld", user->st->name, remote_clock, microseconds, (long)st->last_collected_time.tv_sec);
+        debug(D_REPLICATION, "First data value for %s, no historical gaps. remote=%llu offset=%llu last_collected=%ld",
+                             user->st->name, remote_clock, microseconds, (long)st->last_collected_time.tv_sec);
         return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
     }
-    time_t now = now_realtime_sec();
+    if (st->last_updated.tv_sec == 0) {
+        st->sflag_replicating_down = 1;
+        netdata_mutex_unlock(&st->shared_flags_lock);
+        send_replication_req(user->host, st->id, now - rpt->gap_history, now);
+        return PARSER_RC_OK;
+    }
     time_t expected_t = st->last_updated.tv_sec + st->update_every;
-    time_t remote_t = (time_t)remote_clock;
-    debug(D_REPLICATION, "BEGIN on %s, last_updated=%ld remote=%llu offset=%llu", st->name, (long)st->last_updated.tv_sec,
-          remote_clock, microseconds);
-    // There are two cases to drop into replication mode:
+    debug(D_REPLICATION, "BEGIN on %s, last_updated=%ld remote=%llu offset=%llu", st->name,
+                         (long)st->last_updated.tv_sec, remote_clock, microseconds);
+    // There are two cases to drop into replication mode during an ongoing stream:
     //   - the data is old, this is probably a stale buffer that arrived as part of a reconnection
     //   - the data contains a gap, either the connection dropped or this node restarted
-    // TODO: switch the initial replication back on later in testing...
     if ( (remote_t - expected_t > st->update_every * 2) || (now - remote_t > st->update_every*2))
     {
         debug(D_REPLICATION, "Gap detected in chart data %s: remote=%ld expected=%ld local=%ld", st->name, remote_t,
-              expected_t, now);
-        st->sflag_replicating_down = 1;
-        netdata_mutex_unlock(&st->shared_flags_lock);
-        send_replication_req(user->host, st->id, expected_t, now);
-        return PARSER_RC_OK;
+                             expected_t, now);
+        time_t gap_length = now - expected_t;
+        if (gap_length > rpt->max_gap) {
+            gap_length = rpt->max_gap;
+            expected_t = now - gap_length;
+        }
+        if (gap_length > 0) {
+            st->sflag_replicating_down = 1;
+            netdata_mutex_unlock(&st->shared_flags_lock);
+            send_replication_req(user->host, st->id, expected_t, now);
+            return PARSER_RC_OK;
+        }
+        // else fall-through to ignoring the gap
     }
-    else {
-        netdata_mutex_unlock(&st->shared_flags_lock);
-        return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
-    }
+    netdata_mutex_unlock(&st->shared_flags_lock);
+    return pluginsd_begin_action(user_v, st, microseconds, remote_clock);
 }
 
 PARSER_RC streaming_set_action(void *user_v, RRDSET *st, RRDDIM *rd, long long int value) {
@@ -169,7 +189,6 @@ PARSER_RC streaming_end_action(void *user_v, RRDSET *st) {
 
 PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
     PARSER_USER_OBJECT *user = user_v;
-    //struct receiver_state *rpt = user->opaque;
     UNUSED(plugins_action);
     char *id = words[1];
     char *start_txt = words[2];
