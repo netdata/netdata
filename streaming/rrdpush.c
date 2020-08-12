@@ -40,6 +40,9 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
+time_t default_rrdpush_gap_block_size;
+uint32_t default_rrdpush_max_gap;
+uint32_t default_rrdpush_gap_history;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -72,6 +75,9 @@ int rrdpush_init() {
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
+    default_rrdpush_gap_block_size = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "gap replication block size", 60);
+    default_rrdpush_max_gap = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "history gap replication", 60);
+    default_rrdpush_gap_history = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "max gap replication", 60);
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
 
 
@@ -333,10 +339,10 @@ void rrdset_done_push(RRDSET *st) {
         if (st->gap_sent == 0) {
             errno = 0;
             error("Invalid replication request - cannot replicate from time 0 on %s", st->name);
+            st->sflag_replicating_up = 0;
         }
         else
             sender_fill_gap_nolock(host->sender, st);
-        st->sflag_replicating_up = 0;
     }
     netdata_mutex_unlock(&st->shared_flags_lock);
     rrdpush_send_chart_metrics_nolock(st, host->sender);
@@ -682,9 +688,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     w->ssl.conn = NULL;
     w->ssl.flags = NETDATA_SSL_START;
 #endif
-    rpt->max_gap           = 60;
-    rpt->gap_history       = 60;
-
+    rpt->max_gap           = default_rrdpush_max_gap;
+    rpt->gap_history       = default_rrdpush_gap_history;
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');

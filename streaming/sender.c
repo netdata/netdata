@@ -390,41 +390,50 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     return 1;
 }
 
+extern time_t default_rrdpush_gap_block_size;
 void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
 {
     UNUSED(s);
     RRDDIM *rd;
     struct rrddim_query_handle handle;
-    time_t start = st->gap_sent, end = st->last_updated.tv_sec;
+    time_t first_t = rrdset_first_entry_t(st);
+    time_t start = MAX((time_t)st->gap_sent,first_t), end = st->last_updated.tv_sec;
+    time_t gap_length = end-start+1;
+    if (gap_length > default_rrdpush_gap_block_size)
+        end = start + gap_length - 1;
     buffer_sprintf(s->build, "REPBEGIN %s %ld %ld\n", st->id, start, end);
     rrddim_foreach_read(rd, st) {
-        if (rd->updated && rd->exposed) {       // TODO - check why updated?
+        if (rd->exposed) {
             time_t sample_t = start;
             time_t ignore;
             size_t index = 0;
             rd->state->query_ops.init(rd, &handle, sample_t, end);
             while (sample_t <= end) {
                 storage_number n = rd->state->query_ops.next_metric(&handle, &ignore);
-                buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index, sample_t, n);
+                buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index,
+                               sample_t, n);
                 // Technically rd->update_every could differ from st->update_every, but it does not.
                 sample_t += rd->update_every;
                 index++;
             }
-            debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t, index);
-        }
-    }
-    rrddim_foreach_read(rd, st) {
-        if (rd->updated && rd->exposed) {
-            buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
-                           COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
-                           CALCULATED_NUMBER_FORMAT "\n",
-                rd->id,
-                rd->last_collected_value,
-                rd->collected_value,
-                rd->collected_value_max,
-                rd->last_stored_value,
-                rd->calculated_value,
-                rd->last_calculated_value);
+            if (sample_t == st->last_updated.tv_sec) {
+                debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t,
+                                     index);
+                buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
+                               COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
+                               CALCULATED_NUMBER_FORMAT "\n",
+                               rd->id,
+                               rd->last_collected_value,
+                               rd->collected_value,
+                               rd->collected_value_max,
+                               rd->last_stored_value,
+                               rd->calculated_value,
+                               rd->last_calculated_value);
+            }
+            else {
+                debug(D_REPLICATION, "%s.%s replicated up to @%ld with %zu samples, another block coming", st->id, 
+                                     rd->id, sample_t, index);
+            }
         }
     }
     if (((end - start) % st->update_every) == 0)
@@ -432,6 +441,8 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
     else
         buffer_sprintf(s->build, "REPEND %ld\n", (end - start) / st->update_every);
     st->gap_sent = end;
+    if ((time_t)st->gap_sent == st->last_updated.tv_sec)
+        st->sflag_replicating_up = 0;
 }
 
 
