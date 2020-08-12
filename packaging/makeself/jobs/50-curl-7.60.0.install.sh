@@ -21,7 +21,9 @@ run ./configure \
   --enable-http \
   --enable-proxy \
   --enable-ipv6 \
-  --enable-cookies
+  --enable-cookies \
+  --with-ca-fallback \
+  --with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-bundle.crt
 
 # Curl autoconf does not honour the curl_LDFLAGS environment variable
 run sed -i -e "s/curl_LDFLAGS =/curl_LDFLAGS = -all-static/" src/Makefile
