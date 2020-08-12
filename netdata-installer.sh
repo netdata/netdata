@@ -642,9 +642,14 @@ build_judy() {
   fi
 
   pushd "${1}" > /dev/null || exit 1
-  run ${env_cmd} autoreconf -ivf
+  run ${env_cmd} libtoolize --force --copy
+  run ${env_cmd} aclocal
+  run ${env_cmd} autoheader
+  run ${env_cmd} automake --add-missing --force --copy --include-deps
+  run ${env_cmd} autoconf
   run ${env_cmd} ./configure
   run ${env_cmd} make -C src
+  run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o
   popd > /dev/null || exit 1
 }
 
