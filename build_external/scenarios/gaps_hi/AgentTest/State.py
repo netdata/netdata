@@ -42,14 +42,14 @@ class DSlice(object):
             return self.blank
         return self.points[ timestamp - self.start ]
 
-def show_mismatch(source, target):
+def show_mismatch(source, target, output):
     end = max(source.start + len(source.points), target.start + len(target.points))
-    print(f"  source {source.start}-{source.start+len(source.points)} target {target.start}-{target.start + len(target.points)}")
+    print(f"  source {source.start}-{source.start+len(source.points)} target {target.start}-{target.start + len(target.points)}", file=output)
     for t in range(source.start, end+1):
         source_sample = source.get(t)
         target_sample = target.get(t)
         if source_sample != target_sample:
-            print(f"  {source.name}@{t} source {source_sample} target {target_sample}")
+            print(f"  {source.name}@{t} source {source_sample} target {target_sample}", file=output)
 
 
 def cmp_dimension(source, target, max_pre=0, max_post=0):
@@ -219,6 +219,18 @@ class State(object):
         self.nodes[node].port = container[0]["NetworkSettings"]["Ports"]["19999/tcp"][0]["HostPort"]
         self.nodes[node].started = True
 
+    def stop_net(self, node):
+        sh(f"docker network disconnect {self.network} {self.nodes[node].container_name}", self.output)
+
+    def start_net(self, node):
+        sh(f"docker network connect --alias {node} {self.network} {self.nodes[node].container_name}", self.output)
+
+    def kill(self, node):
+        sh(f"docker kill -s INT {self.nodes[node].container_name}", self.output)
+
+    def restart(self, node):
+        sh(f"docker start {self.nodes[node].container_name}", self.output)
+
     def wait_up(self, node):
         url = f"http://localhost:{self.nodes[node].port}/api/v1/info"
         print(f"  Waiting for {node} on {url}", file=self.output)
@@ -339,10 +351,10 @@ class State(object):
                     best_match, best_score = target_sl, score
 
             if best_score == 0:
-                print(f"  Data match {ch} with skew={best_match.skew}")
+                print(f"  Data match {ch} with skew={best_match.skew}", file=self.output)
             else:
-                print(f"  Data mismatch {ch}, closest with skew={best_match.skew}")
-                show_mismatch(source_sl, best_match)
+                print(f"  Data mismatch {ch}, closest with skew={best_match.skew}", file=self.output)
+                show_mismatch(source_sl, best_match, self.output)
                 passed = False
 
 
