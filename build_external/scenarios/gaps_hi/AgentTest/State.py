@@ -4,19 +4,23 @@ from AgentTest.Node import Node
 
 class DSlice(object):
     def __init__(self, raw_json, skew):
-        data = sorted(raw_json["data"])   # Timestamps ascending
-        self.name = "+".join(raw_json["labels"][1:])
-        self.start = data[0][0] + skew
-        self.skew = skew
-        # Remove sparseness when update_every>1, fill empty slots with None
-        self.points = []
-        self.blank = [None] * (len(data[0])-1)
-        next = self.start
-        for d in data:
-            if d[0]+skew != next:
-                self.points.extend( [self.blank]*(d[0]+skew-next) )
-            self.points.append( d[1:] )
-            next = d[0]+skew+1
+        try:
+            data = sorted(raw_json["data"])   # Timestamps ascending
+            self.name = "+".join(raw_json["labels"][1:])
+            self.start = data[0][0] + skew
+            self.skew = skew
+            # Remove sparseness when update_every>1, fill empty slots with None
+            self.points = []
+            self.blank = [None] * (len(data[0])-1)
+            next = self.start
+            for d in data:
+                if d[0]+skew != next:
+                    self.points.extend( [self.blank]*(d[0]+skew-next) )
+                self.points.append( d[1:] )
+                next = d[0]+skew+1
+        except:
+            print(f"Invalid json data: {raw_json}")
+            raise Exception("failed")
 
     def __str__(self):
         return f"{self.name}@{self.start}={self.points}"
