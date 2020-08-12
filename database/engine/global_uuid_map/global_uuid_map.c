@@ -240,14 +240,16 @@ int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type, int
         if (!replace_instead_of_generate) /* else take *uuid as user input */
             uuid_generate(*uuid);
         uv_rwlock_wrlock(&global_lock);
-        int rc = guid_store_nolock(uuid, target_object, object_type);
+        rc = guid_store_nolock(uuid, target_object, object_type);
         uv_rwlock_wrunlock(&global_lock);
+        if (rc)
+            freez(target_object);
         return rc;
     }
-    //uv_rwlock_wrunlock(&global_lock);
 #ifdef NETDATA_INTERNAL_CHECKS
     dump_object(uuid, target_object);
 #endif
+    freez(target_object);
     return 0;
 }
 
