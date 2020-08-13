@@ -6,6 +6,36 @@
 sqlite3 *db = NULL;
 sqlite3 *dbmem = NULL;
 
+    static void _uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+    {
+        uuid_t  uuid;
+
+        if ( argc != 1 ){
+            sqlite3_result_null(context);
+            return ;
+        }
+        int rc = uuid_parse(sqlite3_value_text(argv[0]), uuid);
+        if (rc == -1)  {
+            sqlite3_result_null(context);
+            return ;
+        }
+
+        sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+    }
+
+
+    static void _uuid_unparse(sqlite3_context *context, int argc, sqlite3_value **argv)
+    {
+        char  uuid_str[37];
+        if ( argc != 1 || sqlite3_value_blob(argv[0]) == NULL) {
+            sqlite3_result_null(context);
+            return ;
+        }
+        uuid_unparse_lower(sqlite3_value_blob(argv[0]), uuid_str);
+        sqlite3_result_text(context, uuid_str, 36, SQLITE_TRANSIENT);
+    }
+
+
 int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
 {
     UNUSED(azColName);
@@ -49,6 +79,9 @@ int sql_init_database()
         sqlite3_free(err_msg);
         sqlite3_close(db);
     }
+
+    sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
+    sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
 
     return rc;
 }
