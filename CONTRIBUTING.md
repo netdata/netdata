@@ -50,7 +50,7 @@ Netdata is all about simplicity and meaningful presentation. A "sponsor" for a c
 -   Uses the charts and alarms in his/her day to day work and provides additional feedback.
 -   Requests additional improvements as things change (e.g. new versions of an API are available).
 
-#### Sponsor a backend
+#### Sponsor an exporting connector
 
 We already support various [backends](backends), and we intend to support more. A "sponsor" for a backend:
 
