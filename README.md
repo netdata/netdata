@@ -25,7 +25,7 @@ Netdata is **distributed, real-time performance and health monitoring** for syst
 highly-optimized monitoring agent you install on all your systems and containers.
 
 Netdata provides **unparalleled insights**, in **real-time**, of everything happening on the systems it's running on
-(including web servers, databases, applications), using **highly interactive web dashboards**. 
+(including web servers, databases, applications), using **highly interactive web dashboards**.
 
 A highly-efficient database **stores long-term historical metrics for days, weeks, or months**, all at 1-second
 granularity. Run this long-term storage autonomously, or integrate Netdata with your existing monitoring toolchains
@@ -336,7 +336,7 @@ This is what you should expect from Netdata:
 -   **Unlimited metrics** - Netdata collects all the available metrics—the more, the better.
 -   **1% CPU utilization of a single core** - It's unbelievably optimized.
 -   **A few MB of RAM** - The highly-efficient database engine stores per-second metrics in RAM and then "spills"
-    historical metrics to disk long-term storage.   
+    historical metrics to disk long-term storage.
 -   **Minimal disk I/O** - While running, Netdata only writes historical metrics and reads `error` and `access` logs.
 -   **Zero configuration** - Netdata auto-detects everything, and can collect up to 10,000 metrics per server out of the
     box.
@@ -437,7 +437,7 @@ by [**plugins**](/collectors/plugins.d/README.md), which support a variety of pr
 Python.
 
 Popular collectors include **Nginx**, **Apache**, **MySQL**, **statsd**, **cgroups** (containers, Docker, Kubernetes,
-LXC, and more), **Traefik**, **web server `access.log` files**, and much more. 
+LXC, and more), **Traefik**, **web server `access.log` files**, and much more.
 
 See the **full list of [supported collectors](/collectors/COLLECTORS.md)**.
 
@@ -468,6 +468,8 @@ Here is a quick list of notable documents:
 You can also check all the other directories. Most of them have plenty of documentation.
 
 ## Community
+
+We recently launched the [Netdata Community](https://community.netdata.cloud). You can find most of us there! It's also a good place to ask questions, find resources, or learn what features or fixes we are working on next.
 
 We welcome [contributions](/CONTRIBUTING.md). Feel free to join the team!
 
