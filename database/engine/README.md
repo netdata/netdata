@@ -121,7 +121,7 @@ validate the memory requirements for your particular system(s) and configuration
 
 There are explicit disk space requirements **per** DB engine **instance**:
 
--   The total disk space footprint will be an additional `#dimensions-being-collected x 4096 x 2` bytes over what
+-   The total disk space footprint will be the maximum between `#dimensions-being-collected x 4096 x 2` bytes or what
     the user configured with `dbengine multihost disk space` or `dbengine disk space`.
 
 ### File descriptor requirements
