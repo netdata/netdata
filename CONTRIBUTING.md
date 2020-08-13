@@ -54,7 +54,7 @@ Netdata is all about simplicity and meaningful presentation. A "sponsor" for a c
 
 We already support various [backends](backends), and we intend to support more. A "sponsor" for a backend:
 
--   Suggests ways in which the information in Netdata could best be exposed to the particular backend, to facilitate meaningful presentation.
+-   Suggests ways in which the information in Netdata could best be exposed to the particular endpoint, to facilitate meaningful presentation.
 -   When the implementation passes QA, tests the implementation in production.
 -   Uses the backend in his/her day to day work and provides additional feedback, after the backend is delivered.
 -   Requests additional improvements as things change (e.g. new versions of the backend API are available).
