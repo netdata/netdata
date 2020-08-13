@@ -415,3 +415,11 @@ void error_with_guid(uuid_t *uuid, char *reason)
     errno = 0;
     error("%s (GUID = %s)", reason, uuid_str);
 }
+
+void info_with_guid(uuid_t *uuid, char *reason)
+{
+    char  uuid_str[37];
+
+    uuid_unparse_lower(*uuid, uuid_str);
+    info("%s (GUID = %s)", reason, uuid_str);
+}

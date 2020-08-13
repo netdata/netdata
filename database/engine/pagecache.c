@@ -444,6 +444,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
             if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr);
             pg_cache_wait_event_unsafe(descr);
+//metalog_print_dimension_by_uuid(ctx->metalog_ctx, page_index->id);
         }
     }
     if (remove_dirty) {
@@ -455,6 +456,7 @@ uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_d
             if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr);
             pg_cache_wait_event_unsafe(descr);
+//metalog_print_dimension_by_uuid(ctx->metalog_ctx, page_index->id);
         }
     }
     rrdeng_page_descr_mutex_unlock(ctx, descr);
