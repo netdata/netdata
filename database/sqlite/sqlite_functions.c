@@ -6,35 +6,33 @@
 sqlite3 *db = NULL;
 sqlite3 *dbmem = NULL;
 
-    static void _uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
-    {
-        uuid_t  uuid;
+static void _uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    uuid_t uuid;
 
-        if ( argc != 1 ){
-            sqlite3_result_null(context);
-            return ;
-        }
-        int rc = uuid_parse(sqlite3_value_text(argv[0]), uuid);
-        if (rc == -1)  {
-            sqlite3_result_null(context);
-            return ;
-        }
-
-        sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+    if (argc != 1) {
+        sqlite3_result_null(context);
+        return;
+    }
+    int rc = uuid_parse(sqlite3_value_text(argv[0]), uuid);
+    if (rc == -1) {
+        sqlite3_result_null(context);
+        return;
     }
 
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
 
-    static void _uuid_unparse(sqlite3_context *context, int argc, sqlite3_value **argv)
-    {
-        char  uuid_str[37];
-        if ( argc != 1 || sqlite3_value_blob(argv[0]) == NULL) {
-            sqlite3_result_null(context);
-            return ;
-        }
-        uuid_unparse_lower(sqlite3_value_blob(argv[0]), uuid_str);
-        sqlite3_result_text(context, uuid_str, 36, SQLITE_TRANSIENT);
+static void _uuid_unparse(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    char uuid_str[37];
+    if (argc != 1 || sqlite3_value_blob(argv[0]) == NULL) {
+        sqlite3_result_null(context);
+        return;
     }
-
+    uuid_unparse_lower(sqlite3_value_blob(argv[0]), uuid_str);
+    sqlite3_result_text(context, uuid_str, 36, SQLITE_TRANSIENT);
+}
 
 int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
 {
@@ -51,8 +49,8 @@ int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
         if (i == 2)
             ((DIMENSION *)dimension_result)->name = strdupz(argv[i]);
     }
-    info("[%s] [%s] [%s]", ((DIMENSION *)dimension_result)->dim_str, ((DIMENSION *)dimension_result)->id,
-        ((DIMENSION *)dimension_result)->name);
+    //info("[%s] [%s] [%s]", ((DIMENSION *)dimension_result)->dim_str, ((DIMENSION *)dimension_result)->id,
+     //   ((DIMENSION *)dimension_result)->name);
     struct dimension **dimension_root = (void *)dim_ptr;
     dimension_result->next = *dimension_root;
     *dimension_root = dimension_result;
@@ -70,7 +68,7 @@ int sql_init_database()
     int rc = sqlite3_open("/tmp/database", &db);
     info("SQLite Database initialized (rc = %d)", rc);
 
-    char *sql = "PRAGMA synchronous=0 ; CREATE TABLE IF NOT EXISTS dimension(dim_uuid text PRIMARY KEY, chart_uuid text, id text, name text, multiplier int, divisor int , algorithm int, archived int, options text);";
+    char *sql = "PRAGMA synchronous=0 ; CREATE TABLE IF NOT EXISTS dimension(dim_uuid blob PRIMARY KEY, chart_uuid blob, id text, name text, multiplier int, divisor int , algorithm int, archived int, options text);";
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
 
@@ -107,7 +105,7 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
     uuid_unparse_lower(*dim_uuid, dim_str);
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values ('%s','%s','%s','%s', %lld, %lld, %d, 1) ;",
+    sprintf(sql, "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values (u2h('%s'),u2h('%s'),'%s','%s', %lld, %lld, %d, 1) ;",
             dim_str, chart_str, id, name, multiplier, divisor, algorithm);
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
@@ -132,7 +130,7 @@ int sql_dimension_archive(uuid_t *dim_uuid, int archive)
 
     uuid_unparse_lower(*dim_uuid, dim_str);
 
-    sprintf(sql, "update dimension set archived = %d where dim_uuid = '%s';", archive, dim_str);
+    sprintf(sql, "update dimension set archived = %d where dim_uuid = u2h('%s');", archive, dim_str);
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
@@ -158,7 +156,7 @@ int sql_dimension_options(uuid_t *dim_uuid, char *options)
 
     uuid_unparse_lower(*dim_uuid, dim_str);
 
-    sprintf(sql, "update dimension set options = '%s' where dim_uuid = '%s';", options, dim_str);
+    sprintf(sql, "update dimension set options = '%s' where dim_uuid = u2h('%s');", options, dim_str);
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
@@ -186,7 +184,7 @@ int sql_load_dimension(char *dim_str, RRDSET *st)
 
     uuid_parse(dim_str, dim_uuid);
 
-    sprintf(sql, "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = '%s' and archived = 1;", dim_str);
+    sprintf(sql, "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = u2h('%s') and archived = 1;", dim_str);
 
     rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
     if (rc != SQLITE_OK)
@@ -256,7 +254,7 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension **dimension_list)
 
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "select dim_uuid, id, name from dimension where chart_uuid = '%s' and archived = 1;", chart_str);
+    sprintf(sql, "select h2u(dim_uuid), id, name from dimension where chart_uuid = u2h('%s') and archived = 1;", chart_str);
 
     rc = sqlite3_exec(db, sql, dim_callback, dimension_list, &err_msg);
     if (rc != SQLITE_OK) {
