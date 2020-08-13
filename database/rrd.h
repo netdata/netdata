@@ -1021,6 +1021,11 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
+static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
+    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        return rd->state->query_ops.latest_time(rd);
+    return (time_t)rd->rrdset->last_updated.tv_sec;
+}
 // get the timestamp of the last entry in the round robin database
 static inline time_t rrdset_last_entry_t(RRDSET *st) {
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {

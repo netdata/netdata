@@ -195,7 +195,7 @@ void recover_collected_time(RRDSET *st, RRDDIM *rd) {
          || (rd->last_collected_time.tv_sec == st->last_collected_time.tv_sec &&
              rd->last_collected_time.tv_usec > st->last_collected_time.tv_usec)))
     {
-        st->last_collected_time = rd->last_collected_time;
+        st->last_collected_time = rd->last_collected_time;   // TODO: Check this should be a MAX() not a copy??
         info("Updating collected time on %s", st->id);
     }
     time_t stored_t = rd->state->query_ops.latest_time(rd);

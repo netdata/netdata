@@ -139,7 +139,7 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     if (st->last_updated.tv_sec == 0) {
         st->sflag_replicating_down = 1;
         netdata_mutex_unlock(&st->shared_flags_lock);
-        send_replication_req(user->host, st->id, now - rpt->gap_history, now);
+        send_replication_req(user->host, st->id, now - rpt->gap_history + 1, now);
         return PARSER_RC_OK;
     }
     time_t expected_t = st->last_updated.tv_sec + st->update_every;

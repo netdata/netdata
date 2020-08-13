@@ -397,49 +397,68 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
     RRDDIM *rd;
     struct rrddim_query_handle handle;
     time_t first_t = rrdset_first_entry_t(st);
-    time_t start = MAX((time_t)st->gap_sent,first_t), end = st->last_updated.tv_sec;
-    time_t gap_length = end-start+1;
+    time_t st_start = MAX((time_t)st->gap_sent,first_t);
+    time_t end = st->last_updated.tv_sec;
+    // TODO: Why are we not taking the end from the request
+    time_t gap_length = end-st_start+1;
+    // TODO: If we shrink the gap then move the start later not the end earlier!
     if (gap_length > default_rrdpush_gap_block_size)
-        end = start + gap_length - 1;
-    buffer_sprintf(s->build, "REPBEGIN %s %ld %ld\n", st->id, start, end);
+        end = st_start + default_rrdpush_gap_block_size - 1;
+    buffer_sprintf(s->build, "REPBEGIN %s %ld %ld\n", st->id, st_start, end);
     rrddim_foreach_read(rd, st) {
         if (rd->exposed) {
-            time_t sample_t = start;
-            time_t ignore;
-            size_t index = 0;
-            rd->state->query_ops.init(rd, &handle, sample_t, end);
-            while (sample_t <= end) {
-                storage_number n = rd->state->query_ops.next_metric(&handle, &ignore);
-                buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index,
-                               sample_t, n);
-                // Technically rd->update_every could differ from st->update_every, but it does not.
-                sample_t += rd->update_every;
-                index++;
+            time_t rd_start = rrddim_first_entry_t(rd);
+            time_t rd_end   = rrddim_last_entry_t(rd);
+            // If the database is empty then there is nothing in the replication window to send. This can occur
+            // because the chart does not have RRDSET_FLAG_STORE_FIRST set and so it streamed initial values that
+            // it did not store.
+            if (rd_end > 0) {
+                time_t sample_t = MAX(st_start, rd_start);
+                time_t metric_t;
+                size_t index = 0;
+                rd->state->query_ops.init(rd, &handle, sample_t, end);
+                debug(D_REPLICATION, "Fill replication with %s.%s @%ld-%ld rd@%ld-%ld", st->id, rd->id, sample_t, end,
+                                     rd_start, rd_end);
+                while (sample_t <= end && !rd->state->query_ops.is_finished(&handle)) {
+                    storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
+                    if (sample_t != metric_t)
+                        debug(D_REPLICATION, "Sample mismatch during replication %ld vs %ld", sample_t, metric_t);
+                    buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index,
+                                   sample_t, n);
+                    // Technically rd->update_every could differ from st->update_every, but it does not.
+                    sample_t += rd->update_every;
+                    index++;
+                }
+                if (sample_t >= st->last_updated.tv_sec) {
+                    debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t,
+                                         index);
+                    buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
+                                   COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
+                                   CALCULATED_NUMBER_FORMAT "\n",
+                                   rd->id,
+                                   rd->last_collected_value,
+                                   rd->collected_value,
+                                   rd->collected_value_max,
+                                   rd->last_stored_value,
+                                   rd->calculated_value,
+                                   rd->last_calculated_value);
+                }
+                else {
+                    debug(D_REPLICATION, "%s.%s replicated up to @%ld with %zu samples, another block coming", st->id, 
+                                         rd->id, sample_t, index);
+                }
+                rd->state->query_ops.finalize(&handle);
             }
-            if (sample_t == st->last_updated.tv_sec) {
-                debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t,
-                                     index);
-                buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
-                               COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
-                               CALCULATED_NUMBER_FORMAT "\n",
-                               rd->id,
-                               rd->last_collected_value,
-                               rd->collected_value,
-                               rd->collected_value_max,
-                               rd->last_stored_value,
-                               rd->calculated_value,
-                               rd->last_calculated_value);
-            }
-            else {
-                debug(D_REPLICATION, "%s.%s replicated up to @%ld with %zu samples, another block coming", st->id, 
-                                     rd->id, sample_t, index);
-            }
+            else
+                debug(D_REPLICATION, "%s.%s has no data in the database yet (@%ld-%ld), empty replication window",
+                                     st->id, rd->id, (long)st->gap_sent, st->last_updated.tv_sec);
+
         }
     }
-    if (((end - start) % st->update_every) == 0)
-        buffer_sprintf(s->build, "REPEND %ld\n", (end - start) / st->update_every + 1);
+    if (((end - st_start) % st->update_every) == 0)
+        buffer_sprintf(s->build, "REPEND %ld\n", (end - st_start) / st->update_every + 1);
     else
-        buffer_sprintf(s->build, "REPEND %ld\n", (end - start) / st->update_every);
+        buffer_sprintf(s->build, "REPEND %ld\n", (end - st_start) / st->update_every);
     st->gap_sent = end;
     if ((time_t)st->gap_sent == st->last_updated.tv_sec)
         st->sflag_replicating_up = 0;
