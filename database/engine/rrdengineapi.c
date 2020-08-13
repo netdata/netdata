@@ -211,7 +211,11 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             fatal_assert(1 == ret);
 
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
-            handle->prev_descr = descr;
+            /*
+             * Disable pinning for now as it leads to deadlocks. When a collector stops collecting the extra pinned page
+             * eventually gets rotated but it cannot be destroyed due to the extra reference.
+             */
+            /* handle->prev_descr = descr;*/
         }
     } else {
         freez(descr->pg_cache_descr->page);
