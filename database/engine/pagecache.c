@@ -123,6 +123,24 @@ void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr)
 }
 
 /*
+ * The caller must hold page descriptor lock.
+ * The lock will be released and re-acquired. The descriptor is not guaranteed
+ * to exist after this function returns.
+ * Returns UV_ETIMEDOUT if timeout_sec seconds pass.
+ */
+int pg_cache_timedwait_event_unsafe(struct rrdeng_page_descr *descr, uint64_t timeout_sec)
+{
+    int ret;
+    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+
+    ++pg_cache_descr->waiters;
+    ret = uv_cond_timedwait(&pg_cache_descr->cond, &pg_cache_descr->mutex, timeout_sec * NSEC_PER_SEC);
+    --pg_cache_descr->waiters;
+
+    return ret;
+}
+
+/*
  * Returns page flags.
  * The lock will be released and re-acquired. The descriptor is not guaranteed
  * to exist after this function returns.
