@@ -52,7 +52,7 @@ Netdata is all about simplicity and meaningful presentation. A "sponsor" for a c
 
 #### Sponsor an exporting connector
 
-We already support various [backends](backends), and we intend to support more. A "sponsor" for a backend:
+We already support various [exporting connectors](/exporting/README.md), and we intend to support more. A "sponsor" for a connector:
 
 -   Suggests ways in which the information in Netdata could best be exposed to the particular endpoint, to facilitate meaningful presentation.
 -   When the implementation passes QA, tests the implementation in production.
