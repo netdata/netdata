@@ -1158,7 +1158,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     int i;
     uint8_t protocol = values[0].protocol;
     uint64_t ct = values[0].ct;
-    error("KILLME_FIRST %u (%u)", protocol, ntohs(key->sport));
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -1177,7 +1176,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         *removesock += (int)w->removeme;
     }
 
-    error("KILLME_LAST %u (%u)", protocol, ntohs(key->sport));
     values[0].recv_packets += precv;
     values[0].sent_packets += psent;
     values[0].recv_bytes   += brecv;
@@ -1223,7 +1221,6 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
         // values for specific processor unless it is used to store data. As result of this behavior one the next socket
         // can have values from the previous one.
         memset(values, 0, length);
-        error("KILLME_READ %u %u %u %u (%u)", values[0].protocol, values[1].protocol, values[2].protocol, values[3].protocol, ntohs(key.sport));
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
             key = next_key;
