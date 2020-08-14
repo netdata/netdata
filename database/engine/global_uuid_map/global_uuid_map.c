@@ -43,15 +43,11 @@ void free_uuid(uuid_t *uuid)
     char object[49];
 
     ret = find_object_by_guid(uuid, object, sizeof(object));
-    if (GUID_TYPE_DIMENSION == ret) {
+    if (GUID_TYPE_DIMENSION == ret)
         free_single_uuid((uuid_t *)(object + 16 + 16));
-        info("FREE DIM");
-    }
 
-    if (GUID_TYPE_CHART == ret) {
+    if (GUID_TYPE_CHART == ret)
             free_single_uuid((uuid_t *)(object + 16));
-            info("FREE CHART");
-    }
 
     free_single_uuid(uuid);
     return;
