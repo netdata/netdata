@@ -10,12 +10,10 @@ static uv_rwlock_t global_lock;
 
 static void free_single_uuid(uuid_t *uuid)
 {
-    char uuid_str[37];
     Pvoid_t *PValue, *PValue1;
     char *existing_object;
     Word_t  size;
 
-    uuid_unparse_lower(*uuid, uuid_str);
     PValue = JudyHSGet(JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t));
     if (likely(PValue)) {
         existing_object = *PValue;
