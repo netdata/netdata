@@ -762,6 +762,30 @@ static void nfacct_send_metrics() {
 
 #endif // HAVE_LIBNETFILTER_ACCT
 
+static void nfacct_signal_handler(int signo)
+{
+    exit((signo == SIGPIPE)?1:0);
+}
+
+// When Netdata crashes this plugin was becoming zombie,
+// this function was added to remove it when sigpipe and other signals are received.
+void nfacct_signals()
+{
+    int signals[] = { SIGPIPE, SIGINT, SIGTERM, 0};
+    int i;
+    struct sigaction sa;
+    sa.sa_flags = 0;
+    sa.sa_handler = nfacct_signal_handler;
+
+    // ignore all signals while we run in a signal handler
+    sigfillset(&sa.sa_mask);
+
+    for (i = 0; signals[i]; i++) {
+        if(sigaction(signals[i], &sa, NULL) == -1)
+            error("Cannot add the handler to signal %d", signals[i]);
+    }
+}
+
 int main(int argc, char **argv) {
 
     // ------------------------------------------------------------------------
@@ -832,6 +856,8 @@ int main(int argc, char **argv) {
 
         error("nfacct.plugin: ignoring parameter '%s'", argv[i]);
     }
+
+    nfacct_signals();
 
     errno = 0;
 
