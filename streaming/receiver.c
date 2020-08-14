@@ -145,6 +145,12 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
     time_t expected_t = st->last_updated.tv_sec + st->update_every;
     debug(D_REPLICATION, "BEGIN on %s, last_updated=%ld remote=%llu offset=%llu", st->name,
                          (long)st->last_updated.tv_sec, remote_clock, microseconds);
+    if (remote_t < expected_t) {
+        debug(D_REPLICATION, "Stale value received %s @%ld - last replication window covered?", st->id, remote_t);
+        rpt->skip_one_value = 1;    // Drop this update
+        netdata_mutex_unlock(&st->shared_flags_lock);
+        return PARSER_RC_OK;
+    }
     // There are two cases to drop into replication mode during an ongoing stream:
     //   - the data is old, this is probably a stale buffer that arrived as part of a reconnection
     //   - the data contains a gap, either the connection dropped or this node restarted
@@ -170,20 +176,28 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
 }
 
 PARSER_RC streaming_set_action(void *user_v, RRDSET *st, RRDDIM *rd, long long int value) {
+    PARSER_USER_OBJECT *user = user_v;
+    struct receiver_state *rpt = user->opaque;
     netdata_mutex_lock(&st->shared_flags_lock);
     int replicating = st->sflag_replicating_down;
     netdata_mutex_unlock(&st->shared_flags_lock);
-    if (replicating)
+    if (replicating || rpt->skip_one_value)
         return PARSER_RC_OK;
     return pluginsd_set_action(user_v, st, rd, value);
 }
 
 PARSER_RC streaming_end_action(void *user_v, RRDSET *st) {
+    PARSER_USER_OBJECT *user = user_v;
+    struct receiver_state *rpt = user->opaque;
     netdata_mutex_lock(&st->shared_flags_lock);
     int replicating = st->sflag_replicating_down;
     netdata_mutex_unlock(&st->shared_flags_lock);
     if (replicating)
         return PARSER_RC_OK;
+    if (rpt->skip_one_value) {
+        rpt->skip_one_value = 0;
+        return PARSER_RC_OK;
+    }
     return pluginsd_end_action(user_v, st);
 }
 
@@ -214,6 +228,14 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     user->st->gap_start = str2ull(start_txt);
     end_t = str2ull(end_txt);
 
+/*    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+#ifdef ENABLE_DBENGINE
+        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+            rrdeng_store_metric_flush_current_page(rd);
+        }
+#endif
+    }*/
     time_t now = now_realtime_sec();
     debug(D_REPLICATION, "Replication started on %s for interval %zu..%ld against current gap %ld..%ld", st->name, 
           user->st->gap_start, end_t, st->last_updated.tv_sec, now);
@@ -275,13 +297,13 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     UNUSED(plugins_action);
     RRDDIM *rd;
     char *num_points_txt = words[1];
+    char *col_usec_txt   = words[2];
     time_t advance_in_secs;
     long advance_in_points;
     if (!num_points_txt)
         goto disable;
     size_t num_points = str2ull(num_points_txt);
-    //struct receiver_state *rpt = user->opaque;
-
+    size_t coll_usec_offset   = str2ul(col_usec_txt);       // 0-999999
 
     /* If data was transferred in the replication window then we do not know how the number of points relates to the
        length of the window or the distribution amongst the dimension, so update the chart-level timestamps from
@@ -303,6 +325,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
             debug(D_REPLICATION, "Timestamps are mis-aligned during replication!");
 
         user->st->last_collected_time.tv_sec = latest_collect_t;
+        user->st->last_collected_time.tv_usec = coll_usec_offset;
         user->st->last_updated.tv_sec        = latest_collect_t;
 
         debug(D_REPLICATION, "Finished replication on %s: %zu points transferred, advance=(%ld-secs %ld-points)"
@@ -371,6 +394,10 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     {
         rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s (idx %zu)", value, timestamp, id, idx);
+        rd->last_stored_value = value;
+        if (rd->state->handle.rrdeng.descr)
+            debug(D_REPLICATION, "page_descr %llu - %llu with %u", rd->state->handle.rrdeng.descr->start_time,
+                  rd->state->handle.rrdeng.descr->end_time, rd->state->handle.rrdeng.descr->page_length);
     }
     else
         rd->values[(rd->rrdset->current_entry + idx) % rd->entries] = value;

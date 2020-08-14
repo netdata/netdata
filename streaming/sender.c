@@ -423,8 +423,16 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                 while (sample_t <= end && !rd->state->query_ops.is_finished(&handle)) {
                     storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
                     if (sample_t != metric_t)
-                        debug(D_REPLICATION, "Sample mismatch during replication %ld vs %ld", sample_t, metric_t);
+                        debug(D_REPLICATION, "%s.%s Sample mismatch during replication %ld vs %ld", st->id, rd->id,
+                                             sample_t, metric_t);
+                    if (handle.rrdeng.descr)
+                        debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u", st->id, rd->id,
+                                             rd->state->handle.rrdeng.descr->start_time,
+                                             rd->state->handle.rrdeng.descr->end_time,
+                                             rd->state->handle.rrdeng.descr->page_length);
                     buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index,
+                                   sample_t, n);
+                    debug(D_REPLICATION, "%s.%s REPDIM %zu %ld " STORAGE_NUMBER_FORMAT "\n", st->id, rd->id, index,
                                    sample_t, n);
                     // Technically rd->update_every could differ from st->update_every, but it does not.
                     sample_t += rd->update_every;
@@ -432,8 +440,8 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                     num_points++;
                 }
                 if (sample_t >= st->last_updated.tv_sec) {
-                    debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t,
-                                         index);
+                    debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples (index=%zu)", st->id,
+                                         rd->id, sample_t, num_points, index);
                     buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
                                    COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
                                    CALCULATED_NUMBER_FORMAT "\n",
@@ -446,7 +454,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                                    rd->last_calculated_value);
                 }
                 else {
-                    debug(D_REPLICATION, "%s.%s replicated up to @%ld with %zu samples, another block coming", st->id, 
+                    debug(D_REPLICATION, "%s.%s replicated up to @%ld with %zu samples, another block coming", st->id,
                                          rd->id, sample_t, index);
                 }
                 rd->state->query_ops.finalize(&handle);
@@ -457,7 +465,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
 
         }
     }
-    buffer_sprintf(s->build, "REPEND %zu\n", num_points);
+    buffer_sprintf(s->build, "REPEND %zu %ld\n", num_points, st->last_collected_time.tv_usec);
     st->gap_sent = end;
     if ((time_t)st->gap_sent == st->last_updated.tv_sec)
         st->sflag_replicating_up = 0;

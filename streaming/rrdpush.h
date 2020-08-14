@@ -87,7 +87,8 @@ struct receiver_state {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
-    unsigned int shutdown:1;    // Tell the thread to exit
+    unsigned int shutdown:1;            // Tell the thread to exit
+    unsigned int skip_one_value:1;      // Avoid processing values that have already been replicated
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 };
 
