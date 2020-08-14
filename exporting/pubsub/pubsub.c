@@ -103,7 +103,10 @@ void pubsub_connector_worker(void *instance_p)
         char error_message[ERROR_LINE_MAX + 1] = "";
 
         uv_mutex_lock(&instance->mutex);
-        uv_cond_wait(&instance->cond_var, &instance->mutex);
+        while (!instance->data_is_ready)
+            uv_cond_wait(&instance->cond_var, &instance->mutex);
+        instance->data_is_ready = 0;
+
 
         if (unlikely(instance->engine->exit)) {
             uv_mutex_unlock(&instance->mutex);

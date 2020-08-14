@@ -165,6 +165,7 @@ struct instance {
     uv_thread_t thread;
     uv_mutex_t mutex;
     uv_cond_t cond_var;
+    int data_is_ready;
 
     int (*start_batch_formatting)(struct instance *instance);
     int (*start_host_formatting)(struct instance *instance, RRDHOST *host);
