@@ -7,13 +7,6 @@
 #include <Judy.h>
 #include "../../rrd.h"
 
-#define MAP_STORE_SIZE  256
-typedef struct map_store {
-    uint16_t index;
-    uuid_t  list[MAP_STORE_SIZE];
-    struct map_store *next;
-} MAP_STORE;
-
 typedef enum guid_type {
     GUID_TYPE_CHAR,
     GUID_TYPE_HOST,
@@ -27,6 +20,5 @@ extern GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_byte
 extern int find_guid_by_object(char *object, uuid_t *uuid, GUID_TYPE);
 extern void init_global_guid_map();
 extern int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type, int replace_instead_of_generate);
-extern void destroy_store_map();
-
+extern void free_uuid(uuid_t *uuid);
 #endif //NETDATA_GLOBAL_UUID_MAP_H

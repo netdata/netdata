@@ -8,56 +8,46 @@ static uv_rwlock_t guid_lock;
 static uv_rwlock_t object_lock;
 static uv_rwlock_t global_lock;
 
-MAP_STORE   *guid_map_store = NULL;
-
-void add_to_guid_store(uuid_t *uuid)
+static void free_single_uuid(uuid_t *uuid)
 {
-    MAP_STORE *tmp_guid_map_store;
-
-    if (!guid_map_store)
-        guid_map_store = callocz(1, sizeof(*guid_map_store));
-
-    uuid_copy(guid_map_store->list[guid_map_store->index++], *uuid);
-    if (guid_map_store->index == MAP_STORE_SIZE) {
-        tmp_guid_map_store = callocz(1, sizeof(*tmp_guid_map_store));
-        tmp_guid_map_store->next = guid_map_store;
-        guid_map_store = tmp_guid_map_store;
-    }
-}
-
-void destroy_store_map()
-{
-    MAP_STORE *tmp_guid_map_store;
-    int i;
+    char uuid_str[37];
     Pvoid_t *PValue, *PValue1;
     char *existing_object;
     Word_t  size;
 
-    info("Releasing memory allocated to the GUID global map ...");
-    while (guid_map_store) {
-        for (i = 0; i < guid_map_store->index; i++) {
-            PValue = JudyHSGet(JGUID_map, (void *) guid_map_store->list[i], (Word_t) sizeof(uuid_t));
-            if (likely(PValue)) {
-                existing_object = *PValue;
-                GUID_TYPE object_type = existing_object[0];
-                size = (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2;
-                PValue1 = JudyHSGet(JGUID_object_map, (void *) existing_object, (Word_t) size);
-                if (PValue1 && *PValue1) {
-                    freez(*PValue1);
-                }
-                JudyHSDel(&JGUID_object_map, (void *) existing_object, (Word_t) object_type?(object_type * 16)+1:strlen((char *) existing_object+1)+2, PJE0);
-                JudyHSDel(&JGUID_map, (void *) guid_map_store->list[i], (Word_t) sizeof(uuid_t), PJE0);
-                freez(existing_object);
-            }
+    uuid_unparse_lower(*uuid, uuid_str);
+    PValue = JudyHSGet(JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t));
+    if (likely(PValue)) {
+        existing_object = *PValue;
+        GUID_TYPE object_type = existing_object[0];
+        size = (Word_t)object_type ? (object_type * 16) + 1 : strlen((char *)existing_object + 1) + 2;
+        PValue1 = JudyHSGet(JGUID_object_map, (void *)existing_object, (Word_t)size);
+        if (PValue1 && *PValue1) {
+            freez(*PValue1);
         }
-        tmp_guid_map_store = guid_map_store->next;
-        freez(guid_map_store);
-        guid_map_store = tmp_guid_map_store;
+        JudyHSDel(&JGUID_object_map, (void *)existing_object,
+                  (Word_t)object_type ? (object_type * 16) + 1 : strlen((char *)existing_object + 1) + 2, PJE0);
+        JudyHSDel(&JGUID_map, (void *)uuid, (Word_t)sizeof(uuid_t), PJE0);
+        freez(existing_object);
     }
-    JudyHSFreeArray(&JGUID_map, PJE0);
-    JudyHSFreeArray(&JGUID_object_map, PJE0);
-    info("Released memory allocated to the GUID global map");
 }
+
+void free_uuid(uuid_t *uuid)
+{
+    GUID_TYPE ret;
+    char object[49];
+
+    ret = find_object_by_guid(uuid, object, sizeof(object));
+    if (GUID_TYPE_DIMENSION == ret)
+        free_single_uuid((uuid_t *)(object + 16 + 16));
+
+    if (GUID_TYPE_CHART == ret)
+        free_single_uuid((uuid_t *)(object + 16));
+
+    free_single_uuid(uuid);
+    return;
+}
+
 
 void   dump_object(uuid_t *index, void *object)
 {
@@ -138,8 +128,6 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
         uuid_copy(*value, *uuid);
         *PValue = value;
     }
-
-    add_to_guid_store(uuid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t count = 0;

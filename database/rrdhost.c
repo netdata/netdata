@@ -879,6 +879,7 @@ void rrdhost_free(RRDHOST *host) {
     netdata_rwlock_destroy(&host->labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
+    free_uuid(&host->host_uuid);
     freez(host);
 
     rrd_hosts_available--;
