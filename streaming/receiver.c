@@ -295,9 +295,9 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         }
         netdata_rwlock_unlock(&user->st->rrdset_rwlock);
         if (user->st->last_updated.tv_sec == 0)
-            advance_in_secs = latest_collect_t - user->st->gap_start;
+            advance_in_secs = latest_collect_t - user->st->gap_start + user->st->update_every;
         else
-            advance_in_secs = latest_collect_t - user->st->last_updated.tv_sec;
+            advance_in_secs = latest_collect_t - user->st->last_updated.tv_sec + user->st->update_every;
         advance_in_points = advance_in_secs / user->st->update_every;
         if ((advance_in_secs % user->st->update_every) != 0)
             debug(D_REPLICATION, "Timestamps are mis-aligned during replication!");
