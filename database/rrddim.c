@@ -528,9 +528,8 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
             freez((void *)rd->id);
             freez(rd->cache_filename);
 #ifdef ENABLE_DBENGINE
-            if (rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            if (rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
                 freez(rd->state->metric_uuid);
-            }
 #endif
             freez(rd->state);
             freez(rd);
