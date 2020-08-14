@@ -193,7 +193,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     char *id = words[1];
     char *start_txt = words[2];
     char *end_txt = words[3];
-    time_t start_t, end_t;
+    time_t end_t;
     if (!id || !start_txt || !end_txt)
         goto disable;
 
@@ -211,12 +211,12 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
         return PARSER_RC_ERROR;
     }
 
-    start_t = str2ull(start_txt);
+    user->st->gap_start = str2ull(start_txt);
     end_t = str2ull(end_txt);
 
     time_t now = now_realtime_sec();
-    debug(D_REPLICATION, "Replication started on %s for interval %ld..%ld against current gap %ld..%ld", st->name, 
-          start_t, end_t, st->last_updated.tv_sec, now);
+    debug(D_REPLICATION, "Replication started on %s for interval %zu..%ld against current gap %ld..%ld", st->name, 
+          user->st->gap_start, end_t, st->last_updated.tv_sec, now);
     return PARSER_RC_OK;
 disable:
     errno = 0;
@@ -273,30 +273,60 @@ disable:
 PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
     PARSER_USER_OBJECT *user = user_v;
     UNUSED(plugins_action);
+    RRDDIM *rd;
     char *num_points_txt = words[1];
+    time_t advance_in_secs;
+    long advance_in_points;
     if (!num_points_txt)
         goto disable;
     size_t num_points = str2ull(num_points_txt);
     //struct receiver_state *rpt = user->opaque;
 
-    debug(D_REPLICATION, "Replication finished on %s: %zu points transferred last_col_time->%ld last_up_time->%ld",
-          user->st->name, num_points, user->st->last_collected_time.tv_sec, user->st->last_updated.tv_sec);
 
-    user->st->last_collected_time.tv_sec += num_points * user->st->update_every;
-    //user->st->last_collected_time.tv_usec = 0;          // Spikes?
-    user->st->last_updated.tv_sec += num_points * user->st->update_every;
-    //user->st->last_updated.tv_usec = 0;                 // Spikes?
-    user->st->counter += num_points;
-    user->st->counter_done += num_points;
-    user->st->current_entry += num_points;
-    user->st->usec_since_last_update = USEC_PER_SEC;
-    if (user->st->current_entry >= user->st->entries)
-        user->st->current_entry -= user->st->entries;
+    /* If data was transferred in the replication window then we do not know how the number of points relates to the
+       length of the window or the distribution amongst the dimension, so update the chart-level timestamps from
+       the dimensions. */
+    if (num_points > 0) {
+        time_t latest_collect_t = 0;
+        netdata_rwlock_rdlock(&user->st->rrdset_rwlock);
+        rrddim_foreach_read(rd, user->st) {
+            if (rd->last_collected_time.tv_sec > latest_collect_t)
+                latest_collect_t = rd->last_collected_time.tv_sec;
+        }
+        netdata_rwlock_unlock(&user->st->rrdset_rwlock);
+        if (user->st->last_updated.tv_sec == 0)
+            advance_in_secs = latest_collect_t - user->st->gap_start;
+        else
+            advance_in_secs = latest_collect_t - user->st->last_updated.tv_sec;
+        advance_in_points = advance_in_secs / user->st->update_every;
+        if ((advance_in_secs % user->st->update_every) != 0)
+            debug(D_REPLICATION, "Timestamps are mis-aligned during replication!");
+
+        user->st->last_collected_time.tv_sec = latest_collect_t;
+        user->st->last_updated.tv_sec        = latest_collect_t;
+
+        debug(D_REPLICATION, "Finished replication on %s: %zu points transferred, advance=(%ld-secs %ld-points)"
+                             " last_col_time->%ld last_up_time->%ld",
+                             user->st->name, num_points, advance_in_secs, advance_in_points,
+                             user->st->last_collected_time.tv_sec, user->st->last_updated.tv_sec);
+
+        user->st->counter       += advance_in_points;
+        user->st->counter_done  += advance_in_points;
+        user->st->current_entry += advance_in_points;
+        user->st->usec_since_last_update = USEC_PER_SEC;
+        while (user->st->current_entry >= user->st->entries)        // Once except for an exceptional corner-case
+            user->st->current_entry -= user->st->entries;
+    }
+    else
+        debug(D_REPLICATION, "Finished replication on %s: window was empty", user->st->name);
+
     netdata_mutex_lock(&user->st->shared_flags_lock);
     user->st->sflag_replicating_down = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
 
-    rrdset_flag_set(user->st, RRDSET_FLAG_STORE_FIRST);     // Prevent 1-sec gap after replication
+    // Prevent 1-sec gap after replication, this is independent of the same flag on the sender. If the sender is
+    // not storing first then another replication will be triggered after the empty window.
+    rrdset_flag_set(user->st, RRDSET_FLAG_STORE_FIRST);
     user->st = NULL;
     return PARSER_RC_OK;
 disable:
@@ -325,7 +355,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         goto disable;
 
     // Remote clock or local clock with slew estimate?
-    usec_t timestamp = str2ull(time_txt);
+    time_t timestamp = (time_t)str2ul(time_txt);
     storage_number value = str2ull(value_txt);
     size_t idx = str2ul(idx_txt);
 
@@ -338,11 +368,14 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     }
 
     if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+    {
         rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s (idx %zu)", value, timestamp, id, idx);
+    }
     else
         rd->values[(rd->rrdset->current_entry + idx) % rd->entries] = value;
-    rd->last_collected_time.tv_sec = timestamp;
-    rd->last_collected_time.tv_usec = timestamp;
+    rd->last_collected_time.tv_sec = timestamp; // Technically these are storage times but maintain legacy modes
+    rd->last_collected_time.tv_usec = 0;        // Chart usec is controlled by rrdset_next_usec_slew
     rd->collections_counter++;
 
     return PARSER_RC_OK;

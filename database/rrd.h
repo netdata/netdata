@@ -486,8 +486,7 @@ struct rrdset {
     size_t compaction_id;                           // The last metadata log compaction procedure that has processed
                                                     // this object.
     struct rrdset_volatile *state;                  // volatile state that is not persistently stored
-    size_t gap_sent;                                // how much of a gap has been filled on this chart
-    size_t unused[1];
+    size_t unused[2];
 
     size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
@@ -534,6 +533,8 @@ struct rrdset {
 
     // -------------------------------------------------------------------------
     // it should be safe to extend this structure with volatile fields that are wiped on load
+    size_t gap_sent;                                // how much of a gap has been filled on this chart (sender)
+    size_t gap_start;                               // start of the current gap being filled (receiver)
     netdata_mutex_t shared_flags_lock;
     unsigned int sflag_replicating_up:1;            // if this chart is being replicated to an upstream parent
     unsigned int sflag_replicating_down:1;          // if this chart is being replicated from a downstream child

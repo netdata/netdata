@@ -401,6 +401,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
     time_t end = st->last_updated.tv_sec;
     // TODO: Why are we not taking the end from the request
     time_t gap_length = end-st_start+1;
+    size_t num_points = 0;
     // TODO: If we shrink the gap then move the start later not the end earlier!
     if (gap_length > default_rrdpush_gap_block_size)
         end = st_start + default_rrdpush_gap_block_size - 1;
@@ -415,7 +416,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
             if (rd_end > 0) {
                 time_t sample_t = MAX(st_start, rd_start);
                 time_t metric_t;
-                size_t index = 0;
+                size_t index = sample_t - st_start;
                 rd->state->query_ops.init(rd, &handle, sample_t, end);
                 debug(D_REPLICATION, "Fill replication with %s.%s @%ld-%ld rd@%ld-%ld", st->id, rd->id, sample_t, end,
                                      rd_start, rd_end);
@@ -428,6 +429,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                     // Technically rd->update_every could differ from st->update_every, but it does not.
                     sample_t += rd->update_every;
                     index++;
+                    num_points++;
                 }
                 if (sample_t >= st->last_updated.tv_sec) {
                     debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples", st->id, rd->id, sample_t,
@@ -455,10 +457,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
 
         }
     }
-    if (((end - st_start) % st->update_every) == 0)
-        buffer_sprintf(s->build, "REPEND %ld\n", (end - st_start) / st->update_every + 1);
-    else
-        buffer_sprintf(s->build, "REPEND %ld\n", (end - st_start) / st->update_every);
+    buffer_sprintf(s->build, "REPEND %zu\n", num_points);
     st->gap_sent = end;
     if ((time_t)st->gap_sent == st->last_updated.tv_sec)
         st->sflag_replicating_up = 0;
