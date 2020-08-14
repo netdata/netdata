@@ -27,6 +27,8 @@ static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
+pthread_mutex_t nv_mutex;
+int wait_to_plot = 0;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -87,6 +89,171 @@ static void ebpf_update_global_publish(
     udp->write = -((long)publish[3].nbyte);
     udp->read = (long)publish[4].nbyte;
 }
+
+/**
+ * Update Network Viewer plot data
+ *
+ * @param plot  the structure where the data will be stored
+ * @param sock  the last update from the socket
+ */
+static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
+{
+    if (sock->ct > plot->last_time) {
+        plot->last_time         = sock->ct;
+        plot->plot_recv_packets = sock->recv_packets;
+        plot->plot_sent_packets = sock->sent_packets;
+        plot->plot_recv_bytes   = sock->recv_bytes;
+        plot->plot_sent_bytes   = sock->sent_bytes;
+        plot->plot_retransmit   = sock->retransmit;
+    }
+
+    sock->recv_packets = 0;
+    sock->sent_packets = 0;
+    sock->recv_bytes   = 0;
+    sock->sent_bytes   = 0;
+    sock->retransmit   = 0;
+}
+
+/**
+ * Calculate Network Viewer Plot
+ *
+ * Do math with collected values before to plot data.
+ */
+static inline void calculate_nv_plot()
+{
+    uint32_t i;
+    uint32_t end = inbound_vectors.next;
+    for (i = 0; i < end; i++) {
+        update_nv_plot_data(&inbound_vectors.plot[i].plot, &inbound_vectors.plot[i].sock);
+    }
+    inbound_vectors.max_plot = end;
+
+    // The 'Other' dimension is always calculated for the chart to have at least one dimension
+    update_nv_plot_data(&inbound_vectors.plot[inbound_vectors.last].plot,
+                        &inbound_vectors.plot[inbound_vectors.last].sock);
+
+    end = outbound_vectors.next;
+    for (i = 0; i < end; i++) {
+        update_nv_plot_data(&outbound_vectors.plot[i].plot, &outbound_vectors.plot[i].sock);
+    }
+    outbound_vectors.max_plot = end;
+
+    // The 'Other' dimension is always calculated for the chart to have at least one dimension
+    update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
+                        &outbound_vectors.plot[outbound_vectors.last].sock);
+}
+
+/**
+ * Network viewer send bytes
+ *
+ * @param ptr   the structure with values to plot
+ * @param chart the chart name.
+ */
+static inline void ebpf_socket_nv_send_bytes(netdata_vector_plot_t *ptr, char *chart)
+{
+    uint32_t i;
+    uint32_t end = ptr->last_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    collected_number value;
+
+    write_begin_chart(NETDATA_EBPF_FAMILY, chart);
+    for (i = 0; i < end; i++) {
+        value = ((collected_number) w[i].plot.plot_sent_bytes);
+        write_chart_dimension(w[i].dimension_sent, value);
+        value = (collected_number) w[i].plot.plot_recv_bytes;
+        write_chart_dimension(w[i].dimension_recv, value);
+    }
+
+    i = ptr->last;
+    value = ((collected_number) w[i].plot.plot_sent_bytes);
+    write_chart_dimension(w[i].dimension_sent, value);
+    value = (collected_number) w[i].plot.plot_recv_bytes;
+    write_chart_dimension(w[i].dimension_recv, value);
+    write_end_chart();
+}
+
+/**
+ * Network Viewer Send packets
+ *
+ * @param ptr   the structure with values to plot
+ * @param chart the chart name.
+ */
+static inline void ebpf_socket_nv_send_packets(netdata_vector_plot_t *ptr, char *chart)
+{
+    uint32_t i;
+    uint32_t end = ptr->last_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    collected_number value;
+
+    write_begin_chart(NETDATA_EBPF_FAMILY, chart);
+    for (i = 0; i < end; i++) {
+        value = ((collected_number)w[i].plot.plot_sent_packets);
+        write_chart_dimension(w[i].dimension_sent, value);
+        value = (collected_number) w[i].plot.plot_recv_packets;
+        write_chart_dimension(w[i].dimension_recv, value);
+    }
+
+    i = ptr->last;
+    value = ((collected_number)w[i].plot.plot_sent_packets);
+    write_chart_dimension(w[i].dimension_sent, value);
+    value = (collected_number)w[i].plot.plot_recv_packets;
+    write_chart_dimension(w[i].dimension_recv, value);
+    write_end_chart();
+}
+
+/**
+ * Network Viewer Send Retransmit
+ *
+ * @param ptr   the structure with values to plot
+ * @param chart the chart name.
+ */
+static inline void ebpf_socket_nv_send_retransmit(netdata_vector_plot_t *ptr, char *chart)
+{
+    uint32_t i;
+    uint32_t end = ptr->last_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    collected_number value;
+
+    write_begin_chart(NETDATA_EBPF_FAMILY, chart);
+    for (i = 0; i < end; i++) {
+        value = (collected_number) w[i].plot.plot_retransmit;
+        write_chart_dimension(w[i].dimension_retransmit, value);
+    }
+
+    i = ptr->last;
+    value = (collected_number)w[i].plot.plot_retransmit;
+    write_chart_dimension(w[i].dimension_retransmit, value);
+    write_end_chart();
+}
+
+/**
+ * Send network viewer data
+ *
+ * @param ptr the pointer to plot data
+ */
+static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
+{
+    if (!ptr->flags)
+        return;
+
+    if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
+        ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_OUTBOUND_BYTES);
+        fflush(stdout);
+
+        ebpf_socket_nv_send_packets(ptr, NETDATA_NV_OUTBOUND_PACKETS);
+        fflush(stdout);
+
+        ebpf_socket_nv_send_retransmit(ptr,  NETDATA_NV_OUTBOUND_RETRANSMIT);
+        fflush(stdout);
+    } else {
+        ebpf_socket_nv_send_bytes(ptr, NETDATA_NV_INBOUND_BYTES);
+        fflush(stdout);
+
+        ebpf_socket_nv_send_packets(ptr, NETDATA_NV_INBOUND_PACKETS);
+        fflush(stdout);
+    }
+}
+
 
 /**
  * Update the publish strctures to create the dimenssions
@@ -308,6 +475,131 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
     socket_apps_created = 1;
 }
 
+/**
+ *  Create network viewer chart
+ *
+ *  Create common charts.
+ *
+ * @param id        the chart id
+ * @param title     the chart title
+ * @param units     the units label
+ * @param family    the group name used to attach the chart on dashaboard
+ * @param order     the chart order
+ * @param ptr       the plot structure with values.
+ */
+static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
+                                        char *family, int order, netdata_vector_plot_t *ptr)
+{
+    ebpf_write_chart_cmd(NETDATA_EBPF_FAMILY,
+                         id,
+                         title,
+                         units,
+                         family,
+                         "stacked",
+                         order);
+
+    uint32_t i;
+    uint32_t end = ptr->last_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    for (i = 0; i < end; i++) {
+        fprintf(stdout, "DIMENSION %s '' incremental -1 1\n", w[i].dimension_sent);
+        fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[i].dimension_recv);
+    }
+
+    end = ptr->last;
+    fprintf(stdout, "DIMENSION %s '' incremental -1 1\n", w[end].dimension_sent);
+    fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[end].dimension_recv);
+}
+
+/**
+ *  Create network viewer retransmit
+ *
+ *  Create a specific chart.
+ *
+ * @param id        the chart id
+ * @param title     the chart title
+ * @param units     the units label
+ * @param family    the group name used to attach the chart on dashaboard
+ * @param order     the chart order
+ * @param ptr       the plot structure with values.
+ */
+static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
+                                             char *family, int order, netdata_vector_plot_t *ptr)
+{
+    ebpf_write_chart_cmd(NETDATA_EBPF_FAMILY,
+                         id,
+                         title,
+                         units,
+                         family,
+                         "stacked",
+                         order);
+
+    uint32_t i;
+    uint32_t end = ptr->last_plot;
+    netdata_socket_plot_t *w = ptr->plot;
+    for (i = 0; i < end; i++) {
+        fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[i].dimension_retransmit);
+    }
+
+    end = ptr->last;
+    fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w[end].dimension_retransmit);
+}
+
+/**
+ * Create Network Viewer charts
+ *
+ * Recreate the charts when new sockets are created.
+ *
+ * @param ptr a pointer for inbound or outbound vectors.
+ */
+static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
+{
+    // We do not have new sockets, so we do not need move forward
+    if (ptr->max_plot == ptr->last_plot)
+        return;
+
+    ptr->last_plot = ptr->max_plot;
+
+    if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
+        ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
+                                    "Outbound connections (bytes).",
+                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
+                                    21080,
+                                    ptr);
+
+        ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_PACKETS,
+                                    "Outbound connections (packets)",
+                                    EBPF_COMMON_DIMENSION_PACKETS,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
+                                    21082,
+                                    ptr);
+
+        ebpf_socket_create_nv_retransmit(NETDATA_NV_OUTBOUND_RETRANSMIT,
+                                         "Retransmitted packets",
+                                         EBPF_COMMON_DIMENSION_CALL,
+                                         NETDATA_NETWORK_CONNECTIONS_GROUP,
+                                         21083,
+                                         ptr);
+    } else {
+        ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
+                                    "Inbound connections (bytes)",
+                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
+                                    21084,
+                                    ptr);
+
+        ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_PACKETS,
+                                    "Inbound connections (packets)",
+                                    EBPF_COMMON_DIMENSION_PACKETS,
+                                    NETDATA_NETWORK_CONNECTIONS_GROUP,
+                                    21085,
+                                    ptr);
+    }
+
+    ptr->flags |= NETWORK_VIEWER_CHARTS_CREATED;
+}
+
 /*****************************************************************
  *
  *  READ INFORMATION FROM KERNEL RING
@@ -471,14 +763,30 @@ static int compare_sockets(void *a, void *b)
 
     // We do not need to compare val2 family, because data inside hash table is always from the same family
     if (val1->family == AF_INET) { //IPV4
-        cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
-        if (!cmp) {
+        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
+            if (val1->index.sport == val2->index.sport)
+                cmp = 0;
+            else {
+                cmp = (val1->index.sport > val2->index.sport)?1:-1;
+            }
+        } else {
             cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+            if (!cmp) {
+                cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
+            }
         }
     } else {
-        cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
-        if (!cmp) {
+        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
+            if (val1->index.sport == val2->index.sport)
+                cmp = 0;
+            else {
+                cmp = (val1->index.sport > val2->index.sport)?1:-1;
+            }
+        } else {
             cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+            if (!cmp) {
+                cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
+            }
         }
     }
 
@@ -549,7 +857,15 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
 
     char dimname[CONFIG_MAX_NAME];
     int size;
-    char *protocol = (ptr->sock.protocol == IPPROTO_UDP) ? "UDP" : "TCP";
+    char *protocol;
+    if (ptr->sock.protocol == IPPROTO_UDP) {
+        protocol = "UDP";
+    } else if (ptr->sock.protocol == IPPROTO_TCP) {
+        protocol = "TCP";
+    } else {
+        protocol = "ALL";
+    }
+
     if (is_outbound)
         size = build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
@@ -562,6 +878,9 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
 
         strcpy(&dimname[size], "recv");
         ptr->dimension_recv = strdupz(dimname);
+
+        dimname[size - 1] = '\0';
+        ptr->dimension_retransmit = strdupz(dimname);
     }
 }
 
@@ -572,11 +891,10 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
  *
  * @param ptr a pointer to the structure where the values are stored.
  * @param is_outbound is a outbound ptr value?
- * @param is_last is this the last value possible?
  *
  * @return It returns 1 if the name is valid and 0 otherwise.
  */
-int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
+int fill_names(netdata_socket_plot_t *ptr, int is_outbound)
 {
     char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
     if (ptr->resolved)
@@ -584,21 +902,12 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
 
     int ret;
     static int resolve_name = -1;
+    static int resolve_service = -1;
     if (resolve_name == -1)
-        resolve_name = network_viewer_opt.name_resolution_enabled;
+        resolve_name = network_viewer_opt.hostname_resolution_enabled;
 
-    if (is_last) {
-        char *other = { "Other" };
-        // We are also copying the NULL bytes to avoid warnings in new compilers
-        strncpy(hostname, other, 6);
-        strncpy(service_name, other, 6);
-
-        ptr->family = AF_INET;
-
-        fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_outbound);
-        ret = 1;
-        goto laststep;
-    }
+    if (resolve_service == -1)
+        resolve_service = network_viewer_opt.service_resolution_enabled;
 
     netdata_socket_idx_t *idx = &ptr->index;
 
@@ -619,6 +928,11 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
 
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr, sizeof(myaddr), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
+
+        if (!ret && !resolve_service) {
+            snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr.sin_port));
+        }
+
         if (ret) {
             // I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET, &myaddr.sin_addr.s_addr, hostname, NI_MAXHOST)) {
@@ -643,12 +957,19 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
 
         ret = (!resolve_name)?-1:getnameinfo((struct sockaddr *)&myaddr6, sizeof(myaddr6), hostname,
                                               sizeof(hostname), service_name, sizeof(service_name), NI_NAMEREQD);
+
+        if (!ret && !resolve_service) {
+            snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr6.sin6_port));
+        }
+
         if (ret) {
             // I cannot resolve the name, I will use the IP
             if (!inet_ntop(AF_INET6, myaddr6.sin6_addr.s6_addr, hostname, NI_MAXHOST)) {
                 strncpy(hostname, errname, 13);
             }
+
             snprintf(service_name, sizeof(service_name), "%u", ntohs(myaddr6.sin6_port));
+
             ret = 1;
         }
     }
@@ -657,14 +978,41 @@ int fill_names(netdata_socket_plot_t *ptr, int is_outbound, uint32_t is_last)
                        strlen(hostname) + strlen(service_name)+ NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH,
                        service_name, is_outbound);
 
-laststep:
-
     if (resolve_name && !ret)
         ret = hostname_matches_pattern(hostname);
 
     ptr->resolved++;
 
     return ret;
+}
+
+/**
+ * Fill last Network Viewer Dimension
+ *
+ * Fill the unique dimension that is always plotted.
+ *
+ * @param ptr           the pointer for the last dimension
+ * @param is_outbound    is this an inbound structure?
+ */
+static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
+{
+    char hostname[NI_MAXHOST], service_name[NI_MAXSERV];
+    char *other = { "other" };
+    // We are also copying the NULL bytes to avoid warnings in new compilers
+    strncpy(hostname, other, 6);
+    strncpy(service_name, other, 6);
+
+    ptr->family = AF_INET;
+    ptr->sock.protocol = 255;
+    ptr->flags = (!is_outbound)?NETDATA_INBOUND_DIRECTION:NETDATA_OUTBOUND_DIRECTION;
+
+    fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_outbound);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
+         (is_outbound)?"outbound":"inbound", network_viewer_opt.max_dim - 1, ptr->resolved_name,
+         ptr->dimension_recv, ptr->dimension_sent, ptr->dimension_retransmit);
+#endif
 }
 
 /**
@@ -677,10 +1025,14 @@ laststep:
  */
 static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *lvalues)
 {
-    sock->recv_packets = lvalues->recv_packets;
-    sock->sent_packets = lvalues->sent_packets;
-    sock->recv_bytes   = lvalues->recv_bytes;
-    sock->sent_bytes   = lvalues->sent_bytes;
+    sock->recv_packets += lvalues->recv_packets;
+    sock->sent_packets += lvalues->sent_packets;
+    sock->recv_bytes   += lvalues->recv_bytes;
+    sock->sent_bytes   += lvalues->sent_bytes;
+    sock->retransmit   += lvalues->retransmit;
+
+    if (lvalues->ct > sock->ct)
+        sock->ct = lvalues->ct;
 }
 
 /**
@@ -692,17 +1044,21 @@ static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *
  * @param lvalues Values read from socket ring.
  * @param lindex  the index information, the real socket.
  * @param family  the family associated to the socket
+ * @param flags   the connection flags
  */
 static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t *lvalues,
-                                    netdata_socket_idx_t *lindex, int family)
+                                    netdata_socket_idx_t *lindex, int family, uint32_t flags)
 {
     netdata_socket_plot_t test, *ret ;
 
-    memcpy(&test.index, lindex, sizeof(*lindex));
+    memcpy(&test.index, lindex, sizeof(netdata_socket_idx_t));
+    test.flags = flags;
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
     if (ret) {
-        update_socket_data(&ret->sock, lvalues);
+        if (lvalues->ct > ret->plot.last_time) {
+            update_socket_data(&ret->sock, lvalues);
+        }
     } else {
         uint32_t curr = out->next;
         uint32_t last = out->last;
@@ -711,36 +1067,30 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         int resolved;
         if (curr == last) {
-            if (!w->resolved) {
-                resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 1);
-                UNUSED(resolved);
-#ifdef NETDATA_INTERNAL_CHECKS
-                info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s",
-                     (out == &inbound_vectors)?"inbound":"outbound", curr, w->resolved_name,
-                     w->dimension_recv, w->dimension_sent);
-#endif
+            if (lvalues->ct > w->plot.last_time) {
+                update_socket_data(&w->sock, lvalues);
             }
-
-            update_socket_data(&w->sock, lvalues);
             return;
         } else {
-            memcpy(&w->sock, lvalues, sizeof(*lvalues));
-            memcpy(&w->index, lindex, sizeof(*lindex));
+            memcpy(&w->sock, lvalues, sizeof(netdata_socket_t));
+            memcpy(&w->index, lindex, sizeof(netdata_socket_idx_t));
             w->family = family;
 
-            resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors, 0);
+            resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors);
         }
 
         if (!resolved) {
             freez(w->resolved_name);
             freez(w->dimension_sent);
             freez(w->dimension_recv);
+            freez(w->dimension_retransmit);
 
             memset(w, 0, sizeof(netdata_socket_plot_t));
 
             return;
         }
 
+        w->flags = flags;
         netdata_socket_plot_t *check ;
         check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl *)w);
         if (check != w)
@@ -749,10 +1099,9 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 #ifdef NETDATA_INTERNAL_CHECKS
         char iptext[INET6_ADDRSTRLEN];
         if (inet_ntop(family, &w->index.daddr.addr8, iptext, sizeof(iptext)))
-            info("New %s dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, SENT = %lu(%lu), RECV = %lu(%lu)",
+            info("New %s dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
                  (out == &inbound_vectors)?"inbound":"outbound", curr, iptext, w->resolved_name,
-                 w->dimension_recv, w->dimension_sent, w->sock.sent_bytes, w->sock.sent_packets,
-                 w->sock.recv_bytes, w->sock.recv_packets);
+                 w->dimension_recv, w->dimension_sent, w->dimension_retransmit);
 #endif
         curr++;
         if (curr > last)
@@ -766,32 +1115,50 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
  *
  * Compare input values with local address to select table to store.
  *
- * @param cmp     index read from hash table.
+ * @param direction  store inbound and outbound direction.
+ * @param cmp        index read from hash table.
+ * @param proto      the protocol read.
  *
  * @return It returns the structure with address to compare.
  */
-netdata_vector_plot_t * select_vector_to_store(netdata_socket_idx_t *cmp)
+netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_socket_idx_t *cmp, uint8_t proto)
 {
-    if (!listen_ports)
+    if (!listen_ports) {
+        *direction = NETDATA_OUTBOUND_DIRECTION;
         return &outbound_vectors;
+    }
 
     ebpf_network_viewer_port_list_t *move_ports = listen_ports;
     while (move_ports) {
-        if (move_ports->first == cmp->sport) {
+        if (move_ports->protocol == proto && move_ports->first == cmp->sport) {
+            *direction = NETDATA_INBOUND_DIRECTION;
             return &inbound_vectors;
         }
 
         move_ports = move_ports->next;
     }
 
+    *direction = NETDATA_OUTBOUND_DIRECTION;
     return &outbound_vectors;
 }
 
+/**
+ * Hash accumulator
+ *
+ * @param values        the values used to calculate the data.
+ * @param key           the key to store  data.
+ * @param removesock    check if this socket must be removed .
+ * @param family        the connection family
+ * @param end           the values size.
+ */
 static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int *removesock, int family, int end)
 {
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
+    uint16_t retransmit = 0;
     int i;
     uint8_t protocol = values[0].protocol;
+    uint64_t ct = values[0].ct;
+    error("KILLME_FIRST %u (%u)", protocol, ntohs(key->sport));
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -799,23 +1166,31 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         psent += w->sent_packets;
         brecv += w->recv_bytes;
         bsent += w->sent_bytes;
+        retransmit += w->retransmit;
 
         if (!protocol)
             protocol = w->protocol;
 
+        if (w->ct > ct)
+            ct = w->ct;
+
         *removesock += (int)w->removeme;
     }
 
+    error("KILLME_LAST %u (%u)", protocol, ntohs(key->sport));
     values[0].recv_packets += precv;
     values[0].sent_packets += psent;
     values[0].recv_bytes   += brecv;
     values[0].sent_bytes   += bsent;
-    values[0].removeme     += *removesock;
-    values[0].protocol = protocol;
+    values[0].retransmit   += retransmit;
+    values[0].removeme     += (uint8_t)*removesock;
+    values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
+    values[0].ct           = ct;
 
     if (is_socket_allowed(key, family)) {
-        netdata_vector_plot_t *table = select_vector_to_store(key);
-        store_socket_inside_avl(table, values, key, family);
+        uint32_t dir;
+        netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
+        store_socket_inside_avl(table, &values[0], key, family, dir);
     }
 }
 
@@ -829,17 +1204,26 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void read_socket_hash_table(int fd, int family)
+static void read_socket_hash_table(int fd, int family, int network_connection)
 {
+    if (wait_to_plot)
+        return;
+
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key;
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
     netdata_socket_t *values = socket_values;
+    size_t length = ebpf_nprocs*sizeof(netdata_socket_t);
     int test, end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        // We need to reset the values when we are working on kernel 4.15 or newer, because kernel does not create
+        // values for specific processor unless it is used to store data. As result of this behavior one the next socket
+        // can have values from the previous one.
+        memset(values, 0, length);
+        error("KILLME_READ %u %u %u %u (%u)", values[0].protocol, values[1].protocol, values[2].protocol, values[3].protocol, ntohs(key.sport));
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
             key = next_key;
@@ -849,8 +1233,10 @@ static void read_socket_hash_table(int fd, int family)
         if (removesock)
             bpf_map_delete_elem(fd, &removeme);
 
-        removesock = 0;
-        hash_accumulator(values, &key, &removesock, family, end);
+        if (network_connection) {
+            removesock = 0;
+            hash_accumulator(values, &key, &removesock, family, end);
+        }
 
         if (removesock)
             removeme = key;
@@ -866,8 +1252,10 @@ static void read_socket_hash_table(int fd, int family)
         return;
     }
 
-    removesock = 0;
-    hash_accumulator(values, &next_key, &removesock, family, end);
+    if (network_connection) {
+        removesock = 0;
+        hash_accumulator(values, &next_key, &removesock, family, end);
+    }
 
     if (removesock)
         bpf_map_delete_elem(fd, &next_key);
@@ -879,14 +1267,15 @@ static void read_socket_hash_table(int fd, int family)
  * Update link list when it is necessary.
  *
  * @param value the ports we are listen to.
+ * @param proto the protocol used with port connection.
  */
-void update_listen_table(uint16_t value)
+void update_listen_table(uint16_t value, uint8_t proto)
 {
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
         while (move) {
-            if (move->first == value)
+            if (move->protocol == proto && move->first == value)
                 return;
 
             store = move;
@@ -895,10 +1284,12 @@ void update_listen_table(uint16_t value)
 
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
         w->first = value;
+        w->protocol = proto;
         store->next = w;
     } else {
         w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
         w->first = value;
+        w->protocol = proto;
 
         listen_ports = w;
     }
@@ -927,13 +1318,16 @@ static void read_listen_table()
             continue;
         }
 
-        update_listen_table(htons(key));
+        // The correct protocol must come from kernel
+        update_listen_table(htons(key), (key == 53)?IPPROTO_UDP:IPPROTO_TCP);
 
         key = next_key;
     }
 
-    if (next_key)
-        update_listen_table(htons(next_key));
+    if (next_key) {
+        // The correct protocol must come from kernel
+        update_listen_table(htons(next_key), (key == 53)?IPPROTO_UDP:IPPROTO_TCP);
+    }
 }
 
 /**
@@ -948,20 +1342,24 @@ static void read_listen_table()
  */
 void *ebpf_socket_read_hash(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
     int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
     int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
+    int network_connection = em->optional;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        pthread_mutex_lock(&nv_mutex);
         read_listen_table();
-        read_socket_hash_table(fd_ipv4, AF_INET);
-        read_socket_hash_table(fd_ipv6, AF_INET6);
+        read_socket_hash_table(fd_ipv4, AF_INET, network_connection);
+        read_socket_hash_table(fd_ipv6, AF_INET6, network_connection);
+        wait_to_plot = 1;
+        pthread_mutex_unlock(&nv_mutex);
     }
 
     return NULL;
@@ -1108,6 +1506,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
 
     int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
     int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
+    int network_connection = em->optional;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -1118,6 +1517,8 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
+        calculate_nv_plot();
+
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
@@ -1125,11 +1526,27 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (socket_apps_enabled)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
-        pthread_mutex_unlock(&collect_data_mutex);
+        fflush(stdout);
 
+        if (network_connection) {
+            // We are calling fflush many times, because when we have a lot of dimensions
+            // we began to have not expected outputs and Netdata closed the plugin.
+            pthread_mutex_lock(&nv_mutex);
+            ebpf_socket_create_nv_charts(&inbound_vectors);
+            fflush(stdout);
+            ebpf_socket_send_nv_data(&inbound_vectors);
+
+            ebpf_socket_create_nv_charts(&outbound_vectors);
+            fflush(stdout);
+            ebpf_socket_send_nv_data(&outbound_vectors);
+            wait_to_plot = 0;
+            pthread_mutex_unlock(&nv_mutex);
+
+        }
+
+        pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&lock);
 
-        fflush(stdout);
     }
 }
 
@@ -1152,6 +1569,7 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
     freez(ptr->dimension_recv);
     freez(ptr->dimension_sent);
     freez(ptr->resolved_name);
+    freez(ptr->dimension_retransmit);
 }
 
 /**
@@ -1266,6 +1684,8 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_service_names(network_viewer_opt.names);
     clean_hostnames(network_viewer_opt.included_hostnames);
     clean_hostnames(network_viewer_opt.excluded_hostnames);
+
+    pthread_mutex_destroy(&nv_mutex);
 }
 
 /*****************************************************************
@@ -1316,6 +1736,19 @@ static void set_local_pointers(ebpf_module_t *em)
     }
 }
 
+/**
+ * Initialize Inbound and Outbound
+ *
+ * Initialize the common outbound and inbound sockets.
+ */
+static void initialize_inbound_outbound()
+{
+    inbound_vectors.last = network_viewer_opt.max_dim - 1;
+    outbound_vectors.last = inbound_vectors.last;
+    fill_last_nv_dimension(&inbound_vectors.plot[inbound_vectors.last], 0);
+    fill_last_nv_dimension(&outbound_vectors.plot[outbound_vectors.last], 1);
+}
+
 /*****************************************************************
  *
  *  EBPF SOCKET THREAD
@@ -1338,18 +1771,20 @@ void *ebpf_socket_thread(void *ptr)
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 
-    inbound_vectors.last = network_viewer_opt.max_dim - 1;
-    outbound_vectors.last = inbound_vectors.last;
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&socket_data);
 
     if (!em->enabled)
         goto endsocket;
 
+    if (pthread_mutex_init(&nv_mutex, NULL)) {
+        error("Cannot initialize local mutex");
+        goto endsocket;
+    }
     pthread_mutex_lock(&lock);
 
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
+    initialize_inbound_outbound();
 
     if (ebpf_update_kernel(&socket_data)) {
         pthread_mutex_unlock(&lock);

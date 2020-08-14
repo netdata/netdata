@@ -104,11 +104,14 @@ netdata_ebpf_events_t socket_probes[] = {
 
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes,
+      .optional = 0 },
     { .thread_name = "socket", .config_name = "network viewer", .enabled = 0, .start_routine = ebpf_socket_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes,
+      .optional = 0  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
-      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL },
+      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL,
+      .optional = 0 },
 };
 
 // Link with apps.plugin
@@ -116,9 +119,10 @@ pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = 500, .name_resolution_enabled = 0,
-                                                     .excluded_port = NULL, .included_port = NULL,
-                                                     .names = NULL, .ipv4_local_ip = NULL, .ipv6_local_ip = NULL };
+ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = NETDATA_NV_CAP_VALUE, .hostname_resolution_enabled = 0,
+                                                     .service_resolution_enabled = 0, .excluded_port = NULL,
+                                                     .included_port = NULL, .names = NULL, .ipv4_local_ip = NULL,
+                                                     .ipv6_local_ip = NULL };
 
 /*****************************************************************
  *
@@ -699,6 +703,43 @@ static inline void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_networ
 #endif
 }
 
+/**
+ *  Read Local Ports
+ *
+ *  Parse /proc/net/{tcp,udp} and get the ports Linux is listening.
+ *
+ *  @param filename the proc file to parse.
+ *  @param proto is the magic number associated to the protocol file we are reading.
+ */
+static void read_local_ports(char *filename, uint8_t proto)
+{
+    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff)
+        return;
+
+    ff = procfile_readall(ff);
+    if (!ff)
+        return;
+
+    size_t lines = procfile_lines(ff), l;
+    for(l = 0; l < lines ;l++) {
+        size_t words = procfile_linewords(ff, l);
+        // This is header or end of file
+        if (unlikely(words < 14))
+            continue;
+
+        // https://elixir.bootlin.com/linux/v5.7.8/source/include/net/tcp_states.h
+        // 0A = TCP_LISTEN
+        if (strcmp("0A", procfile_lineword(ff, l, 5)))
+            continue;
+
+        // Read local port
+        uint16_t port = (uint16_t)strtol(procfile_lineword(ff, l, 2), NULL, 16);
+        update_listen_table(htons(port), proto);
+    }
+
+    procfile_close(ff);
+}
 
 /**
  * Read Local addresseses
@@ -1480,25 +1521,54 @@ static void link_hostnames(char *parse)
 }
 
 /**
+ * Read max dimension.
+ *
+ * Netdata plot two dimensions per connection, so it is necessary to adjust the values.
+ */
+static void read_max_dimension()
+{
+    int maxdim ;
+    maxdim = (int) appconfig_get_number(&collector_config,
+                                        EBPF_NETWORK_VIEWER_SECTION,
+                                        "maximum dimensions",
+                                        NETDATA_NV_CAP_VALUE);
+    if (maxdim < 0) {
+        error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
+              maxdim, NETDATA_NV_CAP_VALUE);
+        maxdim = NETDATA_NV_CAP_VALUE;
+    }
+
+    maxdim /= 2;
+    if (!maxdim) {
+        info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
+        network_viewer_opt.max_dim = 1;
+    }
+
+    network_viewer_opt.max_dim = (uint32_t)maxdim;
+}
+
+/**
  * Parse network viewer section
  */
 static void parse_network_viewer_section()
 {
-    network_viewer_opt.max_dim = appconfig_get_number(&collector_config,
-                                                      EBPF_NETWORK_VIEWER_SECTION,
-                                                      "maximum dimensions",
-                                                      50);
+    read_max_dimension();
 
-    network_viewer_opt.name_resolution_enabled = appconfig_get_boolean(&collector_config,
+    network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
-                                                                       "resolve hostname ips",
+                                                                       "resolve hostnames",
                                                                        0);
+
+    network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(&collector_config,
+                                                                           EBPF_NETWORK_VIEWER_SECTION,
+                                                                           "resolve service names",
+                                                                           0);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                                 "ports", NULL);
     parse_ports(value);
 
-    if (network_viewer_opt.name_resolution_enabled) {
+    if (network_viewer_opt.hostname_resolution_enabled) {
         value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
         link_hostnames(value);
     } else {
@@ -1609,7 +1679,8 @@ static void read_collector_values(int *disable_apps)
     *disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name, 1);
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name,
+                                             1);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
@@ -1624,6 +1695,10 @@ static void read_collector_values(int *disable_apps)
         parse_service_name_section();
         started++;
     }
+
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
+                                    0);
+    ebpf_modules[1].optional = enabled;
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
@@ -1882,6 +1957,10 @@ int main(int argc, char **argv)
     ebpf_allocate_common_vectors();
 
     read_local_addresses();
+    read_local_ports("/proc/net/tcp", IPPROTO_TCP);
+    read_local_ports("/proc/net/tcp6", IPPROTO_TCP);
+    read_local_ports("/proc/net/udp", IPPROTO_UDP);
+    read_local_ports("/proc/net/udp6", IPPROTO_UDP);
 
     struct netdata_static_thread ebpf_threads[] = {
         {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},

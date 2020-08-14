@@ -85,6 +85,7 @@ typedef struct ebpf_module {
     netdata_run_mode_t mode;
     netdata_ebpf_events_t *probes;
     uint32_t thread_id;
+    int optional;
 } ebpf_module_t;
 
 extern ebpf_module_t ebpf_modules[];
@@ -189,9 +190,10 @@ extern void write_end_chart();
 #define EBPF_NETWORK_VIEWER_SECTION "network viewer"
 #define EBPF_SERVICE_NAME_SECTION "service name"
 
-#define EBPF_COMMON_DIMENSION_CALL "Calls"
+#define EBPF_COMMON_DIMENSION_CALL "calls"
 #define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
-#define EBPF_COMMON_DIMENSION_DIFFERENCE "Difference"
+#define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
+#define EBPF_COMMON_DIMENSION_PACKETS "packets"
 
 // Common variables
 extern char *ebpf_user_config_dir;
