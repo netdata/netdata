@@ -669,7 +669,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     int ret, error;
 
     out_of_space = 0;
-    if (unlikely(ctx->disk_space > ctx->max_disk_space)) {
+    /* Do not allow the pinned pages to exceed the disk space quota to avoid deadlocks */
+    if (unlikely(ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE))) {
         out_of_space = 1;
     }
     datafile = ctx->datafiles.last;

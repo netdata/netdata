@@ -19,6 +19,7 @@ extern RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t 
 extern RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid);
 extern RRDHOST *metalog_get_host_from_uuid(struct metalog_instance *ctx, uuid_t *uuid);
 extern void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid);
+extern void metalog_print_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid);
 
 /* must call once before using anything */
 extern int metalog_init(struct rrdengine_instance *rrdeng_parent_ctx);

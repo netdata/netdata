@@ -117,6 +117,13 @@ options.
 You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
 validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
 
+### Disk space requirements
+
+There are explicit disk space requirements **per** DB engine **instance**:
+
+-   The total disk space footprint will be the maximum between `#dimensions-being-collected x 4096 x 2` bytes or what
+    the user configured with `dbengine multihost disk space` or `dbengine disk space`.
+
 ### File descriptor requirements
 
 The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming child or

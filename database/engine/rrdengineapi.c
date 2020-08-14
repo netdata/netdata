@@ -204,14 +204,18 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
             handle->prev_descr = NULL;
         } else {
+            /*
+             * Disable pinning for now as it leads to deadlocks. When a collector stops collecting the extra pinned page
+             * eventually gets rotated but it cannot be destroyed due to the extra reference.
+             */
             /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
-            rrdeng_page_descr_mutex_lock(ctx, descr);
+/*          rrdeng_page_descr_mutex_lock(ctx, descr);
             ret = pg_cache_try_get_unsafe(descr, 0);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
-            fatal_assert(1 == ret);
+            fatal_assert(1 == ret);*/
 
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
-            handle->prev_descr = descr;
+            /* handle->prev_descr = descr;*/
         }
     } else {
         freez(descr->pg_cache_descr->page);
