@@ -8,6 +8,13 @@ static uv_rwlock_t guid_lock;
 static uv_rwlock_t object_lock;
 static uv_rwlock_t global_lock;
 
+
+void free_global_guid_map()
+{
+    JudyHSFreeArray(&JGUID_map, PJE0);
+    JudyHSFreeArray(&JGUID_object_map, PJE0);
+}
+
 static void free_single_uuid(uuid_t *uuid)
 {
     Pvoid_t *PValue, *PValue1;
@@ -36,11 +43,15 @@ void free_uuid(uuid_t *uuid)
     char object[49];
 
     ret = find_object_by_guid(uuid, object, sizeof(object));
-    if (GUID_TYPE_DIMENSION == ret)
+    if (GUID_TYPE_DIMENSION == ret) {
         free_single_uuid((uuid_t *)(object + 16 + 16));
+        info("FREE DIM");
+    }
 
-    if (GUID_TYPE_CHART == ret)
-        free_single_uuid((uuid_t *)(object + 16));
+    if (GUID_TYPE_CHART == ret) {
+            free_single_uuid((uuid_t *)(object + 16));
+            info("FREE CHART");
+    }
 
     free_single_uuid(uuid);
     return;

@@ -21,4 +21,5 @@ extern int find_guid_by_object(char *object, uuid_t *uuid, GUID_TYPE);
 extern void init_global_guid_map();
 extern int find_or_generate_guid(void *object, uuid_t *uuid, GUID_TYPE object_type, int replace_instead_of_generate);
 extern void free_uuid(uuid_t *uuid);
+extern void free_global_guid_map();
 #endif //NETDATA_GLOBAL_UUID_MAP_H
