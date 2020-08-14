@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- Clarify which notifications are received when the "|critical" limit is set [\#9740](https://github.com/netdata/netdata/pull/9740) ([cakrit](https://github.com/cakrit))
+- Added proper certificate handling cURL in our static build. [\#9733](https://github.com/netdata/netdata/pull/9733) ([Ferroin](https://github.com/Ferroin))
+- Add CAP\_SYS\_CHROOT for netdata service [\#9726](https://github.com/netdata/netdata/pull/9726) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed global GUID map memory leak [\#9725](https://github.com/netdata/netdata/pull/9725) ([stelfrag](https://github.com/stelfrag))
+- Update README.md [\#9721](https://github.com/netdata/netdata/pull/9721) ([aabatangle](https://github.com/aabatangle))
 - Fix crash when receiving malformed labels via streaming. [\#9715](https://github.com/netdata/netdata/pull/9715) ([mfundul](https://github.com/mfundul))
 - Fixed issue with missing alarms [\#9712](https://github.com/netdata/netdata/pull/9712) ([stelfrag](https://github.com/stelfrag))
 - Set the default value of the home directory to the environment's HOME [\#9711](https://github.com/netdata/netdata/pull/9711) ([cakrit](https://github.com/cakrit))
@@ -16,6 +20,7 @@
 - Fix print message when building for Ubuntu Focal [\#9694](https://github.com/netdata/netdata/pull/9694) ([devinrsmith](https://github.com/devinrsmith))
 - Replace alarm redirection link for cloud, to stop showing 404 [\#9688](https://github.com/netdata/netdata/pull/9688) ([cakrit](https://github.com/cakrit))
 - Fix for ignored LXC containers [\#9645](https://github.com/netdata/netdata/pull/9645) ([vlvkobal](https://github.com/vlvkobal))
+- Add community link to readme [\#9602](https://github.com/netdata/netdata/pull/9602) ([zack-shoylev](https://github.com/zack-shoylev))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
@@ -221,9 +226,6 @@
 - Implement new incremental parser [\#9074](https://github.com/netdata/netdata/pull/9074) ([stelfrag](https://github.com/stelfrag))
 - OpenTSDB and TLS [\#9068](https://github.com/netdata/netdata/pull/9068) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added required bundle for libuuid on ClearLinux. [\#9060](https://github.com/netdata/netdata/pull/9060) ([Ferroin](https://github.com/Ferroin))
-- Add notes/known issues section to installation page [\#9053](https://github.com/netdata/netdata/pull/9053) ([joelhans](https://github.com/joelhans))
-- Missing error aws [\#9048](https://github.com/netdata/netdata/pull/9048) ([thiagoftsm](https://github.com/thiagoftsm))
-- Change backends to exporting engine in general documentation pages [\#9045](https://github.com/netdata/netdata/pull/9045) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
