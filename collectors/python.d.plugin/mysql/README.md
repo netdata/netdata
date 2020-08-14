@@ -385,7 +385,7 @@ remote:
 ```
 
 If no configuration is given, the module will attempt to connect to MySQL server via a unix socket at
-`/var/run/mysqld/mysqld.sock` without password and with username `root`.
+`/var/run/mysqld/mysqld.sock` without password and with username `root` or `netdata` (you granted permissions for `netdata` user in the Requirements section of this document).
 
 `userstats` graph works only if you enable the plugin in MariaDB server and set proper MySQL privileges (SUPER or
 PROCESS). For more details, please check the [MariaDB User Statistics
