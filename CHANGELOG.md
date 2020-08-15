@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix code formatting for the mdstat collector [\#9749](https://github.com/netdata/netdata/pull/9749) ([vlvkobal](https://github.com/vlvkobal))
 - Clarify which notifications are received when the "|critical" limit is set [\#9740](https://github.com/netdata/netdata/pull/9740) ([cakrit](https://github.com/cakrit))
+- Fix flushing errors [\#9738](https://github.com/netdata/netdata/pull/9738) ([mfundul](https://github.com/mfundul))
 - Added proper certificate handling cURL in our static build. [\#9733](https://github.com/netdata/netdata/pull/9733) ([Ferroin](https://github.com/Ferroin))
 - Add CAP\_SYS\_CHROOT for netdata service [\#9726](https://github.com/netdata/netdata/pull/9726) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed global GUID map memory leak [\#9725](https://github.com/netdata/netdata/pull/9725) ([stelfrag](https://github.com/stelfrag))
@@ -15,12 +17,15 @@
 - Fixed issue with missing alarms [\#9712](https://github.com/netdata/netdata/pull/9712) ([stelfrag](https://github.com/stelfrag))
 - Set the default value of the home directory to the environment's HOME [\#9711](https://github.com/netdata/netdata/pull/9711) ([cakrit](https://github.com/cakrit))
 - Remove broken optimization in the sender thread [\#9703](https://github.com/netdata/netdata/pull/9703) ([amoss](https://github.com/amoss))
+- Send follow up alarms when the initial status matches the notification [\#9698](https://github.com/netdata/netdata/pull/9698) ([cakrit](https://github.com/cakrit))
 - Correct vulnerability reporting instructions [\#9696](https://github.com/netdata/netdata/pull/9696) ([cakrit](https://github.com/cakrit))
 - Fix collectors on MacOS and FreeBSD to ignore archived charts. [\#9695](https://github.com/netdata/netdata/pull/9695) ([mfundul](https://github.com/mfundul))
 - Fix print message when building for Ubuntu Focal [\#9694](https://github.com/netdata/netdata/pull/9694) ([devinrsmith](https://github.com/devinrsmith))
 - Replace alarm redirection link for cloud, to stop showing 404 [\#9688](https://github.com/netdata/netdata/pull/9688) ([cakrit](https://github.com/cakrit))
 - Fix for ignored LXC containers [\#9645](https://github.com/netdata/netdata/pull/9645) ([vlvkobal](https://github.com/vlvkobal))
 - Add community link to readme [\#9602](https://github.com/netdata/netdata/pull/9602) ([zack-shoylev](https://github.com/zack-shoylev))
+- Network viewer charts [\#9591](https://github.com/netdata/netdata/pull/9591) ([thiagoftsm](https://github.com/thiagoftsm))
+- doc: netdata user is also a default [\#9555](https://github.com/netdata/netdata/pull/9555) ([mrbarletta](https://github.com/mrbarletta))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
@@ -225,7 +230,6 @@
 - New alarms \(exporting and Backend\) [\#9075](https://github.com/netdata/netdata/pull/9075) ([thiagoftsm](https://github.com/thiagoftsm))
 - Implement new incremental parser [\#9074](https://github.com/netdata/netdata/pull/9074) ([stelfrag](https://github.com/stelfrag))
 - OpenTSDB and TLS [\#9068](https://github.com/netdata/netdata/pull/9068) ([thiagoftsm](https://github.com/thiagoftsm))
-- Added required bundle for libuuid on ClearLinux. [\#9060](https://github.com/netdata/netdata/pull/9060) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
