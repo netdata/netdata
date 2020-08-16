@@ -155,14 +155,14 @@ def backend_charts_template(name):
     return order, charts
 
 
-def disk_charts_template(name):
+def storage_charts_template(name):
     order = [
-        'disk_{0}_usage'.format(name),
+        'storage_{0}_usage'.format(name),
     ]
 
     charts = {
         order[0]: {
-            'options': [None, 'Disk "{0}" Usage'.format(name), 'KiB', 'disk usage', 'varnish.disk_usage', 'stacked'],
+            'options': [None, 'Storage "{0}" Usage'.format(name), 'KiB', 'storage usage', 'varnish.storage_usage', 'stacked'],
             'lines': [
                 ['{0}.g_space'.format(name), 'free', 'absolute', 1, 1 << 10],
                 ['{0}.g_bytes'.format(name), 'allocated', 'absolute', 1, 1 << 10]
@@ -227,7 +227,7 @@ class Service(ExecutableService):
         self.parser = Parser()
         self.command = None
         self.collected_vbe = set()
-        self.collected_smf = set()
+        self.collected_smf_sma = set()
 
     def create_command(self):
         varnishstat = find_binary(VARNISHSTAT)
@@ -298,7 +298,7 @@ class Service(ExecutableService):
         data.update(stats)
 
         self.get_vbe_backends(data, raw)
-        self.get_smf_disks(server_stats)
+        self.get_smf_sma_storages(server_stats)
 
         # varnish 5 uses default.g_bytes and default.g_space
         data['memory_allocated'] = data.get('s0.g_bytes') or data.get('default.g_bytes')
@@ -320,7 +320,7 @@ class Service(ExecutableService):
             self.collected_vbe.add(name)
             self.add_backend_charts(name)
 
-    def get_smf_disks(self, server_stats):
+    def get_smf_sma_storages(self, server_stats):
         #  [('SMF.', 'ssdStorage.c_req', '47686'),
         #  ('SMF.', 'ssdStorage.c_fail', '0'),
         #  ('SMF.', 'ssdStorage.c_bytes', '668102656'),
@@ -331,21 +331,21 @@ class Service(ExecutableService):
         #  ('SMF.', 'ssdStorage.g_smf', '40130'),
         #  ('SMF.', 'ssdStorage.g_smf_frag', '311'),
         #  ('SMF.', 'ssdStorage.g_smf_large', '66')]
-        disks = [name for typ, name, _ in server_stats if typ.startswith('SMF') and name.endswith('g_space')]
-        if not disks:
+        storages = [name for typ, name, _ in server_stats if typ.startswith(('SMF', 'SMA')) and name.endswith('g_space')]
+        if not storages:
             return
-        for disk in disks:
-            disk = disk.split('.')[0]  # ssdStorage
-            if disk in self.collected_smf:
+        for storage in storages:
+            storage = storage.split('.')[0]
+            if storage in self.collected_smf_sma:
                 continue
-            self.collected_smf.add(disk)
-            self.add_disk_charts(disk)
+            self.collected_smf_sma.add(storage)
+            self.add_storage_charts(storage)
 
     def add_backend_charts(self, backend_name):
         self.add_charts(backend_name, backend_charts_template)
 
-    def add_disk_charts(self, disk_name):
-        self.add_charts(disk_name, disk_charts_template)
+    def add_storage_charts(self, storage_name):
+        self.add_charts(storage_name, storage_charts_template)
 
     def add_charts(self, name, charts_template):
         order, charts = charts_template(name)
