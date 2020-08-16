@@ -5,6 +5,7 @@
 #include "libnetdata/libnetdata.h"
 #include "../daemon/common.h"
 #include "aclk_common.h"
+#include "aclk_stats.h"
 
 extern int aclk_shutting_down;
 
@@ -132,7 +133,7 @@ static inline void aclk_lws_wss_clear_io_buffers()
 }
 
 static const struct lws_protocols protocols[] = { { "aclk-wss", aclk_lws_wss_callback,
-                                                    sizeof(struct aclk_lws_wss_perconnect_data), 0, 0, 0, 0 },
+                                                    sizeof(struct aclk_lws_wss_perconnect_data), 32768*4, 0, 0, 32768*4 },
                                                   { NULL, NULL, 0, 0, 0, 0, 0 } };
 
 static void aclk_lws_wss_log_divert(int level, const char *line)
@@ -322,6 +323,10 @@ int aclk_lws_wss_connect(char *host, int port)
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
+#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 0
+#warning DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.
+    i.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+#endif
     lws_client_connect_via_info(&i);
     return 0;
 }
@@ -432,8 +437,14 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 if ( bytes_left > FRAGMENT_SIZE)
                     bytes_left = FRAGMENT_SIZE;
                 int n = lws_write(wsi, data->data + LWS_PRE + data->written, bytes_left, LWS_WRITE_BINARY);
-                if (n>=0)
+                if (n>=0) {
                     data->written += n;
+                    if (aclk_stats_enabled) {
+                        ACLK_STATS_LOCK;
+                        aclk_metrics_per_sample.write_q_consumed += n;
+                        ACLK_STATS_UNLOCK;
+                    }
+                }
                 //error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
                 if (data->written == data->data_size)
                 {
@@ -451,6 +462,11 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             if (!received_data_to_ringbuff(engine_instance->read_ringbuffer, in, len))
                 retval = 1;
             aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);
+            if (aclk_stats_enabled) {
+                ACLK_STATS_LOCK;
+                aclk_metrics_per_sample.read_q_added += len;
+                ACLK_STATS_UNLOCK;
+            }
 
             // to future myself -> do not call this while read lock is active as it will eventually
             // want to acquire same lock later in aclk_lws_wss_client_read() function
@@ -520,6 +536,12 @@ int aclk_lws_wss_client_write(void *buf, size_t count)
         lws_wss_packet_buffer_append(&engine_instance->write_buffer_head, lws_wss_packet_buffer_new(buf, count));
         aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
 
+        if (aclk_stats_enabled) {
+            ACLK_STATS_LOCK;
+            aclk_metrics_per_sample.write_q_added += count;
+            ACLK_STATS_UNLOCK;
+        }
+
         lws_callback_on_writable(engine_instance->lws_wsi);
         return count;
     }
@@ -544,6 +566,12 @@ int aclk_lws_wss_client_read(void *buf, size_t count)
     data_to_be_read = lws_ring_consume(engine_instance->read_ringbuffer, NULL, buf, data_to_be_read);
     if (data_to_be_read == readable_byte_count)
         engine_instance->data_to_read = 0;
+
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.read_q_consumed += data_to_be_read;
+        ACLK_STATS_UNLOCK;
+    }
 
 abort:
     aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);

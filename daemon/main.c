@@ -36,12 +36,18 @@ void netdata_cleanup_and_exit(int ret) {
         // exit cleanly
 
         // stop everything
-        info("EXIT: stopping master threads...");
+        info("EXIT: stopping static threads...");
         cancel_main_threads();
 
         // free the database
         info("EXIT: freeing database memory...");
+#ifdef ENABLE_DBENGINE
+        rrdeng_prepare_exit(&multidb_ctx);
+#endif
         rrdhost_free_all();
+#ifdef ENABLE_DBENGINE
+        rrdeng_exit(&multidb_ctx);
+#endif
     }
 
     // unlink the pid
@@ -232,7 +238,7 @@ void cancel_main_threads() {
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
-            info("EXIT: Stopping master thread: %s", static_threads[i].name);
+            info("EXIT: Stopping main thread: %s", static_threads[i].name);
             netdata_thread_cancel(*static_threads[i].thread);
             found++;
         }
@@ -254,7 +260,7 @@ void cancel_main_threads() {
     if(found) {
         for (i = 0; static_threads[i].name != NULL ; i++) {
             if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
-                error("Master thread %s takes too long to exit. Giving up...", static_threads[i].name);
+                error("Main thread %s takes too long to exit. Giving up...", static_threads[i].name);
         }
     }
     else
@@ -434,6 +440,14 @@ static void log_init(void) {
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", ""), 1);
 }
 
+char *initialize_lock_directory_path(char *prefix)
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
+
+    return config_get(CONFIG_SECTION_GLOBAL, "lock directory", filename);
+}
+
 static void backwards_compatible_config() {
     // move [global] options to the [web] section
     config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",
@@ -527,7 +541,10 @@ static void get_netdata_configured_variables() {
     netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    netdata_configured_web_dir);
     netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
-    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
+    char *env_home=getenv("HOME");
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         env_home?env_home:netdata_configured_home_dir);
+
+    netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
 
     {
         pluginsd_initialize_plugin_directories();
@@ -557,6 +574,13 @@ static void get_netdata_configured_variables() {
         error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
     }
+
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space", compute_multidb_diskspace());
+    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
+        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
+    }
+
 #endif
     // ------------------------------------------------------------------------
 
@@ -685,9 +709,21 @@ void set_global_environment() {
     setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
     setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
     setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
+    setenv("NETDATA_LOCK_DIR"         , netdata_configured_lock_dir, 1);
     setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
+
+    char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
+    int clean = 0;
+    if (!default_port) {
+        default_port = strdupz("19999");
+        clean = 1;
+    }
+
+    setenv("NETDATA_LISTEN_PORT"      , default_port, 1);
+    if(clean)
+        freez(default_port);
 
     get_system_timezone();
 
@@ -906,6 +942,11 @@ int main(int argc, char **argv) {
             else i++;
         }
     }
+    if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
+        // don't run netdata, this is the spawn server
+        spawn_server();
+        exit(0);
+    }
 
     // parse options
     {
@@ -990,6 +1031,7 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
+                            registry_init();
                             if(rrd_init("unittest", NULL)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
                                 return 1;
@@ -1086,6 +1128,36 @@ int main(int argc, char **argv) {
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
                         else if(strcmp(optarg, "set") == 0) {
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
+                                        " Overwrites settings of netdata.conf.\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " If -c netdata.conf is given on the command line,\n"
+                                        " before -W set... the user may overwrite command\n"
+                                        " line parameters at netdata.conf\n"
+                                        " If -c netdata.conf is given after (or missing)\n"
+                                        " -W set... the user cannot overwrite the command line\n"
+                                        " parameters."
+                                        "\n"
+                                );
+                                return 1;
+                            }
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *value = argv[optind + 2];
+                            optind += 3;
+
+                            // set this one as the default
+                            // only if it is not already set in the config file
+                            // so the caller can use -c netdata.conf before or
+                            // after this parameter to prevent or allow overwriting
+                            // variables at netdata.conf
+                            config_set_default(section, key,  value);
+
+                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                        }
+                        else if(strcmp(optarg, "set2") == 0) {
                             if(optind + 4 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W set 'conf_file' 'section' 'key' 'value'\n\n"
                                         " Overwrites settings of netdata.conf or cloud.conf\n"
@@ -1237,6 +1309,9 @@ int main(int argc, char **argv) {
         // files using relative filenames
         if(chdir(netdata_configured_user_config_dir) == -1)
             fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+
+        // Get execution path before switching user to avoid permission issues
+        get_netdata_execution_path();
     }
 
     {
@@ -1347,6 +1422,19 @@ int main(int argc, char **argv) {
 
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
+    // initialyze internal registry
+    registry_init();
+    // fork the spawn server
+    spawn_init();
+    /*
+     * Libuv uv_spawn() uses SIGCHLD internally:
+     * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
+     * and inadvertently replaces the netdata signal handler which was setup during initialization.
+     * Thusly, we must explicitly restore the signal handler for SIGCHLD.
+     * Warning: extreme care is needed when mixing and matching POSIX and libuv.
+     */
+    signals_restore_SIGCHLD();
+
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
@@ -1354,6 +1442,9 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
+#ifdef ENABLE_DBENGINE
+    init_global_guid_map();
+#endif
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
@@ -1371,6 +1462,10 @@ int main(int argc, char **argv) {
 
     // Load host labels
     reload_host_labels();
+#ifdef ENABLE_DBENGINE
+    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        metalog_commit_update_host(localhost);
+#endif
 
     // ------------------------------------------------------------------------
     // spawn the threads

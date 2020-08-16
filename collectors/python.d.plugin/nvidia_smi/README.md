@@ -9,36 +9,33 @@ sidebar_label: "Nvidia GPUs"
 Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
 
 
-**Requirements and Notes:**
+## Requirements and Notes
 
 -   You must have the `nvidia-smi` tool installed and your NVIDIA GPU(s) must support the tool. Mostly the newer high end models used for AI / ML and Crypto or Pro range, read more about [nvidia_smi](https://developer.nvidia.com/nvidia-system-management-interface).
-
 -   You must enable this plugin as its disabled by default due to minor performance issues.
-
 -   On some systems when the GPU is idle the `nvidia-smi` tool unloads and there is added latency again when it is next queried. If you are running GPUs under constant workload this isn't likely to be an issue.
-
 -   Currently the `nvidia-smi` tool is being queried via cli. Updating the plugin to use the nvidia c/c++ API directly should resolve this issue. See discussion here: <https://github.com/netdata/netdata/pull/4357>
-
 -   Contributions are welcome.
-
 -   Make sure `netdata` user can execute `/usr/bin/nvidia-smi` or wherever your binary is.
-
 -   If `nvidia-smi` process [is not killed after netdata restart](https://github.com/netdata/netdata/issues/7143) you need to off `loop_mode`.
-
 -   `poll_seconds` is how often in seconds the tool is polled for as an integer.
 
-It produces:
+## Charts
 
-1.  Per GPU
+It produces the following charts:
 
-    -   GPU utilization
-    -   memory allocation
-    -   memory utilization
-    -   fan speed
-    -   power usage
-    -   temperature
-    -   clock speed
-    -   PCI bandwidth
+-   PCI Express Bandwidth Utilization in `KiB/s`
+-   Fan Speed in `percentage`
+-   GPU Utilization in `percentage`
+-   Memory Bandwidth Utilization in `percentage`
+-   Encoder/Decoder Utilization in `percentage`
+-   Memory Usage in `MiB`
+-   Temperature in `celsius`
+-   Clock Frequencies in `MHz`
+-   Power Utilization in `Watts`
+-   Memory Used by Each Process in `MiB`
+-   Memory Used by Each User in `MiB`
+-   Number of User on GPU in `num`
 
 ## Configuration
 

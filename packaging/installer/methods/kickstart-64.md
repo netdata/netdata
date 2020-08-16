@@ -14,7 +14,8 @@ This page covers detailed instructions on using and configuring the installation
 This method uses a pre-compiled static binary to install Netdata on any Intel/AMD 64bit Linux system and on any Linux
 distribution, even those with a broken or unsupported package manager.
 
-To install Netdata from a binary package and get _automatic nightly updates_, run the following as your normal user:
+To install Netdata from a static binary package, including all dependencies required to connect to Netdata Cloud, and
+get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
@@ -76,15 +77,15 @@ To use `md5sum` to verify the intregity of the `kickstart-static64.sh` script yo
 command above, run the following:
 
 ```bash
-[ "33ecd20452f569c1d9972bcefdf04692" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "6c3c2957caeeeb1decaf6b6178a3a3cd" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md) for a
-fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
 guide](/docs/getting-started.md) for a quick overview.

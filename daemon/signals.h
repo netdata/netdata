@@ -6,6 +6,7 @@
 extern void signals_init(void);
 extern void signals_block(void);
 extern void signals_unblock(void);
+extern void signals_restore_SIGCHLD(void);
 extern void signals_reset(void);
 extern void signals_handle(void) NORETURN;
 

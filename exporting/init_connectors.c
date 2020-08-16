@@ -13,6 +13,10 @@
 #include "aws_kinesis/aws_kinesis.h"
 #endif
 
+#if ENABLE_EXPORTING_PUBSUB
+#include "pubsub/pubsub.h"
+#endif
+
 #if HAVE_MONGOC
 #include "mongodb/mongodb.h"
 #endif
@@ -60,6 +64,12 @@ int init_connectors(struct engine *engine)
                     return 1;
 #endif
                 break;
+            case EXPORTING_CONNECTOR_TYPE_PUBSUB:
+#if ENABLE_EXPORTING_PUBSUB
+                if (init_pubsub_instance(instance) != 0)
+                    return 1;
+#endif
+                break;
             case EXPORTING_CONNECTOR_TYPE_MONGODB:
 #if HAVE_MONGOC
                 if (init_mongodb_instance(instance) != 0)
@@ -80,6 +90,8 @@ int init_connectors(struct engine *engine)
         char threadname[NETDATA_THREAD_NAME_MAX + 1];
         snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "EXPORTING-%zu", instance->index);
         uv_thread_set_name_np(instance->thread, threadname);
+
+        send_statistics("EXPORTING_START", "OK", instance->config.type_name);
     }
 
     return 0;

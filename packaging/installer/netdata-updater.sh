@@ -14,6 +14,10 @@
 #  - NETDATA_TARBALL_CHECKSUM
 #  - NETDATA_PREFIX / NETDATA_LIB_DIR (After 1.16.1 we will only depend on lib dir)
 #
+# Optional environment options:
+#
+#  - NETDATA_TARBALL_BASEURL (set the base url for downloading the dist tarball)
+#
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author: Paweł Krupa <paulfantom@gmail.com>
@@ -108,7 +112,7 @@ get_latest_version() {
   if [ "${RELEASE_CHANNEL}" == "stable" ]; then
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
   else
-    latest="$(download "https://storage.googleapis.com/netdata-nightlies/latest-version.txt" /dev/stdout)"
+    latest="$(download "$NETDATA_TARBALL_BASEURL/latest-version.txt" /dev/stdout)"
   fi
   parse_version "$latest"
 }
@@ -123,13 +127,12 @@ set_tarball_urls() {
   if [ "$1" = "stable" ]; then
     local latest
     # Simple version
-    # latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.${extension}"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.${extension}"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+    export NETDATA_TARBALL_URL="$NETDATA_TARBALL_BASEURL/netdata-latest.${extension}"
+    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_TARBALL_BASEURL/sha256sums.txt"
   fi
 }
 
@@ -185,8 +188,8 @@ update() {
       do_not_start="--dont-start-it"
     fi
 
-    if [ -n "${NETDATA_SELECTED_DASHBOARD}" ] ; then
-        env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
+    if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
+      env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
     fi
 
     info "Re-installing netdata..."
@@ -210,6 +213,23 @@ tmpdir=
 
 trap cleanup EXIT
 
+while [ -n "${1}" ]; do
+  if [ "${1}" = "--not-running-from-cron" ]; then
+    NETDATA_NOT_RUNNING_FROM_CRON=1
+    shift 1
+  else
+    break
+  fi
+done
+
+# Random sleep to aileviate stampede effect of Agents upgrading
+# and disconnecting/reconnecting at the same time (or near to).
+# But only we're not a controlling terminal (tty)
+# Randomly sleep between 1s and 60m
+if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
+  sleep $(((RANDOM % 3600) + 1))s
+fi
+
 # Usually stored in /etc/netdata/.environment
 : "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
@@ -221,6 +241,9 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
 # Source the tarbal checksum, if not already available from environment (for existing installations with the old logic)
 [[ -z "${NETDATA_TARBALL_CHECKSUM}" ]] && [[ -f ${NETDATA_LIB_DIR}/netdata.tarball.checksum ]] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
+
+# Netdata Tarball Base URL (defaults to our Google Storage Bucket)
+[ -z "$NETDATA_TARBALL_BASEURL" ] && NETDATA_TARBALL_BASEURL=https://storage.googleapis.com/netdata-nightlies
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"

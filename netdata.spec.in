@@ -93,6 +93,10 @@ Group:		Applications/System
 Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
 
+# Remove conflicting EPEL packages
+Obsoletes:  %{name}-conf
+Obsoletes:  %{name}-data
+
 # #####################################################################
 # Core build/install/runtime dependencies
 # #####################################################################
@@ -235,6 +239,7 @@ happened, on your systems and applications.
 %setup -q -n %{name}-%{version}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 
 %build
 # Conf step
@@ -279,8 +284,8 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
-# Install ebpf_process.plugin
-install -m 4750 -p ebpf_process.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf_process.plugin"
+# Install ebpf.plugin
+install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
 
 # ###########################################################
 # Install cups.plugin
@@ -408,6 +413,7 @@ install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-dashboard.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_datadir}/%{name}/web
+${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
 
 %pre
 
@@ -450,7 +456,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sysconfdir}/rc.d/init.d/netdata
 %endif
 
-%defattr(4750,root,netdata,0750)
+%defattr(0750,root,netdata,0750)
 
 %dir %{_libexecdir}/%{name}/python.d
 %dir %{_libexecdir}/%{name}/charts.d

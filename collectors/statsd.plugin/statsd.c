@@ -1324,7 +1324,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if (!strcmp(name, "dimension")) {
                 // metric [name [type [multiplier [divisor]]]]
                 char *words[10];
-                pluginsd_split_words(value, words, 10);
+                pluginsd_split_words(value, words, 10, NULL, NULL, 0);
 
                 int pattern = 0;
                 size_t i = 0;
@@ -1461,6 +1461,8 @@ static inline RRDSET *statsd_private_rrdset_create(
             , chart_type      // chart type
             , memory_mode     // memory mode
             , history         // history
+            , 0               // not archived
+            , NULL            // no known UUID
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
 
@@ -1999,6 +2001,8 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->chart_type         // chart type
                 , app->rrd_memory_mode      // memory mode
                 , app->rrd_history_entries  // history
+                , 0                         // not archived
+                , NULL                      // no known UUID
         );
 
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);

@@ -31,6 +31,7 @@ ORDER = [
     'pool_read_operations',
     'pool_write_operations',
     'osd_usage',
+    'osd_size',
     'osd_apply_latency',
     'osd_commit_latency'
 ]
@@ -99,6 +100,10 @@ CHARTS = {
     },
     'osd_usage': {
         'options': [None, 'Ceph OSDs', 'KiB', 'osd', 'ceph.osd_usage', 'line'],
+        'lines': []
+    },
+    'osd_size': {
+        'options': [None, 'Ceph OSDs size', 'KiB', 'osd', 'ceph.osd_size', 'line'],
         'lines': []
     },
     'osd_apply_latency': {
@@ -189,6 +194,9 @@ class Service(SimpleService):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])
+            self.definitions['osd_size']['lines'].append(['size_{0}'.format(osd['name']),
+                                                           osd['name'],
+                                                           'absolute'])
             self.definitions['osd_apply_latency']['lines'].append(['apply_latency_{0}'.format(osd['name']),
                                                                    osd['name'],
                                                                    'absolute'])
@@ -217,6 +225,7 @@ class Service(SimpleService):
                 data.update(self._get_pool_rw(pool_io))
             for osd in osd_df['nodes']:
                 data.update(self._get_osd_usage(osd))
+                data.update(self._get_osd_size(osd))
             for osd_apply_commit in osd_perf_infos:
                 data.update(self._get_osd_latency(osd_apply_commit))
             return data
@@ -294,6 +303,14 @@ class Service(SimpleService):
         :return: A osd dict with osd name's key and usage bytes' value
         """
         return {osd['name']: float(osd['kb_used'])}
+
+    @staticmethod
+    def _get_osd_size(osd):
+        """
+        Process raw data into osd dict information to get osd size (kb)
+        :return: A osd dict with osd name's key and size bytes' value
+        """
+        return {'size_{0}'.format(osd['name']): float(osd['kb'])}
 
     @staticmethod
     def _get_osd_latency(osd):

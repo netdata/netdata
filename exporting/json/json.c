@@ -12,7 +12,7 @@ int init_json_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 5448;
 
@@ -37,8 +37,10 @@ int init_json_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for json exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     return 0;
 }
@@ -131,8 +133,8 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 
         "\"timestamp\":%llu}\n",
 
-        engine->config.prefix,
-        engine->config.hostname,
+        instance->config.prefix,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,
@@ -208,8 +210,8 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
 
         "\"timestamp\": %llu}\n",
 
-        engine->config.prefix,
-        engine->config.hostname,
+        instance->config.prefix,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,

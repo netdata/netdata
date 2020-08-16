@@ -29,6 +29,7 @@ fi
 # Pull in OpenSSL properly if on macOS
 if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
   export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+  export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib"
 fi
 
 # -----------------------------------------------------------------------------
@@ -73,28 +74,8 @@ else
   source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
-download_tarball() {
-  url="${1}"
-  dest="${2}"
-  name="${3}"
-  opt="${4}"
-
-  if command -v curl > /dev/null 2>&1; then
-    run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O - "${url}" > "${dest}"
-  else
-    echo >&2
-    echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
-    echo >&2 "Either add packages or disable it by issuing '--disable-${opt}' in the installer"
-    echo >&2
-
-    run_failed "I need curl or wget to proceed, but neither is available on this system."
-  fi
-}
-
 download_go() {
-  download_tarball "${1}" "${2}" "go.d plugin" "go"
+  download_file "${1}" "${2}" "go.d plugin" "go"
 }
 
 # make sure we save all commands we run
@@ -192,7 +173,7 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
-  --enable-ebpf              Enable eBPF Kernel plugin (Default: disabled, feature preview)
+  --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
@@ -255,6 +236,7 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
+    "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
     "--auto-update" | "-u") AUTOUPDATE=1 ;;
@@ -279,7 +261,8 @@ while [ -n "${1}" ]; do
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--enable-ebpf") NETDATA_ENABLE_EBPF=1 ;;
+    "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
@@ -315,6 +298,13 @@ while [ -n "${1}" ]; do
   esac
   shift 1
 done
+
+make="make"
+# See: https://github.com/netdata/netdata/issues/9163
+if [ "$(uname -s)" = "FreeBSD" ]; then
+  make="gmake"
+  NETDATA_CONFIGURE_OPTIONS="$NETDATA_CONFIGURE_OPTIONS --disable-dependency-tracking"
+fi
 
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
@@ -363,7 +353,7 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
   ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
   Anonymous usage stats will be collected and sent to Google Analytics.
   To opt-out, pass --disable-telemetry option to the installer or export
-  the enviornment variable DO_NOT_TRACK to a non-zero or non-empty value
+  the environment variable DO_NOT_TRACK to a non-zero or non-empty value
   (e.g: export DO_NOT_TRACK=1).
 
 BANNER4
@@ -479,20 +469,26 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 
 build_libmosquitto() {
+  local env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+  fi
+
   if [ "$(uname -s)" = Linux ]; then
-    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C "${1}/lib"
+    run ${env_cmd} make -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+      run ${env_cmd} cmake \
         -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
         -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
         -D WITH_STATIC_LIBRARIES:boolean=YES \
         .
     else
-      run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
+      run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run env CFLAGS= CXXFLAGS= LDFLAGS= make -C lib
+    run ${env_cmd} make -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -553,17 +549,24 @@ bundle_libmosquitto
 # -----------------------------------------------------------------------------
 
 build_libwebsockets() {
+  local env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+  fi
+
   pushd "${1}" > /dev/null || exit 1
   if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake \
+    run ${env_cmd} cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
       -D LWS_WITH_SOCKS5:bool=ON \
+      $CMAKE_FLAGS \
       .
   else
-    run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -D LWS_WITH_SOCKS5:bool=ON .
+    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON $CMAKE_FLAGS .
   fi
-  run env CFLAGS= CXXFLAGS= LDFLAGS= make
+  run ${env_cmd} make
   popd > /dev/null || exit 1
 }
 
@@ -627,9 +630,15 @@ bundle_libwebsockets
 # -----------------------------------------------------------------------------
 
 build_jsonc() {
+  local env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+  fi
+
   pushd "${1}" > /dev/null || exit 1
-  run env CFLAGS= CXXFLAGS= LDFLAGS= cmake -DBUILD_SHARED_LIBS=OFF .
-  run env CFLAGS= CXXFLAGS= LDFLAGS= make
+  run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
+  run ${env_cmd} make
   popd > /dev/null || exit 1
 }
 
@@ -692,6 +701,71 @@ bundle_jsonc() {
 bundle_jsonc
 
 # -----------------------------------------------------------------------------
+
+build_libbpf() {
+  pushd "${1}/src" > /dev/null || exit 1
+  run env CFLAGS= CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
+  popd > /dev/null || exit 1
+}
+
+copy_libbpf() {
+  target_dir="${PWD}/externaldeps/libbpf"
+
+  if [ "$(uname -m)" = x86_64 ]; then
+    lib_subdir="lib64"
+  else
+    lib_subdir="lib"
+  fi
+
+  run mkdir -p "${target_dir}" || return 1
+
+  run cp "${1}/usr/${lib_subdir}/libbpf.a" "${target_dir}/libbpf.a" || return 1
+  run cp -r "${1}/usr/include" "${target_dir}" || return 1
+}
+
+bundle_libbpf() {
+  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+    return 0
+  fi
+
+  progress "Prepare libbpf"
+
+  LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf.version)"
+
+  tmp="$(mktemp -d -t netdata-libbpf-XXXXXX)"
+  LIBBPF_PACKAGE_BASENAME="v${LIBBPF_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "libbpf" \
+    "https://github.com/netdata/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
+    "${LIBBPF_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBBPF}"; then
+    if run tar -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
+      copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "libbpf built and prepared."
+    else
+      run_failed "Failed to build libbpf."
+      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build libbpf. You may not be able to use eBPF plugin."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for libbpf."
+    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 0 ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for libbpf. You may not be able to use eBPF plugin."
+    fi
+  fi
+}
+
+bundle_libbpf
+
+# -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
 if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
@@ -724,12 +798,12 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Cleanup compilation directory"
 
-run make clean
+run $make clean
 
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run make -j$(find_processors) || exit 1
+run $make -j$(find_processors) || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
@@ -836,7 +910,7 @@ touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
-run make install || exit 1
+run $make install || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
@@ -1067,9 +1141,9 @@ if [ "${UID}" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
-    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin" ]; then
+    run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
@@ -1158,7 +1232,7 @@ govercomp() {
   for ((i = 0; i < ${#ver1[@]}; i++)); do
     if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
       return 1
-    elif [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
+    elif [ "${ver2[i]}" -gt "${ver1[i]}" ]; then
       return 2
     fi
   done
@@ -1281,6 +1355,19 @@ function get_kernel_version() {
   printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
 }
 
+function get_rh_version() {
+  if [ ! -f /etc/redhat-release ]; then
+    printf "000000000"
+    return
+  fi
+
+  r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
 detect_libc() {
   libc=
   if ldd --version 2>&1 | grep -q -i glibc; then
@@ -1300,90 +1387,36 @@ detect_libc() {
   return 0
 }
 
-get_compatible_kernel_for_ebpf() {
-  kver="${1}"
-
-  # XXX: Logic taken from Slack discussion in #ebpf
-  # everything that has a version <= 4.14 can use the code built to 4.14
-  # also all distributions that has a version <= 4.15.256 can use the code built to 4.15
-  # Continue the logic, everything that has a version < 4.19.102 and >= 4.15 can use the code built to 4.19
-  # Kernel 4.19 had a feature added in the version 4.19.102 that force us to break it in two, so version >= 4.19.102
-  # and smaller than < 5.0 runs with code built to 4.19.102
-  # Finally,  everybody that is using 5.X can use what is compiled with 5.4
-
-  kpkg=
-
-  if [ "${kver}" -ge 005000000 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 5.4.20"
-    kpkg="5_4_20"
-  elif [ "${kver}" -ge 004019102 ] && [ "${kver}" -le 004020017 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.104"
-    kpkg="4_19_104"
-  elif [ "${kver}" -ge 004016000 ] && [ "${kver}" -le 004020017 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.19.98"
-    kpkg="4_19_98"
-  elif [ "${kver}" -ge 004015000 ] && [ "${kver}" -le 004015256 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.15.18"
-    kpkg="4_15_18"
-  elif [ "${kver}" -le 004014999 ]; then
-    echo >&2 " Using eBPF Kernel Package built against Linux 4.14.171"
-    kpkg="4_14_171"
-  else
-    echo >&2 " ERROR: Cannot detect a supported kernel on your system!"
-    return 1
-  fi
-
-  echo "${kpkg}"
-  return 0
-}
-
 should_install_ebpf() {
-  if [ "${NETDATA_ENABLE_EBPF:=0}" -ne 1 ]; then
-    run_failed "ebpf not enabled. --enable-ebpf to enable"
-    return 1
-  fi
-
-  if [ "$(uname)" != "Linux" ]; then
-    echo >&2 " Sorry eBPF Collector is currently unsupproted on $(uname) Systems at this time."
-    echo >&2 " Please contact NetData suppoort! https://github.com/netdata/netdata/issues/new"
-    return 1
-  fi
-
-  # Get and Parse Kernel Version
-  kver="$(get_kernel_version)"
-  kver="${kver:-0}"
-
-  # Check Kernel Compatibility
-  if ! get_compatible_kernel_for_ebpf "${kver}" > /dev/null; then
-    echo >&2 " Detected Kernel: ${kver}"
-    run_failed "Kernel incompatible. Please contact NetData support!"
+  if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
+    run_failed "eBPF explicitly disabled."
+    defer_error "eBPF explicitly disabled."
     return 1
   fi
 
   # Check Kernel Config
-
-  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
-
-  echo >&2 " Downloading check-kernel-config.sh ..."
-  if ! get "https://raw.githubusercontent.com/netdata/kernel-collector/master/tools/check-kernel-config.sh" > "${tmp}"/check-kernel-config.sh; then
-    run_failed "Failed to download check-kernel-config.sh"
-    echo 2>&" Removing temporary directory ${tmp} ..."
-    rm -rf "${tmp}"
-    return 1
+  if ! run "${INSTALLER_DIR}"/packaging/check-kernel-config.sh; then
+    echo >&2 "Warning: Kernel unsupported or missing required config (eBPF may not work on your system)"
   fi
-
-  run chmod +x "${tmp}"/check-kernel-config.sh
-
-  if ! run "${tmp}"/check-kernel-config.sh; then
-    run_failed "Kernel unsupported or missing required config"
-    return 1
-  fi
-
-  rm -rf "${tmp}"
-
-  # TODO: Check for current vs. latest version
 
   return 0
+}
+
+remove_old_ebpf() {
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
+    echo >&2 "Removing alpha eBPF collector."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
+    echo >&2 "Removing alpha eBPF stock file"
+    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf"
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
+    echo >&2 "Renaming eBPF configuration file."
+    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
+  fi
 }
 
 install_ebpf() {
@@ -1391,69 +1424,43 @@ install_ebpf() {
     return 0
   fi
 
+  remove_old_ebpf
+
   progress "Installing eBPF plugin"
 
-  # Get and Parse Kernel Version
-  kver="$(get_kernel_version)"
-  kver="${kver:-0}"
-
-  # Get Compatible eBPF Kernel Package
-  kpkg="$(get_compatible_kernel_for_ebpf "${kver}")"
-
   # Detect libc
-  libc="$(detect_libc)"
+  libc="${EBPF_LIBC:-"$(detect_libc)"}"
 
-  PACKAGE_TARBALL="netdata_ebpf-${kpkg}-${libc}.tar.xz"
-
-  echo >&2 " Getting latest eBPF Package URL for ${PACKAGE_TARBALL} ..."
-
-  PACKAGE_TARBALL_URL=
-  PACKAGE_TARBALL_URL="$(get "https://api.github.com/repos/netdata/kernel-collector/releases/latest" | grep -o -E "\"browser_download_url\": \".*${PACKAGE_TARBALL}\"" | sed -e 's/"browser_download_url": "\(.*\)"/\1/')"
-
-  if [ -z "${PACKAGE_TARBALL_URL}" ]; then
-    run_failed "Could not get latest eBPF Package URL for ${PACKAGE_TARBALL}"
-    return 1
-  fi
+  EBPF_VERSION="$(cat packaging/ebpf.version)"
+  EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
 
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
-  echo >&2 " Downloading eBPF Package ${PACKAGE_TARBALL_URL} ..."
-  if ! get "${PACKAGE_TARBALL_URL}" > "${tmp}"/"${PACKAGE_TARBALL}"; then
-    run_failed "Failed to download latest eBPF Package ${PACKAGE_TARBALL_URL}"
+  if ! fetch_and_verify "ebpf" \
+    "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
+    "${EBPF_TARBALL}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_OVERRIDE_EBPF}"; then
+    run_failed "Failed to download eBPF collector package"
     echo 2>&" Removing temporary directory ${tmp} ..."
     rm -rf "${tmp}"
     return 1
   fi
 
-  echo >&2 " Extracting ${PACKAGE_TARBALL} ..."
-  tar -xf "${tmp}/${PACKAGE_TARBALL}" -C "${tmp}"
+  echo >&2 " Extracting ${EBPF_TARBALL} ..."
+  tar -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
 
-  echo >&2 " Finding suitable lib directory ..."
-  libdir=
-  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
-  if [ -z "${libdir}" ]; then
-    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
-  fi
+  # chown everything to root:netdata before we start copying out of our package
+  run chown -R root:netdata "${tmp}"
 
-  if [ -z "${libdir}" ]; then
-    run_failed "Could not find a suitable lib directory"
-    return 1
-  fi
+  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
 
-  run cp -a -v "${tmp}/usr/lib64/libbpf_kernel.so" "${libdir}"
-  run cp -a -v "${tmp}/libnetdata_ebpf.so" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/pnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run cp -a -v "${tmp}"/rnetdata_ebpf_process.o "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  run ln -v -f -s "${libdir}"/libbpf_kernel.so "${libdir}"/libbpf_kernel.so.0
-  run ldconfig
-
-  echo >&2 "ePBF installation all done!"
   rm -rf "${tmp}"
 
   return 0
 }
 
-progress "eBPF Kernel Collector (opt-in)"
+progress "eBPF Kernel Collector"
 install_ebpf
 
 # -----------------------------------------------------------------------------

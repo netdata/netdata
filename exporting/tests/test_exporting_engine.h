@@ -18,6 +18,10 @@
 #include "exporting/aws_kinesis/aws_kinesis.h"
 #endif
 
+#if ENABLE_EXPORTING_PUBSUB
+#include "exporting/pubsub/pubsub.h"
+#endif
+
 #if HAVE_MONGOC
 #include "exporting/mongodb/mongodb.h"
 #endif
@@ -89,8 +93,6 @@ calculated_number __wrap_exporting_calculate_value_from_stored_data(
 int __real_prepare_buffers(struct engine *engine);
 int __wrap_prepare_buffers(struct engine *engine);
 
-int __wrap_notify_workers(struct engine *engine);
-
 void __real_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
 void __wrap_create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
 
@@ -114,6 +116,7 @@ int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
 void *__real_init_write_request();
 void *__wrap_init_write_request();
 
@@ -135,7 +138,9 @@ void __wrap_add_metric(
     void *write_request_p,
     const char *name, const char *chart, const char *family, const char *dimension,
     const char *instance, const double value, const int64_t timestamp);
+#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
+#if HAVE_KINESIS
 void __wrap_aws_sdk_init();
 void __wrap_kinesis_init(
     void *kinesis_specific_data_p, const char *region, const char *access_key_id, const char *secret_key,
@@ -144,7 +149,21 @@ void __wrap_kinesis_put_record(
     void *kinesis_specific_data_p, const char *stream_name, const char *partition_key, const char *data,
     size_t data_len);
 int __wrap_kinesis_get_result(void *request_outcomes_p, char *error_message, size_t *sent_bytes, size_t *lost_bytes);
+#endif /* HAVE_KINESIS */
 
+#if ENABLE_EXPORTING_PUBSUB
+int __wrap_pubsub_init(
+    void *pubsub_specific_data_p, char *error_message, const char *destination, const char *credentials_file,
+    const char *project_id, const char *topic_id);
+int __wrap_pubsub_add_message(void *pubsub_specific_data_p, char *data);
+int __wrap_pubsub_publish(
+    void *pubsub_specific_data_p, char *error_message, size_t buffered_metrics, size_t buffered_bytes);
+int __wrap_pubsub_get_result(
+    void *pubsub_specific_data_p, char *error_message,
+    size_t *sent_metrics, size_t *sent_bytes, size_t *lost_metrics, size_t *lost_bytes);
+#endif /* ENABLE_EXPORTING_PUBSUB */
+
+#if HAVE_MONGOC
 void __wrap_mongoc_init();
 mongoc_uri_t *__wrap_mongoc_uri_new_with_error(const char *uri_string, bson_error_t *error);
 int32_t __wrap_mongoc_uri_get_option_as_int32(const mongoc_uri_t *uri, const char *option, int32_t fallback);
@@ -163,6 +182,7 @@ bool __wrap_mongoc_collection_insert_many(
     const bson_t *opts,
     bson_t *reply,
     bson_error_t *error);
+#endif /* HAVE_MONGOC */
 
 // -----------------------------------------------------------------------
 // fixtures

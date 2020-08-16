@@ -5,7 +5,7 @@
 
 #include "rrd2json.h"
 
-extern void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile);
+extern void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived);
 extern void chartcollectors2json(RRDHOST *host, BUFFER *wb);
 
 #endif //NETDATA_API_FORMATTER_CHARTS2JSON_H

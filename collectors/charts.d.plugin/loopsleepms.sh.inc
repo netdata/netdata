@@ -10,16 +10,24 @@ fi
 # -----------------------------------------------------------------------------
 # use the date command as a high resolution timer
 
+# macOS 'date' doesnt support '%N' precision
+# echo $(/bin/date +"%N") is "N"
+if [ "$($LOOPSLEEP_DATE +"%N")" = "N" ]; then
+  LOOPSLEEP_DATE_FORMAT="%s * 1000"
+else
+  LOOPSLEEP_DATE_FORMAT="%s * 1000 + 10#%-N / 1000000"
+fi
+
 now_ms=
 LOOPSLEEPMS_HIGHRES=1
 test "$($LOOPSLEEP_DATE +%N)" = "%N" && LOOPSLEEPMS_HIGHRES=0
 test -z "$($LOOPSLEEP_DATE +%N)" && LOOPSLEEPMS_HIGHRES=0
 current_time_ms_from_date() {
-	if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]; then
-		now_ms="$($LOOPSLEEP_DATE +'%s')000"
-	else
-		now_ms="$(($($LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000')))"
-	fi
+  if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]; then
+    now_ms="$($LOOPSLEEP_DATE +'%s')000"
+  else
+    now_ms="$(($($LOOPSLEEP_DATE +"$LOOPSLEEP_DATE_FORMAT")))"
+  fi
 }
 
 # -----------------------------------------------------------------------------

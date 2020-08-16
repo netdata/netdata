@@ -282,6 +282,8 @@
 #define NETDATA_CHART_PRIO_TC_QOS_TOCKENS             7030
 #define NETDATA_CHART_PRIO_TC_QOS_CTOCKENS            7040
 
+// Infiniband
+#define NETDATA_CHART_PRIO_INFINIBAND                 7100
 
 // Netfilter
 

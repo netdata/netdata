@@ -32,10 +32,16 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
 fi
 
 # Run the build script inside the container
-run docker run -a stdin -a stdout -a stderr -i -t -v \
-  "$(pwd)":/usr/src/netdata.git:rw \
-  "${DOCKER_CONTAINER_NAME}" \
-  /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
+if [ -t 1 ]; then
+  run docker run -a stdin -a stdout -a stderr -i -t -v \
+    "$(pwd)":/usr/src/netdata.git:rw \
+    "${DOCKER_CONTAINER_NAME}" \
+    /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
+else
+  run docker run -v "$(pwd)":/usr/src/netdata.git:rw \
+    "${DOCKER_CONTAINER_NAME}" \
+    /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
+fi
 
 if [ "${USER}" ]; then
   sudo chown -R "${USER}" .

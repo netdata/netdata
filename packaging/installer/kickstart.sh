@@ -13,7 +13,12 @@
 #  --dont-wait                do not prompt for user input
 #  --non-interactive          do not prompt for user input
 #  --no-updates               do not install script for daily updates
-#  --local-files   set the full path of the desired tarball to run install with
+#  --local-files              set the full path of the desired tarball to run install with
+#  --allow-duplicate-install  do not bail if we detect a duplicate install
+#
+# Environment options:
+#
+#  NETDATA_TARBALL_BASEURL    set the base url for downloading the dist tarball
 #
 # This script will:
 #
@@ -28,6 +33,9 @@
 
 # External files
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+
+# Netdata Tarball Base URL (defaults to our Google Storage Bucket)
+[ -z "$NETDATA_TARBALL_BASEURL" ] && NETDATA_TARBALL_BASEURL=https://storage.googleapis.com/netdata-nightlies
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -158,9 +166,9 @@ download() {
   url="${1}"
   dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
   elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O - "${url}" > "${dest}" || fatal "Cannot download ${url}"
+    run wget -T 15 -O "${dest}" "${url}" || fatal "Cannot download ${url}"
   else
     fatal "I need curl or wget to proceed, but neither is available on this system."
   fi
@@ -175,13 +183,12 @@ set_tarball_urls() {
   if [ "$1" = "stable" ]; then
     local latest
     # Simple version
-    # latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+    export NETDATA_TARBALL_URL="$NETDATA_TARBALL_BASEURL/netdata-latest.tar.gz"
+    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_TARBALL_BASEURL/sha256sums.txt"
   fi
 }
 
@@ -272,21 +279,49 @@ sudo=""
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
 # ---------------------------------------------------------------------------------------------------------------------
-# try to update using autoupdater in the first place
+# look for an existing install and try to update that instead if it exists
 
-updater=""
-[ -x /etc/periodic/daily/netdata-updater ] && updater=/etc/periodic/daily/netdata-updater
-[ -x /etc/cron.daily/netdata-updater ] && updater=/etc/cron.daily/netdata-updater
-if [ -L "${updater}" ]; then
-  # remove old updater (symlink)
-  run ${sudo} rm -f "${updater}"
-  updater=""
+ndpath="$(command -v netdata 2>/dev/null)"
+if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
+    ndpath="/opt/netdata/bin/netdata"
 fi
-if [ -n "${updater}" ]; then
-  # attempt to run the updater, to respect any compilation settings already in place
-  progress "Re-installing netdata..."
-  run ${sudo} "${updater}" -f || fatal "Failed to forcefully update netdata"
-  exit 0
+
+if [ -n "$ndpath" ] ; then
+  ndprefix="$(dirname "$(dirname "${ndpath}")")"
+
+  if [ "${ndprefix}" = /usr ] ; then
+    ndprefix="/"
+  fi
+
+  progress "Found existing install of Netdata under: ${ndprefix}"
+
+  if [ -r "${ndprefix}/etc/netdata/.environment" ] ; then
+    if [ -x "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" ] ; then
+      progress "Attempting to update existing install instead of creating a new one"
+      if run ${sudo} "${ndprefix}/usr/libexec/netdata/netdata-updater.sh" --not-running-from-cron ; then
+        progress "Updated existing install at ${ndpath}"
+        exit 0
+      else
+        fatal "Failed to update existing Netdata install"
+        exit 1
+      fi
+    else
+      if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+        fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
+        exit 1
+      else
+        progress "User explicitly requested duplicate install, proceeding."
+      fi
+    fi
+  else
+    progress "Existing install appears to be handled manually or through the system package manager."
+    if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
+      fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue."
+      exit 1
+    else
+      progress "User explicitly requested duplicate install, proceeding."
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -311,6 +346,9 @@ while [ -n "${1}" ]; do
   elif [ "${1}" = "--stable-channel" ]; then
     RELEASE_CHANNEL="stable"
     NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --stable-channel"
+    shift 1
+  elif [ "${1}" = "--allow-duplicate-install" ]; then
+    NETDATA_ALLOW_DUPLICATE_INSTALL=1
     shift 1
   elif [ "${1}" = "--local-files" ]; then
     shift 1

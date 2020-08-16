@@ -1,7 +1,7 @@
 <!--
 ---
 title: "What is Netdata?"
-date: 2020-04-07
+date: 2020-05-01
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/what-is-netdata.md
 ---
 -->
@@ -37,7 +37,7 @@ Netdata is **fast** and **efficient**, designed to permanently run on all system
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **macOS**, along with
 other systems derived from them, such as **Kubernetes** and **Docker**.
 
-Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing
+Netdata is not hosted by the CNCF but is the fourth most starred open-source project in the [Cloud Native Computing
 Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
 ---
@@ -59,7 +59,7 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 6.  [Infographic](#infographic) - Everything about Netdata in a single graphic
 7.  [Features](#features) - How you'll use Netdata on your systems
 8.  [Visualization](#visualization) - Learn about visual anomaly detection
-9. [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
+9.  [What Netdata monitors](#what-netdata-monitors) - See which apps/services Netdata auto-detects
 10. [Documentation](#documentation) - Read the documentation
 11. [Community](#community) - Discuss Netdata with others and get support
 12. [License](#license) - Check Netdata's licencing
@@ -71,13 +71,14 @@ Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&la
 The following animated GIF shows the top part of a typical Netdata dashboard.
 
 ![The Netdata dashboard in
-action](https://user-images.githubusercontent.com/1153921/70638670-85dd5080-1bf6-11ea-893e-94400f445574.gif)
+action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
 > A typical Netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse
 > wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive,
 > **real-time**, and optimized to get the work done!
 
-Want to see Netdata live? Check out any of our [live demos](https://www.netdata.cloud/#live-demo).
+Want to try Netdata before you install? See our [live
+demo](https://london.my-netdata.io/default.html#menu_system_submenu_cpu;theme=slate;help=true).
 
 ## User base
 
@@ -155,11 +156,14 @@ To try Netdata in a Docker container, run this:
 ```sh
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
@@ -219,12 +223,12 @@ This is how it works:
 
 | Function    | Description                                                                                                                                                                                                                                                    | Documentation                                       |
 | :---------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------- |
-| **Collect** | Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. | [`collectors`](/collectors/README.md)                |
-| **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](/database/README.md)                    |
-| **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](/health/README.md)                        |
-| **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](/streaming/README.md)                  |
-| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`backends`](/backends/README.md)                    |
-| **Query**   | Multiple independent workers are attached to the [internal web server](/web/server/README.md), servicing API requests, including [data queries](/web/api/queries/README.md).                                                                                     | [`web/api`](/web/api/README.md)                      |
+| **Collect** | Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. | [`collectors`](/collectors/README.md)               |
+| **Store**   | Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.                                                                                                             | [`database`](/database/README.md)                   |
+| **Check**   | A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.                                                                              | [`health`](/health/README.md)                       |
+| **Stream**  | A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.                                                                                                                 | [`streaming`](/streaming/README.md)                 |
+| **Archive** | A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.                                                                                                                                               | [`exporting`](/docs/export/README.md)               |
+| **Query**   | Multiple independent workers are attached to the [internal web server](/web/server/README.md), servicing API requests, including [data queries](/web/api/queries/README.md).                                                                                   | [`web/api`](/web/api/README.md)                     |
 
 The result is a highly efficient, low-latency system, supporting multiple readers and one writer on each metric.
 
@@ -264,18 +268,17 @@ This is what you should expect from Netdata:
 
 -   **Sophisticated alerting** - Netdata comes with hundreds of alarms **out of the box**! It supports dynamic
     thresholds, hysteresis, alarm templates, multiple role-based notification methods, and more.
--   **Notifications**: [alerta.io](/health/notifications/alerta/README.md), [amazon
-    sns](/health/notifications/awssns/README.md), [discordapp.com](/health/notifications/discord/README.md),
-    [email](/health/notifications/email/README.md), [flock.com](/health/notifications/flock/README.md),
-    [hangouts](/health/notifications/hangouts/README.md), [irc](/health/notifications/irc/README.md),
-    [kavenegar.com](/health/notifications/kavenegar/README.md), [messagebird.com](/health/notifications/messagebird/),
-    [pagerduty.com](/health/notifications/pagerduty/README.md), [prowl](/health/notifications/prowl/README.md),
-    [pushbullet.com](/health/notifications/pushbullet/README.md),
-    [pushover.net](/health/notifications/pushover/README.md), [rocket.chat](/health/notifications/rocketchat/README.md),
-    [slack.com](/health/notifications/slack/README.md), [smstools3](/health/notifications/smstools3/README.md),
-    [syslog](/health/notifications/syslog/README.md), [telegram.org](/health/notifications/telegram/README.md),
-    [twilio.com](/health/notifications/twilio/README.md), [web](/health/notifications/web/README.md) and [custom
-    notifications](/health/notifications/custom/README.md).
+-   **Notifications**: [alerta.io](/health/notifications/alerta/), [amazon sns](/health/notifications/awssns/),
+    [discordapp.com](/health/notifications/discord/), [email](/health/notifications/email/),
+    [flock.com](/health/notifications/flock/), [hangouts](/health/notifications/hangouts/),
+    [irc](/health/notifications/irc/), [kavenegar.com](/health/notifications/kavenegar/),
+    [messagebird.com](/health/notifications/messagebird/), [pagerduty.com](/health/notifications/pagerduty/),
+    [prowl](/health/notifications/prowl/), [pushbullet.com](/health/notifications/pushbullet/),
+    [pushover.net](/health/notifications/pushover/), [rocket.chat](/health/notifications/rocketchat/),
+    [slack.com](/health/notifications/slack/), [smstools3](/health/notifications/smstools3/),
+    [syslog](/health/notifications/syslog/), [telegram.org](/health/notifications/telegram/),
+    [twilio.com](/health/notifications/twilio/), [web](/health/notifications/web/) and [custom
+    notifications](/health/notifications/custom/).
 
 ### Integrations
 
@@ -303,7 +306,8 @@ This is what you should expect from Netdata:
 To improve clarity on charts, Netdata dashboards present **positive** values for metrics representing `read`, `input`,
 `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
-![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
+![Screenshot showing positive and negative
+values](https://user-images.githubusercontent.com/1153921/81870401-9d649080-952a-11ea-80e3-4a7b480252ee.gif)
 
 _Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is
 negative._
@@ -312,7 +316,8 @@ negative._
 
 Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible time-frame.
 
-![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
+![Animated GIF showing the auso-scaling Y
+axis](https://user-images.githubusercontent.com/1153921/80838276-8084a080-8bad-11ea-8167-8d5ab2fb1be1.gif)
 
 _A zero-based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is
 selected._
@@ -322,26 +327,22 @@ selected._
 Charts on Netdata dashboards are synchronized to each other. There is no master chart. Any chart can be panned or zoomed
 at any time, and all other charts will follow.
 
-![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
+charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
 
 _Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the
 mouse pointer is over a chart._
-
-> The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server when navigating via the
-> [My nodes menu](/registry/README.md).
 
 ### Highlighted time-frame
 
 To improve visual anomaly detection across charts, the user can highlight a time-frame (by pressing `Alt` + `mouse
 selection`) on all charts.
 
-![highlighted-timeframe](https://user-images.githubusercontent.com/2662304/48311876-f9093300-e5ae-11e8-9c74-e3e291741990.gif)
+![An animated GIF of highlighting a specific
+timeframe](https://user-images.githubusercontent.com/1153921/80839611-6ef0c800-8bb0-11ea-9e9c-f75ec9a2e54c.gif)
 
 _A highlighted time-frame can be given by pressing `Alt` + `mouse selection` on any chart. Netdata will highlight the
 same range on all charts._
-
-> Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [My nodes
-> menu](/registry/README.md).
 
 ## What Netdata monitors
 
@@ -360,7 +361,7 @@ write a collector for your custom application using our [plugin API](/collectors
 
 ## Documentation
 
-The Netdata documentation is at <https://docs.netdata.cloud>, but you can also find each page inside of Netdata's
+The Netdata documentation is at <https://learn.netdata.cloud>, but you can also find each page inside of Netdata's
 repository itself in Markdown (`.md`) files. You can find all our documentation by navigating the repository.
 
 Here is a quick list of notable documents:
@@ -373,7 +374,7 @@ Here is a quick list of notable documents:
 | [`collectors`](/collectors/README.md)                 | Information about data collection plugins.                                                                            |
 | [`health`](/health/README.md)                         | How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods. |
 | [`streaming`](/streaming/README.md)                   | How to build hierarchies of Netdata servers, by streaming metrics between them.                                       |
-| [`backends`](/backends/README.md)                     | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
+| [`exporting`](/docs/export/README.md)                 | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
 | [`web/api`](/web/api/README.md)                       | Learn how to query the Netdata API and the queries it supports.                                                       |
 | [`web/api/badges`](/web/api/badges/README.md)         | Learn how to generate badges (SVG images) from live data.                                                             |
 | [`web/gui/custom`](/web/gui/custom/README.md)         | Learn how to create custom Netdata dashboards.                                                                        |
@@ -397,7 +398,7 @@ You can also find Netdata on:
 
 ## License
 
-Netdata is GPLv3+.
+Netdata is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE).
 
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](/REDISTRIBUTED.md).
 

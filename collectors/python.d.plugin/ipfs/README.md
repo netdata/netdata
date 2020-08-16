@@ -6,16 +6,16 @@ sidebar_label: "IPFS"
 
 # IPFS monitoring with Netdata
 
-Collects [IPFS](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics. 
+Collects [`IPFS`](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics.
 
-1.  **Bandwidth** in kbits/s
+## Charts
 
-    -   in
-    -   out
+It produces the following charts:
 
-2.  **Peers**
-
-    -   peers
+-   Bandwidth in `kilobits/s`
+-   Peers in `peers`
+-   Repo Size in `GiB`
+-   Repo Objects in `objects`
 
 ## Configuration
 
@@ -27,14 +27,23 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/ipfs.conf
 ```
 
-Only url to IPFS server is needed.
+---
 
-Sample:
+Calls to the following endpoints are disabled due to `IPFS` bugs:
+
+-   `/api/v0/stats/repo` (https://github.com/ipfs/go-ipfs/issues/3874)
+-   `/api/v0/pin/ls` (https://github.com/ipfs/go-ipfs/issues/7528)
+
+Can be enabled in the collector configuration file.
+
+The configuration needs only `url` to `IPFS` server, here is an example for 2 `IPFS` instances:
 
 ```yaml
 localhost:
-  name : 'local'
-  url  : 'http://localhost:5001'
+  url: 'http://localhost:5001'
+
+remote:
+  url: 'http://203.0.113.10::5001'
 ```
 
 ---

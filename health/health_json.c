@@ -354,7 +354,6 @@ void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     for(ae = host->health_log.alarms; ae && count < max ; ae = ae->next) {
 
         if(likely(!((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL)
-                   && (ae->old_status != RRDCALC_STATUS_WARNING || ae->old_status != RRDCALC_STATUS_CRITICAL)
                     && !ae->updated_by_id)))
             continue;
 

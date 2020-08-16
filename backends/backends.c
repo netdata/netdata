@@ -697,6 +697,7 @@ void *backends_main(void *ptr) {
     // prepare the backend main loop
 
     info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every, hostname, global_backend_prefix);
+    send_statistics("BACKEND_START", "OK", type);
 
     usec_t step_ut = global_backend_update_every * USEC_PER_SEC;
     time_t after = now_realtime_sec();

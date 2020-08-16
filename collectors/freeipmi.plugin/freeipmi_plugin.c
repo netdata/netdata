@@ -160,7 +160,7 @@ char *sel_config_file = NULL;
 static void
 _init_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_config)
 {
-    assert (ipmi_config);
+    fatal_assert(ipmi_config);
 
     ipmi_config->driver_type = driver_type;
     ipmi_config->disable_auto_probe = disable_auto_probe;
@@ -1580,7 +1580,7 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
 
 int parse_inband_driver_type (const char *str)
 {
-    assert (str);
+    fatal_assert(str);
 
     if (strcasecmp (str, IPMI_PARSE_DEVICE_KCS_STR) == 0)
         return (IPMI_MONITORING_DRIVER_TYPE_KCS);
@@ -1604,7 +1604,7 @@ int parse_inband_driver_type (const char *str)
 
 int parse_outofband_driver_type (const char *str)
 {
-    assert (str);
+    fatal_assert(str);
 
     if (strcasecmp (str, IPMI_PARSE_DEVICE_LAN_STR) == 0)
         return (IPMI_MONITORING_PROTOCOL_VERSION_1_5);

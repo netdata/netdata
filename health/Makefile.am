@@ -45,6 +45,7 @@ dist_healthconfig_DATA = \
     health.d/dockerd.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
+    health.d/exporting.conf \
     health.d/fping.conf \
     health.d/ioping.conf \
     health.d/fronius.conf \

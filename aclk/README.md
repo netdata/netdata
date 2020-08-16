@@ -1,17 +1,23 @@
 <!--
----
 title: "Agent-Cloud link (ACLK)"
 description: "The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud."
-date: 2020-04-30
+date: 2020-05-11
 custom_edit_url: https://github.com/netdata/netdata/edit/master/aclk/README.md
----
 -->
 
 # Agent-cloud link (ACLK)
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
-through Netdata Cloud. The ACLK is encrypted, safe, and _does not exchange data with Netdata Cloud until you claim a
-node_.
+through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port
+`443`. The ACLK is encrypted, safe, and _is only established if you claim your node_.
+
+The Cloud App lives at app.netdata.cloud which currently resolves to 35.196.244.138. However, this IP or range of 
+IPs can change without notice. Watch this page for updates.
+
+Netdata is a distributed monitoring system. Very few data are streamed to the cloud, such as data about:
+ - All configured alarms and their current status
+ - Metrics that are requested by the cloud user
+ - A list of the active collectors
 
 For a guide to claiming a node using the ACLK, plus additional troubleshooting and reference information, read our [get
 started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or the full [claiming
@@ -20,7 +26,7 @@ documentation](/claim/README.md).
 ## Enable and configure the ACLK
 
 The ACLK is enabled by default, with its settings automatically configured and stored in the Agent's memory. No file is
-created at `var/lib/netdata/cloud.d/cloud.conf` until you either claim a node or create it yourself. The default
+created at `/var/lib/netdata/cloud.d/cloud.conf` until you either claim a node or create it yourself. The default
 configuration uses two settings:
 
 ```conf
@@ -31,6 +37,16 @@ configuration uses two settings:
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
 claiming](/claim/README.md#claim-through-a-proxy).
+
+You can configure following keys in the `netdata.conf` section `[cloud]`:
+```
+[cloud]
+    statistics = yes
+    query thread count = 2
+```
+
+- `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
+- `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
 
 ## Disable the ACLK
 

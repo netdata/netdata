@@ -73,6 +73,130 @@ static uint32_t Write_hash = 0;
 static uint32_t user_hash = 0;
 static uint32_t system_hash = 0;
 
+enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
+
+enum cgroups_systemd_setting {
+    SYSTEMD_CGROUP_ERR,
+    SYSTEMD_CGROUP_LEGACY,
+    SYSTEMD_CGROUP_HYBRID,
+    SYSTEMD_CGROUP_UNIFIED
+};
+
+struct cgroups_systemd_config_setting {
+    char *name;
+    enum cgroups_systemd_setting setting;
+};
+
+static struct cgroups_systemd_config_setting cgroups_systemd_options[] = {
+    { .name = "legacy",  .setting = SYSTEMD_CGROUP_LEGACY  },
+    { .name = "hybrid",  .setting = SYSTEMD_CGROUP_HYBRID  },
+    { .name = "unified", .setting = SYSTEMD_CGROUP_UNIFIED },
+    { .name = NULL,      .setting = SYSTEMD_CGROUP_ERR     },
+};
+
+/* on Fed systemd is not in PATH for some reason */
+#define SYSTEMD_CMD_RHEL "/usr/lib/systemd/systemd --version"
+#define SYSTEMD_HIERARCHY_STRING "default-hierarchy="
+
+#define MAXSIZE_PROC_CMDLINE 4096
+static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
+{
+    pid_t command_pid;
+    enum cgroups_systemd_setting retval = SYSTEMD_CGROUP_ERR;
+    char buf[MAXSIZE_PROC_CMDLINE];
+    char *begin, *end;
+
+    FILE *f = mypopen(exec, &command_pid);
+
+    if (!f)
+        return retval;
+
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
+        if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
+            end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
+            if (!*begin)
+                break;
+            while (isalpha(*end))
+                end++;
+            *end = 0;
+            for (int i = 0; cgroups_systemd_options[i].name; i++) {
+                if (!strcmp(begin, cgroups_systemd_options[i].name)) {
+                    retval = cgroups_systemd_options[i].setting;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    if (mypclose(f, command_pid))
+        return SYSTEMD_CGROUP_ERR;
+
+    return retval;
+}
+
+static enum cgroups_type cgroups_try_detect_version()
+{
+    pid_t command_pid;
+    char buf[MAXSIZE_PROC_CMDLINE];
+    enum cgroups_systemd_setting systemd_setting;
+    int cgroups2_available = 0;
+
+    // 1. check if cgroups2 availible on system at all
+    FILE *f = mypopen("grep cgroup /proc/filesystems", &command_pid);
+    if (!f) {
+        error("popen failed");
+        return CGROUPS_AUTODETECT_FAIL;
+    }
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, f) != NULL) {
+        if (strstr(buf, "cgroup2")) {
+            cgroups2_available = 1;
+            break;
+        }
+    }
+    if(mypclose(f, command_pid))
+        return CGROUPS_AUTODETECT_FAIL;
+
+    if(!cgroups2_available)
+        return CGROUPS_V1;
+
+    // 2. check systemd compiletime setting
+    if ((systemd_setting = cgroups_detect_systemd("systemd --version")) == SYSTEMD_CGROUP_ERR)
+        systemd_setting = cgroups_detect_systemd(SYSTEMD_CMD_RHEL);
+
+    if(systemd_setting == SYSTEMD_CGROUP_ERR)
+        return CGROUPS_AUTODETECT_FAIL;
+
+    if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
+        // curently we prefer V1 if HYBRID is set as it seems to be more feature complete
+        // in the future we might want to continue here if SYSTEMD_CGROUP_HYBRID
+        // and go ahead with V2
+        return CGROUPS_V1;
+    }
+
+    // 3. if we are unified as on Fedora (default cgroups2 only mode)
+    //    check kernel command line flag that can override that setting
+    f = fopen("/proc/cmdline", "r");
+    if (!f) {
+        error("Error reading kernel boot commandline parameters");
+        return CGROUPS_AUTODETECT_FAIL;
+    }
+
+    if (!fgets(buf, MAXSIZE_PROC_CMDLINE, f)) {
+        error("couldn't read all cmdline params into buffer");
+        fclose(f);
+        return CGROUPS_AUTODETECT_FAIL;
+    }
+
+    fclose(f);
+
+    if (strstr(buf, "systemd.unified_cgroup_hierarchy=0")) {
+        info("cgroups v2 (unified cgroups) is available but are disabled on this system.");
+        return CGROUPS_V1;
+    }
+    return CGROUPS_V2;
+}
+
 void read_cgroup_plugin_configuration() {
     system_page_size = sysconf(_SC_PAGESIZE);
 
@@ -89,7 +213,11 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
-    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", cgroup_use_unified_cgroups);
+    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
+    if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
+        cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
+
+    info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
 
     cgroup_containers_chart_priority = (int)config_get_number("plugin:cgroups", "containers priority", cgroup_containers_chart_priority);
     if(cgroup_containers_chart_priority < 1)
@@ -251,7 +379,7 @@ void read_cgroup_plugin_configuration() {
                     " !/libvirt "
                     " !/lxc "
                     " !/lxc/*/* "                          //  #1397 #2649
-                    " !/lxc.monitor "
+                    " !/lxc.monitor* "
                     " !/lxc.pivot "
                     " !/lxc.payload "
                     " !/machine "
@@ -275,6 +403,7 @@ void read_cgroup_plugin_configuration() {
                     " !/lxc/*/* "                          //  #2161 #2649
                     " !/lxc.monitor "
                     " !/lxc.payload/*/* "
+                    " !/lxc.payload.* "
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
 

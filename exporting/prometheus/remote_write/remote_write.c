@@ -35,6 +35,7 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
         "POST %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Accept: */*\r\n"
+        "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: %zu\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
         connector_specific_config->remote_write_path,
@@ -83,6 +84,20 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
 }
 
 /**
+ * Release specific data allocated.
+ *
+ * @param instance an instance data structure.
+ */
+void clean_prometheus_remote_write(struct instance *instance)
+{
+    freez(instance->connector_specific_data);
+
+    struct prometheus_remote_write_specific_config *connector_specific_config =
+        instance->config.connector_specific_config;
+    freez(connector_specific_config->remote_write_path);
+}
+
+/**
  * Initialize Prometheus Remote Write connector instance
  *
  * @param instance an instance data structure.
@@ -108,14 +123,18 @@ int init_prometheus_remote_write_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));
     instance->connector_specific_data = (void *)connector_specific_data;
 
     connector_specific_data->write_request = init_write_request();
+
+    instance->engine->protocol_buffers_initialized = 1;
 
     return 0;
 }
@@ -133,7 +152,10 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
         (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, instance->engine->config.hostname, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(
+        hostname,
+        (host == localhost) ? instance->engine->config.hostname : host->hostname,
+        PROMETHEUS_ELEMENT_MAX);
 
     add_host_info(
         connector_specific_data->write_request,
@@ -210,6 +232,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
         char name[PROMETHEUS_LABELS_MAX + 1];
         char dimension[PROMETHEUS_ELEMENT_MAX + 1];
         char *suffix = "";
+        RRDHOST *host = rd->rrdset->rrdhost;
 
         if (as_collected) {
             // we need as-collected / raw data
@@ -220,7 +243,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
                     rd->id, rd->rrdset->id,
-                    instance->engine->config.hostname,
+                    (host == localhost) ? instance->engine->config.hostname : host->hostname,
                     (unsigned long)rd->last_collected_time.tv_sec,
                     (unsigned long)instance->after,
                     (unsigned long)instance->before);
@@ -235,11 +258,12 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     dimension,
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
                     PROMETHEUS_ELEMENT_MAX);
-                snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->engine->config.prefix, context, suffix);
+                snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
-                    name, chart, family, dimension, instance->engine->config.hostname,
+                    name, chart, family, dimension,
+                    (host == localhost) ? instance->engine->config.hostname : host->hostname,
                     rd->last_collected_value, timeval_msec(&rd->last_collected_time));
             } else {
                 // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -250,12 +274,13 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(
-                    name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->engine->config.prefix, context, dimension,
+                    name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->config.prefix, context, dimension,
                     suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
-                    name, chart, family, NULL, instance->engine->config.hostname,
+                    name, chart, family, NULL,
+                    (host == localhost) ? instance->engine->config.hostname : host->hostname,
                     rd->last_collected_value, timeval_msec(&rd->last_collected_time));
             }
         } else {
@@ -275,11 +300,12 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
                     PROMETHEUS_ELEMENT_MAX);
                 snprintf(
-                    name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->engine->config.prefix, context, units, suffix);
+                    name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->config.prefix, context, units, suffix);
 
                 add_metric(
                     connector_specific_data->write_request,
-                    name, chart, family, dimension, instance->engine->config.hostname,
+                    name, chart, family, dimension,
+                    (host == localhost) ? instance->engine->config.hostname : host->hostname,
                     value, last_t * MSEC_PER_SEC);
             }
         }

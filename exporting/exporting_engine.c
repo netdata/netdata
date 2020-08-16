@@ -2,12 +2,89 @@
 
 #include "exporting_engine.h"
 
-static void exporting_main_cleanup(void *ptr) {
+static struct engine *engine = NULL;
+
+/**
+ * Exporting Clean Engine
+ *
+ * Clean all variables allocated inside engine structure
+ *
+ * @param en a pointer to the strcuture that will be cleaned.
+ */
+static void exporting_clean_engine()
+{
+    if (!engine)
+        return;
+
+#if HAVE_KINESIS
+    if (engine->aws_sdk_initialized)
+        aws_sdk_shutdown();
+#endif
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if (engine->protocol_buffers_initialized)
+        protocol_buffers_shutdown();
+#endif
+
+    //Cleanup web api
+    prometheus_clean_server_root();
+
+    for (struct instance *instance = engine->instance_root; instance;) {
+        struct instance *current_instance = instance;
+        instance = instance->next;
+
+        clean_instance(current_instance);
+    }
+
+    freez((void *)engine->config.hostname);
+    freez(engine);
+}
+
+/**
+ * Clean up the main exporting thread and all connector workers on Netdata exit
+ *
+ * @param ptr thread data.
+ */
+static void exporting_main_cleanup(void *ptr)
+{
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
 
+    if (!engine) {
+        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return;
+    }
+
+    engine->exit = 1;
+
+    int found = 0;
+    usec_t max = 2 * USEC_PER_SEC, step = 50000;
+
+    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+        if (!instance->exited) {
+            found++;
+            info("stopping worker for instance %s", instance->config.name);
+            uv_mutex_unlock(&instance->mutex);
+            uv_cond_signal(&instance->cond_var);
+        } else
+            info("found stopped worker for instance %s", instance->config.name);
+    }
+
+    while (found && max > 0) {
+        max -= step;
+        info("Waiting %d exporting connectors to finish...", found);
+        sleep_usec(step);
+        found = 0;
+
+        for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+            if (!instance->exited)
+                found++;
+        }
+    }
+
+    exporting_clean_engine();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -24,7 +101,7 @@ void *exporting_main(void *ptr)
 {
     netdata_thread_cleanup_push(exporting_main_cleanup, ptr);
 
-    struct engine *engine = read_exporting_config();
+    engine = read_exporting_config();
     if (!engine) {
         info("EXPORTING: no exporting connectors configured");
         goto cleanup;
@@ -32,6 +109,7 @@ void *exporting_main(void *ptr)
 
     if (init_connectors(engine) != 0) {
         error("EXPORTING: cannot initialize exporting connectors");
+        send_statistics("EXPORTING_START", "FAIL", "-");
         goto cleanup;
     }
 
@@ -48,22 +126,13 @@ void *exporting_main(void *ptr)
         heartbeat_next(&hb, step_ut);
         engine->now = now_realtime_sec();
 
-        if (mark_scheduled_instances(engine)) {
-            if (prepare_buffers(engine) != 0) {
-                error("EXPORTING: cannot prepare data to send");
-                break;
-            }
-        }
-
-        if (notify_workers(engine) != 0) {
-            error("EXPORTING: cannot communicate with exporting connector instance working threads");
-            break;
-        }
+        if (mark_scheduled_instances(engine))
+            prepare_buffers(engine);
 
         send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
 
 #ifdef UNIT_TESTING
-        break;
+        return NULL;
 #endif
     }
 

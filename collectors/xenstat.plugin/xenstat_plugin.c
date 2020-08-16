@@ -137,6 +137,7 @@ struct domain_metrics {
     unsigned int shutdown;
     unsigned int crashed;
     unsigned int dying;
+    unsigned int cur_vcpus;
 
     unsigned long long cpu_ns;
     unsigned long long cur_mem;
@@ -247,23 +248,18 @@ static struct domain_metrics *domain_metrics_free(struct domain_metrics *d) {
 }
 
 static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
-    static unsigned int last_num_vcpus = 0;
     unsigned int num_vcpus = 0;
     xenstat_vcpu *vcpu = NULL;
     struct vcpu_metrics *vcpu_m = NULL, *last_vcpu_m = NULL;
 
     num_vcpus = xenstat_domain_num_vcpus(domain);
-    if(unlikely(num_vcpus != last_num_vcpus)) {
-        d->num_vcpus_changed = 1;
-        last_num_vcpus = num_vcpus;
-    }
 
     for(vcpu_m = d->vcpu_root; vcpu_m ; vcpu_m = vcpu_m->next)
         vcpu_m->updated = 0;
 
     vcpu_m = d->vcpu_root;
 
-    unsigned int  i;
+    unsigned int  i, num_online_vcpus=0;
     for(i = 0; i < num_vcpus; i++) {
         if(unlikely(!vcpu_m)) {
             vcpu_m = callocz(1, sizeof(struct vcpu_metrics));
@@ -282,12 +278,18 @@ static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
         }
 
         vcpu_m->online = xenstat_vcpu_online(vcpu);
+        if(likely(vcpu_m->online)) { num_online_vcpus++; }
         vcpu_m->ns = xenstat_vcpu_ns(vcpu);
 
         vcpu_m->updated = 1;
 
         last_vcpu_m = vcpu_m;
         vcpu_m = vcpu_m->next;
+    }
+
+    if(unlikely(num_online_vcpus != d->cur_vcpus)) {
+        d->num_vcpus_changed = 1;
+        d->cur_vcpus = num_online_vcpus;
     }
 
     return 0;

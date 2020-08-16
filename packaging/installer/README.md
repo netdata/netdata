@@ -1,8 +1,6 @@
 <!--
----
 title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
----
 -->
 
 # Installation guide
@@ -36,7 +34,8 @@ _actively_ contributing to Netdata's future.
 
 This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others.
 
-To install Netdata from source and get _automatic nightly updates_, run the following as your normal user:
+To install Netdata from source, including all dependencies required to connect to Netdata Cloud, and get _automatic
+nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -49,8 +48,8 @@ page](/packaging/installer/methods/kickstart.md).
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md)
-for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
 guide](/docs/getting-started.md) for a quick overview.
@@ -82,8 +81,7 @@ Netdata on Docker](/packaging/docker/README.md)
 
 [![Install Netdata on
 Kubernetes](https://user-images.githubusercontent.com/1153921/76029478-cc8ad000-5ef1-11ea-8981-dd04744b00da.png) Install
-Netdata on Kubernetes with a Helm
-chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
+Netdata on a Kubernetes cluster](/packaging/installer/methods/kubernetes.md)
 
 [![Install Netdata on cloud providers
 (GCP/AWS/Azure)](https://user-images.githubusercontent.com/1153921/76029431-aebd6b00-5ef1-11ea-92b4-06704dabb93e.png)
@@ -97,9 +95,9 @@ Netdata on macOS](/packaging/installer/methods/macos.md)
 FreeBSD](https://user-images.githubusercontent.com/1153921/76029787-5fc40580-5ef2-11ea-9461-23e9049aa8f8.png) Install
 Netdata on FreeBSD](/packaging/installer/methods/freebsd.md)
 
-[![Install manually from
-source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
-manually from source](/packaging/installer/methods/manual.md)
+[![Install from a Git
+checkout](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png) Install
+from a Git checkout](/packaging/installer/methods/manual.md)
 
 [![Install on offline/air-gapped
 systems](https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png) Install on
@@ -120,6 +118,10 @@ installation on FreeNAS](/packaging/installer/methods/freenas.md)
 [![Manual installation on
 Alpine](https://user-images.githubusercontent.com/1153921/76029682-37d4a200-5ef2-11ea-9a2c-a8ffeb1d13c3.png) Manual
 installation on Alpine](/packaging/installer/methods/alpine.md)
+
+[![Build manually from
+source](https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png)
+Build manually from source](/packaging/installer/methods/source.md)
 
 </div>
 
@@ -165,3 +167,69 @@ the community helps fix any bugs that might have been introduced in previous rel
 -   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
     installation
 -   Retain more control over the Netdata version you use
+
+## Installation notes and known issues
+
+We are tracking a few issues related to installation and packaging.
+
+### Older distributions (Ubuntu 14.04, Debian 8, CentOS 6) and OpenSSL
+
+If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
+6, your Agent may not be able to securely connect to Netdata Cloud due to an outdated version of OpenSSL. These old
+versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
+helps securely encrypt SSL connections.
+
+We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
+up-to-date version of OpenSSL with hostname validation enabled.
+
+If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
+with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
+man-in-the-middle attacks.
+
+### CentOS 6 and CentOS 8
+
+To install the Agent on certain CentOS and RHEL systems, you must enable non-default repositories, such as EPEL or
+PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos-rehel-6-x) and
+[CentOS 8](/packaging/installer/methods/manual.md#centos-rehel-8-x) sections for more information.
+
+### Access to file is not permitted
+
+If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web//index.html` when you try to
+visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's permissions to match those of your
+system.
+
+Run `ls -la /usr/share/netdata/web/index.html` to find the file's permissions. You may need to change this path based on
+the error you're seeing in your browser. In the below example, the file is owned by the user `netdata` and the group
+`netdata`.
+
+```bash
+ls -la /usr/share/netdata/web/index.html
+-rw-r--r--. 1 netdata netdata 89377 May  5 06:30 /usr/share/netdata/web/index.html
+```
+
+Open your `netdata.conf` file and find the `[web]` section, plus the `web files owner`/`web files group` settings. Edit
+the lines to match the output from `ls -la` above and uncomment them if necessary.
+
+```conf
+[web]
+    web files owner = netdata
+    web files group = netdata
+```
+
+Save the file, [restart the Netdata Agent](/docs/getting-started.md#start-stop-and-restart-netdata), and try accessing
+the dashboard again.
+
+### Multiple versions of OpenSSL
+
+We've received reports from the community about issues with running the `kickstart.sh` script on systems that have both
+a distribution-installed version of OpenSSL and a manually-installed local version. The Agent's installer cannot handle
+both.
+
+We recommend you install Netdata with the [static binary](/packaging/installer/methods/kickstart-64.md) to avoid the
+issue altogether. Or, you can manually remove one version of OpenSSL to remove the conflict.
+
+### Clang compiler on Linux
+
+Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
+section on `nonrepresentable section on output`
+errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.

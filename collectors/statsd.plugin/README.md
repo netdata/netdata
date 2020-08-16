@@ -447,7 +447,7 @@ Using the above, the dimensions will be added as `GET`, `ADD` and `DELETE`.
 
 ~~(although this is required for incremental values, Netdata allows mixing incremental and absolute values on the same charts, so this little limitation [i.e. 2 values to start visualization], is applied on all Netdata dimensions).~~
 
-(statsd metrics do not loose their first data collection due to interpolation anymore - fixed with [PR #2411](https://github.com/netdata/netdata/pull/2411))
+(statsd metrics do not lose their first data collection due to interpolation anymore - fixed with [PR #2411](https://github.com/netdata/netdata/pull/2411))
 
 ## sending statsd metrics from shell scripts
 

@@ -8,6 +8,7 @@
 #include "remote_write_request.h"
 
 int init_prometheus_remote_write_instance(struct instance *instance);
+extern void clean_prometheus_remote_write(struct instance *instance);
 
 int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host);
 int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st);

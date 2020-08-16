@@ -1,35 +1,32 @@
 <!--
 ---
-title: "Getting started guide"
-date: 2020-04-06
+title: "Get started guide"
+date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started.md
 ---
 -->
 
-# Getting started guide
+# Get started guide
 
-Thanks for trying Netdata! In this getting started guide, we'll quickly walk you through the first steps you should take
-after getting Netdata installed.
+Thanks for trying the Netdata Agent! In this getting started guide, we'll quickly walk you through the first steps you
+should take after installing the Agent.
 
-Netdata can collect thousands of metrics in real-time and use its database for long-term metrics storage without any
+The Agent can collect thousands of metrics in real-time and use its database for long-term metrics storage without any
 configuration, but there are some valuable things to know to get the most out of Netdata based on your needs.
 
 We'll skip right into some technical details, so if you're brand-new to monitoring the health and performance of systems
-and applications, our [**step-by-step tutorial**](/docs/step-by-step/step-00.md) might be a better fit.
+and applications, our [**step-by-step guide**](/docs/guides/step-by-step/step-00.md) might be a better fit.
 
 > If you haven't installed Netdata yet, visit the [installation instructions](/packaging/installer/README.md) for
 > details, including our one-liner script, which automatically installs Netdata on almost all Linux distributions.
 
 ## Access the dashboard
 
-Open up your web browser of choice and navigate to `http://YOUR-HOST:19999`. Welcome to Netdata!
+Open up your web browser of choice and navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname
+of your Agent. Hit **Enter**. Welcome to Netdata!
 
 ![Animated GIF of navigating to the
-dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
-
-<details markdown="1"><summary>Want to see the dashboard and its features in action? Check out our video.</summary>
-<iframe width="720" height="405" src="https://www.youtube.com/embed/Ob6-Wkb6ZBA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-</details>
+dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
 
 **What's next?**: 
 
@@ -70,8 +67,9 @@ configuration keeps RAM usage low while allowing for long-term, on-disk metrics 
 You can tweak this custom _database engine_ to store a much larger dataset than your system's available RAM,
 particularly if you allow Netdata to use slightly more RAM and disk space than the default configuration.
 
-Read our tutorial, [**Changing how long Netdata stores metrics**](/docs/tutorials/longer-metrics-storage.md), to learn
-more.
+Read our guide on [changing how long Netdata stores metrics](/docs/guides/longer-metrics-storage.md) to learn more
+and use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to figure
+out the exact settings you'll need to store historical metrics right in the Agent's database.
 
 **What's next?**:
 
@@ -97,9 +95,9 @@ Some modules, like `chrony`, are disabled by default and must be enabled manuall
 
 Once Netdata detects a valid source of data, it will continue trying to collect data from it. For example, if
 Netdata is collecting data from an Nginx web server, and you shut Nginx down, Netdata will collect new data as soon as
-you start the web server back up—no restart necessary.
+you start the web server back up&mdash;no restart necessary.
 
-### Configuring plugins
+### Configure plugins
 
 Even if Netdata auto-detects your service/application, you might want to configure what, or how often, Netdata is
 collecting data.
@@ -192,29 +190,33 @@ Find the `SEND_EMAIL="YES"` line and change it to `SEND_EMAIL="NO"`.
 -   See all the alarm options via the [health configuration reference](/health/REFERENCE.md).
 -   Add a new notification method, like [Slack](/health/notifications/slack/).
 
-## Monitoring multiple systems with Netdata
+## Monitor multiple systems with Netdata Cloud
 
-If you have Netdata installed on multiple systems, you can have them all appear in the **My nodes** menu at the top-left
-corner of the dashboard.
+If you have the Agent installed on multiple nodes, you can use Netdata Cloud in two ways: Monitor the health and
+performance of an entire infrastructure via the Cloud web interface, or use the Visited Nodes menu that's built into
+every dashboard.
 
-To show all your servers in that menu, you need to [register for or sign in](/docs/netdata-cloud/signing-in.md) to
-[Netdata Cloud](/docs/netdata-cloud/README.md) from each system. Each system will then appear in the **My nodes** menu, which you
-can use to navigate between your systems quickly.
+For example, a small infrastructure monitored via Netdata Cloud:
 
-![Animated GIF of the My Nodes menu in
-action](https://user-images.githubusercontent.com/1153921/64389938-9aa7b800-cff9-11e9-9653-a77e791811ad.gif)
+![Animated GIF of Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
 
-Whenever you pan, zoom, highlight, select, or pause a chart, Netdata will synchronize those settings with any other
-agent you visit via the My nodes menu. Even your scroll position is synchronized, so you'll see the same charts and
-respective data for easy comparisons or root cause analysis.
+And the process of using the Visited nodes menu to move between Agent dashboards running on various systems, both local
+and remote:
 
-You can now seamlessly track performance anomalies across your entire infrastructure!
+![Switching between dashboards with Visited
+nodes](https://user-images.githubusercontent.com/1153921/80831018-e158ac80-8b9e-11ea-882e-1d82cdc028cd.gif)
+
+You can use these features together or separately&mdash;the decision is up to you and the needs of your infrastructure.
 
 **What's next?**:
 
--   Read up on how the [Netdata Cloud registry works](/registry/), and what kind of data it stores and sends to
-    your web browser.
--   Familiarize yourself with the [Nodes View](/docs/netdata-cloud/nodes-view.md)
+-   Read about the [Agent-Cloud integration]().
+-   Get an overview of Cloud's features by reading [Cloud documentation](https://learn.netdata.cloud/docs/cloud/).
+-   Follow the 5-minute [get started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started/) guide to finish
+    onboarding and claim your first nodes.
+-   Better understand how agents connect securely to the Cloud with [claiming](/claim/README.md) and [Agent-Cloud
+    link](/aclk/README.md) documentation.
 
 ## Start, stop, and restart Netdata
 
@@ -235,12 +237,13 @@ and `init.d`:
 ## What's next?
 
 Even after you've configured `netdata.conf`, tweaked alarms, learned the basics of performance troubleshooting, and
-added all your systems to the **My nodes** menu, you've just gotten started with Netdata.
+claimed all your systems in Netdata Cloud or added them to the Visited nodes menu, you've just gotten started with
+Netdata.
 
 Take a look at some more advanced features and configurations:
 
 -   Centralize Netdata metrics from many systems with [streaming](/streaming/README.md)
--   Enable long-term archiving of Netdata metrics via [backends](/backends/README.md) to time-series databases.
+-   Enable long-term archiving of Netdata metrics via [exporting engine](/exporting/README.md) to time-series databases.
 -   Improve security by putting Netdata behind an [Nginx proxy with SSL](/docs/Running-behind-nginx.md).
 
 Or, learn more about how you can contribute to [Netdata core](/CONTRIBUTING.md) or our

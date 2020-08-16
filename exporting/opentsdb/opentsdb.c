@@ -12,7 +12,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
@@ -37,8 +37,10 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     return 0;
 }
@@ -53,9 +55,19 @@ int init_opentsdb_http_instance(struct instance *instance)
 {
     instance->worker = simple_connector_worker;
 
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    struct simple_connector_config *connector_specific_config = callocz(1, sizeof(struct simple_connector_config));
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
+
+#ifdef ENABLE_HTTPS
+    struct opentsdb_specific_data *connector_specific_data = callocz(1, sizeof(struct opentsdb_specific_data));
+    connector_specific_data->flags = NETDATA_SSL_START;
+    connector_specific_data->conn = NULL;
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
+        security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
+    }
+    instance->connector_specific_data = connector_specific_data;
+#endif
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
@@ -78,8 +90,10 @@ int init_opentsdb_http_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
     }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
+    if (uv_mutex_init(&instance->mutex))
+        return 1;
+    if (uv_cond_init(&instance->cond_var))
+        return 1;
 
     return 0;
 }
@@ -165,12 +179,12 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
     buffer_sprintf(
         instance->buffer,
         "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s%s%s\n",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         (instance->labels) ? buffer_tostring(instance->labels) : "");
@@ -212,12 +226,12 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
     buffer_sprintf(
         instance->buffer,
         "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s%s\n",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)last_t,
         value,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         (instance->labels) ? buffer_tostring(instance->labels) : "");
@@ -322,12 +336,12 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "    \"host\": \"%s%s%s\"%s"
         "  }"
         "}",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");
@@ -382,12 +396,12 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "    \"host\": \"%s%s%s\"%s"
         "  }"
         "}",
-        engine->config.prefix,
+        instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)last_t,
         value,
-        engine->config.hostname,
+        (host == localhost) ? engine->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");

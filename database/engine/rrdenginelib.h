@@ -59,8 +59,8 @@ struct completion {
 static inline void init_completion(struct completion *p)
 {
     p->completed = 0;
-    assert(0 == uv_cond_init(&p->cond));
-    assert(0 == uv_mutex_init(&p->mutex));
+    fatal_assert(0 == uv_cond_init(&p->cond));
+    fatal_assert(0 == uv_mutex_init(&p->mutex));
 }
 
 static inline void destroy_completion(struct completion *p)
@@ -75,7 +75,7 @@ static inline void wait_for_completion(struct completion *p)
     while (0 == p->completed) {
         uv_cond_wait(&p->cond, &p->mutex);
     }
-    assert(1 == p->completed);
+    fatal_assert(1 == p->completed);
     uv_mutex_unlock(&p->mutex);
 }
 
@@ -100,7 +100,17 @@ static inline void crc32set(void *crcp, uLong crc)
 extern void print_page_cache_descr(struct rrdeng_page_descr *page_cache_descr);
 extern void print_page_descr(struct rrdeng_page_descr *descr);
 extern int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
-extern int open_file_direct_io(char *path, int flags, uv_file *file);
+extern int open_file_for_io(char *path, int flags, uv_file *file, int direct);
+static inline int open_file_direct_io(char *path, int flags, uv_file *file)
+{
+    return open_file_for_io(path, flags, file, 1);
+}
+static inline int open_file_buffered_io(char *path, int flags, uv_file *file)
+{
+    return open_file_for_io(path, flags, file, 0);
+}
 extern char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
+extern int compute_multidb_diskspace();
+extern int is_legacy_child(const char *machine_guid);
 
 #endif /* NETDATA_RRDENGINELIB_H */

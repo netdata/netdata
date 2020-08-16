@@ -25,6 +25,7 @@ typedef enum exporting_options {
 
     EXPORTING_OPTION_SEND_CONFIGURED_LABELS = (1 << 3),
     EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
+    EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
     EXPORTING_OPTION_SEND_NAMES             = (1 << 16)
 } EXPORTING_OPTIONS;
@@ -50,6 +51,7 @@ typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_JSON,                    // Stores the data using JSON.
     EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // The user selected to use Prometheus backend
     EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
+    EXPORTING_CONNECTOR_TYPE_PUBSUB,                  // Send message to Google Cloud Pub/Sub
     EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
     EXPORTING_CONNECTOR_TYPE_NUM                      // Number of backend types
 } EXPORTING_CONNECTOR_TYPE;
@@ -58,9 +60,11 @@ struct engine;
 
 struct instance_config {
     EXPORTING_CONNECTOR_TYPE type;
+    const char *type_name;
 
     const char *name;
     const char *destination;
+    const char *prefix;
 
     int update_every;
     int buffer_on_failures;
@@ -87,13 +91,18 @@ struct aws_kinesis_specific_config {
     char *secure_key;
 };
 
+struct pubsub_specific_config {
+    char *credentials_file;
+    char *project_id;
+    char *topic_id;
+};
+
 struct mongodb_specific_config {
     char *database;
     char *collection;
 };
 
 struct engine_config {
-    const char *prefix;
     const char *hostname;
     int update_every;
 };
@@ -144,6 +153,7 @@ struct instance {
     struct stats stats;
 
     int scheduled;
+    int disabled;
     int skip_host;
     int skip_chart;
 
@@ -172,6 +182,8 @@ struct instance {
     size_t index;
     struct instance *next;
     struct engine *engine;
+
+    volatile sig_atomic_t exited;
 };
 
 struct engine {
@@ -181,9 +193,12 @@ struct engine {
     time_t now;
 
     int aws_sdk_initialized;
+    int protocol_buffers_initialized;
     int mongoc_initialized;
 
     struct instance *instance_root;
+
+    volatile sig_atomic_t exit;
 };
 
 extern struct instance *prometheus_exporter_instance;
@@ -196,8 +211,7 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
 int init_connectors(struct engine *engine);
 
 int mark_scheduled_instances(struct engine *engine);
-int prepare_buffers(struct engine *engine);
-int notify_workers(struct engine *engine);
+void prepare_buffers(struct engine *engine);
 
 size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 
@@ -209,13 +223,13 @@ calculated_number exporting_calculate_value_from_stored_data(
     RRDDIM *rd,
     time_t *last_timestamp);
 
-int start_batch_formatting(struct engine *engine);
-int start_host_formatting(struct engine *engine, RRDHOST *host);
-int start_chart_formatting(struct engine *engine, RRDSET *st);
-int metric_formatting(struct engine *engine, RRDDIM *rd);
-int end_chart_formatting(struct engine *engine, RRDSET *st);
-int end_host_formatting(struct engine *engine, RRDHOST *host);
-int end_batch_formatting(struct engine *engine);
+void start_batch_formatting(struct engine *engine);
+void start_host_formatting(struct engine *engine, RRDHOST *host);
+void start_chart_formatting(struct engine *engine, RRDSET *st);
+void metric_formatting(struct engine *engine, RRDDIM *rd);
+void end_chart_formatting(struct engine *engine, RRDSET *st);
+void end_host_formatting(struct engine *engine, RRDHOST *host);
+void end_batch_formatting(struct engine *engine);
 int flush_host_labels(struct instance *instance, RRDHOST *host);
 int simple_connector_update_buffered_bytes(struct instance *instance);
 
@@ -228,6 +242,24 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
 void send_internal_metrics(struct instance *instance);
 
+extern void clean_instance(struct instance *ptr);
+
+static inline void disable_instance(struct instance *instance)
+{
+    instance->disabled = 1;
+    instance->scheduled = 0;
+    uv_mutex_unlock(&instance->mutex);
+    error("EXPORTING: Instance %s disabled", instance->config.name);
+}
+
 #include "exporting/prometheus/prometheus.h"
+#include "exporting/opentsdb/opentsdb.h"
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+#include "exporting/prometheus/remote_write/remote_write.h"
+#endif
+
+#if HAVE_KINESIS
+#include "exporting/aws_kinesis/aws_kinesis.h"
+#endif
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */

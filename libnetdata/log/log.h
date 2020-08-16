@@ -38,6 +38,8 @@
 #define D_STREAM            0x0000000040000000
 #define D_RRDENGINE         0x0000000100000000
 #define D_ACLK              0x0000000200000000
+#define D_METADATALOG       0x0000000400000000
+#define D_GUIDLOG           0x0000000800000000
 #define D_SYSTEM            0x8000000000000000
 
 //#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
@@ -87,6 +89,7 @@ static inline void debug_dummy(void) {}
 #define infoerr(args...) error_int("INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error(args...)   error_int("ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
+#define fatal_assert(expr) ((expr) ? (void)(0) : fatal_int(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
 
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);

@@ -12,11 +12,6 @@ if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
 fi
 
 echo "Netdata entrypoint script starting"
-if [ ${RESCRAMBLE+x} ]; then
-  echo "Reinstalling all packages to get the latest Polymorphic Linux scramble"
-  apk upgrade --update-cache --available
-fi
-
 if [ -n "${PGID}" ]; then
   echo "Creating docker group ${PGID}"
   addgroup -g "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"

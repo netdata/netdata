@@ -8,6 +8,15 @@ sidebar_label: "ProxySQL"
 
 Monitors database backend and frontend performance metrics.
 
+## Requirements
+
+-   python library [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
+-   `netdata` local user to connect to the ProxySQL server.
+
+To create the `netdata` user, follow [the documentation](https://github.com/sysown/proxysql/wiki/Users-configuration#creating-a-new-user).
+
+## Charts
+
 It produces:
 
 1.  **Connections (frontend)**

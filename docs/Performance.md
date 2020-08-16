@@ -196,8 +196,8 @@ following settings in the `[global]` section of `netdata.conf`:
 	# dbengine disk space = 256
 ```
 
-See the [database engine documentation](/database/engine/README.md) or our [tutorial on metrics
-retention](tutorials/longer-metrics-storage.md) for more details on lowering the database engine's memory requirements.
+See the [database engine documentation](/database/engine/README.md) or our [guide on metrics
+retention](/docs/guides/longer-metrics-storage.md) for more details on lowering the database engine's memory requirements.
 
 ### 6. Disable gzip compression of responses
 

@@ -69,6 +69,30 @@ static struct prometheus_server {
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
+static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
+
+/**
+ * Clean server root local structure
+ */
+void prometheus_clean_server_root()
+{
+    if (prometheus_server_root) {
+        netdata_mutex_lock(&prometheus_server_root_mutex);
+
+        struct prometheus_server *ps;
+        for (ps = prometheus_server_root; ps; ) {
+            struct prometheus_server *current = ps;
+            ps = ps->next;
+            if(current->server)
+                freez((void *)current->server);
+
+            freez(current);
+        }
+        prometheus_server_root = NULL;
+        netdata_mutex_unlock(&prometheus_server_root_mutex);
+    }
+}
+
 /**
  * Get the last time when a Prometheus server scraped the Netdata Prometheus exporter.
  *
@@ -82,8 +106,6 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
 #ifdef UNIT_TESTING
     return 0;
 #endif
-    static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
-
     uint32_t hash = simple_hash(server);
 
     netdata_mutex_lock(&prometheus_server_root_mutex);
@@ -565,7 +587,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     t);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s %s\n", prefix, context, suffix, t);
+                                buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, t);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
@@ -624,7 +646,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(
-                                    wb, "# COMMENT TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, t);
+                                    wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, t);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
@@ -684,7 +706,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     (unsigned long long)last_time);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
+                                buffer_sprintf(wb, "# TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(

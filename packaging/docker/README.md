@@ -1,9 +1,7 @@
 <!--
----
 title: "Install Netdata with Docker"
 date: 2020-04-23
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
----
 -->
 
 # Install the Netdata Agent with Docker
@@ -33,12 +31,6 @@ Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/en
 directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about
 ENTRYPOINT vs COMMAND in the [Docker
 documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
-
-### Package scrambling in runtime (x86_64 only)
-
-Our x86_64 Docker images use [Polymorphic Polyverse Linux package scrambling](https://polyverse.io/how-it-works/). For
-increased security, you can enable rescrambling of Netdata packages during runtime by setting the environment variable
-`RESCRAMBLE=true` while starting Netdata with a Docker container.
 
 ## Run the Agent with the Docker command
 
@@ -97,6 +89,29 @@ volumes:
 
 Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
+## Health Checks
+
+Our Docker image provides integrated support for health checks through the standard Docker interfaces.
+
+You can control how the health checks run by using the environment variable `NETDATA_HEALTHCHECK_TARGET` as follows:
+
+-   If left unset, the health check will attempt to access the
+    `/api/v1/info` endpoint of the agent.
+-   If set to the exact value 'cli', the health check
+    script will use `netdatacli ping` to determine if the agent is running
+    correctly or not. This is sufficient to ensure that Netdata did not
+    hang during startup, but does not provide a rigorous verification
+    that the daemon is collecting data or is otherwise usable.
+-   If set to anything else, the health check will treat the vaule as a
+    URL to check for a 200 status code on. In most cases, this should
+    start with `http://localhost:19999/` to check the agent running in
+    the container.
+
+In most cases, the default behavior of checking the `/api/v1/info`
+endpoint will be sufficient. If you are using a configuration which
+disables the web server or restricts access to certain API's, you will
+need to use a non-default configuration for health checks to work.
+
 ## Configure Agent containers
 
 You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. You should
@@ -136,8 +151,8 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](/docs/running-behind-haproxy/) so that it restricts connections to read-only access
-to the CONTAINERS endpoint.
+[HAProxy](/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
+endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
 network. Access to the proxy container is limited to only within the network.
@@ -206,8 +221,9 @@ services:
 ### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
-[Netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address
-Netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
+[Netdata daemon command line options](https://learn.netdata.cloud/docs/agent/daemon/#command-line-options) such as the
+IP address Netdata will be running on, using the [command
+instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
 ## Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 
@@ -261,11 +277,17 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
 ```
 
 ### Restrict access with basic auth

@@ -12,8 +12,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 This page covers detailed instructions on using and configuring the automatic one-line installation script named
 `kickstart.sh`.
 
-This method is fully automatic on all Linux distributions. To install Netdata from source and get _automatic nightly
-updates_, run the following as your normal user:
+This method is fully automatic on all Linux distributions. To install Netdata from source, including all dependencies
+required to connect to Netdata Cloud, and get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -58,15 +58,15 @@ To use `md5sum` to verify the intregity of the `kickstart.sh` script you will do
 run the following:
 
 ```bash
-[ "f1e7aa92ca64b797fdc14df59faad205" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "86abaea95a24df12fe444c1b3e5cfa33" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md)
-for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
 guide](/docs/getting-started.md) for a quick overview.

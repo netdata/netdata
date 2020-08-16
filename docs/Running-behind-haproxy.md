@@ -168,7 +168,7 @@ backend netdata_backend
 
 ## Enable authentication
 
-To use basic HTTP Authentication, create a authentication list:
+To use basic HTTP Authentication, create an authentication list:
 
 ```conf
 # HTTP Auth

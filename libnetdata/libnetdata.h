@@ -300,6 +300,7 @@ extern char *netdata_configured_host_prefix;
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"
+#include "circular_buffer/circular_buffer.h"
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"
@@ -313,7 +314,9 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
+#ifdef HAVE_LIBBPF
 #include "ebpf/ebpf.h"
+#endif
 #include "eval/eval.h"
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"

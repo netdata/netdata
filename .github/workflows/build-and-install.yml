@@ -6,7 +6,18 @@ on:
       - master
   pull_request:
 jobs:
-  build:
+  static-build:
+    name: Build (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - run: |
+          git fetch --prune --unshallow --tags
+      - name: Build
+        run: |
+          .github/scripts/build-static-x86_64.sh
+  source-build:
     name: Build & Install
     strategy:
       fail-fast: false
@@ -17,15 +28,15 @@ jobs:
           - 'alpine:3.10'
           - 'alpine:3.9'
           - 'archlinux:latest'
-          - 'centos:8'
+            #- 'centos:8'
           - 'centos:7'
+          - 'clearlinux:latest'
           - 'debian:bullseye'
           - 'debian:buster'
           - 'debian:stretch'
           - 'debian:jessie'
           - 'fedora:32'
           - 'fedora:31'
-          - 'fedora:30'
           - 'opensuse/leap:15.2'
           - 'opensuse/leap:15.1'
           - 'opensuse/tumbleweed:latest'
@@ -50,8 +61,8 @@ jobs:
           - distro: 'archlinux:latest'
             pre: 'pacman --noconfirm -Sy grep libffi'
 
-          - distro: 'centos:8'
-            rmjsonc: 'dnf remove -y json-c-devel'
+            #- distro: 'centos:8'
+            #rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'debian:bullseye'
             pre: 'apt-get update'
@@ -66,8 +77,6 @@ jobs:
           - distro: 'fedora:32'
             rmjsonc: 'dnf remove -y json-c-devel'
           - distro: 'fedora:31'
-            rmjsonc: 'dnf remove -y json-c-devel'
-          - distro: 'fedora:30'
             rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'opensuse/leap:15.2'

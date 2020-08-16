@@ -678,7 +678,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
 
                     p = intrnames + i * (MAXCOMLEN + 1);
                     if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
-                        RRDDIM *rd_interrupts = rrddim_find(st_interrupts, p);
+                        RRDDIM *rd_interrupts = rrddim_find_active(st_interrupts, p);
 
                         if (unlikely(!rd_interrupts))
                             rd_interrupts = rrddim_add(st_interrupts, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

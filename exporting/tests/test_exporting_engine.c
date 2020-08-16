@@ -60,16 +60,10 @@ static void test_exporting_engine(void **state)
     expect_memory(__wrap_prepare_buffers, engine, engine, sizeof(struct engine));
     will_return(__wrap_prepare_buffers, 0);
 
-    expect_function_call(__wrap_notify_workers);
-    expect_memory(__wrap_notify_workers, engine, engine, sizeof(struct engine));
-    will_return(__wrap_notify_workers, 0);
-
     expect_function_call(__wrap_send_main_rusage);
     expect_value(__wrap_send_main_rusage, st_rusage, NULL);
     expect_value(__wrap_send_main_rusage, rd_user, NULL);
     expect_value(__wrap_send_main_rusage, rd_system, NULL);
-
-    expect_function_call(__wrap_info_int);
 
     void *ptr = malloc(sizeof(struct netdata_static_thread));
     assert_ptr_equal(exporting_main(ptr), NULL);
@@ -83,7 +77,6 @@ static void test_read_exporting_config(void **state)
     *state = engine;
 
     assert_ptr_not_equal(engine, NULL);
-    assert_string_equal(engine->config.prefix, "netdata");
     assert_string_equal(engine->config.hostname, "test-host");
     assert_int_equal(engine->config.update_every, 3);
     assert_int_equal(engine->instance_num, 0);
@@ -95,6 +88,7 @@ static void test_read_exporting_config(void **state)
     assert_ptr_equal(instance->engine, engine);
     assert_int_equal(instance->config.type, EXPORTING_CONNECTOR_TYPE_GRAPHITE);
     assert_string_equal(instance->config.destination, "localhost");
+    assert_string_equal(instance->config.prefix, "netdata");
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);
     assert_int_equal(instance->config.timeoutms, 10000);
@@ -799,7 +793,7 @@ static void test_create_main_rusage_chart(void **state)
     expect_string(rrdset_create_custom, id, "exporting_main_thread_cpu");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting");
-    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, context, "exporting_cpu_usage");
     expect_string(rrdset_create_custom, units, "milliseconds/s");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
@@ -868,7 +862,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, id, "exporting_test_instance_metrics");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting_test_instance");
-    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, context, "exporting_buffer");
     expect_string(rrdset_create_custom, units, "metrics");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
@@ -892,7 +886,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, id, "exporting_test_instance_bytes");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting_test_instance");
-    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, context, "exporting_data_size");
     expect_string(rrdset_create_custom, units, "KiB");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
@@ -916,7 +910,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, id, "exporting_test_instance_ops");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting_test_instance");
-    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, context, "exporting_operations");
     expect_string(rrdset_create_custom, units, "operations");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
@@ -940,7 +934,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, id, "exporting_test_instance_thread_cpu");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting_test_instance");
-    expect_value(rrdset_create_custom, context, NULL);
+    expect_string(rrdset_create_custom, context, "exporting_instance");
     expect_string(rrdset_create_custom, units, "milliseconds/s");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
@@ -1120,7 +1114,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
         "netdata_info{instance=\"test_hostname\",application=\"(null)\",version=\"(null)\"} 1\n"
         "netdata_host_tags_info{key1=\"value1\",key2=\"value2\"} 1\n"
         "netdata_host_tags{key1=\"value1\",key2=\"value2\"} 1\n"
-        "# COMMENT TYPE test_prefix_test_context gauge\n"
+        "# TYPE test_prefix_test_context gauge\n"
         "test_prefix_test_context{chart=\"chart_name\",family=\"test_family\",dimension=\"dimension_name\"} 690565856.0000000\n");
 
     buffer_flush(buffer);
@@ -1200,9 +1194,10 @@ static void test_prometheus_remote_write_send_header(void **state)
         "POST /receive HTTP/1.1\r\n"
         "Host: test-host\r\n"
         "Accept: */*\r\n"
+        "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: 11\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
-    expect_value(__wrap_send, len, 125);
+    expect_value(__wrap_send, len, 167);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
     assert_int_equal(prometheus_remote_write_send_header(&sock, instance),0);
@@ -1470,6 +1465,144 @@ static void test_aws_kinesis_connector_worker(void **state)
 }
 #endif // HAVE_KINESIS
 
+#if ENABLE_EXPORTING_PUBSUB
+static void test_init_pubsub_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+
+    struct pubsub_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct pubsub_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->credentials_file = strdupz("/test/credentials/file");
+    connector_specific_config->project_id = strdupz("test_project_id");
+    connector_specific_config->topic_id = strdupz("test_topic_id");
+
+    expect_function_call(__wrap_pubsub_init);
+    expect_not_value(__wrap_pubsub_init, pubsub_specific_data_p, NULL);
+    expect_string(__wrap_pubsub_init, destination, "localhost");
+    expect_string(__wrap_pubsub_init, error_message, "");
+    expect_string(__wrap_pubsub_init, credentials_file, "/test/credentials/file");
+    expect_string(__wrap_pubsub_init, project_id, "test_project_id");
+    expect_string(__wrap_pubsub_init, topic_id, "test_topic_id");
+    will_return(__wrap_pubsub_init, 0);
+
+    assert_int_equal(init_pubsub_instance(instance), 0);
+
+    assert_ptr_equal(instance->worker, pubsub_connector_worker);
+    assert_ptr_equal(instance->start_batch_formatting, NULL);
+    assert_ptr_equal(instance->start_host_formatting, format_host_labels_json_plaintext);
+    assert_ptr_equal(instance->start_chart_formatting, NULL);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_json_plaintext);
+    assert_ptr_equal(instance->end_chart_formatting, NULL);
+    assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
+    assert_ptr_equal(instance->end_batch_formatting, NULL);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+    assert_ptr_not_equal(instance->connector_specific_data, NULL);
+    freez(instance->connector_specific_data);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+
+    expect_function_call(__wrap_pubsub_init);
+    expect_not_value(__wrap_pubsub_init, pubsub_specific_data_p, NULL);
+    expect_string(__wrap_pubsub_init, destination, "localhost");
+    expect_string(__wrap_pubsub_init, error_message, "");
+    expect_string(__wrap_pubsub_init, credentials_file, "/test/credentials/file");
+    expect_string(__wrap_pubsub_init, project_id, "test_project_id");
+    expect_string(__wrap_pubsub_init, topic_id, "test_topic_id");
+    will_return(__wrap_pubsub_init, 0);
+
+    assert_int_equal(init_pubsub_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_json_plaintext);
+
+    free(connector_specific_config->credentials_file);
+    free(connector_specific_config->project_id);
+    free(connector_specific_config->topic_id);
+}
+
+static void test_pubsub_connector_worker(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->instance_root;
+    struct stats *stats = &instance->stats;
+
+    __real_mark_scheduled_instances(engine);
+
+    expect_function_call(__wrap_rrdhost_is_exportable);
+    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
+    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
+    will_return(__wrap_rrdhost_is_exportable, 1);
+
+    RRDSET *st = localhost->rrdset_root;
+    expect_function_call(__wrap_rrdset_is_exportable);
+    expect_value(__wrap_rrdset_is_exportable, instance, instance);
+    expect_value(__wrap_rrdset_is_exportable, st, st);
+    will_return(__wrap_rrdset_is_exportable, 1);
+
+    __real_prepare_buffers(engine);
+
+    struct pubsub_specific_config *connector_specific_config =
+        callocz(1, sizeof(struct pubsub_specific_config));
+    instance->config.connector_specific_config = connector_specific_config;
+    connector_specific_config->credentials_file = strdupz("/test/credentials/file");
+    connector_specific_config->project_id = strdupz("test_project_id");
+    connector_specific_config->topic_id = strdupz("test_topic_id");
+
+    struct pubsub_specific_data *connector_specific_data = callocz(1, sizeof(struct pubsub_specific_data));
+    instance->connector_specific_data = (void *)connector_specific_data;
+
+    expect_function_call(__wrap_pubsub_add_message);
+    expect_not_value(__wrap_pubsub_add_message, pubsub_specific_data_p, NULL);
+    // The buffer is prepared by Graphite exporting connector
+    expect_string(
+        __wrap_pubsub_add_message, data,
+        "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
+    will_return(__wrap_pubsub_add_message, 0);
+
+    expect_function_call(__wrap_pubsub_publish);
+    expect_not_value(__wrap_pubsub_publish, pubsub_specific_data_p, NULL);
+    expect_string(__wrap_pubsub_publish, error_message, "");
+    expect_value(__wrap_pubsub_publish, buffered_metrics, 1);
+    expect_value(__wrap_pubsub_publish, buffered_bytes, 84);
+    will_return(__wrap_pubsub_publish, 0);
+
+    expect_function_call(__wrap_pubsub_get_result);
+    expect_not_value(__wrap_pubsub_get_result, pubsub_specific_data_p, NULL);
+    expect_not_value(__wrap_pubsub_get_result, error_message, NULL);
+    expect_not_value(__wrap_pubsub_get_result, sent_metrics, NULL);
+    expect_not_value(__wrap_pubsub_get_result, sent_bytes, NULL);
+    expect_not_value(__wrap_pubsub_get_result, lost_metrics, NULL);
+    expect_not_value(__wrap_pubsub_get_result, lost_bytes, NULL);
+    will_return(__wrap_pubsub_get_result, 0);
+
+    expect_function_call(__wrap_send_internal_metrics);
+    expect_value(__wrap_send_internal_metrics, instance, instance);
+    will_return(__wrap_send_internal_metrics, 0);
+
+    pubsub_connector_worker(instance);
+
+    assert_int_equal(stats->buffered_metrics, 0);
+    assert_int_equal(stats->buffered_bytes, 84);
+    assert_int_equal(stats->received_bytes, 0);
+    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_metrics, 0);
+    assert_int_equal(stats->lost_metrics, 0);
+    assert_int_equal(stats->receptions, 1);
+    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->transmission_failures, 0);
+    assert_int_equal(stats->data_lost_events, 0);
+    assert_int_equal(stats->lost_bytes, 0);
+    assert_int_equal(stats->reconnects, 0);
+
+    free(connector_specific_config->credentials_file);
+    free(connector_specific_config->project_id);
+    free(connector_specific_config->topic_id);
+}
+#endif // ENABLE_EXPORTING_PUBSUB
+
 #if HAVE_MONGOC
 static void test_init_mongodb_instance(void **state)
 {
@@ -1726,7 +1859,7 @@ int main(void)
                    cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
 
     const struct CMUnitTest internal_metrics_tests[] = {
-        cmocka_unit_test(test_create_main_rusage_chart),
+        cmocka_unit_test_setup_teardown(test_create_main_rusage_chart, setup_rrdhost, teardown_rrdhost),
         cmocka_unit_test(test_send_main_rusage),
         cmocka_unit_test(test_send_internal_metrics),
     };
@@ -1774,6 +1907,17 @@ int main(void)
     };
 
     test_res += cmocka_run_group_tests_name("kinesis_exporting_connector", kinesis_tests, NULL, NULL);
+#endif
+
+#if ENABLE_EXPORTING_PUBSUB
+    const struct CMUnitTest pubsub_tests[] = {
+        cmocka_unit_test_setup_teardown(
+            test_init_pubsub_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_pubsub_connector_worker, setup_initialized_engine, teardown_initialized_engine),
+    };
+
+    test_res += cmocka_run_group_tests_name("pubsub_exporting_connector", pubsub_tests, NULL, NULL);
 #endif
 
 #if HAVE_MONGOC

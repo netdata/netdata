@@ -11,14 +11,18 @@ Thank you for considering contributing to Netdata.
 
 We love to receive contributions. Maintaining a platform for monitoring everything imaginable requires a broad understanding of a plethora of technologies, systems and applications. We rely on community contributions and user feedback to continue providing the best monitoring solution out there.
 
-There are many ways to contribute, with varying requirements of skills, explained in detail in the following sections. 
-Specific GitHub issues we need help with can be seen [here](https://github.com/netdata/netdata/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22). Some of them are also labeled as "good first issue". 
+There are many ways to contribute, with varying requirements of skills, explained in detail in the following sections.
+Specific GitHub issues we need help with can be seen [here](https://github.com/netdata/netdata/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22). Some of them are also labeled as "good first issue".
 
-## All NetData Users
+## All Netdata Users
 
 ### Give Netdata a GitHub star
 
 This is the minimum open-source users should contribute back to the projects they use. Github stars help the project gain visibility, stand out. So, if you use Netdata, consider pressing that button. **It really matters**.
+
+### Join the Netdata Community
+
+We have launched a [discussion board](https://community.netdata.cloud) where you can find many of us.
 
 ### Spread the word
 
@@ -26,7 +30,7 @@ Community growth allows the project to attract new talent willing to contribute.
 
 ### Provide feedback
 
-Is there anything that bothers you about Netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know. [Open a github issue](https://github.com/netdata/netdata/issues) to discuss it. Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences our road-map significantly. **We rely on your feedback to make Netdata better**.
+Is there anything that bothers you about Netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to match your requirements? Let us know by making a post at [at Netdata Community](https://community.netdata.cloud/category/4/feedback) to discuss it or [open a GitHub issue](https://github.com/netdata/netdata/issues). Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences [our roadmap](https://community.netdata.cloud/category/1/announcements-and-roadmap) significantly. **We rely on your feedback to make Netdata better**.
 
 ### Translate some documentation
 
@@ -46,11 +50,11 @@ Netdata is all about simplicity and meaningful presentation. A "sponsor" for a c
 -   Uses the charts and alarms in his/her day to day work and provides additional feedback.
 -   Requests additional improvements as things change (e.g. new versions of an API are available).
 
-#### Sponsor a backend
+#### Sponsor an exporting connector
 
-We already support various [backends](backends) and we intend to support more. A "sponsor" for a backend: 
+We already support various [exporting connectors](/exporting/README.md), and we intend to support more. A "sponsor" for a connector:
 
--   Suggests ways in which the information in Netdata could best be exposed to the particular backend, to facilitate meaningful presentation.
+-   Suggests ways in which the information in Netdata could best be exposed to the particular endpoint, to facilitate meaningful presentation.
 -   When the implementation passes QA, tests the implementation in production.
 -   Uses the backend in his/her day to day work and provides additional feedback, after the backend is delivered.
 -   Requests additional improvements as things change (e.g. new versions of the backend API are available).
@@ -59,7 +63,7 @@ We already support various [backends](backends) and we intend to support more. A
 
 Netdata delivers alarms via various [notification methods](health/notifications). A "sponsor" for a notification method:
 
--   Points the devs to the documentation for the API and identifies any unusual features of interest (e.g. the ability in Slack to send a notification either to a channel or to a user). 
+-   Points the devs to the documentation for the API and identifies any unusual features of interest (e.g. the ability in Slack to send a notification either to a channel or to a user).
 -   Uses the notification method in production and provides feedback.
 -   Requests additional improvements as things change (e.g. new versions of the API are available).
 
@@ -83,7 +87,7 @@ Don't be afraid to submit a pull request with your corrections or additions! We 
 
 We expect most contributions to be for new data collection plugins. You can read about how external plugins work [here](collectors/plugins.d/). Additional instructions are available for [Node.js plugins](collectors/node.d.plugin) and [Python plugins](collectors/python.d.plugin).
 
-Of course we appreciate contributions for any other part of the NetData agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include NetData charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
+Of course we appreciate contributions for any other part of the Netdata agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include Netdata charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
 
 If you are working on the C source code please be aware that we have a standard build configuration that we use. This
 is meant to keep the source tree clean and free of warnings. When you are preparing to work on the code:
@@ -167,14 +171,14 @@ When you contribute code to Netdata, you are automatically accepting that you wi
 
 The single most important rule when writing code is this: *check the surrounding code and try to imitate it*. [Reference](https://developer.gnome.org/programming-guidelines/stable/c-coding-style.html.en)
 
-We use several different languages and have had contributions from several people with different styles. When in doubt, you can check similar existing code. 
+We use several different languages and have had contributions from several people with different styles. When in doubt, you can check similar existing code.
 
 For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the following exceptions:
 
 -   Use 4 space indentation instead of 8
 -   We occasionally have multiple statements on a single line (e.g. `if (a) b;`)
--   Allow max line length of 120 chars 
--   Allow opening brace at the end of a function declaration: `function() {`. 
+-   Allow max line length of 120 chars
+-   Allow opening brace at the end of a function declaration: `function() {`.
 -   Allow trailing comments
 
 ### Your first pull request
@@ -186,17 +190,39 @@ There are several guides for pull requests, such as the following:
 
 However, it's not always that simple. Our [PR approval process](#pr-approval-process) and the several merges we do every day may cause your fork to get behind the Netdata master. If you worked on something that has changed in the meantime, you will be required to do a git rebase, to bring your fork to the correct state. A very easy to follow guide on how to do it without learning all the intricacies of GitHub can be found [here](https://medium.com/@ruthmpardee/git-fork-workflow-using-rebase-587a144be470)
 
-One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
+One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed.
 
-#### PR title guidelines
+#### PR Guidelines
 
-All verbs in PR titles must be in the past tense. E.g. "Added" instead of "Adds", "Fixed" instead of "Fixes".
+PR Titles:
 
-Bug fixes must have the title "Fixed [description of the problem as a user would perceive it], by [explanation of the correction]". 
+- Must follow the [Imperative Mood](https://en.wikipedia.org/wiki/Imperative_mood)
+- Must be no more than ~50 characters (_longer description in the PR_)
 
-Improvements must have the title "[Area or module] : [Added/Refactored/Improved/Corrected/Started to/Stopped/Modified/Optimized] [x], [in order to/so that] [benefit]". The second part may be left out, if the benefit is obvious from the improvement "x".  
+PR Descriptions:
 
-New collectors must have the title "[New collector] : [Name of collector]".
+- Must clearly contain sufficient information regarding the content of the PR, including area/component, test plan, etc.
+- Must reference an existing issue.
+
+Some PR title examples:
+
+- Fix bug in Netdata installer for FreeBSD 11.2
+- Update docs for other installation methods
+- Add new collector for Prometheus endpoints
+- Add 4.19 Kernel variant for eBPF
+- Fix typo in README
+- Refactor code for better maintainability
+- etc
+
+The key idea here is to start with a "verb" of what you are doing in the PR.
+
+For good examples have a look at other projects like:
+
+- https://github.com/facebook/react/commits/master
+- https://github.com/tensorflow/tensorflow/commits/master
+- https://github.com/vuejs/vue/commits/dev
+- https://github.com/microsoft/vscode/commits/master
+- Also see the Linux Kernel and Git projects as well as good examples.
 
 #### Commit messages when PRs are merged
 

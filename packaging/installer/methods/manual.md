@@ -1,11 +1,11 @@
 <!--
 ---
-title: "Install Netdata on Linux manually"
+title: "Install Netdata on Linux from a Git checkout"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
 ---
 -->
 
-# Install Netdata on Linux manually
+# Install Netdata on Linux from a Git checkout
 
 To install the latest git version of Netdata, please follow these 2 steps:
 
@@ -68,16 +68,16 @@ This is how to do it by hand:
 
 ```sh
 # Debian / Ubuntu
-apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
+apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libelf-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
 
 # Fedora
-dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
+dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel elfutils-libelf-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 
 # CentOS / Red Hat Enterprise Linux
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel make nc pkgconfig python zlib-devel cmake
+yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel elfutils-libelf-devel make nc pkgconfig python zlib-devel cmake
 
 # openSUSE
-zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
+zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libelf-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 ```
 
 Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
@@ -107,6 +107,7 @@ Netdata plugins and various aspects of Netdata can be enabled or benefit when th
 | `python-pymongo`|used for monitoring **mongodb** databases|
 | `nodejs`|used for `node.js` plugins for monitoring **named** and **SNMP** devices|
 | `lm-sensors`|for monitoring **hardware sensors**|
+| `libelf`|for monitoring kernel-level metrics using eBPF|
 | `libmnl`|for collecting netfilter metrics|
 | `netcat`|for shell plugins to collect metrics from remote systems|
 
@@ -127,6 +128,7 @@ Netdata Cloud support may require the following packages to be installed:
 | package  | description
 |:--------:| -----------------------
 | `cmake` | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux
+| `openssl` | Needed to secure communications with the Netdata Cloud
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
@@ -153,7 +155,7 @@ CentOS 8.x:
 
 - Enable the PowerTools repo
 - Enable the EPEL repo
-- Enable the Extra repo from [extra.getpagespeed.com](https://extras.getpagespeed.com/release-el8-latest.rpm)
+- Enable the Extra repo from [OKAY](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
 
 And install the minimum required dependencies:
 
@@ -168,10 +170,10 @@ yum config-manager --set-enabled PowerTools
 yum install -y epel-release
 
 # Install Repo for libuv-devl (NEW)
-yum install -y https://extras.getpagespeed.com/release-el8-latest.rpm
+yum install -y http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
 
 # Install Devel Packages
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
+yum install autoconf automake curl gcc git cmake libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
 
 # Install Judy-Devel directly
 yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
@@ -216,8 +218,8 @@ In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md)
-for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
 guide](/docs/getting-started.md) for a quick overview.

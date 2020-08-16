@@ -124,10 +124,6 @@ jobs:
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:18.04" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 18.04"
 
-    - name: Run netdata lifecycle, on Ubuntu 19.10
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.10" tests/updater_checks.sh && break; done'
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.10"
-
       # Centos runs
     - name: Run netdata lifecycle on CentOS 7
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh && break; done '
@@ -161,14 +157,50 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
 
       # Fedora runs
-    - name: Run netdata lifecycle, on Fedora 30
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh && break; done'
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
-
     - name: Run netdata lifecycle, on Fedora 31
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
+    - name: DEB package test
+      git:
+        depth: false
+      before_install:
+        - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
+      before_script:
+        - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+      script:
+        - echo "GIT Branch:" && git branch
+        - echo "Last commit:" && git log -1
+        - echo "GIT Describe:" && git describe
+        - echo "packaging/version:" && cat packaging/version
+        - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
+        - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
+        - sudo chown -R root:travis "/var/lib/lxc"
+        - sudo chmod -R 750 "/var/lib/lxc"
+        - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+
+    - name: RPM package test
+      git:
+        depth: false
+      before_install:
+        - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
+      before_script:
+        - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+      script:
+        - echo "GIT Branch:" && git branch
+        - echo "Last commit:" && git log -1
+        - echo "GIT Describe:" && git describe
+        - echo "packaging/version:" && cat packaging/version
+        - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
+        - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
+        - sudo chmod -R 755 "/var/lib/lxc"
+        - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
 
     - stage: Support activities on main branch
       name: Generate changelog for release (only on special and tagged commit msg)
@@ -184,7 +216,6 @@ jobs:
       git:
         depth: false
       if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
-
 
     # ###### Packaging workflow section ######
     # References:
@@ -231,15 +262,7 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-      name: "Build & Publish DEB package for ubuntu/eoan"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="eoan" BUILD_STRING="ubuntu/eoan"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for ubuntu/bionic"
+      name: "Build & Publish DEB package for ubuntu/bionic"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
       env:
@@ -252,6 +275,14 @@ jobs:
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="xenial" BUILD_STRING="ubuntu/xenial"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish DEB package for ubuntu/focal"
+      <<: *DEB_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) DEB( Ubuntu)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="focal" BUILD_STRING="ubuntu/focal"
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
 
@@ -270,15 +301,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for debian/jessie"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Debian)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
 
     - stage: Package centos, fedora and opensuse
       _template: &RPM_TEMPLATE
@@ -331,14 +353,6 @@ jobs:
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Fedora 30"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="30" BUILD_STRING="fedora/30"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 

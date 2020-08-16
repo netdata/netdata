@@ -10,7 +10,9 @@ extern int become_daemon(int dont_fork, const char *user);
 extern void netdata_cleanup_and_exit(int i);
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
 
-extern char pidfile[];
+extern void get_netdata_execution_path(void);
 
+extern char pidfile[];
+extern char exepath[];
 
 #endif /* NETDATA_DAEMON_H */

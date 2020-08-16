@@ -52,7 +52,6 @@ area/docs:
   - "**/*.md"
   - diagrams/*
   - diagrams/**/*
-  - netlify.toml
 
 area/external/python:
   - collectors/python.d.plugin/*

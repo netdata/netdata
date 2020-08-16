@@ -230,7 +230,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: system.load");
             } else {
 
-                st = rrdset_find_bytype_localhost("system", "load");
+                st = rrdset_find_active_bytype_localhost("system", "load");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "system"
@@ -270,7 +270,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             do_swap = 0;
             error("DISABLED: system.swap");
         } else {
-            st = rrdset_find_localhost("system.swap");
+            st = rrdset_find_active_localhost("system.swap");
             if (unlikely(!st)) {
                 st = rrdset_create_localhost(
                         "system"
@@ -332,7 +332,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                         iftot.ift_obytes += if2m->ifm_data.ifi_obytes;
                     }
                 }
-                st = rrdset_find_localhost("system.ipv4");
+                st = rrdset_find_active_localhost("system.ipv4");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "system"
@@ -382,7 +382,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.ecnpkts");
         } else {
             if (likely(do_tcp_packets)) {
-                st = rrdset_find_localhost("ipv4.tcppackets");
+                st = rrdset_find_active_localhost("ipv4.tcppackets");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -412,7 +412,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_tcp_errors)) {
-                st = rrdset_find_localhost("ipv4.tcperrors");
+                st = rrdset_find_active_localhost("ipv4.tcperrors");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -445,7 +445,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_tcp_handshake)) {
-                st = rrdset_find_localhost("ipv4.tcphandshake");
+                st = rrdset_find_active_localhost("ipv4.tcphandshake");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -486,7 +486,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                 tcpstat.tcps_persistdrop ||
                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpconnaborts");
+                st = rrdset_find_active_localhost("ipv4.tcpconnaborts");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -523,7 +523,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                         (tcpstat.tcps_rcvoopack ||
                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_ofo = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpofo");
+                st = rrdset_find_active_localhost("ipv4.tcpofo");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -557,7 +557,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_syscookies = CONFIG_BOOLEAN_YES;
 
-                st = rrdset_find_localhost("ipv4.tcpsyncookies");
+                st = rrdset_find_active_localhost("ipv4.tcpsyncookies");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -595,7 +595,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                   tcpstat.tcps_ecn_not_supported ||
                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ecn = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.ecnpkts");
+                st = rrdset_find_active_localhost("ipv4.ecnpkts");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -638,7 +638,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.udperrors");
         } else {
             if (likely(do_udp_packets)) {
-                st = rrdset_find_localhost("ipv4.udppackets");
+                st = rrdset_find_active_localhost("ipv4.udppackets");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -668,7 +668,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_udp_errors)) {
-                st = rrdset_find_localhost("ipv4.udperrors");
+                st = rrdset_find_active_localhost("ipv4.udperrors");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -729,7 +729,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_icmp_packets)) {
-                st = rrdset_find_localhost("ipv4.icmp");
+                st = rrdset_find_active_localhost("ipv4.icmp");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -758,7 +758,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_localhost("ipv4.icmp_errors");
+                st = rrdset_find_active_localhost("ipv4.icmp_errors");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -791,7 +791,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_icmpmsg)) {
-                st = rrdset_find_localhost("ipv4.icmpmsg");
+                st = rrdset_find_active_localhost("ipv4.icmpmsg");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -840,7 +840,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.errors");
         } else {
             if (likely(do_ip_packets)) {
-                st = rrdset_find_localhost("ipv4.packets");
+                st = rrdset_find_active_localhost("ipv4.packets");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -874,7 +874,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsout)) {
-                st = rrdset_find_localhost("ipv4.fragsout");
+                st = rrdset_find_active_localhost("ipv4.fragsout");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -907,7 +907,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsin)) {
-                st = rrdset_find_localhost("ipv4.fragsin");
+                st = rrdset_find_active_localhost("ipv4.fragsin");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -940,7 +940,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_errors)) {
-                st = rrdset_find_localhost("ipv4.errors");
+                st = rrdset_find_active_localhost("ipv4.errors");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv4"
@@ -1000,7 +1000,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           ip6stat.ip6s_delivered ||
                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_packets = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.packets");
+                st = rrdset_find_active_localhost("ipv6.packets");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1039,7 +1039,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                            ip6stat.ip6s_ofragments ||
                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_fragsout = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.fragsout");
+                st = rrdset_find_active_localhost("ipv6.fragsout");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1078,7 +1078,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           ip6stat.ip6s_fragments ||
                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_fragsin = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.fragsin");
+                st = rrdset_find_active_localhost("ipv6.fragsin");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1124,7 +1124,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                          ip6stat.ip6s_noroute ||
                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_errors = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.errors");
+                st = rrdset_find_active_localhost("ipv6.errors");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1186,7 +1186,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                     icmp6_total.msgs_out ||
                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6 = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmp");
+                st = rrdset_find_active_localhost("ipv6.icmp");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1220,7 +1220,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           icmp6stat.icp6s_outhist[ND_REDIRECT] ||
                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_redir = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmpredir");
+                st = rrdset_find_active_localhost("ipv6.icmpredir");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1263,7 +1263,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                            icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB] ||
                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_errors = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmperrors");
+                st = rrdset_find_active_localhost("ipv6.icmperrors");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1316,7 +1316,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY] ||
                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_echos = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmpechos");
+                st = rrdset_find_active_localhost("ipv6.icmpechos");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1356,7 +1356,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                            icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT] ||
                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_router = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmprouter");
+                st = rrdset_find_active_localhost("ipv6.icmprouter");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1396,7 +1396,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                              icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT] ||
                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_neighbor = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmpneighbor");
+                st = rrdset_find_active_localhost("ipv6.icmpneighbor");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1442,7 +1442,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           icmp6stat.icp6s_outhist[136] ||
                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_types = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv6.icmptypes");
+                st = rrdset_find_active_localhost("ipv6.icmptypes");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
                             "ipv6"
@@ -1495,7 +1495,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.uptime");
         } else {
             clock_gettime(CLOCK_REALTIME, &cur_time);
-            st = rrdset_find_localhost("system.uptime");
+            st = rrdset_find_active_localhost("system.uptime");
 
             if(unlikely(!st)) {
                 st = rrdset_create_localhost(
