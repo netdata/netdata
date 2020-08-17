@@ -67,6 +67,7 @@ static void exporting_main_cleanup(void *ptr)
             found++;
             info("stopping worker for instance %s", instance->config.name);
             uv_mutex_unlock(&instance->mutex);
+            instance->data_is_ready = 1;
             uv_cond_signal(&instance->cond_var);
         } else
             info("found stopped worker for instance %s", instance->config.name);

@@ -294,6 +294,7 @@ void end_batch_formatting(struct engine *engine)
                 continue;
             }
             uv_mutex_unlock(&instance->mutex);
+            instance->data_is_ready = 1;
             uv_cond_signal(&instance->cond_var);
 
             instance->scheduled = 0;
