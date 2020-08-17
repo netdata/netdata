@@ -57,6 +57,12 @@ collector—we may be looking for contributions from users such as yourself!
 The Netdata Agent auto-detects and collects metrics from all of the services and applications below. You can also
 configure any of these collectors according to your setup and infrastructure.
 
+### Generic
+
+-   [Prometheus endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus): Gathers
+    metrics from one or more Prometheus endpoints that use the OpenMetrics exposition format. Autodetects more than 600
+    endpoints.
+
 ### APM (application performance monitoring)
 
 -   [Go applications](/collectors/python.d.plugin/go_expvar/README.md): Monitor any Go application that exposes its
