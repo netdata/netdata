@@ -329,9 +329,10 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         user->st->last_updated.tv_sec        = latest_collect_t;
 
         debug(D_REPLICATION, "Finished replication on %s: %zu points transferred, advance=(%ld-secs %ld-points)"
-                             " last_col_time->%ld last_up_time->%ld",
+                             " last_col_time->%ld.%ld last_up_time->%ld",
                              user->st->name, num_points, advance_in_secs, advance_in_points,
-                             user->st->last_collected_time.tv_sec, user->st->last_updated.tv_sec);
+                             user->st->last_collected_time.tv_sec, user->st->last_collected_time.tv_usec,
+                             user->st->last_updated.tv_sec);
 
         user->st->counter       += advance_in_points;
         user->st->counter_done  += advance_in_points;
@@ -347,6 +348,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     user->st->sflag_replicating_down = 0;
     netdata_mutex_unlock(&user->st->shared_flags_lock);
 
+    debug_dump_rrdset_state(user->st);
     // Prevent 1-sec gap after replication, this is independent of the same flag on the sender. If the sender is
     // not storing first then another replication will be triggered after the empty window.
     rrdset_flag_set(user->st, RRDSET_FLAG_STORE_FIRST);
@@ -393,7 +395,8 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
     {
         rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
-        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s (idx %zu)", value, timestamp, id, idx);
+        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s (idx %zu)", value, timestamp, user->st->id,
+                             id, idx);
         rd->last_stored_value = value;
         if (rd->state->handle.rrdeng.descr)
             debug(D_REPLICATION, "page_descr %llu - %llu with %u", rd->state->handle.rrdeng.descr->start_time,

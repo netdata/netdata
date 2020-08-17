@@ -1071,6 +1071,7 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
 }
 
 time_t rrdhost_last_entry_t(RRDHOST *h);
+void debug_dump_rrdset_state(RRDSET *st);
 
 // get the last slot updated in the round robin database
 #define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))

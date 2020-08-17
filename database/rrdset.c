@@ -1328,6 +1328,7 @@ static inline size_t rrdset_done_interpolate(
                 rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, storage_flags));
 //                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 #ifdef NETDATA_INTERNAL_CHECKS
+                debug_dump_rrdset_state(st);
                 debug(D_REPLICATION, "interpolate-store %s.%s@%llu stored(last=%llu,next=%llu) "
                       "collect(last=%llu,now=%llu,val=" COLLECTED_NUMBER_FORMAT ") " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
                       st->name, rd->name, update_every_ut, last_stored_ut, next_store_ut, last_collect_ut,
@@ -1448,6 +1449,34 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
     }
 }
 
+void debug_dump_rrdset_state(RRDSET *st) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if (debug_flags&D_REPLICATION) {
+        RRDDIM *rd;
+        debug(D_REPLICATION, "Chart state %s: counter=%zu counter_done=%zu usec_since_last=%llu last_updated=%ld.%ld"
+                             " last_collected=%ld.%ld collected_total=%lld last_collected_total=%lld",
+                             st->id, st->counter, st->counter_done, st->usec_since_last_update,
+                             st->last_updated.tv_sec, st->last_updated.tv_usec,
+                             st->last_collected_time.tv_sec, st->last_collected_time.tv_usec,
+                             st->collected_total, st->last_collected_total);
+        netdata_rwlock_rdlock(&st->rrdset_rwlock);
+        rrddim_foreach_read(rd, st) {
+            debug(D_REPLICATION, "Dimension state %s.%s: calculated_value=" CALCULATED_NUMBER_FORMAT
+                                 " last_calculated_value=" CALCULATED_NUMBER_FORMAT
+                                 " last_stored_value=" CALCULATED_NUMBER_FORMAT
+                                 " col_counter=%zu"
+                                 " col_volume=" CALCULATED_NUMBER_FORMAT
+                                 " store_volume=" CALCULATED_NUMBER_FORMAT
+                                 " last_coll_time=%ld.%ld",
+                                 st->id, rd->id, rd->calculated_value, rd->last_calculated_value,
+                                 rd->last_stored_value, rd->collections_counter, rd->collected_volume,
+                                 rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
+        }
+        netdata_rwlock_unlock(&st->rrdset_rwlock);
+    }
+#endif
+}
+
 void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
@@ -1497,7 +1526,8 @@ void rrdset_done(RRDSET *st) {
     rrdset_debug(st, "microseconds since last update: %llu", st->usec_since_last_update);
     #endif
 
-    // set last_collected_time
+    // set last_collected_time: this is part of the initial condition for the interpolator if we are running locally,
+    // or if we stream the initial value. This is does not happen if we replicated the initial state from the sender.
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // it is the first entry
         // set the last_collected_time to now

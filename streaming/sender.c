@@ -443,8 +443,8 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                     debug(D_REPLICATION, "%s.%s finished replication @%ld with %zu samples (index=%zu)", st->id,
                                          rd->id, sample_t, num_points, index);
                     buffer_sprintf(s->build, "REPMETA \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " "
-                                   COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT " "
-                                   CALCULATED_NUMBER_FORMAT "\n",
+                                   COLLECTED_NUMBER_FORMAT " " CALCULATED_NUMBER_FORMAT  " " CALCULATED_NUMBER_FORMAT
+                                   " " CALCULATED_NUMBER_FORMAT "\n",
                                    rd->id,
                                    rd->last_collected_value,
                                    rd->collected_value,
@@ -467,6 +467,7 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
     }
     buffer_sprintf(s->build, "REPEND %zu %ld\n", num_points, st->last_collected_time.tv_usec);
     st->gap_sent = end;
+    debug_dump_rrdset_state(st);
     if ((time_t)st->gap_sent == st->last_updated.tv_sec)
         st->sflag_replicating_up = 0;
 }
