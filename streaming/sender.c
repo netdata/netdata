@@ -465,7 +465,13 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
 
         }
     }
-    buffer_sprintf(s->build, "REPEND %zu %ld\n", num_points, st->last_collected_time.tv_usec);
+    usec_t last_collected_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
+    // The replication always happens at a known step during the point update as we trigger it from rrdset_done().
+    // This avoids race hazards where the chart could be in an inconsistent state during the update, but it means that
+    // we replicate during the window where that last_collected_time has been updated and the difference is held in
+    // the local variables now_collect_ut and last_collect_ut. Account for this so that the interpolation on the
+    // receiver has access to the same same data.
+    buffer_sprintf(s->build, "REPEND %zu %llu\n", num_points, last_collected_ut - st->usec_since_last_update);
     st->gap_sent = end;
     debug_dump_rrdset_state(st);
     if ((time_t)st->gap_sent == st->last_updated.tv_sec)

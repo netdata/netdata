@@ -142,7 +142,10 @@ PARSER_RC streaming_begin_action(void *user_v, RRDSET *st, usec_t microseconds, 
         send_replication_req(user->host, st->id, now - rpt->gap_history + 1, now);
         return PARSER_RC_OK;
     }
-    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    // The collected value is sent before interpolation so the last_updated time is not for the new value, it is
+    // the most recent timestamp before the new point. We do not know in advance how many stored points this collected
+    // value will produce on interpolation.
+    time_t expected_t = st->last_updated.tv_sec;
     debug(D_REPLICATION, "BEGIN on %s, last_updated=%ld remote=%llu offset=%llu", st->name,
                          (long)st->last_updated.tv_sec, remote_clock, microseconds);
     if (remote_t < expected_t) {
@@ -297,13 +300,13 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     UNUSED(plugins_action);
     RRDDIM *rd;
     char *num_points_txt = words[1];
-    char *col_usec_txt   = words[2];
+    char *col_time_txt   = words[2];
     time_t advance_in_secs;
     long advance_in_points;
     if (!num_points_txt)
         goto disable;
     size_t num_points = str2ull(num_points_txt);
-    size_t coll_usec_offset   = str2ul(col_usec_txt);       // 0-999999
+    usec_t last_collect_ut = str2ull(col_time_txt);  // The chart-level last_collected_time in usec
 
     /* If data was transferred in the replication window then we do not know how the number of points relates to the
        length of the window or the distribution amongst the dimension, so update the chart-level timestamps from
@@ -324,9 +327,11 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         if ((advance_in_secs % user->st->update_every) != 0)
             debug(D_REPLICATION, "Timestamps are mis-aligned during replication!");
 
-        user->st->last_collected_time.tv_sec = latest_collect_t;
-        user->st->last_collected_time.tv_usec = coll_usec_offset;
+        // Timestamps stored during replication are storage times (db timestamps) not collection times.
         user->st->last_updated.tv_sec        = latest_collect_t;
+        // This needs usec precision to replicate the interpolators on both machines (it drives the deltas)
+        user->st->last_collected_time.tv_sec = last_collect_ut / USEC_PER_SEC;
+        user->st->last_collected_time.tv_usec = last_collect_ut % USEC_PER_SEC;
 
         debug(D_REPLICATION, "Finished replication on %s: %zu points transferred, advance=(%ld-secs %ld-points)"
                              " last_col_time->%ld.%ld last_up_time->%ld",
