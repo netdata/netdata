@@ -12,6 +12,7 @@ Monitors the leases database to show all active leases for given pools.
 
 -   dhcpd leases file MUST BE readable by Netdata
 -   pools MUST BE in CIDR format
+-   `python-ipaddress` package is needed in Python2
 
 It produces:
 
@@ -41,11 +42,14 @@ Sample:
 
 ```yaml
 local:
-  leases_path       : '/var/lib/dhcp/dhcpd.leases'
-  pools       : '192.168.3.0/24 192.168.4.0/24 192.168.5.0/24'
+  leases_path: '/var/lib/dhcp/dhcpd.leases'
+  pools:
+    office:         '192.168.2.0/24'                            # name(dimension): pool in CIDR format
+    wifi:           '192.168.3.10-192.168.3.20'                 # name(dimension): pool in IP Range format
+    192.168.4.0/24: '192.168.4.0/24'                            # name(dimension): pool in CIDR format
+    wifi-guest:     '192.168.5.0/24 192.168.6.10-192.168.6.20'  # name(dimension): pool in CIDR + IP Range format
 ```
 
-In case of python2 you need to  install `py2-ipaddress` to make plugin work.
 The module will not work If no configuration is given.
 
 ---
