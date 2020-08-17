@@ -281,8 +281,8 @@ PARSER_RC streaming_rep_meta(char **words, void *user_v, PLUGINSD_ACTION *plugin
     rd->collected_value = strtoll(collected_str, NULL, 0);
     rd->collected_value_max = strtoll(collected_max_str, NULL, 0);
     rd->last_stored_value = strtod(last_stored_str, NULL);
-    rd->calculated_value = strtod(last_stored_str, NULL);
-    rd->last_calculated_value = strtod(last_stored_str, NULL);
+    rd->calculated_value = strtod(calculated_str, NULL);
+    rd->last_calculated_value = strtod(last_calculated_str, NULL);
     debug(D_REPLICATION, "Replication of %s.%s: last_col_val=" COLLECTED_NUMBER_FORMAT " col_val=" COLLECTED_NUMBER_FORMAT " col_val_max=" COLLECTED_NUMBER_FORMAT " last_store=" CALCULATED_NUMBER_FORMAT " calc_val=" CALCULATED_NUMBER_FORMAT " last_calc_val=" CALCULATED_NUMBER_FORMAT,
           user->st->id, id, rd->last_collected_value, rd->collected_value, rd->collected_value_max,
           rd->last_stored_value, rd->calculated_value, rd->last_calculated_value);

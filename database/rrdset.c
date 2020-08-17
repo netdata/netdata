@@ -1238,15 +1238,17 @@ static inline size_t rrdset_done_interpolate(
                                    / (calculated_number)(now_collect_ut - last_collect_ut)
                             );
                     #ifdef NETDATA_INTERNAL_CHECKS
-                    debug(D_REPLICATION, "interpolate %s.%s@%llu stored(last=%llu,next=%llu) "
-                          "collect(last=%llu,now=%llu) " CALCULATED_NUMBER_FORMAT "->" CALCULATED_NUMBER_FORMAT,
-                          st->name, rd->name, update_every_ut,
-                          last_stored_ut, next_store_ut,
-                          last_collect_ut, now_collect_ut,
-                          rd->calculated_value, new_value);
-                    #endif
-
-                    #ifdef NETDATA_INTERNAL_CHECKS
+                    debug(D_REPLICATION, "%s.%s: interpolate-calc "
+                                CALCULATED_NUMBER_FORMAT " = "
+                                CALCULATED_NUMBER_FORMAT
+                                " * (%llu - %llu)"
+                                " / (%llu - %llu)"
+                              , st->name, rd->name
+                              , new_value
+                              , rd->calculated_value
+                              , next_store_ut, last_collect_ut
+                              , now_collect_ut, last_collect_ut
+                    );
                     rrdset_debug(st, "%s: CALC2 INC "
                                 CALCULATED_NUMBER_FORMAT " = "
                                 CALCULATED_NUMBER_FORMAT
@@ -1286,6 +1288,10 @@ static inline size_t rrdset_done_interpolate(
                         // this is the last iteration
                         // do not interpolate
                         // just show the calculated value
+                        #ifdef NETDATA_INTERNAL_CHECKS
+                        debug(D_REPLICATION, "%s.%s: interpolate-calc =" CALCULATED_NUMBER_FORMAT
+                                           , st->name, rd->name, rd->calculated_value);
+                        #endif
 
                         new_value = rd->calculated_value;
                     }
@@ -1302,6 +1308,17 @@ static inline size_t rrdset_done_interpolate(
                                 );
 
                         #ifdef NETDATA_INTERNAL_CHECKS
+                        debug(D_REPLICATION, "%s.%s: interpolate-calc "
+                                    CALCULATED_NUMBER_FORMAT " = ((("
+                                            "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+                                            " * %llu"
+                                            " / %llu) + " CALCULATED_NUMBER_FORMAT
+                                  , st->name, rd->name
+                                  , new_value
+                                  , rd->calculated_value, rd->last_calculated_value
+                                  , (next_store_ut - first_ut)
+                                  , (now_collect_ut - first_ut), rd->last_calculated_value
+                        );
                         rrdset_debug(st, "%s: CALC2 DEF "
                                     CALCULATED_NUMBER_FORMAT " = ((("
                                             "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
@@ -1464,12 +1481,15 @@ void debug_dump_rrdset_state(RRDSET *st) {
             debug(D_REPLICATION, "Dimension state %s.%s: calculated_value=" CALCULATED_NUMBER_FORMAT
                                  " last_calculated_value=" CALCULATED_NUMBER_FORMAT
                                  " last_stored_value=" CALCULATED_NUMBER_FORMAT
+                                 " collected_value=" COLLECTED_NUMBER_FORMAT
+                                 " last_collected_value=" COLLECTED_NUMBER_FORMAT
                                  " col_counter=%zu"
                                  " col_volume=" CALCULATED_NUMBER_FORMAT
                                  " store_volume=" CALCULATED_NUMBER_FORMAT
                                  " last_coll_time=%ld.%ld",
                                  st->id, rd->id, rd->calculated_value, rd->last_calculated_value,
-                                 rd->last_stored_value, rd->collections_counter, rd->collected_volume,
+                                 rd->last_stored_value, rd->collected_value, rd->last_collected_value,
+                                 rd->collections_counter, rd->collected_volume,
                                  rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
         }
         netdata_rwlock_unlock(&st->rrdset_rwlock);
@@ -1627,8 +1647,12 @@ void rrdset_done(RRDSET *st) {
     }
     st->counter_done++;
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Streaming of values. All replication happens at this point.
     if(unlikely(st->rrdhost->rrdpush_send_enabled))
         rrdset_done_push(st);
+    debug_dump_rrdset_state(st);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     #ifdef NETDATA_INTERNAL_CHECKS
     rrdset_debug(st, "last_collect_ut = %0.3" LONG_DOUBLE_MODIFIER " (last collection time)", (LONG_DOUBLE)last_collect_ut/USEC_PER_SEC);
@@ -1688,6 +1712,17 @@ void rrdset_done(RRDSET *st) {
                                        / (calculated_number)rd->divisor;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
+                debug(D_REPLICATION, "%s.%s: interpolate-scale "
+                            CALCULATED_NUMBER_FORMAT " = "
+                            COLLECTED_NUMBER_FORMAT
+                            " * " CALCULATED_NUMBER_FORMAT
+                            " / " CALCULATED_NUMBER_FORMAT
+                          , st->name, rd->name
+                          , rd->calculated_value
+                          , rd->collected_value
+                          , (calculated_number)rd->multiplier
+                          , (calculated_number)rd->divisor
+                );
                 rrdset_debug(st, "%s: CALC ABS/ABS-NO-IN "
                             CALCULATED_NUMBER_FORMAT " = "
                             COLLECTED_NUMBER_FORMAT
@@ -1715,6 +1750,15 @@ void rrdset_done(RRDSET *st) {
                             / (calculated_number)st->collected_total;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
+                debug(D_REPLICATION, "%s.%s: interpolate-scale "
+                            CALCULATED_NUMBER_FORMAT " = 100"
+                            " * " COLLECTED_NUMBER_FORMAT
+                            " / " COLLECTED_NUMBER_FORMAT
+                          , st->name, rd->name
+                          , rd->calculated_value
+                          , rd->collected_value
+                          , st->collected_total
+                );
                 rrdset_debug(st, "%s: CALC PCENT-ROW "
                             CALCULATED_NUMBER_FORMAT " = 100"
                             " * " COLLECTED_NUMBER_FORMAT
@@ -1784,6 +1828,18 @@ void rrdset_done(RRDSET *st) {
                 }
 
                 #ifdef NETDATA_INTERNAL_CHECKS
+                debug(D_REPLICATION, "%s.%s: interpolate-scale "
+                            CALCULATED_NUMBER_FORMAT " = ("
+                            COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
+                            ")"
+                                    " * " CALCULATED_NUMBER_FORMAT
+                            " / " CALCULATED_NUMBER_FORMAT
+                          , st->name, rd->name
+                          , rd->calculated_value
+                          , rd->collected_value, rd->last_collected_value
+                          , (calculated_number)rd->multiplier
+                          , (calculated_number)rd->divisor
+                );
                 rrdset_debug(st, "%s: CALC INC PRE "
                             CALCULATED_NUMBER_FORMAT " = ("
                             COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
@@ -1832,6 +1888,15 @@ void rrdset_done(RRDSET *st) {
                             / (calculated_number)(st->collected_total - st->last_collected_total);
 
                 #ifdef NETDATA_INTERNAL_CHECKS
+                debug(D_REPLICATION, "%s.%s: interpolate-scale "
+                            CALCULATED_NUMBER_FORMAT " = 100"
+                            " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+                            " / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+                          , st->name, rd->name
+                          , rd->calculated_value
+                          , rd->collected_value, rd->last_collected_value
+                          , st->collected_total, st->last_collected_total
+                );
                 rrdset_debug(st, "%s: CALC PCENT-DIFF "
                             CALCULATED_NUMBER_FORMAT " = 100"
                             " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
@@ -1851,6 +1916,11 @@ void rrdset_done(RRDSET *st) {
                 rd->calculated_value = 0;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
+                debug(D_REPLICATION, "%s.%s: interpolate-scale "
+                            CALCULATED_NUMBER_FORMAT " = 0"
+                          , st->name, rd->name
+                          , rd->calculated_value
+                );
                 rrdset_debug(st, "%s: CALC "
                             CALCULATED_NUMBER_FORMAT " = 0"
                           , rd->name
