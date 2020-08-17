@@ -5,6 +5,7 @@
 int setup_configured_engine(void **state)
 {
     struct engine *engine = __mock_read_exporting_config();
+    engine->instance_root->data_is_ready = 1;
 
     *state = engine;
 
