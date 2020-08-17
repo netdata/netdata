@@ -20,8 +20,9 @@ Most Pi-hole users run it on a [Raspberry Pi](https://www.raspberrypi.org/produc
 name), a credit card-sized, super-capable computer that costs about $35.
 
 And to keep tabs on how both Pi-hole and the Raspberry Pi are working to protect your network, you can use the
-open-source [Netdata monitoring agent](https://github.com/netdata/netdata). With a two-minute installation and zero
-configuration, you'll be able to monitor thousands of metrics in real-time and receive alerts if Pi-hole stops working.
+open-source [Netdata monitoring agent](https://github.com/netdata/netdata). After a two-minute installation and with
+zero configuration, you'll be able to monitor thousands of metrics in real-time and receive alerts if Pi-hole stops
+working.
 
 This guide will show you how to set up both Pi-hole and Netdata's real-time monitoring dashboard.
 
@@ -87,12 +88,20 @@ By the time you've reached this point in the guide, Netdata has already collecte
 containing valuable information about Pi-hole and your Raspberry Pi. Use Netdata's dashboard and synced charts to zoom,
 highlight, scrub through time, and intuit how an anomaly in one part of your system might affect another.
 
+Out of the box, the Pi-hole collector gives you real-time insights into the volume of queries, connected clients, DNS
+queries per type, top clients, top blocked domains, and more. Additional Netdata collectors create charts for CPU,
+disks, networking, per-application usage, and much more.
+
+![The Netdata dashboard in
+action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
+
 If you're completely new to Netdata, take a look at our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for a
 walkthrough of all its features. For a more expedited tour, see the [get started guide](/docs/getting-started.md).
 
 ### Enable temperature sensor monitoring
 
-You need to manually enable Netdata's built-in temperature sensor collector because the default Python version isn't compatible with a Raspberry Pi's sensors. First, open the `charts.d.conf` file for editing.
+You need to manually enable Netdata's built-in temperature sensor collector because the default Python version isn't
+compatible with a Raspberry Pi's sensors. First, open the `charts.d.conf` file for editing.
 
 ```bash
 cd /etc/netdata
@@ -102,7 +111,7 @@ sudo ./edit-config charts.d.conf
 Uncomment the `sensors=force` line and save the file. Restart Netdata with `sudo service netdata restart` to enable
 Raspberry Pi temperature sensor monitoring.
 
-### Storing historical metrics on the Raspberry Pi
+### Storing historical metrics on your Raspberry Pi
 
 By default, Netdata allocates 256 MiB in disk space to store historical metrics inside the [database
 engine](/database/engine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
