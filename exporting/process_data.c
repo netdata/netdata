@@ -43,7 +43,8 @@ int mark_scheduled_instances(struct engine *engine)
     int instances_were_scheduled = 0;
 
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
-        if (!instance->disabled && (engine->now % instance->config.update_every < localhost->rrd_update_every)) {
+        if (!instance->disabled && (engine->now % instance->config.update_every >=
+                                    instance->config.update_every - localhost->rrd_update_every)) {
             instance->scheduled = 1;
             instances_were_scheduled = 1;
             instance->before = engine->now;
