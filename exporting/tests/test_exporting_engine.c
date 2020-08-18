@@ -1192,7 +1192,7 @@ static void test_prometheus_remote_write_send_header(void **state)
     expect_string(
         __wrap_send, buf,
         "POST /receive HTTP/1.1\r\n"
-        "Host: test-host\r\n"
+        "Host: localhost\r\n"
         "Accept: */*\r\n"
         "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: 11\r\n"
