@@ -421,20 +421,24 @@ AC_ARG_WITH([libJudy],
                                                      [HAVE_libJudy_a="yes"],
                                                      [HAVE_libJudy_a="no"])
                     LIBS="${LIBS_BACKUP}"
+                    JUDY_LIBS="${libJudy_dir}/libJudy.a"
+                    JUDY_CFLAGS="-I${libJudy_dir}"
+                    AC_MSG_RESULT([$HAVE_libJudy_a])
                 else
                     libjudy_dir=""
                     HAVE_libJudy_a="no"
                     AC_MSG_RESULT([$HAVE_libJudy_a])
                 fi
             ],
-            [libjudy_dir=""])
+            [HAVE_libJudy_a="no"])
 
-
-test "$HAVE_libJudy_a" = "no" && AC_CHECK_LIB(
-                                [Judy],
-                                [JudyLIns],
-                                [JUDY_LIBS="-lJudy"]
-                            )
+if test "${HAVE_libJudy_a}" = "no"; then
+    AC_CHECK_LIB(
+                    [Judy],
+                    [JudyLIns],
+                    [JUDY_LIBS="-lJudy"]
+                )
+fi
 
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
