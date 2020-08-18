@@ -241,7 +241,7 @@ class State(object):
         while True:
             try:
                 r = requests.get(url)
-                info = requests.get(url).json()
+                info = r.json()
                 self.nodes[node].guid = info['uid']
                 return
             except requests.ConnectionError:
@@ -259,7 +259,7 @@ class State(object):
         while True:
             try:
                 r = requests.get(url)
-                info = requests.get(url).json()
+                info = r.json()
             except requests.ConnectionError:
                 print(f"  {receiver} not responding...", file=self.output)
                 time.sleep(1)
@@ -280,7 +280,7 @@ class State(object):
             try:
                 attempts += 1
                 r = requests.get(url)
-                info = requests.get(url).json()
+                info = r.json()
             except json.decoder.JSONDecodeError:
                 print(f"  {node} returned empty...", file=self.output)
                 time.sleep(1)

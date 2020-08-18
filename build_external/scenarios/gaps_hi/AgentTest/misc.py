@@ -4,7 +4,7 @@ def sh(cmdline, output, input=None):
                  'shell' :True} #,      'executable':'/usr/local/bin/bash' }
 
   print(f"> {cmdline}", file=output)
-  if input==None:
+  if input is None:
     o = subp.Popen(cmdline, **commonArgs) # nosec
   else:
     o = subp.Popen(cmdline, stdin=subp.PIPE, **commonArgs) # nosec
