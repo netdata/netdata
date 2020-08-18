@@ -367,6 +367,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     debug(D_HEALTH, "executing command '%s'", command_to_run);
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
+    debug(D_HEALTH, "enqueue the alarm '%s' with the serial '%lu'", ae->name, ae->exec_spawn_serial);
     enqueue_alarm_notify_in_progress(ae);
 
     return; //health_alarm_wait_for_execution
@@ -375,7 +376,7 @@ done:
 }
 
 static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
-    if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
+    if ((!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) || !ae->exec_spawn_serial)
         return;
 
     spawn_wait_cmd(ae->exec_spawn_serial, &ae->exec_code, &ae->exec_run_timestamp);
