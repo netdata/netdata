@@ -102,7 +102,7 @@ def compare_data(source, replica, output, max_pre=0, max_post=0, skew=0):
         print(f"Mismatch in start times {source_start} -> {replica_start})", file=output)
         passed = False
 
-    if replica_start < source_start or replica_end > replica_end:
+    if replica_start < source_start or replica_end > source_end:
         print("Garbage in replica", file=output)
         passed = False
 
@@ -340,6 +340,8 @@ class State(object):
                 print(f"  FAILED to retrieve {ch} from {source} - response has zero rows", file=self.output)
                 passed = False
                 continue
+            with open(os.path.join(self.test_base,f"{source}-{ch}.json"),"wt") as f:
+                f.write(json.dumps(source_json, sort_keys=True, indent=4))
             target_json = self.nodes[target].get_data(ch,host=source)
             if not target_json:
                 print(f"  FAILED to check sync looking at http://localhost:{self.nodes[target].port}", file=self.output)
@@ -351,6 +353,8 @@ class State(object):
                 continue
             if source_json["labels"] != target_json["labels"]:
                 print(f"  Mismatch in chart labels on {ch}: source={source_json['labels']} target={target_json['labels']}", file=self.output)
+            with open(os.path.join(self.test_base,f"{target}-{ch}.json"),"wt") as f:
+                f.write(json.dumps(target_json, sort_keys=True, indent=4))
 
             source_sl = DSlice(source_json,0)
             best_match, best_score = None, None
