@@ -41,7 +41,7 @@ class Node(object):
             print(f"            - SYS_PTRACE", file=f)
         with open(conf, "w") as f:
             print(f"[global]", file=f)
-            print(f"    debug flags = 0x00000000c0020000", file=f)
+            print(f"    debug flags = 0x00000000c0000000", file=f)
             print(f"    errors flood protection period = 0", file=f)
             print(f"    hostname = {self.name}", file=f)
             print(f"    memory mode = {self.db_mode}", file=f)
