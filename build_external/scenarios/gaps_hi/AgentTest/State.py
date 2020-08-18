@@ -12,12 +12,12 @@ class DSlice(object):
             # Remove sparseness when update_every>1, fill empty slots with None
             self.points = []
             self.blank = [None] * (len(data[0])-1)
-            next = self.start
+            next_t = self.start
             for d in data:
-                if d[0]+skew != next:
-                    self.points.extend( [self.blank]*(d[0]+skew-next) )
+                if d[0]+skew != next_t:
+                    self.points.extend( [self.blank]*(d[0]+skew-next_t) )
                 self.points.append( d[1:] )
-                next = d[0]+skew+1
+                next_t = d[0]+skew+1
         except:
             print(f"Invalid json data: {raw_json}")
             raise Exception("failed")
@@ -360,7 +360,7 @@ class State(object):
             best_match, best_score = None, None
             for skew in (-2*update_every, -update_every, 0, update_every, 2*update_every):
                 target_sl = DSlice(target_json,skew)
-                score, pre, post = source_sl.score(target_sl)
+                score, _, post = source_sl.score(target_sl)
                 #print(f"  skew={skew} score={score} pre={pre} post={post}")
                 #show_mismatch(source_sl, target_sl)
                 if best_match is None or score < best_score:

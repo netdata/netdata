@@ -1,4 +1,4 @@
-import functools, json, math, operator, os, re, requests, sys, time
+import functools, math, operator, os, re, requests, sys, time
 import AgentTest
 
 me   = os.path.abspath(sys.argv[0])
@@ -139,6 +139,7 @@ def BaselineParentFirst(state):
     print("  Measure baseline for 60s...", file=state.output)
     time.sleep(60)
     state.end_checks.append( lambda: state.check_sync("child","parent", max_pre=5) )
+    # pylint: disable-msg=W0622
     state.post_checks.append( lambda: state.check_norep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
