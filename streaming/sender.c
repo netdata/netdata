@@ -471,7 +471,8 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
     // we replicate during the window where that last_collected_time has been updated and the difference is held in
     // the local variables now_collect_ut and last_collect_ut. Account for this so that the interpolation on the
     // receiver has access to the same same data.
-    buffer_sprintf(s->build, "REPEND %zu %llu\n", num_points, last_collected_ut - st->usec_since_last_update);
+    buffer_sprintf(s->build, "REPEND %zu %lld %lld %llu\n", num_points, st->collected_total, st->last_collected_total,
+                   last_collected_ut - st->usec_since_last_update);
     st->gap_sent = end;
     debug_dump_rrdset_state(st);
     if ((time_t)st->gap_sent == st->last_updated.tv_sec)

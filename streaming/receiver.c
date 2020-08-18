@@ -300,12 +300,16 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     UNUSED(plugins_action);
     RRDDIM *rd;
     char *num_points_txt = words[1];
-    char *col_time_txt   = words[2];
+    char *col_total_txt  = words[2];
+    char *last_total_txt = words[3];
+    char *col_time_txt   = words[4];
     time_t advance_in_secs;
     long advance_in_points;
     if (!num_points_txt)
         goto disable;
     size_t num_points = str2ull(num_points_txt);
+    total_number col_total = str2ll(col_total_txt, NULL);
+    total_number last_total = str2ll(last_total_txt, NULL);
     usec_t last_collect_ut = str2ull(col_time_txt);  // The chart-level last_collected_time in usec
 
     /* If data was transferred in the replication window then we do not know how the number of points relates to the
@@ -333,18 +337,20 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         user->st->last_collected_time.tv_sec = last_collect_ut / USEC_PER_SEC;
         user->st->last_collected_time.tv_usec = last_collect_ut % USEC_PER_SEC;
 
-        debug(D_REPLICATION, "Finished replication on %s: %zu points transferred, advance=(%ld-secs %ld-points)"
-                             " last_col_time->%ld.%ld last_up_time->%ld",
-                             user->st->name, num_points, advance_in_secs, advance_in_points,
-                             user->st->last_collected_time.tv_sec, user->st->last_collected_time.tv_usec,
-                             user->st->last_updated.tv_sec);
-
         user->st->counter       += advance_in_points;
         user->st->counter_done  += advance_in_points;
         user->st->current_entry += advance_in_points;
         user->st->usec_since_last_update = USEC_PER_SEC;
         while (user->st->current_entry >= user->st->entries)        // Once except for an exceptional corner-case
             user->st->current_entry -= user->st->entries;
+        user->st->collected_total = col_total;
+        user->st->last_collected_total = last_total;
+
+        debug(D_REPLICATION, "Finished replication on %s: %zu points transferred, advance=(%ld-secs %ld-points)"
+                             " last_col_time->%ld.%ld last_up_time->%ld col_total=%lld last_col_total=%lld",
+                             user->st->name, num_points, advance_in_secs, advance_in_points,
+                             user->st->last_collected_time.tv_sec, user->st->last_collected_time.tv_usec,
+                             user->st->last_updated.tv_sec, user->st->collected_total, user->st->last_collected_total);
     }
     else
         debug(D_REPLICATION, "Finished replication on %s: window was empty", user->st->name);
