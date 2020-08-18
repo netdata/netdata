@@ -39,7 +39,7 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
         "Content-Length: %zu\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
         connector_specific_config->remote_write_path,
-        instance->engine->config.hostname,
+        instance->config.destination,
         buffer_strlen((BUFFER *)instance->buffer));
 
     size_t header_len = buffer_strlen(header);
