@@ -1073,7 +1073,7 @@ void *backends_main(void *ptr) {
                                     "Content-Length: %zu\r\n"
                                     "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
                                     remote_write_path,
-                                    hostname,
+                                    destination,
                                     data_size
                     );
 
