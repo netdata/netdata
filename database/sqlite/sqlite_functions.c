@@ -14,7 +14,7 @@ static void _uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv
         sqlite3_result_null(context);
         return;
     }
-    int rc = uuid_parse(sqlite3_value_text(argv[0]), uuid);
+    int rc = uuid_parse((const char *) sqlite3_value_text(argv[0]), uuid);
     if (rc == -1) {
         sqlite3_result_null(context);
         return;
@@ -172,6 +172,8 @@ int sql_dimension_options(uuid_t *dim_uuid, char *options)
  *
  */
 
+#define SQL_SELECT_DIMENSION    "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = @dim and archived = 1;"
+
 int sql_load_dimension(char *dim_str, RRDSET *st)
 {
     char sql[1024];
@@ -184,10 +186,15 @@ int sql_load_dimension(char *dim_str, RRDSET *st)
 
     uuid_parse(dim_str, dim_uuid);
 
-    sprintf(sql, "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = u2h('%s') and archived = 1;", dim_str);
-
-    rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+    //sprintf(sql, "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = u2h('%s') and archived = 1;", dim_str);
+    rc = sqlite3_prepare_v2(db, SQL_SELECT_DIMENSION, -1, &res, 0);
     if (rc != SQLITE_OK)
+        return 1;
+
+    int param = sqlite3_bind_parameter_index(res, "@dim");
+
+    rc = sqlite3_bind_blob(res, param, dim_uuid, 16, SQLITE_STATIC);
+    if (rc != SQLITE_OK) // Release the RES
         return 1;
 
     rc = sqlite3_step(res);
@@ -227,7 +234,7 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
     struct dimension *dimension_list = NULL, *tmp_dimension_list;
     sql_select_dimension(st->chart_uuid, &dimension_list);
 
-    // loop throug all the dimensions and create under the chart
+    // loop through all the dimensions and create under the chart
     while(dimension_list) {
 
         sql_load_dimension(dimension_list->dim_str, st);
