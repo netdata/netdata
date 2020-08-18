@@ -685,6 +685,7 @@ bundle_judy() {
       copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libJudy built and prepared."
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-libjudy=externaldeps/libJudy"
     else
       run_failed "Failed to build libJudy."
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
