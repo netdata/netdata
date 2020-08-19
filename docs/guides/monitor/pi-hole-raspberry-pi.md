@@ -85,8 +85,8 @@ Netdata dashboard or load it up again in a new tab, you'll see a new entry in th
 ## Use Netdata to explore and monitor your Raspberry Pi and Pi-hole
 
 By the time you've reached this point in the guide, Netdata has already collected hundreds of thousands of metrics
-containing valuable information about Pi-hole and your Raspberry Pi. Use Netdata's dashboard and synced charts to zoom,
-highlight, scrub through time, and intuit how an anomaly in one part of your system might affect another.
+values containing valuable information about Pi-hole and your Raspberry Pi. Use Netdata's dashboard and synced charts to
+zoom, highlight, scrub through time, and intuit how an anomaly in one part of your system might affect another.
 
 Out of the box, the Pi-hole collector gives you real-time insights into the volume of queries, connected clients, DNS
 queries per type, top clients, top blocked domains, and more. Additional Netdata collectors create charts for CPU,
