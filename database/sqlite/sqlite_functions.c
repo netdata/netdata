@@ -386,6 +386,16 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_l
 //    }
 //
 //    sqlite3_reset(res);
+
+    if (global_dimensions) {
+        for(int i=0; global_dimensions[i].id; i++) {
+            freez(global_dimensions[i].id);
+            freez(global_dimensions[i].name);
+        }
+        freez(global_dimensions);
+        global_dimensions = NULL;
+    }
+
     if (!global_dimensions) {
         rc = sqlite3_prepare_v2(db, SQL_GET_DIMLIST, -1, &res, 0);
         if (rc != SQLITE_OK)
@@ -450,7 +460,7 @@ void sql_sync_ram_db()
 
     sqlite3_exec(db, "delete from ram.chart_stat ; insert into ram.chart_stat select chart_uuid, min(rowid), max(rowid) from ram.chart_dim group by chart_uuid;", 0, 0, NULL);
 
-    loaded = 1;
+    loaded = 0;
 }
 
 void  sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number number)
