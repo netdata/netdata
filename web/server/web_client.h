@@ -155,6 +155,7 @@ struct web_client {
     char client_port[NI_MAXSERV];
     char server_host[NI_MAXHOST];
     char client_host[NI_MAXHOST];
+    char forwarded_host[NI_MAXHOST]; //Used with proxy
 
     char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];          // we decode the URL in this buffer
     char decoded_query_string[NETDATA_WEB_REQUEST_URL_SIZE + 1]; // we decode the Query String in this buffer
