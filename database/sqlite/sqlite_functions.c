@@ -3,6 +3,8 @@
 #include <sqlite3.h>
 #include "sqlite_functions.h"
 
+struct dimension_list *global_dimensions = NULL;
+
 sqlite3 *db = NULL;
 sqlite3 *dbmem = NULL;
 
@@ -78,6 +80,33 @@ int sql_init_database()
         sqlite3_close(db);
     }
 
+    rc = sqlite3_exec(db, "create index if not exists ind_chart_uuid on dimension (chart_uuid);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, "ATTACH ':memory:' as ram;", 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS ram.chart_dim(chart_uuid blob, dim_uuid blob, id text, name text); create index ram.ind_dim_uuid on chart_dim (dim_uuid); create index if not exists ram.ind_chart_uuid on chart_dim (chart_uuid);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS ram.chart_stat(chart_uuid blob, min_row int, max_row int); create index ram.ind_chart_uuid1 on chart_stat (chart_uuid);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
     sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
     sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
 
@@ -89,6 +118,34 @@ int sql_close_database()
     if (db)
         sqlite3_close(db);
     return 0;
+}
+
+void sql_compact_database()
+{
+    char *err_msg = NULL;
+
+    int rc = sqlite3_exec(db, "VACUUM;", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+}
+
+void sql_backup_database()
+{
+    char *err_msg = NULL;
+
+    char sql[512];
+
+    sprintf(sql,"VACUUM into '/tmp/database.%u'", time(NULL));
+
+    int rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
 }
 
 int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
@@ -114,6 +171,7 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
 //        error("SQL error: %s", err_msg);
 //        sqlite3_free(err_msg);
 //    }
+    // FIRST DONE
 
     // SECOND WAY TO DO IT
     sqlite3_stmt *res;
@@ -133,7 +191,6 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
     // Omit checks
 
     rc = sqlite3_step(res);
-
     sqlite3_finalize(res);
     return (rc != SQLITE_ROW);
 }
@@ -195,7 +252,7 @@ int sql_dimension_options(uuid_t *dim_uuid, char *options)
 
 #define SQL_SELECT_DIMENSION    "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = @dim and archived = 1;"
 
-int sql_load_dimension(char *dim_str, RRDSET *st)
+int sql_create_dimension(char *dim_str, RRDSET *st)
 {
     char sql[1024];
     uuid_t  dim_uuid;
@@ -245,6 +302,9 @@ int sql_load_dimension(char *dim_str, RRDSET *st)
     return 0;
 }
 
+/*
+ * Load a charts dimensions and create them under RRDSET
+ */
 int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
 {
     UNUSED(dimensions);
@@ -253,12 +313,12 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
         return 1;
 
     struct dimension *dimension_list = NULL, *tmp_dimension_list;
-    sql_select_dimension(st->chart_uuid, &dimension_list);
+    sql_load_one_chart_dimension(st->chart_uuid, &dimension_list);
 
     // loop through all the dimensions and create under the chart
     while(dimension_list) {
 
-        sql_load_dimension(dimension_list->dim_str, st);
+        sql_create_dimension(dimension_list->dim_str, st);
 
         tmp_dimension_list = dimension_list->next;
         freez(dimension_list->id);
@@ -270,7 +330,7 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
     return 0;
 }
 
-int sql_select_dimension(uuid_t *chart_uuid, struct dimension **dimension_list)
+int sql_load_one_chart_dimension(uuid_t *chart_uuid, struct dimension **dimension_list)
 {
     char *err_msg = NULL;
     char sql[1024];
@@ -282,7 +342,7 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension **dimension_list)
 
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "select h2u(dim_uuid), id, name from dimension where chart_uuid = u2h('%s') and archived = 1;", chart_str);
+    sprintf(sql, "select h2u(dim_uuid), id, name, chart_uuid from dimension where chart_uuid = u2h('%s') and archived = 1;", chart_str);
 
     rc = sqlite3_exec(db, sql, dim_callback, dimension_list, &err_msg);
     if (rc != SQLITE_OK) {
@@ -290,6 +350,93 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension **dimension_list)
         sqlite3_free(err_msg);
     }
     return 0;
+}
+
+
+/*
+ * Load all chart dimensions and return an array
+ */
+
+//#define SQL_GET_DIMLIST "select h2u(dim_uuid), id, name, chart_uuid, rowid from ram.chart_dim where chart_uuid = @chart;"
+#define SQL_GET_DIMLIST "select h2u(dim_uuid), id, name, chart_uuid, rowid from ram.chart_dim order by chart_uuid;"
+int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_list, int *from, int *to)
+{
+    char *err_msg = NULL;
+    char chart_str[37];
+    int rc;
+    sqlite3_stmt *res;
+
+    if (!db)
+        return 1;
+
+    //uuid_unparse_lower(*chart_uuid, chart_str);
+
+//    while (sqlite3_step(res) == SQLITE_ROW) {
+//            info("Reading chart data (%s) --> [%s] [%s] [%s]", chart_str, sqlite3_column_text(res, 0), sqlite3_column_text(res, 1),
+//                 sqlite3_column_text(res, 2));
+//            rows++;
+//    }
+//
+//    sqlite3_reset(res);
+    if (!global_dimensions) {
+        rc = sqlite3_prepare_v2(db, SQL_GET_DIMLIST, -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return 1;
+
+//        int param = sqlite3_bind_parameter_index(res, "@chart");
+//
+//        rc = sqlite3_bind_blob(res, param, chart_uuid, 16, SQLITE_STATIC);
+//        if (rc != SQLITE_OK) { // Release the RES
+//            info("Failed to bind");
+//            return 1;
+//        }
+
+        int rows = 100000; // assume max of 100 dimensions
+
+        info("Allocating dimensions");
+        global_dimensions = callocz(rows + 1, sizeof(**dimension_list));
+
+        int i = 0;
+        while (sqlite3_step(res) == SQLITE_ROW) {
+            uuid_parse(sqlite3_column_text(res, 0), global_dimensions[i].dim_uuid);
+            strcpy(global_dimensions[i].dim_str, sqlite3_column_text(res, 0));
+            //strcpy(global_dimensions[i].id, sqlite3_column_text(res, 1));
+            //strcpy(global_dimensions[i].name, sqlite3_column_text(res, 2));
+            global_dimensions[i].id = strdupz(sqlite3_column_text(res, 1));
+            global_dimensions[i].name = strdupz(sqlite3_column_text(res, 2));
+            i++;
+        }
+
+        info("Initialized dimensions %d", i);
+        sqlite3_finalize(res);
+    }
+
+    if (from && to) {
+        rc = sqlite3_prepare_v2(
+            db, "select min_row, max_row from ram.chart_stat where chart_uuid = @chart;", -1, &res, 0);
+        int param = sqlite3_bind_parameter_index(res, "@chart");
+        rc = sqlite3_bind_blob(res, param, chart_uuid, 16, SQLITE_STATIC);
+        if (rc != SQLITE_OK) {
+            error("Failed to bind to get chart range");
+        }
+        while (sqlite3_step(res) == SQLITE_ROW) {
+            *from = sqlite3_column_int(res, 0) - 1;
+            *to = sqlite3_column_int(res, 1);
+        }
+        sqlite3_finalize(res);
+    }
+    *dimension_list = global_dimensions;
+
+    return 0;
+}
+
+void sql_sync_ram_db()
+{
+
+    sqlite3_exec(db, "delete from ram.chart_dim; insert into ram.chart_dim select chart_uuid,dim_uuid,id, name from dimension order by chart_uuid;", 0, 0, NULL);
+
+    sqlite3_exec(db, "delete from ram.chart_stat ; insert into ram.chart_stat select chart_uuid, min(rowid), max(rowid) from ram.chart_dim group by chart_uuid;", 0, 0, NULL);
+
 }
 
 void  sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number number)
