@@ -22,6 +22,17 @@ way to do this is with a symlink:
 ln -s contrib/debian
 ```
 
+Edit the `debian/changelog` file to reflect the package version and
+the build time:
+
+```sh
+netdata (1.21.0) unstable; urgency=medium
+
+  * Initial Release
+
+ -- Netdata Builder <bot@netdata.cloud>   Tue, 12 May 2020 10:36:52 +0200
+```
+
 Then build the debian package:
 
 ```sh
@@ -32,35 +43,15 @@ This should give a package that can be installed in the parent
 directory, which you can install manually with dpkg.
 
 ```sh
-ls ../*.deb
-../netdata_1.0.0_amd64.deb
-sudo dpkg -i ../netdata_1.0.0_amd64.deb
+ls -1 ../*.deb
+../netdata_1.21.0_amd64.deb
+../netdata-dbgsym_1.21.0_amd64.deb
+../netdata-plugin-cups_1.21.0_amd64.deb
+../netdata-plugin-cups-dbgsym_1.21.0_amd64.deb
+../netdata-plugin-freeipmi_1.21.0_amd64.deb
+../netdata-plugin-freeipmi-dbgsym_1.21.0_amd64.deb
+sudo dpkg -i ../netdata_1.21.0_amd64.deb
 ```
-
-### Building for a Debian system without systemd
-
-The included packaging is designed for modern Debian systems that
-are based on systemd. To build non-systemd packages (for example,
-for Debian wheezy), you will need to make a couple of minor
-updates first.
-
--   edit `contrib/debian/rules` and adjust the `dh` rule near the
-    top to remove systemd (see comments in that file).
-
--   rename `contrib/debian/control.wheezy` to `contrib/debian/control`.
-
--   change `control.wheezy from contrib/Makefile* to control`.
-
--   uncomment `EXTRA_OPTS="-P /var/run/netdata.pid"` in
-    `contrib/debian/netdata.default`
-
--   edit `contrib/debian/netdata.init` and change `PIDFILE` to
-    `/var/run/netdata.pid`
-
--   remove `dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry` from
-    `contrib/debian/netdata.postinst.in`. If you are going to handle the unique id file differently.
-
-Then proceed as the main instructions above.
 
 ### Reinstalling Netdata
 
