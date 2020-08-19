@@ -194,7 +194,7 @@ class State(object):
             except Exception as e:
                 passed = False
                 print(f"{case.__name__} -> exception during test: {str(e)}")
-                traceback.print_tb(e)
+                traceback.print_exc(file=self.output)
 
             for c in self.end_checks:
                 passed = c() and passed         # Shortcut logic, left to right
@@ -238,7 +238,9 @@ class State(object):
     def wait_up(self, node):
         url = f"http://localhost:{self.nodes[node].port}/api/v1/info"
         print(f"  Waiting for {node} on {url}", file=self.output)
-        while True:
+        counter = 0
+        while counter < 10:
+            counter += 1
             try:
                 r = requests.get(url)
                 info = r.json()
@@ -249,6 +251,7 @@ class State(object):
             except json.decoder.JSONDecodeError:
                 print(f"  Waiting for {node}...", file=self.output)
             time.sleep(1)
+        raise Exception(f"Node {node} did not respond!")
 
     def wait_connected(self, sender, receiver):
         '''This will detect the *first time* connection of a child to a parent. It looks in the mirrored
@@ -256,7 +259,9 @@ class State(object):
            exists on the parent.'''
         url = f"http://localhost:{self.nodes[receiver].port}/api/v1/info"
         print(f"  Waiting for {sender} to connect to {receiver}", file=self.output)
-        while True:
+        counter = 0
+        while counter < 20:
+            counter += 1
             try:
                 r = requests.get(url)
                 info = r.json()
@@ -360,9 +365,10 @@ class State(object):
             best_match, best_score = None, None
             for skew in (-2*update_every, -update_every, 0, update_every, 2*update_every):
                 target_sl = DSlice(target_json,skew)
-                score, _, post = source_sl.score(target_sl)
+                score, pre, post = source_sl.score(target_sl)
                 #print(f"  skew={skew} score={score} pre={pre} post={post}")
                 #show_mismatch(source_sl, target_sl)
+                score += pre + post
                 if best_match is None or score < best_score:
                     best_match, best_score = target_sl, score
 

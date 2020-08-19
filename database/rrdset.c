@@ -899,7 +899,7 @@ RRDSET *rrdset_create_custom(
         st->last_collected_time.tv_sec = 0;
         st->last_collected_time.tv_usec = 0;
     }
-    info("create_custom host=%s chart=%s last_collect=%ld", host->hostname, st->id, st->last_updated.tv_sec);
+    info("create_custom host=%s chart=%s last_update=%ld last_collect=%ld", host->hostname, st->id, st->last_updated.tv_sec, st->last_collected_time.tv_sec);
     st->counter_done = 0;
     st->rrddim_page_alignment = 0;
 
@@ -1336,6 +1336,7 @@ static inline size_t rrdset_done_interpolate(
             }
 
             if(unlikely(!store_this_entry)) {
+                debug(D_REPLICATION, "%s.%s: interpolate-skip -> !store_this_entry", st->name, rd->name);
                 rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
 //                rd->values[current_entry] = SN_EMPTY_SLOT; //pack_storage_number(0, SN_NOT_EXISTS);
                 continue;
@@ -1529,6 +1530,7 @@ void rrdset_done(RRDSET *st) {
     }
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
+    debug_dump_rrdset_state(st);
 
     RRDDIM *rd;
 

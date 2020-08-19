@@ -195,14 +195,15 @@ void recover_collected_time(RRDSET *st, RRDDIM *rd) {
          || (rd->last_collected_time.tv_sec == st->last_collected_time.tv_sec &&
              rd->last_collected_time.tv_usec > st->last_collected_time.tv_usec)))
     {
-        st->last_collected_time = rd->last_collected_time;   // TODO: Check this should be a MAX() not a copy??
+        st->last_collected_time = rd->last_collected_time;
         info("Updating collected time on %s", st->id);
     }
     time_t stored_t = rd->state->query_ops.latest_time(rd);
     if (stored_t > st->last_updated.tv_sec) {
+        info("Dimension %s.%s updated more recently than %s, changing last_updated %ld -> %ld",
+            st->id, rd->id, st->id, st->last_updated.tv_sec, stored_t);
         st->last_updated.tv_sec = stored_t;
         st->last_updated.tv_usec = 0;
-        info("Updating updated time on %s", st->id);
     }
 #endif
 }

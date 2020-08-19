@@ -1,4 +1,4 @@
-import functools, math, operator, os, re, requests, sys, time
+import functools, math, operator, os, re, sys, time
 import AgentTest
 
 me   = os.path.abspath(sys.argv[0])
@@ -277,7 +277,7 @@ def ParentShortRestart(state):
     time.sleep(3)
     state.restart("parent")
     state.wait_isparent("parent")
-    time.sleep(10)
+    time.sleep(15)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
     state.post_checks.append( lambda: state.check_rep() )
