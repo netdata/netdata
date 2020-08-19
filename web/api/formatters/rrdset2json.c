@@ -86,39 +86,42 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
 #ifdef SQLITE_POC
      if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-        struct dimension_list *dimension_list = NULL, *tmp_dimension_list;
-        int from_row, to_row;
-        if (st->state->to) {
-            from_row = st->state->from;
-            to_row = st->state->to;
-            int max_rows = sql_select_dimension(st->chart_uuid, &dimension_list, NULL, NULL);
-        }
-        else {
-            int max_rows = sql_select_dimension(st->chart_uuid, &dimension_list, &from_row, &to_row);
-            st->state->from = from_row;
-            st->state->to = to_row;
-        }
-        for (int row=from_row; row < to_row; row++) {
-            if (dimensions)
-                buffer_strcat(wb, ",\n\t\t\t\t\"");
-            else
-                buffer_strcat(wb, "\t\t\t\t\"");
-            buffer_strcat_jsonescape(wb, dimension_list[row].id);
-            buffer_strcat(wb, "\": { \"name\": \"");
-            buffer_strcat_jsonescape(wb, dimension_list[row].name);
-            buffer_strcat(wb, " (");
-            buffer_strcat(wb, dimension_list[row].dim_str);
-            buffer_strcat(wb, ")");
-            buffer_strcat(wb, "\" }");
+//         char sql[512];
+//        struct dimension *dimension_list = NULL, *tmp_dimension_list;
+//        int from_row, to_row;
+//        if (st->state->to) {
+//            from_row = st->state->from;
+//            to_row = st->state->to;
+//            int max_rows = sql_select_dimension(st->chart_uuid, &dimension_list, NULL, NULL);
+//        }
+//        else {
+//            int max_rows = sql_select_dimension(st->chart_uuid, &dimension_list, &from_row, &to_row);
+//            st->state->from = from_row;
+//            st->state->to = to_row;
+//        }
+        sql_load_one_chart_dimension(st->chart_uuid, wb, dimensions);
 
+//        while (dimension_list) {
+//            if (dimensions)
+//                buffer_strcat(wb, ",\n\t\t\t\t\"");
+//            else
+//                buffer_strcat(wb, "\t\t\t\t\"");
+//            buffer_strcat_jsonescape(wb, dimension_list->id);
+//            buffer_strcat(wb, "\": { \"name\": \"");
+//            buffer_strcat_jsonescape(wb, dimension_list->name);
+//            buffer_strcat(wb, " (");
+//            buffer_strcat(wb, dimension_list->dim_str);
+//            buffer_strcat(wb, ")");
+//            buffer_strcat(wb, "\" }");
+//
 //            tmp_dimension_list = dimension_list->next;
 //            freez(dimension_list->id);
 //            freez(dimension_list->name);
 //            freez(dimension_list);
 //            dimension_list = tmp_dimension_list;
-            dimensions++;
-        }
-        //freez(dimension_list);
+//            dimensions++;
+//        }
+//        freez(dimension_list);
     }
 #endif
 
