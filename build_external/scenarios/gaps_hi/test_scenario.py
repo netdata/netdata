@@ -140,6 +140,7 @@ def BaselineParentFirst(state):
     print("  Measure baseline for 60s...", file=state.output)
     time.sleep(60)
     state.end_checks.append( lambda: state.check_sync("child","parent", max_pre=5) )
+    # max_score=0 because the interpolators will see the same data sequence when the parent starts first
     # pylint: disable-msg=W0622
     state.post_checks.append( lambda: state.check_norep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
@@ -154,11 +155,12 @@ def BaselineChildFirst(state):
     print("  Measure baseline for 60s...", file=state.output)
     time.sleep(60)
     # pylint: disable-msg=W0622
-    state.end_checks.append( lambda: state.check_sync("child","parent",max_pre=10) )
+    state.end_checks.append( lambda: state.check_sync("child","parent",max_pre=10,max_score=1) )
+    # Score will be one as without replication the initial state of the interpolators will differ
     state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
-# With the defautl historical gap setting this will trigger replication at the start of the connection
+# With the default historical gap setting this will trigger replication at the start of the connection
 def ParentFirst(state):
     state.start("parent")
     state.wait_up("parent")

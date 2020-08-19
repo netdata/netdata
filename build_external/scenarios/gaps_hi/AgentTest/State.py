@@ -154,7 +154,8 @@ class State(object):
                                            "gap detect"   : "Gap detect",
                                            "data rx"      : "RECEIVER",
                                            "data tx"      : "STREAM: Sending data. Buffer",
-                                           "replication"  : "REPLIC" })
+                                           "Finished replication on"  : "REPLIC",
+                                           "Fill replication with" : "REPLIC" })
         # Suppress DNS failures in two node scenario on the top level
         self.parser2         = LogParser({ "child connect": "client willing",
                                            "child disconnect" : "STREAM child.*disconnected \(completed",
@@ -164,6 +165,11 @@ class State(object):
                                            "data rx"      : "RECEIVER",
                                            "data tx"      : "STREAM: Sending data. Buffer",
                                            "replication"  : "REPLIC" })
+
+    def copy(self):
+        result = State(self.working[:], self.config[:], self.config_label[:], self.prefix[:], self.network[:])
+        for k,v in self.nodes:
+            result.nodes[k] = v.copy()
 
     def add_node(self, name):
         n = Node(name, f"{self.prefix}_{name}_1", self.parser)
@@ -307,7 +313,7 @@ class State(object):
         '''Check that replication did not occur during the test by scanning the logs for debug.'''
         failed = False
         for n in self.nodes.values():
-            if n.started and len(sh(f"grep -i replic {n.log}",self.output))>0:
+            if n.started and len(sh(f"grep -i 'Finished replication on\|Fill replication with' {n.log}",self.output))>0:
                 print(f"  FAILED {n.name} was involved in replication", file=self.output)
                 failed = True
         if not failed:
@@ -317,14 +323,14 @@ class State(object):
     def check_rep(self):
         '''Check that replication did occur during the test by scanning the logs for debug.'''
         for n in self.nodes.values():
-            if n.started and len(sh(f"grep -i replic {n.log}",self.output))>0:
+            if n.started and len(sh(f"grep -i 'Finished replication on\|Fill replication with' {n.log}",self.output))>0:
                 print(f"  PASSED {n.name} was involved in replication", file=self.output)
                 return True
         print(f"  FAILED no replication detected on nodes", file=self.output)
         return False
 
 
-    def check_sync(self, source, target, max_pre=0, max_post=0):
+    def check_sync(self, source, target, max_score=0, max_pre=0, max_post=0):
         if self.nodes[source].stream_target != self.nodes[target]:
             print(f"  TEST ERROR cannot check sync as {source} does not stream to {target}")
             return False
@@ -373,10 +379,10 @@ class State(object):
                 if best_match is None or score < best_score:
                     best_match, best_score = target_sl, score
 
-            if best_score == 0:
-                print(f"  Data match {ch} with skew={best_match.skew}", file=self.output)
+            if best_score <= max_score:
+                print(f"  Data match {ch} with skew={best_match.skew} score={best_score}", file=self.output)
             else:
-                print(f"  Data mismatch {ch}, closest with skew={best_match.skew} score={score} pre={pre} post={post}",
+                print(f"  Data mismatch {ch}, closest with skew={best_match.skew} score={best_score} pre={pre} post={post}",
                       file=self.output)
                 show_mismatch(source_sl, best_match, self.output)
                 passed = False

@@ -14,6 +14,17 @@ class Node(object):
         self.db_mode = "dbengine"
         self.config = {}
 
+    def copy(self):
+        result = Node(self.name[:], self.cname[:], self.parser)
+        result.port = self.port
+        result.guid = self.guid[:]
+        # This will be in the old configuration, needs a lookup if this is a problem
+        result.stream_target = self.stream_target
+        result.db_mode = self.db_mode[:]
+        result.config = dict(self.config.items())
+        return result
+
+
     def stream_to(self, target):
         self.stream_target = target
         target.receiver = True
@@ -30,7 +41,7 @@ class Node(object):
             print(f"services:", file=f)
             print(f"    {self.name}:", file=f)
             print(f"        image: debian_10_dev", file=f)
-            print(f"        command: /usr/sbin/netdata -D", file=f)
+            #print(f"        command: /usr/bin/gdb ", file=f)
             if self.port is not None:
                 print(f"        ports:", file=f)
                 print(f"            - {self.port}:19999", file=f)
