@@ -1016,7 +1016,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     encoded_url = s;
 
     //we search for the position where we have " HTTP/", because it finishes the user request
-    s = url_find_protocol(s);
+        s = url_find_protocol(s);
 
     // incomplete requests
     if(unlikely(!*s)) {
@@ -1160,16 +1160,31 @@ void web_client_build_http_header(struct web_client *w) {
 
     char headerbegin[8328];
     if (w->response.code == HTTP_RESP_MOVED_PERM) {
-        memcpy(headerbegin,"\r\nLocation: https://",20);
-        size_t headerlength = strlen(w->server_host);
-        memcpy(&headerbegin[20],w->server_host,headerlength);
-        headerlength += 20;
-        size_t tmp = strlen(w->last_url);
-        memcpy(&headerbegin[headerlength],w->last_url,tmp);
-        headerlength += tmp;
-        memcpy(&headerbegin[headerlength],"\r\n",2);
-        headerlength += 2;
-        headerbegin[headerlength] = 0x00;
+        char *move = headerbegin;
+        memcpy(move, "\r\nLocation: https://", 20);
+        move += 20;
+
+        size_t length = strlen(w->server_host);
+        memcpy(move, w->server_host, length);
+        move += length;
+
+        length = strlen(w->last_url);
+        memcpy(move, w->last_url, length);
+        move += length;
+        if (w->url_search_path && w->separator) {
+            char *s = url_find_protocol(w->url_search_path);
+            if (s)
+                *s = '\0';
+
+            length = strlen(w->url_search_path);
+            memcpy(move, w->url_search_path, length);
+            move += length;
+        }
+
+        memcpy(move, "\r\n",  2);
+        move += 2;
+        *move = '\0';
+        buffer_flush(w->response.data);
     }else {
         memcpy(headerbegin,"\r\n",2);
         headerbegin[2]=0x00;
@@ -1581,9 +1596,6 @@ void web_client_process_request(struct web_client *w) {
 #ifdef ENABLE_HTTPS
         case HTTP_VALIDATION_REDIRECT:
         {
-            buffer_flush(w->response.data);
-            w->response.data->contenttype = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
             w->response.code = HTTP_RESP_MOVED_PERM;
             break;
         }
