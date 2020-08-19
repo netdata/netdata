@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix HTTP header for the remote write exporting connector [\#9775](https://github.com/netdata/netdata/pull/9775) ([vlvkobal](https://github.com/vlvkobal))
+- Fix broken link in privacy policy [\#9771](https://github.com/netdata/netdata/pull/9771) ([joelhans](https://github.com/joelhans))
 - python.d/redis: collect `maxmemory` [\#9767](https://github.com/netdata/netdata/pull/9767) ([ilyam8](https://github.com/ilyam8))
+- Fix unit tests for exporting engine [\#9766](https://github.com/netdata/netdata/pull/9766) ([vlvkobal](https://github.com/vlvkobal))
 - fix\_broken\_pipe: Fix netfilter for it closes when sigpipe happens [\#9756](https://github.com/netdata/netdata/pull/9756) ([thiagoftsm](https://github.com/thiagoftsm))
 - python.d/isc\_dhcpd: add support for ip ranges [\#9755](https://github.com/netdata/netdata/pull/9755) ([vsc55](https://github.com/vsc55))
 - Add check for spurious wakeups [\#9751](https://github.com/netdata/netdata/pull/9751) ([vlvkobal](https://github.com/vlvkobal))
@@ -231,7 +234,6 @@
 - Dynamic memory cleanup for Pub/Sub exporting connector [\#9112](https://github.com/netdata/netdata/pull/9112) ([vlvkobal](https://github.com/vlvkobal))
 - Package: obsoletes conflicting EPEL packages \(\#6879 \#8784\) [\#9108](https://github.com/netdata/netdata/pull/9108) ([Saruspete](https://github.com/Saruspete))
 - Add support for eBPF for Netdata static64 \(kickstart-static64.sh\) [\#9104](https://github.com/netdata/netdata/pull/9104) ([prologic](https://github.com/prologic))
-- Exporting cleanup [\#9098](https://github.com/netdata/netdata/pull/9098) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
