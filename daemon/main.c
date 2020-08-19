@@ -118,6 +118,7 @@ int make_dns_decision(const char *section_name, const char *config_name, const c
     if(strcmp("heuristic",value))
         error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
               value, section_name, config_name);
+
     return simple_pattern_is_potential_name(p);
 }
 
@@ -163,9 +164,9 @@ void web_server_config_options(void)
                                                        "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
                                                        " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
                                                        " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
-                                                       " 172.31.*"), NULL, SIMPLE_PATTERN_EXACT);
+                                                       " 172.31.* UNKNOWN"), NULL, SIMPLE_PATTERN_EXACT);
     web_allow_netdataconf_dns  =
-        make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_mgmt_from);
+        make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_netdataconf_from);
     web_allow_mgmt_from        =
         simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
                               NULL, SIMPLE_PATTERN_EXACT);
