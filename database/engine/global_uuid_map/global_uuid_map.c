@@ -168,15 +168,19 @@ GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
     if (likely(object && max_bytes)) {
         switch (value_type) {
             case GUID_TYPE_CHAR:
-                if (unlikely(max_bytes - 1 < strlen((char *) *PValue+1)))
+                if (unlikely(max_bytes - 1 < strlen((char *) *PValue+1))) {
+                    uv_rwlock_rdunlock(&global_lock);
                     return GUID_TYPE_NOSPACE;
+                }
                 strncpyz(object, (char *) *PValue+1, max_bytes - 1);
                 break;
             case GUID_TYPE_HOST:
             case GUID_TYPE_CHART:
             case GUID_TYPE_DIMENSION:
-                if (unlikely(max_bytes < (size_t) value_type * 16))
+                if (unlikely(max_bytes < (size_t) value_type * 16)) {
+                    uv_rwlock_rdunlock(&global_lock);
                     return GUID_TYPE_NOSPACE;
+                }
                 memcpy(object, *PValue+1, value_type * 16);
                 break;
             default:
