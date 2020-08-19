@@ -131,6 +131,7 @@ def fuzzy_cmp_data(direct_data, remote_data, remote_name):
 
 # TODO: max_pre should be 0 for this case when the receiver queries history on first connection
 def BaselineParentFirst(state):
+    state.nodes["parent"].config["stream.conf/API_KEY"] = "history gap replication = 0"
     state.start("parent")
     state.wait_up("parent")
     state.start("child")
@@ -144,6 +145,7 @@ def BaselineParentFirst(state):
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
 def BaselineChildFirst(state):
+    state.nodes["parent"].config["stream.conf/API_KEY"] = "history gap replication = 0"
     state.start("child")
     state.wait_up("child")
     state.start("parent")
@@ -154,6 +156,34 @@ def BaselineChildFirst(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent",max_pre=10) )
     state.post_checks.append( lambda: state.check_norep() )     # This is not defined in the ask: design choice
+    state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
+
+# With the defautl historical gap setting this will trigger replication at the start of the connection
+def ParentFirst(state):
+    state.start("parent")
+    state.wait_up("parent")
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "parent")
+    print("  Measure baseline for 60s...", file=state.output)
+    time.sleep(60)
+    state.end_checks.append( lambda: state.check_sync("child","parent", max_pre=5) )
+    # pylint: disable-msg=W0622
+    state.post_checks.append( lambda: state.check_rep() )
+    state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
+
+# With the defautl historical gap setting this will trigger replication at the start of the connection
+def ChildFirst(state):
+    state.start("child")
+    state.wait_up("child")
+    state.start("parent")
+    state.wait_up("parent")
+    state.wait_connected("child", "parent")
+    print("  Measure baseline for 60s...", file=state.output)
+    time.sleep(60)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","parent",max_pre=10) )
+    state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
 def ChildShortDisconnect(state):
@@ -495,6 +525,8 @@ def ChildDropDuringParentRestart(state):
 cases = [
     BaselineChildFirst,
     BaselineParentFirst,
+    ChildFirst,
+    ParentFirst,
     ChildDropDuringParentRestart,
     ChildDropInsideParentReconnect,
     ChildDropOverParentReconnect,

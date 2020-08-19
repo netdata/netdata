@@ -180,7 +180,7 @@ class State(object):
         print(f"\n---------------> Wipe test state: {case.__name__} in {self.config_label}\n")
         with open(os.path.join(self.test_base,"test.log"),"w") as f:
             self.output = f
-            # Setup initial node state and generate config
+            # Setup initial node state and generate first-time config (used for compose to clean out old state)
             for n in self.nodes.values():
                 n.create_config(self.test_base)
             self.end_checks = []    # Before the containers are killed
@@ -216,6 +216,8 @@ class State(object):
 
 
     def start(self, node):
+        # Create second-time config (used to override netdata config keys from instead test case)
+        self.nodes[node].create_config(self.test_base)
         sh(f"docker-compose -p {self.prefix} -f {self.test_base}/{node}-compose.yml up -d", self.output)
         container = json.loads(sh(f"docker inspect {self.nodes[node].container_name}",self.output))
         # This catches dynamically assigned ports but auto-scaling is poor in Docker so we normally set these
@@ -368,14 +370,14 @@ class State(object):
                 score, pre, post = source_sl.score(target_sl)
                 #print(f"  skew={skew} score={score} pre={pre} post={post}")
                 #show_mismatch(source_sl, target_sl)
-                score += pre + post
                 if best_match is None or score < best_score:
                     best_match, best_score = target_sl, score
 
             if best_score == 0:
                 print(f"  Data match {ch} with skew={best_match.skew}", file=self.output)
             else:
-                print(f"  Data mismatch {ch}, closest with skew={best_match.skew}", file=self.output)
+                print(f"  Data mismatch {ch}, closest with skew={best_match.skew} score={score} pre={pre} post={post}",
+                      file=self.output)
                 show_mismatch(source_sl, best_match, self.output)
                 passed = False
 

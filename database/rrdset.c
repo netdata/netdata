@@ -1492,7 +1492,8 @@ void debug_dump_rrdset_state(RRDSET *st) {
                                  rd->last_stored_value, rd->collected_value, rd->last_collected_value,
                                  rd->collections_counter, rd->collected_volume,
                                  rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
-            if (rd->state->handle.rrdeng.descr) {
+            #ifdef ENABLE_DBENGINE
+            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && rd->state->handle.rrdeng.descr) {
                 // This is safe but do not do this from production code. (The debugging points that call this are
                 // on the collector thread and this is the hot-page so it cannot be flushed during execution).
                 struct rrdeng_page_descr *descr = rd->state->handle.rrdeng.descr;
@@ -1513,6 +1514,7 @@ void debug_dump_rrdset_state(RRDSET *st) {
                                      entries,
                                      buffer);
             }
+            #endif
         }
         netdata_rwlock_unlock(&st->rrdset_rwlock);
     }

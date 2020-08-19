@@ -12,6 +12,7 @@ class Node(object):
         self.stream_target = None
         self.receiver = False
         self.db_mode = "dbengine"
+        self.config = {}
 
     def stream_to(self, target):
         self.stream_target = target
@@ -45,9 +46,17 @@ class Node(object):
             print(f"    errors flood protection period = 0", file=f)
             print(f"    hostname = {self.name}", file=f)
             print(f"    memory mode = {self.db_mode}", file=f)
+            for k,v in self.config.items():
+                file, section = k.split("/")
+                if file == "netdata.conf" and section == "global":
+                    print(f"    {v}")
             print(f"[web]", file=f)
             print(f"    ssl key = /etc/netdata/ssl/key.pem", file=f)
             print(f"    ssl certificate = /etc/netdata/ssl/cert.pem", file=f)
+            for k,v in self.config.items():
+                file, section = k.split("/")
+                if file == "netdata.conf" and section == "web":
+                    print(f"    {v}",file=f)
         with open(stream, "w") as f:
             if self.stream_target is not None:
                 print(f"[stream]", file=f)
@@ -60,6 +69,10 @@ class Node(object):
                 print(f"    buffer size bytes = 10485760", file=f)
                 print(f"    reconnect delay seconds = 5", file=f)
                 print(f"    initial clock resync iterations = 60", file=f)
+                for k,v in self.config.items():
+                    file, section = k.split("/")
+                    if file == "stream.conf" and section == "stream":
+                        print(f"    {v}",file=f)
             if self.receiver:
                 print(f"[00000000-0000-0000-0000-000000000000]", file=f)
                 print(f"    enabled = yes", file=f)
@@ -70,6 +83,10 @@ class Node(object):
                 print(f"    # postpone alarms for a short period after the sender is connected", file=f)
                 print(f"    default postpone alarms on connect seconds = 60", file=f)
                 print(f"    multiple connections = allow", file=f)
+                for k,v in self.config.items():
+                    file, section = k.split("/")
+                    if file == "stream.conf" and section == "API_KEY":
+                        print(f"    {v}",file=f)
 
     def get_data(self, chart, host=None):
         if host is None:
