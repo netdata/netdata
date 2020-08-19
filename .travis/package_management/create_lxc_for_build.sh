@@ -51,7 +51,7 @@ fi
 # Detect architecture and load extra variables needed
 detect_arch_from_commit
 
-if [ x"${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}" = "builder/fedora/31/i386" ]; then
+if [ x"${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}" = x"builder/fedora/31/i386" ]; then
   echo " Skipping Fedora 31 i386 build (non-existent upstream) ..."
   exit 0
 fi
