@@ -248,8 +248,6 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    //BRING IT TO HERE
-
     if(unlikely(web_client_receive(w) < 0))
         return -1;
 
