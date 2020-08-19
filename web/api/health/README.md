@@ -1,6 +1,7 @@
 <!--
 ---
 title: "Health API Calls"
+date: 2020-04-27
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/health/README.md
 ---
 -->
@@ -11,17 +12,17 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/health/R
 
 ### Enabled Alarms
 
-NetData enables alarms on demand, i.e. when the chart they should be linked to starts collecting data. So, although many more alarms are configured, only the useful ones are enabled.
+Netdata enables alarms on demand, i.e. when the chart they should be linked to starts collecting data. So, although many
+more alarms are configured, only the useful ones are enabled.
 
-To get the list of all enabled alarms:
-
-`http://your.netdata.ip:19999/api/v1/alarms?all`
+To get the list of all enabled alarms, open your browser and navigate to `http://NODE:19999/api/v1/alarms?all`,
+replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
 ### Raised Alarms
 
 This API call will return the alarms currently in WARNING or CRITICAL state.
 
-`http://your.netdata.ip:19999/api/v1/alarms`
+`http://NODE:19999/api/v1/alarms`
 
 ### Event Log
 
@@ -35,11 +36,11 @@ The size of the alarm log is configured in `netdata.conf`. There are 2 settings:
 
 The API call retrieves all entries of the alarm log:
 
-`http://your.netdata.ip:19999/api/v1/alarm_log`
+`http://NODE:19999/api/v1/alarm_log`
 
 ### Alarm Log Incremental Updates
 
-`http://your.netdata.ip:19999/api/v1/alarm_log?after=UNIQUEID`
+`http://NODE:19999/api/v1/alarm_log?after=UNIQUEID`
 
 The above returns all the events in the alarm log that occurred after UNIQUEID (you poll it once without `after=`, remember the last UNIQUEID of the returned set, which you give back to get incrementally the next events).
 
@@ -47,7 +48,7 @@ The above returns all the events in the alarm log that occurred after UNIQUEID (
 
 The following will return an SVG badge of the alarm named `NAME`, attached to the chart named `CHART`.
 
-`http://your.netdata.ip:19999/api/v1/badge.svg?alarm=NAME&chart=CHART`
+`http://NODE:19999/api/v1/badge.svg?alarm=NAME&chart=CHART`
 
 ## Health Management API
 
@@ -60,7 +61,7 @@ Specifically, the API allows you to:
 -   Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the Netdata UI will show the alarms as active, but no notifications will be sent.
 -   Disable or Silence specific alarms that match selectors on alarm/template name, chart, context, host and family.
 
-The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://localhost:19999/netdata.conf`:
+The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://NODE:19999/netdata.conf`:
 
 ```
 [registry]
@@ -70,7 +71,7 @@ The API is available by default, but it is protected by an `api authorization to
 You can access the API via GET requests, by adding the bearer token to an `Authorization` http header, like this:
 
 ```
-curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
+curl "http://NODE:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
 By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in `netdata.conf` within the [web] section. See [web server access lists](/web/server/README.md#access-lists) for more information.
@@ -83,14 +84,14 @@ If you've configured and entered your token correclty, you should see the plain 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
 
 ```sh
-curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken"
+curl "http://NODE:19999/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
 The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
 ```sh
-curl "http://myserver/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken"
+curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
 Alarms may then still be raised and logged in Netdata, so you'll be able to see them via the UI.  
@@ -98,7 +99,7 @@ Alarms may then still be raised and logged in Netdata, so you'll be able to see 
 Regardless of the option you choose, at the end of your maintenance period you revert to the normal state via the RESET command.
 
 ```sh
- curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
+ curl "http://NODE:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
 ### Disable or silence specific alarms
@@ -122,7 +123,7 @@ To clear all selectors and reset the mode to default, use the `RESET` command.
 The following example silences notifications for all the alarms with context=load:
 
 ```
-curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-Token: Mytoken"
+curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-Token: Mytoken"
 ```
 
 #### Selection criteria
@@ -142,19 +143,19 @@ You can add any of the selection criteria you need on the request, to ensure tha
 Example 1: Disable all health checks for context = `random`
 
 ```
-http://localhost/api/v1/manage/health?cmd=DISABLE&context=random
+http://NODE:19999/api/v1/manage/health?cmd=DISABLE&context=random
 ```
 
 Example 2: Silence all alarms and templates with name starting with `out_of` on host `myhost`
 
 ```
-http://localhost/api/v1/manage/health?cmd=SILENCE&alarm=out_of*&hosts=myhost
+http://NODE:19999/api/v1/manage/health?cmd=SILENCE&alarm=out_of*&hosts=myhost
 ```
 
 Example 2.2: Add one more selector, to also silence alarms for cpu1 and cpu2
 
 ```
-http://localhost/api/v1/manage/health?families=cpu1 cpu2
+http://NODE:19999/api/v1/manage/health?families=cpu1 cpu2
 ```
 
 ### List silencers
@@ -162,7 +163,7 @@ http://localhost/api/v1/manage/health?families=cpu1 cpu2
 The command `LIST` was added in Netdata v1.16.0 and returns a JSON with the current status of the silencers.
 
 ```
- curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
+ curl "http://NODE:19999/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
 ```
 
 As an example, the following response shows that we have two silencers configured, one for an alarm called `samplealarm` and one for alarms with context `random` on host `myhost`
