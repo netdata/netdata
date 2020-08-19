@@ -355,10 +355,14 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
 inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
+    // measure the time a data collection needs
+    unsigned long long start = now_realtime_usec();
     sql_sync_ram_db();
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     charts2json(host, w->response.data, 0, 1);
+    unsigned long long end = now_realtime_usec();
+    info("SQLITE: Archived chart collection generated in %llu usec\n", end - start);
     return HTTP_RESP_OK;
 }
 
