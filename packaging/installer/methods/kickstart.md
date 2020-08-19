@@ -28,6 +28,7 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 
 -   Detects the Linux distribution and **installs the required system packages** for building Netdata. Unless you added
     the `--dont-wait` option, it will ask for your permission first.
+-   Checks for an existing installation, and if found updates that instead of creating a new install.
 -   Downloads the latest Netdata source tree to `/usr/src/netdata.git`.
 -   Installs Netdata by running `./netdata-installer.sh` from the source tree, using any [optional
     parameters](#optional-parameters-to-alter-your-installation) you have specified.
@@ -47,6 +48,8 @@ installation. Here are a few important parameters:
 -   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
+-   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
+    cannot be used to change installation types.
 -   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
@@ -58,7 +61,7 @@ To use `md5sum` to verify the intregity of the `kickstart.sh` script you will do
 run the following:
 
 ```bash
-[ "86abaea95a24df12fe444c1b3e5cfa33" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "15420d0d5bd61fe4027c20d9276a696e" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.

@@ -31,8 +31,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 
 The `kickstart.sh` script does the following after being downloaded and run:
 
--   Detects the Linux distribution and **installs the required system packages** for building Netdata. Unless you added
-    the `--dont-wait` option, it will ask for your permission first.
+-   Checks to see if there is an existing installation, and if there is updates that in preference to reinstalling.
 -   Downloads the latest Netdata binary from the [binary-packages](https://github.com/netdata/binary-packages)
     repository. You can also run any of these `.run` files with [makeself](https://github.com/megastep/makeself).
 -   Installs Netdata by running `./netdata-installer.sh` from the source tree, including any options you might have
@@ -66,6 +65,8 @@ your installation. Here are a few important parameters:
 -   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
+-   `--reinstall`: If an existing installation is detected, reinstall instead of attempting to update it. Note
+    that this cannot be used to switch betwen installation types.
 -   `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths:
     the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force
     kickstart run the process using those files. This option conflicts with the `--stable-channel` option. If you set
@@ -77,7 +78,7 @@ To use `md5sum` to verify the intregity of the `kickstart-static64.sh` script yo
 command above, run the following:
 
 ```bash
-[ "6c3c2957caeeeb1decaf6b6178a3a3cd" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "e06b4ecd791bc50c93d6c71839b53c41" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
