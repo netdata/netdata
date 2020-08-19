@@ -107,7 +107,7 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
-    rc = sqlite3_exec(db, "PRAGMA cache_size = 300000;", 0, 0, &err_msg);
+    rc = sqlite3_exec(db, "PRAGMA cache_size=-8192;", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
@@ -320,7 +320,7 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
         return 1;
 
     struct dimension *dimension_list = NULL, *tmp_dimension_list;
-    sql_load_one_chart_dimension(st->chart_uuid, &dimension_list);
+    //sql_load_one_chart_dimension(st->chart_uuid, &dimension_list);
 
     // loop through all the dimensions and create under the chart
     while(dimension_list) {
@@ -337,25 +337,48 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
     return 0;
 }
 
-int sql_load_one_chart_dimension(uuid_t *chart_uuid, struct dimension **dimension_list)
+int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int dimensions)
 {
     char *err_msg = NULL;
     char sql[1024];
     char chart_str[37];
     int rc;
+    static sqlite3_stmt *res = NULL;
 
     if (!db)
         return 1;
 
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "select h2u(dim_uuid), id, name, chart_uuid from dimension where chart_uuid = u2h('%s') and archived = 1;", chart_str);
+    sprintf(sql, "select h2u(dim_uuid), id, name, chart_uuid from dimension where chart_uuid = @chart and archived = 1;");
+    if (!res)
+        rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
-    rc = sqlite3_exec(db, sql, dim_callback, dimension_list, &err_msg);
-    if (rc != SQLITE_OK) {
-        error("SQL error: %s", err_msg);
-        sqlite3_free(err_msg);
+    int param = sqlite3_bind_parameter_index(res, "@chart");
+    rc = sqlite3_bind_blob(res, param, chart_uuid, 16, SQLITE_STATIC);
+
+    //rc = sqlite3_exec(db, sql, dim_callback, dimension_list, &err_msg);
+    //if (rc != SQLITE_OK) {
+      //  error("SQL error: %s", err_msg);
+        //sqlite3_free(err_msg);
+    //}
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        if (dimensions)
+            buffer_strcat(wb, ",\n\t\t\t\t\"");
+        else
+            buffer_strcat(wb, "\t\t\t\t\"");
+        buffer_strcat_jsonescape(wb, sqlite3_column_text(res, 1));
+        buffer_strcat(wb, "\": { \"name\": \"");
+        buffer_strcat_jsonescape(wb, sqlite3_column_text(res, 2));
+        buffer_strcat(wb, " (");
+        buffer_strcat(wb, sqlite3_column_text(res, 0));
+        buffer_strcat(wb, ")");
+        buffer_strcat(wb, "\" }");
+        dimensions++;
     }
+    //sqlite3_finalize(row_res);
+    sqlite3_reset(res);
     return 0;
 }
 
