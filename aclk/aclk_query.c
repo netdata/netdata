@@ -441,11 +441,11 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     w->acl = 0x1f;
 
     char *mysep = strchr(buff, '?');
-    if (mysep) {
-        strncpyz(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE);
+    if (likely(mysep)) {
+        url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
         *mysep = '\0';
     } else
-        strncpyz(w->decoded_query_string, buff, NETDATA_WEB_REQUEST_URL_SIZE);
+        url_decode_r(w->decoded_query_string, buff, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
     // execute the query
     t = aclk_web_api_request_v1(localhost, w, *buff ? buff : "noop");
