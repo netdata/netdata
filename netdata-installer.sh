@@ -42,6 +42,45 @@ fi
 cd "${NETDATA_SOURCE_DIR}" || exit 1
 
 # -----------------------------------------------------------------------------
+# figure out an appropriate temporary directory
+_cannot_use_tmpdir() {
+  local testfile ret
+  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  ret=0
+
+  if [ -z "${testfile}" ] ; then
+    return "${ret}"
+  fi
+
+  if /bin/echo -e "#!/bin/sh\necho SUCCESS\n" > "${testfile}" ; then
+    if chmod +x "${testfile}" ; then
+      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+        ret=1
+      fi
+    fi
+  fi
+
+  rm -f "${testfile}"
+  return "${ret}"
+}
+
+if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
+  if _cannot_use_tmpdir /tmp ; then
+    if _cannot_use_tmpdir "${PWD}" ; then
+      echo >&2
+      echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+      exit 1
+    else
+      TMPDIR="${PWD}"
+    fi
+  else
+    TMPDIR="/tmp"
+  fi
+fi
+
+echo >&2 "Using ${TMPDIR} as a temporary directory."
+
+# -----------------------------------------------------------------------------
 # set up handling for deferred error messages
 NETDATA_DEFERRED_ERRORS=""
 

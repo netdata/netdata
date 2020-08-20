@@ -16,6 +16,7 @@
 #
 # Optional environment options:
 #
+#  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_TARBALL_BASEURL (set the base url for downloading the dist tarball)
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
@@ -62,15 +63,43 @@ cleanup() {
   fi
 }
 
-create_tmp_directory() {
-  # Check if tmp is mounted as noexec
-  if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
-    pattern="$(pwd)/netdata-updater-XXXXXX"
-  else
-    pattern="/tmp/netdata-updater-XXXXXX"
+_cannot_use_tmpdir() {
+  local testfile ret
+  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  ret=0
+
+  if [ -z "${testfile}" ] ; then
+    return "${ret}"
   fi
 
-  mktemp -d "$pattern"
+  if /bin/echo -e "#!/bin/sh\necho SUCCESS\n" > "${testfile}" ; then
+    if chmod +x "${testfile}" ; then
+      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+        ret=1
+      fi
+    fi
+  fi
+
+  rm -f "${testfile}"
+  return "${ret}"
+}
+
+create_tmp_directory() {
+  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
+    if _cannot_use_tmpdir /tmp ; then
+      if _cannot_use_tmpdir "${PWD}" ; then
+        echo >&2
+        echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+        exit 1
+      else
+        TMPDIR="${PWD}"
+      fi
+    else
+      TMPDIR="/tmp"
+    fi
+  fi
+
+  mktemp -d -t netdata-updater-XXXXXXXXXX
 }
 
 download() {
@@ -264,24 +293,24 @@ fi
 set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
 
 if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
-  TMPDIR="$(create_tmp_directory)"
+  tmpdir="$(create_tmp_directory)"
   PREVDIR="$(pwd)"
 
-  echo >&2 "Entering ${TMPDIR}"
-  cd "${TMPDIR}" || exit 1
+  echo >&2 "Entering ${tmpdir}"
+  cd "${tmpdir}" || exit 1
 
-  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
-  download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
-  if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
+  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"
+  download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.gz.run"
+  if ! grep netdata-latest.gz.run "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${tmpdir}"
   fi
 
   # Do not pass any options other than the accept, for now
   # shellcheck disable=SC2086
-  if sh "${TMPDIR}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
-    rm -r "${TMPDIR}"
+  if sh "${tmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
+    rm -r "${tmpdir}"
   else
-    echo >&2 "NOTE: did not remove: ${TMPDIR}"
+    echo >&2 "NOTE: did not remove: ${tmpdir}"
   fi
   echo >&2 "Switching back to ${PREVDIR}"
   cd "${PREVDIR}" || exit 1
