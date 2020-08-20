@@ -1162,34 +1162,7 @@ void web_client_build_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
-    //char headerlocation[8328];
     if (w->response.code == HTTP_RESP_MOVED_PERM) {
-        /*
-        char *move = headerlocation;
-        memcpy(move, "\r\nLocation: https://", 20);
-        move += 20;
-
-        size_t length = strlen(w->server_host);
-        memcpy(move, w->server_host, length);
-        move += length;
-
-        length = strlen(w->last_url);
-        memcpy(move, w->last_url, length);
-        move += length;
-        if (w->url_search_path && w->separator) {
-            char *s = url_find_protocol(w->url_search_path);
-            if (s)
-                *s = '\0';
-
-            length = strlen(w->url_search_path);
-            memcpy(move, w->url_search_path, length);
-            move += length;
-        }
-
-        memcpy(move, "\r\n",  2);
-        move += 2;
-        *move = '\0';
-    */
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
                        "Location: https://%s%s",
@@ -1213,11 +1186,6 @@ void web_client_build_http_header(struct web_client *w) {
                        w->origin,
                        content_type_string,
                        date);
-
-        /*
-        memcpy(headerlocation,"\r\n",2);
-        headerlocation[2]=0x00;
-         */
     }
 
     if(unlikely(web_x_frame_options))
