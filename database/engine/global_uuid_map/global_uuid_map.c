@@ -9,6 +9,51 @@ static uv_rwlock_t object_lock;
 static uv_rwlock_t global_lock;
 
 
+void free_global_guid_map()
+{
+    JudyHSFreeArray(&JGUID_map, PJE0);
+    JudyHSFreeArray(&JGUID_object_map, PJE0);
+}
+
+static void free_single_uuid(uuid_t *uuid)
+{
+    Pvoid_t *PValue, *PValue1;
+    char *existing_object;
+    Word_t  size;
+
+    PValue = JudyHSGet(JGUID_map, (void *) uuid, (Word_t) sizeof(uuid_t));
+    if (likely(PValue)) {
+        existing_object = *PValue;
+        GUID_TYPE object_type = existing_object[0];
+        size = (Word_t)object_type ? (object_type * 16) + 1 : strlen((char *)existing_object + 1) + 2;
+        PValue1 = JudyHSGet(JGUID_object_map, (void *)existing_object, (Word_t)size);
+        if (PValue1 && *PValue1) {
+            freez(*PValue1);
+        }
+        JudyHSDel(&JGUID_object_map, (void *)existing_object,
+                  (Word_t)object_type ? (object_type * 16) + 1 : strlen((char *)existing_object + 1) + 2, PJE0);
+        JudyHSDel(&JGUID_map, (void *)uuid, (Word_t)sizeof(uuid_t), PJE0);
+        freez(existing_object);
+    }
+}
+
+void free_uuid(uuid_t *uuid)
+{
+    GUID_TYPE ret;
+    char object[49];
+
+    ret = find_object_by_guid(uuid, object, sizeof(object));
+    if (GUID_TYPE_DIMENSION == ret)
+        free_single_uuid((uuid_t *)(object + 16 + 16));
+
+    if (GUID_TYPE_CHART == ret)
+            free_single_uuid((uuid_t *)(object + 16));
+
+    free_single_uuid(uuid);
+    return;
+}
+
+
 void   dump_object(uuid_t *index, void *object)
 {
     char uuid_s[36 + 1];
@@ -101,34 +146,6 @@ static inline int guid_store_nolock(uuid_t *uuid, void *object, GUID_TYPE object
 }
 
 
-inline int guid_store(uuid_t *uuid, char *object, GUID_TYPE object_type)
-{
-    uv_rwlock_wrlock(&global_lock);
-    int rc = guid_store_nolock(uuid, object, object_type);
-    uv_rwlock_wrunlock(&global_lock);
-    return rc;
-}
-
-/*
- * This can be used to bulk load entries into the global map
- *
- * A lock must be aquired since it will call guid_store_nolock
- * with a "no lock" parameter.
- *
- * Note: object memory must be allocated by caller and not released
- */
-int guid_bulk_load(char *uuid, char *object)
-{
-    uuid_t target_uuid;
-    if (likely(!uuid_parse(uuid, target_uuid))) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        debug(D_GUIDLOG,"Mapping GUID [%s] on [%s]", uuid, object);
-#endif
-        return guid_store_nolock(&target_uuid, object, GUID_TYPE_CHAR);
-    }
-    return 1;
-}
-
 /*
  * Given a GUID, find if an object is stored
  *   - Optionally return the object
@@ -151,15 +168,19 @@ GUID_TYPE find_object_by_guid(uuid_t *uuid, char *object, size_t max_bytes)
     if (likely(object && max_bytes)) {
         switch (value_type) {
             case GUID_TYPE_CHAR:
-                if (unlikely(max_bytes - 1 < strlen((char *) *PValue+1)))
+                if (unlikely(max_bytes - 1 < strlen((char *) *PValue+1))) {
+                    uv_rwlock_rdunlock(&global_lock);
                     return GUID_TYPE_NOSPACE;
+                }
                 strncpyz(object, (char *) *PValue+1, max_bytes - 1);
                 break;
             case GUID_TYPE_HOST:
             case GUID_TYPE_CHART:
             case GUID_TYPE_DIMENSION:
-                if (unlikely(max_bytes < (size_t) value_type * 16))
+                if (unlikely(max_bytes < (size_t) value_type * 16)) {
+                    uv_rwlock_rdunlock(&global_lock);
                     return GUID_TYPE_NOSPACE;
+                }
                 memcpy(object, *PValue+1, value_type * 16);
                 break;
             default:
@@ -265,12 +286,6 @@ void init_global_guid_map()
     fatal_assert(0 == uv_rwlock_init(&guid_lock));
     fatal_assert(0 == uv_rwlock_init(&object_lock));
     fatal_assert(0 == uv_rwlock_init(&global_lock));
-
-//    int rc = guid_bulk_load("6fc56a64-05d7-47a7-bc82-7f3235d8cbda","d6b37186-74db-11ea-88b2-0bf5095b1f9e/cgroup_qemu_ubuntu18.04.cpu_per_core/cpu3");
-//    rc = guid_bulk_load("75c6fa02-97cc-40c1-aacd-a0132190472e","d6b37186-74db-11ea-88b2-0bf5095b1f9e/services.throttle_io_ops_write/system.slice_setvtrgb.service");
-//    if (rc == 0)
-//        info("BULK GUID load successful");
-
     return;
 }
 

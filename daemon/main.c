@@ -60,7 +60,9 @@ void netdata_cleanup_and_exit(int ret) {
 #ifdef ENABLE_HTTPS
     security_clean_openssl();
 #endif
-
+#ifdef ENABLE_DBENGINE
+    free_global_guid_map();
+#endif
     info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
