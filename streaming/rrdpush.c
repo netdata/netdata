@@ -364,6 +364,21 @@ void rrdpush_send_labels(RRDHOST *host) {
 
     host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }
+
+void rrdpush_was_runtime_claimed(RRDHOST *host)
+{
+    if(unlikely(!host->rrdpush_send_enabled))
+        return;
+
+    sender_start(host->sender);
+    rrdhost_rdlock(host);
+
+    buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->claimed_id ? host->claimed_id : "NULL") );
+
+    rrdhost_unlock(host);
+    sender_commit(host->sender);
+}
+
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
