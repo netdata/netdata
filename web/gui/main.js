@@ -1929,7 +1929,7 @@ function renderChartsAndMenu(data) {
 
 function loadJs(url, callback) {
     $.ajax({
-        url: `../${url}`,
+        url: url.startsWith("http") ? url : `../${url}`,
         cache: true,
         dataType: "script",
         xhrFields: { withCredentials: true } // required for the cookie
