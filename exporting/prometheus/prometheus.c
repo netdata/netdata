@@ -364,7 +364,7 @@ static int print_host_variables(RRDVAR *rv, void *data)
                 opts->labels,
                 label_post,
                 value,
-                ((rv->last_updated) ? rv->last_updated : opts->now) * 1000ULL);
+                opts->now * 1000ULL);
         else
             buffer_sprintf(
                 opts->wb,
