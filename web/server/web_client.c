@@ -1084,6 +1084,10 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
+                        // The client will be redirected for Netdata and we are preserving the original request.
+                        *ue = '\0';
+                        strncpyz(w->last_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+                        *ue = ' ';
                         web_client_disable_wait_receive(w);
                         return HTTP_VALIDATION_REDIRECT;
                     }
@@ -1158,9 +1162,10 @@ void web_client_build_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
-    char headerbegin[8328];
+    //char headerlocation[8328];
     if (w->response.code == HTTP_RESP_MOVED_PERM) {
-        char *move = headerbegin;
+        /*
+        char *move = headerlocation;
         memcpy(move, "\r\nLocation: https://", 20);
         move += 20;
 
@@ -1184,28 +1189,36 @@ void web_client_build_http_header(struct web_client *w) {
         memcpy(move, "\r\n",  2);
         move += 2;
         *move = '\0';
+    */
+        buffer_sprintf(w->response.header_output,
+                       "HTTP/1.1 %d %s\r\n"
+                       "Location: https://%s%s",
+                       w->response.code, code_msg,
+                       w->server_host,
+                       w->last_url);
         buffer_flush(w->response.data);
     }else {
-        memcpy(headerbegin,"\r\n",2);
-        headerbegin[2]=0x00;
-    }
+        buffer_sprintf(w->response.header_output,
+                       "HTTP/1.1 %d %s\r\n"
+                       "Connection: %s\r\n"
+                       "Server: NetData Embedded HTTP Server %s\r\n"
+                       "Access-Control-Allow-Origin: %s\r\n"
+                       "Access-Control-Allow-Credentials: true\r\n"
+                       "Content-Type: %s\r\n"
+                       "Date: %s\r\n",
+                       w->response.code,
+                       code_msg,
+                       web_client_has_keepalive(w)?"keep-alive":"close",
+                       VERSION,
+                       w->origin,
+                       content_type_string,
+                       date);
 
-    buffer_sprintf(w->response.header_output,
-            "HTTP/1.1 %d %s\r\n"
-                    "Connection: %s\r\n"
-                    "Server: NetData Embedded HTTP Server %s\r\n"
-                    "Access-Control-Allow-Origin: %s\r\n"
-                    "Access-Control-Allow-Credentials: true\r\n"
-                    "Content-Type: %s\r\n"
-                    "Date: %s%s"
-                   , w->response.code, code_msg
-                   , web_client_has_keepalive(w)?"keep-alive":"close"
-                   , VERSION
-                   , w->origin
-                   , content_type_string
-                   , date
-                   , headerbegin
-    );
+        /*
+        memcpy(headerlocation,"\r\n",2);
+        headerlocation[2]=0x00;
+         */
+    }
 
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
