@@ -1016,7 +1016,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     encoded_url = s;
 
     //we search for the position where we have " HTTP/", because it finishes the user request
-        s = url_find_protocol(s);
+    s = url_find_protocol(s);
 
     // incomplete requests
     if(unlikely(!*s)) {
