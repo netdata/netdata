@@ -858,6 +858,7 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
+    freez(host->claimed_id);
     freez((void *)host->tags);
     free_host_labels(host->labels);
     freez((void *)host->os);
@@ -1707,4 +1708,13 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
     }
     rrdhost_unlock(h);
     return result;
+}
+
+void rrdhost_set_claimed_id(RRDHOST *host, const char *new_id)
+{
+    rrdhost_wrlock(host);
+    if (unlikely(host->claimed_id))
+        freez(host->claimed_id);
+    host->claimed_id = new_id ? strdupz(new_id) : NULL;
+    rrdhost_unlock(localhost);
 }

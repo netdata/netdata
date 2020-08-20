@@ -154,6 +154,8 @@ void load_claiming_state(void)
 
     long bytes_read;
     claimed_id = read_by_filename(filename, &bytes_read);
+    //TODO: remove claimed_id global variable and cleanup
+    rrdhost_set_claimed_id(localhost, claimed_id);
     netdata_mutex_unlock(&claim_mutex);   // Only the main thread can call this function, safe to release and then read
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
@@ -162,6 +164,7 @@ void load_claiming_state(void)
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
     netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+
 #endif
 }
 

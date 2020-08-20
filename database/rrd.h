@@ -817,6 +817,8 @@ struct rrdhost {
     struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
+    char *claimed_id;                               // Claimed ID if host has one otherwise NULL
+
     struct rrdhost *next;
 };
 extern RRDHOST *localhost;
@@ -1174,6 +1176,8 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 extern int alarm_compare_id(void *a, void *b);
 extern int alarm_compare_name(void *a, void *b);
+
+extern void rrdhost_set_claimed_id(RRDHOST *host, const char *new_id);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions
