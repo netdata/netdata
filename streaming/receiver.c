@@ -120,7 +120,11 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         return PARSER_RC_OK;
     }
 
-    rrdhost_set_claimed_id(host, words[2]);
+    netdata_mutex_lock(&host->claimed_id_lock);
+    if (host->claimed_id)
+        freez(host->claimed_id);
+    host->claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+    netdata_mutex_unlock(&host->claimed_id_lock);
 
     rrdpush_was_runtime_claimed(host);
 

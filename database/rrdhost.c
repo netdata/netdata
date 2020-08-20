@@ -1712,12 +1712,3 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
     rrdhost_unlock(h);
     return result;
 }
-
-void rrdhost_set_claimed_id(RRDHOST *host, const char *new_id)
-{
-    netdata_mutex_lock(&host->claimed_id_lock);
-    if (unlikely(host->claimed_id))
-        freez(host->claimed_id);
-    host->claimed_id = new_id ? strdupz(new_id) : NULL;
-    netdata_mutex_unlock(&host->claimed_id_lock);
-}

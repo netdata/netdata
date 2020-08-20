@@ -27,8 +27,6 @@ static char *claiming_errors[] = {
         "Service Unavailable",                          // 17
         "Agent Unique Id Not Readable"                  // 18
 };
-static netdata_mutex_t claim_mutex = NETDATA_MUTEX_INITIALIZER;
-static char *claimed_id = NULL;
 
 /* Retrieve the claim id for the agent.
  * Caller owns the string.
@@ -36,9 +34,9 @@ static char *claimed_id = NULL;
 char *is_agent_claimed()
 {
     char *result;
-    netdata_mutex_lock(&claim_mutex);
-    result = (claimed_id == NULL) ? NULL : strdup(claimed_id);
-    netdata_mutex_unlock(&claim_mutex);
+    netdata_mutex_lock(&localhost->claimed_id_lock);
+    result = (localhost->claimed_id == NULL) ? NULL : strdup(localhost->claimed_id);
+    netdata_mutex_unlock(&localhost->claimed_id_lock);
     return result;
 }
 
@@ -135,10 +133,10 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_setting = 0;
 #else
-    netdata_mutex_lock(&claim_mutex);
-    if (claimed_id != NULL) {
-        freez(claimed_id);
-        claimed_id = NULL;
+    netdata_mutex_lock(&localhost->claimed_id_lock);
+    if (localhost->claimed_id) {
+        freez(localhost->claimed_id);
+        localhost->claimed_id = NULL;
     }
     if (aclk_connected)
     {
@@ -153,10 +151,9 @@ void load_claiming_state(void)
     snprintfz(filename, FILENAME_MAX, "%s/cloud.d/claimed_id", netdata_configured_varlib_dir);
 
     long bytes_read;
-    claimed_id = read_by_filename(filename, &bytes_read);
-    //TODO: remove claimed_id global variable and cleanup
-    rrdhost_set_claimed_id(localhost, claimed_id);
-    netdata_mutex_unlock(&claim_mutex);   // Only the main thread can call this function, safe to release and then read
+    char *claimed_id = read_by_filename(filename, &bytes_read);
+    localhost->claimed_id = claimed_id;
+    netdata_mutex_unlock(&localhost->claimed_id_lock);
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
@@ -164,7 +161,6 @@ void load_claiming_state(void)
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
     netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
-
 #endif
 }
 
