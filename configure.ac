@@ -320,7 +320,7 @@ AC_CHECK_LIB(
     [sqlite3],
     [sqlite3_open],
     [SQLITE_LIBS="-lsqlite3"]
-    [SQLITE_FLAGS="SQLITE_ENABLE_MEMSYS5"]
+    [SQLITE_FLAGS=""]
 )
 test -z "${SQLITE_LIBS}" && \
     AC_MSG_ERROR([libsqlite3 required but not found. Try installing 'libsqlite3'.])

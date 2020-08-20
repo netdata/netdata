@@ -357,8 +357,9 @@ inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_cl
     (void)url;
     // measure the time a data collection needs
     unsigned long long start = now_realtime_usec();
-    sql_sync_ram_db();
+    //sql_sync_ram_db();
     buffer_flush(w->response.data);
+    //buffer_increase(w->response.data, 5 * 1024 * 1024);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     charts2json(host, w->response.data, 0, 1);
     unsigned long long end = now_realtime_usec();

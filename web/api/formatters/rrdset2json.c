@@ -99,7 +99,9 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 //            st->state->from = from_row;
 //            st->state->to = to_row;
 //        }
-        sql_load_one_chart_dimension(st->chart_uuid, wb, dimensions);
+        int old_dimensions = dimensions;
+        int duration = sql_load_one_chart_dimension(st->chart_uuid, wb, &dimensions);
+
 
 //        while (dimension_list) {
 //            if (dimensions)
@@ -122,6 +124,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 //            dimensions++;
 //        }
 //        freez(dimension_list);
+        //info("SQLITE: Processed %d dimensions in %d usec", dimensions - old_dimensions, duration);
     }
 #endif
 
