@@ -87,32 +87,26 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
-    rc = sqlite3_exec(db, "ATTACH ':memory:' as ram;", 0, 0, &err_msg);
-    if (rc != SQLITE_OK) {
-        error("SQL error: %s", err_msg);
-        sqlite3_free(err_msg);
-    }
-
-    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS ram.chart_dim(chart_uuid blob, dim_uuid blob, id text, name text); create index ram.ind_dim_uuid on chart_dim (dim_uuid); create index if not exists ram.ind_chart_uuid on chart_dim (chart_uuid);", 0, 0, &err_msg);
-
-    if (rc != SQLITE_OK) {
-        error("SQL error: %s", err_msg);
-        sqlite3_free(err_msg);
-    }
-
-    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS ram.chart_stat(chart_uuid blob, min_row int, max_row int); create index ram.ind_chart_uuid1 on chart_stat (chart_uuid);", 0, 0, &err_msg);
-
-    if (rc != SQLITE_OK) {
-        error("SQL error: %s", err_msg);
-        sqlite3_free(err_msg);
-    }
-
-    rc = sqlite3_exec(db, "PRAGMA cache_size=-8192;", 0, 0, &err_msg);
-
-    if (rc != SQLITE_OK) {
-        error("SQL error: %s", err_msg);
-        sqlite3_free(err_msg);
-    }
+    // EXAMPLE -- Creating RAM database and attaching
+//    rc = sqlite3_exec(db, "ATTACH ':memory:' as ram;", 0, 0, &err_msg);
+//    if (rc != SQLITE_OK) {
+//        error("SQL error: %s", err_msg);
+//        sqlite3_free(err_msg);
+//    }
+//
+//    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS ram.chart_dim(chart_uuid blob, dim_uuid blob, id text, name text); create index ram.ind_dim_uuid on chart_dim (dim_uuid); create index if not exists ram.ind_chart_uuid on chart_dim (chart_uuid);", 0, 0, &err_msg);
+//
+//    if (rc != SQLITE_OK) {
+//        error("SQL error: %s", err_msg);
+//        sqlite3_free(err_msg);
+//    }
+//
+//    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS ram.chart_stat(chart_uuid blob, min_row int, max_row int); create index ram.ind_chart_uuid1 on chart_stat (chart_uuid);", 0, 0, &err_msg);
+//
+//    if (rc != SQLITE_OK) {
+//        error("SQL error: %s", err_msg);
+//        sqlite3_free(err_msg);
+//    }
 
     sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
     sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
@@ -167,38 +161,40 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
         return 1;
 
     // FIRST WAY TO DO IT
-//    uuid_unparse_lower(*dim_uuid, dim_str);
-//    uuid_unparse_lower(*chart_uuid, chart_str);
-//
-//    sprintf(sql, "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values (u2h('%s'),u2h('%s'),'%s','%s', %lld, %lld, %d, 1) ;",
-//            dim_str, chart_str, id, name, multiplier, divisor, algorithm);
-//
-//    rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-//    if (rc != SQLITE_OK) {
-//        error("SQL error: %s", err_msg);
-//        sqlite3_free(err_msg);
-//    }
+    uuid_unparse_lower(*dim_uuid, dim_str);
+    uuid_unparse_lower(*chart_uuid, chart_str);
+
+    sprintf(sql, "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values (u2h('%s'),u2h('%s'),'%s','%s', %lld, %lld, %d, 1) ;",
+            dim_str, chart_str, id, name, multiplier, divisor, algorithm);
+    //unsigned long long start = now_realtime_usec();
+    rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+    //unsigned long long end = now_realtime_usec();
+    //info("SQLITE: Query insert in %llu usec", end - start);
     // FIRST DONE
 
     // SECOND WAY TO DO IT
-    sqlite3_stmt *res;
-#define SQL_INSERT_DIMENSION "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values (?0001,?0002,?0003,?0004, ?0005, ?0006, ?0007, 1) ;"
-    rc = sqlite3_prepare_v2(db, SQL_INSERT_DIMENSION, -1, &res, 0);
-    if (rc != SQLITE_OK)
-        return 1;
-
-    int param = sqlite3_bind_parameter_index(res, "@dim");
-    rc = sqlite3_bind_blob(res, 1, dim_uuid, 16, SQLITE_STATIC);
-    rc = sqlite3_bind_blob(res, 2, chart_uuid, 16, SQLITE_STATIC);
-    rc = sqlite3_bind_text(res, 3, id, -1, SQLITE_STATIC);
-    rc = sqlite3_bind_text(res, 4, name, -1, SQLITE_STATIC);
-    rc = sqlite3_bind_int(res, 5, multiplier);
-    rc = sqlite3_bind_int(res, 6, divisor);
-    rc = sqlite3_bind_int(res, 7, algorithm);
-    // Omit checks
-
-    rc = sqlite3_step(res);
-    sqlite3_finalize(res);
+//    sqlite3_stmt *res;
+//#define SQL_INSERT_DIMENSION "INSERT OR REPLACE into dimension (dim_uuid, chart_uuid, id, name, multiplier, divisor , algorithm, archived) values (?0001,?0002,?0003,?0004, ?0005, ?0006, ?0007, 1) ;"
+//    rc = sqlite3_prepare_v2(db, SQL_INSERT_DIMENSION, -1, &res, 0);
+//    if (rc != SQLITE_OK)
+//        return 1;
+//
+//    int param = sqlite3_bind_parameter_index(res, "@dim");
+//    rc = sqlite3_bind_blob(res, 1, dim_uuid, 16, SQLITE_STATIC);
+//    rc = sqlite3_bind_blob(res, 2, chart_uuid, 16, SQLITE_STATIC);
+//    rc = sqlite3_bind_text(res, 3, id, -1, SQLITE_STATIC);
+//    rc = sqlite3_bind_text(res, 4, name, -1, SQLITE_STATIC);
+//    rc = sqlite3_bind_int(res, 5, multiplier);
+//    rc = sqlite3_bind_int(res, 6, divisor);
+//    rc = sqlite3_bind_int(res, 7, algorithm);
+//    // Omit checks
+//    rc = sqlite3_step(res);
+//    sqlite3_finalize(res);
     return (rc != SQLITE_ROW);
 }
 
@@ -315,11 +311,25 @@ int sql_create_dimension(char *dim_str, RRDSET *st)
 int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
 {
     UNUSED(dimensions);
+    char sql[1024];
+    char chart_str[37];
+    int rc;
+    char *err_msg = NULL;
 
     if (!db)
         return 1;
 
     struct dimension *dimension_list = NULL, *tmp_dimension_list;
+
+    uuid_unparse_lower(st->chart_uuid, chart_str);
+    sprintf(sql, "select h2u(dim_uuid), id, name from dimension where chart_uuid = u2h('%s') and archived = 1;", chart_str);
+
+    rc = sqlite3_exec(db, sql, dim_callback, &dimension_list, &err_msg);
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
     //sql_load_one_chart_dimension(st->chart_uuid, &dimension_list);
 
     // loop through all the dimensions and create under the chart
@@ -337,7 +347,7 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
     return 0;
 }
 
-int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int dimensions)
+int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions)
 {
     char *err_msg = NULL;
     char sql[1024];
@@ -350,9 +360,10 @@ int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int dimensions)
 
     uuid_unparse_lower(*chart_uuid, chart_str);
 
-    sprintf(sql, "select h2u(dim_uuid), id, name, chart_uuid from dimension where chart_uuid = @chart and archived = 1;");
-    if (!res)
+    if (!res) {
+        sprintf(sql, "select h2u(dim_uuid), id, name from dimension where chart_uuid = @chart and archived = 1;");
         rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+    }
 
     int param = sqlite3_bind_parameter_index(res, "@chart");
     rc = sqlite3_bind_blob(res, param, chart_uuid, 16, SQLITE_STATIC);
@@ -362,9 +373,12 @@ int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int dimensions)
       //  error("SQL error: %s", err_msg);
         //sqlite3_free(err_msg);
     //}
-
+    //unsigned long long start = now_realtime_usec();
+    //unsigned long long dur = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
-        if (dimensions)
+        //unsigned long long end = now_realtime_usec();
+        //info("SQLITE: Query result in %llu usec", end - start);
+        if (*dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
             buffer_strcat(wb, "\t\t\t\t\"");
@@ -375,8 +389,11 @@ int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int dimensions)
         buffer_strcat(wb, sqlite3_column_text(res, 0));
         buffer_strcat(wb, ")");
         buffer_strcat(wb, "\" }");
-        dimensions++;
+        (*dimensions)++;
     }
+    //unsigned long long end = now_realtime_usec();
+    //dur = dur + (end - start);
+    //info("SQLITE: Chart %s generated in %llu usec", chart_str, end - start);
     //sqlite3_finalize(row_res);
     sqlite3_reset(res);
     return 0;
