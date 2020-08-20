@@ -779,6 +779,7 @@ RRDSET *rrdset_create_custom(
             st->exporting_flags = NULL;
             st->sflag_replicating_down = 0;
             st->sflag_replicating_up = 0;
+            st->usec_since_last_update = 0;
 
             if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);
