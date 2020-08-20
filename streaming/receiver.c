@@ -95,6 +95,38 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
     return PARSER_RC_ERROR;
 }
 
+#define CLAIMED_ID_MIN_WORDS 3
+PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugins_action)
+{
+    UNUSED(user);
+    UNUSED(plugins_action);
+
+    int i;
+
+    for (i = 0; words[i]; i++) ;
+    if (i != CLAIMED_ID_MIN_WORDS) {
+        error("Command CLAIMED_ID came malformed %d parameters are compulsory", CLAIMED_ID_MIN_WORDS - 1);
+        return PARSER_RC_ERROR;
+    }
+
+    RRDHOST *host = rrdhost_find_by_guid(words[1], 0);
+    if (!host) {
+        error("Host with GUID %s not found. Ignoring", words[1]);
+        return PARSER_RC_OK; //the message is OK problem must be somewehere else
+    }
+
+    if (host == localhost) {
+        error("Streaming Child attempted to change claiming id of parent (me). This is not allowed.");
+        return PARSER_RC_OK;
+    }
+
+    rrdhost_set_claimed_id(host, words[2]);
+
+    rrdpush_was_runtime_claimed(host);
+
+    return PARSER_RC_OK;
+}
+
 /* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
  */
 static int receiver_read(struct receiver_state *r, FILE *fp) {
@@ -156,6 +188,7 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
     parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
+    parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
