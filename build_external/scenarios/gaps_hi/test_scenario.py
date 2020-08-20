@@ -570,7 +570,11 @@ for case in cases:
         print(f"Checking {args.pattern} against {case.__name__}")
         if re.match(args.pattern, case.__name__):
             for state in configurations:
-                state.wrap(case)
+                clean_state = state.copy()
+                clean_state.nodes["child"].stream_to(clean_state.nodes["parent"])
+                clean_state.wrap(case)
     else:
         for state in configurations:
-            state.wrap(case)
+            clean_state = state.copy()
+            clean_state.nodes["child"].stream_to(clean_state.nodes["parent"])
+            clean_state.wrap(case)

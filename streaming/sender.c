@@ -425,11 +425,11 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                     if (sample_t != metric_t)
                         debug(D_REPLICATION, "%s.%s Sample mismatch during replication %ld vs %ld", st->id, rd->id,
                                              sample_t, metric_t);
-                    if (handle.rrdeng.descr)
-                        debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u", st->id, rd->id,
-                                             rd->state->handle.rrdeng.descr->start_time,
-                                             rd->state->handle.rrdeng.descr->end_time,
-                                             rd->state->handle.rrdeng.descr->page_length);
+                    //if (handle.rrdeng.descr)
+                    //    debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u", st->id, rd->id,
+                    //                         rd->state->handle.rrdeng.descr->start_time,
+                    //                         rd->state->handle.rrdeng.descr->end_time,
+                    //                         rd->state->handle.rrdeng.descr->page_length);
                     buffer_sprintf(s->build, "REPDIM \"%s\" %zu %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, index,
                                    sample_t, n);
                     debug(D_REPLICATION, "%s.%s REPDIM %zu %ld " STORAGE_NUMBER_FORMAT "\n", st->id, rd->id, index,

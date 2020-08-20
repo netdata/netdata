@@ -15,7 +15,7 @@ class Node(object):
         self.config = {}
 
     def copy(self):
-        result = Node(self.name[:], self.cname[:], self.parser)
+        result = Node(self.name[:], self.container_name[:], self.parser)
         result.port = self.port
         result.guid = self.guid[:]
         # This will be in the old configuration, needs a lookup if this is a problem

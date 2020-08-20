@@ -155,7 +155,8 @@ class State(object):
                                            "data rx"      : "RECEIVER",
                                            "data tx"      : "STREAM: Sending data. Buffer",
                                            "Finished replication on"  : "REPLIC",
-                                           "Fill replication with" : "REPLIC" })
+                                           "Fill replication with" : "REPLIC",
+                                           "Segmentation fault" : "CRASH!"})
         # Suppress DNS failures in two node scenario on the top level
         self.parser2         = LogParser({ "child connect": "client willing",
                                            "child disconnect" : "STREAM child.*disconnected \(completed",
@@ -164,12 +165,14 @@ class State(object):
                                            "gap detect"   : "Gap detect",
                                            "data rx"      : "RECEIVER",
                                            "data tx"      : "STREAM: Sending data. Buffer",
-                                           "replication"  : "REPLIC" })
+                                           "replication"  : "REPLIC",
+                                           "Segmentation fault" : "CRASH!"})
 
     def copy(self):
         result = State(self.working[:], self.config[:], self.config_label[:], self.prefix[:], self.network[:])
-        for k,v in self.nodes:
+        for k,v in self.nodes.items():
             result.nodes[k] = v.copy()
+        return result
 
     def add_node(self, name):
         n = Node(name, f"{self.prefix}_{name}_1", self.parser)
@@ -216,6 +219,9 @@ class State(object):
                     ev = n.parser.parse(n.log)
                     for e in ev:
                         print(n.name, e, file=f)
+            if "Segmentation fault" in n.log:
+                print(f"{n.name} crashed during the test, stack trace in the log")
+                passed = False
             print(f"{case.__name__} -> {passed}")
             print(f"{case.__name__} -> {passed}", file=f)
             self.output = None
