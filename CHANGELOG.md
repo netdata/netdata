@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- dashboard v1.3.1 [\#9786](https://github.com/netdata/netdata/pull/9786) ([jacekkolasa](https://github.com/jacekkolasa))
+- Fix long stats.d chart names \(suggested by @vince-lessbits\) [\#9783](https://github.com/netdata/netdata/pull/9783) ([amoss](https://github.com/amoss))
+- Fix Travis CI builds and skip Fedora 31 i386 build/test cycles [\#9781](https://github.com/netdata/netdata/pull/9781) ([prologic](https://github.com/prologic))
+- Fix UNIX socket access with kickstart-static64 [\#9780](https://github.com/netdata/netdata/pull/9780) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix HTTP header for the remote write exporting connector [\#9775](https://github.com/netdata/netdata/pull/9775) ([vlvkobal](https://github.com/vlvkobal))
 - Fix broken link in privacy policy [\#9771](https://github.com/netdata/netdata/pull/9771) ([joelhans](https://github.com/joelhans))
+- Fixed numerous bugs in duplicate install handling. [\#9769](https://github.com/netdata/netdata/pull/9769) ([Ferroin](https://github.com/Ferroin))
 - python.d/redis: collect `maxmemory` [\#9767](https://github.com/netdata/netdata/pull/9767) ([ilyam8](https://github.com/ilyam8))
 - Fix unit tests for exporting engine [\#9766](https://github.com/netdata/netdata/pull/9766) ([vlvkobal](https://github.com/vlvkobal))
 - fix\_broken\_pipe: Fix netfilter for it closes when sigpipe happens [\#9756](https://github.com/netdata/netdata/pull/9756) ([thiagoftsm](https://github.com/thiagoftsm))
 - python.d/isc\_dhcpd: add support for ip ranges [\#9755](https://github.com/netdata/netdata/pull/9755) ([vsc55](https://github.com/vsc55))
+- Remove debug messages from ebpf. [\#9754](https://github.com/netdata/netdata/pull/9754) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add check for spurious wakeups [\#9751](https://github.com/netdata/netdata/pull/9751) ([vlvkobal](https://github.com/vlvkobal))
 - Fix code formatting for the mdstat collector [\#9749](https://github.com/netdata/netdata/pull/9749) ([vlvkobal](https://github.com/vlvkobal))
 - Fix exporting update point [\#9748](https://github.com/netdata/netdata/pull/9748) ([vlvkobal](https://github.com/vlvkobal))
@@ -20,6 +26,7 @@
 - Added proper certificate handling cURL in our static build. [\#9733](https://github.com/netdata/netdata/pull/9733) ([Ferroin](https://github.com/Ferroin))
 - Add CAP\_SYS\_CHROOT for netdata service [\#9726](https://github.com/netdata/netdata/pull/9726) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed global GUID map memory leak [\#9725](https://github.com/netdata/netdata/pull/9725) ([stelfrag](https://github.com/stelfrag))
+- Fix proxy redirect [\#9722](https://github.com/netdata/netdata/pull/9722) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update README.md [\#9721](https://github.com/netdata/netdata/pull/9721) ([aabatangle](https://github.com/aabatangle))
 - Fix crash when receiving malformed labels via streaming. [\#9715](https://github.com/netdata/netdata/pull/9715) ([mfundul](https://github.com/mfundul))
 - Fixed issue with missing alarms [\#9712](https://github.com/netdata/netdata/pull/9712) ([stelfrag](https://github.com/stelfrag))
@@ -31,11 +38,13 @@
 - Fix print message when building for Ubuntu Focal [\#9694](https://github.com/netdata/netdata/pull/9694) ([devinrsmith](https://github.com/devinrsmith))
 - Replace alarm redirection link for cloud, to stop showing 404 [\#9688](https://github.com/netdata/netdata/pull/9688) ([cakrit](https://github.com/cakrit))
 - python.d/ipfs: disable call to the `/api/v0/stats/repo` endpoint by default [\#9687](https://github.com/netdata/netdata/pull/9687) ([ilyam8](https://github.com/ilyam8))
+- Fix netdata/netdata Docker image size [\#9669](https://github.com/netdata/netdata/pull/9669) ([prologic](https://github.com/prologic))
 - python.d/varnish: multiple storage backends fix [\#9668](https://github.com/netdata/netdata/pull/9668) ([florianmagnin](https://github.com/florianmagnin))
 - Fix for ignored LXC containers [\#9645](https://github.com/netdata/netdata/pull/9645) ([vlvkobal](https://github.com/vlvkobal))
 - Add community link to readme [\#9602](https://github.com/netdata/netdata/pull/9602) ([zack-shoylev](https://github.com/zack-shoylev))
 - Network viewer charts [\#9591](https://github.com/netdata/netdata/pull/9591) ([thiagoftsm](https://github.com/thiagoftsm))
 - doc: netdata user is also a default [\#9555](https://github.com/netdata/netdata/pull/9555) ([mrbarletta](https://github.com/mrbarletta))
+- cgroups.plugin: add and document support for reading container names from Podman [\#9474](https://github.com/netdata/netdata/pull/9474) ([K900](https://github.com/K900))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
@@ -231,9 +240,6 @@
 - Send anonymous statistics from backends and exporting engine [\#9125](https://github.com/netdata/netdata/pull/9125) ([vlvkobal](https://github.com/vlvkobal))
 - Fix buffer splitting in the Kinesis exporting connector [\#9122](https://github.com/netdata/netdata/pull/9122) ([vlvkobal](https://github.com/vlvkobal))
 - Update the kernel-collector version to v0.2.0 [\#9118](https://github.com/netdata/netdata/pull/9118) ([prologic](https://github.com/prologic))
-- Dynamic memory cleanup for Pub/Sub exporting connector [\#9112](https://github.com/netdata/netdata/pull/9112) ([vlvkobal](https://github.com/vlvkobal))
-- Package: obsoletes conflicting EPEL packages \(\#6879 \#8784\) [\#9108](https://github.com/netdata/netdata/pull/9108) ([Saruspete](https://github.com/Saruspete))
-- Add support for eBPF for Netdata static64 \(kickstart-static64.sh\) [\#9104](https://github.com/netdata/netdata/pull/9104) ([prologic](https://github.com/prologic))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
