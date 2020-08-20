@@ -169,7 +169,8 @@ class State(object):
                                            "Segmentation fault" : "CRASH!"})
 
     def copy(self):
-        result = State(self.working[:], self.config[:], self.config_label[:], self.prefix[:], self.network[:])
+        result = State(self.working[:], self.config[:], self.config_label[:], self.prefix[:],
+                       self.network[len(self.prefix):])
         for k,v in self.nodes.items():
             result.nodes[k] = v.copy()
         return result

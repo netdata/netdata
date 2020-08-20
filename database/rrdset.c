@@ -1498,21 +1498,23 @@ void debug_dump_rrdset_state(RRDSET *st) {
                 // on the collector thread and this is the hot-page so it cannot be flushed during execution).
                 struct rrdeng_page_descr *descr = rd->state->handle.rrdeng.descr;
                 struct page_cache_descr *pc_descr = descr->pg_cache_descr;
-                storage_number x;
-                uint32_t entries = descr->page_length / sizeof(x);
-                uint32_t start = 0;
-                if (entries > 3)
-                    start = entries-3;
-                char buffer[80] = {0};
-                for(uint32_t i=start; i<entries; i++) {
-                    x = ((storage_number*)pc_descr->page)[i];
-                    sprintf(buffer + strlen(buffer), STORAGE_NUMBER_FORMAT " ", x);
+                if (pc_descr) {
+                    storage_number x;
+                    uint32_t entries = descr->page_length / sizeof(x);
+                    uint32_t start = 0;
+                    if (entries > 3)
+                        start = entries-3;
+                    char buffer[80] = {0};
+                    for(uint32_t i=start; i<entries; i++) {
+                        x = ((storage_number*)pc_descr->page)[i];
+                        sprintf(buffer + strlen(buffer), STORAGE_NUMBER_FORMAT " ", x);
+                    }
+                    debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u, last points %s", st->id, rd->id,
+                                         descr->start_time,
+                                         descr->end_time,
+                                         entries,
+                                         buffer);
                 }
-                debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u, last points %s", st->id, rd->id,
-                                     descr->start_time,
-                                     descr->end_time,
-                                     entries,
-                                     buffer);
             }
             #endif
         }
