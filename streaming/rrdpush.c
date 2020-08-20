@@ -371,11 +371,11 @@ void rrdpush_was_runtime_claimed(RRDHOST *host)
         return;
 
     sender_start(host->sender);
-    rrdhost_rdlock(host);
+    netdata_mutex_lock(&host->receiver_lock);
 
     buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->claimed_id ? host->claimed_id : "NULL") );
 
-    rrdhost_unlock(host);
+    netdata_mutex_unlock(&host->receiver_lock);
     sender_commit(host->sender);
 }
 

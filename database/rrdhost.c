@@ -167,6 +167,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels_rwlock);
 
+    netdata_mutex_init(&host->claimed_id_lock);
+
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
 
@@ -858,6 +860,7 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
+    pthread_mutex_destroy(&host->claimed_id_lock);
     freez(host->claimed_id);
     freez((void *)host->tags);
     free_host_labels(host->labels);
@@ -1712,9 +1715,9 @@ time_t rrdhost_last_entry_t(RRDHOST *h) {
 
 void rrdhost_set_claimed_id(RRDHOST *host, const char *new_id)
 {
-    rrdhost_wrlock(host);
+    netdata_mutex_lock(&host->claimed_id_lock);
     if (unlikely(host->claimed_id))
         freez(host->claimed_id);
     host->claimed_id = new_id ? strdupz(new_id) : NULL;
-    rrdhost_unlock(localhost);
+    netdata_mutex_unlock(&host->claimed_id_lock);
 }
