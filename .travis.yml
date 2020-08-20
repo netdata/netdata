@@ -162,6 +162,7 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
     - name: DEB package test
+      if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
       git:
         depth: false
       before_install:
@@ -183,6 +184,7 @@ jobs:
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
 
     - name: RPM package test
+      if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
       git:
         depth: false
       before_install:
