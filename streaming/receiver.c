@@ -102,10 +102,22 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
     UNUSED(plugins_action);
 
     int i;
+    uuid_t uuid;
 
     for (i = 0; words[i]; i++) ;
     if (i != CLAIMED_ID_MIN_WORDS) {
         error("Command CLAIMED_ID came malformed %d parameters are compulsory", CLAIMED_ID_MIN_WORDS - 1);
+        return PARSER_RC_ERROR;
+    }
+
+    // We don't need to parsed UUID
+    // just do it to check the format
+    if(uuid_parse(words[1], uuid)) {
+        error("The host GUID received doesn't have format of valid UUID!");
+        return PARSER_RC_ERROR;
+    }
+    if(uuid_parse(words[2], uuid)) {
+        error("The Claim ID received doesn't have format of valid UUID!");
         return PARSER_RC_ERROR;
     }
 

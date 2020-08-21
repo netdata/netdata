@@ -133,6 +133,7 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_setting = 0;
 #else
+    uuid_t uuid;
     netdata_mutex_lock(&localhost->claimed_id_lock);
     if (localhost->claimed_id) {
         freez(localhost->claimed_id);
@@ -152,6 +153,11 @@ void load_claiming_state(void)
 
     long bytes_read;
     char *claimed_id = read_by_filename(filename, &bytes_read);
+    if(claimed_id && uuid_parse(claimed_id, uuid)) {
+        error("claimed_id doesn't look like valid UUID");
+        freez(claimed_id);
+        claimed_id = NULL;
+    }
     localhost->claimed_id = claimed_id;
     netdata_mutex_unlock(&localhost->claimed_id_lock);
     if (!claimed_id) {
