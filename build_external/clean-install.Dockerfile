@@ -26,14 +26,24 @@ RUN rm -rf autom4te.cache
 RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
-RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
+RUN CFLAGS="-O0 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
     -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
 
+RUN rm /var/cache/netdata/dbengine/*
 RUN rm /var/lib/netdata/registry/netdata.public.unique.id
+RUN apt update
+RUN apt install gdb -y
+RUN printf 'file /usr/sbin/netdata\n\
+set args -D\n\
+run\n\
+info frame\n\
+info args\n\
+info local\n\
+bt\n' >> wrapper.gdb
 
-CMD ["/usr/sbin/netdata","-D"]
+CMD ["/usr/bin/gdb","-x","/opt/netdata/source/wrapper.gdb"]
 ENTRYPOINT []
