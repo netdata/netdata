@@ -1497,6 +1497,8 @@ void debug_dump_rrdset_state(RRDSET *st) {
             if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && rd->state->handle.rrdeng.descr) {
                 // This is safe but do not do this from production code. (The debugging points that call this are
                 // on the collector thread and this is the hot-page so it cannot be flushed during execution).
+                uv_rwlock_rdlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
+
                 struct rrdeng_page_descr *descr = rd->state->handle.rrdeng.descr;
                 struct page_cache_descr *pc_descr = descr->pg_cache_descr;
                 if (pc_descr) {
@@ -1516,6 +1518,7 @@ void debug_dump_rrdset_state(RRDSET *st) {
                                          entries,
                                          buffer);
                 }
+                uv_rwlock_rdunlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
             }
             #endif
         }
