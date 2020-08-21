@@ -154,7 +154,7 @@ void load_claiming_state(void)
     long bytes_read;
     char *claimed_id = read_by_filename(filename, &bytes_read);
     if(claimed_id && uuid_parse(claimed_id, uuid)) {
-        error("claimed_id doesn't look like valid UUID");
+        error("claimed_id \"%s\" doesn't look like valid UUID", claimed_id);
         freez(claimed_id);
         claimed_id = NULL;
     }
