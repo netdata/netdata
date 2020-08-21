@@ -817,6 +817,7 @@ struct rrdhost {
     struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
+    // if held together with receiver_lock. Order is receiver_lock then claimed_id_lock
     netdata_mutex_t claimed_id_lock;
     char *claimed_id;                               // Claimed ID if host has one otherwise NULL
 
