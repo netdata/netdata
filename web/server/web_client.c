@@ -1169,7 +1169,6 @@ void web_client_build_http_header(struct web_client *w) {
                        w->response.code, code_msg,
                        w->server_host,
                        w->last_url);
-        buffer_flush(w->response.data);
     }else {
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
@@ -1577,6 +1576,16 @@ void web_client_process_request(struct web_client *w) {
 #ifdef ENABLE_HTTPS
         case HTTP_VALIDATION_REDIRECT:
         {
+            buffer_flush(w->response.data);
+            w->response.data->contenttype = CT_TEXT_HTML;
+            buffer_strcat(w->response.data,
+                          "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html>"
+                          "<body onload=\"window.location.href ='https://'+ window.location.hostname +"
+                          " ':' + window.location.port + window.location.pathname + window.location.search\">"
+                          "Redirecting to safety connection, case your browser does not support redirection, please"
+                          " click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' "
+                          " + window.location.port + window.location.pathname + window.location.search\">here</a>."
+                          "</body></html>");
             w->response.code = HTTP_RESP_MOVED_PERM;
             break;
         }
