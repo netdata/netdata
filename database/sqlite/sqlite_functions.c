@@ -114,6 +114,12 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
+    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS metric_page(key_id integer primary key, dim_uuid blob, entries int, start_date int, end_date int, metric blob);", 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
     sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
     sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
 
@@ -585,11 +591,13 @@ void  sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number numb
 void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
 {
     char *err_msg = NULL;
-    char  sql[1024];
+    //char  sql[1024];
     char  dim_str[37];
     int rc;
     static sqlite3_stmt *res = NULL;
+    static sqlite3_stmt *res_page = NULL;
     static int dim_id, date_id;
+    static int metric_id;
 
     if (!descr->page_length) {
         info("SQLITE: Empty page");
@@ -597,12 +605,12 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     }
 
     uuid_unparse_lower(*dim_uuid, dim_str);
-    int entries =  descr->page_length / sizeof(storage_number);
-    int *metric = descr->pg_cache_descr->page;
-    int dt = 0;
+    uint32_t entries =  descr->page_length / sizeof(storage_number);
+    uint32_t *metric = descr->pg_cache_descr->page;
+    //uint32_t dt = 0;
     time_t start_time = descr->start_time/ USEC_PER_SEC;
-    if (entries > 1)
-        dt = ((descr->end_time - descr->start_time) / USEC_PER_SEC) / (entries - 1);
+    //if (entries > 1)
+    //    dt = ((descr->end_time - descr->start_time) / USEC_PER_SEC) / (entries - 1);
 
     if (!res) {
         //snprintf(sql, 256, "insert into metric (dim_uuid, date_created, value) values (@dim_uuid, @date, @value);");
@@ -616,17 +624,39 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
         //value_id = sqlite3_bind_parameter_index(res, "@value");
     }
 
-    //rc = sqlite3_bind_blob(res, dim_id, dim_uuid, 16, SQLITE_STATIC);
-
-    for (int i=entries-1; i < entries; i++, start_time += dt) {
-        rc = sqlite3_bind_blob(res, dim_id, dim_uuid, 16, SQLITE_STATIC);
-        rc = sqlite3_bind_int(res, date_id, start_time);
-        //rc = sqlite3_bind_int(res, value_id, metric[i]);
-        //info("SQLITE: Metric d - %d", start_time, metric[i]);
-        sqlite3_step(res);
-        sqlite3_reset(res);
+    if (!res_page) {
+        rc = sqlite3_prepare_v2(db, "insert into metric_page (entries, dim_uuid, start_date, end_date, metric) values (@entries, @dim, @start_date, @end_date, @page);", -1, &res_page, 0);
+        if (rc != SQLITE_OK) {
+            info("SQLITE: Failed to prepare statement for metric page");
+            return;
+        }
+        metric_id = sqlite3_bind_parameter_index(res_page, "@page");
     }
-    //sqlite3_reset(res);
-    //info("SQL STORE: %s entries %lu from (%llu to %llu) dt=%d", dim_str, descr->page_length / sizeof(storage_number), descr->start_time / USEC_PER_SEC, descr->end_time / USEC_PER_SEC, dt);
+
+    rc = sqlite3_bind_blob(res, dim_id, dim_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_int(res, date_id, descr->end_time / USEC_PER_SEC);
+
+
+    void *compressed_buf = NULL;
+    int max_compressed_size = LZ4_compressBound(descr->page_length);
+    compressed_buf = mallocz(max_compressed_size);
+
+    int compressed_size = LZ4_compress_default(metric, compressed_buf, descr->page_length, max_compressed_size);
+
+    rc = sqlite3_bind_int(res_page, 1, entries);
+    rc = sqlite3_bind_int64(res_page, 3, descr->start_time);
+    rc = sqlite3_bind_int64(res_page, 4, descr->end_time);
+    rc = sqlite3_bind_blob(res_page, metric_id, compressed_buf, compressed_size, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res_page, 2  , dim_uuid, 16, SQLITE_TRANSIENT);
+
+    freez(compressed_buf);
+
+    unsigned long long start = now_realtime_usec();
+    sqlite3_step(res);
+    sqlite3_reset(res);
+    sqlite3_step(res_page);
+    sqlite3_reset(res_page);
+    unsigned long long end = now_realtime_usec();
+    info("SQLITE: PAGE in  %llu usec (%d -> %d bytes) (max computed %d) entries=%d", end-start, descr->page_length, compressed_size, max_compressed_size, entries);
     return;
 }
