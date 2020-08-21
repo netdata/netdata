@@ -186,6 +186,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     if (unlikely(NULL == descr)) {
         return;
     }
+    sql_add_metric_page(rd->state->metric_uuid, descr);
     if (likely(descr->page_length)) {
         int ret, page_is_empty;
 
