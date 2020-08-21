@@ -365,7 +365,7 @@ void rrdpush_send_labels(RRDHOST *host) {
     host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }
 
-void rrdpush_was_runtime_claimed(RRDHOST *host)
+void rrdpush_claimed_id(RRDHOST *host)
 {
     if(unlikely(!host->rrdpush_send_enabled))
         return;

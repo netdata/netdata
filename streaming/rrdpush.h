@@ -107,7 +107,7 @@ extern void rrdset_done_push(RRDSET *st);
 extern void rrdset_push_chart_definition_now(RRDSET *st);
 extern void *rrdpush_sender_thread(void *ptr);
 extern void rrdpush_send_labels(RRDHOST *host);
-extern void rrdpush_was_runtime_claimed(RRDHOST *host);
+extern void rrdpush_claimed_id(RRDHOST *host);
 
 extern int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
 extern void rrdpush_sender_thread_stop(RRDHOST *host);

@@ -627,7 +627,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 RRDHOST *h;
                 rrdhost_foreach_read(h) {
                     if(h->claimed_id)
-                        rrdpush_was_runtime_claimed(h);
+                        rrdpush_claimed_id(h);
                 }
                 rrd_unlock();
             }

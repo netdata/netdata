@@ -126,7 +126,7 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
     host->claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
     netdata_mutex_unlock(&host->claimed_id_lock);
 
-    rrdpush_was_runtime_claimed(host);
+    rrdpush_claimed_id(host);
 
     return PARSER_RC_OK;
 }
