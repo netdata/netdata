@@ -116,7 +116,7 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         error("The host GUID received doesn't have format of valid UUID!");
         return PARSER_RC_ERROR;
     }
-    if(uuid_parse(words[2], uuid)) {
+    if(uuid_parse(words[2], uuid) && strcmp(words[2], "NULL")) {
         error("The Claim ID received doesn't have format of valid UUID!");
         return PARSER_RC_ERROR;
     }
