@@ -422,9 +422,15 @@ void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st)
                                      rd_start, rd_end);
                 while (sample_t <= end && !rd->state->query_ops.is_finished(&handle)) {
                     storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
-                    if (sample_t != metric_t)
+                    if (n==SN_EMPTY_SLOT) {
+                        debug(D_REPLICATION, "%s.%s dbengine could not service query, aborting replication", st->id,
+                                             rd->id);
+                        break;
+                    }
+                    if (sample_t != metric_t) {
                         debug(D_REPLICATION, "%s.%s Sample mismatch during replication %ld vs %ld", st->id, rd->id,
                                              sample_t, metric_t);
+                    }
                     //if (handle.rrdeng.descr)
                     //    debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u", st->id, rd->id,
                     //                         rd->state->handle.rrdeng.descr->start_time,
