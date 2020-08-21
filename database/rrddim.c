@@ -400,6 +400,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
     rd->state = mallocz(sizeof(*rd->state));
+
+    if (dim_uuid == NULL)
+        dim_uuid = sql_find_dim_uuid(st, rd->id, rd->name);
+
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         rrdeng_metric_init(rd, dim_uuid);

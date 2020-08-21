@@ -108,6 +108,12 @@ int sql_init_database()
 //        sqlite3_free(err_msg);
 //    }
 
+    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS metric_update(dim_uuid blob primary key, date_created int);", 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
     sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
     sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
 
@@ -116,6 +122,7 @@ int sql_init_database()
 
 int sql_close_database()
 {
+    info("SQLITE: Closing database");
     if (db)
         sqlite3_close(db);
     return 0;
@@ -490,6 +497,41 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_l
     return 0;
 }
 
+char *sql_find_dim_uuid(RRDSET *st, char *id, char *name)
+{
+    sqlite3_stmt *res;
+    uuid_t *uuid = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(
+        db, "select dim_uuid from dimension where chart_uuid = @chart and id = @id and name = @name;", -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        info("SQLITE: failed to bind to find GUID");
+        return NULL;
+    }
+
+    int dim_id = sqlite3_bind_parameter_index(res, "@chart");
+    int id_id = sqlite3_bind_parameter_index(res, "@id");
+    int name_id = sqlite3_bind_parameter_index(res, "@name");
+
+    rc = sqlite3_bind_blob(res, dim_id, st->chart_uuid, 16, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, id_id, id, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res, name_id, name, -1, SQLITE_STATIC);
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        uuid = malloc(sizeof(uuid_t));
+        //char dim_str[37];
+        //info("Got %d bytes", sqlite3_column_bytes(res, 0));
+        //uuid_unparse_lower(sqlite3_column_blob(res, 0), dim_str);
+        //info("SQLITE: dim uuid for [%s] [%s] = [%s] ", id, name, dim_str);
+        uuid_copy(*uuid, sqlite3_column_blob(res, 0));
+        break;
+    }
+    sqlite3_finalize(res);
+    return uuid;
+}
+
+
 void sql_sync_ram_db()
 {
     static int loaded = 0;
@@ -546,12 +588,13 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     char  sql[1024];
     char  dim_str[37];
     int rc;
-    BUFFER *wb;
+    static sqlite3_stmt *res = NULL;
+    static int dim_id, date_id;
 
-    if (!descr->page_length)
+    if (!descr->page_length) {
+        info("SQLITE: Empty page");
         return;
-
-    wb =buffer_create(300);
+    }
 
     uuid_unparse_lower(*dim_uuid, dim_str);
     int entries =  descr->page_length / sizeof(storage_number);
@@ -560,18 +603,30 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     time_t start_time = descr->start_time/ USEC_PER_SEC;
     if (entries > 1)
         dt = ((descr->end_time - descr->start_time) / USEC_PER_SEC) / (entries - 1);
-    for (int i=0; i < entries; i++, start_time += dt) {
-        snprintf(sql, 256, "insert into metric (dim_uuid, date_created, value) values ('%s', %ld, %d);", dim_str,
-                 start_time, metric[i]);
-        buffer_strcat(wb, sql);
+
+    if (!res) {
+        //snprintf(sql, 256, "insert into metric (dim_uuid, date_created, value) values (@dim_uuid, @date, @value);");
+        rc = sqlite3_prepare_v2(db, "insert or replace into metric_update (dim_uuid, date_created) values (@dim_uuid, @date);", -1, &res, 0);
+        if (rc != SQLITE_OK) {
+            info("SQLITE: Failed to prepare statement");
+            return;
+        }
+        dim_id = sqlite3_bind_parameter_index(res, "@dim_uuid");
+        date_id = sqlite3_bind_parameter_index(res, "@date");
+        //value_id = sqlite3_bind_parameter_index(res, "@value");
     }
-    info("SQL STORE: %s entries %lu from (%llu to %llu)", dim_str, descr->page_length / sizeof(storage_number), descr->start_time / USEC_PER_SEC, descr->end_time / USEC_PER_SEC);
-    info("SQL DETAIL: %s", buffer_tostring(wb));
-    rc = sqlite3_exec(db, buffer_tostring(wb), 0, 0, &err_msg);
-    if (rc != SQLITE_OK) {
-        error("SQL error: %s", err_msg);
-        sqlite3_free(err_msg);
+
+    //rc = sqlite3_bind_blob(res, dim_id, dim_uuid, 16, SQLITE_STATIC);
+
+    for (int i=entries-1; i < entries; i++, start_time += dt) {
+        rc = sqlite3_bind_blob(res, dim_id, dim_uuid, 16, SQLITE_STATIC);
+        rc = sqlite3_bind_int(res, date_id, start_time);
+        //rc = sqlite3_bind_int(res, value_id, metric[i]);
+        //info("SQLITE: Metric d - %d", start_time, metric[i]);
+        sqlite3_step(res);
+        sqlite3_reset(res);
     }
-    buffer_free(wb);
+    //sqlite3_reset(res);
+    //info("SQL STORE: %s entries %lu from (%llu to %llu) dt=%d", dim_str, descr->page_length / sizeof(storage_number), descr->start_time / USEC_PER_SEC, descr->end_time / USEC_PER_SEC, dt);
     return;
 }
