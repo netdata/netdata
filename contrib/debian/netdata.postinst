@@ -59,7 +59,9 @@ case "$1" in
     chmod 4750 /usr/libexec/netdata/plugins.d/slabinfo.plugin
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network
     chmod 4750 /usr/libexec/netdata/plugins.d/nfacct.plugin
-    chmod 4750 /usr/libexec/netdata/plugins.d/ebpf.plugin
+
+    # Workaround if system does not have ebpf.plugin
+    chmod -f 4750 /usr/libexec/netdata/plugins.d/ebpf.plugin || true
 
     # Workaround for other plugins not installed directly by this package
     chmod -f 4750 /usr/libexec/netdata/plugins.d/freeipmi.plugin || true
