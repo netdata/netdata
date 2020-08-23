@@ -41,6 +41,10 @@ extern char *sql_find_dim_uuid(RRDSET *st, char *id, char *name);
 extern void sql_sync_ram_db();
 extern void sql_backup_database();
 extern void sql_compact_database();
+extern void sql_store_datafile_info(char *path, int fileno, size_t file_size);
+extern void sql_store_page_info(uuid_t temp_id, int valid_page, int page_length, usec_t  start_time, usec_t end_time, int , size_t offset, size_t size);
+extern void sql_add_metric_page_from_extent(struct rrdeng_page_descr *descr);
+
 
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H
