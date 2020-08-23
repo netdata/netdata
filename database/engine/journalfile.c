@@ -312,6 +312,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             page_index = *PValue;
         }
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+        char dim_str[37];
+        uuid_unparse_lower(temp_id, dim_str);
         if (NULL == PValue) {
             /* First time we see the UUID */
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
@@ -327,6 +329,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->page_length = jf_metric_data->descr[i].page_length;
         descr->start_time = jf_metric_data->descr[i].start_time;
         descr->end_time = jf_metric_data->descr[i].end_time;
+       // info("JOURNAL: Page %d metric %s OFFSET(%llu, size=%d) (%llu - %llu) file %d", valid_pages, dim_str, my_offset, descr->page_length, descr->start_time, descr->end_time, extent->datafile->file);
+        sql_store_page_info(temp_id, valid_pages, descr->page_length, descr->start_time, descr->end_time, extent->datafile->file, extent->offset, extent->size);
         descr->id = &page_index->id;
         descr->extent = extent;
         extent->pages[valid_pages++] = descr;

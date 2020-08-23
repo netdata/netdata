@@ -253,6 +253,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
+    sql_store_datafile_info(path, file, file_size);
     info("Data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
     return 0;
 

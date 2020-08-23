@@ -125,6 +125,8 @@ after_crc_check:
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
         pg_cache_descr->page = page;
+        // TODO: Migrate page to the SQLite
+        //sql_add_metric_page_from_extent(descr);
         pg_cache_descr->flags |= RRD_PAGE_POPULATED;
         pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
         rrdeng_page_descr_mutex_unlock(ctx, descr);
