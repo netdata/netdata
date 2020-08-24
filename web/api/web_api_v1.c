@@ -799,11 +799,16 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         netdata_mutex_lock(&rc->receiver_lock);
         netdata_mutex_lock(&rc->claimed_id_lock);
-        buffer_sprintf(wb, "\t\t{ \"guid\": \"%s\", \"reachable\": \"%s\", \"claim_id\": \"%s\" }"
+        buffer_sprintf(wb, "\t\t{ \"guid\": \"%s\", \"reachable\": %s, \"claim_id\": "
                        , rc->machine_guid
                        , (rc->receiver || rc == localhost) ? "true" : "false"
-                       , rc->claimed_id ? rc->claimed_id : "null"
         );
+
+        if(rc->claimed_id)
+            buffer_sprintf(wb, "\"%s\" }", rc->claimed_id);
+        else
+            buffer_strcat(wb, "null }");
+
         netdata_mutex_unlock(&rc->claimed_id_lock);
         netdata_mutex_unlock(&rc->receiver_lock);
         count++;
