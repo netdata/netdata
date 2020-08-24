@@ -100,6 +100,15 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
                 data->version = e->data.number;
                 break;
             }
+            if (!strcmp(e->name, "min-version")) {
+                data->min_version = e->data.number;
+                break;
+            }
+            if (!strcmp(e->name, "max-version")) {
+                data->max_version = e->data.number;
+                break;
+            }
+
             break;
 
         case JSON_BOOLEAN:
@@ -513,7 +522,7 @@ static void aclk_graceful_disconnect()
 
     // Send a graceful disconnect message
     BUFFER *b = buffer_create(512);
-    aclk_create_header(b, "disconnect", NULL, 0, 0, ACLK_VERSION);
+    aclk_create_header(b, "disconnect", NULL, 0, 0, aclk_shared_state.version_neg);
     buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
     aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
     buffer_free(b);
@@ -820,6 +829,10 @@ static void aclk_try_to_connect(char *hostname, char *port, int port_num)
     int rc;
     aclk_connecting = 1;
     create_publish_base_topic();
+    ACLK_SHARED_STATE_LOCK;
+    aclk_shared_state.version_neg = 0;
+    aclk_shared_state.version_neg_wait_till = 0;
+    ACLK_SHARED_STATE_UNLOCK;
     rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
@@ -1115,11 +1128,12 @@ static inline void aclk_hello_msg()
     char *msg_id = create_uuid();
 
     ACLK_SHARED_STATE_LOCK;
-    aclk_shared_state.negotiated_version = -1;
+    aclk_shared_state.version_neg = 0;
+    aclk_shared_state.version_neg_wait_till = now_monotonic_usec() + USEC_PER_SEC * VERSION_NEG_TIMEOUT;
     ACLK_SHARED_STATE_UNLOCK;
 
     //Hello message is versioned separatelly from the rest of the protocol
-    aclk_create_header(buf, "hello", msg_id, 0, 0, 1);
+    aclk_create_header(buf, "hello", msg_id, 0, 0, ACLK_VERSION_NEG_VERSION);
     buffer_sprintf(buf, ",\"min-version\":%d,\"max-version\":%d}", ACLK_VERSION_MIN, ACLK_VERSION_MAX);
     aclk_send_message(ACLK_METADATA_TOPIC, buf->buffer, msg_id);
     freez(msg_id);
@@ -1214,9 +1228,9 @@ void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted)
     // session.
 
     if (metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0, ACLK_VERSION);
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0, aclk_shared_state.version_neg);
     else
-        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us, aclk_shared_state.version_neg);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
 
@@ -1259,9 +1273,9 @@ int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted)
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "update", msg_id, 0, 0, ACLK_VERSION);
+        aclk_create_header(local_buffer, "update", msg_id, 0, 0, aclk_shared_state.version_neg);
     else
-        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
+        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us, aclk_shared_state.version_neg);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
@@ -1361,7 +1375,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    aclk_create_header(local_buffer, "chart", msg_id, 0, 0, ACLK_VERSION);
+    aclk_create_header(local_buffer, "chart", msg_id, 0, 0, aclk_shared_state.version_neg);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     rrdset2json(st, local_buffer, NULL, NULL, 1);
@@ -1438,7 +1452,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     char *msg_id = create_uuid();
 
     buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0, ACLK_VERSION);
+    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0, aclk_shared_state.version_neg);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
@@ -1463,11 +1477,101 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 /*
  * Parse the incoming payload and queue a command if valid
  */
-int aclk_handle_cloud_request(char *payload)
+static int aclk_handle_cloud_request(struct aclk_request *cloud_to_agent)
 {
-    struct aclk_request cloud_to_agent = {
-        .type_id = NULL, .msg_id = NULL, .callback_topic = NULL, .payload = NULL, .version = 0
-    };
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+        debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");
+        ACLK_SHARED_STATE_UNLOCK;
+        return 1;
+    }
+    ACLK_SHARED_STATE_UNLOCK;
+
+    if (unlikely(!cloud_to_agent->payload || !cloud_to_agent->callback_topic || !cloud_to_agent->msg_id)) {
+        //TODO VERSION CHECK
+        /*        if (cloud_to_agent.version > ACLK_VERSION)
+            error("Unsupported version in JSON request %d", cloud_to_agent.version);*/
+
+        return 1;
+    }
+
+    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, NULL, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD)))
+        debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
+
+    // Note: the payload comes from the callback and it will be automatically freed
+    return 0;
+}
+
+// This handles `version` message from cloud used to negotiate
+// protocol version we will use
+static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
+{
+    int version = -1;
+
+    if(unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
+        error("Unsuported version of \"version\" message from cloud. Expected %d, Got %d", ACLK_VERSION_NEG_VERSION, cloud_to_agent->version);
+        return 1;
+    }
+    if(unlikely(!cloud_to_agent->min_version)) {
+        error("Min version missing or 0");
+        return 1;
+    }
+    if(unlikely(!cloud_to_agent->max_version)) {
+        error("Max version missing or 0");
+        return 1;
+    }
+    if(unlikely(cloud_to_agent->max_version < cloud_to_agent->max_version)) {
+        error("Max version (%d) must be >= than min version (%d)", cloud_to_agent->max_version, cloud_to_agent->min_version);
+        return 1;
+    }
+
+    if(unlikely(cloud_to_agent->min_version > ACLK_VERSION_MAX)) {
+        error("Agent too old for this cloud. Minimum version required by cloud %d. Maximum version supported by this agent %d.", cloud_to_agent->min_version, ACLK_VERSION_MAX);
+        //TODO Disconnect ACLK permanently until restart of agent
+        return 1;
+    }
+    if(unlikely(cloud_to_agent->max_version < ACLK_VERSION_MIN)) {
+        error("Cloud version is too old for this agent. Maximum version supported by cloud %d. Minimum (oldest) version supported by this agent %d.", cloud_to_agent->max_version, ACLK_VERSION_MIN);
+        aclk_kill_link = 1;
+        return 1;
+    }
+
+    version = MIN(cloud_to_agent->max_version, ACLK_VERSION_MAX);
+
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(now_monotonic_usec() > aclk_shared_state.version_neg_wait_till)) {
+        error("The \"version\" message came too late ignoring.");
+        goto err_cleanup;
+    }
+    if (unlikely(aclk_shared_state.version_neg)) {
+        error("Version has already been set to %d", aclk_shared_state.version_neg);
+        goto err_cleanup;
+    }
+    aclk_shared_state.version_neg = version;
+    ACLK_SHARED_STATE_UNLOCK;
+
+    info("Choosing version %d of ACLK", version);
+
+    return 0;
+
+err_cleanup:
+    ACLK_SHARED_STATE_UNLOCK;
+    return 1;
+}
+
+struct {
+    char *name;
+    int(*fnc)(struct aclk_request *cloud_to_agent);
+} aclk_incoming_msg_types[] = {
+    { .name = "http",    .fnc = aclk_handle_cloud_request    },
+    { .name = "version", .fnc = aclk_handle_version_response },
+    { .name = NULL,      .fnc = NULL                         }
+};
+
+int aclk_handle_cloud_message(char *payload)
+{
+    struct aclk_request cloud_to_agent;
+    memset(&cloud_to_agent, 0, sizeof(struct aclk_request));
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
@@ -1475,63 +1579,52 @@ int aclk_handle_cloud_request(char *payload)
         ACLK_STATS_UNLOCK;
     }
 
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
-        debug(D_ACLK, "Ignoring cloud request; agent not in stable state");
-        ACLK_SHARED_STATE_UNLOCK;
-        return 0;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
-
     if (unlikely(!payload)) {
         debug(D_ACLK, "ACLK incoming message is empty");
-        return 0;
+        goto err_cleanup;
     }
 
     debug(D_ACLK, "ACLK incoming message (%s)", payload);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
-    if (unlikely(
-            JSON_OK != rc || !cloud_to_agent.payload || !cloud_to_agent.callback_topic || !cloud_to_agent.msg_id ||
-            !cloud_to_agent.type_id || cloud_to_agent.version > ACLK_VERSION ||
-            strcmp(cloud_to_agent.type_id, "http"))) {
-        if (JSON_OK != rc)
-            error("Malformed json request (%s)", payload);
+    if (unlikely(rc != JSON_OK)) {
+        error("Malformed json request (%s)", payload);
+        goto err_cleanup;
+    }
 
-        if (cloud_to_agent.version > ACLK_VERSION)
-            error("Unsupported version in JSON request %d", cloud_to_agent.version);
+    if (!cloud_to_agent.type_id) {
+        error("Cloud message is missing compulsory key \"type\"");
+        goto err_cleanup;
+    }
 
-        if (cloud_to_agent.payload)
-            freez(cloud_to_agent.payload);
-
-        if (cloud_to_agent.type_id)
-            freez(cloud_to_agent.type_id);
-
-        if (cloud_to_agent.msg_id)
-            freez(cloud_to_agent.msg_id);
-
-        if (cloud_to_agent.callback_topic)
-            freez(cloud_to_agent.callback_topic);
-
-        if (aclk_stats_enabled) {
-            ACLK_STATS_LOCK;
-            aclk_metrics_per_sample.cloud_req_err++;
-            ACLK_STATS_UNLOCK;
+    for (int i = 0; aclk_incoming_msg_types[i].name; i++) {
+        if (strcmp(cloud_to_agent.type_id, aclk_incoming_msg_types[i].name) == 0) {
+            if (likely(!aclk_incoming_msg_types[i].fnc(&cloud_to_agent))) {
+                freez(cloud_to_agent.type_id);
+                return 0;
+            }
+            goto err_cleanup;
         }
-
-        return 1;
     }
 
-    // Checked to be "http", not needed anymore
-    if (likely(cloud_to_agent.type_id)) {
+    error("Unknown message type from Cloud \"%s\"", cloud_to_agent.type_id);
+
+err_cleanup:
+    if (cloud_to_agent.payload)
+        freez(cloud_to_agent.payload);
+    if (cloud_to_agent.type_id)
         freez(cloud_to_agent.type_id);
-        cloud_to_agent.type_id = NULL;
+    if (cloud_to_agent.msg_id)
+        freez(cloud_to_agent.msg_id);
+    if (cloud_to_agent.callback_topic)
+        freez(cloud_to_agent.callback_topic);
+
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        aclk_metrics_per_sample.cloud_req_err++;
+        ACLK_STATS_UNLOCK;
     }
 
-    if (unlikely(aclk_queue_query(cloud_to_agent.callback_topic, NULL, cloud_to_agent.msg_id, cloud_to_agent.payload, 0, 0, ACLK_CMD_CLOUD)))
-        debug(D_ACLK, "ACLK failed to queue incoming message (%s)", payload);
-
-    // Note: the payload comes from the callback and it will be automatically freed
-    return 0;
+    return 1;
 }

@@ -12,6 +12,19 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_VERSION_MIN 1
 #define ACLK_VERSION_MAX 1
 
+// Version negotiation messages have they own versioning
+// this is also used for LWT message as we set that up
+// before version negotiation
+#define ACLK_VERSION_NEG_VERSION 1
+
+// Maximum time to wait for version negotiation before aborting
+// and defaulting to oldest supported version
+#define VERSION_NEG_TIMEOUT 3
+
+#if ACLK_VERSION_MIN > ACLK_VERSION_MAX
+#error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
+#endif
+
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
     ACLK_CMD_ONCONNECT,
@@ -36,7 +49,11 @@ extern struct aclk_shared_state {
     ACLK_METADATA_STATE metadata_submitted;
     ACLK_AGENT_STATE agent_state;
     time_t last_popcorn_interrupt;
-    int negotiated_version;
+
+    // read only while ACLK connected
+    // protect by lock otherwise
+    volatile int version_neg;
+    usec_t version_neg_wait_till;
 } aclk_shared_state;
 
 typedef enum aclk_proxy_type {
