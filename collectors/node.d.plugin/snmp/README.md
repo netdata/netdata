@@ -297,14 +297,14 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                     "family": "power",
                     "dimensions": {
                         "supply": {
-                            "oid": ".1.3.6.1.2.1.105.1.3.1.1.2.1",
+                            "oid": "1.3.6.1.2.1.105.1.3.1.1.2.1",
                             "algorithm": "absolute",
                             "multiplier": 1,
                             "divisor": 1,
                             "offset": 0
                         },
                         "used": {
-                            "oid": ".1.3.6.1.2.1.105.1.3.1.1.4.1",
+                            "oid": "1.3.6.1.2.1.105.1.3.1.1.4.1",
                             "algorithm": "absolute",
                             "multiplier": 1,
                             "divisor": 1,
@@ -320,14 +320,14 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                     "family": "IP",
                     "dimensions": {
                         "receives": {
-                            "oid": ".1.3.6.1.2.1.4.3.0",
+                            "oid": "1.3.6.1.2.1.4.3.0",
                             "algorithm": "incremental",
                             "multiplier": 1,
                             "divisor": 1,
                             "offset": 0
                         },
                         "discards": {
-                            "oid": ".1.3.6.1.2.1.4.8.0",
+                            "oid": "1.3.6.1.2.1.4.8.0",
                             "algorithm": "incremental",
                             "multiplier": 1,
                             "divisor": 1,
@@ -343,21 +343,21 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                     "family": "IP",
                     "dimensions": {
                         "bad_header": {
-                            "oid": ".1.3.6.1.2.1.4.4.0",
+                            "oid": "1.3.6.1.2.1.4.4.0",
                             "algorithm": "incremental",
                             "multiplier": 1,
                             "divisor": 1,
                             "offset": 0
                         },
                         "bad_address": {
-                            "oid": ".1.3.6.1.2.1.4.5.0",
+                            "oid": "1.3.6.1.2.1.4.5.0",
                             "algorithm": "incremental",
                             "multiplier": 1,
                             "divisor": 1,
                             "offset": 0
                         },
                         "unknown_protocol": {
-                            "oid": ".1.3.6.1.2.1.4.7.0",
+                            "oid": "1.3.6.1.2.1.4.7.0",
                             "algorithm": "incremental",
                             "multiplier": 1,
                             "divisor": 1,
@@ -373,21 +373,21 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                     "family": "IP",
                     "dimensions": {
                         "requests": {
-                            "oid": ".1.3.6.1.2.1.4.10.0",
+                            "oid": "1.3.6.1.2.1.4.10.0",
                             "algorithm": "incremental",
                             "multiplier": 1,
                             "divisor": 1,
                             "offset": 0
                         },
                         "discards": {
-                            "oid": ".1.3.6.1.2.1.4.11.0",
+                            "oid": "1.3.6.1.2.1.4.11.0",
                             "algorithm": "incremental",
                             "multiplier": -1,
                             "divisor": 1,
                             "offset": 0
                         },
                         "no_route": {
-                            "oid": ".1.3.6.1.2.1.4.12.0",
+                            "oid": "1.3.6.1.2.1.4.12.0",
                             "algorithm": "incremental",
                             "multiplier": -1,
                             "divisor": 1,
@@ -397,7 +397,7 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                 },
                 "snmp_switch.bandwidth_port": {
                     "title": "Switch Bandwidth for port ",
-                    "titleoid": ".1.3.6.1.2.1.31.1.1.1.18.",
+                    "titleoid": "1.3.6.1.2.1.31.1.1.1.18.",
                     "units": "kilobits/s",
                     "type": "area",
                     "priority": 100,
@@ -408,14 +408,14 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                     ],
                     "dimensions": {
                         "in": {
-                            "oid": ".1.3.6.1.2.1.2.2.1.10.",
+                            "oid": "1.3.6.1.2.1.2.2.1.10.",
                             "algorithm": "incremental",
                             "multiplier": 8,
                             "divisor": 1024,
                             "offset": 0
                         },
                         "out": {
-                            "oid": ".1.3.6.1.2.1.2.2.1.16.",
+                            "oid": "1.3.6.1.2.1.2.2.1.16.",
                             "algorithm": "incremental",
                             "multiplier": -8,
                             "divisor": 1024,
