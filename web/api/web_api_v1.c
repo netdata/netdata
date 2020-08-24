@@ -775,23 +775,31 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
 
 static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     RRDHOST *rc;
-    BUFFER *guids = buffer_create(2048);
     int count = 0;
 
     buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
-    buffer_strcat(guids, "\t\"mirrored_hosts_status\": [\n");
     rrd_rdlock();
     rrdhost_foreach_read(rc) {
         if (rrdhost_flag_check(rc, RRDHOST_FLAG_ARCHIVED))
             continue;
-        if(count > 0) {
+        if (count > 0)
             buffer_strcat(wb, ",\n");
-            buffer_strcat(guids, ",\n");
-        }
+
         buffer_sprintf(wb, "\t\t\"%s\"", rc->hostname);
+        count++;
+    }
+
+    buffer_strcat(wb, "\n\t],\n\t\"mirrored_hosts_status\": [\n");
+    count = 0;
+    rrdhost_foreach_read(rc) {
+        if (rrdhost_flag_check(rc, RRDHOST_FLAG_ARCHIVED))
+            continue;
+        if (count > 0)
+            buffer_strcat(wb, ",\n");
+
         netdata_mutex_lock(&rc->receiver_lock);
         netdata_mutex_lock(&rc->claimed_id_lock);
-        buffer_sprintf(guids, "\t\t{ \"guid\": \"%s\", \"reachable\": \"%s\", \"claim_id\": \"%s\" }"
+        buffer_sprintf(wb, "\t\t{ \"guid\": \"%s\", \"reachable\": \"%s\", \"claim_id\": \"%s\" }"
                        , rc->machine_guid
                        , (rc->receiver || rc == localhost) ? "true" : "false"
                        , rc->claimed_id ? rc->claimed_id : "null"
@@ -801,9 +809,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         count++;
     }
     rrd_unlock();
+
     buffer_strcat(wb, "\n\t],\n");
-    buffer_sprintf(wb, "%s\n\t],\n", buffer_tostring(guids));
-    buffer_free(guids);
 }
 
 static inline void web_client_api_request_v1_info_mirrored_hosts_uids(BUFFER *wb) {
