@@ -537,6 +537,10 @@ void *aclk_query_main_thread(void *ptr)
     }
 
     while (!netdata_exit) {
+        if(aclk_disable_runtime) {
+            sleep(1);
+            continue;
+        }
         ACLK_SHARED_STATE_LOCK;
         if (unlikely(!aclk_shared_state.version_neg)) {
             if (!aclk_shared_state.version_neg_wait_till || aclk_shared_state.version_neg_wait_till > now_monotonic_usec()) {

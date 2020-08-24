@@ -945,6 +945,11 @@ void *aclk_main(void *ptr)
  /*       size_t write_q, write_q_bytes, read_q;
         lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);*/
 
+        if (aclk_disable_runtime && !aclk_connected) {
+            sleep(1);
+            continue;
+        }
+
         if (aclk_kill_link) {                       // User has reloaded the claiming state
             aclk_kill_link = 0;
             aclk_graceful_disconnect();
@@ -1527,7 +1532,8 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
 
     if(unlikely(cloud_to_agent->min_version > ACLK_VERSION_MAX)) {
         error("Agent too old for this cloud. Minimum version required by cloud %d. Maximum version supported by this agent %d.", cloud_to_agent->min_version, ACLK_VERSION_MAX);
-        //TODO Disconnect ACLK permanently until restart of agent
+        aclk_kill_link = 1;
+        aclk_disable_runtime = 1;
         return 1;
     }
     if(unlikely(cloud_to_agent->max_version < ACLK_VERSION_MIN)) {

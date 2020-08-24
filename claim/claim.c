@@ -116,7 +116,7 @@ void claim_agent(char *claiming_arguments)
 }
 
 #ifdef ENABLE_ACLK
-extern int aclk_connected, aclk_kill_link;
+extern int aclk_connected, aclk_kill_link, aclk_disable_runtime;
 #endif
 
 /* Change the claimed state of the agent.
@@ -144,6 +144,7 @@ void load_claiming_state(void)
         info("Agent was already connected to Cloud - forcing reconnection under new credentials");
         aclk_kill_link = 1;
     }
+    aclk_disable_runtime = 0;
 
     // Propagate into aclk and registry. Be kind of atomic...
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);

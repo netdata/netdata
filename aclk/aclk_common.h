@@ -76,4 +76,6 @@ void safe_log_proxy_censor(char *proxy);
 int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
 
+extern int aclk_disable_runtime;
+
 #endif //ACLK_COMMON_H
