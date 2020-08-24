@@ -348,7 +348,7 @@ static int aclk_execute_query(struct aclk_query *this_query)
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
 
-        aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0);
+        aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0, ACLK_VERSION);
         buffer_strcat(local_buffer, ",\n\t\"payload\": ");
         char *encoded_response = aclk_encode_response(w->response.data->buffer, w->response.data->len, 0);
         char *encoded_header = aclk_encode_response(w->response.header_output->buffer, w->response.header_output->len, 1);

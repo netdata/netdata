@@ -513,7 +513,7 @@ static void aclk_graceful_disconnect()
 
     // Send a graceful disconnect message
     BUFFER *b = buffer_create(512);
-    aclk_create_header(b, "disconnect", NULL, 0, 0);
+    aclk_create_header(b, "disconnect", NULL, 0, 0, ACLK_VERSION);
     buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
     aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
     buffer_free(b);
@@ -1138,7 +1138,7 @@ void aclk_disconnect()
     aclk_force_reconnect = 1;
 }
 
-inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us)
+inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us, int version)
 {
     uuid_t uuid;
     char uuid_str[36 + 1];
@@ -1164,9 +1164,9 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
         "\t\"connect\": %ld,\n"
         "\t\"connect-offset-usec\": %llu,\n"
         "\t\"version\": %d",
-        type, msg_id, ts_secs, ts_us, aclk_session_sec, aclk_session_us, ACLK_VERSION);
+        type, msg_id, ts_secs, ts_us, aclk_session_sec, aclk_session_us, version);
 
-    debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", ACLK_VERSION, msg_id, type, ts_secs);
+    debug(D_ACLK, "Sending v%d msgid [%s] type [%s] time [%ld]", version, msg_id, type, ts_secs);
 }
 
 
@@ -1194,9 +1194,9 @@ void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted)
     // session.
 
     if (metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0);
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0, ACLK_VERSION);
     else
-        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us);
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
 
@@ -1239,9 +1239,9 @@ int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted)
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "update", msg_id, 0, 0);
+        aclk_create_header(local_buffer, "update", msg_id, 0, 0, ACLK_VERSION);
     else
-        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us);
+        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
@@ -1341,7 +1341,7 @@ int aclk_send_single_chart(char *hostname, char *chart)
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    aclk_create_header(local_buffer, "chart", msg_id, 0, 0);
+    aclk_create_header(local_buffer, "chart", msg_id, 0, 0, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     rrdset2json(st, local_buffer, NULL, NULL, 1);
@@ -1418,7 +1418,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     char *msg_id = create_uuid();
 
     buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0);
+    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
