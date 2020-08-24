@@ -106,24 +106,24 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 
     for (i = 0; words[i]; i++) ;
     if (i != CLAIMED_ID_MIN_WORDS) {
-        error("Command CLAIMED_ID came malformed %d parameters are compulsory", CLAIMED_ID_MIN_WORDS - 1);
+        error("Command CLAIMED_ID came malformed %d parameters are expected but %d received", CLAIMED_ID_MIN_WORDS - 1, i - 1);
         return PARSER_RC_ERROR;
     }
 
     // We don't need to parsed UUID
     // just do it to check the format
     if(uuid_parse(words[1], uuid)) {
-        error("The host GUID received doesn't have format of valid UUID!");
+        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[1]);
         return PARSER_RC_ERROR;
     }
     if(uuid_parse(words[2], uuid) && strcmp(words[2], "NULL")) {
-        error("The Claim ID received doesn't have format of valid UUID!");
+        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[2]);
         return PARSER_RC_ERROR;
     }
 
     RRDHOST *host = rrdhost_find_by_guid(words[1], 0);
     if (!host) {
-        error("Host with GUID %s not found. Ignoring", words[1]);
+        error("Host with GUID \"%s\" not found. Ignoring", words[1]);
         return PARSER_RC_OK; //the message is OK problem must be somewehere else
     }
 
