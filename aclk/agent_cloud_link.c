@@ -1108,6 +1108,23 @@ int aclk_subscribe(char *sub_topic, int qos)
     return rc;
 }
 
+static inline void aclk_hello_msg()
+{
+    BUFFER *buf = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+
+    char *msg_id = create_uuid();
+
+    ACLK_SHARED_STATE_LOCK;
+    aclk_shared_state.negotiated_version = -1;
+    ACLK_SHARED_STATE_UNLOCK;
+
+    //Hello message is versioned separatelly from the rest of the protocol
+    aclk_create_header(buf, "hello", msg_id, 0, 0, 1);
+    buffer_sprintf(buf, ",\"min-version\":%d,\"max-version\":%d}", ACLK_VERSION_MIN, ACLK_VERSION_MAX);
+    aclk_send_message(ACLK_METADATA_TOPIC, buf->buffer, msg_id);
+    freez(msg_id);
+}
+
 // This is called from a callback when the link goes up
 void aclk_connect()
 {
@@ -1117,6 +1134,9 @@ void aclk_connect()
 
     aclk_connected = 1;
     aclk_reconnect_delay(0);
+
+    aclk_hello_msg();
+
     QUERY_THREAD_WAKEUP;
     return;
 }

@@ -7,6 +7,11 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
+// minimum and maximum supported version of ACLK
+// in this version of agent
+#define ACLK_VERSION_MIN 1
+#define ACLK_VERSION_MAX 1
+
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
     ACLK_CMD_ONCONNECT,
@@ -31,6 +36,7 @@ extern struct aclk_shared_state {
     ACLK_METADATA_STATE metadata_submitted;
     ACLK_AGENT_STATE agent_state;
     time_t last_popcorn_interrupt;
+    int negotiated_version;
 } aclk_shared_state;
 
 typedef enum aclk_proxy_type {
