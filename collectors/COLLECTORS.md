@@ -14,10 +14,10 @@ Read more about collectors and how to enable them in our [collectors documentati
 [collector quickstart](/collectors/QUICKSTART.md) to figure out how to collect metrics from your favorite app/service
 with auto-detection and minimal configuration.
 
-Some collectors have both Go and Python versions. While the Go verisons are newer, they are most often disabled by
-default as we continue our effort to make them enabled by default. See the [Go plugin
-documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/#why-disabled-how-to-enable) for details on
-how to disable the Python collector and enable the Go equivalent.
+Some collectors have both Go and Python versions. The Go versions are newer and more actively maintained, but are often
+disabled by default in favor of the Python version, as we're still in the process of migrating all collectors to Go. See
+the [Go plugin documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/#why-disabled-how-to-enable)
+for details on how to disable the Python collector and enable the Go equivalent.
 
 If you don't see the app/service you'd like to monitor here, check out our [GitHub
 issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
