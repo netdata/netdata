@@ -98,11 +98,11 @@ PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins
 #define CLAIMED_ID_MIN_WORDS 3
 PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
-    UNUSED(user);
     UNUSED(plugins_action);
 
     int i;
     uuid_t uuid;
+    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
 
     for (i = 0; words[i]; i++) ;
     if (i != CLAIMED_ID_MIN_WORDS) {
@@ -121,9 +121,8 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         return PARSER_RC_ERROR;
     }
 
-    RRDHOST *host = rrdhost_find_by_guid(words[1], 0);
-    if (!host) {
-        error("Host with GUID \"%s\" not found. Ignoring", words[1]);
+    if(strcmp(words[1], host->machine_guid)) {
+        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
         return PARSER_RC_OK; //the message is OK problem must be somewehere else
     }
 
