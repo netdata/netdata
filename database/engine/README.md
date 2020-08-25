@@ -76,12 +76,12 @@ The Agent allocates resources for each instance separately using the `dbengine d
 `dbengine disk space`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space, which
 means the total disk space required to store all instances is, roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`.
 
-#### Backwards compatibility
+#### Backward compatibility
 
 All existing metrics belonging to child nodes are automatically converted to legacy dbengine instances and the localhost
 metrics are transferred to the multihost dbengine instance.
 
-All new child nodes are automatically transferred to the multhost dbengine instance and share its page cache and disk
+All new child nodes are automatically transferred to the multihost dbengine instance and share its page cache and disk
 space. If you want to migrate a child node from its legacy dbengine instance to the multihost dbengine instance, you
 must delete the instance's directory, which is located in `/var/cache/netdata/MACHINE_GUID/dbengine`, after stopping the
 Agent.
