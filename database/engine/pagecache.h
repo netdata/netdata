@@ -3,6 +3,7 @@
 #ifndef NETDATA_PAGECACHE_H
 #define NETDATA_PAGECACHE_H
 
+#include <sqlite3.h>
 #include "rrdengine.h"
 
 /* Forward declarations */
@@ -61,6 +62,9 @@ struct rrdeng_page_descr {
     usec_t start_time;
     usec_t end_time;
     uint32_t page_length;
+#ifdef SQLITE_RT_BLOB
+    sqlite3_blob *blob;
+#endif
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)

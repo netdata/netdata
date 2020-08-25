@@ -89,6 +89,9 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     descr->extent = NULL;
     descr->pg_cache_descr_state = 0;
     descr->pg_cache_descr = NULL;
+#ifdef SQLITE_RT_BLOB
+    descr->blob = NULL;
+#endif
 
     return descr;
 }

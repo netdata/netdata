@@ -656,7 +656,11 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
 
 
     if (!res) {
-        rc = sqlite3_prepare_v2(db, "insert or replace into metric_update (dim_uuid, date_created) values (@dim_uuid, @date);", -1, &res, 0);
+#ifdef SQLITE_RT_BLOB
+        rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created, metric) values (@dim_uuid, @date, zeroblob(4096)) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
+#else
+        rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created, metric) values (@dim_uuid, @date) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
+#endif
         if (rc != SQLITE_OK) {
             info("SQLITE: Failed to prepare statement");
             return;
@@ -777,6 +781,46 @@ void sql_store_datafile_info(char *path, int fileno, size_t file_size)
         sqlite3_free(err_msg);
     }
     return;
+}
+
+sqlite3_blob *sql_open_metric_blob(uuid_t *dim_uuid)
+{
+    sqlite3_blob *blob;
+    static sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (!db)
+        return NULL;
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(db, "select rowid from metric_update where dim_uuid = @dim;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return NULL;
+    }
+
+
+    rc = sqlite3_bind_blob(res, 1, dim_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return NULL;
+
+    sqlite3_int64 row = 0;
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW)
+       row = sqlite3_column_int64(res, 0);
+    else
+        info("BLOB execution find row failed %d", rc);
+
+//    if (row != 2681)
+//        return NULL;
+
+    rc = sqlite3_blob_open(db, "main", "metric_update", "metric", row, 1, &blob);
+    if (rc != SQLITE_OK)
+        info("BLOB open failed");
+
+    char dim_str[37];
+    uuid_unparse_lower(dim_uuid, dim_str);
+    info("BLOB open for %s on line %lld", dim_str, row);
+    sqlite3_reset(res);
+    return blob;
 }
 
 void sql_store_page_info(uuid_t dim_uuid, int valid_page, int page_length, usec_t  start_time, usec_t end_time, int fileno, size_t offset, size_t size)
