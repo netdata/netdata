@@ -363,7 +363,7 @@ inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_cl
     w->response.data->contenttype = CT_APPLICATION_JSON;
     charts2json(host, w->response.data, 0, 1);
     unsigned long long end = now_realtime_usec();
-    info("SQLITE: Archived chart collection generated in %llu usec\n", end - start);
+    info("SQLITE: Archived chart collection generated in %llu usec", end - start);
     return HTTP_RESP_OK;
 }
 

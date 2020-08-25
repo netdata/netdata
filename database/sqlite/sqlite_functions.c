@@ -341,7 +341,7 @@ int sql_create_dimension(char *dim_str, RRDSET *st)
 
         RRDDIM *rd = rrddim_add_custom(
             st, (const char *) sqlite3_column_text(res, 0), (const char *)  sqlite3_column_text(res, 1), sqlite3_column_int(res, 2),
-            sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode, 0, &dim_uuid);
+            sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode, 2, &dim_uuid);
 
         rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
         rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
