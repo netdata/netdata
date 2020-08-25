@@ -190,6 +190,9 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
         return;
     }
     sql_add_metric_page(rd->state->metric_uuid, descr);
+#ifdef SQLITE_RT_BLOB
+    sqlite3_blob_close(descr->blob);
+#endif
     if (likely(descr->page_length)) {
         int page_is_empty;
 
@@ -286,6 +289,22 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     }
     page = descr->pg_cache_descr->page;
     page[descr->page_length / sizeof(number)] = number;
+#ifdef SQLITE_RT_BLOB
+    if (descr->blob) {
+        //info("Writing to BLOB at offset %d", descr->page_length);
+        int rc= sqlite3_blob_write(descr->blob, &number, sizeof(number), descr->page_length);
+        if (rc != SQLITE_OK)
+            info("Writing to BLOB at offset %d FAILED", descr->page_length);
+
+        storage_number new_number = 0;
+        rc = sqlite3_blob_read(descr->blob, &new_number, sizeof(new_number), descr->page_length);
+        if (rc != SQLITE_OK)
+            info("Reading from BLOB at offset %d FAILED", descr->page_length);
+
+        if (new_number != number)
+            info("BLOB numbers are NOT OK %d vs %d", number, new_number);
+    }
+#endif
     pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + sizeof(number));
 
     if (perfect_page_alignment)
@@ -713,8 +732,14 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
     void *page;
     /* TODO: check maximum number of pages in page cache limit */
 
+#ifdef SQLITE_RT_BLOB
+    sqlite3_blob *blob = (*ret_descr) ? (*ret_descr)->blob : sql_open_metric_blob(descr->id);
+#endif
     descr = pg_cache_create_descr();
     descr->id = id; /* TODO: add page type: metric, log, something? */
+#ifdef SQLITE_RT_BLOB
+    descr->blob = blob;
+#endif
     page = mallocz(RRDENG_BLOCK_SIZE); /*TODO: add page size */
     rrdeng_page_descr_mutex_lock(ctx, descr);
     pg_cache_descr = descr->pg_cache_descr;
