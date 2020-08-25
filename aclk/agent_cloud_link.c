@@ -1492,11 +1492,23 @@ static int aclk_handle_cloud_request(struct aclk_request *cloud_to_agent)
     }
     ACLK_SHARED_STATE_UNLOCK;
 
-    if (unlikely(!cloud_to_agent->payload || !cloud_to_agent->callback_topic || !cloud_to_agent->msg_id)) {
-        //TODO VERSION CHECK
-        /*        if (cloud_to_agent.version > ACLK_VERSION)
-            error("Unsupported version in JSON request %d", cloud_to_agent.version);*/
+    if (unlikely(cloud_to_agent->version != aclk_shared_state.version_neg)) {
+        error("Received \"http\" message from Cloud with version %d, but ACLK version %d is used", cloud_to_agent->version, aclk_shared_state.version_neg);
+        return 1;
+    }
 
+    if (unlikely(!cloud_to_agent->payload)) {
+        error("payload missing");
+        return 1;
+    }
+    
+    if (unlikely(!cloud_to_agent->callback_topic)) {
+        error("callback_topic missing");
+        return 1;
+    }
+    
+    if (unlikely(!cloud_to_agent->msg_id)) {
+        error("msg_id missing");
         return 1;
     }
 
