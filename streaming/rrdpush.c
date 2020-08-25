@@ -367,7 +367,7 @@ void rrdpush_send_labels(RRDHOST *host) {
 
 void rrdpush_claimed_id(RRDHOST *host)
 {
-    if(unlikely(!host->rrdpush_send_enabled))
+    if(unlikely(!host->rrdpush_send_enabled || !host->rrdpush_sender_connected))
         return;
 
     sender_start(host->sender);

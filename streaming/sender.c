@@ -622,15 +622,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 buffer_sprintf(s->build, "TIMESTAMP %ld", now);
                 sender_commit(s);
             }
-            if (s->version >= STREAM_VERSION_CLAIM) {
-                rrd_rdlock();
-                RRDHOST *h;
-                rrdhost_foreach_read(h) {
-                    if(h->claimed_id)
-                        rrdpush_claimed_id(h);
-                }
-                rrd_unlock();
-            }
+            if (s->version >= STREAM_VERSION_CLAIM)
+                rrdpush_claimed_id(s->host);
             continue;
         }
 
