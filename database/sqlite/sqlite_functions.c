@@ -659,7 +659,7 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
 #ifdef SQLITE_RT_BLOB
         rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created, metric) values (@dim_uuid, @date, zeroblob(4096)) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
 #else
-        rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created, metric) values (@dim_uuid, @date) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
+        rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created) values (@dim_uuid, @date) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
 #endif
         if (rc != SQLITE_OK) {
             info("SQLITE: Failed to prepare statement");
