@@ -110,7 +110,7 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         return PARSER_RC_ERROR;
     }
 
-    // We don't need to parsed UUID
+    // We don't need the parsed UUID
     // just do it to check the format
     if(uuid_parse(words[1], uuid)) {
         error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", words[1]);

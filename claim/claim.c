@@ -35,7 +35,7 @@ char *is_agent_claimed()
 {
     char *result;
     netdata_mutex_lock(&localhost->claimed_id_lock);
-    result = (localhost->claimed_id == NULL) ? NULL : strdup(localhost->claimed_id);
+    result = (localhost->claimed_id == NULL) ? NULL : strdupz(localhost->claimed_id);
     netdata_mutex_unlock(&localhost->claimed_id_lock);
     return result;
 }
