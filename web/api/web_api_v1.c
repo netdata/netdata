@@ -818,19 +818,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     buffer_strcat(wb, "\n\t],\n");
 }
 
-static inline void web_client_api_request_v1_info_mirrored_hosts_uids(BUFFER *wb) {
-    RRDHOST *rc;
-    int count = 0;
-    rrd_rdlock();
-    rrdhost_foreach_read(rc) {
-        if(count > 0) buffer_strcat(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\"%s\"", rc->machine_guid);
-        count++;
-    }
-    buffer_strcat(wb, "\n");
-    rrd_unlock();
-}
-
 inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     char tabs[11];
 
