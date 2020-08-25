@@ -51,7 +51,7 @@ you have, how many metrics your Agent collects, and more.
 ### Legacy configuration
 
 The deprecated `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing
-Netdata metric values per legacy database engine instance (see [below](#Streaming-metrics-to-the-database-engine)).
+Netdata metric values per legacy database engine instance (see [details on the legacy mode](#legacy-mode) below).
 
 ```conf
 [global]
@@ -62,13 +62,13 @@ Netdata metric values per legacy database engine instance (see [below](#Streamin
 
 When using the multihost database engine, all parent and child nodes share the same `page cache size` and `dbengine
 multihost disk space` in a single dbengine instance. The [**database engine
-calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) can help you understand what you should set
-`page cache size` and `dbengine multihost disk space` to on the parent node to allocate enough resources based on your
-metrics retention policy and how many child nodes you have.
+calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) helps you properly set `page cache size` and
+`dbengine multihost disk space` on your parent node to allocate enough resources based on your metrics retention policy
+and how many child nodes you have.
 
 #### Legacy mode
 
-_For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself,  and
+_For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself, and
 another instance for every child node it receives metrics from. If you had four streaming nodes, you would have five
 instances in total (`1 parent + 4 child nodes = 5 instances`).
 
