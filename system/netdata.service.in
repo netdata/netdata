@@ -61,7 +61,6 @@ ProtectHome=read-only
 # PrivateTmp break netdatacli functionality. See - https://github.com/netdata/netdata/issues/7587
 #PrivateTmp=true
 ProtectControlGroups=true
-PrivateMounts=true
 # We whitelist this because it's the standard location to listen on a UNIX socket.
 ReadWriteDirectories=/run/netdata
 
