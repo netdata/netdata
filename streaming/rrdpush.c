@@ -377,6 +377,10 @@ void rrdpush_claimed_id(RRDHOST *host)
 
     netdata_mutex_unlock(&host->claimed_id_lock);
     sender_commit(host->sender);
+
+    // signal the sender there are more data
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 }
 
 // ----------------------------------------------------------------------------
