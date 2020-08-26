@@ -78,8 +78,6 @@ if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
   fi
 fi
 
-echo >&2 "Using ${TMPDIR} as a temporary directory."
-
 # -----------------------------------------------------------------------------
 # set up handling for deferred error messages
 NETDATA_DEFERRED_ERRORS=""
@@ -362,6 +360,10 @@ netdata_banner "real-time performance monitoring, done right!"
 cat << BANNER1
 
   You are about to build and install netdata to your system.
+
+  The build process will use ${TPUT_CYAN}${TMPDIR}${TPUT_RESET} for
+  any temporary files. You can override this by setting \$TMPDIR to a
+  writable directory where you can execute files.
 
   It will be installed at these locations:
 
