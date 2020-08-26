@@ -7,9 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 
 # Monitor Pi-hole (and a Raspberry Pi) with Netdata
 
-Between intrusive ads, invasive trackers, and vicious malware, many techies and homelab enthusiasts are advancing the
-security and speed of their networks with a tiny computer and a powerful piece of software:
-[Pi-hole](https://pi-hole.net/).
+Between intrusive ads, invasive trackers, and vicious malware, many techies and homelab enthusiasts are advancing their
+networks' security and speed with a tiny computer and a powerful piece of software: [Pi-hole](https://pi-hole.net/).
 
 Pi-hole is a DNS sinkhole that prevents unwanted content from even reaching devices on your home network. It blocks ads
 and malware at the network, instead of using extensions/add-ons for individual browsers, so you'll stop seeing ads in
@@ -29,8 +28,8 @@ directly using a keyboard, mouse, and monitor.
 
 ## Why monitor Pi-hole and a Raspberry Pi with Netdata?
 
-Netdata tool that helps you monitor and troubleshoot all kinds of devices and the applications they run, including IoT
-devices like the Raspberry Pi and applications like Pi-hole.
+Netdata helps you monitor and troubleshoot all kinds of devices and the applications they run, including IoT devices
+like the Raspberry Pi and applications like Pi-hole.
 
 After a two-minute installation and with zero configuration, you'll be able all of Pi-hole's metrics, including the
 volume of queries, connected clients, DNS queries per type, top clients, top blocked domains, and more.
@@ -44,8 +43,8 @@ Netdata](https://user-images.githubusercontent.com/1153921/90447745-c8fe9600-e09
 
 ## Install Netdata
 
-Let's start by installing Netdata first. This way you'll start collecting system metrics as soon as possible for the
-longest and deepest database of historical metrics.
+Let's start by installing Netdata first so that it can start collecting system metrics as soon as possible for the most
+possible historic data.
 
 We recommend installing Netdata with the one-line kickstart script on Raspbian systems. Check out our [install
 docs](/packaging/installer/README.md) if you want to try a different method.
@@ -99,7 +98,7 @@ part of your system might affect another.
 ![The Netdata dashboard in
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
-If you're completely new to Netdata, take a look at our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for a
+If you're completely new to Netdata, look at our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for a
 walkthrough of all its features. For a more expedited tour, see the [get started guide](/docs/getting-started.md).
 
 ### Enable temperature sensor monitoring
