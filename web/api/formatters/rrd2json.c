@@ -135,9 +135,8 @@ int rrdset2anything_api_v1(
         , time_t *latest_timestamp
 ) {
     st->last_accessed_time = now_realtime_sec();
-    int flyby = (!st->dimensions);
 
-    RRDDIM *temp_rd;
+    RRDDIM *temp_rd = NULL;
     if (!st->dimensions)
         temp_rd = sql_load_chart_dimensions(st, 2);
 

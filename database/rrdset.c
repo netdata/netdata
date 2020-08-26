@@ -695,6 +695,13 @@ RRDSET *rrdset_create_custom(
         return st;
     }
 
+#ifdef SQLITE_POC
+    // If we attempt to create archived chart then send it to the SQLITE
+    if (is_archived == 1) {
+        int rc = sql_store_chart(chart_uuid, &host->host_uuid, type, id, name, family, context, title, units, plugin, module, priority, update_every, (int ) chart_type, (int ) memory_mode, history_entries);
+        //return NULL;
+    }
+#endif
     char fullfilename[FILENAME_MAX + 1];
 
     // ------------------------------------------------------------------------

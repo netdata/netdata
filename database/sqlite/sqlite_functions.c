@@ -380,6 +380,16 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
     return rd;
 }
 
+int sql_store_chart(
+    uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
+    const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
+    int update_every, int chart_type, int memory_mode, long history_entries)
+{
+
+    info("SQLITE: Will create chart %s", id);
+    return 0;
+}
+
 /*
  * Load a charts dimensions and create them under RRDSET
  */
