@@ -500,11 +500,25 @@ function toggleAgentItem(e, guid) {
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
 const OLD_DASHBOARD_SUFFIX = "old"
+let isOldSuffix = true
+try {
+    const currentScriptMainJs = document.currentScript;
+    const mainJsSrc = currentScriptMainJs.getAttribute("src")
+    isOldSuffix = mainJsSrc.startsWith("../main.js")
+} catch {
+    console.warn("current script not detecting, assuming the dashboard is running with /old suffix")
+}
+
+function transformWithOldSuffix(url) {
+    return isOldSuffix ? `../${url}` : url
+}
+
 function renderStreamedHosts(options) {
     let html = `<div class="info-item">Databases streamed to this agent</div>`;
 
     var base = document.location.origin.toString() +
-      document.location.pathname.toString().replace(`/${OLD_DASHBOARD_SUFFIX}`, "");
+      document.location.pathname.toString()
+        .replace(isOldSuffix ? `/${OLD_DASHBOARD_SUFFIX}` : "", "");
     if (base.endsWith("/host/" + options.hostname + "/")) {
         base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
     }
@@ -538,10 +552,10 @@ function renderStreamedHosts(options) {
         displayedDatabases = true;
 
         if (hostname === master) {
-            url = `${base}/${OLD_DASHBOARD_SUFFIX}/`;
+            url = isOldSuffix ? `${base}/${OLD_DASHBOARD_SUFFIX}/` : `${base}/`;
             icon = 'home';
         } else {
-            url = `${base}/host/${hostname}/${OLD_DASHBOARD_SUFFIX}/`;
+            url = isOldSuffix ? `${base}/host/${hostname}/${OLD_DASHBOARD_SUFFIX}/` : `${base}/host/${hostname}/`;
             icon = 'window-restore';
         }
 
@@ -1929,7 +1943,7 @@ function renderChartsAndMenu(data) {
 
 function loadJs(url, callback) {
     $.ajax({
-        url: url.startsWith("http") ? url : `../${url}`,
+        url: url.startsWith("http") ? url : transformWithOldSuffix(url),
         cache: true,
         dataType: "script",
         xhrFields: { withCredentials: true } // required for the cookie
@@ -1976,7 +1990,7 @@ function loadBootstrapSlider(callback) {
     if (bootstrapSliderLoaded === false) {
         bootstrapSliderLoaded = true;
         loadJs('lib/bootstrap-slider-10.0.0.min.js', function () {
-            NETDATA._loadCSS('../css/bootstrap-slider-10.0.0.min.css');
+            NETDATA._loadCSS(transformWithOldSuffix("css/bootstrap-slider-10.0.0.min.css"));
             callback();
         });
     } else {
