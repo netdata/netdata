@@ -1057,6 +1057,50 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
     }
 }
 
+// get the timestamp of the last entry in the round robin database
+static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
+    RRDSET *st = rd->rrdset;
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)  {
+        RRDDIM *temp_rd;
+        time_t last_entry_t  = 0;
+
+        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
+        //rrddim_foreach_read(rd, st) {
+        while (rd) {
+            temp_rd = rd->next;
+            last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
+            rd = temp_rd;
+        }
+        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+        return last_entry_t;
+    } else {
+        return (time_t)st->last_updated.tv_sec;
+    }
+}
+
+// get the timestamp of first entry in the round robin database
+static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
+    RRDSET *st = rd->rrdset;
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        RRDDIM *temp_rd;
+        time_t first_entry_t = LONG_MAX;
+
+        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
+        while (rd) {
+            temp_rd = rd->next;
+            first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
+            rd = temp_rd;
+        }
+        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+        if (unlikely(LONG_MAX == first_entry_t)) return 0;
+        return first_entry_t;
+    } else {
+        return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
+    }
+}
+
 time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // get the last slot updated in the round robin database

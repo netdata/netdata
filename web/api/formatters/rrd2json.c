@@ -69,7 +69,11 @@ int rrdset2value_api_v1(
         , time_t *db_before
         , int *value_is_null
 ) {
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions);
+    RRDDIM *temp_rd = NULL;
+    if (!st->dimensions)
+        temp_rd = sql_load_chart_dimensions(st, 2);
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, temp_rd);
+
     if(!r) {
         if(value_is_null) *value_is_null = 1;
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -98,6 +102,21 @@ int rrdset2value_api_v1(
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
 
+    if (temp_rd) {
+        info("SQLITE: Free 1");
+        RRDDIM *t;
+        while(temp_rd) {
+            t = temp_rd->next;
+            freez(temp_rd->id);
+            freez(temp_rd->name);
+            freez(temp_rd->state->metric_uuid);
+            //freez(rd->state->page_index);
+            freez(temp_rd->state);
+            freez(temp_rd);
+            temp_rd = t;
+        }
+    }
+
     rrdr_free(r);
     return HTTP_RESP_OK;
 }
@@ -116,8 +135,13 @@ int rrdset2anything_api_v1(
         , time_t *latest_timestamp
 ) {
     st->last_accessed_time = now_realtime_sec();
+    int flyby = (!st->dimensions);
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL);
+    RRDDIM *temp_rd;
+    if (!st->dimensions)
+        temp_rd = sql_load_chart_dimensions(st, 2);
+
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, temp_rd);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -175,12 +199,12 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1);
-            rrdr2csv(r, wb, format, options, "", ",", "\\n", "");
+            rrdr2csv(r, wb, format, options, "", ",", "\\n", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2csv(r, wb, format, options, "", ",", "\r\n", "");
+            rrdr2csv(r, wb, format, options, "", ",", "\r\n", "", temp_rd);
         }
         break;
 
@@ -188,12 +212,12 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1);
-            rrdr2csv(r, wb, format, options, "", "|", "\\n", "");
+            rrdr2csv(r, wb, format, options, "", "|", "\\n", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2csv(r, wb, format, options, "", "|", "\r\n", "");
+            rrdr2csv(r, wb, format, options, "", "|", "\r\n", "", temp_rd);
         }
         break;
 
@@ -202,14 +226,14 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             rrdr_json_wrapper_begin(r, wb, format, options, 0);
             buffer_strcat(wb, "[\n");
-            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n", temp_rd);
             buffer_strcat(wb, "\n]");
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
         else {
             wb->contenttype = CT_APPLICATION_JSON;
             buffer_strcat(wb, "[\n");
-            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n", temp_rd);
             buffer_strcat(wb, "\n]");
         }
         break;
@@ -218,12 +242,12 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP) {
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1);
-            rrdr2csv(r, wb, format, options, "", "\t", "\\n", "");
+            rrdr2csv(r, wb, format, options, "", "\t", "\\n", "", temp_rd);
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_PLAIN;
-            rrdr2csv(r, wb, format, options, "", "\t", "\r\n", "");
+            rrdr2csv(r, wb, format, options, "", "\t", "\r\n", "", temp_rd);
         }
         break;
 
@@ -232,14 +256,14 @@ int rrdset2anything_api_v1(
             wb->contenttype = CT_APPLICATION_JSON;
             rrdr_json_wrapper_begin(r, wb, format, options, 1);
             buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
-            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "");
+            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "", temp_rd);
             buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
             rrdr_json_wrapper_end(r, wb, format, options, 1);
         }
         else {
             wb->contenttype = CT_TEXT_HTML;
             buffer_strcat(wb, "<html>\n<center>\n<table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">\n");
-            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\n", "");
+            rrdr2csv(r, wb, format, options, "<tr><td>", "</td><td>", "</td></tr>\n", "", temp_rd);
             buffer_strcat(wb, "</table>\n</center>\n</html>\n");
         }
         break;
@@ -250,7 +274,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0);
 
-        rrdr2json(r, wb, options, 1);
+        rrdr2json(r, wb, options, 1, temp_rd);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -262,7 +286,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0);
 
-        rrdr2json(r, wb, options, 1);
+        rrdr2json(r, wb, options, 1, temp_rd);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -273,7 +297,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0);
 
-        rrdr2json(r, wb, options, 0);
+        rrdr2json(r, wb, options, 0, temp_rd);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -286,13 +310,26 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0);
 
-        rrdr2json(r, wb, options, 0);
+        rrdr2json(r, wb, options, 0, temp_rd);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         break;
     }
 
+    if (temp_rd) {
+        RRDDIM *t;
+        while(temp_rd) {
+            t = temp_rd->next;
+            freez(temp_rd->id);
+            freez(temp_rd->name);
+            freez(temp_rd->state->metric_uuid);
+            //freez(rd->state->page_index);
+            freez(temp_rd->state);
+            freez(temp_rd);
+            temp_rd = t;
+        }
+    }
     rrdr_free(r);
     return HTTP_RESP_OK;
 }

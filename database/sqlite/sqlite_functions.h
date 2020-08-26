@@ -30,8 +30,8 @@ extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char 
 extern int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_list, int *, int *);
 extern int sql_dimension_archive(uuid_t *dim_uuid, int archive);
 extern int sql_dimension_options(uuid_t *dim_uuid, char *options);
-extern int sql_create_dimension(char *dim_str, RRDSET *st);
-extern int sql_load_chart_dimensions(RRDSET *st, char *dimensions);
+extern RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp);
+extern RRDDIM *sql_load_chart_dimensions(RRDSET *st, int temp);
 extern void sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number number);
 extern void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr);
 //extern int sql_load_one_chart_dimension(uuid_t *chart_uuid, struct dimension **dimension_list);

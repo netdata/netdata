@@ -269,11 +269,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd = callocz(1, size);
         rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
         rd->id = strdupz(id);
-        rd->hash = simple_hash(rd->id);
+        //rd->hash = simple_hash(rd->id);
 
         snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-        rd->name = config_get(st->config_section, varname, (name && *name) ? name : rd->id);
-        rd->hash_name = simple_hash(rd->name);
+        //rd->name = config_get(st->config_section, varname, (name && *name) ? name : rd->id);
+        rd->name = strdupz((name && *name) ? name : rd->id);
+        //rd->hash_name = simple_hash(rd->name);
 
         snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
         rd->algorithm = rrd_algorithm_id(config_get(st->config_section, varname, rrd_algorithm_name(algorithm)));
@@ -305,6 +306,23 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
         rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
+
+//        if(!st->dimensions)
+//            st->dimensions = rd;
+//        else {
+//            RRDDIM *td = st->dimensions;
+//
+//            if(td->algorithm != rd->algorithm || abs(td->multiplier) != abs(rd->multiplier) || abs(td->divisor) != abs(rd->divisor)) {
+//                if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+//                    rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+//                }
+//            }
+//
+//            for(; td->next; td = td->next) ;
+//            td->next = rd;
+//        }
+        rrdset_unlock(st);
+
         return rd;
     }
 

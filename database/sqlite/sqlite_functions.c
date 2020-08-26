@@ -312,7 +312,7 @@ int sql_dimension_options(uuid_t *dim_uuid, char *options)
 
 #define SQL_SELECT_DIMENSION    "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = @dim and archived = 1;"
 
-int sql_create_dimension(char *dim_str, RRDSET *st)
+RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
 {
     //char sql[1024];
     uuid_t  dim_uuid;
@@ -327,47 +327,49 @@ int sql_create_dimension(char *dim_str, RRDSET *st)
     //sprintf(sql, "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = u2h('%s') and archived = 1;", dim_str);
     rc = sqlite3_prepare_v2(db, SQL_SELECT_DIMENSION, -1, &res, 0);
     if (rc != SQLITE_OK)
-        return 1;
+        return NULL;
 
     int param = sqlite3_bind_parameter_index(res, "@dim");
 
     rc = sqlite3_bind_blob(res, param, dim_uuid, 16, SQLITE_STATIC);
     if (rc != SQLITE_OK) // Release the RES
-        return 1;
+        return NULL;
 
     rc = sqlite3_step(res);
 
+    RRDDIM *rd = NULL;
     if (rc == SQLITE_ROW) {
+        rd = rrddim_add_custom(
+            st, (const char *)sqlite3_column_text(res, 0), (const char *)sqlite3_column_text(res, 1),
+            sqlite3_column_int(res, 2), sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode,
+            temp, &dim_uuid);
 
-        RRDDIM *rd = rrddim_add_custom(
-            st, (const char *) sqlite3_column_text(res, 0), (const char *)  sqlite3_column_text(res, 1), sqlite3_column_int(res, 2),
-            sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode, 2, &dim_uuid);
-
-        rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
-        rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-        rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
-        const char *option = (const char *) sqlite3_column_text(res, 5);
-        if (option && *option) {
-            if (strstr(option, "hidden") != NULL)
-                rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-            if (strstr(option, "noreset") != NULL)
-                rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-            if (strstr(option, "nooverflow") != NULL)
-                rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+        if (temp != 2) {
+            rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+            rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
+            const char *option = (const char *)sqlite3_column_text(res, 5);
+            if (option && *option) {
+                if (strstr(option, "hidden") != NULL)
+                    rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+                if (strstr(option, "noreset") != NULL)
+                    rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+                if (strstr(option, "nooverflow") != NULL)
+                    rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            }
         }
     }
 
     sqlite3_finalize(res);
 
-    return 0;
+    return rd;
 }
 
 /*
  * Load a charts dimensions and create them under RRDSET
  */
-int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
+RRDDIM *sql_load_chart_dimensions(RRDSET *st, int temp)
 {
-    UNUSED(dimensions);
     char sql[1024];
     char chart_str[37];
     int rc;
@@ -390,18 +392,21 @@ int sql_load_chart_dimensions(RRDSET *st, char *dimensions)
     //sql_load_one_chart_dimension(st->chart_uuid, &dimension_list);
 
     // loop through all the dimensions and create under the chart
+    RRDDIM *rd = NULL;
     while(dimension_list) {
 
-        sql_create_dimension(dimension_list->dim_str, st);
+        RRDDIM *temp_rd = sql_create_dimension(dimension_list->dim_str, st, temp);
 
         tmp_dimension_list = dimension_list->next;
         freez(dimension_list->id);
         freez(dimension_list->name);
         freez(dimension_list);
         dimension_list = tmp_dimension_list;
+        temp_rd->next = rd;
+        rd = temp_rd;
     }
 
-    return 0;
+    return rd;
 }
 
 int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions)
