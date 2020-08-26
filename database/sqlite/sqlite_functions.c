@@ -62,7 +62,7 @@ int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
 /*
  * Initialize a database
  */
-
+#define CHART_DEF "CREATE TABLE IF NOT EXISTS chart (chart_uuid blob PRIMARY KEY, host_uuid blob, id text, name text, family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, chart_type int, memory_mode int, history_entries);"
 int sql_init_database()
 {
     char *err_msg = NULL;
@@ -80,7 +80,22 @@ int sql_init_database()
         sqlite3_close(db);
     }
 
+    rc = sqlite3_exec(db, CHART_DEF, 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+    }
+
     rc = sqlite3_exec(db, "create index if not exists ind_chart_uuid on dimension (chart_uuid);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, "create index if not exists ind_host_uuid on chart (host_uuid);", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
