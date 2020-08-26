@@ -58,8 +58,8 @@ cleanup() {
     rm "${logfile}"
   fi
 
-  if [ -n "$tmpdir" ] && [ -d "$tmpdir" ]; then
-    rm -rf "$tmpdir"
+  if [ -n "$ndtmpdir" ] && [ -d "$ndtmpdir" ]; then
+    rm -rf "$ndtmpdir"
   fi
 }
 
@@ -72,7 +72,7 @@ _cannot_use_tmpdir() {
     return "${ret}"
   fi
 
-  if /bin/echo -e "#!/bin/sh\necho SUCCESS\n" > "${testfile}" ; then
+  if /bin/echo -e '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
     if chmod +x "${testfile}" ; then
       if [ "$("${testfile}")" = "SUCCESS" ] ; then
         ret=1
@@ -169,10 +169,10 @@ update() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
   RUN_INSTALLER=0
-  tmpdir=$(create_tmp_directory)
-  cd "$tmpdir" || exit 1
+  ndtmpdir=$(create_tmp_directory)
+  cd "$ndtmpdir" || exit 1
 
-  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
+  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
 
   current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
   latest_version="$(get_latest_version)"
@@ -191,9 +191,9 @@ update() {
   elif [ -n "${NETDATA_TARBALL_CHECKSUM}" ] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
     info "Newest version is already installed"
   else
-    download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.tar.gz"
+    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
     if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${tmpdir}"
+      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}"
     fi
     NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
     tar -xf netdata-latest.tar.gz >&3 2>&3
@@ -231,14 +231,14 @@ update() {
     echo "${NEW_CHECKSUM}" > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
   fi
 
-  rm -rf "${tmpdir}" >&3 2>&3
+  rm -rf "${ndtmpdir}" >&3 2>&3
   [ -n "${logfile}" ] && rm "${logfile}" && logfile=
 
   return 0
 }
 
 logfile=
-tmpdir=
+ndtmpdir=
 
 trap cleanup EXIT
 
@@ -293,24 +293,24 @@ fi
 set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
 
 if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
-  tmpdir="$(create_tmp_directory)"
+  ndtmpdir="$(create_tmp_directory)"
   PREVDIR="$(pwd)"
 
-  echo >&2 "Entering ${tmpdir}"
-  cd "${tmpdir}" || exit 1
+  echo >&2 "Entering ${ndtmpdir}"
+  cd "${ndtmpdir}" || exit 1
 
-  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"
-  download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.gz.run"
-  if ! grep netdata-latest.gz.run "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${tmpdir}"
+  download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
+  download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
+  if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}"
   fi
 
   # Do not pass any options other than the accept, for now
   # shellcheck disable=SC2086
-  if sh "${tmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
-    rm -r "${tmpdir}"
+  if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
+    rm -r "${ndtmpdir}"
   else
-    echo >&2 "NOTE: did not remove: ${tmpdir}"
+    echo >&2 "NOTE: did not remove: ${ndtmpdir}"
   fi
   echo >&2 "Switching back to ${PREVDIR}"
   cd "${PREVDIR}" || exit 1
