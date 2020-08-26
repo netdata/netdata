@@ -10,19 +10,22 @@ sidebar_label: AWS Kinesis Data Streams
 ## Prerequisites
 
 To use AWS Kinesis for metric collecting and processing, you should first
-[install](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) AWS SDK for C++. Netdata
-works with the SDK version 1.7.121. Other versions might work correctly as well, but they were not tested with Netdata.
+[install](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) AWS SDK for C++.
 `libcrypto`, `libssl`, and `libcurl` are also required to compile Netdata with Kinesis support enabled. Next, Netdata
 should be re-installed from the source. The installer will detect that the required libraries are now available.
 
-If the AWS SDK for C++ is being installed from source, it is useful to set `-DBUILD_ONLY="kinesis"`. Otherwise, the
-building process could take a very long time. Note that the default installation path for the libraries is
+If the AWS SDK for C++ is being installed from source, it is useful to set `-DBUILD_ONLY=kinesis`. Otherwise, the
+build process could take a very long time. Note, that the default installation path for the libraries is
 `/usr/local/lib64`. Many Linux distributions don't include this path as the default one for a library search, so it is
 advisable to use the following options to `cmake` while building the AWS SDK:
 
 ```sh
-cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib -DCMAKE_INSTALL_INCLUDEDIR=/usr/include -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis <aws-sdk-cpp sources>
+sudo cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_ONLY=kinesis <aws-sdk-cpp sources>
 ```
+
+The `-DCMAKE_INSTALL_PREFIX=/usr` option also ensures that
+[third party dependencies](https://github.com/aws/aws-sdk-cpp#third-party-dependencies) are installed in your system
+during the SDK build process.
 
 ## Configuration
 
