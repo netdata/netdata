@@ -126,11 +126,6 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         return PARSER_RC_OK; //the message is OK problem must be somewehere else
     }
 
-    if (host == localhost) {
-        error("Streaming Child attempted to change claiming id of parent (me). This is not allowed.");
-        return PARSER_RC_OK;
-    }
-
     netdata_mutex_lock(&host->claimed_id_lock);
     if (host->claimed_id)
         freez(host->claimed_id);
