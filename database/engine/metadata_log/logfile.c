@@ -695,13 +695,17 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         metalogfile = metalogfiles[i];
         ret = load_metadata_logfile(ctx, metalogfile);
         if (0 != ret) {
+            error("Deleting invalid metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
+                      METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
+            unlink_metadata_logfile(metalogfile);
             freez(metalogfile);
             ++failed_to_load;
-            break;
+            continue;
         }
         metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
         rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
     }
+    matched_files -= failed_to_load;
     debug(D_METADATALOG, "PARSER ended");
 
     parser_destroy(parser);
@@ -712,11 +716,6 @@ static int scan_metalog_files(struct metalog_instance *ctx)
 after_failed_to_parse:
 
     freez(metalogfiles);
-    if (failed_to_load) {
-        error("%u metadata log files failed to load.", failed_to_load);
-        finalize_metalog_files(ctx);
-        return UV_EIO;
-    }
 
     return matched_files;
 }
