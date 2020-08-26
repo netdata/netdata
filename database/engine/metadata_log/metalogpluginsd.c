@@ -114,11 +114,11 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         plugin, module, priority, update_every,
         chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid);
 
-//#ifdef SQLITE_POC
-//    ((PARSER_USER_OBJECT *)user)->st = st;
-//    uuid_clear(state->uuid);
-//    return PARSER_RC_OK;
-//#endif
+#ifdef SQLITE_POC
+    ((PARSER_USER_OBJECT *)user)->st = st;
+    uuid_clear(state->uuid);
+    return PARSER_RC_OK;
+#endif
     rrdset_isnot_obsolete(st); /* archived charts cannot be obsolete */
     if (options && *options) {
         if (strstr(options, "detail"))

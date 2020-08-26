@@ -5,7 +5,7 @@
 #define NETDATA_SQLITE_FUNCTIONS_H
 
 #include "../../daemon/common.h"
-#include "../rrd.h"
+//#include "../rrd.h"
 
 typedef struct dimension {
     uuid_t  dim_uuid;
