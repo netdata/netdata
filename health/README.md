@@ -1,9 +1,6 @@
 <!--
----
 title: "Health monitoring"
-date: 2020-04-24
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/README.md
----
 -->
 
 # Health monitoring
