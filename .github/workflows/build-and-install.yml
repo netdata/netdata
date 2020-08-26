@@ -59,7 +59,7 @@ jobs:
             rmjsonc: 'apk del json-c-dev'
 
           - distro: 'archlinux:latest'
-            pre: 'pacman --noconfirm -Sy grep libffi'
+            pre: 'pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi'
 
             #- distro: 'centos:8'
             #rmjsonc: 'dnf remove -y json-c-devel'
