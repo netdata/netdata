@@ -1,41 +1,68 @@
 <!--
 title: "What is Netdata?"
-description: ""
+description: "Netdata is distributed, real-time performance and health monitoring for systems and applications on a single node or an entire infrastructure."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/what-is-netdata.md
 -->
 
 # What is Netdata?
 
-t/k
-
-## Two integrated components: Agent and Cloud
-
-The Netdata solution is composed of two 
+Netdata is distributed, real-time performance and health monitoring for systems and applications. This solution uses two
+primary components, the Netdata Agent and Netdata Cloud, to offer powerful monitoring, visualization, and
+troubleshooting for both single nodes and entire infrastructures.
 
 ## Netdata Agent
 
-t/k
+Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero
+configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT
+devices.
+
+You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container platforms (Kubernetes
+clusters, Docker), and many other operating systems (FreeBSD, macOS). No `sudo` required.
+
+![agent-hero-overview](https://user-images.githubusercontent.com/1153921/91363069-9e0af500-e7b0-11ea-82f1-8cba692ca118.png)
 
 ## Netdata Cloud
 
-Netdata Cloud gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key
-metrics, insightful charts, and active alarms from all your nodes in a single web interface. When an anomaly strikes,
-seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
-
-![Animated GIF of Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
+Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata
+Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar
+Netdata dashboard.
 
 **[Netdata Cloud is free](/docs/cloud/faq-glossary#how-much-does-netdata-cost-how-and-why-is-it-free)**! You can add an
 entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and alarms
 entirely for free.
 
 While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or
-centralized in any way. Metrics data remains with your nodes and is only streamed to your browser through Cloud. 
+centralized in any way. Metrics data remains with your nodes and is only streamed to your browser through Cloud.
 
-In addition, Cloud only expands on the functionality of the wildly popular [free and open source Agent](/docs/agent/).
-We will never make any of our open source Agent features cloud-exclusive, and we will actively continue to develop the
-Agent so that we can integrate new features with Netdata Cloud.
+![cloud-hero-overview](https://user-images.githubusercontent.com/1153921/91363071-9ea38b80-e7b0-11ea-87d9-28b91b360cd1.png)
 
-## Features
+## What you can do with Netdata
 
-t/k
+Netdata is designed to collect everything, help you visualize metrics, troubleshoot complex performance problems, and
+make data interoperable with the rest of your monitoring stack:
+
+-   **Collect**: Netdata collects all available metrics from your system and applications. It uses 300+ collectors,
+    Kubernetes service discovery, in-depth container monitoring, while using only 1% CPU and a few MB of RAM. It even
+    collects metrics from Windows machines.
+-   **Visualize**: The dashboard meaningfully presents charts to to help you understand the relationships between your
+    hardware, operating system, running apps/services, and the rest of your infrastructure. Add nodes to Netdata Cloud
+    for a complete view of your infrastructure from a single pane of glass.
+-   **Monitor**: Netdata's health watchdog uses uses hundreds of preconfigured alarms to notify you via Slack, email,
+    PagerDuty and more when an anomaly strikes. Customize with dynamic thresholds, hysteresis, alarm templates, and
+    role-based notifications.
+-   **Troubleshoot**: 1s granularity helps you detect analyze anomalies other monitoring platforms might have missed.
+    Interactive visualizations reduce your reliance on the console and historical metrics help you trace issues back to
+    their root cause.
+-   **Store**: Netdata's efficient database engine efficiently stores per-second metrics for days, weeks, or even
+    months. Every distributed node stores metrics locally, which simplifies deployment, slashes costs, and enriches
+    Netdata's interactive dashboards.
+-   **Export**: Integrate per-second metrics with other time-series databases like Graphite, Prometheus, InfluxDB,
+    TimescaleDB, and more with Netdata's interoperable and extensible core.
+-   **Stream**: Aggregate metrics from any number of distributed nodes in one place for in-depth analysis, including
+    ephemeral nodes in a Kubernetes cluster.
+
+## What's next?
+
+Learn more about [why you should use Netdata](/docs/overview/why-netdata), or [how Netdata works with your existing
+monitoring stack](/docs/overview/netdata-monitoring-stack).
