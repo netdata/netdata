@@ -774,42 +774,42 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
 }
 
 static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
-    RRDHOST *rc;
+    RRDHOST *host;
     int count = 0;
 
     buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
     rrd_rdlock();
-    rrdhost_foreach_read(rc) {
-        if (rrdhost_flag_check(rc, RRDHOST_FLAG_ARCHIVED))
+    rrdhost_foreach_read(host) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        buffer_sprintf(wb, "\t\t\"%s\"", rc->hostname);
+        buffer_sprintf(wb, "\t\t\"%s\"", host->hostname);
         count++;
     }
 
     buffer_strcat(wb, "\n\t],\n\t\"mirrored_hosts_status\": [\n");
     count = 0;
-    rrdhost_foreach_read(rc)
+    rrdhost_foreach_read(host)
     {
-        if (rrdhost_flag_check(rc, RRDHOST_FLAG_ARCHIVED))
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        netdata_mutex_lock(&rc->receiver_lock);
+        netdata_mutex_lock(&host->receiver_lock);
         buffer_sprintf(
-            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": %s, \"claim_id\": ", rc->machine_guid,
-            (rc->receiver || rc == localhost) ? "true" : "false");
-        netdata_mutex_unlock(&rc->receiver_lock);
+            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": %s, \"claim_id\": ", host->machine_guid,
+            (host->receiver || host == localhost) ? "true" : "false");
+        netdata_mutex_unlock(&host->receiver_lock);
 
-        netdata_mutex_lock(&rc->claimed_id_lock);
-        if (rc->claimed_id)
-            buffer_sprintf(wb, "\"%s\" }", rc->claimed_id);
+        netdata_mutex_lock(&host->claimed_id_lock);
+        if (host->claimed_id)
+            buffer_sprintf(wb, "\"%s\" }", host->claimed_id);
         else
             buffer_strcat(wb, "null }");
-        netdata_mutex_unlock(&rc->claimed_id_lock);
+        netdata_mutex_unlock(&host->claimed_id_lock);
 
         count++;
     }
