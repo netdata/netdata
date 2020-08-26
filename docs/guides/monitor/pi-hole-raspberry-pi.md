@@ -14,28 +14,33 @@ security and speed of their networks with a tiny computer and a powerful piece o
 Pi-hole is a DNS sinkhole that prevents unwanted content from even reaching devices on your home network. It blocks ads
 and malware at the network, instead of using extensions/add-ons for individual browsers, so you'll stop seeing ads in
 some of the most intrusive places, like your smart TV. Pi-hole can even [improve your network's speed and reduce
-bandwidth](https://pi-hole.net/2017/05/12/seven-things-you-may-not-know-about-pi-hole/#page-content).
+bandwidth](https://discourse.pi-hole.net/t/will-pi-hole-slow-down-my-network/2048).
 
 Most Pi-hole users run it on a [Raspberry Pi](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/) (hence the
 name), a credit card-sized, super-capable computer that costs about $35.
 
 And to keep tabs on how both Pi-hole and the Raspberry Pi are working to protect your network, you can use the
-open-source [Netdata monitoring agent](https://github.com/netdata/netdata). After a two-minute installation and with
-zero configuration, you'll be able to monitor thousands of metrics in real-time and receive alerts if Pi-hole stops
-working.
+open-source [Netdata monitoring agent](https://github.com/netdata/netdata). 
 
-This guide will show you how to set up both Pi-hole and Netdata's real-time monitoring dashboard.
+To get started, all you need is a [Raspberry Pi](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/) with
+Raspbian installed. This guide uses a Raspberry Pi 4 Model B and Raspbian GNU/Linux 10 (buster). This guide assumes
+you're connecting to a Raspberry Pi remotely over SSH, but you could also complete all these steps on the system
+directly using a keyboard, mouse, and monitor.
+
+## Why monitor Pi-hole and a Raspberry Pi with Netdata?
+
+Netdata tool that helps you monitor and troubleshoot all kinds of devices and the applications they run, including IoT
+devices like the Raspberry Pi and applications like Pi-hole.
+
+After a two-minute installation and with zero configuration, you'll be able all of Pi-hole's metrics, including the
+volume of queries, connected clients, DNS queries per type, top clients, top blocked domains, and more.
+
+With Netdata installed, you can also monitor system metrics and any other applications you might be running. By default,
+Netdata collects metrics on CPU usage, disk IO, bandwidth, per-application resource usage, and a ton more. With the
+Raspberry Pi used for this guide, Netdata automatically collects about 1,500 metrics every second!
 
 ![Real-time Pi-hole monitoring with
 Netdata](https://user-images.githubusercontent.com/1153921/90447745-c8fe9600-e098-11ea-8a57-4f07339f002b.png)
-
-## Prerequisites
-
-All you need to get started is a [Raspberry Pi](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/) with
-Raspbian installed. This guide uses a Raspberry Pi 4 Model B and Raspbian GNU/Linux 10 (buster).
-
-This guide assumes you're connecting to a Raspberry Pi remotely over SSH, but you could also complete all these steps on
-the system directly using a keyboard, mouse, and monitor.
 
 ## Install Netdata
 
@@ -90,10 +95,6 @@ per second adds up quick.
 
 You can now use Netdata's synchronized charts to zoom, highlight, scrub through time, and intuit how an anomaly in one
 part of your system might affect another.
-
-Out of the box, the Pi-hole collector gives you real-time insights into the volume of queries, connected clients, DNS
-queries per type, top clients, top blocked domains, and more. Additional Netdata collectors create charts for CPU,
-disks, networking, per-application usage, and much more.
 
 ![The Netdata dashboard in
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
