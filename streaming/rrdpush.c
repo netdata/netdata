@@ -364,6 +364,25 @@ void rrdpush_send_labels(RRDHOST *host) {
 
     host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }
+
+void rrdpush_claimed_id(RRDHOST *host)
+{
+    if(unlikely(!host->rrdpush_send_enabled || !host->rrdpush_sender_connected))
+        return;
+
+    sender_start(host->sender);
+    netdata_mutex_lock(&host->claimed_id_lock);
+
+    buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->claimed_id ? host->claimed_id : "NULL") );
+
+    netdata_mutex_unlock(&host->claimed_id_lock);
+    sender_commit(host->sender);
+
+    // signal the sender there are more data
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+}
+
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 

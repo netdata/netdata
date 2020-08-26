@@ -622,6 +622,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 buffer_sprintf(s->build, "TIMESTAMP %ld", now);
                 sender_commit(s);
             }
+            if (s->version >= STREAM_VERSION_CLAIM)
+                rrdpush_claimed_id(s->host);
             continue;
         }
 

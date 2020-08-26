@@ -167,6 +167,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels_rwlock);
 
+    netdata_mutex_init(&host->claimed_id_lock);
+
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
 
@@ -858,6 +860,8 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
+    pthread_mutex_destroy(&host->claimed_id_lock);
+    freez(host->claimed_id);
     freez((void *)host->tags);
     free_host_labels(host->labels);
     freez((void *)host->os);

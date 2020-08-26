@@ -817,6 +817,9 @@ struct rrdhost {
     struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
+    netdata_mutex_t claimed_id_lock;
+    char *claimed_id;                               // Claimed ID if host has one otherwise NULL
+
     struct rrdhost *next;
 };
 extern RRDHOST *localhost;
