@@ -83,6 +83,7 @@ extern void metadata_logfile_init(struct metadata_logfile *metadatalog, struct m
 extern int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_starting_fileno,
                                    unsigned new_fileno);
 extern int close_metadata_logfile(struct metadata_logfile *metadatalog);
+extern int fsync_metadata_logfile(struct metadata_logfile *metalogfile);
 extern int unlink_metadata_logfile(struct metadata_logfile *metalogfile);
 extern int destroy_metadata_logfile(struct metadata_logfile *metalogfile);
 extern int create_metadata_logfile(struct metadata_logfile *metalogfile);

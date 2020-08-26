@@ -248,6 +248,26 @@ int close_metadata_logfile(struct metadata_logfile *metalogfile)
     return ret;
 }
 
+int fsync_metadata_logfile(struct metadata_logfile *metalogfile)
+{
+    struct metalog_instance *ctx = metalogfile->ctx;
+    uv_fs_t req;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
+
+    ret = uv_fs_fsync(NULL, &req, metalogfile->file, NULL);
+    if (ret < 0) {
+        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
+    return ret;
+}
+
 int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
 {
     struct metalog_instance *ctx = metalogfile->ctx;
@@ -344,6 +364,15 @@ int create_metadata_logfile(struct metadata_logfile *metalogfile)
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
     uv_fs_req_cleanup(&req);
+
+    ret = uv_fs_fsync(NULL, &req, metalogfile->file, NULL);
+    if (ret < 0) {
+        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
     free(superblock);
     if (ret < 0) {
         destroy_metadata_logfile(metalogfile);
