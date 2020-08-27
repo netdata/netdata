@@ -52,47 +52,225 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
-{
-    UNUSED(plugins_action);
-    char *remote_time_txt = words[1];
-    time_t remote_time = 0;
-    RRDHOST *host = ((PARSER_USER_OBJECT *)user)->host;
-    struct plugind *cd = ((PARSER_USER_OBJECT *)user)->cd;
-    if (cd->version < VERSION_GAP_FILLING ) {
-        error("STREAM %s from %s: Child negotiated version %u but sent TIMESTAMP!", host->hostname, cd->cmd,
-               cd->version);
-        return PARSER_RC_OK;    // Ignore error and continue stream
-    }
-    if (remote_time_txt && *remote_time_txt) {
-        remote_time = str2ull(remote_time_txt);
-        time_t now = now_realtime_sec(), prev = rrdhost_last_entry_t(host);
-        time_t gap = 0;
-        if (prev == 0)
-            info("STREAM %s from %s: Initial connection (no gap to check), remote=%ld local=%ld slew=%ld",
-                 host->hostname, cd->cmd, remote_time, now, now-remote_time);
-        else {
-            gap = now - prev;
-            info("STREAM %s from %s: Checking for gaps... remote=%ld local=%ld..%ld slew=%ld  %ld-sec gap",
-                 host->hostname, cd->cmd, remote_time, prev, now, remote_time - now, gap);
-        }
-        char message[128];
-        sprintf(message,"REPLICATE %ld %ld\n", remote_time - gap, remote_time);
-        int ret;
+void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) {
+    char message[RRD_ID_LENGTH_MAX+60];
+    sprintf(message,"REPLICATE %s %ld %ld\n", st_id, start, end);
+    int ret;
+    debug(D_STREAM, "Replicate command: %s",message);
 #ifdef ENABLE_HTTPS
-        SSL *conn = host->stream_ssl.conn ;
-        if(conn && !host->stream_ssl.flags) {
-            ret = SSL_write(conn, message, strlen(message));
-        } else {
-            ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
-        }
-#else
+    SSL *conn = host->stream_ssl.conn ;
+    if(conn && !host->stream_ssl.flags) {
+        ret = SSL_write(conn, message, strlen(message));
+    } else {
         ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+    }
+#else
+    ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
 #endif
-        if (ret != (int)strlen(message))
-            error("Failed to send initial timestamp - gaps may appear in charts");
+    if (ret != (int)strlen(message))
+        error("Failed to send replication request for %s!", st_id);
+}
+
+static void skip_gap(RRDSET *st, time_t first_t, time_t last_t) {
+    // dbengine should handle time jump
+    if (st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+        rrdset_rdlock(st);
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            long current_entry = st->current_entry;
+            debug(D_REPLICATION, "Legacy-mode on %s.%s filling empty slots %ld-%ld.",
+                  st->name, rd->name, (long)first_t, (long)last_t);
+            for (time_t gap_t = first_t; gap_t <= last_t; gap_t += st->update_every) {
+                rd->values[current_entry] = SN_EMPTY_SLOT;
+                current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
+            }
+        }
+        rrdset_unlock(st);
+    }
+    st->last_updated.tv_sec = last_t;
+}
+
+
+PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    UNUSED(plugins_action);
+    char *id = words[1];
+    char *start_txt = words[2];
+    char *end_txt = words[3];
+    if (!id || !start_txt || !end_txt)
+        goto disable;
+
+    RRDSET *st = NULL;
+    st = rrdset_find(user->host, id);
+    if (unlikely(!st))
+        goto disable;
+    user->st = st;
+    st->state->window_start = str2ll(start_txt, NULL);
+    st->state->window_end   = str2ll(end_txt, NULL);
+
+    struct receiver_state *rpt = user->opaque;
+    time_t now = now_realtime_sec();
+    if (st->last_updated.tv_sec == 0) {
+        if (rpt->gap_history==0) {
+            st->last_updated.tv_sec = st->state->window_start;
+            debug(D_REPLICATION, "Initial data for %s, no historical gaps. window=%ld..%ld",
+                  st->name, (long)st->state->window_start, (long)st->state->window_end);
+            st->state->ignore_block = 0;
+            return PARSER_RC_OK;
+        } else {
+            debug(D_REPLICATION, "Initial data for %s, asking for history window=%ld..%ld",
+                  st->name, (long)now - rpt->gap_history+1, now);
+            send_replication_req(user->host, st->id, now - rpt->gap_history + 1, now);
+            st->state->ignore_block = 1;
+            st->last_updated.tv_sec = now - rpt->gap_history;
+            return PARSER_RC_OK;
+        }
+    }
+
+    if (st->state->window_start < st->last_updated.tv_sec + st->update_every) {
+        debug(D_REPLICATION, "Ignoring stale replication on %s block %ld-%ld, last_updated=%ld",
+              st->name, (long)st->state->window_start, (long)st->state->window_end,
+              st->last_updated.tv_sec);
+        st->state->ignore_block = 1;
         return PARSER_RC_OK;
     }
+    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    if (st->state->window_start > expected_t) {
+        time_t gap_end   = st->state->window_end;
+        time_t gap_points = (gap_end - expected_t) / st->update_every;
+        if (gap_points > rpt->max_gap)
+            gap_points = rpt->max_gap;
+        time_t gap_first = gap_end - gap_points * st->update_every;
+        if (gap_first > st->state->window_start) {
+            // TODO - put a test scenario in to capture this, triggers a problem in the dbengine
+            debug(D_REPLICATION, "Gap detected on %s: expected %ld, block %ld-%ld. Exceeds max_gap %u, ignoring...",
+                  st->name, (long)expected_t, (long)st->state->window_start, (long)st->state->window_end, rpt->max_gap);
+            skip_gap(st, expected_t, st->state->window_end - st->update_every);
+        } else {
+            if (gap_first > expected_t)
+                skip_gap(st, expected_t, gap_first - st->update_every);
+            debug(D_REPLICATION, "Gap detected on %s: expected %ld, block %ld-%ld. Requesting %ld-%ld",
+                  st->name, (long)expected_t, (long)st->state->window_start, (long)st->state->window_end,
+                  (long)gap_first, (long)gap_end);
+            send_replication_req(user->host, st->id, gap_first, gap_end);
+            st->state->ignore_block = 1;
+            return PARSER_RC_OK;
+        }
+    }
+    user->st->last_updated.tv_sec = user->st->state->window_start;
+    user->st->state->ignore_block = 0;
+    debug(D_REPLICATION, "Replication on %s @ %ld, block %ld-%ld last_update=%ld", st->name, now,
+                         user->st->state->window_start, user->st->state->window_end, st->last_updated.tv_sec);
+    return PARSER_RC_OK;
+disable:
+    errno = 0;
+    error("Replication failed - Invalid REPBEGIN %s %s %s on host %s. Disabling it.", words[1], words[2], words[3],
+          user->host->hostname);
+    user->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    UNUSED(plugins_action);
+    char *id        = words[1];
+    char *time_txt  = words[2];
+    char *value_txt = words[3];
+
+    if (user->st == NULL) {
+        errno = 0;
+        error("Received RRDDIM for %s out of sequence", id);
+        goto disable;
+    }
+
+    if (user->st->state->ignore_block)
+        return PARSER_RC_OK;
+
+    if (!id || !time_txt || !value_txt)
+        goto disable;
+
+    time_t timestamp = (time_t)str2ul(time_txt);
+    storage_number value = str2ull(value_txt);
+
+    RRDDIM *rd = rrddim_find(user->st, id);
+    //time_t st_last = rrdset_last_entry_t(user->st);  UNUSED?
+    if (rd == NULL) {
+        errno = 0;
+        error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
+        return PARSER_RC_OK;
+    }
+
+    if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+    {
+        rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s", value, timestamp, user->st->id, id);
+        rd->last_stored_value = value;
+    }
+    else
+    {
+        size_t offset = (size_t)(time - user->st->last_updated.tv_sec);
+        rd->values[(rd->rrdset->current_entry + offset) % rd->entries] = value;
+    }
+    rd->collections_counter++;
+
+    return PARSER_RC_OK;
+disable:
+    error("Gap replication failed - Invalid REPDIM %s %s %s on host %s. Disabling it.", words[1], words[2], words[3],
+          user->host->hostname);
+    user->enabled = 0;
+    return PARSER_RC_ERROR;
+}
+
+PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins_action) {
+    PARSER_USER_OBJECT *user = user_v;
+    UNUSED(plugins_action);
+    char *num_points_txt = words[1];
+    char *col_total_txt  = words[2];
+    char *last_total_txt = words[3];
+    if (!num_points_txt)
+        goto disable;
+
+    if (user->st == NULL) {
+        error("Received RRDEND out of sequence");
+        goto disable;
+    }
+
+    if (user->st->state->ignore_block) {
+        user->st->state->ignore_block = 0;
+        return PARSER_RC_OK;
+    }
+    user->st->state->ignore_block = 0;
+
+    size_t num_points = str2ull(num_points_txt);
+    total_number col_total = str2ll(col_total_txt, NULL);
+    total_number last_total = str2ll(last_total_txt, NULL);
+
+    struct rrdset_volatile *state = user->st->state;
+    user->st->last_updated.tv_sec = state->window_end - user->st->update_every;
+    if (num_points > 0) {
+        long advance = (state->window_end - state->window_start) / user->st->update_every;
+        user->st->counter       += advance;
+        user->st->counter_done  += advance;
+        user->st->current_entry += advance;
+        while (user->st->current_entry >= user->st->entries)        // Once except for an exceptional corner-case
+            user->st->current_entry -= user->st->entries;
+        user->st->collected_total = col_total;
+        user->st->last_collected_total = last_total;
+        debug(D_REPLICATION, "Finished replication %s: window %ld..%ld with %zu points transferred, advance=%ld-pts",
+                             user->st->name, state->window_start, state->window_end, num_points, advance);
+    } else {
+        debug(D_REPLICATION, "Finished replication on %s: window %ld-%ld was empty, last_updated=%ld", user->st->name,
+                             state->window_start, state->window_end, user->st->last_updated.tv_sec);
+    }
+    state->window_start = 0;
+    state->window_end = 0;
+    rrdset_dump_debug_state(user->st);
+    user->st = NULL;
+    return PARSER_RC_OK;
+disable:
+    errno = 0;
+    error("Gap replication failed - Invalid REPEND %s on host %s. Disabling it.", words[1], user->host->hostname);
+    user->enabled = 0;
     return PARSER_RC_ERROR;
 }
 
@@ -140,6 +318,7 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 
     return PARSER_RC_OK;
 }
+
 
 /* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
  */
@@ -201,8 +380,10 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     user->trust_durations = 0;
 
     PARSER *parser = parser_init(rpt->host, user, fp, PARSER_INPUT_SPLIT);
-    parser_add_keyword(parser, "TIMESTAMP", streaming_timestamp);
     parser_add_keyword(parser, "CLAIMED_ID", streaming_claimed_id);
+    parser_add_keyword(parser, "REPBEGIN", streaming_rep_begin);
+    parser_add_keyword(parser, "REPDIM", streaming_rep_dim);
+    parser_add_keyword(parser, "REPEND", streaming_rep_end);
 
     if (unlikely(!parser)) {
         error("Failed to initialize parser");
@@ -290,6 +471,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+
+    rpt->gap_history = appconfig_get_number(&stream_config, rpt->key, "history gap replication", rpt->gap_history);
+    rpt->gap_history = appconfig_get_number(&stream_config, rpt->machine_guid, "history gap replication", rpt->gap_history);
+
+    rpt->max_gap = appconfig_get_number(&stream_config, rpt->key, "max gap replication", rpt->max_gap);
+    rpt->max_gap = appconfig_get_number(&stream_config, rpt->machine_guid, "max gap replication", rpt->max_gap);
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 

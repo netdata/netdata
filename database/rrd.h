@@ -429,6 +429,9 @@ struct rrdset_volatile {
     char *old_context;
     struct label *new_labels;
     struct label_index labels;
+    struct timeval last_sent;                // the timestamp of the last db point sent from this node over streaming
+    time_t window_start, window_end;         // the current incoming replication block
+    int ignore_block;
 };
 
 // ----------------------------------------------------------------------------
@@ -1344,6 +1347,7 @@ extern void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
     const char *guid, const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *program_name, const char *program_version);
+extern void rrdset_dump_debug_state(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

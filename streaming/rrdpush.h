@@ -10,10 +10,9 @@
 
 #define CONNECTED_TO_SIZE 100
 
-// #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4       Gap-filling
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3
-#define VERSION_GAP_FILLING 4
 #define STREAM_VERSION_CLAIM 3
+#define VERSION_GAP_FILLING 4
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
@@ -83,6 +82,7 @@ struct receiver_state {
     int update_every;
     uint32_t stream_version;
     time_t last_msg_t;
+    uint32_t max_gap, gap_history;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
 #ifdef ENABLE_HTTPS
@@ -102,6 +102,7 @@ extern unsigned int remote_clock_resync_iterations;
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
 void sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s);
+void sender_replicate(RRDSET *st);
 extern int rrdpush_init();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
@@ -116,4 +117,7 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 
+extern int need_to_send_chart_definition(RRDSET *st);
+extern int should_send_chart_matching(RRDSET *st);
+extern void rrdpush_send_chart_definition_nolock(RRDSET *st);
 #endif //NETDATA_RRDPUSH_H
