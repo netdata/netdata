@@ -338,6 +338,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         journalfile_init(journalfile, datafile);
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
+            if (!must_delete_pair) /* If datafile is still open close it */
+                close_data_file(datafile);
             must_delete_pair = 1;
         }
         if (must_delete_pair) {
