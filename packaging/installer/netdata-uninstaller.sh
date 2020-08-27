@@ -187,7 +187,7 @@ portable_del_group() {
       run groupdel "${groupname}" && return 0
     else
       echo >&2 "Group ${groupname} already removed in a previous step."
-      run_ok
+      return 0
     fi
   fi
 
@@ -197,6 +197,7 @@ portable_del_group() {
       run dseditgroup -o delete "${groupname}" && return 0
     else
       echo >&2 "Could not find group ${groupname}, nothing to do"
+      return 0
     fi
   fi
 
