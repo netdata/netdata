@@ -83,6 +83,12 @@ PARSER_RC metalog_pluginsd_host_action(
         , 1     // archived
     );
 
+//#ifdef SQLITE_POC
+//    ((PARSER_USER_OBJECT *)user)->host = host;
+//    //uuid_clear(state->uuid);
+//    return PARSER_RC_OK;
+//#endif
+
 write_replay:
     if (host) { /* It's a valid object */
         struct metalog_record record;

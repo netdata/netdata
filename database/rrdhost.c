@@ -133,6 +133,11 @@ RRDHOST *rrdhost_create(const char *hostname,
 #else
     int is_legacy = 1;
 #endif
+
+    if (is_archived) {
+        sql_store_host(guid, hostname, registry_hostname, update_every, os, timezone, tags);
+        //return NULL;
+    }
     rrd_check_wrlock();
 
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);

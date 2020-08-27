@@ -62,7 +62,9 @@ int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
 /*
  * Initialize a database
  */
+#define HOST_DEF "CREATE TABLE IF NOT EXISTS host (host_uuid blob PRIMARY KEY, hostname text, registry_hostname text, update_every int, os text, timezone text, tags text);"
 #define CHART_DEF "CREATE TABLE IF NOT EXISTS chart (chart_uuid blob PRIMARY KEY, host_uuid blob, type text, id text, name text, family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, chart_type int, memory_mode int, history_entries);"
+#define DIM_DEF "CREATE TABLE IF NOT EXISTS dimension(dim_uuid blob PRIMARY KEY, chart_uuid blob, id text, name text, multiplier int, divisor int , algorithm int, archived int, options text);"
 int sql_init_database()
 {
     char *err_msg = NULL;
@@ -70,14 +72,25 @@ int sql_init_database()
     int rc = sqlite3_open("/tmp/database", &db);
     info("SQLite Database initialized (rc = %d)", rc);
 
-    char *sql = "PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS dimension(dim_uuid blob PRIMARY KEY, chart_uuid blob, id text, name text, multiplier int, divisor int , algorithm int, archived int, options text);";
-
-    rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+    rc = sqlite3_exec(db, "PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL;", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
-        sqlite3_close(db);
+    }
+
+    rc = sqlite3_exec(db, HOST_DEF, 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, DIM_DEF, 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
     }
 
     rc = sqlite3_exec(db, CHART_DEF, 0, 0, &err_msg);
@@ -85,7 +98,6 @@ int sql_init_database()
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
-        sqlite3_close(db);
     }
 
     rc = sqlite3_exec(db, "create index if not exists ind_chart_uuid on dimension (chart_uuid);", 0, 0, &err_msg);
@@ -107,7 +119,6 @@ int sql_init_database()
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
-        sqlite3_close(db);
     }
 
     rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS page (dim_uuid blob, page int , page_size int, start_date int, end_date int, fileno int, offset int, size int); delete from page;", 0, 0, &err_msg);
@@ -115,7 +126,6 @@ int sql_init_database()
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
-        sqlite3_close(db);
     }
 
     rc = sqlite3_exec(db, "create unique index if not exists ind_page on page (dim_uuid, start_date);", 0, 0, &err_msg);
@@ -378,6 +388,37 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
     sqlite3_finalize(res);
 
     return rd;
+}
+
+#define HOST_DEF "CREATE TABLE IF NOT EXISTS host (host_uuid blob PRIMARY KEY, hostname text, registry_hostname text, update_every int, os text, timezone text, tags text);"
+
+#define INSERT_HOST "insert or replace into host (host_uuid,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
+int sql_store_host(
+    char *guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone, char *tags)
+{
+    sqlite3_stmt *res;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db, INSERT_HOST, -1, &res, 0);
+    if (rc != SQLITE_OK)
+        return NULL;
+
+    uuid_t  host_uuid;
+    uuid_parse(guid, host_uuid);
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 2, hostname, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 3, registry_hostname, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_int(res, 4, update_every);
+    rc = sqlite3_bind_text(res, 5, os, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 6, timezone, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 7, tags, -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step(res);
+
+    rc = sqlite3_finalize(res);
+
+    return 0;
 }
 
 #define INSERT_CHART "insert or replace into chart (chart_uuid, host_uuid, type, id, name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
