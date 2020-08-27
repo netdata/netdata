@@ -9,8 +9,8 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 
 // minimum and maximum supported version of ACLK
 // in this version of agent
-#define ACLK_VERSION_MIN 1
-#define ACLK_VERSION_MAX 1
+#define ACLK_VERSION_MIN 2
+#define ACLK_VERSION_MAX 2
 
 // Version negotiation messages have they own versioning
 // this is also used for LWT message as we set that up
@@ -24,6 +24,9 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #if ACLK_VERSION_MIN > ACLK_VERSION_MAX
 #error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
 #endif
+
+// Define ACLK Feature Version Boundaries Here
+#define ACLK_V_COMPRESSION 2
 
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,

@@ -1534,21 +1534,24 @@ static inline int aclk_v2_payload_preverify(const char *payload)
     return 0;
 }
 
+#define HTTP_CHECK_AGENT_INITIALIZED() ACLK_SHARED_STATE_LOCK;\
+    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {\
+        debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");\
+        ACLK_SHARED_STATE_UNLOCK;\
+        return 1;\
+    }\
+    ACLK_SHARED_STATE_UNLOCK;
+
 /*
  * Parse the incoming payload and queue a command if valid
  */
-static int aclk_handle_cloud_request(struct aclk_request *cloud_to_agent)
+static int aclk_handle_cloud_request_v1(struct aclk_request *cloud_to_agent, char *raw_payload)
 {
-    errno = 0;
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
-        debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");
-        ACLK_SHARED_STATE_UNLOCK;
-        return 1;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
+    UNUSED(raw_payload);
+    HTTP_CHECK_AGENT_INITIALIZED();
 
-    if (unlikely(cloud_to_agent->version != aclk_shared_state.version_neg)) {
+    errno = 0;
+    if (unlikely(cloud_to_agent->version != 1)) {
         error("Received \"http\" message from Cloud with version %d, but ACLK version %d is used", cloud_to_agent->version, aclk_shared_state.version_neg);
         return 1;
     }
@@ -1571,14 +1574,50 @@ static int aclk_handle_cloud_request(struct aclk_request *cloud_to_agent)
     if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, NULL, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD)))
         debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
 
-    // Note: the payload comes from the callback and it will be automatically freed
     return 0;
 }
 
+static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
+{
+    HTTP_CHECK_AGENT_INITIALIZED();
+
+    if(cloud_to_agent->version < ACLK_V_COMPRESSION) {
+        error("This handler cannot reply to request with version older than %d, received %d.", ACLK_V_COMPRESSION, cloud_to_agent->version);
+        return 1;
+    }
+
+    if(unlikely(aclk_extract_v2_payload(raw_payload, cloud_to_agent))) {
+        error("Error extracting payload expected after the JSON dictionary.");
+        return 1;
+    }
+
+    if(unlikely(aclk_v2_payload_preverify(cloud_to_agent->payload)))
+        return 1;
+
+    if (unlikely(!cloud_to_agent->callback_topic)) {
+        error("Missing callback_topic");
+        return 1;
+    }
+
+    if (unlikely(!cloud_to_agent->msg_id)) {
+        error("Missing msg_id");
+        return 1;
+    }
+
+    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, NULL, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD_2)))
+        debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
+
+    UNUSED(cloud_to_agent);
+    return 0;
+}
+
+static void aclk_set_cloud_to_agent_handlers(int version);
+
 // This handles `version` message from cloud used to negotiate
 // protocol version we will use
-static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
+static int aclk_handle_version_response(struct aclk_request *cloud_to_agent, char *raw_payload)
 {
+    UNUSED(raw_payload);
     int version = -1;
     errno = 0;
 
@@ -1629,6 +1668,8 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
 
     info("Choosing version %d of ACLK", version);
 
+    aclk_set_cloud_to_agent_handlers(version);
+
     return 0;
 
 err_cleanup:
@@ -1636,14 +1677,34 @@ err_cleanup:
     return 1;
 }
 
-struct {
+typedef struct aclk_incoming_msg_type{
     char *name;
-    int(*fnc)(struct aclk_request *cloud_to_agent);
-} aclk_incoming_msg_types[] = {
-    { .name = "http",    .fnc = aclk_handle_cloud_request    },
+    int(*fnc)(struct aclk_request *, char *);
+}aclk_incoming_msg_type;
+
+aclk_incoming_msg_type aclk_incoming_msg_types_v1[] = {
+    { .name = "http",    .fnc = aclk_handle_cloud_request_v1 },
     { .name = "version", .fnc = aclk_handle_version_response },
     { .name = NULL,      .fnc = NULL                         }
 };
+
+aclk_incoming_msg_type aclk_incoming_msg_types_compression[] = {
+    { .name = "http",    .fnc = aclk_handle_cloud_request_v2 },
+    { .name = "version", .fnc = aclk_handle_version_response },
+    { .name = NULL,      .fnc = NULL                         }
+};
+
+struct aclk_incoming_msg_type *aclk_incoming_msg_types = aclk_incoming_msg_types_v1;
+
+static void aclk_set_cloud_to_agent_handlers(int version)
+{
+    if(version >= ACLK_V_COMPRESSION) {
+        aclk_incoming_msg_types = aclk_incoming_msg_types_compression;
+        return;
+    }
+
+    aclk_incoming_msg_types = aclk_incoming_msg_types_v1;
+}
 
 int aclk_handle_cloud_message(char *payload)
 {
@@ -1680,11 +1741,15 @@ int aclk_handle_cloud_message(char *payload)
 
     for (int i = 0; aclk_incoming_msg_types[i].name; i++) {
         if (strcmp(cloud_to_agent.type_id, aclk_incoming_msg_types[i].name) == 0) {
-            if (likely(!aclk_incoming_msg_types[i].fnc(&cloud_to_agent))) {
+            if (likely(!aclk_incoming_msg_types[i].fnc(&cloud_to_agent, payload))) {
                 // in case of success handler is supposed to clean up after itself
                 // or as in the case of aclk_handle_cloud_request take
                 // ownership of the pointers (done to avoid copying)
                 // see what `aclk_queue_query` parameter `internal` does
+
+                // NEVER CONTINUE THIS LOOP AFTER CALLING FUNCTION!!!
+                // msg handlers (namely aclk_handle_version_responce)
+                // can freely change what aclk_incoming_msg_types points to
                 freez(cloud_to_agent.type_id);
                 return 0;
             }
