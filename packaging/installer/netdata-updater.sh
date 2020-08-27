@@ -17,7 +17,7 @@
 # Optional environment options:
 #
 #  - TMPDIR (set to a usable temporary directory)
-#  - NETDATA_TARBALL_BASEURL (set the base url for downloading the dist tarball)
+#  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -141,7 +141,7 @@ get_latest_version() {
   if [ "${RELEASE_CHANNEL}" == "stable" ]; then
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
   else
-    latest="$(download "$NETDATA_TARBALL_BASEURL/latest-version.txt" /dev/stdout)"
+    latest="$(download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout)"
   fi
   parse_version "$latest"
 }
@@ -272,7 +272,7 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 [[ -z "${NETDATA_TARBALL_CHECKSUM}" ]] && [[ -f ${NETDATA_LIB_DIR}/netdata.tarball.checksum ]] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
 
 # Grab the nightlies baseurl (defaulting to our Google Storage bucket)
-[ -z "${NETDATA_NIGHTLIES_BASEURL}" ] && export NETDATA_NIGHTLIES_BASEURL="https://storage.googleapis.com/netdata-nightlies"
+export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
