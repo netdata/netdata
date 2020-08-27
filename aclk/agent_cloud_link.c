@@ -1015,7 +1015,6 @@ void *aclk_main(void *ptr)
             stress_counter = 0;
         }*/
 
-        // TODO: Move to on-connect
         if (unlikely(!aclk_subscribed)) {
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 1);
             aclk_hello_msg();
