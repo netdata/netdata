@@ -1165,7 +1165,7 @@ void web_client_build_http_header(struct web_client *w) {
     if (w->response.code == HTTP_RESP_MOVED_PERM) {
         buffer_sprintf(w->response.header_output,
                        "HTTP/1.1 %d %s\r\n"
-                       "Location: https://%s%s",
+                       "Location: https://%s%s\r\n",
                        w->response.code, code_msg,
                        w->server_host,
                        w->last_url);
