@@ -121,15 +121,43 @@ fatal() {
   exit 1
 }
 
-create_tmp_directory() {
-  # Check if tmp is mounted as noexec
-  if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
-    pattern="$(pwd)/netdata-kickstart-XXXXXX"
-  else
-    pattern="/tmp/netdata-kickstart-XXXXXX"
+_cannot_use_tmpdir() {
+  local testfile ret
+  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  ret=0
+
+  if [ -z "${testfile}" ] ; then
+    return "${ret}"
   fi
 
-  mktemp -d $pattern
+  if /bin/echo -e '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
+    if chmod +x "${testfile}" ; then
+      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+        ret=1
+      fi
+    fi
+  fi
+
+  rm -f "${testfile}"
+  return "${ret}"
+}
+
+create_tmp_directory() {
+  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
+    if _cannot_use_tmpdir /tmp ; then
+      if _cannot_use_tmpdir "${PWD}" ; then
+        echo >&2
+        echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+        exit 1
+      else
+        TMPDIR="${PWD}"
+      fi
+    else
+      TMPDIR="/tmp"
+    fi
+  fi
+
+  mktemp -d -t netdata-kickstart-XXXXXXXXXX
 }
 
 download() {

@@ -61,7 +61,7 @@ To use `md5sum` to verify the intregity of the `kickstart.sh` script you will do
 run the following:
 
 ```bash
-[ "e08dfbc39c23bf8993861e19c7d32368" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "0bfd0e5d8ac868ff09957f1d43e8a35a" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
