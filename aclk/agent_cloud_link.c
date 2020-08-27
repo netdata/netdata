@@ -851,8 +851,7 @@ static inline void aclk_hello_msg()
     aclk_shared_state.version_neg_wait_till = now_monotonic_usec() + USEC_PER_SEC * VERSION_NEG_TIMEOUT;
     ACLK_SHARED_STATE_UNLOCK;
 
-    //Hello message is versioned separatelly from the rest of the protocol
-    aclk_create_header(buf, "hello", msg_id, 0, 0, ACLK_VERSION_NEG_VERSION);
+    aclk_create_header(buf, "hello", msg_id, 0, 0, ACLK_VERSION_MIN);
     buffer_sprintf(buf, ",\"min-version\":%d,\"max-version\":%d}", ACLK_VERSION_MIN, ACLK_VERSION_MAX);
     aclk_send_message(ACLK_METADATA_TOPIC, buf->buffer, msg_id);
     freez(msg_id);
@@ -1524,8 +1523,8 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
 {
     int version = -1;
 
-    if(unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
-        error("Unsuported version of \"version\" message from cloud. Expected %d, Got %d", ACLK_VERSION_NEG_VERSION, cloud_to_agent->version);
+    if(unlikely(cloud_to_agent->version != ACLK_VERSION_MIN)) {
+        error("Unsuported version of \"version\" message from cloud. Expected %d, Got %d", ACLK_VERSION_MIN, cloud_to_agent->version);
         return 1;
     }
     if(unlikely(!cloud_to_agent->min_version)) {
