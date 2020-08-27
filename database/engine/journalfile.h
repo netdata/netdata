@@ -38,6 +38,7 @@ extern void journalfile_init(struct rrdengine_journalfile *journalfile, struct r
 extern void *wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned size);
 extern void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc);
 extern int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
+extern int unlink_journal_file(struct rrdengine_journalfile *journalfile);
 extern int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 extern int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 extern int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,

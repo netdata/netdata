@@ -248,6 +248,26 @@ int close_metadata_logfile(struct metadata_logfile *metalogfile)
     return ret;
 }
 
+int fsync_metadata_logfile(struct metadata_logfile *metalogfile)
+{
+    struct metalog_instance *ctx = metalogfile->ctx;
+    uv_fs_t req;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
+
+    ret = uv_fs_fsync(NULL, &req, metalogfile->file, NULL);
+    if (ret < 0) {
+        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
+    return ret;
+}
+
 int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
 {
     struct metalog_instance *ctx = metalogfile->ctx;
@@ -344,6 +364,15 @@ int create_metadata_logfile(struct metadata_logfile *metalogfile)
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
     uv_fs_req_cleanup(&req);
+
+    ret = uv_fs_fsync(NULL, &req, metalogfile->file, NULL);
+    if (ret < 0) {
+        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
     free(superblock);
     if (ret < 0) {
         destroy_metadata_logfile(metalogfile);
@@ -695,13 +724,17 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         metalogfile = metalogfiles[i];
         ret = load_metadata_logfile(ctx, metalogfile);
         if (0 != ret) {
+            error("Deleting invalid metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
+                      METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
+            unlink_metadata_logfile(metalogfile);
             freez(metalogfile);
             ++failed_to_load;
-            break;
+            continue;
         }
         metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
         rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
     }
+    matched_files -= failed_to_load;
     debug(D_METADATALOG, "PARSER ended");
 
     parser_destroy(parser);
@@ -712,11 +745,6 @@ static int scan_metalog_files(struct metalog_instance *ctx)
 after_failed_to_parse:
 
     freez(metalogfiles);
-    if (failed_to_load) {
-        error("%u metadata log files failed to load.", failed_to_load);
-        finalize_metalog_files(ctx);
-        return UV_EIO;
-    }
 
     return matched_files;
 }

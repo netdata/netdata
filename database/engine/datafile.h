@@ -57,6 +57,7 @@ extern void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengin
 extern void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 extern void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 extern int close_data_file(struct rrdengine_datafile *datafile);
+extern int unlink_data_file(struct rrdengine_datafile *datafile);
 extern int destroy_data_file(struct rrdengine_datafile *datafile);
 extern int create_data_file(struct rrdengine_datafile *datafile);
 extern int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno);

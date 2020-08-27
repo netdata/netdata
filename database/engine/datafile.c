@@ -75,6 +75,27 @@ int close_data_file(struct rrdengine_datafile *datafile)
     return ret;
 }
 
+int unlink_data_file(struct rrdengine_datafile *datafile)
+{
+    struct rrdengine_instance *ctx = datafile->ctx;
+    uv_fs_t req;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    generate_datafilepath(datafile, path, sizeof(path));
+
+    ret = uv_fs_unlink(NULL, &req, path, NULL);
+    if (ret < 0) {
+        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
+    ++ctx->stats.datafile_deletions;
+
+    return ret;
+}
 
 int destroy_data_file(struct rrdengine_datafile *datafile)
 {
@@ -305,33 +326,47 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     ctx->last_fileno = datafiles[matched_files - 1]->fileno;
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
+        uint8_t must_delete_pair = 0;
+
         datafile = datafiles[i];
         ret = load_data_file(datafile);
         if (0 != ret) {
-            freez(datafile);
-            ++failed_to_load;
-            break;
+            must_delete_pair = 1;
         }
         journalfile = mallocz(sizeof(*journalfile));
         datafile->journalfile = journalfile;
         journalfile_init(journalfile, datafile);
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
-            close_data_file(datafile);
-            freez(datafile);
-            freez(journalfile);
-            ++failed_to_load;
-            break;
+            if (!must_delete_pair) /* If datafile is still open close it */
+                close_data_file(datafile);
+            must_delete_pair = 1;
         }
+        if (must_delete_pair) {
+            char path[RRDENG_PATH_MAX];
+
+            error("Deleting invalid data and journal file pair.");
+            ret = unlink_journal_file(journalfile);
+            if (!ret) {
+                generate_journalfilepath(datafile, path, sizeof(path));
+                info("Deleted journal file \"%s\".", path);
+            }
+            ret = unlink_data_file(datafile);
+            if (!ret) {
+                generate_datafilepath(datafile, path, sizeof(path));
+                info("Deleted data file \"%s\".", path);
+            }
+            freez(journalfile);
+            freez(datafile);
+            ++failed_to_load;
+            continue;
+        }
+
         datafile_list_insert(ctx, datafile);
         ctx->disk_space += datafile->pos + journalfile->pos;
     }
+    matched_files -= failed_to_load;
     freez(datafiles);
-    if (failed_to_load) {
-        error("%u datafiles failed to load.", failed_to_load);
-        finalize_data_files(ctx);
-        return UV_EIO;
-    }
 
     return matched_files;
 }

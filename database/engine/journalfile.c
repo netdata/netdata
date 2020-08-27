@@ -125,6 +125,29 @@ int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengi
     return ret;
 }
 
+int unlink_journal_file(struct rrdengine_journalfile *journalfile)
+{
+    struct rrdengine_datafile *datafile = journalfile->datafile;
+    struct rrdengine_instance *ctx = datafile->ctx;
+    uv_fs_t req;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    generate_journalfilepath(datafile, path, sizeof(path));
+
+    ret = uv_fs_unlink(NULL, &req, path, NULL);
+    if (ret < 0) {
+        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
+    ++ctx->stats.journalfile_deletions;
+
+    return ret;
+}
+
 int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile->ctx;
