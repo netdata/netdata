@@ -369,6 +369,9 @@ void rrdpush_claimed_id(RRDHOST *host)
 {
     if(unlikely(!host->rrdpush_send_enabled || !host->rrdpush_sender_connected))
         return;
+    
+    if(host->sender->version < STREAM_VERSION_CLAIM)
+        return;
 
     sender_start(host->sender);
     netdata_mutex_lock(&host->claimed_id_lock);
