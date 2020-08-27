@@ -6,9 +6,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/wh
 
 # What is Netdata?
 
-Netdata is distributed, real-time performance and health monitoring for systems and applications. This solution uses two
-primary components, the Netdata Agent and Netdata Cloud, to offer powerful monitoring, visualization, and
-troubleshooting for both single nodes and entire infrastructures.
+Netdata is distributed, real-time performance and health monitoring for systems and applications. It's designed to help
+sysadmins, SREs, DevOps engineers, and IT professionals collect all metrics, visualize the health of their systems, and
+troubleshoot complex performance problems.
+
+Netdata's solution uses two components, the Netdata Agent and Netdata Cloud, to deliver performance and health
+monitoring for both single and entire infrastructures.
 
 ## Netdata Agent
 
@@ -16,8 +19,8 @@ Netdata's distributed monitoring Agent collects thousands of metrics from system
 configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT
 devices.
 
-You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container platforms (Kubernetes
-clusters, Docker), and many other operating systems (FreeBSD, macOS). No `sudo` required.
+You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms
+(Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
 
 ![agent-hero-overview](https://user-images.githubusercontent.com/1153921/91363069-9e0af500-e7b0-11ea-82f1-8cba692ca118.png)
 
@@ -39,8 +42,8 @@ centralized in any way. Metrics data remains with your nodes and is only streame
 
 ## What you can do with Netdata
 
-Netdata is designed to collect everything, help you visualize metrics, troubleshoot complex performance problems, and
-make data interoperable with the rest of your monitoring stack:
+Netdata is designed to be both simple to use and flexible for every monitoring, visualization, and troubleshooting use
+case:
 
 -   **Collect**: Netdata collects all available metrics from your system and applications. It uses 300+ collectors,
     Kubernetes service discovery, in-depth container monitoring, while using only 1% CPU and a few MB of RAM. It even
@@ -66,3 +69,5 @@ make data interoperable with the rest of your monitoring stack:
 
 Learn more about [why you should use Netdata](/docs/overview/why-netdata), or [how Netdata works with your existing
 monitoring stack](/docs/overview/netdata-monitoring-stack).
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Foverview%2Fwhat-is-netdata&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
