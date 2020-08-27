@@ -37,7 +37,7 @@ extern void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *desc
 //extern int sql_load_one_chart_dimension(uuid_t *chart_uuid, struct dimension **dimension_list);
 extern int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions);
 extern char *sql_find_dim_uuid(RRDSET *st, char *id, char *name);
-
+extern char *sql_find_chart_uuid(RRDHOST *host, char *id, char *name);
 extern int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,

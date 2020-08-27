@@ -62,7 +62,7 @@ int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
 /*
  * Initialize a database
  */
-#define CHART_DEF "CREATE TABLE IF NOT EXISTS chart (chart_uuid blob PRIMARY KEY, host_uuid blob, id text, name text, family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, chart_type int, memory_mode int, history_entries);"
+#define CHART_DEF "CREATE TABLE IF NOT EXISTS chart (chart_uuid blob PRIMARY KEY, host_uuid blob, type text, id text, name text, family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, chart_type int, memory_mode int, history_entries);"
 int sql_init_database()
 {
     char *err_msg = NULL;
@@ -380,13 +380,41 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
     return rd;
 }
 
+#define INSERT_CHART "insert or replace into chart (chart_uuid, host_uuid, type, id, name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
 int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
     int update_every, int chart_type, int memory_mode, long history_entries)
 {
+    sqlite3_stmt *res;
+    int rc;
 
-    info("SQLITE: Will create chart %s", id);
+    rc = sqlite3_prepare_v2(db, INSERT_CHART, -1, &res, 0);
+    if (rc != SQLITE_OK)
+        return NULL;
+
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 2, host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 3, type, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 4, id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 5, name, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 6, family, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 7, context, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 8, title, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 9, units, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 10, plugin, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 11, module, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_int(res, 12, priority);
+    rc = sqlite3_bind_int(res, 13, update_every);
+    rc = sqlite3_bind_int(res, 14, chart_type);
+    rc = sqlite3_bind_int(res, 15, memory_mode);
+    rc = sqlite3_bind_int(res, 15, history_entries);
+
+    rc = sqlite3_step(res);
+
+    rc = sqlite3_finalize(res);
+
+    //info("SQLITE: Will create chart %s", id);
     return 0;
 }
 
@@ -611,6 +639,35 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name)
     return uuid;
 }
 
+char *sql_find_chart_uuid(RRDHOST *host, char *id, char *name)
+{
+    sqlite3_stmt *res;
+    uuid_t *uuid = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(
+        db, "select chart_uuid from chart where host_uuid = @host and id = @id and name = @name;", -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        info("SQLITE: failed to bind to find GUID");
+        return NULL;
+    }
+
+    int dim_id = sqlite3_bind_parameter_index(res, "@host");
+    int id_id = sqlite3_bind_parameter_index(res, "@id");
+    int name_id = sqlite3_bind_parameter_index(res, "@name");
+
+    rc = sqlite3_bind_blob(res, dim_id, &host->host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, id_id, id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, name_id, name, -1, SQLITE_TRANSIENT);
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        uuid = mallocz(sizeof(uuid_t));
+        uuid_copy(*uuid, sqlite3_column_blob(res, 0));
+        break;
+    }
+    sqlite3_finalize(res);
+    return uuid;
+}
 
 void sql_sync_ram_db()
 {

@@ -218,13 +218,61 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
                           collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
                           int is_archived, uuid_t *dim_uuid) {
+    RRDDIM *rd = NULL;
+    // SPECIAL case create transient
+    if (is_archived == 2 && memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+//        char varname[CONFIG_MAX_NAME + 1];
+        unsigned long size = sizeof(RRDDIM);
+        rd = callocz(1, size);
+        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        rd->id = strdupz(id);
+        //rd->hash = simple_hash(rd->id);
+
+//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+        //rd->name = config_get(st->config_section, varname, (name && *name) ? name : rd->id);
+        rd->name = strdupz((name && *name) ? name : rd->id);
+        //rd->hash_name = simple_hash(rd->name);
+
+//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
+        rd->algorithm = algorithm;
+
+//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
+        rd->multiplier = multiplier;
+
+//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
+        rd->divisor = divisor;
+        if (!rd->divisor)
+            rd->divisor = 1;
+
+        rd->entries = st->entries;
+        rd->update_every = st->update_every;
+
+        rd->rrdset = st;
+        rd->state = mallocz(sizeof(*rd->state));
+
+        if (dim_uuid == NULL)
+            dim_uuid = sql_find_dim_uuid(st, rd->id, rd->name);
+
+        rrdeng_metric_init(rd, dim_uuid);
+        rd->state->collect_ops.init = rrdeng_store_metric_init;
+        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
+        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
+        rd->state->query_ops.init = rrdeng_load_metric_init;
+        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
+        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
+        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
+        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
+        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
+        return rd;
+    }
+
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-    RRDDIM *rd = rrddim_find(st, id);
+    rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
 
@@ -262,69 +310,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 //        sql_dimension_archive(dim_uuid, 0);
 #endif
 
-    // SPECIAL case create transient
-    if (is_archived == 2 && memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        char varname[CONFIG_MAX_NAME + 1];
-        unsigned long size = sizeof(RRDDIM);
-        rd = callocz(1, size);
-        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        rd->id = strdupz(id);
-        //rd->hash = simple_hash(rd->id);
 
-        snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-        //rd->name = config_get(st->config_section, varname, (name && *name) ? name : rd->id);
-        rd->name = strdupz((name && *name) ? name : rd->id);
-        //rd->hash_name = simple_hash(rd->name);
-
-        snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
-        rd->algorithm = rrd_algorithm_id(config_get(st->config_section, varname, rrd_algorithm_name(algorithm)));
-
-        snprintfz(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
-        rd->multiplier = config_get_number(st->config_section, varname, multiplier);
-
-        snprintfz(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
-        rd->divisor = config_get_number(st->config_section, varname, divisor);
-        if (!rd->divisor)
-            rd->divisor = 1;
-
-        rd->entries = st->entries;
-        rd->update_every = st->update_every;
-
-        rd->rrdset = st;
-        rd->state = mallocz(sizeof(*rd->state));
-
-        if (dim_uuid == NULL)
-            dim_uuid = sql_find_dim_uuid(st, rd->id, rd->name);
-
-        rrdeng_metric_init(rd, dim_uuid);
-        rd->state->collect_ops.init = rrdeng_store_metric_init;
-        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
-        rd->state->query_ops.init = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-
-//        if(!st->dimensions)
-//            st->dimensions = rd;
-//        else {
-//            RRDDIM *td = st->dimensions;
-//
-//            if(td->algorithm != rd->algorithm || abs(td->multiplier) != abs(rd->multiplier) || abs(td->divisor) != abs(rd->divisor)) {
-//                if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
-//                    rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
-//                }
-//            }
-//
-//            for(; td->next; td = td->next) ;
-//            td->next = rd;
-//        }
-        rrdset_unlock(st);
-
-        return rd;
-    }
 
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
