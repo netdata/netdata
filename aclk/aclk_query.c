@@ -553,15 +553,14 @@ void *aclk_query_main_thread(void *ptr)
                 " Reverting to default ACLK version of %d.", VERSION_NEG_TIMEOUT, ACLK_VERSION_MIN);
             aclk_shared_state.version_neg = ACLK_VERSION_MIN;
         }
-        if (unlikely(!aclk_shared_state.metadata_submitted)) {
-            ACLK_SHARED_STATE_UNLOCK;
+        if (unlikely(aclk_shared_state.metadata_submitted == ACLK_METADATA_REQUIRED)) {
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
+                ACLK_SHARED_STATE_UNLOCK;
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
                 sleep(1);
                 continue;
             }
-            ACLK_SHARED_STATE_LOCK;
             aclk_shared_state.metadata_submitted = ACLK_METADATA_CMD_QUEUED;
         }
         ACLK_SHARED_STATE_UNLOCK;
