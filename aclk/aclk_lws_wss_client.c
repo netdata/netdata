@@ -201,7 +201,7 @@ void aclk_lws_wss_client_destroy()
     aclk_lws_wss_destroy_context();
     engine_instance->lws_wsi = NULL;
 
-    aclk_lws_wss_clear_io_buffers(engine_instance);
+    aclk_lws_wss_clear_io_buffers();
 
 #ifdef ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED
     pthread_mutex_destroy(&engine_instance->write_buf_mutex);
@@ -510,7 +510,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             aclk_lws_connection_closed();
             return -1;                       // the callback response is ignored, hope the above remains true
         case LWS_CALLBACK_WSI_DESTROY:
-            aclk_lws_wss_clear_io_buffers(engine_instance);
+            aclk_lws_wss_clear_io_buffers();
             if (!engine_instance->websocket_connection_up)
                 aclk_lws_wss_fail_report();
             engine_instance->lws_wsi = NULL;

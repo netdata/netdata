@@ -187,7 +187,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
         return;
     }
     if (likely(descr->page_length)) {
-        int ret, page_is_empty;
+        int page_is_empty;
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
