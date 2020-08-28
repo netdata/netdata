@@ -208,8 +208,10 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     }
     else
     {
-        size_t offset = (size_t)(time - user->st->last_updated.tv_sec);
+        size_t offset = (size_t)(timestamp - user->st->last_updated.tv_sec) / user->st->update_every;
         rd->values[(rd->rrdset->current_entry + offset) % rd->entries] = value;
+        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld = %ld + %zu for %s.%s", value, timestamp,
+              rd->rrdset->current_entry, offset, user->st->id, id);
     }
     rd->collections_counter++;
 
