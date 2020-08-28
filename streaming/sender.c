@@ -794,7 +794,7 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
                                  window_end, rd_oldest, rd_end);
 
             // Technically rd->update_every could differ from st->update_every, but it does not.
-            for( sample_t = rd_oldest; sample_t < rd_end; sample_t += rd->update_every) {
+            for( metric_t = rd_oldest; metric_t < rd_end; ) {
 
                 if (rd->state->query_ops.is_finished(&handle)) {
                     debug(D_REPLICATION, "%s.%s query handle finished early @%ld", st->id, rd->id, sample_t);
@@ -802,19 +802,10 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
                 }
 
                 storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
-                if (n==SN_EMPTY_SLOT) {
+                if (n==SN_EMPTY_SLOT)
                     debug(D_REPLICATION, "%s.%s db empty in valid dimension range @ %ld", st->id, rd->id, sample_t);
-                }
-                if (sample_t != metric_t) {
-                    debug(D_REPLICATION, "%s.%s Sample mismatch during replication %ld vs %ld", st->id, rd->id,
-                                         sample_t, metric_t);
-                }
-                //if (handle.rrdeng.descr)
-                //    debug(D_REPLICATION, "%s.%s page_descr %llu - %llu with %u", st->id, rd->id,
-                //                         rd->state->handle.rrdeng.descr->start_time,
-                //                         rd->state->handle.rrdeng.descr->end_time,
-                //                         rd->state->handle.rrdeng.descr->page_length);
-                buffer_sprintf(s->build, "REPDIM \"%s\" %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, metric_t, n);
+                else
+                    buffer_sprintf(s->build, "REPDIM \"%s\" %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, metric_t, n);
                 debug(D_REPLICATION, "%s.%s REPDIM %ld " STORAGE_NUMBER_FORMAT "\n", st->id, rd->id, sample_t, n);
                 num_points++;
             }
