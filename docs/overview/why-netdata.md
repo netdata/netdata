@@ -1,7 +1,7 @@
 <!--
 title: "Why use Netdata?"
 description: "Netdata is simple to deploy, scalable, and optimized for troubleshooting. Cut the complexity and expense out of your monitoring stack."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/why-use-netdata.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/why-netdata.md
 -->
 
 # Why use Netdata?
