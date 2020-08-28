@@ -217,7 +217,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
                           collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
-                          int is_archived, uuid_t *dim_uuid) {
+                          int is_archived, uuid_t *dim_uuid, uuid_t *chart_uuid) {
     RRDDIM *rd = NULL;
     // SPECIAL case create transient
     if (is_archived == 2 && memory_mode == RRD_MEMORY_MODE_DBENGINE) {
@@ -266,6 +266,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         return rd;
     }
 
+#ifdef SQLITE_POC
+    // If we attempt to create archived dimension then send it to the SQLITE
+    if (is_archived == 1) {
+        int rc = sql_store_dimension(dim_uuid, chart_uuid, id, name, multiplier, divisor, algorithm);
+        return NULL;
+    }
+//    if (dim_uuid)
+//        sql_dimension_archive(dim_uuid, 0);
+#endif
+
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
@@ -298,19 +308,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rrdset_unlock(st);
         return rd;
     }
-
-#ifdef SQLITE_POC
-    // If we attempt to create archived dimension then send it to the SQLITE
-    if (is_archived == 1) {
-        int rc = sql_store_dimension(dim_uuid, st->chart_uuid, id, name, multiplier, divisor, algorithm);
-        rrdset_unlock(st);
-        return NULL;
-    }
-//    if (dim_uuid)
-//        sql_dimension_archive(dim_uuid, 0);
-#endif
-
-
 
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];

@@ -10,6 +10,8 @@ typedef struct parser_user_object {
     PARSER  *parser;
     RRDSET *st;
     RRDHOST *host;
+    uuid_t  host_uuid;
+    uuid_t  chart_uuid;
     void    *opaque;
     struct plugind *cd;
     int trust_durations;

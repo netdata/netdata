@@ -51,6 +51,10 @@ extern void sql_store_page_info(uuid_t temp_id, int valid_page, int page_length,
 extern void sql_add_metric_page_from_extent(struct rrdeng_page_descr *descr);
 extern struct sqlite3_blob *sql_open_metric_blob(uuid_t *dim_uuid);
 
+extern time_t sql_rrdeng_metric_latest_time(RRDDIM *rd);
+extern time_t sql_rrdeng_metric_oldest_time(RRDDIM *rd);
+
+
 
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -388,8 +388,11 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
     }
 
     if (unlikely(!st)) {
-        error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
-        goto disable;
+        //TODO: Check that we have at least a chart_uuid
+        if (uuid_is_null(((PARSER_USER_OBJECT *) user)->chart_uuid)) {
+            error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
+            goto disable;
+        }
     }
 
     long multiplier = 1;
@@ -409,7 +412,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
     if (unlikely(!algorithm || !*algorithm))
         algorithm = "absolute";
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(
             D_PLUGINSD,
             "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",

@@ -115,6 +115,8 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         return PARSER_RC_OK;
     }
     chart_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
+    if (chart_uuid)
+        uuid_copy(((PARSER_USER_OBJECT *) user)->chart_uuid, chart_uuid);
     st = rrdset_create_custom(
         host, type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
@@ -166,14 +168,15 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
     UNUSED(algorithm);
     uuid_t *dim_uuid;
 
-    if (unlikely(!st)) {
-        debug(D_METADATALOG, "Ignoring dimension belonging to missing or ignored chart.");
-        return PARSER_RC_OK;
-    }
+//    if (unlikely(!st)) {
+//        debug(D_METADATALOG, "Ignoring dimension belonging to missing or ignored chart.");
+//        return PARSER_RC_OK;
+//    }
     dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
+    uuid_t *chart_uuid = ((PARSER_USER_OBJECT *)user)->chart_uuid;
 
     RRDDIM *rd =
-        rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1, dim_uuid);
+        rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1, dim_uuid, chart_uuid);
 #ifdef SQLITE_POC
     sql_dimension_options(dim_uuid, options);
     uuid_clear(state->uuid);

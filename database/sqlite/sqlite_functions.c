@@ -121,7 +121,7 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
-    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS page (dim_uuid blob, page int , page_size int, start_date int, end_date int, fileno int, offset int, size int); delete from page;", 0, 0, &err_msg);
+    rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS page (dim_uuid blob, page int , page_size int, start_date int, end_date int, fileno int, offset int, size int); --delete from page;", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
@@ -367,7 +367,7 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
         rd = rrddim_add_custom(
             st, (const char *)sqlite3_column_text(res, 0), (const char *)sqlite3_column_text(res, 1),
             sqlite3_column_int(res, 2), sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode,
-            temp, &dim_uuid);
+            temp, &dim_uuid, NULL);
 
         if (temp != 2) {
             rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
@@ -963,7 +963,7 @@ void sql_store_page_info(uuid_t dim_uuid, int valid_page, int page_length, usec_
     static void *compressed_buf = NULL;
     static int max_compressed_size = 0;
 
-    return;
+    //return;
 
     if (!res) {
         int rc = sqlite3_prepare_v2(
@@ -1019,3 +1019,65 @@ void sql_store_page_info(uuid_t dim_uuid, int valid_page, int page_length, usec_
 }
 //
 //    sql_store_page_info(temp_id, valid_page, descr->page_length, descr->start_time, descr->end_time, extent->datafile->file, extent->offset);
+
+time_t sql_rrdeng_metric_latest_time(RRDDIM *rd)
+{
+    sqlite3_blob *blob;
+    static sqlite3_stmt *res = NULL;
+    int rc;
+    time_t  tim;
+
+    if (!db)
+        return NULL;
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(db, "select cast(max(end_date)/1E6 as \"int\") from page where dim_uuid = @dim;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return NULL;
+    }
+
+
+    rc = sqlite3_bind_blob(res, 1, rd->state->metric_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return NULL;
+
+    unsigned long long start = now_realtime_usec();
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW)
+        tim = sqlite3_column_int(res, 0);
+    unsigned long long end = now_realtime_usec();
+    info("SQLITE: MAX in %llu usec (value = %ld)", end - start, tim);
+
+    sqlite3_reset(res);
+    return tim;
+}
+
+time_t sql_rrdeng_metric_oldest_time(RRDDIM *rd)
+{
+    sqlite3_blob *blob;
+    static sqlite3_stmt *res = NULL;
+    int rc;
+    time_t tim;
+
+    if (!db)
+        return 0;
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(
+            db, "select cast(min(start_date)/1E6 as \"int\") from page where dim_uuid = @dim;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, rd->state->metric_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return 0;
+
+    unsigned long long start = now_realtime_usec();
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW)
+        tim = sqlite3_column_int(res, 0);
+    unsigned long long end = now_realtime_usec();
+    info("SQLITE: MIN in %llu usec (value = %ld)", end - start, tim);
+
+    sqlite3_reset(res);
+    return tim;
+}
