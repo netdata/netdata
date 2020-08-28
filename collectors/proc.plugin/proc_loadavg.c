@@ -46,6 +46,19 @@ int do_proc_loadavg(int update_every, usec_t dt) {
 
     //unsigned long long running_processes  = str2ull(procfile_lineword(ff, 0, 3));
     unsigned long long active_processes     = str2ull(procfile_lineword(ff, 0, 4));
+    
+    //open PID_MAX and get the number
+    FILE *fp;
+    int val;
+    char pid_max [TMP_MAX];
+    fp=fopen("/proc/sys/kernel/pid_max", "r");
+    fscanf(fp,"%d",&val);
+    //snprintf(pid_max,TMP_MAX,"%d",val);
+    fclose(fp);
+    //
+
+    unsigned long long max_processes        = (unsigned long long) val;
+   
     //unsigned long long next_pid           = str2ull(procfile_lineword(ff, 0, 5));
 
 
@@ -94,7 +107,8 @@ int do_proc_loadavg(int update_every, usec_t dt) {
 
     if(likely(do_all_processes)) {
         static RRDSET *processes_chart = NULL;
-        static RRDDIM *rd_active = NULL;
+        static RRDDIM *rd_active = NULL, *rd_pidmax;
+        
 
         if(unlikely(!processes_chart)) {
             processes_chart = rrdset_create_localhost(
@@ -113,10 +127,13 @@ int do_proc_loadavg(int update_every, usec_t dt) {
             );
 
             rd_active = rrddim_add(processes_chart, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pidmax = rrddim_add(processes_chart, "pidmax", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(processes_chart);
 
         rrddim_set_by_pointer(processes_chart, rd_active, active_processes);
+        rrddim_set_by_pointer(processes_chart, rd_pidmax,    max_processes);
+        rrddim_hide(processes_chart, "pidmax");
         rrdset_done(processes_chart);
     }
 
