@@ -149,7 +149,9 @@ static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handl
     long entries = rd->rrdset->entries;
     long slot = handle->slotted.slot;
 
-    (void)current_time;
+    long slots_from_end = (handle->slotted.last_slot + rd->rrdset->entries - slot) % rd->rrdset->entries;
+    *current_time = handle->end_time - slots_from_end * rd->update_every;
+
     if (unlikely(handle->slotted.slot == handle->slotted.last_slot))
         handle->slotted.finished = 1;
     storage_number n = rd->values[slot++];
