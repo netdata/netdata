@@ -68,6 +68,9 @@ typedef enum aclk_proxy_type {
     PROXY_NOT_SET,
 } ACLK_PROXY_TYPE;
 
+extern int aclk_kill_link; // Tells the agent to tear down the link
+extern int aclk_disable_runtime;
+
 const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type);
 
 #define ACLK_PROXY_PROTO_ADDR_SEPARATOR "://"
@@ -81,7 +84,5 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
 int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
-
-extern int aclk_disable_runtime;
 
 #endif //ACLK_COMMON_H

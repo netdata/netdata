@@ -703,6 +703,8 @@ set(ACLK_PLUGIN_FILES
         aclk/mqtt.h
         aclk/aclk_stats.c
         aclk/aclk_stats.h
+        aclk/aclk_rx_msgs.c
+        aclk/aclk_rx_msgs.h
         )
 
 set(SPAWN_PLUGIN_FILES

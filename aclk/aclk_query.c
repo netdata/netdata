@@ -1,6 +1,7 @@
 #include "aclk_common.h"
 #include "aclk_query.h"
 #include "aclk_stats.h"
+#include "aclk_rx_msgs.h"
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
 
@@ -717,6 +718,7 @@ void *aclk_query_main_thread(void *ptr)
             error("ACLK version negotiation failed. No reply to \"hello\" with \"version\" from cloud in time of %ds."
                 " Reverting to default ACLK version of %d.", VERSION_NEG_TIMEOUT, ACLK_VERSION_MIN);
             aclk_shared_state.version_neg = ACLK_VERSION_MIN;
+            aclk_set_rx_handlers(aclk_shared_state.version_neg);
         }
         if (unlikely(aclk_shared_state.metadata_submitted == ACLK_METADATA_REQUIRED)) {
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {

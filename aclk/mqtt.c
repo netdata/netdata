@@ -5,6 +5,7 @@
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
 #include "aclk_stats.h"
+#include "aclk_rx_msgs.h"
 
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
