@@ -238,6 +238,11 @@ int aclk_handle_cloud_message(char *payload)
         goto err_cleanup;
     }
 
+    if (!aclk_shared_state.version_neg && strcmp(cloud_to_agent.type_id, "version")) {
+        error("Only \"version\" message is allowed before popcorning and version negotiation is finished. Ignoring");
+        goto err_cleanup;
+    }
+
     for (int i = 0; aclk_incoming_msg_types[i].name; i++) {
         if (strcmp(cloud_to_agent.type_id, aclk_incoming_msg_types[i].name) == 0) {
             if (likely(!aclk_incoming_msg_types[i].fnc(&cloud_to_agent, payload))) {
