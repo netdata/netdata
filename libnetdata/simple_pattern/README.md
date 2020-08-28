@@ -1,4 +1,10 @@
-## Netdata simple patterns
+<!--
+title: "Netdata simple patterns"
+description: "Netdata supports simple patterns, which are less cryptic versions of regular expressions. Use familiar notation for powerful results."
+custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/simple_pattern/README.md
+-->
+
+# Netdata simple patterns
 
 Unix prefers regular expressions. But they are just too hard, too cryptic
 to use, write and understand.
