@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix broken `Edit this page` link in simple patterns doc [\#9847](https://github.com/netdata/netdata/pull/9847) ([joelhans](https://github.com/joelhans))
+- fixes compilation warnings [\#9845](https://github.com/netdata/netdata/pull/9845) ([underhood](https://github.com/underhood))
+- dashboard v1.4.2 [\#9837](https://github.com/netdata/netdata/pull/9837) ([jacekkolasa](https://github.com/jacekkolasa))
 - Change a log level in cgroup-network helper [\#9836](https://github.com/netdata/netdata/pull/9836) ([vlvkobal](https://github.com/vlvkobal))
+- Don't falsely report that the group was not deleted [\#9835](https://github.com/netdata/netdata/pull/9835) ([michmach](https://github.com/michmach))
 - Fixed updater bug introduced by incomplete variable rename in \#8808. [\#9834](https://github.com/netdata/netdata/pull/9834) ([Ferroin](https://github.com/Ferroin))
 - Fixes proxy forwarding claim\_id to old parent [\#9828](https://github.com/netdata/netdata/pull/9828) ([underhood](https://github.com/underhood))
 - Remove Google Charts info from API doc [\#9826](https://github.com/netdata/netdata/pull/9826) ([joelhans](https://github.com/joelhans))
@@ -20,6 +24,7 @@
 - Add `claimed\_id` for child nodes streamed to their parents [\#9804](https://github.com/netdata/netdata/pull/9804) ([underhood](https://github.com/underhood))
 - Improved temporary directory checking in installer and updater. [\#9797](https://github.com/netdata/netdata/pull/9797) ([Ferroin](https://github.com/Ferroin))
 - Fix loading custom dashboard\_info in /old dashboard [\#9792](https://github.com/netdata/netdata/pull/9792) ([jacekkolasa](https://github.com/jacekkolasa))
+- Fix redirect with parameters [\#9790](https://github.com/netdata/netdata/pull/9790) ([thiagoftsm](https://github.com/thiagoftsm))
 - dashboard v1.3.1 [\#9786](https://github.com/netdata/netdata/pull/9786) ([jacekkolasa](https://github.com/jacekkolasa))
 - Fix long stats.d chart names \(suggested by @vince-lessbits\) [\#9783](https://github.com/netdata/netdata/pull/9783) ([amoss](https://github.com/amoss))
 - Fix Travis CI builds and skip Fedora 31 i386 build/test cycles [\#9781](https://github.com/netdata/netdata/pull/9781) ([prologic](https://github.com/prologic))
@@ -233,14 +238,6 @@
 - Clean type\_name in exporting connector instance configuration [\#9188](https://github.com/netdata/netdata/pull/9188) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed cmake build affected by \#9074 [\#9186](https://github.com/netdata/netdata/pull/9186) ([stelfrag](https://github.com/stelfrag))
 - Fix exporting unit tests [\#9183](https://github.com/netdata/netdata/pull/9183) ([vlvkobal](https://github.com/vlvkobal))
-- Fix missing ebpf packaging files from dist archive [\#9182](https://github.com/netdata/netdata/pull/9182) ([prologic](https://github.com/prologic))
-- cov\_358988: Remove coverity bug [\#9180](https://github.com/netdata/netdata/pull/9180) ([thiagoftsm](https://github.com/thiagoftsm))
-- Integration between eBPF and Apps [\#9178](https://github.com/netdata/netdata/pull/9178) ([thiagoftsm](https://github.com/thiagoftsm))
-- Improve dbengine docs for streaming setups [\#9177](https://github.com/netdata/netdata/pull/9177) ([joelhans](https://github.com/joelhans))
-- Really prevent overwriting netdata.conf on static installs. [\#9174](https://github.com/netdata/netdata/pull/9174) ([Ferroin](https://github.com/Ferroin))
-- Remove knatsakis and ncmans from CODEOWNERS for the agent. [\#9173](https://github.com/netdata/netdata/pull/9173) ([Ferroin](https://github.com/Ferroin))
-- Added health check functionality to our Docker images. [\#9172](https://github.com/netdata/netdata/pull/9172) ([Ferroin](https://github.com/Ferroin))
-- Remove the experimental label from the exporting engine documentation [\#9171](https://github.com/netdata/netdata/pull/9171) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
