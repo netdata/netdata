@@ -6,12 +6,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/wh
 
 # What is Netdata?
 
-Netdata is distributed, real-time performance and health monitoring for systems and applications. It's designed to help
-sysadmins, SREs, DevOps engineers, and IT professionals collect all metrics, visualize the health of their systems, and
-troubleshoot complex performance problems.
+Netdata helps sysadmins, SREs, DevOps engineers, and IT professionals collect all possible metrics from systems and
+applications, visualize these metrics in real-time, and troubleshoot complex performance problems.
 
-Netdata's solution uses two components, the Netdata Agent and Netdata Cloud, to deliver performance and health
-monitoring for both single and entire infrastructures.
+Netdata's solution uses two components, the Netdata Agent and Netdata Cloud, to deliver real-time performance and health
+monitoring for both single nodes and entire infrastructures.
 
 ## Netdata Agent
 
@@ -36,7 +35,8 @@ entire infrastructure of nodes, invite all your colleagues, and visualize any nu
 entirely for free.
 
 While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or
-centralized in any way. Metrics data remains with your nodes and is only streamed to your browser through Cloud.
+centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when
+you're viewing the Netdata Cloud interface.
 
 ![cloud-hero-overview](https://user-images.githubusercontent.com/1153921/91363071-9ea38b80-e7b0-11ea-87d9-28b91b360cd1.png)
 
@@ -45,20 +45,20 @@ centralized in any way. Metrics data remains with your nodes and is only streame
 Netdata is designed to be both simple to use and flexible for every monitoring, visualization, and troubleshooting use
 case:
 
--   **Collect**: Netdata collects all available metrics from your system and applications. It uses 300+ collectors,
-    Kubernetes service discovery, in-depth container monitoring, while using only 1% CPU and a few MB of RAM. It even
-    collects metrics from Windows machines.
--   **Visualize**: The dashboard meaningfully presents charts to to help you understand the relationships between your
+-   **Collect**: Netdata collects all available metrics from your system and applications with 300+ collectors,
+    Kubernetes service discovery, and in-depth container monitoring, all while using only 1% CPU and a few MB of RAM. It
+    even collects metrics from Windows machines.
+-   **Visualize**: The dashboard meaningfully presents charts to help you understand the relationships between your
     hardware, operating system, running apps/services, and the rest of your infrastructure. Add nodes to Netdata Cloud
     for a complete view of your infrastructure from a single pane of glass.
--   **Monitor**: Netdata's health watchdog uses uses hundreds of preconfigured alarms to notify you via Slack, email,
+-   **Monitor**: Netdata's health watchdog uses hundreds of preconfigured alarms to notify you via Slack, email,
     PagerDuty and more when an anomaly strikes. Customize with dynamic thresholds, hysteresis, alarm templates, and
     role-based notifications.
 -   **Troubleshoot**: 1s granularity helps you detect analyze anomalies other monitoring platforms might have missed.
-    Interactive visualizations reduce your reliance on the console and historical metrics help you trace issues back to
+    Interactive visualizations reduce your reliance on the console, and historical metrics help you trace issues back to
     their root cause.
 -   **Store**: Netdata's efficient database engine efficiently stores per-second metrics for days, weeks, or even
-    months. Every distributed node stores metrics locally, which simplifies deployment, slashes costs, and enriches
+    months. Every distributed node stores metrics locally, simplifying deployment, slashing costs, and enriching
     Netdata's interactive dashboards.
 -   **Export**: Integrate per-second metrics with other time-series databases like Graphite, Prometheus, InfluxDB,
     TimescaleDB, and more with Netdata's interoperable and extensible core.

@@ -6,9 +6,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/wh
 
 # Why use Netdata?
 
-Netdata takes a different approach to helping people build extraordinary infrastructure. It was born out of a
-frustration with existing monitoring tools that are too complex, too expensive, and don't help their users actually
-troubleshoot issues. 
+Netdata takes a different approach to helping people build extraordinary infrastructure. It was built out of frustration
+with existing monitoring tools that are too complex, too expensive, and don't help their users actually troubleshoot
+complex performance and health issues.
 
 Netdata is:
 
@@ -34,7 +34,7 @@ Netdata is:
 -   **Visual anomaly detection** with a UI/UX that emphasizes the relationships between charts.
 -   **Customizable dashboards** to pinpoint correlated metrics, respond to incidents, and help you streamline your
     workflows.
--   **Distributed metrics in a centralized interface** to help users or teams trace complex issues between distributed
+-   **Distributed metrics in a centralized interface** to assist users or teams trace complex issues between distributed
     nodes.
 
 ## Comparison with other monitoring solutions
