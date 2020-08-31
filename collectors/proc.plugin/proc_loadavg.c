@@ -47,17 +47,9 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     //unsigned long long running_processes  = str2ull(procfile_lineword(ff, 0, 3));
     unsigned long long active_processes     = str2ull(procfile_lineword(ff, 0, 4));
     
-    //open PID_MAX and get the number
-    FILE *fp;
-    int val;
-    char pid_max [TMP_MAX];
-    fp=fopen("/proc/sys/kernel/pid_max", "r");
-    fscanf(fp,"%d",&val);
-    fclose(fp);
+    //get system pid_max
+    unsigned long long max_processes        = get_system_pid_max();
     //
-
-    unsigned long long max_processes        = (unsigned long long) val;
-   
     //unsigned long long next_pid           = str2ull(procfile_lineword(ff, 0, 5));
 
 
