@@ -167,6 +167,12 @@ AC_ARG_ENABLE(
     ,
     [enable_jsonc="detect"]
 )
+AC_ARG_ENABLE(
+    [ebpf],
+    [AS_HELP_STRING([--disable-ebpf], [Disable eBPF support @<:@default autodetect@:>@])],
+    ,
+    [enable_ebpf="detect"]
+)
 
 # -----------------------------------------------------------------------------
 # Check if cloud is enabled and if the functionality is available
@@ -968,6 +974,7 @@ AC_CHECK_FILE(
 
 AC_MSG_CHECKING([if ebpf.plugin should be enabled])
 if test "${build_target}" = "linux" -a \
+        "${enable_ebpf}" != "no" -a \
         "${have_libelf}" = "yes" -a \
         "${have_bpf}" = "yes" -a \
         "${have_libbpf}" = "yes"; then

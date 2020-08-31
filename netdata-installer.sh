@@ -299,7 +299,7 @@ while [ -n "${1}" ]; do
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
-    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
@@ -1432,6 +1432,12 @@ should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
     run_failed "eBPF explicitly disabled."
     defer_error "eBPF explicitly disabled."
+    return 1
+  fi
+
+  if [ "$(uname -s)" != "Linux" ]; then
+    run_failed "Currently eBPF is only supported on Linux."
+    defer_error "Currently eBPF is only supported on Linux."
     return 1
   fi
 
