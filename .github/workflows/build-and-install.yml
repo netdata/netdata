@@ -136,10 +136,10 @@ jobs:
           - 'ubuntu:20.04'
         include:
           - distro: 'centos:7'
-            pre: >- 
+            pre: >-
               yum update &&
               yum groupinstall -y 'Development Tools' &&
-              yum install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel'
+              yum install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
