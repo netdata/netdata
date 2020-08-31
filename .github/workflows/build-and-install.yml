@@ -138,8 +138,8 @@ jobs:
           - distro: 'centos:7'
             pre: >-
               yum update &&
-              yum groupinstall -y 'Development Tools' &&
-              yum install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel
+              yum -y groupinstall 'Development Tools' &&
+              yum -y install libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
@@ -160,8 +160,8 @@ jobs:
           - distro: 'fedora:32'
             pre: >-
               dnf update &&
-              dnf groupinstall -y 'Development Tools' &&
-              dnf install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-devel
+              dnf -y groupinstall 'Development Tools' &&
+              dnf -y install libcurl-devel openssl-devel libuuid-devel pulseaudio-devel
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
