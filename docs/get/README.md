@@ -4,7 +4,7 @@ description: "Time to get Netdata's monitoring and troubleshooting solution. Sig
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/get/README.md
 -->
 
-## Get Netdata
+# Get Netdata
 
 import { OneLineInstall } from '../src/components/OneLineInstall/'
 import { Install, InstallBox } from '../src/components/InstallBox/'
