@@ -171,7 +171,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
         return;
     }
     if (likely(descr->page_length)) {
-        int page_is_empty;
+        int /*ret, */page_is_empty;
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
@@ -216,7 +216,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     struct page_cache *pg_cache;
     struct rrdeng_page_descr *descr;
     storage_number *page;
-    uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
+    uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0, tf_alignment_change = 0;
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
@@ -244,10 +244,14 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
+        usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number));
+        if (0 != ((point_in_time - descr->end_time) % tf_spacing))
+            tf_alignment_change = 1;
     }
     if (unlikely(NULL == descr ||
                  descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE ||
-                 must_flush_unaligned_page)) {
+                 must_flush_unaligned_page ||
+                 tf_alignment_change)) {
         rrdeng_store_metric_flush_current_page(rd);
 
         page = rrdeng_create_page(ctx, &rd->state->page_index->id, &descr);
