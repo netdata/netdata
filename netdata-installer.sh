@@ -692,7 +692,7 @@ bundle_judy() {
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-libjudy=externaldeps/libJudy"
     else
       run_failed "Failed to build libJudy."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+      if [ -n "${NETDATA_BUILD_JUDY}" ]; then
         exit 1
       else
         defer_error_highlighted "Failed to build libJudy. dbengine support will be disabled."
@@ -700,7 +700,7 @@ bundle_judy() {
     fi
   else
     run_failed "Unable to fetch sources for libJudy."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+    if [ -n "${NETDATA_BUILD_JUDY}" ]; then
       exit 1
     else
       defer_error_highlighted "Unable to fetch sources for libJudy. dbengine support will be disabled."
