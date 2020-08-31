@@ -136,17 +136,17 @@ jobs:
           - 'fedora:32'
           - 'ubuntu:20.04'
         include:
-          - distro: 'centos:8'
-            pre: >-
-              yum -y update &&
-              yum -y groupinstall 'Development Tools' &&
-              yum -y install libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel
-            build_kinesis: >-
-              git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
-              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
-              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
-              ./aws-sdk-cpp
+          #- distro: 'centos:8'
+          #  pre: >-
+          #    yum -y update &&
+          #    yum -y groupinstall 'Development Tools' &&
+          #    yum -y install libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel
+          #  build_kinesis: >-
+          #    git clone https://github.com/aws/aws-sdk-cpp.git &&
+          #    cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
+          #    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
+          #    -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
+          #    ./aws-sdk-cpp
           - distro: 'debian:buster'
             pre: >-
               apt-get update &&
