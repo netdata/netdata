@@ -130,7 +130,7 @@ _cannot_use_tmpdir() {
     return "${ret}"
   fi
 
-  if /bin/echo -e '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
     if chmod +x "${testfile}" ; then
       if [ "$("${testfile}")" = "SUCCESS" ] ; then
         ret=1
