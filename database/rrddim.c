@@ -307,8 +307,17 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                     memset(rd, 0, size);
                     reset = 1;
                 }
-                else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
+                // Collected times are valid on the collecting node
+                else if(host == localhost &&
+                    dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
                     info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
+                    memset(rd, 0, size);
+                    reset = 1;
+                }
+                // If the data was streamed here then the updated times should be used
+                else if(host != localhost &&
+                    dt_usec(&now, &st->last_updated) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
+                    info("File %s is too old (last updated %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &st->last_updated) / USEC_PER_SEC, rd->entries * rd->update_every);
                     memset(rd, 0, size);
                     reset = 1;
                 }
