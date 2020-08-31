@@ -56,7 +56,8 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     uuid_t legacy_uuid;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
-    int replace_instead_of_generate = 0;
+    int replace_instead_of_generate = 0, is_multihost_child = 0;
+    RRDHOST *host = rd->rrdset->rrdhost;
 
     ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
     if (unlikely(!ctx)) {
@@ -67,6 +68,8 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
     rd->state->metric_uuid = callocz(1, sizeof(uuid_t));
+    if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
+        is_multihost_child = 1;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &legacy_uuid, sizeof(uuid_t));
@@ -74,8 +77,9 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         page_index = *PValue;
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (NULL == PValue) {
-        /* First time we see the legacy UUID, drop legacy support, normal path */
+    if (is_multihost_child || NULL == PValue) {
+        /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
+         * Drop legacy support, normal path */
 
         if (NULL != dim_uuid) {
             replace_instead_of_generate = 1;
