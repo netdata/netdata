@@ -160,7 +160,7 @@ jobs:
                     -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis \
                     ./aws-sdk-cpp'
           - distro: 'ubuntu:20.04'
-            pre: 'apt-get update && apt-get install libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev'
+            pre: 'apt-get update && apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev'
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib \
