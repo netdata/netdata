@@ -666,6 +666,10 @@ bundle_judy() {
   # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
   if [ -n "${NETDATA_DISABLE_DBENGINE}" ] && [ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ] ; then
     return 0
+  elif [ -n "${NETDATA_BUILD_JUDY}" ] ; then
+    progress "User requested bundling of libJudy, building it now"
+  elif [ ! -e /usr/include/Judy.h ] ; then
+    progress "/usr/include/Judy.h does not exist, but we need libJudy, building our own copy"
   fi
 
   progress "Prepare libJudy"
