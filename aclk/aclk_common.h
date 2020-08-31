@@ -12,6 +12,11 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_VERSION_MIN 1
 #define ACLK_VERSION_MAX 1
 
+// Version negotiation messages have they own versioning
+// this is also used for LWT message as we set that up
+// before version negotiation
+#define ACLK_VERSION_NEG_VERSION 1
+
 // Maximum time to wait for version negotiation before aborting
 // and defaulting to oldest supported version
 #define VERSION_NEG_TIMEOUT 3
