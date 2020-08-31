@@ -664,7 +664,8 @@ copy_judy() {
 
 bundle_judy() {
   # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
-  if [ -n "${NETDATA_DISABLE_DBENGINE}" ] && [ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ] ; then
+  # shellcheck disable=SC2235
+  if [ -n "${NETDATA_DISABLE_DBENGINE}" ] || ( [ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ] ); then
     return 0
   elif [ -n "${NETDATA_BUILD_JUDY}" ] ; then
     progress "User requested bundling of libJudy, building it now"
