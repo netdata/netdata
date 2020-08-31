@@ -17,6 +17,7 @@ DEFAULT_PORT = '389'
 DEFAULT_TLS = False
 DEFAULT_CERT_CHECK = True
 DEFAULT_TIMEOUT = 1
+DEFAULT_START_TLS = False
 
 ORDER = [
     'total_connections',
@@ -143,7 +144,8 @@ class Service(SimpleService):
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
         self.use_tls = configuration.get('use_tls', DEFAULT_TLS)
         self.cert_check = configuration.get('cert_check', DEFAULT_CERT_CHECK)
-        self.alive = False
+        self.use_start_tls = configuration.get('use_start_tls', DEFAULT_START_TLS)
+	self.alive = False
         self.conn = None
 
     def disconnect(self):
@@ -159,10 +161,15 @@ class Service(SimpleService):
             else:
                 self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
-            if self.use_tls and not self.cert_check:
+            if (self.use_tls or self.use_start_tls) and not self.cert_check:
                 self.conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-            if self.username and self.password:
-                self.conn.simple_bind(self.username, self.password)
+            if self.use_start_tls: 
+		        self.conn.protocol_version=ldap.VERSION3
+		        self.conn.set_option(ldap.OPT_X_TLS_NEWCTX,0)
+		        self.conn.start_tls_s()
+	    if self.username and self.password:
+                self.conn.simple_bind_s(self.username, self.password)
+	
         except ldap.LDAPError as error:
             self.error(error)
             return False
