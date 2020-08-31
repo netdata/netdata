@@ -130,12 +130,12 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - 'centos:7'
+          - 'centos:8'
           - 'debian:buster'
           - 'fedora:32'
           - 'ubuntu:20.04'
         include:
-          - distro: 'centos:7'
+          - distro: 'centos:8'
             pre: >-
               yum update &&
               yum -y groupinstall 'Development Tools' &&
