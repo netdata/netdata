@@ -1435,7 +1435,7 @@ should_install_ebpf() {
     return 1
   fi
 
-  if [ "$(uname -s)" != Linux ]; then
+  if [ "$(uname -s)" != "Linux" ]; then
     run_failed "Currently eBPF is only supported on Linux."
     defer_error "Currently eBPF is only supported on Linux."
     return 1
