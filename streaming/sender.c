@@ -770,11 +770,16 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
     time_t window_end = window_start + unsent_points * st->update_every;    // window_end <= st_newest + update_every
 
     // If we are responding to an explicit request then we may send empty windows, these communicate to the far end
-    // that there is no data in the interval.
+    // that there is no data in the interval. There are times in the REPBEGIN:
+    //   * The beginning of the window in time (e.g. where we are reporting from including gaps)
+    //   * The beginning of the data in time   (e.g. dropping leading gaps from the window)
+    //   * The end of the window.
+    // The start times are inclusive and the end time is exclusive, so if the requested window is 10..20 and the
+    // chart contains data at times 15,16,17,18 then the response will be REPBEGIN 10 15 19
     if (start_time == 0)
-        buffer_sprintf(s->build, "REPBEGIN %s %ld %ld\n", st->id, window_start, window_end);
+        buffer_sprintf(s->build, "REPBEGIN %s %ld %ld %ld\n", st->id, window_start, window_start, window_end);
     else
-        buffer_sprintf(s->build, "REPBEGIN %s %ld %ld\n", st->id, start_time, window_end);
+        buffer_sprintf(s->build, "REPBEGIN %s %ld %ld %ld\n", st->id, start_time, window_start, window_end);
 
     size_t num_points = 0;
     rrddim_foreach_read(rd, st) {
@@ -788,25 +793,23 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
             time_t rd_oldest = MAX(rd_start, window_start);
             rd_end = MIN(rd_end,   window_end);
 
-            time_t sample_t, metric_t;
             rd->state->query_ops.init(rd, &handle, rd_oldest, rd_end);
             debug(D_REPLICATION, "Fill replication with %s.%s @%ld-%ld rd@%ld-%ld", st->id, rd->id, window_start,
                                  window_end, rd_oldest, rd_end);
 
-            // Technically rd->update_every could differ from st->update_every, but it does not.
-            for( metric_t = rd_oldest; metric_t < rd_end; ) {
+            for (time_t metric_t = rd_oldest; metric_t < rd_end; ) {
 
                 if (rd->state->query_ops.is_finished(&handle)) {
-                    debug(D_REPLICATION, "%s.%s query handle finished early @%ld", st->id, rd->id, sample_t);
+                    debug(D_REPLICATION, "%s.%s query handle finished early @%ld", st->id, rd->id, metric_t);
                     break;
                 }
 
                 storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
                 if (n==SN_EMPTY_SLOT)
-                    debug(D_REPLICATION, "%s.%s db empty in valid dimension range @ %ld", st->id, rd->id, sample_t);
+                    debug(D_REPLICATION, "%s.%s db empty in valid dimension range @ %ld", st->id, rd->id, metric_t);
                 else
                     buffer_sprintf(s->build, "REPDIM \"%s\" %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, metric_t, n);
-                debug(D_REPLICATION, "%s.%s REPDIM %ld " STORAGE_NUMBER_FORMAT "\n", st->id, rd->id, sample_t, n);
+                debug(D_REPLICATION, "%s.%s REPDIM %ld " STORAGE_NUMBER_FORMAT "\n", st->id, rd->id, metric_t, n);
                 num_points++;
             }
             rd->state->query_ops.finalize(&handle);

@@ -1077,9 +1077,9 @@ void rrdset_dump_debug_state(RRDSET *st) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if (debug_flags&D_REPLICATION) {
         RRDDIM *rd;
-        debug(D_REPLICATION, "Chart state %s: counter=%zu counter_done=%zu usec_since_last=%llu last_updated=%ld.%ld"
+        debug(D_REPLICATION, "Chart state %s: counter=%zu counter_done=%zu current_entry=%ld usec_since_last=%llu last_updated=%ld.%ld"
                              " last_collected=%ld.%ld collected_total=%lld last_collected_total=%lld",
-                             st->id, st->counter, st->counter_done, st->usec_since_last_update,
+                             st->id, st->counter, st->counter_done, st->current_entry, st->usec_since_last_update,
                              st->last_updated.tv_sec, st->last_updated.tv_usec,
                              st->last_collected_time.tv_sec, st->last_collected_time.tv_usec,
                              st->collected_total, st->last_collected_total);

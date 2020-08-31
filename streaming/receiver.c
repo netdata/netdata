@@ -96,7 +96,8 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     UNUSED(plugins_action);
     char *id = words[1];
     char *start_txt = words[2];
-    char *end_txt = words[3];
+    char *first_txt = words[3];
+    char *end_txt = words[4];
     if (!id || !start_txt || !end_txt)
         goto disable;
 
@@ -106,6 +107,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
         goto disable;
     user->st = st;
     st->state->window_start = str2ll(start_txt, NULL);
+    st->state->window_first = str2ll(first_txt, NULL);
     st->state->window_end   = str2ll(end_txt, NULL);
 
     struct receiver_state *rpt = user->opaque;
@@ -157,10 +159,11 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
             return PARSER_RC_OK;
         }
     }
-    user->st->last_updated.tv_sec = user->st->state->window_start;
+    user->st->last_updated.tv_sec = user->st->state->window_first;
     user->st->state->ignore_block = 0;
     debug(D_REPLICATION, "Replication on %s @ %ld, block %ld-%ld last_update=%ld", st->name, now,
                          user->st->state->window_start, user->st->state->window_end, st->last_updated.tv_sec);
+
     return PARSER_RC_OK;
 disable:
     errno = 0;
@@ -208,6 +211,9 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     }
     else
     {
+        // We are assuming here that data received for each dimension in the window is dense. This is because any
+        // gaps from dropped samples should be filled with either SN_EMPTY_SLOT or interpolated values at storage time
+        // on the collecting node.
         size_t offset = (size_t)(timestamp - user->st->last_updated.tv_sec) / user->st->update_every;
         rd->values[(rd->rrdset->current_entry + offset) % rd->entries] = value;
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld = %ld + %zu for %s.%s", value, timestamp,
@@ -241,7 +247,6 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
         user->st->state->ignore_block = 0;
         return PARSER_RC_OK;
     }
-    user->st->state->ignore_block = 0;
 
     size_t num_points = str2ull(num_points_txt);
     total_number col_total = str2ll(col_total_txt, NULL);
@@ -250,7 +255,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     struct rrdset_volatile *state = user->st->state;
     user->st->last_updated.tv_sec = state->window_end - user->st->update_every;
     if (num_points > 0) {
-        long advance = (state->window_end - state->window_start) / user->st->update_every;
+        long advance = (state->window_end - state->window_first) / user->st->update_every;
         user->st->counter       += advance;
         user->st->counter_done  += advance;
         user->st->current_entry += advance;
@@ -258,13 +263,16 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
             user->st->current_entry -= user->st->entries;
         user->st->collected_total = col_total;
         user->st->last_collected_total = last_total;
-        debug(D_REPLICATION, "Finished replication %s: window %ld..%ld with %zu points transferred, advance=%ld-pts",
-                             user->st->name, state->window_start, state->window_end, num_points, advance);
+        debug(D_REPLICATION, "Finished replication %s: window %ld/%ld..%ld with %zu-pts transferred, advance=%ld-pts",
+                             user->st->name, state->window_start, state->window_first, state->window_end, num_points,
+                             advance);
     } else {
-        debug(D_REPLICATION, "Finished replication on %s: window %ld-%ld was empty, last_updated=%ld", user->st->name,
-                             state->window_start, state->window_end, user->st->last_updated.tv_sec);
+        debug(D_REPLICATION, "Finished replication on %s: window %ld/%ld-%ld empty, last_updated=%ld", user->st->name,
+                             state->window_start, state->window_first, state->window_end,
+                             user->st->last_updated.tv_sec);
     }
     state->window_start = 0;
+    state->window_first = 0;
     state->window_end = 0;
     rrdset_dump_debug_state(user->st);
     user->st = NULL;

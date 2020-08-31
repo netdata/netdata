@@ -430,7 +430,7 @@ struct rrdset_volatile {
     struct label *new_labels;
     struct label_index labels;
     struct timeval last_sent;                // the timestamp of the last db point sent from this node over streaming
-    time_t window_start, window_end;         // the current incoming replication block
+    time_t window_start, window_first, window_end;         // the current incoming replication block
     int ignore_block;
 };
 
