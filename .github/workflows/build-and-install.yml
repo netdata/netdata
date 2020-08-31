@@ -140,7 +140,7 @@ jobs:
           #  pre: >-
           #    yum -y update &&
           #    yum -y groupinstall 'Development Tools' &&
-          #    yum -y install libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel
+          #    yum -y install libcurl-devel openssl-devel libuuid-devel
           #  build_kinesis: >-
           #    git clone https://github.com/aws/aws-sdk-cpp.git &&
           #    cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
@@ -162,7 +162,7 @@ jobs:
             pre: >-
               dnf -y update &&
               dnf -y groupinstall 'Development Tools' &&
-              dnf -y install libcurl-devel openssl-devel libuuid-devel pulseaudio-devel
+              dnf -y install libcurl-devel openssl-devel libuuid-devel
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
