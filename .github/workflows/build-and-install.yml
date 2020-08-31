@@ -125,7 +125,7 @@ jobs:
           docker run -w /netdata test \
               /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
   aws-kinesis-build:
-    name: Aws Kinesis Build
+    name: With AWS Kinesis SDK
     strategy:
       fail-fast: false
       matrix:
@@ -139,34 +139,34 @@ jobs:
             pre: 'yum update && yum install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel'
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib \
-                    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
-                    -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis \
-                    ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
+              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
+              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp
           - distro: 'debian:buster'
             pre: 'apt-get update && apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev'
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib \
-                    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
-                    -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis \
-                    ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
+              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
+              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp
           - distro: 'fedora:32'
             pre: 'dnf update && dnf install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-devel'
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib \
-                    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
-                    -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis \
-                    ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
+              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
+              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp
           - distro: 'ubuntu:20.04'
             pre: 'apt-get update && apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev'
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib \
-                    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
-                    -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis \
-                    ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
+              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
+              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
