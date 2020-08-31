@@ -84,8 +84,9 @@ Even more options available in our [packaging documentation](/docs/agent/packagi
 
 ## Claim your node on Netdata Cloud
 
-You need to claim your nodes to see them in Netdata Cloud. Claiming establishes a secure TLS connection to Netdata Cloud
-using the [Agent-Cloud link](/aclk/README.md), and proves you have write and administrative access to that node.
+You need to [claim](/claim/README.md) your nodes to see them in Netdata Cloud. Claiming establishes a secure TLS
+connection to Netdata Cloud using the [Agent-Cloud link](/aclk/README.md), and proves you have write and administrative
+access to that node.
 
 When you view a node in Netdata Cloud, the Agent running on that node streams metrics, metadata, and alarm status to
 Netdata Cloud, which in turn streams those metrics to your web browser. Netdata Cloud does not store or log metrics or
@@ -109,5 +110,11 @@ and [Agent-Cloud link](/aclk/README.md) reference docs.
 
 You've now set up your free Netdata Cloud account, installed the Agent, and claimed one or more nodes to your Space.
 You're ready to start monitoring, visualizing, and troubleshooting with Netdata.
+
+Interested in monitoring a single node? Check out our [single-node monitoring
+quickstart](/docs/quickstart/single-node.md).
+
+If you're looking to monitor an entire infrastructure with Netdata, see the [infrastructure monitoring
+quickstart](/docs/quickstart/infrastructure.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Foverview%2Fnetdata-monitoring-stacka&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
