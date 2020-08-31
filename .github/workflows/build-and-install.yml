@@ -130,7 +130,8 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          - 'centos:8'
+          # XXX: CentOS 8.x is broken (libjudy)
+          # - 'centos:8'
           - 'debian:buster'
           - 'fedora:32'
           - 'ubuntu:20.04'
