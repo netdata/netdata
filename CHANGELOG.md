@@ -8,6 +8,8 @@
 
 - Fix broken `Edit this page` link in simple patterns doc [\#9847](https://github.com/netdata/netdata/pull/9847) ([joelhans](https://github.com/joelhans))
 - fixes compilation warnings [\#9845](https://github.com/netdata/netdata/pull/9845) ([underhood](https://github.com/underhood))
+- Don't install eBPF plugin components when they shouldn't be installed [\#9844](https://github.com/netdata/netdata/pull/9844) ([vlvkobal](https://github.com/vlvkobal))
+- Fixed tmpdir handling failure on macOS/FreeBSD. [\#9842](https://github.com/netdata/netdata/pull/9842) ([Ferroin](https://github.com/Ferroin))
 - dashboard v1.4.2 [\#9837](https://github.com/netdata/netdata/pull/9837) ([jacekkolasa](https://github.com/jacekkolasa))
 - Change a log level in cgroup-network helper [\#9836](https://github.com/netdata/netdata/pull/9836) ([vlvkobal](https://github.com/vlvkobal))
 - Don't falsely report that the group was not deleted [\#9835](https://github.com/netdata/netdata/pull/9835) ([michmach](https://github.com/michmach))
@@ -233,9 +235,6 @@
 - Add link to kernel docs for ftrace [\#9211](https://github.com/netdata/netdata/pull/9211) ([Steve8291](https://github.com/Steve8291))
 - fix small typo [\#9205](https://github.com/netdata/netdata/pull/9205) ([Steve8291](https://github.com/Steve8291))
 - Update apps.plugin documentation and dashboard.info [\#9199](https://github.com/netdata/netdata/pull/9199) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix compilation for older systems [\#9198](https://github.com/netdata/netdata/pull/9198) ([ktsaou](https://github.com/ktsaou))
-- Support for matrix notifications [\#9196](https://github.com/netdata/netdata/pull/9196) ([okias](https://github.com/okias))
-- Clean type\_name in exporting connector instance configuration [\#9188](https://github.com/netdata/netdata/pull/9188) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
