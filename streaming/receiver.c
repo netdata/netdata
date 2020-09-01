@@ -421,9 +421,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 */
 
-    rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_ORPHAN);
 //    rpt->host->connected_senders++;
-    rpt->host->senders_disconnected_time = 0;
     rpt->host->labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
     if(health_enabled != CONFIG_BOOLEAN_NO) {
@@ -455,12 +453,20 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if (!netdata_exit && rpt->host) {
         netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == rpt) {
+            netdata_mutex_unlock(&rpt->host->receiver_lock);
+
+            rrd_wrlock();
             rrdhost_wrlock(rpt->host);
             rpt->host->senders_disconnected_time = now_realtime_sec();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
                 rpt->host->health_enabled = 0;
             rrdhost_unlock(rpt->host);
+            rrd_unlock();
+
+            netdata_mutex_lock(&rpt->host->receiver_lock);
+        }
+        if (rpt->host->receiver == rpt) {
             rrdpush_sender_thread_stop(rpt->host);
         }
         netdata_mutex_unlock(&rpt->host->receiver_lock);

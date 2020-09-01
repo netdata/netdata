@@ -573,6 +573,12 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_send_charts_matching
            , system_info);
     }
+    if (host) {
+        rrdhost_wrlock(host);
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+        host->senders_disconnected_time = 0;
+        rrdhost_unlock(host);
+    }
 
     rrdhost_cleanup_orphan_hosts_nolock(host);
 
