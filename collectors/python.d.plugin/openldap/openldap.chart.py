@@ -206,10 +206,10 @@ class Service(SimpleService):
             if result_type != 101:
                 continue
 
-            try: 
-                data[key] = int(list(result_data[0][1].values())[0][0]) 
-            except (ValueError, IndexError) as error: 
-                self.debug(error) 
-                continue 
+            try:
+                data[key] = int(list(result_data[0][1].values())[0][0])
+            except (ValueError, IndexError) as error:
+                self.debug(error)
+                continue
 
         return data
