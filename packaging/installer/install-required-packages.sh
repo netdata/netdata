@@ -650,6 +650,13 @@ declare -A pkg_automake=(
   ['default']="automake"
 )
 
+# required to bundle libJudy
+declare -A pkg_libtool=(
+  ['gentoo']="sys-devel/libtool"
+  ['clearlinux']="c-basic"
+  ['default']="libtool"
+)
+
 # Required to build libwebsockets and libmosquitto on some systems.
 declare -A pkg_cmake=(
   ['gentoo']="dev-util/cmake"
@@ -1291,6 +1298,7 @@ packages() {
   suitable_package autoconf-archive
   require_cmd autogen || suitable_package autogen
   require_cmd automake || suitable_package automake
+  require_cmd libtoolize || suitable_package libtool
   require_cmd pkg-config || suitable_package pkg-config
   require_cmd cmake || suitable_package cmake
 

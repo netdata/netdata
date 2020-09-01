@@ -328,14 +328,6 @@ AC_CHECK_LIB(
     [LZ4_LIBS="-llz4"]
 )
 
-# -----------------------------------------------------------------------------
-# Judy General purpose dynamic array
-
-AC_CHECK_LIB(
-    [Judy],
-    [JudyLIns],
-    [JUDY_LIBS="-lJudy"]
-)
 
 
 # -----------------------------------------------------------------------------
@@ -416,6 +408,44 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
+
+AC_ARG_WITH([libJudy],
+            [AS_HELP_STRING([--with-libJudy=PREFIX],[Use a specific Judy library (default is system-library)])],
+            [
+                libJudy_dir="$withval"
+                AC_MSG_CHECKING(for libJudy in $withval)
+                if test -f "${libJudy_dir}/libJudy.a" -a -f "${libJudy_dir}/Judy.h"; then
+                    LIBS_BACKUP="${LIBS}"
+                    LIBS="${libJudy_dir}/libJudy.a"
+                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "${libJudy_dir}/Judy.h"
+                                                     int main (int argc, char **argv) {
+                                                        Pvoid_t PJLArray = (Pvoid_t) NULL;
+                                                        Word_t * PValue;
+                                                        Word_t Index;
+                                                        JLI(PValue, PJLArray, Index);
+                                                     }]])],
+                                                     [HAVE_libJudy_a="yes"],
+                                                     [HAVE_libJudy_a="no"])
+                    LIBS="${LIBS_BACKUP}"
+                    JUDY_LIBS="${libJudy_dir}/libJudy.a"
+                    JUDY_CFLAGS="-I${libJudy_dir}"
+                    AC_MSG_RESULT([$HAVE_libJudy_a])
+                else
+                    libjudy_dir=""
+                    HAVE_libJudy_a="no"
+                    AC_MSG_RESULT([$HAVE_libJudy_a])
+                fi
+            ],
+            [HAVE_libJudy_a="no"])
+
+if test "${HAVE_libJudy_a}" = "no"; then
+    AC_CHECK_LIB(
+                    [Judy],
+                    [JudyLIns],
+                    [JUDY_LIBS="-lJudy"]
+                )
+fi
+
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
@@ -457,23 +487,23 @@ AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 # JSON-C
 
 if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
-	# Try and detect manual static build presence (from netdata-installer.sh)
-	AC_MSG_CHECKING([if statically built json-c is present])
-	HAVE_libjson_c_a="no"
-	if test -f "externaldeps/jsonc/libjson-c.a"; then
-		LIBS_BKP="${LIBS}"
-		LIBS="externaldeps/jsonc/libjson-c.a"
-		AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/jsonc/json-c/json.h"
-										 int main (int argc, char **argv) {
-											 struct json_object *jobj;
-											 char *str = "{ \"msg-type\": \"random\" }";
-											 jobj = json_tokener_parse(str);
-											 json_object_get_type(jobj);
-										 }]])],
-										[HAVE_libjson_c_a="yes"],
-										[HAVE_libjson_c_a="no"])
-		LIBS="${LIBS_BKP}"
-	fi
+    # Try and detect manual static build presence (from netdata-installer.sh)
+    AC_MSG_CHECKING([if statically built json-c is present])
+    HAVE_libjson_c_a="no"
+    if test -f "externaldeps/jsonc/libjson-c.a"; then
+        LIBS_BKP="${LIBS}"
+        LIBS="externaldeps/jsonc/libjson-c.a"
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/jsonc/json-c/json.h"
+                                         int main (int argc, char **argv) {
+                                             struct json_object *jobj;
+                                             char *str = "{ \"msg-type\": \"random\" }";
+                                             jobj = json_tokener_parse(str);
+                                             json_object_get_type(jobj);
+                                         }]])],
+                                        [HAVE_libjson_c_a="yes"],
+                                        [HAVE_libjson_c_a="no"])
+        LIBS="${LIBS_BKP}"
+    fi
 
 	if test "${HAVE_libjson_c_a}" = "yes"; then
 		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
