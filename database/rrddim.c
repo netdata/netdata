@@ -137,10 +137,11 @@ static int rrddim_collect_finalize(RRDDIM *rd) {
 
 static void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
     handle->rd = rd;
-    handle->start_time = start_time;
-    handle->end_time = end_time;
     handle->slotted.slot = rrdset_time2slot(rd->rrdset, start_time);
     handle->slotted.last_slot = rrdset_time2slot(rd->rrdset, end_time);
+    // The time2slot functions adjust their inputs to fit the range in the RRD so map back the adjusted values
+    handle->start_time = rrdset_slot2time(rd->rrdset, handle->slotted.slot);
+    handle->end_time = rrdset_slot2time(rd->rrdset, handle->slotted.last_slot);
     handle->slotted.finished = 0;
 }
 
@@ -149,8 +150,7 @@ static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handl
     long entries = rd->rrdset->entries;
     long slot = handle->slotted.slot;
 
-    long slots_from_end = (handle->slotted.last_slot + rd->rrdset->entries - slot) % rd->rrdset->entries;
-    *current_time = handle->end_time - slots_from_end * rd->update_every;
+    *current_time = rrdset_slot2time(rd->rrdset, slot);
 
     if (unlikely(handle->slotted.slot == handle->slotted.last_slot))
         handle->slotted.finished = 1;

@@ -1228,32 +1228,20 @@ static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
 
 // get the timestamp of a specific slot in the round robin database
 // only valid when not using dbengine
+// it always returns a valid time, although the time may be outside the time range of the dimension if the requested
+// slot is not in use
 static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     time_t ret;
-    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
 
     if(slot >= (size_t)st->entries) {
         error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);
         slot = (size_t)st->entries - 1;
     }
 
-    if(slot > rrdset_last_slot(st)) {
-        ret = last_entry_t - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
-    }
-    else {
-        ret = last_entry_t - (size_t)st->update_every;
-    }
-
-    if(unlikely(ret < first_entry_t)) {
-        error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
-        ret = first_entry_t;
-    }
-
-    if(unlikely(ret > last_entry_t)) {
-        error("INTERNAL ERROR: rrdset_slot2time() on %s returns time into the future", st->name);
-        ret = last_entry_t;
-    }
+    if (slot < (size_t)st->current_entry)
+        ret = rrdset_last_entry_t(st) - st->update_every * (st->current_entry - slot - 1);
+    else
+        ret = rrdset_last_entry_t(st) - st->update_every * (st->current_entry + st->entries - slot - 1);
 
     return ret;
 }
