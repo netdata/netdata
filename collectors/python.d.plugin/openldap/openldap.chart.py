@@ -150,10 +150,7 @@ class Service(SimpleService):
 
     def disconnect(self):
         if self.conn:
-            if self.use_start_tls or self.use_tls:
-                self.conn.unbind_s()
-            else:
-                self.conn.unbind()
+            self.conn.unbind()
             self.conn = None
             self.alive = False
 
@@ -172,10 +169,7 @@ class Service(SimpleService):
                 self.conn.protocol_version = ldap.VERSION3
                 self.conn.start_tls_s()
             if self.username and self.password:
-                if self.use_start_tls or self.use_tls:
-                    self.conn.simple_bind_s(self.username, self.password)
-                else:
-                    self.conn.simple_bind(self.username, self.password)
+                self.conn.simple_bind(self.username, self.password)
         except ldap.LDAPError as error:
             self.error(error)
             return False
