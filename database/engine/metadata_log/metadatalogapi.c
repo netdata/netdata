@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define NETDATA_RRD_INTERNALS
 
+#include <database/sqlite/sqlite_functions.h>
 #include "metadatalog.h"
 
 static inline struct metalog_instance *get_metalog_ctx(RRDHOST *host)
@@ -295,7 +296,7 @@ RRDHOST *metalog_get_host_from_uuid(struct metalog_instance *ctx, uuid_t *host_g
 
     uuid_unparse_lower(*host_guid, machine_guid);
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
-    ret = find_object_by_guid(host_guid, NULL, 0);
+    ret = sql_find_object_by_guid(host_guid, NULL, 0);
     if (unlikely(GUID_TYPE_HOST != ret)) {
         errno = 0;
         if (unlikely(!host))

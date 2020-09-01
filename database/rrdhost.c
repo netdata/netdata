@@ -134,7 +134,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_legacy = 1;
 #endif
 
-    if (is_archived) {
+    if (is_archived || is_localhost) {
         sql_store_host(guid, hostname, registry_hostname, update_every, os, timezone, tags);
         //return NULL;
     }

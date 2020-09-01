@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define NETDATA_RRD_INTERNALS
 
+#include <database/sqlite/sqlite_functions.h>
 #include "metadatalog.h"
 #include "metalogpluginsd.h"
 
@@ -19,6 +20,7 @@ PARSER_RC metalog_pluginsd_host_action(
 
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
+    uuid_parse(machine_guid, ((PARSER_USER_OBJECT *)user)->host_uuid);
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (host) {
         if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
@@ -34,6 +36,8 @@ PARSER_RC metalog_pluginsd_host_action(
     if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
         struct metalog_record record;
         struct metadata_logfile *metalogfile = state->metalogfile;
+
+        sql_store_host(machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
 
         uuid_parse(machine_guid, record.uuid);
         mlf_record_insert(metalogfile, &record);
@@ -109,6 +113,7 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
     RRDSET *st = NULL;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
     uuid_t *chart_uuid;
+    uuid_t *host_uuid;
 
     if (unlikely(!host)) {
         debug(D_METADATALOG, "Ignoring chart belonging to missing or ignored host.");
@@ -117,10 +122,14 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
     chart_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
     if (chart_uuid)
         uuid_copy(((PARSER_USER_OBJECT *) user)->chart_uuid, chart_uuid);
+
+    if (!host)
+        host_uuid = &(((PARSER_USER_OBJECT *)user)->host_uuid);
+
     st = rrdset_create_custom(
         host, type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
-        chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid);
+        chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid, host_uuid);
 
 #ifdef SQLITE_POC
     ((PARSER_USER_OBJECT *)user)->st = st;
@@ -173,7 +182,9 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 //        return PARSER_RC_OK;
 //    }
     dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
-    uuid_t *chart_uuid = ((PARSER_USER_OBJECT *)user)->chart_uuid;
+    uuid_t *chart_uuid=NULL;
+    if (!st)
+        chart_uuid = &(((PARSER_USER_OBJECT *)user)->chart_uuid);
 
     RRDDIM *rd =
         rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1, dim_uuid, chart_uuid);
@@ -223,7 +234,27 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     uuid_t *chart_guid, *chart_char_guid;
     RRDHOST *host;
 
-    ret = find_object_by_guid(uuid, object, 49);
+    ret = sql_find_object_by_guid(uuid, object, 49);
+    switch (ret) {
+        case GUID_TYPE_NOTFOUND:
+            error_with_guid(uuid, "Failed to find valid context");
+            break;
+        case GUID_TYPE_CHAR:
+            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
+            break;
+        case GUID_TYPE_HOST:
+            uuid_copy(((PARSER_USER_OBJECT *)user)->host_uuid, *uuid);
+            break;
+        case GUID_TYPE_CHART:
+            uuid_copy(((PARSER_USER_OBJECT *)user)->chart_uuid, *uuid);
+            break;
+        case GUID_TYPE_DIMENSION:
+            break;
+        default:
+            break;
+    }
+    /*
+
     switch (ret) {
         case GUID_TYPE_NOTFOUND:
             error_with_guid(uuid, "Failed to find valid context");
@@ -275,7 +306,7 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
         default:
             error("Unknown return code %u from find_object_by_guid", ret);
             break;
-    }
+    } */
 
     return PARSER_RC_OK;
 }

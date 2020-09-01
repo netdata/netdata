@@ -948,10 +948,11 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , RRD_MEMORY_MODE memory_mode
                              , long history_entries
                              , int is_archived
-                             , uuid_t *chart_uuid);
+                             , uuid_t *chart_uuid
+                             , uuid_t *host_uuid);
 
 #define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries, 0, NULL)
+    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries, 0, NULL, NULL)
 
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)

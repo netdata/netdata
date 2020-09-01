@@ -505,6 +505,7 @@ RRDSET *rrdset_create_custom(
         , long history_entries
         , int is_archived
         , uuid_t *chart_uuid
+        , uuid_t *host_uuid
 ) {
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
@@ -699,7 +700,8 @@ RRDSET *rrdset_create_custom(
     // If we attempt to create archived chart then send it to the SQLITE
     if (is_archived == 1) {
         int rc = sql_store_chart(chart_uuid, &host->host_uuid, type, id, name, family, context, title, units, plugin, module, priority, update_every, (int ) chart_type, (int ) memory_mode, history_entries);
-//        return NULL;
+        rrdhost_unlock(host);
+        return NULL;
     }
 #endif
 

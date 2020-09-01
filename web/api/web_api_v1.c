@@ -494,6 +494,13 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     RRDSET *st = rrdset_find(host, chart);
     if(!st) st = rrdset_find_byname(host, chart);
+
+    if (!st) {
+        st = callocz(1, sizeof(RRDSET *));
+        st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        st->compaction_id = -1;
+    }
+
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);

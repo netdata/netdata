@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <database/sqlite/sqlite_functions.h>
 #include "web/api/web_api_v1.h"
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {

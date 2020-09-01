@@ -151,7 +151,8 @@ RRDDIM *rrddim_add_custom(
     RRD_ALGORITHM algorithm,
     RRD_MEMORY_MODE memory_mode,
     int is_archived,
-    uuid_t *dim_uuid)
+    uuid_t *dim_uuid,
+    uuid_t *chart_uuid)
 {
     check_expected_ptr(st);
     UNUSED(id);

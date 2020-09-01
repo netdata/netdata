@@ -438,7 +438,10 @@ int sql_store_chart(
     rc = sqlite3_bind_blob(res, 2, host_uuid, 16, SQLITE_TRANSIENT);
     rc = sqlite3_bind_text(res, 3, type, -1, SQLITE_TRANSIENT);
     rc = sqlite3_bind_text(res, 4, id, -1, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_text(res, 5, name, -1, SQLITE_TRANSIENT);
+    if (name)
+        rc = sqlite3_bind_text(res, 5, name, -1, SQLITE_TRANSIENT);
+    else
+        rc = sqlite3_bind_text(res, 5, id, -1, SQLITE_TRANSIENT);
     rc = sqlite3_bind_text(res, 6, family, -1, SQLITE_TRANSIENT);
     rc = sqlite3_bind_text(res, 7, context, -1, SQLITE_TRANSIENT);
     rc = sqlite3_bind_text(res, 8, title, -1, SQLITE_TRANSIENT);
@@ -1080,4 +1083,199 @@ time_t sql_rrdeng_metric_oldest_time(RRDDIM *rd)
 
     sqlite3_reset(res);
     return tim;
+}
+
+GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size)
+{
+    static sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (!db)
+        return 0;
+
+    int guid_type = GUID_TYPE_NOTFOUND;
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(
+                db, "select 1 from host where host_uuid=@guid union select 2 from chart where chart_uuid=@guid union select 3 from dimension where dim_uuid =@guid;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return guid_type;
+
+    unsigned long long start = now_realtime_usec();
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW)
+        guid_type = sqlite3_column_int(res, 0);
+    unsigned long long end = now_realtime_usec();
+    char dim_str[37];
+    uuid_unparse_lower(uuid, dim_str);
+    info("SQLITE: sql_find_object_by_guid [%s] in %llu usec (value = %ld)", dim_str,    end - start, guid_type);
+
+    sqlite3_reset(res);
+    return guid_type;
+}
+
+GUID_TYPE sql_add_dimension_guid(uuid_t *uuid, uuid_t *chart)
+{
+    static sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (!db)
+        return 0;
+
+    int guid_type = GUID_TYPE_NOTFOUND;
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(
+            db,
+            "select 1 from host where host_uuid=@guid union select 2 from chart where chart_uuid=@guid union select 3 from dimension where dim_uuid =@guid;",
+            -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return guid_type;
+
+    unsigned long long start = now_realtime_usec();
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW)
+        guid_type = sqlite3_column_int(res, 0);
+    unsigned long long end = now_realtime_usec();
+    char dim_str[37];
+    uuid_unparse_lower(uuid, dim_str);
+    info("SQLITE: sql_find_object_by_guid [%s] in %llu usec (value = %ld)", dim_str, end - start, guid_type);
+
+    sqlite3_reset(res);
+    return guid_type;
+}
+
+#define SELECT_CHART "select chart_uuid, id, name, type, family, context, title, priority, plugin, module, unit, chart_type, update_every from chart where host_uuid = @host_uuid order by chart_uuid asc;"
+//#define SELECT_DIMENSION "select d.chart_uuid, d.id, d.name, d.multiplier, d.divisor, d.algorithm from chart c, dimension d where c.host_uuid = @host_uuid and c.chart_uuid = d.chart_uuid order by c.chart_uuid asc;"
+#define SELECT_DIMENSION "select d.id, d.name from dimension d where d.chart_uuid = @chart_uuid;"
+
+void sql_rrdim2json(uuid_t *chart_uuid, BUFFER *wb, size_t *dimensions_count, size_t *memory_used)
+{
+    int rc;
+    sqlite3_stmt *res_dim = NULL;
+
+    rc = sqlite3_prepare_v2(db, SELECT_DIMENSION, -1, &res_dim, 0);
+
+    rc = sqlite3_bind_blob(res_dim, 1, chart_uuid, 16, SQLITE_TRANSIENT);
+
+    //uuid_t dim_chart_uuid;
+//    char *dim_id = NULL;
+//    char *dim_name = NULL;
+//    int dim_multiplier = 0;
+//    int dim_divisor = 0;
+//    int dim_algorithm = 0;
+
+    int dimensions = 0;
+    buffer_sprintf(wb, "\t\t\t\"dimensions\": {\n");
+    while (sqlite3_step(res_dim) == SQLITE_ROW) {
+        if (dimensions)
+            buffer_strcat(wb, ",\n\t\t\t\t\"");
+        else
+            buffer_strcat(wb, "\t\t\t\t\"");
+        buffer_strcat_jsonescape(wb, sqlite3_column_text(res_dim, 0));
+        buffer_strcat(wb, "\": { \"name\": \"");
+        buffer_strcat_jsonescape(wb, sqlite3_column_text(res_dim, 1));
+        buffer_strcat(wb, "\" }");
+        dimensions++;
+
+    }
+    buffer_sprintf(wb, "\n\t\t\t}");
+}
+
+void sql_rrdset2json(RRDHOST *host, BUFFER *wb, size_t *dimensions_count, size_t *memory_used)
+{
+    time_t first_entry_t = 0; //= rrdset_first_entry_t(st);
+    time_t last_entry_t = 0; //rrdset_last_entry_t(st);
+    int rc;
+
+    sqlite3_stmt *res_chart = NULL;
+
+    rc = sqlite3_prepare_v2(db, SELECT_CHART, -1, &res_chart, 0);
+    if (rc != SQLITE_OK) {
+        error("Failed to prepare query to get charts. Wrong schema?");
+        return;
+    }
+    rc = sqlite3_bind_blob(res_chart, 1, &host->host_uuid, 16, SQLITE_TRANSIENT);
+
+//    uuid_t  chart_uuid;
+//    char   *chart_id = NULL;
+//    char   *chart_name = NULL;
+//    char   *chart_type = NULL;
+//    char   *chart_family = NULL;
+//    char   *chart_context = NULL;
+//    char   *chart_title = NULL;
+//    int    chart_priority = 0;
+//    char   *chart_plugin_name = NULL;
+//    char   *chart_module_name = NULL;
+//    char   *chart_units = NULL;
+//    int    chart_type_id = 0;
+//    int    chart_update_every = 0;
+
+    int dimensions = 0;
+    int c = 0;
+    while (sqlite3_step(res_chart) == SQLITE_ROW) {
+        char id[512];
+        sprintf(id, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
+        if (rrdset_find(host, id))
+            continue;
+
+        if (c)
+            buffer_strcat(wb, ",\n\t\t\"");
+        else
+            buffer_strcat(wb, "\n\t\t\"");
+        c++;
+
+        buffer_strcat(wb, id);
+        buffer_strcat(wb, "\": ");
+
+        buffer_sprintf(
+            wb,
+            "\t\t{\n"
+            "\t\t\t\"id\": \"%s\",\n"
+            "\t\t\t\"name\": \"%s\",\n"
+            "\t\t\t\"type\": \"%s\",\n"
+            "\t\t\t\"family\": \"%s\",\n"
+            "\t\t\t\"context\": \"%s\",\n"
+            "\t\t\t\"title\": \"%s (%s)\",\n"
+            "\t\t\t\"priority\": %ld,\n"
+            "\t\t\t\"plugin\": \"%s\",\n"
+            "\t\t\t\"module\": \"%s\",\n"
+            "\t\t\t\"enabled\": %s,\n"
+            "\t\t\t\"units\": \"%s\",\n"
+            "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
+            "\t\t\t\"chart_type\": \"%s\",\n",
+            id //sqlite3_column_text(res_chart, 1)
+            ,
+            id // sqlite3_column_text(res_chart, 2)
+            ,
+            sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 4), sqlite3_column_text(res_chart, 5),
+            sqlite3_column_text(res_chart, 6), id //sqlite3_column_text(res_chart, 2)
+            ,
+            sqlite3_column_int(res_chart, 7),
+            sqlite3_column_text(res_chart, 8) ? sqlite3_column_text(res_chart, 8) : "",
+            sqlite3_column_text(res_chart, 9) ? sqlite3_column_text(res_chart, 9) : "", "false",
+            sqlite3_column_text(res_chart, 10), id //sqlite3_column_text(res_chart, 2)
+            ,
+            rrdset_type_name(sqlite3_column_int(res_chart, 11)));
+
+        sql_rrdim2json(sqlite3_column_blob(res_chart, 0), wb, dimensions_count, memory_used);
+        //if (dimensions)
+        //    buffer_strcat(wb, ",\n\t\t\t\t\"");
+        //else
+        buffer_strcat(wb, "\n\t\t}");
+    }
+
+    //buffer_sprintf(wb, "\n\t\t}");
+
+    // Final cleanup;
+
+    return;
 }

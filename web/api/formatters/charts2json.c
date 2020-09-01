@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <database/sqlite/sqlite_functions.h>
 #include "charts2json.h"
 
 // generate JSON for the /api/v1/charts API call
@@ -70,16 +71,24 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 
     c = 0;
     rrdhost_rdlock(host);
-    rrdset_foreach_read(st, host) {
-        if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
-            if(c) buffer_strcat(wb, ",");
-            buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, st->id);
-            buffer_strcat(wb, "\": ");
-            rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
-            c++;
-            st->last_accessed_time = now;
+    if (show_archived) {
+       sql_rrdset2json(host, wb, &dimensions, &memory);
+    }
+    else {
+        rrdset_foreach_read(st, host)
+        {
+            if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
+                if (c)
+                    buffer_strcat(wb, ",");
+                buffer_strcat(wb, "\n\t\t\"");
+                buffer_strcat(wb, st->id);
+                buffer_strcat(wb, "\": ");
+                rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
+
+                c++;
+                st->last_accessed_time = now;
+            }
         }
     }
 
