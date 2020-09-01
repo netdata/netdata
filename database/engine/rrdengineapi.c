@@ -245,7 +245,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             handle->unaligned_page = 0;
         }
         usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number));
-        if (0 != ((point_in_time - descr->end_time) % tf_spacing))
+        if (0 < tf_spacing && 0 != ((point_in_time - descr->end_time) % tf_spacing))
             tf_alignment_change = 1;
     }
     if (unlikely(NULL == descr ||
