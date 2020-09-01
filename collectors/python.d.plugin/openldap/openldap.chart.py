@@ -164,8 +164,8 @@ class Service(SimpleService):
             if (self.use_tls or self.use_start_tls) and not self.cert_check:
                 self.conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             if self.use_start_tls:
-                self.conn.protocol_version=ldap.VERSION3
-                self.conn.set_option(ldap.OPT_X_TLS_NEWCTX,0)
+                self.conn.protocol_version = ldap.VERSION3
+                self.conn.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
                 self.conn.start_tls_s()
             if self.username and self.password:
                 self.conn.simple_bind_s(self.username, self.password)
@@ -203,13 +203,13 @@ class Service(SimpleService):
                 self.alive = False
                 return None
 
-            try:
-                if result_type == 101:
-                    val = int(list(result_data[0][1].values())[0][0])
-            except (ValueError, IndexError) as error:
-                self.debug(error)
+            if result_type != 101:
                 continue
 
-            data[key] = val
+            try: 
+                data[key] = int(list(result_data[0][1].values())[0][0]) 
+            except (ValueError, IndexError) as error: 
+                self.debug(error) 
+                continue 
 
         return data
