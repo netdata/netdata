@@ -172,7 +172,6 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     }
     if (likely(descr->page_length)) {
         int /*ret, */page_is_empty;
-
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
         if (handle->prev_descr) {
@@ -244,9 +243,11 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
-        usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number));
-        if (0 < tf_spacing && 0 != ((point_in_time - descr->end_time) % tf_spacing))
-            tf_alignment_change = 1;
+        if (descr->page_length >= sizeof(number)*2) {
+            usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number) - 1);
+            if (0 != ((point_in_time - descr->end_time) % tf_spacing))
+                tf_alignment_change = 1;
+        }
     }
     if (unlikely(NULL == descr ||
                  descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE ||
