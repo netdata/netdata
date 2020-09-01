@@ -1,19 +1,21 @@
 <!--
 title: "Infrastructure monitoring with Netdata"
 sidebar_label: "Infrastructure monitoring"
-description: "."
+description: "Build a robust, infinitely-scalable infrastructure monitoring solution with Netdata. "
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/infrastructure.md
 -->
 
-While the free, open-source Netdata Agent is a surpurb single-node monitoring tool, it also works in parallel with
-Netdata Cloud to create a unified infrastructure monitoring tool.
+Together, the Netdata Agent and Netdata Cloud create a powerful, infinitely-scalable infrastructure monitoring solution.
 
-The Netdata Agent turns each node in your infrastructure into a distributed metrics collection and storage system, and
-then Netdat Cloud puts real-time metrics from every node into a single interface.
+The Netdata Agent uses zero-configuration collectors to instantly gather metrics from every application and container,
+and the distributed data model lets you monitor everything at a fraction of the cost compared to centralized metrics
+databases. Netdata Cloud unifies all the metrics from these distributed nodes on customizable, interactive, and
+real-time visualizations.
 
 In this quickstart guide, you'll learn how to see key metrics from all your nodes in one interface, and build your first
 dashboard for aggregating like metrics from many distributed nodes. You'll then take a peek into configuring individual
-nodes and tweaking collectors to gather metrics on every critical application.
+nodes, in addition to helpful pointers about collecting all the metrics from every critical application in your
+infrastructure.
 
 > This quickstart assumes you've installed the Netdata Agent on more than one node in your infrastructure, and claimed
 > that node to your Space in Netdata Cloud. If you haven't yet, see the [_Get Netdata_ doc](/docs/get/README.md) for
@@ -111,7 +113,7 @@ infrastructure-focused features:
 -   [Export metrics](/docs/export/enable-exporting.md) to an external time-series database to use Netdata alongside
     other monitoring and troubleshooting tools.
 
-If you want to get granular with 
+To change how the Netdata Agent runs on each node, dig in to configuration files:
 
 -   [Change how long nodes in your infrastructure retain metrics](/docs/store/change-metrics-retention.md) based on how
     many metrics each node collects, your preferred retention period, and the resources you want to dedicate toward
