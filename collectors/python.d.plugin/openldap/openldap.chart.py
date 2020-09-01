@@ -163,10 +163,12 @@ class Service(SimpleService):
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
             if (self.use_tls or self.use_start_tls) and not self.cert_check:
                 self.conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+            if self.use_start_tls or self.use_tls:
+                self.conn.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
             if self.use_start_tls:
                 self.conn.protocol_version = ldap.VERSION3
-                self.conn.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
                 self.conn.start_tls_s()
+
             if self.username and self.password:
                 self.conn.simple_bind_s(self.username, self.password)
         except ldap.LDAPError as error:
