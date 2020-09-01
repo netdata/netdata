@@ -5,6 +5,8 @@ description: "Learn dashboard basics, configuring your nodes, and collecting met
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/single-node.md
 -->
 
+# Single-node monitoring with Netdata
+
 Because it's free, open-source, and requires only 1% CPU utilization to collect thousands of metrics every second,
 Netdata is a surpurb single-node monitoring tool.
 

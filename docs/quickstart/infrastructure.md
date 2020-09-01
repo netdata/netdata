@@ -5,6 +5,8 @@ description: "Build a robust, infinitely-scalable infrastructure monitoring solu
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/infrastructure.md
 -->
 
+# Infrastructure monitoring with Netdata
+
 Together, the Netdata Agent and Netdata Cloud create a powerful, infinitely-scalable infrastructure monitoring solution.
 
 The Netdata Agent uses zero-configuration collectors to instantly gather metrics from every application and container,
