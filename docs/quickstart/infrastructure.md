@@ -8,7 +8,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/
 While the free, open-source Netdata Agent is a surpurb single-node monitoring tool, it also works in parallel with
 Netdata Cloud to create a unified infrastructure monitoring tool.
 
-The Netdata Agent turns each node in your infrastructure into a distributed metrics collection and storage system, and then Netdat Cloud puts real-time metrics from every node into a single interface.
+The Netdata Agent turns each node in your infrastructure into a distributed metrics collection and storage system, and
+then Netdat Cloud puts real-time metrics from every node into a single interface.
 
 In this quickstart guide, you'll learn how to see key metrics from all your nodes in one interface, and build your first
 dashboard for aggregating like metrics from many distributed nodes. You'll then take a peek into configuring individual
@@ -20,31 +21,47 @@ nodes and tweaking collectors to gather metrics on every critical application.
 
 ## See your infrastructure's metrics
 
-To see all your nodes from a single pane of glass, first [sign in](https://app.netdata.cloud) to Netdata Cloud. You
-should immediately see all your nodes on a single interface inside of your Space.
+To see all your nodes from a single pane of glass, first [sign in](https://app.netdata.cloud) to Netdata Cloud. As you
+sign in, Netdata Cloud pings each of claimed node to start on-demand streaming from your nodes to your browser. When
+Netdata Cloud loads your War Room's **Nodes** view, you'll immediately see key metrics from your nodes, streamed in
+real-time, in a single interface.
 
 ![Animated GIF of Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
 
-You can [organize your nodes](/docs/configure/spaces-war-rooms.md) into **War Rooms** based on your preferred strategy.
-Most Netdata Cloud users set up War Rooms based on the node's purpose or the primary application it's responsible for
-running.
+You can drill down into any node's full dashboard by clicking on that node's hostname in the Nodes view.
 
-Once you've properly set up your Space, you can [invite your team](/docs/configure/invite-collaborate.md) and
-collaborate on identifying anomalies or troubleshooting complex performance problems.
+![Screenshot of an embedded node
+dashboard](https://user-images.githubusercontent.com/1153921/87457036-9b678e00-c5bc-11ea-977d-ad561a73beef.png)
+
+You can use node dashboards to drill down on specific issues, scrub backwards in time to investigate historical data,
+and see like metrics presented meaningfully to help you in [visual anomaly
+detection](/docs/troubleshoot/visual-anomaly-detection.md). Learn about [interacting with dashboards and
+charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time metrics.
 
 > If you want to monitor a Kubernetes cluster with Netdata, see our [k8s installation
-> doc](/packaging/installer/methods/kubernetes.md) and read our guide, [_Monitor a Kubernetes cluster with
-> Netdata_](/docs/guides/kubernetes-k8s-netdata.md).
+> doc](/packaging/installer/methods/kubernetes.md) for setup details, and then read our guide, [_Monitor a Kubernetes
+> cluster with Netdata_](/docs/guides/kubernetes-k8s-netdata.md).
 
 ## Build new dashboards for your infrastructure
 
+You can use Netdata Cloud to build new dashboards that match the topology of your infrastructure or assist you in
+diagnosing very specific issues by aggregating correlated charts from any number of nodes.
 
+To build your first dashboard, click on the **Nodes** dropdown, then select **+ Add**. Enter a name to assign to this
+dashboard. Click on either of the **Add chart** buttons, then select the node you want to add a chart from. Select the
+context, which are Netdata's way to organize charts, and then click **Add chart**.
+
+Once you added a few charts, you can move them around, resize them, and add text. Make sure you click the **Save**
+button before you navigate away.
+
+Read more about [creating new dashboards](/docs/visualize/create-dashboard.md) for more details about the process and
+additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
 
 ## Configure your nodes
 
-You can configure any node in your infrastructure based on its unique needs, whether that's to store more metrics
-locally, reduce the frequency of data collection, or reduce resource usage.
+You can configure any node in your infrastructure if you need to, although most users will find the default settings
+work extremely well for monitoring their infrastructures.
 
 Each node has a configuration file called `netdata.conf`, which is typically at `/etc/netdata/netdata.conf`. The best
 way to edit this file is using the `edit-config` script, which ensures the configuration changes you make are not
@@ -65,33 +82,42 @@ collected on any of your nodes.
 ## Collect metrics from your system and applications
 
 Netdata has [300+ pre-installed collectors](/docs/collectors/COLLECTORS.md) that gather thousands of metrics with zero
-configuration. In fact, Netdata is already collecting thousands of metrics per second on your single node, all without
-you setting it up first.
+configuration. Collectors search each of your nodes in default locations and ports to find running applications and
+gather as many metrics as they can without you having to configure them individually.
 
-These collectors search your system in default locations and ports to find the applications running on your node and
-gather as many metrics. The dashboard presents them meaningfully in charts to help you understand the baseline and
-identify anomalies.
+In fact, Netdata is already collecting thousands of metrics per second from your webservers, databases, containers, and
+much more, on each node in your infrastructure.
 
-You may need to set up specific collectors for them to work, or you might want to configure a specific collector's
-behavior. Read more about [collector configuration](/docs/collect/configuration.md), or find detailed information about
-which [system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), and
-[application](/docs/collect/application-metrics.md) metrics you can collect with Netdata.
+These metrics enrich your Netdata Cloud experience. You can see metrics from systems, containers, and applications in
+the individual node dashboards, and you can create new dashboards around very specific charts, such as the real-time
+volume of 503 responses from each of your webserver nodes.
+
+Most collectors work without configuring them, but you should read up on how [collector
+configuration](/docs/collect/configure.md) works.
+
+In addition, find detailed information about which [system](/docs/collect/system-metrics.md),
+[container](/docs/collect/container-metrics.md), and [application](/docs/collect/application-metrics.md) metrics you can
+collect from across your infrastructure with Netdata.
 
 ## What's next?
 
 Netdata has many features that help you monitor the health of your node and troubleshoot complex performance problems.
 Once you have a handle on configuration and are collecting all the right metrics, try out some of Netdata's other
-features:
+infrastructure-focused features:
 
--   [Build new dashboards](/docs/visualize/create-dashboards.md) to put disparate-but-relevant metrics onto a single
-    interface.
+-   [Organize your nodes](/docs/configure/spaces-war-rooms.md) into **War Rooms** based on your preferred strategy.
+-   [Invite your team](/docs/configure/invite-collaborate.md) to collaborate on identifying anomalies or troubleshooting
+    complex performance problems.
+-   [Export metrics](/docs/export/enable-exporting.md) to an external time-series database to use Netdata alongside
+    other monitoring and troubleshooting tools.
+
+If you want to get granular with 
+
+-   [Change how long nodes in your infrastructure retain metrics](/docs/store/change-metrics-retention.md) based on how
+    many metrics each node collects, your preferred retention period, and the resources you want to dedicate toward
+    long-term metrics retention.
 -   [Create new alarms](/docs/monitor/configure-alarms.md), or tweak some of the pre-configured alarms, to stay on top
     of anomalies.
 -   [Enable notifications](/docs/monitor/enable-notifications.md) to Slack, PagerDuty, email, and 30+ other services.
--   [Change how long your node stores metrics](/docs/store/change-metrics-retention.md) based on how many metrics it
-    collects, your preferred retention period, and the resources you want to dedicate toward long-term metrics
-    retention.
--   [Export metrics](/docs/export/enable-exporting.md) to an external time-series database to use Netdata alongside
-    other monitoring and troubleshooting tools.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fquickstart%2Finfrastructure&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

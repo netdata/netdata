@@ -18,14 +18,14 @@ on your node.
 
 ## See your node's metrics
 
-To see your node's real-time metrics, you can either access the node's dashboard directly or through Netdata Cloud. The
+To see your node's real-time metrics, you can either access the node's local dashboard or through Netdata Cloud. The
 navigation, charts, and metrics are identical with both methods. In addition, both dashboards update with new metrics in
 real-time, with fully interactive and synchronized charts.
 
-The primary difference is thatNetdata Cloud also has a few extra features, like creating new dashboards, that you might
+The primary difference is that Netdata Cloud also has a few extra features, like creating new dashboards, that you might
 want to use for monitoring your node.
 
-To see your node's dashboard directly, open up your web browser of choice and navigate to `http://NODE:19999`, replacing
+To see your node's local dashboard, open up your web browser of choice and navigate to `http://NODE:19999`, replacing
 `NODE` with the IP address or hostname of your Agent. Hit `Enter`. 
 
 ![Animated GIF of navigating to the
@@ -62,17 +62,17 @@ metrics.
 ## Collect metrics from your system and applications
 
 Netdata has [300+ pre-installed collectors](/docs/collectors/COLLECTORS.md) that gather thousands of metrics with zero
-configuration. In fact, Netdata is already collecting thousands of metrics per second on your single node, all without
-you setting it up first.
+configuration. Collectors search your node in default locations and ports to find running applications and gather as
+many metrics as they can without you having to configure them individually.
 
-These collectors search your system in default locations and ports to find the applications running on your node and
-gather as many metrics. The dashboard presents them meaningfully in charts to help you understand the baseline and
-identify anomalies.
+These metrics enrich both the local and Netdata Cloud dashboards.
 
-You may need to set up specific collectors for them to work, or you might want to configure a specific collector's
-behavior. Read more about [collector configuration](/docs/collect/configuration.md), or find detailed information about
-which [system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), and
-[application](/docs/collect/application-metrics.md) metrics you can collect with Netdata.
+Most collectors work without configuring them, but you should read up on how [collector
+configuration](/docs/collect/configure.md) works.
+
+In addition, find detailed information about which [system](/docs/collect/system-metrics.md),
+[container](/docs/collect/container-metrics.md), and [application](/docs/collect/application-metrics.md) metrics you can
+collect from across your infrastructure with Netdata.
 
 ## What's next?
 
