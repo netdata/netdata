@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/
 # Single-node monitoring with Netdata
 
 Because it's free, open-source, and requires only 1% CPU utilization to collect thousands of metrics every second,
-Netdata is a surpurb single-node monitoring tool.
+Netdata is a superb single-node monitoring tool.
 
 In this quickstart guide, you'll learn how to access your single node's metrics through dashboards, configure your node
 to your liking, and make sure the Netdata Agent is collecting metrics from the applications or containers you're running
@@ -20,12 +20,12 @@ on your node.
 
 ## See your node's metrics
 
-To see your node's real-time metrics, you can either access the node's local dashboard or through Netdata Cloud. The
-navigation, charts, and metrics are identical with both methods. In addition, both dashboards update with new metrics in
-real-time, with fully interactive and synchronized charts.
+To see your node's real-time metric, you need to access its dashboard. You can either view the local dashboard, which
+runs on the node itself, or see the dashboard through Netdata Cloud. Both methods feature real-time, interactive, and
+synchronized charts, with the same metrics, and use the same UI.
 
-The primary difference is that Netdata Cloud also has a few extra features, like creating new dashboards, that you might
-want to use for monitoring your node.
+The primary difference is that Netdata Cloud also has a few extra features, like creating new dashboards using a
+drag-and-drop editor, that enhance your monitoring and troubleshooting experience.
 
 To see your node's local dashboard, open up your web browser of choice and navigate to `http://NODE:19999`, replacing
 `NODE` with the IP address or hostname of your Agent. Hit `Enter`. 
@@ -34,20 +34,20 @@ To see your node's local dashboard, open up your web browser of choice and navig
 dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
 
 To see a node's dashboard in Netdata Cloud, [sign in](https://app.netdata.cloud). From the **Nodes** view in your
-**General** War Room, click on the hostname of your node to access its dashboard.
+**General** War Room, click on the hostname of your node to access its dashboard through Netdata Cloud.
 
 ![Screenshot of an embedded node
 dashboard](https://user-images.githubusercontent.com/1153921/87457036-9b678e00-c5bc-11ea-977d-ad561a73beef.png)
 
 Once you've decided which dashboard you prefer, learn about [interacting with dashboards and
-charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time metrics.
+charts](/docs/visualize/interact-dashboards-charts.md) to get the most from Netdata's real-time metrics.
 
 ## Configure your node
 
 The Netdata Agent is highly configurable so that you can match its behavior to your node. You will find most
 configuration options in the `netdata.conf` file, which is typically at `/etc/netdata/netdata.conf`. The best way to
-edit this file is using the `edit-config` script, which ensures the configuration changes you make are not overwritten
-by updates to the Netdata Agent yourself. For example:
+edit this file is using the `edit-config` script, which ensures updates to the Netdata Agent do not overwrite your
+changes. For example:
 
 ```bash
 cd /etc/netdata
@@ -65,7 +65,7 @@ metrics.
 
 Netdata has [300+ pre-installed collectors](/docs/collectors/COLLECTORS.md) that gather thousands of metrics with zero
 configuration. Collectors search your node in default locations and ports to find running applications and gather as
-many metrics as they can without you having to configure them individually.
+many metrics as possible without you having to configure them individually.
 
 These metrics enrich both the local and Netdata Cloud dashboards.
 
@@ -79,8 +79,8 @@ collect from across your infrastructure with Netdata.
 ## What's next?
 
 Netdata has many features that help you monitor the health of your node and troubleshoot complex performance problems.
-Once you have a handle on configuration and are collecting all the right metrics, try out some of Netdata's other
-features:
+Once you understand configuration, and are certain Netdata is collecting all the important metrics from your node, try
+out some of Netdata's other visualization and health monitoring features:
 
 -   [Build new dashboards](/docs/visualize/create-dashboards.md) to put disparate-but-relevant metrics onto a single
     interface.

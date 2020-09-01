@@ -9,12 +9,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/
 
 Together, the Netdata Agent and Netdata Cloud create a powerful, infinitely-scalable infrastructure monitoring solution.
 
-The Netdata Agent uses zero-configuration collectors to instantly gather metrics from every application and container,
-and the distributed data model lets you monitor everything at a fraction of the cost compared to centralized metrics
+The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly.
+The distributed data model lets you monitor everything at a fraction of the cost compared to centralized metrics
 databases. Netdata Cloud unifies all the metrics from these distributed nodes on customizable, interactive, and
 real-time visualizations.
 
-In this quickstart guide, you'll learn how to see key metrics from all your nodes in one interface, and build your first
+In this quickstart guide, you'll learn how to see key metrics from all your nodes in one interface and build your first
 dashboard for aggregating like metrics from many distributed nodes. You'll then take a peek into configuring individual
 nodes, in addition to helpful pointers about collecting all the metrics from every critical application in your
 infrastructure.
@@ -26,7 +26,7 @@ infrastructure.
 ## See your infrastructure's metrics
 
 To see all your nodes from a single pane of glass, first [sign in](https://app.netdata.cloud) to Netdata Cloud. As you
-sign in, Netdata Cloud pings each of claimed node to start on-demand streaming from your nodes to your browser. When
+sign in, Netdata Cloud pings each claimed node to start on-demand streaming from your nodes to your browser. When
 Netdata Cloud loads your War Room's **Nodes** view, you'll immediately see key metrics from your nodes, streamed in
 real-time, in a single interface.
 
@@ -38,8 +38,8 @@ You can drill down into any node's full dashboard by clicking on that node's hos
 ![Screenshot of an embedded node
 dashboard](https://user-images.githubusercontent.com/1153921/87457036-9b678e00-c5bc-11ea-977d-ad561a73beef.png)
 
-You can use node dashboards to drill down on specific issues, scrub backwards in time to investigate historical data,
-and see like metrics presented meaningfully to help you in [visual anomaly
+You can use node dashboards to drill down on specific issues, scrub backward in time to investigate historical data, and
+see like metrics presented meaningfully to help you in [visual anomaly
 detection](/docs/troubleshoot/visual-anomaly-detection.md). Learn about [interacting with dashboards and
 charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time metrics.
 
@@ -49,8 +49,8 @@ charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all 
 
 ## Build new dashboards for your infrastructure
 
-You can use Netdata Cloud to build new dashboards that match the topology of your infrastructure or assist you in
-diagnosing very specific issues by aggregating correlated charts from any number of nodes.
+You can use Netdata Cloud to build new dashboards that match your infrastructure's topology or help you diagnose complex
+issues by aggregating correlated charts from any number of nodes.
 
 To build your first dashboard, click on the **Nodes** dropdown, then select **+ Add**. Enter a name to assign to this
 dashboard. Click on either of the **Add chart** buttons, then select the node you want to add a chart from. Select the
@@ -68,8 +68,8 @@ You can configure any node in your infrastructure if you need to, although most 
 work extremely well for monitoring their infrastructures.
 
 Each node has a configuration file called `netdata.conf`, which is typically at `/etc/netdata/netdata.conf`. The best
-way to edit this file is using the `edit-config` script, which ensures the configuration changes you make are not
-overwritten by updates to the Netdata Agent. For example:
+way to edit this file is using the `edit-config` script, which ensures updates to the Netdata Agent do not overwrite
+your changes. For example:
 
 ```bash
 cd /etc/netdata
