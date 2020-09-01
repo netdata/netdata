@@ -150,7 +150,7 @@ class Service(SimpleService):
 
     def disconnect(self):
         if self.conn:
-            self.conn.unbind()
+            self.conn.unbind_s()
             self.conn = None
             self.alive = False
 
