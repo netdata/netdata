@@ -106,7 +106,7 @@ To silence this alarm, change `sysadmin` to `silent`.
       to: silent
 ```
 
-Use `killall -USR2 netdata` to reload your health configuration. You can add `to: silence` to any alarm you'd rather not
+Use `killall -USR2 netdata` to reload your health configuration. You can add `to: silent` to any alarm you'd rather not
 bother you with notifications.
 
 ## Write your first health entity
