@@ -108,8 +108,9 @@ and [Agent-Cloud link](/aclk/README.md) reference docs.
 
 ## What's next?
 
-You've now set up your free Netdata Cloud account, installed the Agent, and claimed one or more nodes to your Space.
-You're ready to start monitoring, visualizing, and troubleshooting with Netdata.
+At this point, you set up your free Netdata Cloud account, installed the Agent, and claimed one or more nodes to your
+Space. You're ready to start monitoring, visualizing, and troubleshooting with Netdata. We have two quickstart guides
+based on the scope of what you need to monitor:
 
 Interested in monitoring a single node? Check out our [single-node monitoring
 quickstart](/docs/quickstart/single-node.md).
