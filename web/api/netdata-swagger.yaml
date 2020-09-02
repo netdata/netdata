@@ -883,7 +883,9 @@ components:
             - host2.example.com
         mirrored_hosts_status:
           type: array
-          description: List of details of hosts mirrored to this served (including self). Indexes correspod to indexes in "mirrored_hosts".
+          description: >-
+            List of details of hosts mirrored to this served (including self).
+            Indexes correspod to indexes in "mirrored_hosts".
           items:
             type: object
             description: Host data
@@ -902,7 +904,9 @@ components:
                 type: string
                 format: uuid
                 nullable: true
-                description: Cloud GUID/identifier in case the host is claimed. If child status unknown or unclaimed this field is set to `null`
+                description: >-
+                  Cloud GUID/identifier in case the host is claimed.
+                  If child status unknown or unclaimed this field is set to `null`
                 example: c3b2a66a-3052-498c-ac52-7fe9e8cccb0c
         os_name:
           type: string
