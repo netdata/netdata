@@ -17,6 +17,8 @@ ACLK:
 area/backends:
   - backends/*
   - backends/**/*
+
+area/exporting:
   - exporting/*
   - exporting/**/*
 
