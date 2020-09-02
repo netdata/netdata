@@ -451,25 +451,21 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {
+        rrd_wrlock();
+        rrdhost_wrlock(rpt->host);
         netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == rpt) {
-            netdata_mutex_unlock(&rpt->host->receiver_lock);
-
-            rrd_wrlock();
-            rrdhost_wrlock(rpt->host);
             rpt->host->senders_disconnected_time = now_realtime_sec();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
                 rpt->host->health_enabled = 0;
-            rrdhost_unlock(rpt->host);
-            rrd_unlock();
-
-            netdata_mutex_lock(&rpt->host->receiver_lock);
         }
         if (rpt->host->receiver == rpt) {
             rrdpush_sender_thread_stop(rpt->host);
         }
         netdata_mutex_unlock(&rpt->host->receiver_lock);
+        rrdhost_unlock(rpt->host);
+        rrd_unlock();
     }
 
     // cleanup
