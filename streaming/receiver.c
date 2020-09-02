@@ -101,8 +101,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
     if (!id || !start_txt || !end_txt)
         goto disable;
 
-    RRDSET *st = NULL;
-    st = rrdset_find(user->host, id);
+    RRDSET *st = rrdset_find(user->host, id);
     if (unlikely(!st))
         goto disable;
     user->st = st;
@@ -235,7 +234,7 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
     char *num_points_txt = words[1];
     char *col_total_txt  = words[2];
     char *last_total_txt = words[3];
-    if (!num_points_txt)
+    if (!num_points_txt || !col_total_txt || !last_total_txt)
         goto disable;
 
     if (user->st == NULL) {

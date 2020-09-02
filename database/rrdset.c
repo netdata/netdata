@@ -1075,7 +1075,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
 void rrdset_dump_debug_state(RRDSET *st) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    if (debug_flags&D_REPLICATION) {
+    if (debug_flags & D_REPLICATION) {
         RRDDIM *rd;
         debug(D_REPLICATION, "Chart state %s: counter=%zu counter_done=%zu current_entry=%ld usec_since_last=%llu last_updated=%ld.%ld"
                              " last_collected=%ld.%ld collected_total=%lld last_collected_total=%lld",
@@ -1131,6 +1131,7 @@ void rrdset_dump_debug_state(RRDSET *st) {
     }
 #endif
 }
+
 static inline usec_t rrdset_init_last_collected_time(RRDSET *st) {
     now_realtime_timeval(&st->last_collected_time);
     last_collected_time_align(st);

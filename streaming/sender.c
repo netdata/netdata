@@ -805,7 +805,7 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
                 }
 
                 storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
-                if (n==SN_EMPTY_SLOT)
+                if (n == SN_EMPTY_SLOT)
                     debug(D_REPLICATION, "%s.%s db empty in valid dimension range @ %ld", st->id, rd->id, metric_t);
                 else
                     buffer_sprintf(s->build, "REPDIM \"%s\" %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, metric_t, n);
