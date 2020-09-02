@@ -1093,7 +1093,7 @@
           },
           "mirrored_hosts_status": {
             "type": "array",
-            "description": "List of details of hosts mirrored to this served (including self). Indexes corespod to indexes in \"mirrored_hosts\".",
+            "description": "List of details of hosts mirrored to this served (including self). Indexes correspod to indexes in \"mirrored_hosts\".",
             "items": {
               "type": "object",
               "description": "Host data",
