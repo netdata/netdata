@@ -9,7 +9,7 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 
 // minimum and maximum supported version of ACLK
 // in this version of agent
-#define ACLK_VERSION_MIN 2
+#define ACLK_VERSION_MIN 1
 #define ACLK_VERSION_MAX 2
 
 // Version negotiation messages have they own versioning
