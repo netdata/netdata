@@ -82,7 +82,7 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = simple_connector_update_buffered_bytes;
 
-    instance->send_header = NULL;
+    instance->send_header = opentsdb_http_send_header;
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -240,26 +240,42 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
 }
 
 /**
- * Prepare an HTTP message for OpenTSDB HTTP connector
+ * Send header to a server
  *
- * @param buffer a buffer to write the message to.
- * @param message the body of the message.
- * @param hostname the name of the host that sends the message.
- * @param length the length of the message body.
+ * @param sock a communication socket.
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
  */
-static inline void opentsdb_build_message(BUFFER *buffer, char *message, const char *hostname, int length)
+int opentsdb_http_send_header(int *sock, struct instance *instance)
 {
-    buffer_sprintf(
-        buffer,
+    int flags = 0;
+#ifdef MSG_NOSIGNAL
+    flags += MSG_NOSIGNAL;
+#endif
+
+    static BUFFER *header;
+    if (!header)
+        header = buffer_create(0);
+
+   buffer_sprintf(
+        header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Content-Type: application/json\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n"
-        "%s",
-        hostname,
-        length,
-        message);
+        "Content-Length: %lu\r\n"
+        "\r\n",
+        instance->config.destination,
+        buffer_strlen((BUFFER *)instance->buffer));
+
+    size_t header_len = buffer_strlen(header);
+    ssize_t written = send(*sock, buffer_tostring(header), header_len, flags);
+
+    buffer_flush(header);
+
+    if (written != -1 && (size_t)written == header_len)
+        return 0;
+    else
+        return 1;
 }
 
 /**
@@ -324,10 +340,8 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
         RRD_ID_LENGTH_MAX);
 
-    char message[1024];
-    int length = snprintfz(
-        message,
-        sizeof(message),
+    buffer_sprintf(
+        instance->buffer,
         "{"
         "  \"metric\": \"%s.%s.%s\","
         "  \"timestamp\": %llu,"
@@ -335,7 +349,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "  \"tags\": {"
         "    \"host\": \"%s%s%s\"%s"
         "  }"
-        "}",
+        "}\n",
         instance->config.prefix,
         chart_name,
         dimension_name,
@@ -345,10 +359,6 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");
-
-    if (length > 0) {
-        opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
-    }
 
     return 0;
 }
@@ -384,10 +394,8 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     if(isnan(value))
         return 0;
 
-    char message[1024];
-    int length = snprintfz(
-        message,
-        sizeof(message),
+    buffer_sprintf(
+        instance->buffer,
         "{"
         "  \"metric\": \"%s.%s.%s\","
         "  \"timestamp\": %llu,"
@@ -395,7 +403,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "  \"tags\": {"
         "    \"host\": \"%s%s%s\"%s"
         "  }"
-        "}",
+        "}\n",
         instance->config.prefix,
         chart_name,
         dimension_name,
@@ -405,10 +413,6 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");
-
-    if (length > 0) {
-        opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
-    }
 
     return 0;
 }
