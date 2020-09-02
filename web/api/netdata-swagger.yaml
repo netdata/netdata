@@ -885,7 +885,7 @@ components:
           type: array
           description: >-
             List of details of hosts mirrored to this served (including self).
-            Indexes correspod to indexes in "mirrored_hosts".
+            Indexes correspond to indexes in "mirrored_hosts".
           items:
             type: object
             description: Host data
