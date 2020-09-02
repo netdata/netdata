@@ -20,11 +20,12 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 
 int opentsdb_http_send_header(int *sock, struct instance *instance);
 
-#ifdef ENABLE_HTTPS
 struct opentsdb_specific_data {
+    BUFFER *header;
+#ifdef ENABLE_HTTPS
     SSL *conn; //SSL connection
     int flags; //The flags for SSL connection
-};
 #endif
+};
 
 #endif //NETDATA_EXPORTING_OPENTSDB_H

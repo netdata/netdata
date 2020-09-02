@@ -59,15 +59,15 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
-#ifdef ENABLE_HTTPS
     struct opentsdb_specific_data *connector_specific_data = callocz(1, sizeof(struct opentsdb_specific_data));
+#ifdef ENABLE_HTTPS
     connector_specific_data->flags = NETDATA_SSL_START;
     connector_specific_data->conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
     }
-    instance->connector_specific_data = connector_specific_data;
 #endif
+    instance->connector_specific_data = connector_specific_data;
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
@@ -253,7 +253,9 @@ int opentsdb_http_send_header(int *sock, struct instance *instance)
     flags += MSG_NOSIGNAL;
 #endif
 
-    static BUFFER *header;
+    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+
+    BUFFER *header = connector_specific_data->header;
     if (!header)
         header = buffer_create(0);
 
@@ -268,7 +270,20 @@ int opentsdb_http_send_header(int *sock, struct instance *instance)
         buffer_strlen((BUFFER *)instance->buffer));
 
     size_t header_len = buffer_strlen(header);
-    ssize_t written = send(*sock, buffer_tostring(header), header_len, flags);
+    ssize_t written = 0;
+
+#ifdef ENABLE_HTTPS
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS &&
+        connector_specific_data->conn &&
+        connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+        written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
+    info("EXPORTING: \n%s", buffer_tostring(header));
+    } else {
+        written = send(*sock, buffer_tostring(header), header_len, flags);
+    }
+#else
+    written = send(*sock, buffer_tostring(header), header_len, flags);
+#endif
 
     buffer_flush(header);
 

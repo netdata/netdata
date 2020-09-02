@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 struct prometheus_remote_write_specific_data {
+    void *header;
     void *write_request;
 };
 

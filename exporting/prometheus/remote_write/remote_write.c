@@ -25,8 +25,9 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
 
     struct prometheus_remote_write_specific_config *connector_specific_config =
         instance->config.connector_specific_config;
+    struct prometheus_remote_write_specific_data *connector_specific_data = instance->connector_specific_data;
 
-    static BUFFER *header;
+    BUFFER *header = (BUFFER *)connector_specific_data->header;
     if (!header)
         header = buffer_create(0);
 
