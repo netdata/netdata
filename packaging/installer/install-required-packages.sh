@@ -1125,16 +1125,13 @@ declare -A pkg_openssl=(
 )
 
 declare -A pkg_judy=(
-  ['alpine']="WARNING|" # TODO - need to add code to download and install judy for alpine and clearlinux
-  ['clearlinux']="WARNING|"
-  ['macos']="WARNING|"
   ['debian']="libjudy-dev"
   ['ubuntu']="libjudy-dev"
   ['suse']="judy-devel"
   ['gentoo']="dev-libs/judy"
   ['arch']="judy"
   ['freebsd']="Judy"
-  ['default']="Judy-devel"
+  ['default']="NOTREQUIRED"
 )
 
 declare -A pkg_python3=(
