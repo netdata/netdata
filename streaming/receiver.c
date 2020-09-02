@@ -451,7 +451,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {
-        rrd_wrlock();
+        rrd_rdlock();
         rrdhost_wrlock(rpt->host);
         netdata_mutex_lock(&rpt->host->receiver_lock);
         if (rpt->host->receiver == rpt) {
