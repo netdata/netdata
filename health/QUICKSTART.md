@@ -125,7 +125,7 @@ To make any changes to your health configuration live, you must reload Netdata's
 without restarting all of Netdata, run the following:
 
 ```bash
-killall -USR2 netdata
+netdatacli reload-health
 ```
 
 ## What's next?
