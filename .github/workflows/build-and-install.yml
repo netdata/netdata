@@ -200,4 +200,4 @@ jobs:
             --enable-backend-kinesis
         run: |
           docker run -w /netdata test \
-            /bin/sh -c $RUNCMD
+            /bin/sh -c "$RUNCMD"
