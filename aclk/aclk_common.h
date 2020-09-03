@@ -45,18 +45,31 @@ typedef enum aclk_metadata_state {
 } ACLK_METADATA_STATE;
 
 typedef enum aclk_agent_state {
-    AGENT_INITIALIZING,
-    AGENT_STABLE
-} ACLK_AGENT_STATE;
+    ACLK_HOST_INITIALIZING,
+    ACLK_HOST_STABLE
+} ACLK_POPCORNING_STATE;
 
 typedef struct aclk_rrdhost_state {
     char *claimed_id; // Claimed ID if host has one otherwise NULL
+
+#ifdef ENABLE_ACLK
+    // per child popcorning
+    ACLK_POPCORNING_STATE state;
+    ACLK_METADATA_STATE metadata;
+
+    time_t timestamp_created;
+    time_t t_last_popcorn_update;
+#endif
 } aclk_rrdhost_state;
 
+#define ACLK_HOST_POPCORNING(host) (host->aclk_state.state == ACLK_HOST_INITIALIZING)
+
+typedef struct rrdhost RRDHOST;
+
 extern struct aclk_shared_state {
-    ACLK_METADATA_STATE metadata_submitted;
-    ACLK_AGENT_STATE agent_state;
-    time_t last_popcorn_interrupt;
+    // optimization to avoid looping trough hosts
+    // every time Query Thread wakes up
+    RRDHOST *next_popcorn_host;
 
     // read only while ACLK connected
     // protect by lock otherwise

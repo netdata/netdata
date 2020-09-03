@@ -38,13 +38,13 @@ static inline int aclk_v2_payload_get_query(const char *payload, struct aclk_req
     return 0;
 }
 
-#define HTTP_CHECK_AGENT_INITIALIZED() ACLK_SHARED_STATE_LOCK;\
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {\
+#define HTTP_CHECK_AGENT_INITIALIZED() rrdhost_aclk_state_lock(localhost);\
+    if (unlikely(localhost->aclk_state.state == ACLK_HOST_INITIALIZING)) {\
         debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");\
-        ACLK_SHARED_STATE_UNLOCK;\
+        rrdhost_aclk_state_unlock(localhost);\
         return 1;\
     }\
-    ACLK_SHARED_STATE_UNLOCK;
+    rrdhost_aclk_state_unlock(localhost);
 
 /*
  * Parse the incoming payload and queue a command if valid

@@ -438,16 +438,95 @@ static struct _collector *_add_collector(const char *hostname, const char *plugi
 #pragma endregion
 #endif
 
-inline static int aclk_popcorn_check_bump()
+/* Avoids the need to scan trough all RRDHOSTS
+ * every time any Query Thread Wakes Up
+ * (every time we need to check child popcorn expiry)
+ * call with ACLK_SHARED_STATE_LOCK held
+ */
+void aclk_update_next_child_to_popcorn()
 {
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
-        aclk_shared_state.last_popcorn_interrupt = now_realtime_sec();
-        ACLK_SHARED_STATE_UNLOCK;
+    RRDHOST *host;
+    int any = 0;
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        if (unlikely( host == localhost || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED )))
+            continue;
+
+        rrdhost_aclk_state_lock(host);
+        if (!ACLK_HOST_POPCORNING(host)) {
+            rrdhost_aclk_state_unlock(host);
+            continue;
+        }
+
+        any = 1;
+
+        if (unlikely(!aclk_shared_state.next_popcorn_host)) {
+            aclk_shared_state.next_popcorn_host = host;
+            rrdhost_aclk_state_unlock(host);
+            continue;
+        }
+
+        time_t t_exp = host->aclk_state.t_last_popcorn_update + ACLK_STABLE_TIMEOUT;
+        if (aclk_shared_state.next_popcorn_host->aclk_state.t_last_popcorn_update > t_exp)
+            aclk_shared_state.next_popcorn_host = host;
+
+        rrdhost_aclk_state_unlock(host);
+    }
+    if(!any)
+        aclk_shared_state.next_popcorn_host = NULL;
+
+    rrd_unlock();
+}
+
+static int aclk_popcorn_check_bump(RRDHOST *host)
+{
+    time_t now = now_realtime_sec();
+    int updated = 0;
+    rrdhost_aclk_state_lock(host);
+    if (unlikely(ACLK_HOST_POPCORNING(host))) {
+        if(now != host->aclk_state.t_last_popcorn_update) {
+            updated = 1;
+            info("%starting ACLK popcorn timer for host \"%s\" with GUID \"%s\"", (host->aclk_state.t_last_popcorn_update ? "Res" : "S"), host->hostname, host->machine_guid);
+        }
+
+        host->aclk_state.t_last_popcorn_update = now;
+        rrdhost_aclk_state_unlock(host);
+
+        if (host != localhost && updated) {
+            ACLK_SHARED_STATE_LOCK;
+            aclk_update_next_child_to_popcorn();
+            ACLK_SHARED_STATE_UNLOCK;
+        }
+
         return 1;
     }
-    ACLK_SHARED_STATE_UNLOCK;
+    rrdhost_aclk_state_unlock(host);
     return 0;
+}
+
+inline static int aclk_host_initializing(RRDHOST *host)
+{
+    rrdhost_aclk_state_lock(host);
+    int ret = ACLK_HOST_POPCORNING(host);
+    rrdhost_aclk_state_unlock(host);
+    return ret;
+}
+
+static void aclk_start_host_popcorning(RRDHOST *host)
+{
+    rrdhost_aclk_state_lock(host);
+    if (host == localhost && host->aclk_state.state != ACLK_HOST_INITIALIZING) {
+        errno = 0;
+        error("Localhost is allowed to do popcorning only once after startup!");
+        rrdhost_aclk_state_unlock(host);
+        return;
+    }
+
+    host->aclk_state.state = ACLK_HOST_INITIALIZING;
+    host->aclk_state.metadata = ACLK_METADATA_REQUIRED;
+    rrdhost_aclk_state_unlock(host);
+    aclk_popcorn_check_bump(host);
 }
 
 /*
@@ -472,7 +551,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_UNLOCK;
 
-    if(aclk_popcorn_check_bump())
+    if(aclk_popcorn_check_bump(localhost))
         return;
 
     if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
@@ -511,7 +590,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     _free_collector(tmp_collector);
 
-    if (aclk_popcorn_check_bump())
+    if (aclk_popcorn_check_bump(localhost))
         return;
 
     if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
@@ -941,7 +1020,8 @@ void *aclk_main(void *ptr)
         config_set_number(CONFIG_SECTION_CLOUD, "query thread count", query_threads.count);
     }
 
-    aclk_shared_state.last_popcorn_interrupt = now_realtime_sec(); // without mutex here because threads are not yet started
+    //start localhost popcorning
+    aclk_start_host_popcorning(localhost);
 
     aclk_stats_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "statistics", CONFIG_BOOLEAN_YES);
     if (aclk_stats_enabled) {
@@ -1200,9 +1280,9 @@ void aclk_disconnect()
     aclk_stats_upd_online(0);
 
     aclk_subscribed = 0;
-    ACLK_SHARED_STATE_LOCK;
-    aclk_shared_state.metadata_submitted = ACLK_METADATA_REQUIRED;
-    ACLK_SHARED_STATE_UNLOCK;
+    rrdhost_aclk_state_lock(localhost);
+    localhost->aclk_state.metadata = ACLK_METADATA_REQUIRED;
+    rrdhost_aclk_state_unlock(localhost);
     aclk_connected = 0;
     aclk_connecting = 0;
     aclk_force_reconnect = 1;
@@ -1373,13 +1453,8 @@ void aclk_single_update_enable()
 // Trigged by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
-
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
+    if (unlikely(aclk_host_initializing(localhost)))
         return;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
 
     if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
         if (likely(aclk_connected)) {
@@ -1440,10 +1515,13 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (host != localhost)
         return 0;
 
+    if (ACLK_HOST_POPCORNING(localhost))
+        return 0;
+
     if (unlikely(aclk_disable_single_updates))
         return 0;
 
-    if (aclk_popcorn_check_bump())
+    if (aclk_popcorn_check_bump(localhost))
         return 0;
 
     if (unlikely(aclk_queue_query("_chart", host, NULL, chart_name, 0, 1, aclk_cmd))) {
@@ -1467,12 +1545,8 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     if (host != localhost)
         return 0;
 
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
-        ACLK_SHARED_STATE_UNLOCK;
+    if(unlikely(aclk_host_initializing(localhost)))
         return 0;
-    }
-    ACLK_SHARED_STATE_UNLOCK;
 
     /*
      * Check if individual updates have been disabled
