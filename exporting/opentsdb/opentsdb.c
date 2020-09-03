@@ -386,12 +386,12 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     buffer_sprintf(
         instance->buffer,
         "{"
-        "  \"metric\": \"%s.%s.%s\","
-        "  \"timestamp\": %llu,"
-        "  \"value\": " COLLECTED_NUMBER_FORMAT ","
-        "  \"tags\": {"
-        "    \"host\": \"%s%s%s\"%s"
-        "  }"
+        "\"metric\":\"%s.%s.%s\","
+        "\"timestamp\":%llu,"
+        "\"value\":"COLLECTED_NUMBER_FORMAT","
+        "\"tags\":{"
+        "\"host\":\"%s%s%s\"%s"
+        "}"
         "}",
         instance->config.prefix,
         chart_name,
@@ -443,12 +443,12 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     buffer_sprintf(
         instance->buffer,
         "{"
-        "  \"metric\": \"%s.%s.%s\","
-        "  \"timestamp\": %llu,"
-        "  \"value\": " CALCULATED_NUMBER_FORMAT ","
-        "  \"tags\": {"
-        "    \"host\": \"%s%s%s\"%s"
-        "  }"
+        "\"metric\":\"%s.%s.%s\","
+        "\"timestamp\":%llu,"
+        "\"value\":"CALCULATED_NUMBER_FORMAT","
+        "\"tags\":{"
+        "\"host\":\"%s%s%s\"%s"
+        "}"
         "}",
         instance->config.prefix,
         chart_name,
