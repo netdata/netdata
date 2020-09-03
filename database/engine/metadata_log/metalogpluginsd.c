@@ -12,7 +12,6 @@ PARSER_RC metalog_pluginsd_host_action(
 {
     int history = 5;
     RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
-    int health_enabled = default_health_enabled;
     int rrdpush_enabled = default_rrdpush_enabled;
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
@@ -49,9 +48,6 @@ PARSER_RC metalog_pluginsd_host_action(
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
 
-    //health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", health_enabled);
-    health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
-
     //rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rrdpush_enabled);
     rrdpush_enabled = appconfig_get_boolean(&stream_config, machine_guid, "proxy enabled", rrdpush_enabled);
 
@@ -77,7 +73,7 @@ PARSER_RC metalog_pluginsd_host_action(
         , update_every
         , history   // entries
         , mode
-        , health_enabled    // health enabled
+        , 0    // health enabled
         , rrdpush_enabled   // Push enabled
         , rrdpush_destination  //destination
         , rrdpush_api_key  // api key
