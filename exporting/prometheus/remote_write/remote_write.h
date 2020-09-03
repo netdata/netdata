@@ -7,6 +7,11 @@
 #include "exporting/prometheus/prometheus.h"
 #include "remote_write_request.h"
 
+struct prometheus_remote_write_specific_data {
+    BUFFER *header;
+    void *write_request;
+};
+
 int init_prometheus_remote_write_instance(struct instance *instance);
 extern void clean_prometheus_remote_write(struct instance *instance);
 
