@@ -195,9 +195,9 @@ jobs:
       - name: Build on ${{ matrix.distro }}
         env:
           RUNCMD: >-
-            ./netdata/build-kinesis.sh &&
+            ./build-kinesis.sh &&
             ./netdata-installer.sh \--dont-wait --dont-start-it \
             --enable-backend-kinesis
         run: |
           docker run -w /netdata test \
-            /bin/sh -c "$RUNCMD"
+            /bin/sh -c $RUNCMD
