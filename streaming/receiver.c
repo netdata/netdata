@@ -126,11 +126,11 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         return PARSER_RC_OK; //the message is OK problem must be somewehere else
     }
 
-    netdata_mutex_lock(&host->aclk_state_lock);
+    rrdhost_aclk_state_lock(host);
     if (host->aclk_state.claimed_id)
         freez(host->aclk_state.claimed_id);
     host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
-    netdata_mutex_unlock(&host->aclk_state_lock);
+    rrdhost_aclk_state_unlock(host);
 
     rrdpush_claimed_id(host);
 

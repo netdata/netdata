@@ -34,9 +34,9 @@ static char *claiming_errors[] = {
 char *is_agent_claimed()
 {
     char *result;
-    netdata_mutex_lock(&localhost->aclk_state_lock);
+    rrdhost_aclk_state_lock(localhost);
     result = (localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(localhost->aclk_state.claimed_id);
-    netdata_mutex_unlock(&localhost->aclk_state_lock);
+    rrdhost_aclk_state_unlock(localhost);
     return result;
 }
 
@@ -134,7 +134,7 @@ void load_claiming_state(void)
     netdata_cloud_setting = 0;
 #else
     uuid_t uuid;
-    netdata_mutex_lock(&localhost->aclk_state_lock);
+    rrdhost_aclk_state_lock(localhost);
     if (localhost->aclk_state.claimed_id) {
         freez(localhost->aclk_state.claimed_id);
         localhost->aclk_state.claimed_id = NULL;
@@ -160,7 +160,7 @@ void load_claiming_state(void)
         claimed_id = NULL;
     }
     localhost->aclk_state.claimed_id = claimed_id;
-    netdata_mutex_unlock(&localhost->aclk_state_lock);
+    rrdhost_aclk_state_unlock(localhost);
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;

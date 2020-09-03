@@ -837,6 +837,9 @@ extern RRDHOST *localhost;
 #define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))
 #define rrdhost_unlock(host) netdata_rwlock_unlock(&((host)->rrdhost_rwlock))
 
+#define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
+#define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
+
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 
