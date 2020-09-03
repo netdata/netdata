@@ -1483,6 +1483,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
  */
 static int aclk_handle_cloud_request(struct aclk_request *cloud_to_agent)
 {
+    errno = 0;
     ACLK_SHARED_STATE_LOCK;
     if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
         debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");
@@ -1523,6 +1524,7 @@ static int aclk_handle_cloud_request(struct aclk_request *cloud_to_agent)
 static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
 {
     int version = -1;
+    errno = 0;
 
     if(unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
         error("Unsuported version of \"version\" message from cloud. Expected %d, Got %d", ACLK_VERSION_NEG_VERSION, cloud_to_agent->version);
@@ -1557,10 +1559,12 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
 
     ACLK_SHARED_STATE_LOCK;
     if (unlikely(now_monotonic_usec() > aclk_shared_state.version_neg_wait_till)) {
+        errno = 0;
         error("The \"version\" message came too late ignoring.");
         goto err_cleanup;
     }
     if (unlikely(aclk_shared_state.version_neg)) {
+        errno = 0;
         error("Version has already been set to %d", aclk_shared_state.version_neg);
         goto err_cleanup;
     }
@@ -1606,11 +1610,13 @@ int aclk_handle_cloud_message(char *payload)
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
     if (unlikely(rc != JSON_OK)) {
+        errno = 0;
         error("Malformed json request (%s)", payload);
         goto err_cleanup;
     }
 
     if (!cloud_to_agent.type_id) {
+        errno = 0;
         error("Cloud message is missing compulsory key \"type\"");
         goto err_cleanup;
     }
@@ -1625,6 +1631,7 @@ int aclk_handle_cloud_message(char *payload)
         }
     }
 
+    errno = 0;
     error("Unknown message type from Cloud \"%s\"", cloud_to_agent.type_id);
 
 err_cleanup:
