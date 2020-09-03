@@ -30,13 +30,11 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
-    ACLK_CMD_CLOUD_2,
     ACLK_CMD_ONCONNECT,
     ACLK_CMD_INFO,
     ACLK_CMD_CHART,
     ACLK_CMD_CHARTDEL,
-    ACLK_CMD_ALARM,
-    ACLK_CMD_MAX
+    ACLK_CMD_ALARM
 } ACLK_CMD;
 
 typedef enum aclk_metadata_state {

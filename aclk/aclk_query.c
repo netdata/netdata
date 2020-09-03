@@ -601,9 +601,8 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
             break;
 
         case ACLK_CMD_CLOUD:
-        case ACLK_CMD_CLOUD_2:
             debug(D_ACLK, "EXECUTING a cloud command");
-            if(this_query->cmd == ACLK_CMD_CLOUD)
+            if (aclk_shared_state.version_neg < ACLK_V_COMPRESSION)
                 aclk_execute_query(this_query);
             else
                 aclk_execute_query_v2(this_query);

@@ -105,7 +105,7 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
         return 1;
     }
 
-    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, NULL, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD_2)))
+    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, NULL, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD)))
         debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
 
     UNUSED(cloud_to_agent);
