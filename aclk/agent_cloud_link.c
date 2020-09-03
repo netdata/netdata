@@ -1539,7 +1539,7 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent)
         error("Max version missing or 0");
         return 1;
     }
-    if(unlikely(cloud_to_agent->max_version < cloud_to_agent->max_version)) {
+    if(unlikely(cloud_to_agent->max_version < cloud_to_agent->min_version)) {
         error("Max version (%d) must be >= than min version (%d)", cloud_to_agent->max_version, cloud_to_agent->min_version);
         return 1;
     }
