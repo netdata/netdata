@@ -1602,8 +1602,9 @@ int aclk_handle_cloud_message(char *payload)
     }
 
     if (unlikely(!payload)) {
-        debug(D_ACLK, "ACLK incoming message is empty");
-        goto err_cleanup;
+        errno = 0;
+        error("ACLK incoming message is empty");
+        goto err_cleanup_nojson;
     }
 
     debug(D_ACLK, "ACLK incoming message (%s)", payload);
@@ -1645,6 +1646,7 @@ err_cleanup:
     if (cloud_to_agent.callback_topic)
         freez(cloud_to_agent.callback_topic);
 
+err_cleanup_nojson:
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.cloud_req_err++;
