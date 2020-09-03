@@ -40,7 +40,7 @@ RUN apt update
 RUN apt install gdb -y
 RUN printf 'file /usr/sbin/netdata\n\
 set args -D\n\
-handle SIGINT nostop\n\
+handle SIGINT nostop print pass\n\
 run\n\
 info frame\n\
 info args\n\

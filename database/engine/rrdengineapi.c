@@ -243,6 +243,12 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
+        // This is deliberately not a fatal assert as the timestamp is derived from a tainted source
+        if (point_in_time <= descr->end_time) {
+            errno = 0;
+            error("Attempt to store older/duplicate point in db: %llu < %llu", point_in_time, descr->end_time);
+            return;
+        }
         if (descr->page_length >= sizeof(number)*2) {
             usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number) - 1);
             if (0 != ((point_in_time - descr->end_time) % tf_spacing))
