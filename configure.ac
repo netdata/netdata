@@ -482,6 +482,8 @@ if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
     enable_dbengine="no"
+    OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+    OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
 fi
 AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])

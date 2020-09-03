@@ -1451,6 +1451,10 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
     init_global_guid_map();
 #endif
+
+#ifdef SQLITE_POC
+    sql_init_database();
+#endif
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 

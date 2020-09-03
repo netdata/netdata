@@ -372,6 +372,9 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
+    database/sqlite/sqlite_functions.c \
+    database/sqlite/sqlite_functions.h \
+    database/sqlite/carray.c \
     $(NULL)
 
 if ENABLE_DBENGINE
@@ -404,8 +407,6 @@ if ENABLE_DBENGINE
         database/engine/metadata_log/compaction.h \
         database/engine/global_uuid_map/global_uuid_map.c \
         database/engine/global_uuid_map/global_uuid_map.h \
-        database/sqlite/sqlite_functions.c \
-        database/sqlite/sqlite_functions.h \
         $(NULL)
 endif
 

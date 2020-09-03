@@ -2,6 +2,7 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+#include "sqlite/sqlite_functions.h"
 
 static inline void calc_link_to_rrddim(RRDDIM *rd)
 {
@@ -217,56 +218,10 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
                           collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
-                          int is_archived, uuid_t *dim_uuid, uuid_t *chart_uuid) {
+                          int is_archived) {
     RRDDIM *rd = NULL;
     // SPECIAL case create transient
-    if (is_archived == 2 && memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-//        char varname[CONFIG_MAX_NAME + 1];
-        unsigned long size = sizeof(RRDDIM);
-        rd = callocz(1, size);
-        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        rd->id = strdupz(id);
-        //rd->hash = simple_hash(rd->id);
-
-//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-        //rd->name = config_get(st->config_section, varname, (name && *name) ? name : rd->id);
-        rd->name = strdupz((name && *name) ? name : rd->id);
-        //rd->hash_name = simple_hash(rd->name);
-
-//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
-        rd->algorithm = algorithm;
-
-//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
-        rd->multiplier = multiplier;
-
-//        snprintfz(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
-        rd->divisor = divisor;
-        if (!rd->divisor)
-            rd->divisor = 1;
-
-        rd->entries = st->entries;
-        rd->update_every = st->update_every;
-
-        rd->rrdset = st;
-        rd->state = mallocz(sizeof(*rd->state));
-
-        if (dim_uuid == NULL)
-            dim_uuid = sql_find_dim_uuid(st, rd->id, rd->name);
-
-        rrdeng_metric_init(rd, dim_uuid);
-        rd->state->collect_ops.init = rrdeng_store_metric_init;
-        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
-        rd->state->query_ops.init = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-        return rd;
-    }
-
-#ifdef SQLITE_POC
+#ifdef SQLITE_POC1   //TODO: remove
     // If we attempt to create archived dimension then send it to the SQLITE
     if (is_archived == 1) {
         int rc = sql_store_dimension(dim_uuid, chart_uuid, id, name, multiplier, divisor, algorithm);
@@ -448,8 +403,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->rrdset = st;
     rd->state = mallocz(sizeof(*rd->state));
 
-    if (dim_uuid == NULL)
-        dim_uuid = sql_find_dim_uuid(st, rd->id, rd->name);
+    rd->state->metric_uuid = sql_find_dim_uuid(st, rd->id, rd->name, multiplier, divisor, algorithm);
 
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -465,6 +419,17 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
     } else {
+#ifdef SQLITE_POC
+        rd->state->collect_ops.init         = rrddim_sql_collect_init;
+        rd->state->collect_ops.store_metric = rrddim_sql_collect_store_metric;
+        rd->state->collect_ops.finalize     = rrddim_sql_collect_finalize;
+        rd->state->query_ops.init           = rrddim_sql_query_init;
+        rd->state->query_ops.next_metric    = rrddim_sql_query_next_metric;
+        rd->state->query_ops.is_finished    = rrddim_sql_query_is_finished;
+        rd->state->query_ops.finalize       = rrddim_sql_query_finalize;
+        rd->state->query_ops.latest_time    = rrddim_sql_query_latest_time;
+        rd->state->query_ops.oldest_time    = rrddim_sql_query_oldest_time;
+#else
         rd->state->collect_ops.init         = rrddim_collect_init;
         rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
         rd->state->collect_ops.finalize     = rrddim_collect_finalize;
@@ -474,6 +439,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.finalize       = rrddim_query_finalize;
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
+#endif
     }
     if (is_archived)
         rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);

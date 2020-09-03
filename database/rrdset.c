@@ -3,6 +3,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 #include <sched.h>
+#include "sqlite/sqlite_functions.h"
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
@@ -504,8 +505,6 @@ RRDSET *rrdset_create_custom(
         , RRD_MEMORY_MODE memory_mode
         , long history_entries
         , int is_archived
-        , uuid_t *chart_uuid
-        , uuid_t *host_uuid
 ) {
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
@@ -696,7 +695,7 @@ RRDSET *rrdset_create_custom(
         return st;
     }
 
-#ifdef SQLITE_POC
+#ifdef SQLITE_POC1     //TODO:REMOVE
     // If we attempt to create archived chart then send it to the SQLITE
     if (is_archived == 1) {
         int rc = sql_store_chart(chart_uuid, &host->host_uuid, type, id, name, family, context, title, units, plugin, module, priority, update_every, (int ) chart_type, (int ) memory_mode, history_entries);
@@ -704,86 +703,6 @@ RRDSET *rrdset_create_custom(
         return NULL;
     }
 #endif
-
-    // Special case create transient
-    if (is_archived == 2 && memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        unsigned long size = sizeof(RRDSET);
-        st = callocz(1, size);
-        st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        long entries;
-        entries = 5; //config_get_number(config_section, "history", 5);
-
-
-        // RELEASE memory
-//        freez(st->plugin_name);
-//        freez(st->module_name);
-//        freez(st->type);
-//        freez(st->state);
-//        freez(st->title);
-//        freez(st->name);
-//        freez(st->units);
-//        freez(st->context);
-//        freez(st->chart_uuid);
-
-
-
-        st->plugin_name = plugin?strdupz(plugin):NULL;
-        st->module_name = module?strdupz(module):NULL;
-
-        //st->config_section = strdupz(config_section);
-        st->rrdhost = host;
-        st->memsize = size;
-        st->entries = entries;
-        st->update_every = update_every;
-
-        if(st->current_entry >= st->entries) st->current_entry = 0;
-
-        //strcpy(st->cache_filename, fullfilename);
-        //strcpy(st->magic, RRDSET_MAGIC);
-
-        strcpy(st->id, fullid);
-        //st->hash = simple_hash(st->id);
-
-        //st->cache_dir = cache_dir;
-
-        st->chart_type = chart_type;
-        st->type       = strdupz(type);
-
-        st->state = callocz(1, sizeof(*st->state));
-        st->family     = NULL; //config_get(st->config_section, "family", family?family:st->type);
-        //st->state->old_family = strdupz(st->family);
-        //json_fix_string(st->family);
-
-        st->units      = strdupz(units?units:""); //config_get(st->config_section, "units", units?units:"");
-        json_fix_string(st->units);
-
-        st->context    = strdupz(context?context:st->id); //config_get(st->config_section, "context", context?context:st->id);
-        //st->state->old_context = strdupz(st->context);
-        json_fix_string(st->context);
-        //st->hash_context = simple_hash(st->context);
-
-        st->priority = config_get_number(st->config_section, "priority", priority);
-
-        if(name && *name && rrdset_set_name(st, name))
-            // we did set the name
-            ;
-        else
-            // could not use the name, use the id
-            rrdset_set_name(st, id);
-
-        st->title = strdupz(title);
-        //st->state->old_title = strdupz(st->title);
-        json_fix_string(st->title);
-
-        //st->rrdfamily = rrdfamily_create(host, st->family);
-
-        st->chart_uuid = callocz(1, sizeof(uuid_t));
-
-        //TODO: Find chart UUID
-        //    uuid_copy(*st->chart_uuid, *chart_uuid);
-        //}
-        return st;
-    }
 
     char fullfilename[FILENAME_MAX + 1];
 
@@ -1020,6 +939,17 @@ RRDSET *rrdset_create_custom(
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
     }
+
+#ifdef SQLITE_POC
+    st->chart_uuid = sql_find_chart_uuid(host, st->id, st->name, type, family, context, title, units, plugin, module, priority,
+                              update_every, chart_type, memory_mode, history_entries);
+
+    st->state->first_entry_t = LONG_MAX;
+    st->state->last_entry_t = 0;
+    sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
+
+#endif
+
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         int replace_instead_of_generate = 0;
@@ -1349,6 +1279,11 @@ static inline size_t rrdset_done_interpolate(
                     }
                     break;
             }
+            // SQLITE: If we are about to store in position 0 and it's not the first one, we need to flush the metrics first
+            if (st->current_entry == 0) {
+                info("Flushing chart %s (%s)", st->id, rd->id);
+                rrddim_sql_collect_finalize(rd);
+            }
 
             if(unlikely(!store_this_entry)) {
                 rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
@@ -1423,6 +1358,11 @@ static inline size_t rrdset_done_interpolate(
 
         st->counter = ++counter;
         st->current_entry = current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
+
+        if (current_entry == 0) {
+            info("SQLITE: Need to flush metrics for chart %s", st->id);
+            //sql_add_metric_page(rd->state->metric_uuid, rd->values, rd->rrdset->current_entry, rrddim_first_entry_t(rd),  rrddim_last_entry_t(rd) - 1);
+        }
 
         st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = 0;

@@ -1462,8 +1462,6 @@ static inline RRDSET *statsd_private_rrdset_create(
             , memory_mode     // memory mode
             , history         // history
             , 0               // not archived
-            , NULL            // no known UUID
-            , NULL
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
 
@@ -2003,8 +2001,6 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , app->rrd_memory_mode      // memory mode
                 , app->rrd_history_entries  // history
                 , 0                         // not archived
-                , NULL                      // no known UUID
-                , NULL
         );
 
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);

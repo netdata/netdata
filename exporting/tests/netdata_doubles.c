@@ -101,8 +101,7 @@ RRDSET *rrdset_create_custom(
     RRDSET_TYPE chart_type,
     RRD_MEMORY_MODE memory_mode,
     long history_entries,
-    int is_archived,
-    uuid_t *chart_uuid)
+    int is_archived)
 {
     check_expected_ptr(host);
     check_expected_ptr(type);
@@ -120,7 +119,6 @@ RRDSET *rrdset_create_custom(
     UNUSED(memory_mode);
     UNUSED(history_entries);
     UNUSED(is_archived);
-    UNUSED(chart_uuid);
 
     function_called();
 

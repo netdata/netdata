@@ -4,6 +4,7 @@
 #define NETDATA_RRD_H 1
 
 #define SQLITE_POC
+#include <sqlite3.h>
 
 // forward typedefs
 typedef struct rrdhost RRDHOST;
@@ -302,6 +303,13 @@ struct rrddim_query_handle {
             long slot;
             long last_slot;
             uint8_t finished;
+#ifdef SQLITE_POC
+            sqlite3_stmt *query;
+            time_t local_start_time;       // Expected data range from DB
+            time_t local_end_time;
+            size_t entries;
+            int init;
+#endif
         } slotted;                         // state the legacy code uses
 #ifdef ENABLE_DBENGINE
         struct rrdeng_query_handle {
@@ -325,6 +333,9 @@ struct rrddim_volatile {
     uuid_t *metric_uuid;                 // global UUID for this metric (unique_across hosts)
     struct pg_cache_page_index *page_index;
     uint32_t compaction_id;              // The last metadata log compaction procedure that has processed this object.
+#endif
+#ifdef SQLITE_POC
+    uuid_t *metric_uuid;
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
@@ -371,6 +382,8 @@ struct rrdset_volatile {
     char *old_context;
     int from;
     int to;
+    time_t first_entry_t;       // First entry in SQLite database (init LONG_MAX)
+    time_t last_entry_t;        // Last entry in SQLite database (init 0)
 };
 
 // ----------------------------------------------------------------------------
@@ -815,6 +828,9 @@ struct rrdhost {
     uint32_t compaction_id;                         // The last metadata log compaction procedure that has processed
                                                     // this object.
 #endif
+#ifdef SQLITE_POC
+    uuid_t  host_uuid;                              // Global GUID for this host
+#endif
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
@@ -947,12 +963,10 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , RRDSET_TYPE chart_type
                              , RRD_MEMORY_MODE memory_mode
                              , long history_entries
-                             , int is_archived
-                             , uuid_t *chart_uuid
-                             , uuid_t *host_uuid);
+                             , int is_archived);
 
 #define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries, 0, NULL, NULL)
+    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries, 0)
 
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
@@ -1023,6 +1037,7 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // get the timestamp of the last entry in the round robin database
 static inline time_t rrdset_last_entry_t(RRDSET *st) {
+#ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t last_entry_t  = 0;
@@ -1034,13 +1049,15 @@ static inline time_t rrdset_last_entry_t(RRDSET *st) {
         if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
         return last_entry_t;
-    } else {
-        return (time_t)st->last_updated.tv_sec;
     }
+#endif
+    return (time_t)st->last_updated.tv_sec;
+
 }
 
 // get the timestamp of first entry in the round robin database
 static inline time_t rrdset_first_entry_t(RRDSET *st) {
+#ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t first_entry_t = LONG_MAX;
@@ -1053,14 +1070,15 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
-    } else {
-        return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
     }
+#endif
+    return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
 }
 
 // get the timestamp of the last entry in the round robin database
 static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
+#ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)  {
         RRDDIM *temp_rd;
         time_t last_entry_t  = 0;
@@ -1075,14 +1093,15 @@ static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
         if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
         return last_entry_t;
-    } else {
-        return (time_t)st->last_updated.tv_sec;
     }
+#endif
+    return (time_t)st->last_updated.tv_sec;
 }
 
 // get the timestamp of first entry in the round robin database
 static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
+#ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *temp_rd;
         time_t first_entry_t = LONG_MAX;
@@ -1097,9 +1116,9 @@ static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
-    } else {
-        return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
     }
+#endif
+    return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
 }
 
 time_t rrdhost_last_entry_t(RRDHOST *h);
@@ -1190,9 +1209,9 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
 extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
 extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
                                  collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
-                                 int is_archived, uuid_t *dim_uuid, uuid_t *chart_uuid);
+                                 int is_archived);
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, \
-                                                                                   algorithm, (st)->rrd_memory_mode, 0, NULL, NULL)
+                                                                                   algorithm, (st)->rrd_memory_mode, 0)
 
 extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);

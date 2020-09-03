@@ -1,7 +1,8 @@
-    // SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <sqlite3.h>
 #include "sqlite_functions.h"
+#include <lz4.h>
 
 struct dimension_list *global_dimensions = NULL;
 
@@ -35,6 +36,19 @@ static void _uuid_unparse(sqlite3_context *context, int argc, sqlite3_value **ar
     uuid_unparse_lower(sqlite3_value_blob(argv[0]), uuid_str);
     sqlite3_result_text(context, uuid_str, 36, SQLITE_TRANSIENT);
 }
+
+static void _uncompress(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    uint32_t uncompressed_buf[4096];
+    if ( argc != 1 || sqlite3_value_blob(argv[0]) == NULL) {
+        sqlite3_result_null(context);
+        return ;
+    }
+    int ret = LZ4_decompress_safe((char *) sqlite3_value_blob(argv[0]), (char *) &uncompressed_buf,
+                                  sqlite3_value_bytes(argv[0]), 4096);
+    sqlite3_result_blob(context, uncompressed_buf, ret, SQLITE_TRANSIENT);
+}
+
 
 int dim_callback(void *dim_ptr, int argc, char **argv, char **azColName)
 {
@@ -191,6 +205,7 @@ int sql_init_database()
 
     sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
     sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
+    sqlite3_create_function(db, "uncompress", 1, SQLITE_ANY , 0, _uncompress, 0, 0);
 
     return rc;
 }
@@ -367,7 +382,7 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
         rd = rrddim_add_custom(
             st, (const char *)sqlite3_column_text(res, 0), (const char *)sqlite3_column_text(res, 1),
             sqlite3_column_int(res, 2), sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode,
-            temp, &dim_uuid, NULL);
+            temp);
 
         if (temp != 2) {
             rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
@@ -649,7 +664,7 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_l
     return 0;
 }
 
-char *sql_find_dim_uuid(RRDSET *st, char *id, char *name)
+char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm)
 {
     sqlite3_stmt *res;
     uuid_t *uuid = NULL;
@@ -658,7 +673,7 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name)
     rc = sqlite3_prepare_v2(
         db, "select dim_uuid from dimension where chart_uuid = @chart and id = @id and name = @name;", -1, &res, 0);
     if (rc != SQLITE_OK) {
-        info("SQLITE: failed to bind to find GUID");
+        info("SQLITE: failed to prepare statement to lookup dimension GUID");
         return NULL;
     }
 
@@ -666,9 +681,9 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name)
     int id_id = sqlite3_bind_parameter_index(res, "@id");
     int name_id = sqlite3_bind_parameter_index(res, "@name");
 
-    rc = sqlite3_bind_blob(res, dim_id, st->chart_uuid, 16, SQLITE_STATIC);
-    rc = sqlite3_bind_text(res, id_id, id, -1, SQLITE_STATIC);
-    rc = sqlite3_bind_text(res, name_id, name, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, dim_id, st->chart_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, id_id, id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, name_id, name, -1, SQLITE_TRANSIENT);
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid = malloc(sizeof(uuid_t));
@@ -679,11 +694,23 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name)
         uuid_copy(*uuid, sqlite3_column_blob(res, 0));
         break;
     }
+
+    // Dimension does is not known, create it
+    if (uuid == NULL) {
+        uuid = malloc(sizeof(uuid_t));
+        info("SQLite: Generating uuid for dimension %s under chart %s", id, st->name);
+
+        uuid_generate(*uuid);
+        sql_store_dimension(uuid, st->chart_uuid, id, name, multiplier, divisor, algorithm);
+    }
+
     sqlite3_finalize(res);
     return uuid;
 }
 
-char *sql_find_chart_uuid(RRDHOST *host, char *id, char *name)
+uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *type, const char *family,
+        const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
+        int update_every, int chart_type, int memory_mode, long history_entries)
 {
     sqlite3_stmt *res;
     uuid_t *uuid = NULL;
@@ -709,6 +736,22 @@ char *sql_find_chart_uuid(RRDHOST *host, char *id, char *name)
         uuid_copy(*uuid, sqlite3_column_blob(res, 0));
         break;
     }
+
+    if (uuid == NULL) {
+        uuid = malloc(sizeof(uuid_t));
+        uuid_generate(*uuid);
+        char uuid_str[37];
+        uuid_unparse_lower(*uuid, uuid_str);
+        info("SQLite: Generating uuid [%s] for chart %s under host %s", uuid_str, id, host->hostname);
+        sql_store_chart(
+            uuid, &host->host_uuid, type, id, name, family, context, title, units, plugin, module, priority,
+            update_every, chart_type, memory_mode, history_entries);
+    }
+
+    char uuid_str[37];
+    uuid_unparse_lower(*uuid, uuid_str);
+    info("SQLite: Returning uuid [%s] for chart %s under host %s", uuid_str, id, host->hostname);
+
     sqlite3_finalize(res);
     return uuid;
 }
@@ -763,35 +806,29 @@ void  sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number numb
     }
 }
 
-void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
+/*
+ * Store a page of metrics to the database
+ * This will be an array of values size * storage_nu,ber
+ */
+
+void sql_add_metric_page(uuid_t *dim_uuid, storage_number *metric, size_t entries, time_t start_time, time_t end_time)
 {
     char *err_msg = NULL;
-    //char  sql[1024];
     char  dim_str[37];
     int rc;
     static sqlite3_stmt *res = NULL;
     static sqlite3_stmt *res_page = NULL;
     static int dim_id, date_id;
     static int metric_id;
-
-    if (!descr->page_length) {
-        info("SQLITE: Empty page");
-        return;
-    }
+    size_t  page_length = entries  * sizeof(storage_number);
 
     uuid_unparse_lower(*dim_uuid, dim_str);
-    uint32_t entries =  descr->page_length / sizeof(storage_number);
-    uint32_t *metric = descr->pg_cache_descr->page;
-    //uint32_t dt = 0;
-    //time_t start_time = descr->start_time/ USEC_PER_SEC;
 
+    if (start_time > end_time)
+        return;
 
     if (!res) {
-#ifdef SQLITE_RT_BLOB
-        rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created, metric) values (@dim_uuid, @date, zeroblob(4096)) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
-#else
         rc = sqlite3_prepare_v2(db, "insert into metric_update (dim_uuid, date_created) values (@dim_uuid, @date) on conflict(dim_uuid) DO update set date_created=excluded.date_created;", -1, &res, 0);
-#endif
         if (rc != SQLITE_OK) {
             info("SQLITE: Failed to prepare statement");
             return;
@@ -810,19 +847,25 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     }
 
     rc = sqlite3_bind_blob(res, dim_id, dim_uuid, 16, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_int(res, date_id, descr->end_time / USEC_PER_SEC);
+    rc = sqlite3_bind_int(res, date_id, end_time);
 
     void *compressed_buf = NULL;
-    int max_compressed_size = LZ4_compressBound(descr->page_length);
-    compressed_buf = mallocz(max_compressed_size);
+    int compressed_size;
+    int max_compressed_size;
 
-    int compressed_size = LZ4_compress_default(metric, compressed_buf, descr->page_length, max_compressed_size);
+    if (entries) {
+        max_compressed_size = LZ4_compressBound(page_length);
+        compressed_buf = mallocz(max_compressed_size);
+        compressed_size = LZ4_compress_default(metric, compressed_buf, page_length, max_compressed_size);
+    }
 
+    sqlite3_clear_bindings(res_page);
     rc = sqlite3_bind_int(res_page, 1, entries);
     rc = sqlite3_bind_blob(res_page, 2, dim_uuid, 16, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_int64(res_page, 3, descr->start_time);
-    rc = sqlite3_bind_int64(res_page, 4, descr->end_time);
-    rc = sqlite3_bind_blob(res_page, metric_id, compressed_buf, compressed_size, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_int64(res_page, 3, start_time);
+    rc = sqlite3_bind_int64(res_page, 4, end_time);
+    if (compressed_buf)
+        rc = sqlite3_bind_blob(res_page, metric_id, compressed_buf, compressed_size, SQLITE_TRANSIENT);
 
     unsigned long long start = now_realtime_usec();
     sqlite3_step(res);
@@ -830,74 +873,74 @@ void sql_add_metric_page(uuid_t *dim_uuid, struct rrdeng_page_descr *descr)
     sqlite3_step(res_page);
     sqlite3_reset(res_page);
     unsigned long long end = now_realtime_usec();
-    info("SQLITE: PAGE in %llu usec (%d -> %d bytes) entries=%d", end-start, descr->page_length, compressed_size, entries);
+    info("SQLITE: PAGE %s in %llu usec (%d -> %d bytes) entries=%d (%d - %d)", dim_str, end-start, page_length, compressed_size, entries, start_time, end_time);
 
-    freez(compressed_buf);
+    freez(compressed_buf); // May be null
     return;
 }
 
-void sql_add_metric_page_from_extent(struct rrdeng_page_descr *descr)
-{
-    char *err_msg = NULL;
-    char dim_str[37];
-    int rc;
-    static sqlite3_stmt *res = NULL;
-    static sqlite3_stmt *res_page = NULL;
-    static int dim_id, date_id;
-    static int metric_id;
-    static int level = 0;
-
-    if (!descr->page_length) {
-        info("SQLITE: Empty page");
-        return;
-    }
-    level++;
-
-    uuid_unparse_lower(descr->id, dim_str);
-    uint32_t entries = descr->page_length / sizeof(storage_number);
-    uint32_t *metric = descr->pg_cache_descr->page;
-
-    if (!res_page) {
-        rc = sqlite3_prepare_v2(
-            db,
-            "insert or replace into metric_migrate (entries, dim_uuid, start_date, end_date, metric) values (@entries, @dim, @start_date, @end_date, @page);",
-            -1, &res_page, 0);
-        if (rc != SQLITE_OK) {
-            info("SQLITE: Failed to prepare statement for metric page");
-            return;
-        }
-        metric_id = sqlite3_bind_parameter_index(res_page, "@page");
-    }
-
-    rc = sqlite3_bind_blob(res, dim_id, descr->id, 16, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_int(res, date_id, descr->end_time / USEC_PER_SEC);
-
-    void *compressed_buf = NULL;
-    int max_compressed_size = LZ4_compressBound(descr->page_length);
-    compressed_buf = mallocz(max_compressed_size);
-
-    int compressed_size = LZ4_compress_default(metric, compressed_buf, descr->page_length, max_compressed_size);
-
-    rc = sqlite3_bind_int(res_page, 1, entries);
-    rc = sqlite3_bind_int64(res_page, 3, descr->start_time);
-    rc = sqlite3_bind_int64(res_page, 4, descr->end_time);
-    rc = sqlite3_bind_blob(res_page, metric_id, compressed_buf, compressed_size, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_blob(res_page, 2, descr->id, 16, SQLITE_TRANSIENT);
-
-    freez(compressed_buf);
-
-    unsigned long long start = now_realtime_usec();
-    sqlite3_step(res);
-    sqlite3_reset(res);
-    sqlite3_step(res_page);
-    sqlite3_reset(res_page);
-    unsigned long long end = now_realtime_usec();
-    info(
-        "SQLITE: PAGE in  %llu usec (%d -> %d bytes) (max computed %d) entries=%d (level - %d)", end - start,
-        descr->page_length, compressed_size, max_compressed_size, entries, level);
-    level--;
-    return;
-}
+//void sql_add_metric_page_from_extent(struct rrdeng_page_descr *descr)
+//{
+//    char *err_msg = NULL;
+//    char dim_str[37];
+//    int rc;
+//    static sqlite3_stmt *res = NULL;
+//    static sqlite3_stmt *res_page = NULL;
+//    static int dim_id, date_id;
+//    static int metric_id;
+//    static int level = 0;
+//
+//    if (!descr->page_length) {
+//        info("SQLITE: Empty page");
+//        return;
+//    }
+//    level++;
+//
+//    uuid_unparse_lower(descr->id, dim_str);
+//    uint32_t entries = descr->page_length / sizeof(storage_number);
+//    uint32_t *metric = descr->pg_cache_descr->page;
+//
+//    if (!res_page) {
+//        rc = sqlite3_prepare_v2(
+//            db,
+//            "insert or replace into metric_migrate (entries, dim_uuid, start_date, end_date, metric) values (@entries, @dim, @start_date, @end_date, @page);",
+//            -1, &res_page, 0);
+//        if (rc != SQLITE_OK) {
+//            info("SQLITE: Failed to prepare statement for metric page");
+//            return;
+//        }
+//        metric_id = sqlite3_bind_parameter_index(res_page, "@page");
+//    }
+//
+//    rc = sqlite3_bind_blob(res, dim_id, descr->id, 16, SQLITE_TRANSIENT);
+//    rc = sqlite3_bind_int(res, date_id, descr->end_time / USEC_PER_SEC);
+//
+//    void *compressed_buf = NULL;
+//    int max_compressed_size = LZ4_compressBound(descr->page_length);
+//    compressed_buf = mallocz(max_compressed_size);
+//
+//    int compressed_size = LZ4_compress_default(metric, compressed_buf, descr->page_length, max_compressed_size);
+//
+//    rc = sqlite3_bind_int(res_page, 1, entries);
+//    rc = sqlite3_bind_int64(res_page, 3, descr->start_time);
+//    rc = sqlite3_bind_int64(res_page, 4, descr->end_time);
+//    rc = sqlite3_bind_blob(res_page, metric_id, compressed_buf, compressed_size, SQLITE_TRANSIENT);
+//    rc = sqlite3_bind_blob(res_page, 2, descr->id, 16, SQLITE_TRANSIENT);
+//
+//    freez(compressed_buf);
+//
+//    unsigned long long start = now_realtime_usec();
+//    sqlite3_step(res);
+//    sqlite3_reset(res);
+//    sqlite3_step(res_page);
+//    sqlite3_reset(res_page);
+//    unsigned long long end = now_realtime_usec();
+//    info(
+//        "SQLITE: PAGE in  %llu usec (%d -> %d bytes) (max computed %d) entries=%d (level - %d)", end - start,
+//        descr->page_length, compressed_size, max_compressed_size, entries, level);
+//    level--;
+//    return;
+//}
 
 void sql_store_datafile_info(char *path, int fileno, size_t file_size)
 {
@@ -1080,6 +1123,82 @@ time_t sql_rrdeng_metric_oldest_time(RRDDIM *rd)
         tim = sqlite3_column_int(res, 0);
     unsigned long long end = now_realtime_usec();
     info("SQLITE: MIN in %llu usec (value = %ld)", end - start, tim);
+
+    sqlite3_reset(res);
+    return tim;
+}
+
+time_t sql_rrdset_first_entry_t(RRDSET *st, time_t *first, time_t *last)
+{
+    sqlite3_blob *blob;
+    static sqlite3_stmt *res = NULL;
+    int rc;
+    time_t tim;
+
+    if (!db)
+        return 0;
+
+    if (st->state->first_entry_t != LONG_MAX) {
+        info("SQLITE: MIN (value = %ld)", st->state->first_entry_t);
+        return st->state->first_entry_t;
+    }
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(
+            db, "select min(m.start_date), max(m.end_date) from metric_page m, chart c, dimension d where c.chart_uuid = @chart_uuid and d.chart_uuid = c.chart_uuid and d.dim_uuid = m.dim_uuid;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return LONG_MAX;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return LONG_MAX;
+
+    tim = LONG_MAX;
+    unsigned long long start = now_realtime_usec();
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW) {
+        *first = sqlite3_column_int(res, 0);
+        *last = sqlite3_column_int(res, 1);
+    }
+    unsigned long long end = now_realtime_usec();
+    info("SQLITE: MIN/MAX in %llu usec (value = %ld  - %ld)", end - start, *first, *last);
+
+    sqlite3_reset(res);
+    return 0;
+}
+
+time_t sql_rrdset_last_entry_t(RRDSET *st)
+{
+    sqlite3_blob *blob;
+    static sqlite3_stmt *res = NULL;
+    int rc;
+    time_t tim;
+
+    if (!db)
+        return 0;
+
+//    if (st->state->first_entry_t != LONG_MAX) {
+//        info("SQLITE: MAX (value = %ld)", st->state->first_entry_t);
+//        return st->state->first_entry_t;
+//    }
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(
+            db, "select max(m.end_date) from metric_page m, chart c, dimension d where c.chart_uuid = @chart_uuid and d.chart_uuid = c.chart_uuid and d.dim_uuid = m.dim_uuid;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) // Release the RES
+        return 0;
+
+    tim = 0;
+    unsigned long long start = now_realtime_usec();
+    if ((rc = sqlite3_step(res)) == SQLITE_ROW)
+        tim = sqlite3_column_int(res, 0);
+    unsigned long long end = now_realtime_usec();
+    info("SQLITE: MAX in %llu usec (value = %ld)", end - start, tim);
 
     sqlite3_reset(res);
     return tim;
@@ -1278,4 +1397,163 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb, size_t *dimensions_count, size_t
     // Final cleanup;
 
     return;
+}
+
+// ----------------------------------------------------------------------------
+// SQLite functions based on the RRDDIM legacy ones
+
+void rrddim_sql_collect_init(RRDDIM *rd)
+{
+    //info("Init collect on %s", rd->id);
+    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+}
+
+void rrddim_sql_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number)
+{
+    (void)point_in_time;
+
+    //info("Store: %llu %s %d", point_in_time, rd->id, number);
+    rd->values[rd->rrdset->current_entry] = number;
+
+}
+
+int rrddim_sql_collect_finalize(RRDDIM *rd)
+{
+    (void)rd;
+
+    //info("Finalize -- collected data [%s %s] is at %d", rd->rrdset->name, rd->name, rd->rrdset->current_entry);
+    if (rd->rrdset->state->last_entry_t < rrddim_first_entry_t(rd)) { //} && rd->rrdset->state->last_entry_t !=0) {
+        info("Adding gap for %d - %d", rd->rrdset->state->last_entry_t , rrddim_first_entry_t(rd));
+        sql_add_metric_page(
+            rd->state->metric_uuid, NULL, 0, rd->rrdset->state->last_entry_t, rrddim_first_entry_t(rd) - 1);
+        //rd->rrdset->state->last_entry_t = rrddim_first_entry_t(rd);
+    }
+
+    if (rd->rrdset->counter > rd->rrdset->entries && rd->rrdset->current_entry == 0) {
+        info("Adding FULL entries for %d - %d", rd->rrdset->state->last_entry_t , rrddim_first_entry_t(rd));
+        sql_add_metric_page(
+            rd->state->metric_uuid, rd->values, rd->rrdset->entries, rrddim_first_entry_t(rd),
+            rrddim_last_entry_t(rd) - 1);
+    }
+    else {
+        sql_add_metric_page(
+            rd->state->metric_uuid, rd->values, rd->rrdset->current_entry, rrddim_first_entry_t(rd),
+            rrddim_last_entry_t(rd) - 1);
+    }
+
+    //rd->rrdset->state->last_entry_t = rrddim_last_entry_t(rd);
+
+    return 0;
+}
+
+
+void rrddim_sql_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
+{
+    handle->rd = rd;
+    handle->start_time = start_time;
+    handle->end_time = end_time;
+    handle->slotted.slot = rrdset_time2slot(rd->rrdset, start_time);
+    handle->slotted.last_slot = rrdset_time2slot(rd->rrdset, end_time);
+    handle->slotted.finished = 0;
+    handle->slotted.init = 0;
+    //info("Query init on %s -- %d %d (oldest time is %d) slots (%d - %d)", rd->name, start_time, end_time, rrddim_sql_query_oldest_time(rd), handle->slotted.slot, handle->slotted.last_slot);
+
+    if ((start_time >= rd->rrdset->state->first_entry_t && start_time <= rd->rrdset->state->last_entry_t) ||
+        (end_time >= rd->rrdset->state->first_entry_t && end_time <= rd->rrdset->state->last_entry_t)) {
+        //handle->slotted.sql_start_time = start_time;
+        //handle->slotted.sql_end_time = MIN(end_time, sql_rrdset_last_entry_t(rd->rrdset));
+        info("SQLITE: Starting an SQLite query");
+
+        char dim_str[37];
+        uuid_unparse_lower(rd->state->metric_uuid, dim_str);
+        int rc = sqlite3_prepare_v2(db, "select start_date, end_date, entries, uncompress(metric) from metric_page where dim_uuid = @dim_uuid and (@start between start_date and end_date or @end between start_date and end_date) order by start_date desc;", -1, &(handle->slotted.query), 0);
+        if (rc != SQLITE_OK) {
+            info("SQLITE: Query statement failed to prepare");
+        }
+        else {
+            info("Ran query on %s - (%d - %d)", dim_str, start_time, end_time);
+            rc = sqlite3_bind_blob(handle->slotted.query, 1, rd->state->metric_uuid, 16, SQLITE_TRANSIENT);
+            rc = sqlite3_bind_int(handle->slotted.query, 2, start_time);
+            rc = sqlite3_bind_int(handle->slotted.query, 3, end_time);
+            handle->slotted.local_end_time = 0;
+            handle->slotted.local_start_time = 0;
+            handle->slotted.init = 1;
+        }
+    }
+//    else
+//        info("Not init SQLITE query");
+}
+
+storage_number rrddim_sql_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time)
+{
+    RRDDIM *rd = handle->rd;
+    long entries = rd->rrdset->entries;
+    long slot = handle->slotted.slot;
+    (void)current_time;
+
+    //info("Query next for %s %d slots (%d - %d)", rd->id, *current_time, handle->slotted.slot, handle->slotted.last_slot);
+
+    if (handle->slotted.init) {
+        // Run the query
+        //info("Trying to fetch data from SQLite query");
+        //TODO: Need to handle collection gaps
+        while (1) {
+            if (*current_time >= handle->slotted.local_start_time && *current_time <= handle->slotted.local_end_time) {
+                //info("SQLITE: Request time %d within (%d - %d)", *current_time, handle->slotted.local_start_time, handle->slotted.local_end_time);
+                if (sqlite3_column_bytes(handle->slotted.query, 3) == 0) {
+                    //info("SQLITE: Return number from SQLite for %d (index = %d) = %d", *current_time, *current_time - handle->slotted.local_start_time, SN_EMPTY_SLOT);
+                    return SN_EMPTY_SLOT;
+                }
+                uint32_t *metric = sqlite3_column_blob(handle->slotted.query, 3);
+                //info("SQLITE: Return number from SQLite for %d (index = %d) = %d", *current_time, *current_time - handle->slotted.local_start_time, metric[(int)(*current_time - handle->slotted.local_start_time) - 1]);
+                return metric[(int)(*current_time - handle->slotted.local_start_time) - 1];
+            }
+            //info("SQLITE: STEP SQLite");
+            if (sqlite3_step(handle->slotted.query) == SQLITE_ROW) {
+                handle->slotted.local_start_time = sqlite3_column_int(handle->slotted.query, 0);
+                handle->slotted.local_end_time = sqlite3_column_int(handle->slotted.query, 1);
+                handle->slotted.entries = sqlite3_column_int(handle->slotted.query, 2);
+                info("SQLITE: STEP %d start %d - %d (%d)", *current_time, handle->slotted.local_start_time,handle->slotted.local_end_time, handle->slotted.entries);
+            } else {
+                //info("Shutting down SQLite query");
+                sqlite3_finalize(handle->slotted.query);
+                handle->slotted.query = NULL;
+                handle->slotted.local_start_time = 0;
+                handle->slotted.local_end_time = 0;
+                break;
+            }
+        }
+    }
+
+    if (unlikely(handle->slotted.slot == handle->slotted.last_slot))
+        handle->slotted.finished = 1;
+    storage_number n = rd->values[slot++];
+
+    if (unlikely(slot >= entries))
+        slot = 0;
+    handle->slotted.slot = slot;
+    return n;
+}
+
+int rrddim_sql_query_is_finished(struct rrddim_query_handle *handle)
+{
+    return handle->slotted.finished;
+}
+
+void rrddim_sql_query_finalize(struct rrddim_query_handle *handle)
+{
+    (void)handle;
+
+    return;
+}
+
+time_t rrddim_sql_query_latest_time(RRDDIM *rd)
+{
+    return rrdset_last_entry_t(rd->rrdset);
+}
+
+time_t rrddim_sql_query_oldest_time(RRDDIM *rd)
+{
+    //return sql_rrdset_first_entry_t(rd->rrdset);
+    return rd->rrdset->state->first_entry_t;
 }

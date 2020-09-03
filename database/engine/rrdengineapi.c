@@ -189,7 +189,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     if (unlikely(NULL == descr)) {
         return;
     }
-    sql_add_metric_page(rd->state->metric_uuid, descr);
+    //sql_add_metric_page(rd->state->metric_uuid, descr);
 #ifdef SQLITE_RT_BLOB
     sqlite3_blob_close(descr->blob);
 #endif

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <database/sqlite/sqlite_functions.h>
 #include "query.h"
 #include "web/api/formatters/rrd2json.h"
 #include "rrdr.h"
@@ -572,6 +573,7 @@ static inline void do_dimension_fixedstep(
         }
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
+        //info("Query %s -- step %d (%d - %d)", handle.rd->id, handle.slotted.slot, handle.slotted.last_slot);
         storage_number n = rd->state->query_ops.next_metric(&handle, &db_now);
         if(unlikely(db_now > before_wanted)) {
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -827,10 +829,12 @@ static RRDR *rrd2rrdr_fixedstep(
     if(duration <= 0 || available_points <= 0)
         return rrdr_create(st, 1, temp_rd);
 
+    //info("Points requested %d",points_requested);
     // check the number of wanted points in the result
     if(unlikely(points_requested < 0)) points_requested = -points_requested;
     if(unlikely(points_requested > available_points)) points_requested = available_points;
     if(unlikely(points_requested == 0)) points_requested = available_points;
+   // info("Points requested after %d",points_requested);
 
     // calculate the desired grouping of source data points
     long group = available_points / points_requested;
@@ -1567,7 +1571,12 @@ RRDR *rrd2rrdr(
         first_entry_t = rrddim_first_entry_t(temp_rd);
         last_entry_t = rrddim_last_entry_t(temp_rd);
     } else {
+#ifdef SQLITE_POC
+        first_entry_t = st->state->first_entry_t;
+        //info("SQLITE: Online available first entry = %d -- SQLITE available = %d",  rrdset_first_entry_t(st),first_entry_t );
+#else
         first_entry_t = rrdset_first_entry_t(st);
+#endif
         last_entry_t = rrdset_last_entry_t(st);
     }
 
