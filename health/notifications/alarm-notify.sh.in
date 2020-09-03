@@ -37,6 +37,7 @@
 #  - Google Hangouts Chat notifications by @EnzoAkira and @hendrikhofstadt
 #  - Dynatrace Event by @illumine
 #  - Stackpulse Event by @thiagoftsm
+#  - Opsgenie by @thiaoftsm #9858
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -386,6 +387,9 @@ SEND_DYNATRACE=
 # stackpulse configs
 STACKPULSE_WEBHOOK=
 
+# opsgenie configs
+OPSGENIE_API_KEY=
+
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -532,6 +536,9 @@ filter_recipient_by_criticality() {
   [ -z "${DYNATRACE_TAG_VALUE}" ] ||
   [ -z "${DYNATRACE_EVENT}" ]; } && SEND_DYNATRACE="NO"
 
+# check irc
+[ -z "${OPSGENIE_API_KEY}" ] && SEND_OPSGENIE="NO"
+
 # check matrix
 { [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
@@ -559,7 +566,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_CUSTOM}" = "YES" ] ||
 	[ "${SEND_MSTEAM}" = "YES" ] ||
 	[ "${SEND_DYNATRACE}" = "YES" ] ||
-	[ "${SEND_STACKPULSE}" = "YES" ]; then
+	[ "${SEND_STACKPULSE}" = "YES" ] ||
+	[ "${SEND_OPSGENIE}" = "YES" ]; then
 	# if we need curl, check for the curl command
 	if [ -z "${curl}" ]; then
 		curl="$(command -v curl 2>/dev/null)"
@@ -588,6 +596,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_CUSTOM="NO"
 		SEND_DYNATRACE="NO"
 		SEND_STACKPULSE="NO"
+		SEND_OPSGENIE="NO"
 	fi
 fi
 
@@ -717,8 +726,9 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_SMS}" \
 	"${SEND_MSTEAM}" \
 	"${SEND_DYNATRACE}" \
-	"${SEND_STACKPULSE}" ; do
-	
+	"${SEND_STACKPULSE}" \
+	"${SEND_OPSGENIE}" ; do
+
 	if [ "${method}" == "YES" ]; then
 		proceed=1
 		break
@@ -2073,6 +2083,170 @@ EOF
   return 0
 }
 # -----------------------------------------------------------------------------
+# Opsgenie sender
+
+create_opsgenie_array() {
+  local counter=0 values="$1" max=$2 message
+
+  message="[ "
+  for value in ${values} ; do
+    if [ "$counter" != "0" ] ; then
+      message+=", "
+    fi
+
+    message+=" \"${value:0:49}\""
+    counter=$((counter + 1))
+
+    if [ "$counter" == "$max" ] ; then
+      break;
+    fi
+  done
+  message+=" ]"$'\n'
+
+  echo "$message"
+}
+
+create_opsgenie_list() {
+  local counter=0 values types="$2" field=$3 max=$4
+
+  # Convert values to array
+  separator=' ' read -r -a values <<< "$1"
+
+  message=" "
+  # The type is a mandatory field, so we are using it to main loop
+  for t in ${types} ; do
+    if [ "$counter" != "0" ] ; then
+      message+=", "
+    fi
+
+    if [ -n "${values[$counter]}" ] ; then
+      message+="{ \"${field}\": \"${values[$counter]}\", \"type\": \"${t}\" }"
+    fi
+
+    counter=$((counter + 1))
+    if [ "$counter" == "$max" ] ; then
+      break;
+    fi
+  done
+
+  echo "$message"
+}
+
+create_opsgenie_lists() {
+  local message=""
+
+  if [ -n "${1}" ] &&  [ -n "${2}" ] ; then
+    message+="$(create_opsgenie_list "${1}" "${2}" "id" 50)"
+  fi
+
+  if [ -n "${3}" ] &&  [ -n "${4}" ] ; then
+    if [ -n "${message}" ]; then
+      message+=", "
+    fi
+
+    message+="$(create_opsgenie_list "${3}" "${4}" "username" 50)"
+  fi
+
+  if [ -n "${5}" ] &&  [ -n "${6}" ] ; then
+    if [ -n "${message}" ]; then
+      message+=", "
+    fi
+
+    message+="$(create_opsgenie_list "${5}" "${6}" "name" 50)"
+  fi
+
+  echo "$message"
+}
+
+send_opsgenie() {
+  local opts=() message idx priority
+  [ "${SEND_OPSGENIE}" != "YES" ] && return 1
+
+  if [ -z "${OPSGENIE_API_KEY}" ] ; then
+    info "Can't send Opsgenie notification, because OPSGENIE_API_KEY is not defined"
+    return 1
+  fi
+
+  case "${status}" in
+    WARNING) priority="P3" ;;
+    CRITICAL) priority="P1" ;;
+    CLEAR) priority="P4" ;;
+    *) priority="P5" ;;
+  esac
+
+  # The restrictions applied for each variable was defined according
+  # the URL https://docs.opsgenie.com/docs/alert-api#create-alert on September 2nd, 2020.
+
+  opts+=("\"message\": \"netdata on ${host:0:129}\","$'\n')
+
+  # Add Optional fields
+  opts+=($'\t'"\"description\": \"${chart}.${name} ${status_message}, ${info}\","$'\n')
+  opts+=($'\t'"\"priority\": \"${priority}\"")
+
+  # Commas are added to previous array element every time another optional value is necessary
+  # Add Optional fields if user specified them
+  idx=2
+  [ -n "${OPSGENIE_ENTITY}" ] && opts[2]="${opts[2]},"$'\n' && idx=3 && opts+=($'\t'"\"entity\": \"${OPSGENIE_ENTITY}\"")
+
+  if [ -n "${OPSGENIE_ACTIONS}" ] ; then
+    opts[${idx}]="${opts[${idx}]},"$'\n'
+    idx=$((idx + 1))
+
+    message="$(create_opsgenie_array "${OPSGENIE_ACTIONS}" 10)"
+
+    opts+=($'\t'"\"actions\": ${message}")
+  fi
+
+  if [ -n "${OPSGENIE_TAGS}" ] ; then
+    opts[${idx}]="${opts[${idx}]},"$'\n'
+    idx=$((idx + 1))
+
+    message="$(create_opsgenie_array "${OPSGENIE_TAGS}" 20)"
+
+    opts+=($'\t'"\"tags\": ${message}")
+  fi
+
+  message="$(create_opsgenie_lists "${OPSGENIE_RESPONDERS_IDS}" "${OPSGENIE_RESPONDERS_IDS_TYPES}"\
+   "${OPSGENIE_RESPONDERS_USERNAMES}" "${OPSGENIE_RESPONDERS_USERNAMES_TYPES}"\
+    "${OPSGENIE_RESPONDERS_NAMES}" "${OPSGENIE_RESPONDERS_NAMES_TYPES}")"
+  if [ -n "${message}" ] ; then
+    opts[${idx}]="${opts[${idx}]},"$'\n'
+    idx=$((idx + 1))
+
+    opts+=($'\t'"\"responders\": [ ${message} ]")
+  fi
+
+  message="$(create_opsgenie_lists "${OPSGENIE_VISIBLE_IDS}" "${OPSGENIE_VISIBLE_IDS_TYPES}"\
+   "${OPSGENIE_VISIBLE_USERNAMES}" "${OPSGENIE_VISIBLE_USERNAMES_TYPES}"\
+    "${OPSGENIE_VISIBLE_NAMES}" "${OPSGENIE_VISIBLE_NAMES_TYPES}")"
+  if [ -n "${message}" ] ; then
+    opts[${idx}]="${opts[${idx}]},"$'\n'
+
+    opts+=($'\t'"\"visibleTo\": [ ${message} ]")
+  fi
+
+  # Fill payload with obligatory fields
+  payload="$(
+    cat <<EOF
+    {
+      ${opts[@]}
+    }
+EOF
+    )"
+
+  httpcode=$(docurl -X POST  -H "Authorization: GenieKey ${OPSGENIE_API_KEY}"  -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v2/alerts")
+  # https://docs.opsgenie.com/docs/alert-api#create-alert
+  if [ "${httpcode}" = "202" ]; then
+    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+  fi
+  ret=$?
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -2589,11 +2763,15 @@ SENT_EMAIL=$?
 send_dynatrace "${host}" "${chart}" "${name}"  "${status}"
 SENT_DYNATRACE=$?
 
-
 # -----------------------------------------------------------------------------
-# send the EVENT to Dynatrace
+# send the EVENT to Stackpulse
 send_stackpulse
 SENT_STACKPULSE=$?
+
+# -----------------------------------------------------------------------------
+# send messages to Opsgenie
+send_opsgenie "${host}" "${chart}" "${name}"  "${status_message}"
+SENT_OPSGENIE=$?
 
 # -----------------------------------------------------------------------------
 # let netdata know
@@ -2623,7 +2801,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_SMS}" \
 	"${SENT_MSTEAM}" \
 	"${SENT_DYNATRACE}" \
-	"${SENT_STACKPULSE}" ; do
+	"${SENT_STACKPULSE}" \
+  "${SENT_OPSGENIE}"; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something
 		exit 0
