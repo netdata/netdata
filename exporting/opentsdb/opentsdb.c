@@ -69,7 +69,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 #endif
     instance->connector_specific_data = connector_specific_data;
 
-    instance->start_batch_formatting = NULL;
+    instance->start_batch_formatting = open_batch_opentsdb_http;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
     instance->start_chart_formatting = NULL;
 
@@ -80,7 +80,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+    instance->end_batch_formatting = close_batch_opentsdb_http;
 
     instance->send_header = opentsdb_http_send_header;
     instance->check_response = exporting_discard_response;
@@ -259,7 +259,7 @@ int opentsdb_http_send_header(int *sock, struct instance *instance)
     if (!header)
         header = buffer_create(0);
 
-   buffer_sprintf(
+    buffer_sprintf(
         header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
@@ -277,7 +277,6 @@ int opentsdb_http_send_header(int *sock, struct instance *instance)
         connector_specific_data->conn &&
         connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
-    info("EXPORTING: \n%s", buffer_tostring(header));
     } else {
         written = send(*sock, buffer_tostring(header), header_len, flags);
     }
@@ -291,6 +290,32 @@ int opentsdb_http_send_header(int *sock, struct instance *instance)
         return 0;
     else
         return 1;
+}
+
+/**
+ * Open a JSON list for a bach
+ *
+ * @param instance an instance data structure.
+ * @return Always returns 0.
+ */
+int open_batch_opentsdb_http(struct instance *instance){
+    buffer_strcat(instance->buffer, "[\n");
+
+    return 0;
+}
+
+/**
+ * Close a JSON list for a bach and update buffered bytes counter
+ *
+ * @param instance an instance data structure.
+ * @return Always returns 0.
+ */
+int close_batch_opentsdb_http(struct instance *instance){
+    buffer_strcat(instance->buffer, "\n]\n");
+
+    simple_connector_update_buffered_bytes(instance);
+
+    return 0;
 }
 
 /**
@@ -355,6 +380,9 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
         RRD_ID_LENGTH_MAX);
 
+    if (buffer_strlen((BUFFER *)instance->buffer) > 2)
+        buffer_strcat(instance->buffer, ",\n");
+
     buffer_sprintf(
         instance->buffer,
         "{"
@@ -364,7 +392,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "  \"tags\": {"
         "    \"host\": \"%s%s%s\"%s"
         "  }"
-        "}\n",
+        "}",
         instance->config.prefix,
         chart_name,
         dimension_name,
@@ -409,6 +437,9 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     if(isnan(value))
         return 0;
 
+    if (buffer_strlen((BUFFER *)instance->buffer) > 2)
+        buffer_strcat(instance->buffer, ",\n");
+
     buffer_sprintf(
         instance->buffer,
         "{"
@@ -418,7 +449,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "  \"tags\": {"
         "    \"host\": \"%s%s%s\"%s"
         "  }"
-        "}\n",
+        "}",
         instance->config.prefix,
         chart_name,
         dimension_name,

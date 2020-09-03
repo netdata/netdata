@@ -165,7 +165,6 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
             connector_specific_data->conn &&
             connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
             written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), len);
-        info("EXPORTING: \n%s", buffer_tostring(buffer));
         } else {
             written = send(*sock, buffer_tostring(buffer), len, flags);
         }
