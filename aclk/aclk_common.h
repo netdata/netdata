@@ -52,7 +52,7 @@ extern struct aclk_shared_state {
 
     // read only while ACLK connected
     // protect by lock otherwise
-    volatile int version_neg;
+    int version_neg;
     usec_t version_neg_wait_till;
 } aclk_shared_state;
 
