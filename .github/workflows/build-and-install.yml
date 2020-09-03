@@ -193,10 +193,11 @@ jobs:
           echo $BUILD_KINESIS > ./build-kinesis.sh && chmod +x ./build-kinesis.sh
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
       - name: Build on ${{ matrix.distro }}
-        cmd: >-
-          ./netdata/build-kinesis.sh &&
-          ./netdata-installer.sh \--dont-wait --dont-start-it \
-          --enable-backend-kinesis
+        env:
+          RUNCMD: >-
+            ./netdata/build-kinesis.sh &&
+            ./netdata-installer.sh \--dont-wait --dont-start-it \
+            --enable-backend-kinesis
         run: |
           docker run -w /netdata test \
-            /bin/sh -c $cmd
+            /bin/sh -c $RUNCMD
