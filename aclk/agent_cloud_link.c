@@ -856,6 +856,7 @@ static inline void aclk_hello_msg()
     buffer_sprintf(buf, ",\"min-version\":%d,\"max-version\":%d}", ACLK_VERSION_MIN, ACLK_VERSION_MAX);
     aclk_send_message(ACLK_METADATA_TOPIC, buf->buffer, msg_id);
     freez(msg_id);
+    buffer_free(buf);
 }
 
 /**
