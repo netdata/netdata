@@ -536,7 +536,7 @@ filter_recipient_by_criticality() {
   [ -z "${DYNATRACE_TAG_VALUE}" ] ||
   [ -z "${DYNATRACE_EVENT}" ]; } && SEND_DYNATRACE="NO"
 
-# check irc
+# check opsgenie
 [ -z "${OPSGENIE_API_KEY}" ] && SEND_OPSGENIE="NO"
 
 # check matrix
@@ -2770,7 +2770,7 @@ SENT_STACKPULSE=$?
 
 # -----------------------------------------------------------------------------
 # send messages to Opsgenie
-send_opsgenie "${host}" "${chart}" "${name}"  "${status_message}"
+send_opsgenie
 SENT_OPSGENIE=$?
 
 # -----------------------------------------------------------------------------

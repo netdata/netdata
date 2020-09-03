@@ -41,6 +41,7 @@ sudo su -s /bin/bash netdata
 
 On success you will have alarms in your Opsgenie platform
 
+![image](https://user-images.githubusercontent.com/49162938/92184518-f725f900-ee40-11ea-9afa-e7c639c72206.png)
 
 , but if Netdata receives an error message, it will print a message like 
 
