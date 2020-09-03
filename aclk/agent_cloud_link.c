@@ -1626,6 +1626,10 @@ int aclk_handle_cloud_message(char *payload)
     for (int i = 0; aclk_incoming_msg_types[i].name; i++) {
         if (strcmp(cloud_to_agent.type_id, aclk_incoming_msg_types[i].name) == 0) {
             if (likely(!aclk_incoming_msg_types[i].fnc(&cloud_to_agent))) {
+                // in case of success handler is supposed to clean up after itself
+                // or as in the case of aclk_handle_cloud_request take
+                // ownership of the pointers (done to avoid copying)
+                // see what `aclk_queue_query` parameter `internal` does
                 freez(cloud_to_agent.type_id);
                 return 0;
             }
