@@ -838,12 +838,12 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
             (host->receiver || host == localhost) ? "true" : "false");
         netdata_mutex_unlock(&host->receiver_lock);
 
-        netdata_mutex_lock(&host->claimed_id_lock);
-        if (host->claimed_id)
-            buffer_sprintf(wb, "\"%s\" }", host->claimed_id);
+        netdata_mutex_lock(&host->aclk_state_lock);
+        if (host->aclk_state.claimed_id)
+            buffer_sprintf(wb, "\"%s\" }", host->aclk_state.claimed_id);
         else
             buffer_strcat(wb, "null }");
-        netdata_mutex_unlock(&host->claimed_id_lock);
+        netdata_mutex_unlock(&host->aclk_state_lock);
 
         count++;
     }

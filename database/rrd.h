@@ -33,6 +33,7 @@ struct pg_cache_page_index;
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
+#include "../aclk/aclk_common.h"
 
 struct context_param {
     RRDDIM *rd;
@@ -825,8 +826,8 @@ struct rrdhost {
     struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
-    netdata_mutex_t claimed_id_lock;
-    char *claimed_id;                               // Claimed ID if host has one otherwise NULL
+    netdata_mutex_t aclk_state_lock;
+    aclk_rrdhost_state aclk_state;
 
     struct rrdhost *next;
 };

@@ -48,6 +48,11 @@ typedef enum aclk_agent_state {
     AGENT_INITIALIZING,
     AGENT_STABLE
 } ACLK_AGENT_STATE;
+
+typedef struct aclk_rrdhost_state {
+    char *claimed_id; // Claimed ID if host has one otherwise NULL
+} aclk_rrdhost_state;
+
 extern struct aclk_shared_state {
     ACLK_METADATA_STATE metadata_submitted;
     ACLK_AGENT_STATE agent_state;
