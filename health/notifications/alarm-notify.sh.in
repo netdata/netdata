@@ -2158,22 +2158,8 @@ create_opsgenie_lists() {
   echo "$message"
 }
 
-send_opsgenie() {
-  local opts=() message idx priority
-  [ "${SEND_OPSGENIE}" != "YES" ] && return 1
-
-  if [ -z "${OPSGENIE_API_KEY}" ] ; then
-    info "Can't send Opsgenie notification, because OPSGENIE_API_KEY is not defined"
-    return 1
-  fi
-
-  case "${status}" in
-    WARNING) priority="P3" ;;
-    CRITICAL) priority="P1" ;;
-    CLEAR) priority="P4" ;;
-    *) priority="P5" ;;
-  esac
-
+opsgenie_create_alarm() {
+  local opts=() message idx priority=$1
   # The restrictions applied for each variable was defined according
   # the URL https://docs.opsgenie.com/docs/alert-api#create-alert on September 2nd, 2020.
 
@@ -2181,12 +2167,13 @@ send_opsgenie() {
 
   # Add Optional fields
   opts+=($'\t'"\"description\": \"${chart}.${name} ${status_message}, ${info}\","$'\n')
-  opts+=($'\t'"\"priority\": \"${priority}\"")
+  opts+=($'\t'"\"priority\": \"${priority}\","$'\n')
+  opts+=($'\t'"\"alias\": \"${alarm_id}\"")
 
   # Commas are added to previous array element every time another optional value is necessary
   # Add Optional fields if user specified them
-  idx=2
-  [ -n "${OPSGENIE_ENTITY}" ] && opts[2]="${opts[2]},"$'\n' && idx=3 && opts+=($'\t'"\"entity\": \"${OPSGENIE_ENTITY}\"")
+  idx=3
+  [ -n "${OPSGENIE_ENTITY}" ] && opts[2]="${opts[2]},"$'\n' && idx=4 && opts+=($'\t'"\"entity\": \"${OPSGENIE_ENTITY}\"")
 
   if [ -n "${OPSGENIE_ACTIONS}" ] ; then
     opts[${idx}]="${opts[${idx}]},"$'\n'
@@ -2234,16 +2221,50 @@ send_opsgenie() {
 EOF
     )"
 
-  httpcode=$(docurl -X POST  -H "Authorization: GenieKey ${OPSGENIE_API_KEY}"  -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v2/alerts")
+  httpcode=$(docurl -X POST -H "Authorization: GenieKey ${OPSGENIE_API_KEY}" -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v2/alerts")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
   if [ "${httpcode}" = "202" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
     error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
   fi
-  ret=$?
 
-  return 0
+  return 0;
+}
+
+opsgenie_close_alarm() {
+  # https://docs.opsgenie.com/docs/alert-api#close-alert
+  httpcode=$(docurl -X POST -H "Authorization: GenieKey ${OPSGENIE_API_KEY}" -H "Content-Type: application/json" -d "{ }" "https://api.opsgenie.com/v2/alerts/${alarm_id}/close?type=alias")
+  if [ "${httpcode}" = "202" ]; then
+    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+  fi
+}
+
+send_opsgenie() {
+  local priority
+  [ "${SEND_OPSGENIE}" != "YES" ] && return 1
+
+  if [ -z "${OPSGENIE_API_KEY}" ] ; then
+    info "Can't send Opsgenie notification, because OPSGENIE_API_KEY is not defined"
+    return 1
+  fi
+
+  case "${status}" in
+    WARNING) priority="P3" ;;
+    CRITICAL) priority="P1" ;;
+    CLEAR) priority="P4" ;;
+    *) priority="P5" ;;
+  esac
+
+  if [ "${status}" != CLEAR ] ; then
+    ret=$(opsgenie_create_alarm "${priority}")
+  else
+    opsgenie_close_alarm
+  fi
+
+  return $ret
 }
 
 # -----------------------------------------------------------------------------
