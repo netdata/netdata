@@ -632,11 +632,16 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
      * lookup to the now-attached structure).
      */
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
+
+    rrd_rdlock();
     RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
     if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
         host = NULL;
     if (host) {
+        rrdhost_wrlock(host);
         netdata_mutex_lock(&host->receiver_lock);
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+        host->senders_disconnected_time = 0;
         if (host->receiver != NULL) {
             time_t age = now_realtime_sec() - host->receiver->last_msg_t;
             if (age > 30) {
@@ -647,6 +652,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             }
             else {
                 netdata_mutex_unlock(&host->receiver_lock);
+                rrdhost_unlock(host);
+                rrd_unlock();
                 log_stream_connection(w->client_ip, w->client_port, key, host->machine_guid, host->hostname,
                                       "REJECTED - ALREADY CONNECTED");
                 info("STREAM %s [receive from [%s]:%s]: multiple connections for same host detected - existing connection is active (within last %ld sec), rejecting new connection.", host->hostname, w->client_ip, w->client_port, age);
@@ -659,7 +666,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
         host->receiver = rpt;
         netdata_mutex_unlock(&host->receiver_lock);
+        rrdhost_unlock(host);
     }
+    rrd_unlock();
 
     rpt->last_msg_t = now_realtime_sec();
 
