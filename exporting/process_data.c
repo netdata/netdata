@@ -418,9 +418,9 @@ int simple_connector_end_batch(struct instance *instance)
     if (header)
         buffer_flush(header);
     else
-        buffer_create(0);
+        header = buffer_create(0);
 
-    // TODO: fill the header
+    // TODO: instance->prepare_header(instance);
 
     size_t buffered_metrics = (size_t)stats->buffered_metrics;
 

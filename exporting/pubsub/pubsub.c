@@ -26,7 +26,7 @@ int init_pubsub_instance(struct instance *instance)
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
-    instance->send_header = NULL;
+    instance->prepare_header = NULL;
     instance->check_response = NULL;
 
     instance->buffer = (void *)buffer_create(0);

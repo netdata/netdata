@@ -153,8 +153,8 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
     struct stats *stats = &instance->stats;
 
     int ret = 0;
-    if (instance->send_header)
-        ret = instance->send_header(sock, instance);
+    if (instance->prepare_header)
+        ret = instance->prepare_header(sock, instance);
 
     ssize_t written = -1;
 

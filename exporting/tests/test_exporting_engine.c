@@ -1159,7 +1159,7 @@ static void test_init_prometheus_remote_write_instance(void **state)
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, NULL);
     assert_ptr_equal(instance->end_batch_formatting, format_batch_prometheus_remote_write);
-    assert_ptr_equal(instance->send_header, prometheus_remote_write_send_header);
+    assert_ptr_equal(instance->prepare_header, prometheus_remote_write_send_header);
     assert_ptr_equal(instance->check_response, process_prometheus_remote_write_response);
 
     assert_ptr_not_equal(instance->buffer, NULL);
@@ -1663,7 +1663,7 @@ static void test_init_mongodb_instance(void **state)
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
     assert_ptr_equal(instance->end_batch_formatting, format_batch_mongodb);
-    assert_ptr_equal(instance->send_header, NULL);
+    assert_ptr_equal(instance->prepare_header, NULL);
     assert_ptr_equal(instance->check_response, NULL);
 
     assert_ptr_not_equal(instance->buffer, NULL);
