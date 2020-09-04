@@ -59,8 +59,6 @@ static void aclk_query_free(struct aclk_query *this_query)
     freez(this_query->topic);
     if (likely(this_query->query))
         freez(this_query->query);
-    if (likely(this_query->data))
-        freez(this_query->data);
     if (likely(this_query->msg_id))
         freez(this_query->msg_id);
     freez(this_query);
@@ -153,7 +151,7 @@ static struct aclk_query *aclk_query_find_position(time_t time_to_run)
 
 // Need to have a QUERY lock before calling this
 static struct aclk_query *
-aclk_query_find(char *topic, char *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query)
+aclk_query_find(char *topic, void *data, char *msg_id, char *query, ACLK_CMD cmd, struct aclk_query **last_query)
 {
     struct aclk_query *tmp_query, *prev_query;
     UNUSED(cmd);
@@ -163,7 +161,7 @@ aclk_query_find(char *topic, char *data, char *msg_id, char *query, ACLK_CMD cmd
     while (tmp_query) {
         if (likely(!tmp_query->deleted)) {
             if (strcmp(tmp_query->topic, topic) == 0 && (!query || strcmp(tmp_query->query, query) == 0)) {
-                if ((!data || (data && strcmp(data, tmp_query->data) == 0)) &&
+                if ((!data || data == tmp_query->data) &&
                     (!msg_id || (msg_id && strcmp(msg_id, tmp_query->msg_id) == 0))) {
                     if (likely(last_query))
                         *last_query = prev_query;
@@ -181,7 +179,7 @@ aclk_query_find(char *topic, char *data, char *msg_id, char *query, ACLK_CMD cmd
  * Add a query to execute, the result will be send to the specified topic
  */
 
-int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run_after, int internal, ACLK_CMD aclk_cmd)
+int aclk_queue_query(char *topic, void *data, char *msg_id, char *query, int run_after, int internal, ACLK_CMD aclk_cmd)
 {
     struct aclk_query *new_query, *tmp_query;
 
@@ -230,9 +228,7 @@ int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run
         new_query->msg_id = msg_id;
     }
 
-    if (data)
-        new_query->data = strdupz(data);
-
+    new_query->data = data;
     new_query->next = NULL;
     new_query->created = now_realtime_usec();
     new_query->run_after = run_after;
@@ -554,6 +550,7 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
     struct aclk_query *this_query;
     static long int query_count = 0;
     ACLK_METADATA_STATE meta_state;
+    RRDHOST *host;
 
     if (!aclk_connected)
         return 0;
@@ -569,6 +566,8 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
         return 1;
     }
     query_count++;
+
+    host = (RRDHOST*)this_query->data;
 
     debug(
         D_ACLK, "Query #%ld (%s) size=%zu in queue %d ms", query_count, this_query->topic,
@@ -586,7 +585,9 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
 
         case ACLK_CMD_CHART:
             debug(D_ACLK, "EXECUTING a chart update command");
-            aclk_send_single_chart(this_query->data, this_query->query);
+            if (!host)
+                fatal("Pointer to host compulsory");
+            aclk_send_single_chart(host->hostname, this_query->query);
             break;
 
         case ACLK_CMD_CHARTDEL:

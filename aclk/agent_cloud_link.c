@@ -1419,7 +1419,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (aclk_popcorn_check_bump())
         return 0;
 
-    if (unlikely(aclk_queue_query("_chart", host->hostname, NULL, chart_name, 0, 1, aclk_cmd))) {
+    if (unlikely(aclk_queue_query("_chart", host, NULL, chart_name, 0, 1, aclk_cmd))) {
         if (likely(aclk_connected)) {
             errno = 0;
             error("ACLK failed to queue chart_update command");
