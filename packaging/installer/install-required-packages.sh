@@ -1131,6 +1131,7 @@ declare -A pkg_judy=(
   ['gentoo']="dev-libs/judy"
   ['arch']="judy"
   ['freebsd']="Judy"
+  ['fedora']="Judy-devel"
   ['default']="NOTREQUIRED"
 )
 
