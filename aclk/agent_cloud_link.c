@@ -1410,6 +1410,65 @@ int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted)
     return 0;
 }
 
+int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd)
+{
+    BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    local_buffer->contenttype = CT_APPLICATION_JSON;
+
+    if(aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE)
+        fatal("This function should not be called if ACLK version is less than %d (current %d)", ACLK_V_CHILDRENSTATE, aclk_shared_state.version_neg);
+
+    debug(D_ACLK, "Sending Child Disconnect");
+
+    char *msg_id = create_uuid();
+
+    aclk_create_header(local_buffer, cmd == ACLK_CMD_CHILD_CONNECT ? "child_connect" : "child_disconnect", msg_id, 0, 0, aclk_shared_state.version_neg);
+
+    buffer_strcat(local_buffer, ",\"payload\":");
+
+    buffer_sprintf(local_buffer, "{\"guid\":\"%s\",\"claim_id\":", host->machine_guid);
+    rrdhost_aclk_state_lock(host);
+    if(host->aclk_state.claimed_id)
+        buffer_sprintf(local_buffer, "\"%s\"}}", host->aclk_state.claimed_id);
+    else
+        buffer_strcat(local_buffer, "null}}");
+
+    rrdhost_aclk_state_unlock(host);
+
+    aclk_send_message(ACLK_METADATA_TOPIC, local_buffer->buffer, msg_id);
+
+    freez(msg_id);
+    buffer_free(local_buffer);
+    return 0;
+}
+
+void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd)
+{
+#if ACLK_VERSION_MIN < ACLK_V_CHILDRENSTATE
+    if (aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE)
+        return;
+#else
+#warning "This check became unnecessary. Remove"
+#endif
+
+    if (unlikely(aclk_host_initializing(localhost)))
+        return;
+
+    switch (cmd) {
+        case ACLK_CMD_CHILD_CONNECT:
+            debug(D_ACLK, "Child Connected %s %s.", host->hostname, host->machine_guid);
+            aclk_start_host_popcorning(host);
+            aclk_queue_query("add_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_CONNECT);
+            break;
+        case ACLK_CMD_CHILD_DISCONNECT:
+            debug(D_ACLK, "Child Disconnected %s %s.", host->hostname, host->machine_guid);
+            aclk_queue_query("del_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_DISCONNECT);
+            break;
+        default:
+            error("Unknown command for aclk_host_state_update %d.", (int)cmd);
+    }
+}
+
 void aclk_send_stress_test(size_t size)
 {
     char *buffer = mallocz(size);

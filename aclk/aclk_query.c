@@ -581,7 +581,20 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
             aclk_execute_query_v2(this_query);
             break;
 
+        case ACLK_CMD_CHILD_CONNECT:
+        case ACLK_CMD_CHILD_DISCONNECT:
+            debug(
+                D_ACLK, "Execution Child %s command",
+                this_query->cmd == ACLK_CMD_CHILD_CONNECT ? "connect" : "disconnect");
+
+            if (!host)
+                fatal("ACLK_CMD_CHILD_CONNECT/DISCONNECT needs host pointer");
+            aclk_send_info_child_connection(host, this_query->cmd);
+            break;
+
         default:
+            errno = 0;
+            error("Unknown ACLK Query Command");
             break;
     }
     debug(D_ACLK, "Query #%ld (%s) done", query_count, this_query->topic);
