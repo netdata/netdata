@@ -151,27 +151,20 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 #endif
 
     struct stats *stats = &instance->stats;
-
-    int ret = 0;
-    if (instance->prepare_header)
-        ret = instance->prepare_header(sock, instance);
-
     ssize_t written = -1;
 
-    if (!ret) {
 #ifdef ENABLE_HTTPS
-        if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
-            options & EXPORTING_OPTION_USE_TLS &&
-            connector_specific_data->conn &&
-            connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-            written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), len);
-        } else {
-            written = send(*sock, buffer_tostring(buffer), len, flags);
-        }
-#else
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
+        options & EXPORTING_OPTION_USE_TLS &&
+        connector_specific_data->conn &&
+        connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+        written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), len);
+    } else {
         written = send(*sock, buffer_tostring(buffer), len, flags);
-#endif
     }
+#else
+    written = send(*sock, buffer_tostring(buffer), len, flags);
+#endif
 
     if(written != -1 && (size_t)written == len) {
         // we sent the data successfully

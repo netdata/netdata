@@ -420,7 +420,7 @@ int simple_connector_end_batch(struct instance *instance)
     else
         header = buffer_create(0);
 
-    // TODO: instance->prepare_header(instance);
+    instance->prepare_header(instance);
 
     size_t buffered_metrics = (size_t)stats->buffered_metrics;
 

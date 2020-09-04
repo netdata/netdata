@@ -21,7 +21,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 int open_batch_opentsdb_http(struct instance *instance);
 int close_batch_opentsdb_http(struct instance *instance);
 
-int opentsdb_http_send_header(int *sock, struct instance *instance);
+void opentsdb_http_prepare_header(struct instance *instance);
 
 struct opentsdb_specific_data {
     BUFFER *header;

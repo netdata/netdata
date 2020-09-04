@@ -10,30 +10,19 @@ char family[PROMETHEUS_ELEMENT_MAX + 1];
 char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
 /**
- * Send header to a server
+ * Prepare HTTP header
  *
- * @param sock a communication socket.
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
  */
-int prometheus_remote_write_send_header(int *sock, struct instance *instance)
+void prometheus_remote_write_prepare_header(struct instance *instance)
 {
-    int flags = 0;
-#ifdef MSG_NOSIGNAL
-    flags += MSG_NOSIGNAL;
-#endif
-
     struct prometheus_remote_write_specific_config *connector_specific_config =
         instance->config.connector_specific_config;
-    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
-    struct simple_connector_buffer *simple_connector_buffer = connector_specific_data->first_buffer;
-
-    BUFFER *header = simple_connector_buffer->header;
-    if (!header)
-        header = buffer_create(0);
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
 
     buffer_sprintf(
-        header,
+        simple_connector_data->first_buffer->header,
         "POST %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Accept: */*\r\n"
@@ -42,17 +31,9 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
         connector_specific_config->remote_write_path,
         instance->config.destination,
-        buffer_strlen((BUFFER *)instance->buffer));
+        buffer_strlen(simple_connector_data->first_buffer->buffer));
 
-    size_t header_len = buffer_strlen(header);
-    ssize_t written = send(*sock, buffer_tostring(header), header_len, flags);
-
-    buffer_flush(header);
-
-    if (written != -1 && (size_t)written == header_len)
-        return 0;
-    else
-        return 1;
+    return;
 }
 
 /**
@@ -117,7 +98,7 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = format_batch_prometheus_remote_write;
 
-    instance->prepare_header = prometheus_remote_write_send_header;
+    instance->prepare_header = prometheus_remote_write_prepare_header;
     instance->check_response = process_prometheus_remote_write_response;
 
     instance->buffer = (void *)buffer_create(0);

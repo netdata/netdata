@@ -85,7 +85,7 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = close_batch_opentsdb_http;
 
-    instance->prepare_header = opentsdb_http_send_header;
+    instance->prepare_header = opentsdb_http_prepare_header;
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -246,57 +246,26 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
 }
 
 /**
- * Send header to a server
+ * Spepare HTTP header
  *
- * @param sock a communication socket.
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
  */
-int opentsdb_http_send_header(int *sock, struct instance *instance)
+void opentsdb_http_prepare_header(struct instance *instance)
 {
-    int flags = 0;
-#ifdef MSG_NOSIGNAL
-    flags += MSG_NOSIGNAL;
-#endif
-
-    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
-    struct simple_connector_buffer *simple_connector_buffer = connector_specific_data->first_buffer;
-
-    BUFFER *header = simple_connector_buffer->header;
-    if (!header)
-        header = buffer_create(0);
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
 
     buffer_sprintf(
-        header,
+        simple_connector_data->first_buffer->header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %lu\r\n"
         "\r\n",
         instance->config.destination,
-        buffer_strlen((BUFFER *)instance->buffer));
+        buffer_strlen(simple_connector_data->first_buffer->buffer));
 
-    size_t header_len = buffer_strlen(header);
-    ssize_t written = 0;
-
-#ifdef ENABLE_HTTPS
-    if (instance->config.options & EXPORTING_OPTION_USE_TLS &&
-        connector_specific_data->conn &&
-        connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-        written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
-    } else {
-        written = send(*sock, buffer_tostring(header), header_len, flags);
-    }
-#else
-    written = send(*sock, buffer_tostring(header), header_len, flags);
-#endif
-
-    buffer_flush(header);
-
-    if (written != -1 && (size_t)written == header_len)
-        return 0;
-    else
-        return 1;
+    return;
 }
 
 /**
