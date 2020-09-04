@@ -287,8 +287,8 @@ if [ "${KERNEL_NAME}" = FreeBSD ] ; then
         RAM_DETECTION="sysctl"
         TOTAL_RAM="$(sysctl -n hw.physmem)"
 elif [ "${KERNEL_NAME}" = Darwin ] ; then
-	RAM_DETECTION="sysctl"
-	TOTAL_RAM="$(sysctl -n hw.physmem)"
+        RAM_DETECTION="sysctl"
+        TOTAL_RAM="$(sysctl -n hw.physmem)"
 elif [ -r /proc/meminfo ] ; then
         RAM_DETECTION="procfs"
         TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -f 1 -d ' ')"
