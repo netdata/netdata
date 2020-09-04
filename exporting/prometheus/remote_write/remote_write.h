@@ -8,7 +8,6 @@
 #include "remote_write_request.h"
 
 struct prometheus_remote_write_specific_data {
-    BUFFER *header;
     void *write_request;
 };
 

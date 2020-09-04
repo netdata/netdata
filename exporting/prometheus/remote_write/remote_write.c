@@ -25,9 +25,10 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
 
     struct prometheus_remote_write_specific_config *connector_specific_config =
         instance->config.connector_specific_config;
-    struct prometheus_remote_write_specific_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_buffer *simple_connector_buffer = connector_specific_data->first_buffer;
 
-    BUFFER *header = connector_specific_data->header;
+    BUFFER *header = simple_connector_buffer->header;
     if (!header)
         header = buffer_create(0);
 
@@ -125,16 +126,19 @@ int init_prometheus_remote_write_instance(struct instance *instance)
         return 1;
     }
 
-    simple_connector_init(instance);
-
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
         return 1;
 
+    struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = (void *)simple_connector_data;
+
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));
-    instance->connector_specific_data = (void *)connector_specific_data;
+    simple_connector_data->connector_specific_data = (void *)connector_specific_data;
+
+    simple_connector_init(instance);
 
     connector_specific_data->write_request = init_write_request();
 
@@ -152,8 +156,10 @@ int init_prometheus_remote_write_instance(struct instance *instance)
  */
 int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host)
 {
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
-        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(
@@ -229,8 +235,10 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
  */
 int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *rd)
 {
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
-        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
     if (rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
         char name[PROMETHEUS_LABELS_MAX + 1];
@@ -326,8 +334,10 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
  */
 int format_batch_prometheus_remote_write(struct instance *instance)
 {
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
-        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
     size_t data_size = get_write_request_size(connector_specific_data->write_request);
 
