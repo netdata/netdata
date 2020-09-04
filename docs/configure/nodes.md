@@ -12,13 +12,13 @@ use cases, but there are some situations where you might want to configure your 
 For example, you might want to increase metrics retention, configure a collector based on your infrastructure's unique
 setup, or secure the local dashboard by restricting it to only connections from `localhost`.
 
-Whatever the reason, Netdata users should know how to configure individual nodes so they can act decisively if they need
-to quickly change how the Netdata Agent monitors their infrastructure.
+Whatever the reason, Netdata users should know how to configure individual nodes to act decisively if an incident,
+anomaly, or change in infrastructure affects how their Agents should peform.
 
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line installation](/docs/get/README.md#install-the-netdata-agent), the
-**Netdata config directory** is `/etc/netdata/`. The config directory contains a number of configuration files with the
+**Netdata config directory** is `/etc/netdata/`. The config directory contains several configuration files with the
 `.conf` extension, a few directories, and a shell script named `edit-config`.
 
 > Some operating systems will use `/opt/netdata/etc/netdata/` as the config directory. If you're not sure where yours
@@ -38,7 +38,7 @@ Upon installation, the Netdata config directory contains a few files and directo
 -   `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains stock configuration files.
     Stock versions are copied into the config directory when opened with `edit-config`. _Do not edit the files in
     `/usr/lib/netdata/conf.d`, as they are overwritten by updates to the Netdata Agent._
--   `edit-config` is a shell script used for [editing configuration files](#edit-netdatas-configuration-files).
+-   `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-netdataconf).
 -   `go.d/`, `python.d/`, `charts.d/`, `node.d`/, and `custom-plugins.d/`, which are directories for each of Netdata's
     [orchestrators](/collectors/plugins.d/README.md#external-plugins-overview). These directories can each contain
     additional `.conf` files for configuring specific collectors.

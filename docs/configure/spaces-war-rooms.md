@@ -1,6 +1,6 @@
 <!--
 title: "Set up Spaces and War Rooms"
-description: ""
+description: "Netdata Cloud allows people and teams of all sizes to organize their infrastructure and collaborate on anomalies or incidents."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/spaces-war-rooms.md
 -->
 
@@ -11,7 +11,7 @@ created a Space and War Room when you first signed in to Cloud, assuming you wer
 someone else.
 
 In either case, you can always create new Spaces and War Rooms based on your changing needs or a scaled-up
-infrastructure. Let's talk through some strategies for creating the most intuitive Cloud experience for your team.
+infrastructure. Let's talk through some strategies for building the most intuitive Cloud experience for your team.
 
 > This guide assumes you've already [signed in](https://app.netdata.cloud) to Netdata Cloud and finished creating your
 > account. If you're not interested in Netdata Cloud's features, you can skip ahead to [node configuration
@@ -19,28 +19,37 @@ infrastructure. Let's talk through some strategies for creating the most intuiti
 
 ## Spaces
 
-Spaces are high-level containers to help you organize your team members and the nodes they're able to view in each War
-Room. You already have one Space in your Netdata Cloud account.
+Spaces are high-level containers to help you organize your team members and the nodes they can view in each War Room.
+You already have at least one Space in your Netdata Cloud account.
 
-To create a new Space, click the **+** icon, and enter its name. Switch between existing Spaces using the Spaces
-navigation. Spaces are distinguished by an abbreviated version of their name.
+To create a new Space, click the **+** icon, enter its name, and click **Save**. Netdata Cloud distinguishes between
+Spaces with an appreviated version of each's name, and you can click on any of the icons to switch between them.
+
+![Spaces navigation in Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/92177439-5b22d000-edf5-11ea-9323-383347f21c8d.png)
 
 The organization you choose will likely be based on two factors:
 
 1.  The fact that any node can be claimed to a single Space.
-2.  The size of your team and the complexity of the infrastructure you monitor. 
+2.  The size of your team and the complexity of the infrastructure you monitor.
 
-A single Space is best for smaller infrastructures, as it puts all your metrics in one easily-accessible place. For
-larger organizations and operations, multiple siloed Spaces may be easier to manage.
+A single Space puts all your metrics in one easily-accessible place, while multiple Spaces creates logical division
+between different users and different pieces of a large infrastructure.
 
 For example, a large organization might have one SRE team for the user-face SaaS application, and a second IT team for
 managing employee's hardware. Since these teams don't monitor the same nodes, they can work in separate Spaces and then
 further organize their nodes into War Rooms.
 
+You can also use multiple Spaces for different aspects of your monitoring "life," such as your work infrastructure
+versus your homelab.
+
 ## War Rooms
 
-War Rooms are where users can view key metrics in real-time and monitor the health of many nodes with their alarm
-status. 
+War Rooms are granular containers for organizing nodes, viewing key metrics in real-time, and monitoring the health and
+alarm status of many nodes. 
+
+War Rooms organize the [at-a-glance Node view](/docs/visualize/view-all-nodes.md) and any new [new
+dashboards](/docs/visualize/create-dashboards.md) you build.
 
 We recommend a few strategies for organizing your War Rooms.
 
@@ -61,14 +70,18 @@ messages rate. You can create a War Room called `$year-$month-$day-pulsar-rate`,
 to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for getting to resolution as fast
 as possible.
 
+For example, here is a War Room based on the node's provider and physical location (**us-east-1**).
+
+![An example War Room based on provider and
+location](https://user-images.githubusercontent.com/1153921/92178714-ff0d7b00-edf7-11ea-8411-09b2e75a5529.png)
+
 ## What's next?
 
 Once you've figured out an organizational structure that works for your infrastructure, it's time to [invite your
-team](/docs/configure/invite-collaborate.md). You can invite any number of colleages to help you collectively
-troubleshoot the most complex of infrastructure-wide performace issues.
+team](/docs/configure/invite-collaborate.md). You can invite any number of colleagues to help you collectively
+troubleshoot the most complex of infrastructure-wide performance issues.
 
-If you don't have a team to collaborate with, or aren't ready to onboard them your new real-time infrastructure
-monitoring dashboard in Netdata Cloud, you can skip ahead to learn the [basics of node
+If you don't have a team or aren't ready to invite them, you can skip ahead to learn the [basics of node
 configuration](/docs/configure/nodes.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fspaces-war-rooms&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

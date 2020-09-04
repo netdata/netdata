@@ -6,10 +6,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/i
 
 # Invite your team and collaborate
 
-Netdata is designed to make an infrastructure's real-time metrics available and actionable to all members of an
-organization. Through inviting others, you can better synchronize with your team or colleagues on understanding the
-heartbeat of your infrastructure. When something goes wrong, you'll be ready to collaboratively troubleshoot complex
-performance problems from a single pane of glass.
+Netdata is designed to make an infrastructure's real-time metrics available and actionable to all organization members.
+By inviting others, you can better synchronize with your team or colleagues to understand your infrastructure's
+heartbeat. When something goes wrong, you'll be ready to collaboratively troubleshoot complex performance problems from
+a single pane of glass.
 
 ## Invite new members
 
@@ -25,7 +25,7 @@ Choose which War Rooms you want to add this user to, then click the plus **+** b
 **New invitations to be sent** queue. Repeat the process with everyone you want to invite to your Space.
 
 When you're ready to send the new invitations you created, hit the **Send** button. Netdata Cloud sends these
-invitations as soon as it can and moves them to the **Invitations awaiting response** category.
+invitations and moves them to the **Invitations awaiting response** category.
 
 Your team will receive their invitations momentarily and prompt them to sign in to join your Space.
 
@@ -41,7 +41,7 @@ additional charts/text.
 
 Let's say you get an alert from your nodes about an excess of 500-type errors in your Nginx logs. Your team can hop on a
 Slack call to begin working together. While one engineer handles creating a new dashboard with a half-dozen relevant
-Nginx log metrics, another can dive into the real-time node dashboard investigate correlated charts in graunular detail.
+Nginx log metrics, another can dive into the real-time node dashboard investigate correlated charts in granular detail.
 
 ## What's next?
 
@@ -50,7 +50,7 @@ doc](https://learn.netdata.cloud/docs/cloud/manage/sign-in). Or, find answers to
 Cloud in our [FAQ](https://learn.netdata.cloud/docs/cloud/faq-glossary).
 
 Next, we recommend you learn the [basics of node configuration](/docs/configure/nodes.md). While the Netdata Agent is
-proudly zero-configuration in most cases, it's important that you understand how to tweak its settings to give you the
-best Netdata, for example, to increase metrics retention and improve security.
+proudly zero-configuration in most cases, you should understand how to tweak its settings to give you the best Netdata,
+for example, to increase metrics retention and improve security.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Finvite-collaborate&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
