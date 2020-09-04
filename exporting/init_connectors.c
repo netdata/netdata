@@ -96,3 +96,38 @@ int init_connectors(struct engine *engine)
 
     return 0;
 }
+
+/**
+ * Initialize a ring buffer for a simple connector
+ *
+ * @param instance an instance data structure.
+ */
+void simple_connector_init(struct instance *instance)
+{
+    struct simple_connector_data *connector_specific_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+
+    // create a ring buffer
+    struct simple_connector_buffer *first_buffer = NULL;
+
+    if (instance->config.buffer_on_failures < 2)
+        instance->config.buffer_on_failures = 1;
+    else
+        instance->config.buffer_on_failures -= 1;
+
+    for (int i = 0; i < instance->config.buffer_on_failures; i++) {
+        struct simple_connector_buffer *current_buffer = callocz(1, sizeof(struct simple_connector_buffer));
+
+        if (!connector_specific_data->first_buffer)
+            first_buffer = current_buffer;
+        else
+            current_buffer->next = connector_specific_data->first_buffer;
+
+        connector_specific_data->first_buffer = current_buffer;
+    }
+
+    first_buffer->next = connector_specific_data->first_buffer;
+    connector_specific_data->last_buffer = connector_specific_data->first_buffer;
+
+    return;
+}

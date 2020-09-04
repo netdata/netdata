@@ -233,6 +233,7 @@ struct engine *read_exporting_config();
 EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
 
 int init_connectors(struct engine *engine);
+void simple_connector_init(struct instance *instance);
 
 int mark_scheduled_instances(struct engine *engine);
 void prepare_buffers(struct engine *engine);
