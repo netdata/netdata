@@ -124,6 +124,9 @@ int init_prometheus_remote_write_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s", instance->config.name);
         return 1;
     }
+
+    simple_connector_init(instance);
+
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
