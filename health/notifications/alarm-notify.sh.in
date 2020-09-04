@@ -2226,7 +2226,7 @@ EOF
   if [ "${httpcode}" = "202" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
-    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
   fi
 
   return 0;
@@ -2238,7 +2238,7 @@ opsgenie_close_alarm() {
   if [ "${httpcode}" = "202" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
-    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
   fi
 }
 
