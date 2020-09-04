@@ -85,11 +85,16 @@ struct simple_connector_buffer {
     BUFFER *header;
     BUFFER *buffer;
 
+    size_t buffered_metrics;
+    size_t buffered_bytes;
+
     struct simple_connector_buffer *next;
 };
 
 struct simple_connector_data {
     void *connector_specific_data;
+
+    size_t total_buffered_metrics;
 
     struct simple_connector_buffer *first_buffer;
     struct simple_connector_buffer *last_buffer;

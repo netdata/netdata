@@ -374,3 +374,64 @@ int simple_connector_update_buffered_bytes(struct instance *instance)
 
     return 0;
 }
+
+/**
+ * Start a batch for a simple connector
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int simple_connector_start_batch(struct instance *instance)
+{
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+    struct stats *stats = &instance->stats;
+
+    BUFFER *simple_connector_buffer = simple_connector_data->last_buffer->buffer;
+    if (simple_connector_buffer) {
+        // ring buffer is full, reuse the oldest element
+        simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
+        buffer_flush(simple_connector_buffer);
+        simple_connector_data->total_buffered_metrics -= simple_connector_data->last_buffer->buffered_metrics;
+        stats->buffered_bytes -= simple_connector_data->last_buffer->buffered_bytes;
+    } else {
+        simple_connector_buffer = buffer_create(0);
+        simple_connector_data->last_buffer->buffer = simple_connector_buffer;
+    }
+
+    return 0;
+}
+
+/**
+ * End a batch for a simple connector
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int simple_connector_end_batch(struct instance *instance)
+{
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+    struct stats *stats = &instance->stats;
+
+    BUFFER *header = simple_connector_data->last_buffer->header;
+    if (header)
+        buffer_flush(header);
+    else
+        buffer_create(0);
+
+    // TODO: fill the header
+
+    size_t buffered_metrics = (size_t)stats->buffered_metrics;
+
+    // The stats->buffered_metrics is used in the simple connector batch formatting as a variable for the number
+    // of metrics, added in the current iteration, so we are clearing it here. We will use the
+    // simple_connector_data->total_buffered_metrics in the worker to show the statistics.
+    stats->buffered_metrics = 0;
+    simple_connector_data->total_buffered_metrics += buffered_metrics;
+
+    simple_connector_data->last_buffer->buffered_metrics = buffered_metrics;
+    simple_connector_data->last_buffer = simple_connector_data->last_buffer->next;
+
+    return 0;
+}
