@@ -35,3 +35,46 @@ void clean_instance(struct instance *instance)
     uv_cond_destroy(&instance->cond_var);
     // uv_mutex_destroy(&instance->mutex);
 }
+
+/**
+ * Clean up a simple connector instance on Netdata exit
+ *
+ * @param instance an instance data structure.
+ */
+void simple_connector_cleanup(struct instance *instance)
+{
+    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
+
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+
+    buffer_free(instance->buffer);
+
+    struct simple_connector_buffer *next_buffer = simple_connector_data->first_buffer;
+    for (int i = 0; i < instance->config.buffer_on_failures; i++) {
+        struct simple_connector_buffer *current_buffer = next_buffer;
+        next_buffer = next_buffer->next;
+
+        if (current_buffer->header)
+            buffer_free(current_buffer->header);
+        if (current_buffer->buffer)
+            buffer_free(current_buffer->buffer);
+        freez(current_buffer);
+    }
+
+#ifdef ENABLE_HTTPS
+    if (simple_connector_data->conn)
+        SSL_free(simple_connector_data->conn);
+#endif
+
+    freez(simple_connector_data);
+
+    struct simple_connector_config *simple_connector_config =
+        (struct simple_connector_config *)instance->config.connector_specific_config;
+    freez(simple_connector_config);
+
+    info("EXPORTING: instance %s exited", instance->config.name);
+    instance->exited = 1;
+
+    return;
+}

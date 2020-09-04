@@ -207,22 +207,6 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 }
 
 /**
- * Clean up a simple connector instance on Netdata exit
- *
- * @param instance an instance data structure.
- */
-void simple_connector_cleanup(struct instance *instance)
-{
-    info("EXPORTING: cleaning up instance %s ...", instance->config.name);
-
-    buffer_free(instance->buffer);
-    freez(instance->config.connector_specific_config);
-
-    info("EXPORTING: instance %s exited", instance->config.name);
-    instance->exited = 1;
-}
-
-/**
  * Simple connector worker
  *
  * Runs in a separate thread for every instance.
@@ -388,13 +372,6 @@ void simple_connector_worker(void *instance_p)
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
         clean_prometheus_remote_write(instance);
-#endif
-
-#ifdef ENABLE_HTTPS
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && options & EXPORTING_OPTION_USE_TLS) {
-        SSL_free(connector_specific_data->conn);
-        freez(instance->connector_specific_data);
-    }
 #endif
 
     simple_connector_cleanup(instance);

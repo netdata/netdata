@@ -83,10 +83,7 @@ struct simple_connector_config {
 
 struct simple_connector_buffer {
     BUFFER *header;
-
     BUFFER *buffer;
-    size_t buffered_metrics;
-    size_t buffered_bytes;
 
     struct simple_connector_buffer *next;
 };
@@ -94,7 +91,6 @@ struct simple_connector_buffer {
 struct simple_connector_data {
     void *connector_specific_data;
 
-    struct simple_connector_buffer *current_buffer;
     struct simple_connector_buffer *first_buffer;
     struct simple_connector_buffer *last_buffer;
 
@@ -268,6 +264,7 @@ void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
 void send_internal_metrics(struct instance *instance);
 
 extern void clean_instance(struct instance *ptr);
+void simple_connector_cleanup(struct instance *instance);
 
 static inline void disable_instance(struct instance *instance)
 {
