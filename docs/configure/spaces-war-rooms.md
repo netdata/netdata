@@ -23,7 +23,7 @@ Spaces are high-level containers to help you organize your team members and the 
 You already have at least one Space in your Netdata Cloud account.
 
 To create a new Space, click the **+** icon, enter its name, and click **Save**. Netdata Cloud distinguishes between
-Spaces with an appreviated version of each's name, and you can click on any of the icons to switch between them.
+Spaces with abbreviated versions of their name. Click on any of the icons to switch between them.
 
 ![Spaces navigation in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/92177439-5b22d000-edf5-11ea-9323-383347f21c8d.png)
@@ -36,8 +36,8 @@ The organization you choose will likely be based on two factors:
 A single Space puts all your metrics in one easily-accessible place, while multiple Spaces creates logical division
 between different users and different pieces of a large infrastructure.
 
-For example, a large organization might have one SRE team for the user-face SaaS application, and a second IT team for
-managing employee's hardware. Since these teams don't monitor the same nodes, they can work in separate Spaces and then
+For example, a large organization might have one SRE team for the user-facing SaaS application, and a second IT team for
+managing employees' hardware. Since these teams don't monitor the same nodes, they can work in separate Spaces and then
 further organize their nodes into War Rooms.
 
 You can also use multiple Spaces for different aspects of your monitoring "life," such as your work infrastructure
