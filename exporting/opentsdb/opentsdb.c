@@ -62,7 +62,7 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
-    struct opentsdb_specific_data *connector_specific_data = callocz(1, sizeof(struct opentsdb_specific_data));
+    struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
 #ifdef ENABLE_HTTPS
     connector_specific_data->flags = NETDATA_SSL_START;
     connector_specific_data->conn = NULL;
@@ -93,6 +93,9 @@ int init_opentsdb_http_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
     }
+
+    simple_connector_init(instance);
+
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
@@ -256,9 +259,10 @@ int opentsdb_http_send_header(int *sock, struct instance *instance)
     flags += MSG_NOSIGNAL;
 #endif
 
-    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_buffer *simple_connector_buffer = connector_specific_data->first_buffer;
 
-    BUFFER *header = connector_specific_data->header;
+    BUFFER *header = simple_connector_buffer->header;
     if (!header)
         header = buffer_create(0);
 
