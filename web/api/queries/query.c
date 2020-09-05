@@ -742,6 +742,7 @@ static int rrdr_convert_before_after_to_absolute(
         , int update_every
         , time_t first_entry_t
         , time_t last_entry_t
+        , RRDSET *st
 ) {
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
@@ -1581,9 +1582,10 @@ RRDR *rrd2rrdr(
     }
 
     rrd_update_every = st->update_every;
+
     absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
                                                                       rrd_update_every, first_entry_t,
-                                                                      last_entry_t);
+                                                                      last_entry_t, st);
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         struct rrdeng_region_info *region_info_array;

@@ -1281,8 +1281,37 @@ static inline size_t rrdset_done_interpolate(
             }
             // SQLITE: If we are about to store in position 0 and it's not the first one, we need to flush the metrics first
             if (st->current_entry == 0) {
-                info("Flushing chart %s (%s)", st->id, rd->id);
-                rrddim_sql_collect_finalize(rd);
+                if (rd->state->active_count) {
+                    info("Flushing chart %s (%s)", st->id, rd->id);
+                    rrddim_sql_collect_finalize(rd);
+                }
+//                else {
+//                    info("Checking %s (%s) for gap filling", st->id, rd->id);
+//                    if (rd->state->db_last_entry_t < rd->state->first_entry_t - 1) {
+//                        info("Adding gap for %s (%s) %d - %d",  st->id, rd->id, rd->state->db_last_entry_t + 1, rd->state->first_entry_t - 1);
+//                        sql_add_metric_page(
+//                            rd->state->metric_uuid, NULL, 0, rd->state->db_last_entry_t + 1,
+//                            rd->state->first_entry_t - 1);
+//                        rd->state->db_last_entry_t = rd->state->first_entry_t - 1;
+//                    }
+//                }
+
+//                if (st->counter >= st->entries) {
+//                    rrddim_sql_collect_finalize(rd);
+//                    update_last_entry = rrddim_last_entry_t(rd);
+//                }
+//                else {
+//                    if (rd->rrdset->state->last_entry_t &&
+//                        rd->rrdset->state->last_entry_t <
+//                            rrddim_first_entry_t(rd)) { //} && rd->rrdset->state->last_entry_t !=0) {
+//                        info("Adding gap for %d - %d", rd->rrdset->state->last_entry_t, rrddim_first_entry_t(rd));
+//                        sql_add_metric_page(
+//                            rd->state->metric_uuid, NULL, 0, rd->rrdset->state->last_entry_t + 1,
+//                            rrddim_first_entry_t(rd) - 1);
+//                        //rd->rrdset->state->last_entry_t = rrddim_first_entry_t(rd);
+//                        update_last_entry = rrddim_last_entry_t(rd);
+//                    }
+//                }
             }
 
             if(unlikely(!store_this_entry)) {
@@ -1366,6 +1395,7 @@ static inline size_t rrdset_done_interpolate(
 
         st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = 0;
+        st->state->last_entry_t = st->last_updated.tv_sec;
 
         last_stored_ut = next_store_ut;
     }

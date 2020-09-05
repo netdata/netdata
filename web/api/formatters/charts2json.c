@@ -64,7 +64,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                    , host->os
                    , host->timezone
                    , host->rrd_update_every
-                   , host->rrd_history_entries
+                   , time(NULL) - host->rrdset_root->state->first_entry_t   //host->rrd_history_entries
                    , rrd_memory_mode_name(host->rrd_memory_mode)
                    , custom_dashboard_info_js_filename
     );

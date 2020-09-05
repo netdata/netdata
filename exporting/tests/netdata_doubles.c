@@ -148,9 +148,7 @@ RRDDIM *rrddim_add_custom(
     collected_number divisor,
     RRD_ALGORITHM algorithm,
     RRD_MEMORY_MODE memory_mode,
-    int is_archived,
-    uuid_t *dim_uuid,
-    uuid_t *chart_uuid)
+    int is_archived)
 {
     check_expected_ptr(st);
     UNUSED(id);
@@ -160,7 +158,6 @@ RRDDIM *rrddim_add_custom(
     check_expected(algorithm);
     UNUSED(memory_mode);
     UNUSED(is_archived);
-    UNUSED(dim_uuid);
 
     function_called();
 

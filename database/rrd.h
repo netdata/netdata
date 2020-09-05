@@ -336,6 +336,12 @@ struct rrddim_volatile {
 #endif
 #ifdef SQLITE_POC
     uuid_t *metric_uuid;
+    time_t db_first_entry_t;       // First entry in the SQLite database
+    time_t db_last_entry_t;        // Last entry in the SQLite database (inclusive)
+    time_t first_entry_t;          // First entry in active_page
+    time_t last_entry_t;           // Last entry in the active_page
+    size_t active_count;
+    uint8_t gap_checked;
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------

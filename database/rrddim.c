@@ -404,6 +404,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state = mallocz(sizeof(*rd->state));
 
     rd->state->metric_uuid = sql_find_dim_uuid(st, rd->id, rd->name, multiplier, divisor, algorithm);
+    rd->state->active_count = 0;
+    rd->state->first_entry_t = LONG_MAX;
+    rd->state->last_entry_t = 0;
+    rd->state->db_first_entry_t = LONG_MAX;
+    rd->state->db_last_entry_t = 0;
+    rd->state->gap_checked = 0;
 
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE

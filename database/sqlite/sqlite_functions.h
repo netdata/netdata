@@ -73,6 +73,7 @@ extern time_t rrddim_sql_query_latest_time(RRDDIM *rd);
 extern time_t rrddim_sql_query_oldest_time(RRDDIM *rd);
 extern time_t sql_rrdset_first_entry_t(RRDSET *st, time_t *first, time_t *last);
 extern time_t sql_rrdset_last_entry_t(RRDSET *st);
+extern time_t sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last);
 
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

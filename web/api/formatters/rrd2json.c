@@ -138,8 +138,8 @@ int rrdset2anything_api_v1(
     st->last_accessed_time = now_realtime_sec();
 
     RRDDIM *temp_rd = NULL;
-    if (!st->dimensions)
-        temp_rd = sql_load_chart_dimensions(st, 2);
+    //if (!st->dimensions)
+      //  temp_rd = sql_load_chart_dimensions(st, 2);
 
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, temp_rd);
     if(!r) {
