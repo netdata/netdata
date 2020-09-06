@@ -174,7 +174,6 @@
 - Fixed typo in the streaming readme [\#9378](https://github.com/netdata/netdata/pull/9378) ([Jiab77](https://github.com/Jiab77))
 - Add support for multiple ACLK query processing threads [\#9355](https://github.com/netdata/netdata/pull/9355) ([underhood](https://github.com/underhood))
 - Change the HTTP method to make the IPFS collector compatible with 0.5.0+ [\#9248](https://github.com/netdata/netdata/pull/9248) ([RubenKelevra](https://github.com/RubenKelevra))
-- Add support for returning headers using python.d's UrlService [\#9236](https://github.com/netdata/netdata/pull/9236) ([vsc55](https://github.com/vsc55))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
