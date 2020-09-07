@@ -166,7 +166,7 @@ def ChildShortDisconnect(state):
     time.sleep(5)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -185,7 +185,7 @@ def ChildLongDisconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -204,7 +204,7 @@ def ChildShortRestart(state):
     time.sleep(10)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     # TODO: expect difference in charts - test validity check
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
@@ -224,7 +224,7 @@ def ChildLongRestart(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     # TODO: expect difference in charts - test validity check
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
@@ -244,7 +244,7 @@ def ParentShortDisconnect(state):
     time.sleep(5)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -263,7 +263,7 @@ def ParentLongDisconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -282,7 +282,7 @@ def ParentShortRestart(state):
     time.sleep(15)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -301,7 +301,7 @@ def ParentLongRestart(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
@@ -326,7 +326,7 @@ def ChildDropInsideParentReconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ParentDropInsideChildReconnect(state):
@@ -350,7 +350,7 @@ def ParentDropInsideChildReconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ChildDropOverParentReconnect(state):
@@ -374,7 +374,7 @@ def ChildDropOverParentReconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ParentDropOverChildReconnect(state):
@@ -398,7 +398,7 @@ def ParentDropOverChildReconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ParentRestartDuringChildReconnect(state):
@@ -422,7 +422,7 @@ def ParentRestartDuringChildReconnect(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ChildRestartDuringParentReconnect(state):
@@ -447,7 +447,7 @@ def ChildRestartDuringParentReconnect(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
     # Expect gaps (when child is not collecting) but not differences
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ParentDropDuringChildRestart(state):
@@ -472,7 +472,7 @@ def ParentDropDuringChildRestart(state):
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
     # Expect gaps (when child is not collecting) but not differences
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 def ChildDropDuringParentRestart(state):
@@ -496,7 +496,7 @@ def ChildDropDuringParentRestart(state):
     time.sleep(30)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent") )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
 
 
