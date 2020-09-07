@@ -245,7 +245,7 @@ class State(object):
         sh(f"docker network connect --alias {node} {self.network} {self.nodes[node].container_name}", self.output)
 
     def kill(self, node):
-        sh(f"docker kill -s INT {self.nodes[node].container_name}", self.output)
+        sh(f"docker kill -s SIGINT {self.nodes[node].container_name}", self.output)
 
     def restart(self, node):
         sh(f"docker start {self.nodes[node].container_name}", self.output)
