@@ -231,12 +231,15 @@ void simple_connector_worker(void *instance_p)
     BUFFER *empty_buffer = buffer_create(0);
 
     while(!instance->engine->exit) {
-    struct stats *stats = &instance->stats;
+        struct stats *stats = &instance->stats;
 
         uv_mutex_lock(&instance->mutex);
-        while (!instance->data_is_ready)
-            uv_cond_wait(&instance->cond_var, &instance->mutex);
-        instance->data_is_ready = 0;
+        if (!connector_specific_data->first_buffer->buffer ||
+            !buffer_strlen(connector_specific_data->first_buffer->buffer)) {
+            while (!instance->data_is_ready)
+                uv_cond_wait(&instance->cond_var, &instance->mutex);
+            instance->data_is_ready = 0;
+        }
 
         if (unlikely(instance->engine->exit)) {
             uv_mutex_unlock(&instance->mutex);
