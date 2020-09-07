@@ -143,10 +143,11 @@ jobs:
           #    yum -y install libcurl-devel openssl-devel libuuid-devel
           #  build_kinesis: >-
           #    git clone https://github.com/aws/aws-sdk-cpp.git &&
-          #    cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
-          #    -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
-          #    -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
-          #    ./aws-sdk-cpp
+          #    cmake -DCMAKE_INSTALL_PREFIX=/usr
+          #    -DBUILD_ONLY=kinesis
+          #    ./aws-sdk-cpp &&
+          #    make &&
+          #    make install
           - distro: 'debian:buster'
             pre: >-
               apt-get update &&
@@ -154,10 +155,11 @@ jobs:
               apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
-              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
-              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
-              ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
           - distro: 'fedora:32'
             pre: >-
               dnf -y update &&
@@ -165,10 +167,11 @@ jobs:
               dnf -y install libcurl-devel openssl-devel libuuid-devel
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
-              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
-              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
-              ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
           - distro: 'ubuntu:20.04'
             pre: >-
               apt-get update &&
@@ -176,10 +179,11 @@ jobs:
               apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
-              cmake -DCMAKE_INSTALL_LIBDIR=/usr/lib
-              -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
-              -DBUILD_SHARED_LIBS=OFF -DBUILD_ONLY=kinesis
-              ./aws-sdk-cpp
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
