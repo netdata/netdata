@@ -2044,6 +2044,7 @@ send_stackpulse() {
     "Alarm" : "${name}",
     "Date": ${when},
     "Description" : "${status_message}, ${info}"
+    "ID" : ${alarm_id}
   }
 EOF
 )
