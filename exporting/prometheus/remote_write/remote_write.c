@@ -113,7 +113,14 @@ int init_prometheus_remote_write_instance(struct instance *instance)
         return 1;
 
     struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
-    instance->connector_specific_data = (void *)simple_connector_data;
+#ifdef ENABLE_HTTPS
+    simple_connector_data->flags = NETDATA_SSL_START;
+    simple_connector_data->conn = NULL;
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
+        security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
+    }
+#endif
+    instance->connector_specific_data = simple_connector_data;
 
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));
@@ -336,6 +343,8 @@ int format_batch_prometheus_remote_write(struct instance *instance)
     }
     buffer->len = data_size;
     instance->stats.buffered_bytes = (collected_number)buffer_strlen(buffer);
+
+    simple_connector_end_batch(instance);
 
     return 0;
 }

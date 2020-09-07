@@ -401,7 +401,8 @@ int simple_connector_end_batch(struct instance *instance)
         header = buffer_create(0);
         simple_connector_data->last_buffer->header = header;
     }
-    instance->prepare_header(instance);
+    if (instance->prepare_header)
+        instance->prepare_header(instance);
 
     size_t buffered_metrics = (size_t)stats->buffered_metrics;
 

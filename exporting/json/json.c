@@ -16,6 +16,16 @@ int init_json_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 5448;
 
+    struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
+#ifdef ENABLE_HTTPS
+    connector_specific_data->flags = NETDATA_SSL_START;
+    connector_specific_data->conn = NULL;
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
+        security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
+    }
+#endif
+    instance->connector_specific_data = connector_specific_data;
+
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_json_plaintext;
     instance->start_chart_formatting = NULL;
