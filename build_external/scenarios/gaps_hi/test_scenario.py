@@ -148,7 +148,7 @@ def ChildFirst(state):
     time.sleep(60)
     # pylint: disable-msg=W0622
     state.end_checks.append( lambda: state.check_sync("child","parent",max_pre=10) )
-    # pylint: disable-msg=W0622
+    # pylint: disable-msg=W0108
     state.post_checks.append( lambda: state.check_rep() )
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
