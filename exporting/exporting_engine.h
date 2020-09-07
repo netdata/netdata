@@ -86,7 +86,6 @@ struct simple_connector_buffer {
     BUFFER *buffer;
 
     size_t buffered_metrics;
-    size_t buffered_bytes;
 
     struct simple_connector_buffer *next;
 };
@@ -257,11 +256,12 @@ void end_chart_formatting(struct engine *engine, RRDSET *st);
 void end_host_formatting(struct engine *engine, RRDHOST *host);
 void end_batch_formatting(struct engine *engine);
 int flush_host_labels(struct instance *instance, RRDHOST *host);
-int simple_connector_update_buffered_bytes(struct instance *instance);
+int simple_connector_end_batch(struct instance *instance);
 
 int exporting_discard_response(BUFFER *buffer, struct instance *instance);
 void simple_connector_receive_response(int *sock, struct instance *instance);
-void simple_connector_send_buffer(int *sock, int *failures, struct instance *instance);
+void simple_connector_send_buffer(
+    int *sock, int *failures, struct instance *instance, BUFFER *header, BUFFER *buffer, size_t buffered_metrics);
 void simple_connector_worker(void *instance_p);
 
 void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);

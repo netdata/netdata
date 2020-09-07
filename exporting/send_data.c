@@ -47,7 +47,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
     struct stats *stats = &instance->stats;
 #ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
-    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
@@ -132,11 +132,9 @@ endloop:
  * @param failures the number of communication failures.
  * @param instance an instance data structure.
  */
-void simple_connector_send_buffer(int *sock, int *failures, struct instance *instance)
+void simple_connector_send_buffer(
+    int *sock, int *failures, struct instance *instance, BUFFER *header, BUFFER *buffer, size_t buffered_metrics)
 {
-    BUFFER *buffer = (BUFFER *)instance->buffer;
-    size_t len = buffer_strlen(buffer);
-
     int flags = 0;
 #ifdef MSG_NOSIGNAL
     flags += MSG_NOSIGNAL;
@@ -144,7 +142,7 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
 #ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
-    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
@@ -152,25 +150,30 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
 
     struct stats *stats = &instance->stats;
     ssize_t written = -1;
+    size_t header_len = buffer_strlen(header);
+    size_t buffer_len = buffer_strlen(buffer);
 
 #ifdef ENABLE_HTTPS
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
         options & EXPORTING_OPTION_USE_TLS &&
         connector_specific_data->conn &&
         connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-        written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), len);
+        written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
+        written += (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), buffer_len);
     } else {
-        written = send(*sock, buffer_tostring(buffer), len, flags);
+        written = send(*sock, buffer_tostring(header), header_len, flags);
+        written += send(*sock, buffer_tostring(buffer), buffer_len, flags);
     }
 #else
-    written = send(*sock, buffer_tostring(buffer), len, flags);
+    written = send(*sock, buffer_tostring(header), header_len, flags);
+    written += send(*sock, buffer_tostring(buffer), buffer_len, flags);
 #endif
 
-    if(written != -1 && (size_t)written == len) {
+    if(written != -1 && (size_t)written == (header_len + buffer_len)) {
         // we sent the data successfully
         stats->transmission_successes++;
         stats->sent_bytes += written;
-        stats->sent_metrics = stats->buffered_metrics;
+        stats->sent_metrics = buffered_metrics;
 
         // reset the failures count
         *failures = 0;
@@ -183,7 +186,7 @@ void simple_connector_send_buffer(int *sock, int *failures, struct instance *ins
         error(
             "EXPORTING: failed to write data to '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.",
             instance->config.destination,
-            len,
+            buffer_len,
             written);
         stats->transmission_failures++;
 
@@ -212,20 +215,33 @@ void simple_connector_worker(void *instance_p)
 
 #ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
-    struct opentsdb_specific_data *connector_specific_data = instance->connector_specific_data;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
 #endif
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
-    struct stats *stats = &instance->stats;
 
     int sock = -1;
     struct timeval timeout = {.tv_sec = (instance->config.timeoutms * 1000) / 1000000,
                               .tv_usec = (instance->config.timeoutms * 1000) % 1000000};
     int failures = 0;
 
+    BUFFER *empty_header = buffer_create(0);
+    BUFFER *empty_buffer = buffer_create(0);
+
     while(!instance->engine->exit) {
+    struct stats *stats = &instance->stats;
+
+        uv_mutex_lock(&instance->mutex);
+        while (!instance->data_is_ready)
+            uv_cond_wait(&instance->cond_var, &instance->mutex);
+        instance->data_is_ready = 0;
+
+        if (unlikely(instance->engine->exit)) {
+            uv_mutex_unlock(&instance->mutex);
+            break;
+        }
 
         // reset the monitoring chart counters
         stats->received_bytes =
@@ -238,6 +254,20 @@ void simple_connector_worker(void *instance_p)
         stats->data_lost_events =
         stats->lost_bytes =
         stats->reconnects = 0;
+
+        BUFFER *header = connector_specific_data->first_buffer->header;
+        BUFFER *buffer = connector_specific_data->first_buffer->buffer;
+        size_t buffered_metrics = connector_specific_data->first_buffer->buffered_metrics;
+        size_t buffered_bytes = buffer_strlen(buffer);
+
+        connector_specific_data->first_buffer->header = empty_header;
+        empty_header = header;
+        connector_specific_data->first_buffer->buffer = empty_buffer;
+        empty_buffer = buffer;
+        connector_specific_data->first_buffer->buffered_metrics = 0;
+        connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
+
+        uv_mutex_unlock(&instance->mutex);
 
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
@@ -316,18 +346,8 @@ void simple_connector_worker(void *instance_p)
         // ------------------------------------------------------------------------
         // if we are connected, send our buffer to the data collecting server
 
-        uv_mutex_lock(&instance->mutex);
-        while (!instance->data_is_ready)
-            uv_cond_wait(&instance->cond_var, &instance->mutex);
-        instance->data_is_ready = 0;
-
-        if (unlikely(instance->engine->exit)) {
-            uv_mutex_unlock(&instance->mutex);
-            break;
-        }
-
         if (likely(sock != -1)) {
-            simple_connector_send_buffer(&sock, &failures, instance);
+            simple_connector_send_buffer(&sock, &failures, instance, header, buffer, buffered_metrics);
         } else {
             error("EXPORTING: failed to update '%s'", instance->config.destination);
             stats->transmission_failures++;
@@ -335,8 +355,6 @@ void simple_connector_worker(void *instance_p)
             // increment the counter we check for data loss
             failures++;
         }
-
-        BUFFER *buffer = instance->buffer;
 
         if (failures > instance->config.buffer_on_failures) {
             stats->lost_bytes += buffer_strlen(buffer);
@@ -347,13 +365,22 @@ void simple_connector_worker(void *instance_p)
             buffer_flush(buffer);
             failures = 0;
             stats->data_lost_events++;
-            stats->lost_metrics = stats->buffered_metrics;
+            stats->lost_metrics = buffered_metrics;
         }
+
+        if (unlikely(instance->engine->exit))
+            break;
+
+        uv_mutex_lock(&instance->mutex);
+
+        stats->buffered_metrics = buffered_metrics;
 
         send_internal_metrics(instance);
 
-        if(likely(buffer_strlen(buffer) == 0))
-            stats->buffered_metrics = 0;
+        connector_specific_data->total_buffered_metrics -= buffered_metrics;
+
+        stats->buffered_metrics = 0;
+        stats->buffered_bytes -= buffered_bytes;
 
         uv_mutex_unlock(&instance->mutex);
 

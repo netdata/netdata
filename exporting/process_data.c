@@ -363,46 +363,6 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 }
 
 /**
- * Update stats for buffered bytes
- *
- * @param instance an instance data structure.
- * @return Always returns 0.
- */
-int simple_connector_update_buffered_bytes(struct instance *instance)
-{
-    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)(instance->buffer));
-
-    return 0;
-}
-
-/**
- * Start a batch for a simple connector
- *
- * @param instance an instance data structure.
- * @return Returns 0 on success, 1 on failure.
- */
-int simple_connector_start_batch(struct instance *instance)
-{
-    struct simple_connector_data *simple_connector_data =
-        (struct simple_connector_data *)instance->connector_specific_data;
-    struct stats *stats = &instance->stats;
-
-    BUFFER *simple_connector_buffer = simple_connector_data->last_buffer->buffer;
-    if (simple_connector_buffer) {
-        // ring buffer is full, reuse the oldest element
-        simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
-        buffer_flush(simple_connector_buffer);
-        simple_connector_data->total_buffered_metrics -= simple_connector_data->last_buffer->buffered_metrics;
-        stats->buffered_bytes -= simple_connector_data->last_buffer->buffered_bytes;
-    } else {
-        simple_connector_buffer = buffer_create(0);
-        simple_connector_data->last_buffer->buffer = simple_connector_buffer;
-    }
-
-    return 0;
-}
-
-/**
  * End a batch for a simple connector
  *
  * @param instance an instance data structure.
@@ -414,12 +374,33 @@ int simple_connector_end_batch(struct instance *instance)
         (struct simple_connector_data *)instance->connector_specific_data;
     struct stats *stats = &instance->stats;
 
-    BUFFER *header = simple_connector_data->last_buffer->header;
-    if (header)
-        buffer_flush(header);
-    else
-        header = buffer_create(0);
+    BUFFER *buffer = (BUFFER *)instance->buffer;
+    BUFFER *simple_connector_buffer = simple_connector_data->last_buffer->buffer;
 
+    if (!simple_connector_buffer) {
+        simple_connector_buffer = buffer_create(0);
+        simple_connector_data->last_buffer->buffer = simple_connector_buffer;
+    }
+
+    if (buffer_strlen(simple_connector_buffer)) {
+        // ring buffer is full, reuse the oldest element
+        simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
+        simple_connector_data->total_buffered_metrics -= simple_connector_data->last_buffer->buffered_metrics;
+        stats->buffered_bytes -= buffer_strlen(simple_connector_data->last_buffer->buffer);
+    }
+
+    simple_connector_data->last_buffer->buffer = buffer;
+    instance->buffer = buffer = simple_connector_buffer;
+
+    buffer_flush(buffer);
+
+    BUFFER *header = simple_connector_data->last_buffer->header;
+    if (header) {
+        buffer_flush(header);
+    } else {
+        header = buffer_create(0);
+        simple_connector_data->last_buffer->header = header;
+    }
     instance->prepare_header(instance);
 
     size_t buffered_metrics = (size_t)stats->buffered_metrics;
@@ -429,6 +410,8 @@ int simple_connector_end_batch(struct instance *instance)
     // simple_connector_data->total_buffered_metrics in the worker to show the statistics.
     stats->buffered_metrics = 0;
     simple_connector_data->total_buffered_metrics += buffered_metrics;
+
+    stats->buffered_bytes += buffer_strlen(simple_connector_buffer);
 
     simple_connector_data->last_buffer->buffered_metrics = buffered_metrics;
     simple_connector_data->last_buffer = simple_connector_data->last_buffer->next;

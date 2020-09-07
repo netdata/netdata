@@ -23,12 +23,4 @@ int close_batch_opentsdb_http(struct instance *instance);
 
 void opentsdb_http_prepare_header(struct instance *instance);
 
-struct opentsdb_specific_data {
-    BUFFER *header;
-#ifdef ENABLE_HTTPS
-    SSL *conn; //SSL connection
-    int flags; //The flags for SSL connection
-#endif
-};
-
 #endif //NETDATA_EXPORTING_OPENTSDB_H

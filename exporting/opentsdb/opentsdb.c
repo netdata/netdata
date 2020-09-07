@@ -27,7 +27,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+    instance->end_batch_formatting = simple_connector_end_batch;
 
     instance->prepare_header = NULL;
     instance->check_response = exporting_discard_response;
@@ -256,14 +256,14 @@ void opentsdb_http_prepare_header(struct instance *instance)
     struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
 
     buffer_sprintf(
-        simple_connector_data->first_buffer->header,
+        simple_connector_data->last_buffer->header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %lu\r\n"
         "\r\n",
         instance->config.destination,
-        buffer_strlen(simple_connector_data->first_buffer->buffer));
+        buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;
 }
@@ -289,7 +289,7 @@ int open_batch_opentsdb_http(struct instance *instance){
 int close_batch_opentsdb_http(struct instance *instance){
     buffer_strcat(instance->buffer, "\n]\n");
 
-    simple_connector_update_buffered_bytes(instance);
+    simple_connector_end_batch(instance);
 
     return 0;
 }
