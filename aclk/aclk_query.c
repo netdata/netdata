@@ -59,6 +59,8 @@ static void aclk_query_free(struct aclk_query *this_query)
     freez(this_query->topic);
     if (likely(this_query->query))
         freez(this_query->query);
+    if(this_query->data && this_query->cmd == ACLK_CMD_CLOUD_QUERY_2)
+        freez(this_query->data);
     if (likely(this_query->msg_id))
         freez(this_query->msg_id);
     freez(this_query);
@@ -396,7 +398,6 @@ static int aclk_execute_query(struct aclk_query *this_query)
 
 static int aclk_execute_query_v2(struct aclk_query *this_query)
 {
-//TODO both aclk_execute_query() and aclk_execute_query_v2() are not pretty :/
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
@@ -404,29 +405,8 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
     BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    char *start, *end;
 #endif
-
-    //get the query
-    char buff[NETDATA_WEB_REQUEST_URL_SIZE];
-    char *rd = this_query->query;
-    char *end;
-    int len;
-    if (strncmp(rd, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX)))
-        return 1;
-    rd += strlen(ACLK_CLOUD_REQ_V2_PREFIX);
-
-    if(!(end = strstr(rd, "\x0D\x0A")))
-        return 1;
-
-    len = MIN(NETDATA_WEB_REQUEST_URL_SIZE-1, end-rd);
-    strncpy(buff, rd, len);
-    buff[len] = 0;
-
-    rd = end + 2;
-
-    if(!(end = strstr(buff," HTTP/1.")))
-        return 1;
-    *end = 0;
 
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -437,30 +417,26 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
     w->acl = 0x1f;
 
-    char *mysep = strchr(buff, '?');
-    if (likely(mysep)) {
+    char *mysep = strchr(this_query->query, '?');
+    if (mysep) {
         url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
         *mysep = '\0';
     } else
-        url_decode_r(w->decoded_query_string, buff, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        url_decode_r(w->decoded_query_string, this_query->query, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+
+    mysep = strrchr(this_query->query, '/');
 
     // execute the query
-    t = aclk_web_api_request_v1(localhost, w, *buff ? buff : "noop");
+    t = aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
-    if ((rd = strstr(rd, WEB_HDR_ACCEPT_ENC))) {
-        rd += strlen(WEB_HDR_ACCEPT_ENC);
-        end = strstr(rd, "\x0D\x0A");
-        if(end)
-            len = MIN(NETDATA_WEB_REQUEST_URL_SIZE-1, end-rd);
-        else
-            len = NETDATA_WEB_REQUEST_URL_SIZE-1;
+    if ((start = strstr((char *)this_query->data, WEB_HDR_ACCEPT_ENC))) {
+        start += strlen(WEB_HDR_ACCEPT_ENC);
+        end = strstr(start, "\x0D\x0A");
+        start = strstr(start, "gzip");
 
-        strncpy(buff, rd, len);
-        buff[len] = 0;
-
-        if(strstr(buff, "gzip")) {
+        if (start && start < end) {
             w->response.zstream.zalloc = Z_NULL;
             w->response.zstream.zfree = Z_NULL;
             w->response.zstream.opaque = Z_NULL;
@@ -570,8 +546,8 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
     host = (RRDHOST*)this_query->data;
 
     debug(
-        D_ACLK, "Query #%ld (%s) size=%zu in queue %d ms", query_count, this_query->topic,
-        this_query->query ? strlen(this_query->query) : 0, (int)(now_realtime_usec() - this_query->created)/1000);
+        D_ACLK, "Query #%ld (%s) size=%zu in queue %llu ms", query_count, this_query->topic,
+        this_query->query ? strlen(this_query->query) : 0, (now_realtime_usec() - this_query->created)/USEC_PER_MS);
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
@@ -603,10 +579,11 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
 
         case ACLK_CMD_CLOUD:
             debug(D_ACLK, "EXECUTING a cloud command");
-            if (aclk_shared_state.version_neg < ACLK_V_COMPRESSION)
-                aclk_execute_query(this_query);
-            else
-                aclk_execute_query_v2(this_query);
+            aclk_execute_query(this_query);
+            break;
+        case ACLK_CMD_CLOUD_QUERY_2:
+            debug(D_ACLK, "EXECUTING Cloud Query v2");
+            aclk_execute_query_v2(this_query);
             break;
 
         default:

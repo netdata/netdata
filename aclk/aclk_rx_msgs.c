@@ -5,31 +5,35 @@
 #include "aclk_stats.h"
 #include "aclk_query.h"
 
-static inline int aclk_extract_v2_payload(char *payload, struct aclk_request *req)
+static inline int aclk_extract_v2_data(char *payload, char **data)
 {
     char* ptr = strstr(payload, ACLK_V2_PAYLOAD_SEPARATOR);
     if(!ptr)
         return 1;
     ptr += strlen(ACLK_V2_PAYLOAD_SEPARATOR);
-    req->payload = strdupz(ptr);
+    *data = strdupz(ptr);
     return 0;
 }
 
-static inline int aclk_v2_payload_preverify(const char *payload)
+static inline int aclk_v2_payload_get_query(const char *payload, struct aclk_request *req)
 {
-    // we do better parsing when we handle the command in query thread
-    // this is only to check roughly if all looks OK
+    const char *start, *end;
+
     if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
         errno = 0;
-        error("Only accepting GET requests from CLOUD.");
+        error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
         return 1;
     }
+    start = payload + 4;
 
-    if(!strstr(payload, " HTTP/1.1\x0D\x0A")) {
+    if(!(end = strstr(payload, " HTTP/1.1\x0D\x0A"))) {
         errno = 0;
         error("Doesn't look like HTTP GET request.");
         return 1;
     }
+
+    req->payload = mallocz((end - start) + 1);
+    strncpyz(req->payload, start, end - start);
 
     return 0;
 }
@@ -81,31 +85,36 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
 {
     HTTP_CHECK_AGENT_INITIALIZED();
 
+    char *data;
+
     errno = 0;
     if(cloud_to_agent->version < ACLK_V_COMPRESSION) {
         error("This handler cannot reply to request with version older than %d, received %d.", ACLK_V_COMPRESSION, cloud_to_agent->version);
         return 1;
     }
 
-    if(unlikely(aclk_extract_v2_payload(raw_payload, cloud_to_agent))) {
+    if(unlikely(aclk_extract_v2_data(raw_payload, &data))) {
         error("Error extracting payload expected after the JSON dictionary.");
         return 1;
     }
 
-    if(unlikely(aclk_v2_payload_preverify(cloud_to_agent->payload)))
+    if(unlikely(aclk_v2_payload_get_query(data, cloud_to_agent)))
         return 1;
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
         error("Missing callback_topic");
+        freez(data);
         return 1;
     }
 
     if (unlikely(!cloud_to_agent->msg_id)) {
         error("Missing msg_id");
+        freez(data);
         return 1;
     }
 
-    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, NULL, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD)))
+    // aclk_queue_query takes ownership of data pointer
+    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, data, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD_QUERY_2)))
         debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
 
     UNUSED(cloud_to_agent);

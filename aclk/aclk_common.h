@@ -34,7 +34,8 @@ typedef enum aclk_cmd {
     ACLK_CMD_INFO,
     ACLK_CMD_CHART,
     ACLK_CMD_CHARTDEL,
-    ACLK_CMD_ALARM
+    ACLK_CMD_ALARM,
+    ACLK_CMD_CLOUD_QUERY_2
 } ACLK_CMD;
 
 typedef enum aclk_metadata_state {
