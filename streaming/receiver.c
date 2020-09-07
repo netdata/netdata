@@ -460,11 +460,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
                 rpt->host->health_enabled = 0;
         }
+        rrdhost_unlock(rpt->host);
         if (rpt->host->receiver == rpt) {
             rrdpush_sender_thread_stop(rpt->host);
         }
         netdata_mutex_unlock(&rpt->host->receiver_lock);
-        rrdhost_unlock(rpt->host);
         rrd_unlock();
     }
 
