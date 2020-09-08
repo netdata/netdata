@@ -839,24 +839,24 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multi
     sqlite3_reset(res);
     sqlite3_finalize(res);
 
-    if (uuid) {
-        rc = sqlite3_prepare_v2(
-            db, "insert or replace into dimension_active (dim_uuid, date_created) values (@id, strftime('%s'));", -1,
-            &res1, 0);
-        if (rc != SQLITE_OK) {
-            info("SQLITE: failed to bind to update dimension active");
-            return NULL;
-        }
-        rc = sqlite3_bind_blob(res1, 1, uuid, 16, SQLITE_TRANSIENT);
-        // TODO: check return code etc
-        while (rc = sqlite3_step(res1) != SQLITE_DONE) {
-            if (rc != SQLITE_BUSY)
-                break;
-            info("Busy detected on DIM set to active");
-        }
-        sqlite3_reset(res1);
-        sqlite3_finalize(res1);
-    }
+//    if (uuid) {
+//        rc = sqlite3_prepare_v2(
+//            db, "insert or replace into dimension_active (dim_uuid, date_created) values (@id, strftime('%s'));", -1,
+//            &res1, 0);
+//        if (rc != SQLITE_OK) {
+//            info("SQLITE: failed to bind to update dimension active");
+//            return NULL;
+//        }
+//        rc = sqlite3_bind_blob(res1, 1, uuid, 16, SQLITE_TRANSIENT);
+//        // TODO: check return code etc
+//        while (rc = sqlite3_step(res1) != SQLITE_DONE) {
+//            if (rc != SQLITE_BUSY)
+//                break;
+//            info("Busy detected on DIM set to active");
+//        }
+//        sqlite3_reset(res1);
+//        sqlite3_finalize(res1);
+//    }
    // netdata_mutex_unlock(&sqlite_find_uuid);
 
     return uuid;
@@ -913,20 +913,20 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *typ
     sqlite3_reset(res);
     sqlite3_finalize(res);
 
-    if (uuid) {
-        rc = sqlite3_prepare_v2(
-            db, "insert or replace into chart_active (chart_uuid, date_created) values (@id, strftime('%s'));",
-            -1, &res1, 0);
-        if (rc != SQLITE_OK) {
-            info("SQLITE: failed to bind to update charts");
-            return NULL;
-        }
-        rc = sqlite3_bind_blob(res1, 1, uuid, 16, SQLITE_TRANSIENT);
-        // TODO: check return code etc
-        rc = sqlite3_step(res1);
-        sqlite3_reset(res1);
-        sqlite3_finalize(res1);
-    }
+//    if (uuid) {
+//        rc = sqlite3_prepare_v2(
+//            db, "insert or replace into chart_active (chart_uuid, date_created) values (@id, strftime('%s'));",
+//            -1, &res1, 0);
+//        if (rc != SQLITE_OK) {
+//            info("SQLITE: failed to bind to update charts");
+//            return NULL;
+//        }
+//        rc = sqlite3_bind_blob(res1, 1, uuid, 16, SQLITE_TRANSIENT);
+//        // TODO: check return code etc
+//        rc = sqlite3_step(res1);
+//        sqlite3_reset(res1);
+//        sqlite3_finalize(res1);
+//    }
     //netdata_mutex_unlock(&sqlite_find_uuid);
     return uuid;
 }
