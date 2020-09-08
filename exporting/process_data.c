@@ -374,32 +374,33 @@ int simple_connector_end_batch(struct instance *instance)
         (struct simple_connector_data *)instance->connector_specific_data;
     struct stats *stats = &instance->stats;
 
-    BUFFER *buffer = (BUFFER *)instance->buffer;
-    BUFFER *simple_connector_buffer = simple_connector_data->last_buffer->buffer;
+    BUFFER *instance_buffer = (BUFFER *)instance->buffer;
+    struct simple_connector_buffer *last_buffer = simple_connector_data->last_buffer;
 
-    if (!simple_connector_buffer) {
-        simple_connector_buffer = buffer_create(0);
-        simple_connector_data->last_buffer->buffer = simple_connector_buffer;
+    if (!last_buffer->buffer) {
+        last_buffer->buffer = buffer_create(0);
     }
 
-    if (buffer_strlen(simple_connector_buffer)) {
+    if (buffer_strlen(last_buffer->buffer)) {
         // ring buffer is full, reuse the oldest element
         simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
-        simple_connector_data->total_buffered_metrics -= simple_connector_data->last_buffer->buffered_metrics;
-        stats->buffered_bytes -= buffer_strlen(simple_connector_data->last_buffer->buffer);
+        simple_connector_data->total_buffered_metrics -= last_buffer->buffered_metrics;
+        stats->buffered_bytes -= buffer_strlen(last_buffer->buffer);
     }
 
-    simple_connector_data->last_buffer->buffer = buffer;
-    instance->buffer = buffer = simple_connector_buffer;
+    // swap buffers
+    BUFFER *tmp_buffer = last_buffer->buffer;
+    last_buffer->buffer = instance_buffer;
+    instance->buffer = instance_buffer = tmp_buffer;
 
-    buffer_flush(buffer);
+    buffer_flush(instance_buffer);
 
-    BUFFER *header = simple_connector_data->last_buffer->header;
+    BUFFER *header = last_buffer->header;
     if (header) {
         buffer_flush(header);
     } else {
         header = buffer_create(0);
-        simple_connector_data->last_buffer->header = header;
+        last_buffer->header = header;
     }
     if (instance->prepare_header)
         instance->prepare_header(instance);
@@ -412,9 +413,9 @@ int simple_connector_end_batch(struct instance *instance)
     stats->buffered_metrics = 0;
     simple_connector_data->total_buffered_metrics += buffered_metrics;
 
-    stats->buffered_bytes += buffer_strlen(simple_connector_buffer);
+    stats->buffered_bytes += buffer_strlen(last_buffer->buffer);
 
-    simple_connector_data->last_buffer->buffered_metrics = buffered_metrics;
+    last_buffer->buffered_metrics = buffered_metrics;
     simple_connector_data->last_buffer = simple_connector_data->last_buffer->next;
 
     return 0;
