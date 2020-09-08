@@ -268,7 +268,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     char fullfilename[FILENAME_MAX + 1];
 
     char varname[CONFIG_MAX_NAME + 1];
-    unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
+    //unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
+    unsigned long size = sizeof(RRDDIM);
 
     debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
@@ -404,12 +405,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state = mallocz(sizeof(*rd->state));
 
     rd->state->metric_uuid = sql_find_dim_uuid(st, rd->id, rd->name, multiplier, divisor, algorithm);
-    rd->state->active_count = 0;
-    rd->state->first_entry_t = LONG_MAX;
-    rd->state->last_entry_t = 0;
+//    rd->state->active_count = 0;
+//    rd->state->first_entry_t = LONG_MAX;
+//    rd->state->last_entry_t = 0;
     rd->state->db_first_entry_t = LONG_MAX;
     rd->state->db_last_entry_t = 0;
-    rd->state->gap_checked = 0;
+//    rd->state->gap_checked = 0;
+    // TODO: Get a full structure with page info from a recycled list
+    //rd->state->values = mallocz(st->entries * sizeof(storage_number));      // Allocate pointer
+    rd->state->metric_page = rrddim_init_metric_page(rd);
+    rd->state->metric_page_last = rd->state->metric_page;
 
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -521,6 +526,10 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 #endif
         }
     }
+#ifdef SQLITE_POC
+    freez(rd->state->metric_uuid);
+#endif
+    freez(rd->state);
 
     if(rd == st->dimensions)
         st->dimensions = rd->next;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "../database/sqlite/sqlite_functions.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
@@ -84,6 +85,8 @@ struct netdata_static_thread static_threads[] = {
 
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
+
+    NETDATA_PLUGIN_HOOK_SQLITE
 
 #ifdef ENABLE_ACLK
     NETDATA_ACLK_HOOK

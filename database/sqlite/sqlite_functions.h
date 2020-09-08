@@ -8,6 +8,19 @@
 //#include "../rrd.h"
 #include "../engine/global_uuid_map//global_uuid_map.h"
 
+#define NETDATA_PLUGIN_HOOK_SQLITE \
+    { \
+        .name = "SQLITE", \
+        .config_section = CONFIG_SECTION_PLUGINS, \
+        .config_name = "sqlite_stats", \
+        .enabled = 1, \
+        .thread = NULL, \
+        .init_routine = NULL, \
+        .start_routine = sqlite_stats_main \
+    },
+
+extern void *sqlite_stats_main(void *ptr);
+
 typedef struct dimension {
     uuid_t  dim_uuid;
     char dim_str[37];
@@ -28,7 +41,7 @@ extern int sql_init_database();
 extern int sql_close_database();
 extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
                         collected_number divisor, int algorithm);
-extern int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_list, int *, int *);
+    extern int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_list, int *, int *);
 extern int sql_dimension_archive(uuid_t *dim_uuid, int archive);
 extern int sql_dimension_options(uuid_t *dim_uuid, char *options);
 extern RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp);
@@ -74,6 +87,8 @@ extern time_t rrddim_sql_query_oldest_time(RRDDIM *rd);
 extern time_t sql_rrdset_first_entry_t(RRDSET *st, time_t *first, time_t *last);
 extern time_t sql_rrdset_last_entry_t(RRDSET *st);
 extern time_t sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last);
+
+extern struct rrddim_metric_page *rrddim_init_metric_page(RRDDIM *rd);
 
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -271,6 +271,11 @@ void rrdset_reset(RRDSET *st) {
             rrdeng_store_metric_flush_current_page(rd);
         }
 #endif
+
+#ifdef SQLITE_POC
+        info("Flushing metrics for %s due to CHART %s reset", rd->id, st->id);
+        rrddim_sql_collect_finalize(rd);
+#endif
     }
 }
 
@@ -376,6 +381,9 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_title);
     freez(st->state->old_family);
     freez(st->state->old_context);
+#ifdef SQLITE_POC
+    freez(st->chart_uuid);
+#endif
     freez(st->state);
 
     switch(st->rrd_memory_mode) {
@@ -732,6 +740,10 @@ RRDSET *rrdset_create_custom(
     }
     int enabled = config_get_boolean(config_section, "enabled", 1);
     if(!enabled) entries = 5;
+
+#ifdef SQLITE_POC
+    //entries = 30;
+#endif
 
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
@@ -1183,6 +1195,7 @@ static inline size_t rrdset_done_interpolate(
 
     size_t counter = st->counter;
     long current_entry = st->current_entry;
+    st->state->transaction = 0;
 
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
 
@@ -1279,39 +1292,12 @@ static inline size_t rrdset_done_interpolate(
                     }
                     break;
             }
-            // SQLITE: If we are about to store in position 0 and it's not the first one, we need to flush the metrics first
+            // SQLITE: If we are about to store in position 0 flush the metrics first
             if (st->current_entry == 0) {
-                if (rd->state->active_count) {
-                    info("Flushing chart %s (%s)", st->id, rd->id);
-                    rrddim_sql_collect_finalize(rd);
+                if (rd->state->metric_page->active_count) {
+                    //info("Flushing chart %s (%s)", st->id, rd->id);
+                    rrddim_sql_flush_metrics(rd);
                 }
-//                else {
-//                    info("Checking %s (%s) for gap filling", st->id, rd->id);
-//                    if (rd->state->db_last_entry_t < rd->state->first_entry_t - 1) {
-//                        info("Adding gap for %s (%s) %d - %d",  st->id, rd->id, rd->state->db_last_entry_t + 1, rd->state->first_entry_t - 1);
-//                        sql_add_metric_page(
-//                            rd->state->metric_uuid, NULL, 0, rd->state->db_last_entry_t + 1,
-//                            rd->state->first_entry_t - 1);
-//                        rd->state->db_last_entry_t = rd->state->first_entry_t - 1;
-//                    }
-//                }
-
-//                if (st->counter >= st->entries) {
-//                    rrddim_sql_collect_finalize(rd);
-//                    update_last_entry = rrddim_last_entry_t(rd);
-//                }
-//                else {
-//                    if (rd->rrdset->state->last_entry_t &&
-//                        rd->rrdset->state->last_entry_t <
-//                            rrddim_first_entry_t(rd)) { //} && rd->rrdset->state->last_entry_t !=0) {
-//                        info("Adding gap for %d - %d", rd->rrdset->state->last_entry_t, rrddim_first_entry_t(rd));
-//                        sql_add_metric_page(
-//                            rd->state->metric_uuid, NULL, 0, rd->rrdset->state->last_entry_t + 1,
-//                            rrddim_first_entry_t(rd) - 1);
-//                        //rd->rrdset->state->last_entry_t = rrddim_first_entry_t(rd);
-//                        update_last_entry = rrddim_last_entry_t(rd);
-//                    }
-//                }
             }
 
             if(unlikely(!store_this_entry)) {
@@ -1387,11 +1373,6 @@ static inline size_t rrdset_done_interpolate(
 
         st->counter = ++counter;
         st->current_entry = current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
-
-        if (current_entry == 0) {
-            info("SQLITE: Need to flush metrics for chart %s", st->id);
-            //sql_add_metric_page(rd->state->metric_uuid, rd->values, rd->rrdset->current_entry, rrddim_first_entry_t(rd),  rrddim_last_entry_t(rd) - 1);
-        }
 
         st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = 0;

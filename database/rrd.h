@@ -324,6 +324,17 @@ struct rrddim_query_handle {
     };
 };
 
+struct rrddim_metric_page {
+    RRDDIM *rd;
+    uint8_t stored;
+    time_t first_entry_t;               // First entry in active_page
+    time_t last_entry_t;                // Last entry in the active_page
+    size_t entries;                     // Total entries allocated in *values;
+    size_t active_count;                // Total entries stored
+    storage_number *values;             // Actual metrics go here
+    struct rrddim_metric_page *next;    // This is used in the sqlite flushing
+    struct rrddim_metric_page *prev;    // This is used during queries
+};
 
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
@@ -336,12 +347,13 @@ struct rrddim_volatile {
 #endif
 #ifdef SQLITE_POC
     uuid_t *metric_uuid;
+    uint8_t gap_checked;
     time_t db_first_entry_t;       // First entry in the SQLite database
     time_t db_last_entry_t;        // Last entry in the SQLite database (inclusive)
-    time_t first_entry_t;          // First entry in active_page
-    time_t last_entry_t;           // Last entry in the active_page
-    size_t active_count;
-    uint8_t gap_checked;
+    struct rrddim_metric_page *metric_page_last;
+    struct rrddim_metric_page *metric_page;
+//    size_t active_count;
+//    storage_number *values;        // Store the values here
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
@@ -390,6 +402,7 @@ struct rrdset_volatile {
     int to;
     time_t first_entry_t;       // First entry in SQLite database (init LONG_MAX)
     time_t last_entry_t;        // Last entry in SQLite database (init 0)
+    int transaction;
 };
 
 // ----------------------------------------------------------------------------

@@ -38,8 +38,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t)rrdset_first_entry_t(r->st)
-                   , kq, kq, (uint32_t)rrdset_last_entry_t(r->st)
+                   , kq, kq, /*(uint32_t)rrdset_first_entry_t(r->st)*/  r->st->state->first_entry_t
+                   , kq, kq, /*(uint32_t)rrdset_last_entry_t(r->st)*/   r->st->state->last_entry_t
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq);
