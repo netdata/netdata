@@ -890,7 +890,7 @@ send_pushover() {
 				info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+				error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -926,7 +926,7 @@ EOF
 				info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+				error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -950,7 +950,7 @@ send_kafka() {
 			info "sent kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}' with HTTP error code ${httpcode}."
+			error "failed to send kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}' with HTTP response status code ${httpcode}."
 		fi
 
 		[ ${sent} -gt 0 ] && return 0
@@ -1007,7 +1007,7 @@ EOF
 				info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+				error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1036,7 +1036,7 @@ send_twilio() {
 				info "sent Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+				error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1085,7 +1085,7 @@ send_hipchat() {
 				info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}' with HTTP error code ${httpcode}."
+				error "failed to send HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1115,7 +1115,7 @@ send_messagebird() {
 				info "sent Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+				error "failed to send Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1142,7 +1142,7 @@ send_kavenegar() {
 				info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+				error "failed to send Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1182,7 +1182,7 @@ send_telegram() {
 			elif [ "${httpcode}" = "401" ]; then
 				error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
 			else
-				error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
+				error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1241,7 +1241,7 @@ EOF
 			info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+			error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1315,7 +1315,7 @@ EOF
 			info "sent slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}"
 			sent=$((sent + 1))
 		else
-			error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}, with HTTP error code ${httpcode}."
+			error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}, with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1378,7 +1378,7 @@ EOF
 			info "sent rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+			error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1450,7 +1450,7 @@ EOF
 		elif [ "${httpcode}" = "202" ]; then
 			info "suppressed alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
 		else
-			error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+			error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1503,7 +1503,7 @@ send_flock() {
 			info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+			error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1565,7 +1565,7 @@ EOF
 			info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+			error "failed to send discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1594,7 +1594,7 @@ send_fleep() {
 				info "sent fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP error code ${httpcode}."
+				error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP response status code ${httpcode}."
 			fi
 		done
 
@@ -1751,7 +1751,7 @@ EOF
 			info "sent Matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send Matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
+			error "failed to send Matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP response status code ${httpcode}."
 		fi
 	done
 
@@ -1959,7 +1959,7 @@ EOF
 				info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
+				error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP response status code ${httpcode}."
 			fi
 		fi
 	done
