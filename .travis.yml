@@ -39,8 +39,12 @@ install:
 # Setup notification system
 #
 notifications:
-  webhooks: https://app.fossa.io/hooks/travisci
-
+  webhooks:
+    urls:
+      - https://app.fossa.io/hooks/travisci
+    if: branch = master
+  slack:
+    if: branch = master
 
 # Define the stage sequence and conditionals
 #
@@ -182,6 +186,7 @@ jobs:
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata DEB package build check failed."
 
     - name: RPM package test
       if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
@@ -203,6 +208,7 @@ jobs:
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata RPM package build check failed."
 
     - stage: Support activities on main branch
       name: Generate changelog for release (only on special and tagged commit msg)
