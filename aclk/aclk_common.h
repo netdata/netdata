@@ -7,6 +7,24 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
+// minimum and maximum supported version of ACLK
+// in this version of agent
+#define ACLK_VERSION_MIN 1
+#define ACLK_VERSION_MAX 1
+
+// Version negotiation messages have they own versioning
+// this is also used for LWT message as we set that up
+// before version negotiation
+#define ACLK_VERSION_NEG_VERSION 1
+
+// Maximum time to wait for version negotiation before aborting
+// and defaulting to oldest supported version
+#define VERSION_NEG_TIMEOUT 3
+
+#if ACLK_VERSION_MIN > ACLK_VERSION_MAX
+#error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
+#endif
+
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
     ACLK_CMD_ONCONNECT,
@@ -31,6 +49,11 @@ extern struct aclk_shared_state {
     ACLK_METADATA_STATE metadata_submitted;
     ACLK_AGENT_STATE agent_state;
     time_t last_popcorn_interrupt;
+
+    // read only while ACLK connected
+    // protect by lock otherwise
+    int version_neg;
+    usec_t version_neg_wait_till;
 } aclk_shared_state;
 
 typedef enum aclk_proxy_type {
@@ -52,5 +75,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
 int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
+
+extern int aclk_disable_runtime;
 
 #endif //ACLK_COMMON_H

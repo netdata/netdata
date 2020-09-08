@@ -7,7 +7,6 @@
 #include "mqtt.h"
 #include "aclk_common.h"
 
-#define ACLK_VERSION 1
 #define ACLK_THREAD_NAME "ACLK_Query"
 #define ACLK_CHART_TOPIC "outbound/meta"
 #define ACLK_ALARMS_TOPIC "outbound/alarms"
@@ -35,6 +34,8 @@ struct aclk_request {
     char *callback_topic;
     char *payload;
     int version;
+    int min_version;
+    int max_version;
 };
 
 typedef enum aclk_init_action { ACLK_INIT, ACLK_REINIT } ACLK_INIT_ACTION;
@@ -72,8 +73,8 @@ char *create_publish_base_topic();
 int aclk_send_single_chart(char *host, char *chart);
 int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
-void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us);
-int aclk_handle_cloud_request(char *payload);
+void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us, int version);
+int aclk_handle_cloud_message(char *payload);
 void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void aclk_alarm_reload();

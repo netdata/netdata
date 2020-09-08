@@ -348,7 +348,7 @@ static int aclk_execute_query(struct aclk_query *this_query)
         buffer_flush(local_buffer);
         local_buffer->contenttype = CT_APPLICATION_JSON;
 
-        aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0);
+        aclk_create_header(local_buffer, "http", this_query->msg_id, 0, 0, aclk_shared_state.version_neg);
         buffer_strcat(local_buffer, ",\n\t\"payload\": ");
         char *encoded_response = aclk_encode_response(w->response.data->buffer, w->response.data->len, 0);
         char *encoded_header = aclk_encode_response(w->response.header_output->buffer, w->response.header_output->len, 1);
@@ -537,16 +537,31 @@ void *aclk_query_main_thread(void *ptr)
     }
 
     while (!netdata_exit) {
+        if(aclk_disable_runtime) {
+            sleep(1);
+            continue;
+        }
         ACLK_SHARED_STATE_LOCK;
-        if (unlikely(!aclk_shared_state.metadata_submitted)) {
-            ACLK_SHARED_STATE_UNLOCK;
+        if (unlikely(!aclk_shared_state.version_neg)) {
+            if (!aclk_shared_state.version_neg_wait_till || aclk_shared_state.version_neg_wait_till > now_monotonic_usec()) {
+                ACLK_SHARED_STATE_UNLOCK;
+                info("Waiting for ACLK Version Negotiation message from Cloud");
+                sleep(1);
+                continue;
+            }
+            errno = 0;
+            error("ACLK version negotiation failed. No reply to \"hello\" with \"version\" from cloud in time of %ds."
+                " Reverting to default ACLK version of %d.", VERSION_NEG_TIMEOUT, ACLK_VERSION_MIN);
+            aclk_shared_state.version_neg = ACLK_VERSION_MIN;
+        }
+        if (unlikely(aclk_shared_state.metadata_submitted == ACLK_METADATA_REQUIRED)) {
             if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
+                ACLK_SHARED_STATE_UNLOCK;
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
                 sleep(1);
                 continue;
             }
-            ACLK_SHARED_STATE_LOCK;
             aclk_shared_state.metadata_submitted = ACLK_METADATA_CMD_QUEUED;
         }
         ACLK_SHARED_STATE_UNLOCK;

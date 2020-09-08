@@ -4,10 +4,14 @@
 
 netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 
+int aclk_disable_runtime = 0;
+
 struct aclk_shared_state aclk_shared_state = {
     .metadata_submitted = ACLK_METADATA_REQUIRED,
     .agent_state = AGENT_INITIALIZING,
-    .last_popcorn_interrupt = 0
+    .last_popcorn_interrupt = 0,
+    .version_neg = 0,
+    .version_neg_wait_till = 0
 };
 
 struct {
