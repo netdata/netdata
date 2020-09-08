@@ -333,8 +333,10 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
-    sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
-    sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
+    //sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
+    //sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
+    sqlite3_create_function(db, "u2h", 1, SQLITE_ANY , 0, _uuid_parse, 0, 0);
+    sqlite3_create_function(db, "h2u", 1, SQLITE_ANY , 0, _uuid_unparse, 0, 0);
     sqlite3_create_function(db, "uncompress", 1, SQLITE_ANY , 0, _uncompress, 0, 0);
 
     return rc;
