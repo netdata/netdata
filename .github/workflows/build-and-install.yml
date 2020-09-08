@@ -200,8 +200,7 @@ jobs:
         env:
           RUNCMD: >-
             ./build-kinesis.sh &&
-            ./netdata-installer.sh \--dont-wait --dont-start-it \
-            --enable-backend-kinesis
+            ./netdata-installer.sh --dont-wait --dont-start-it --enable-backend-kinesis
         run: |
           docker run -w /netdata test \
             /bin/sh -c $RUNCMD
