@@ -238,6 +238,20 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
+    rc = sqlite3_exec(db, "create index if not exists ind_dim1 on dimension (chart_uuid, id, name);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, "create index if not exists ind_cha1 on chart (host_uuid, id, name);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
     rc = sqlite3_exec(db, "create index if not exists ind_host_uuid on chart (host_uuid);", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
