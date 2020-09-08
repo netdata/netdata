@@ -56,7 +56,10 @@ static int aclk_handle_cloud_request_v1(struct aclk_request *cloud_to_agent, cha
 
     errno = 0;
     if (unlikely(cloud_to_agent->version != 1)) {
-        error("Received \"http\" message from Cloud with version %d, but ACLK version %d is used", cloud_to_agent->version, aclk_shared_state.version_neg);
+        error(
+            "Received \"http\" message from Cloud with version %d, but ACLK version %d is used",
+            cloud_to_agent->version,
+            aclk_shared_state.version_neg);
         return 1;
     }
 
@@ -88,17 +91,20 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
     char *data;
 
     errno = 0;
-    if(cloud_to_agent->version < ACLK_V_COMPRESSION) {
-        error("This handler cannot reply to request with version older than %d, received %d.", ACLK_V_COMPRESSION, cloud_to_agent->version);
+    if (cloud_to_agent->version < ACLK_V_COMPRESSION) {
+        error(
+            "This handler cannot reply to request with version older than %d, received %d.",
+            ACLK_V_COMPRESSION,
+            cloud_to_agent->version);
         return 1;
     }
 
-    if(unlikely(aclk_extract_v2_data(raw_payload, &data))) {
+    if (unlikely(aclk_extract_v2_data(raw_payload, &data))) {
         error("Error extracting payload expected after the JSON dictionary.");
         return 1;
     }
 
-    if(unlikely(aclk_v2_payload_get_query(data, cloud_to_agent)))
+    if (unlikely(aclk_v2_payload_get_query(data, cloud_to_agent)))
         return 1;
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
@@ -114,7 +120,9 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
     }
 
     // aclk_queue_query takes ownership of data pointer
-    if (unlikely(aclk_queue_query(cloud_to_agent->callback_topic, data, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0, ACLK_CMD_CLOUD_QUERY_2)))
+    if (unlikely(aclk_queue_query(
+            cloud_to_agent->callback_topic, data, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0,
+            ACLK_CMD_CLOUD_QUERY_2)))
         debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
 
     UNUSED(cloud_to_agent);
@@ -129,31 +137,42 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent, cha
     int version = -1;
     errno = 0;
 
-    if(unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
-        error("Unsuported version of \"version\" message from cloud. Expected %d, Got %d", ACLK_VERSION_NEG_VERSION, cloud_to_agent->version);
+    if (unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
+        error(
+            "Unsuported version of \"version\" message from cloud. Expected %d, Got %d",
+            ACLK_VERSION_NEG_VERSION,
+            cloud_to_agent->version);
         return 1;
     }
-    if(unlikely(!cloud_to_agent->min_version)) {
+    if (unlikely(!cloud_to_agent->min_version)) {
         error("Min version missing or 0");
         return 1;
     }
-    if(unlikely(!cloud_to_agent->max_version)) {
+    if (unlikely(!cloud_to_agent->max_version)) {
         error("Max version missing or 0");
         return 1;
     }
-    if(unlikely(cloud_to_agent->max_version < cloud_to_agent->min_version)) {
-        error("Max version (%d) must be >= than min version (%d)", cloud_to_agent->max_version, cloud_to_agent->min_version);
+    if (unlikely(cloud_to_agent->max_version < cloud_to_agent->min_version)) {
+        error(
+            "Max version (%d) must be >= than min version (%d)", cloud_to_agent->max_version,
+            cloud_to_agent->min_version);
         return 1;
     }
 
-    if(unlikely(cloud_to_agent->min_version > ACLK_VERSION_MAX)) {
-        error("Agent too old for this cloud. Minimum version required by cloud %d. Maximum version supported by this agent %d.", cloud_to_agent->min_version, ACLK_VERSION_MAX);
+    if (unlikely(cloud_to_agent->min_version > ACLK_VERSION_MAX)) {
+        error(
+            "Agent too old for this cloud. Minimum version required by cloud %d."
+            " Maximum version supported by this agent %d.",
+            cloud_to_agent->min_version, ACLK_VERSION_MAX);
         aclk_kill_link = 1;
         aclk_disable_runtime = 1;
         return 1;
     }
-    if(unlikely(cloud_to_agent->max_version < ACLK_VERSION_MIN)) {
-        error("Cloud version is too old for this agent. Maximum version supported by cloud %d. Minimum (oldest) version supported by this agent %d.", cloud_to_agent->max_version, ACLK_VERSION_MIN);
+    if (unlikely(cloud_to_agent->max_version < ACLK_VERSION_MIN)) {
+        error(
+            "Cloud version is too old for this agent. Maximum version supported by cloud %d."
+            " Minimum (oldest) version supported by this agent %d.",
+            cloud_to_agent->max_version, ACLK_VERSION_MIN);
         aclk_kill_link = 1;
         return 1;
     }
