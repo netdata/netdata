@@ -39,8 +39,12 @@ install:
 # Setup notification system
 #
 notifications:
-  webhooks: https://app.fossa.io/hooks/travisci
-
+  webhooks:
+    urls:
+      - https://app.fossa.io/hooks/travisci
+    if: branch = master
+  slack:
+    if: branch = master
 
 # Define the stage sequence and conditionals
 #
