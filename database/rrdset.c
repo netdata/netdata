@@ -1535,6 +1535,7 @@ void rrdset_done(RRDSET *st) {
     last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
+    // TODO: SQLite Check/Fix this
     if(unlikely(!st->counter_done)) {
         // if we have not collected metrics this session (st->counter_done == 0)
         // and we have collected metrics for this chart in the past (st->counter != 0)

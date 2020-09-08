@@ -567,10 +567,12 @@ static inline void do_dimension_fixedstep(
         // read the value from the database
         //storage_number n = rd->values[slot];
 #ifdef NETDATA_INTERNAL_CHECKS
+#ifndef SQLITE_POC
         if ((rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
             (rrdset_time2slot(st, now) != (long unsigned)handle.slotted.slot)) {
             error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)handle.slotted.slot, rrdset_time2slot(st, now));
         }
+#endif
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
         //info("Query %s -- step %d (%d - %d)", handle.rd->id, handle.slotted.slot, handle.slotted.last_slot);
