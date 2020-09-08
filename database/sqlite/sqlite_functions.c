@@ -203,7 +203,7 @@ int sql_init_database()
     int rc = sqlite3_open(sqlite_database, &db);
     info("SQLite Database initialized at %s (rc = %d)", sqlite_database, rc);
 
-    rc = sqlite3_exec(db, "PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=33554432; PRAGMA cache_size=-2000; PRAGMA temp_store=MEMORY;", 0, 0, &err_msg);
+    rc = sqlite3_exec(db, "PRAGMA synchronous=0 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=33554432; PRAGMA cache_size=-2000; PRAGMA temp_store=MEMORY;", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
