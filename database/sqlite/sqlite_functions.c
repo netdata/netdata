@@ -2017,7 +2017,8 @@ void *sqlite_stats_main(void *ptr) {
         rrdset_done(st2);
 
         count++;
-        sqlite_flush_page(32);
+        for (int c=0; c < 120; c++)
+            sqlite_flush_page(32);
     }
 
     netdata_thread_cleanup_pop(1);
