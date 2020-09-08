@@ -803,13 +803,13 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multi
     uuid_t *uuid = NULL;
     int rc;
 
-    netdata_mutex_lock(&sqlite_find_uuid);
+    //netdata_mutex_lock(&sqlite_find_uuid);
     if (!res) {
         rc = sqlite3_prepare_v2(
             db, "select dim_uuid from dimension where chart_uuid = @chart and id = @id and name = @name;", -1, &res, 0);
         if (rc != SQLITE_OK) {
             info("SQLITE: failed to prepare statement to lookup dimension GUID");
-            netdata_mutex_unlock(&sqlite_find_uuid);
+            //netdata_mutex_unlock(&sqlite_find_uuid);
             return NULL;
         }
     }
@@ -857,7 +857,7 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multi
         sqlite3_reset(res1);
         sqlite3_finalize(res1);
     }
-    netdata_mutex_unlock(&sqlite_find_uuid);
+   // netdata_mutex_unlock(&sqlite_find_uuid);
 
     return uuid;
 }
@@ -871,14 +871,14 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *typ
     uuid_t *uuid = NULL;
     int rc;
 
-    netdata_mutex_lock(&sqlite_find_uuid);
+    //netdata_mutex_lock(&sqlite_find_uuid);
 
     if (!res) {
         rc = sqlite3_prepare_v2(
             db, "select chart_uuid from chart where host_uuid = @host and id = @id and name = @name;", -1, &res, 0);
         if (rc != SQLITE_OK) {
             info("SQLITE: failed to bind to find GUID");
-            netdata_mutex_unlock(&sqlite_find_uuid);
+            //netdata_mutex_unlock(&sqlite_find_uuid);
             return NULL;
         }
     }
@@ -927,7 +927,7 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *typ
         sqlite3_reset(res1);
         sqlite3_finalize(res1);
     }
-    netdata_mutex_unlock(&sqlite_find_uuid);
+    //netdata_mutex_unlock(&sqlite_find_uuid);
     return uuid;
 }
 
