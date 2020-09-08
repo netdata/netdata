@@ -284,9 +284,13 @@ void mongodb_connector_worker(void *instance_p)
         struct stats *stats = &instance->stats;
 
         uv_mutex_lock(&instance->mutex);
-        while (!instance->data_is_ready)
-            uv_cond_wait(&instance->cond_var, &instance->mutex);
-        instance->data_is_ready = 0;
+        if (!connector_specific_data->first_buffer->insert ||
+            !connector_specific_data->first_buffer->documents_inserted) {
+            while (!instance->data_is_ready)
+                uv_cond_wait(&instance->cond_var, &instance->mutex);
+            instance->data_is_ready = 0;
+        }
+
 
         if (unlikely(instance->engine->exit)) {
             uv_mutex_unlock(&instance->mutex);
