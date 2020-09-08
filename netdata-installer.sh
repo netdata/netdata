@@ -48,13 +48,13 @@ _cannot_use_tmpdir() {
   testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
   ret=0
 
-  if [ -z "${testfile}" ] ; then
+  if [ -z "${testfile}" ]; then
     return "${ret}"
   fi
 
-  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
-    if chmod +x "${testfile}" ; then
-      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}"; then
+    if chmod +x "${testfile}"; then
+      if [ "$("${testfile}")" = "SUCCESS" ]; then
         ret=1
       fi
     fi
@@ -64,9 +64,9 @@ _cannot_use_tmpdir() {
   return "${ret}"
 }
 
-if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
-  if _cannot_use_tmpdir /tmp ; then
-    if _cannot_use_tmpdir "${PWD}" ; then
+if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
+  if _cannot_use_tmpdir /tmp; then
+    if _cannot_use_tmpdir "${PWD}"; then
       echo >&2
       echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
       exit 1
@@ -684,14 +684,14 @@ build_judy() {
   fi
 
   pushd "${1}" > /dev/null || return 1
-  if run ${env_cmd} libtoolize --force --copy && \
-     run ${env_cmd} aclocal && \
-     run ${env_cmd} autoheader && \
-     run ${env_cmd} automake --add-missing --force --copy --include-deps && \
-     run ${env_cmd} autoconf && \
-     run ${env_cmd} ./configure && \
-     run ${env_cmd} make -C src && \
-     run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o ; then
+  if run ${env_cmd} libtoolize --force --copy &&
+    run ${env_cmd} aclocal &&
+    run ${env_cmd} autoheader &&
+    run ${env_cmd} automake --add-missing --force --copy --include-deps &&
+    run ${env_cmd} autoconf &&
+    run ${env_cmd} ./configure &&
+    run ${env_cmd} make -C src &&
+    run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
     popd > /dev/null || return 1
   else
     popd > /dev/null || return 1
@@ -711,11 +711,11 @@ copy_judy() {
 bundle_judy() {
   # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
   # shellcheck disable=SC2235
-  if [ -n "${NETDATA_DISABLE_DBENGINE}" ] || ( [ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ] ); then
+  if [ -n "${NETDATA_DISABLE_DBENGINE}" ] || ([ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ]); then
     return 0
-  elif [ -n "${NETDATA_BUILD_JUDY}" ] ; then
+  elif [ -n "${NETDATA_BUILD_JUDY}" ]; then
     progress "User requested bundling of libJudy, building it now"
-  elif [ ! -e /usr/include/Judy.h ] ; then
+  elif [ ! -e /usr/include/Judy.h ]; then
     progress "/usr/include/Judy.h does not exist, but we need libJudy, building our own copy"
   fi
 
@@ -736,7 +736,7 @@ bundle_judy() {
       copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libJudy built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-libjudy=externaldeps/libJudy"
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-libJudy=externaldeps/libJudy"
     else
       run_failed "Failed to build libJudy."
       if [ -n "${NETDATA_BUILD_JUDY}" ]; then
