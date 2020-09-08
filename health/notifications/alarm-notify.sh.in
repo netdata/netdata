@@ -2039,11 +2039,20 @@ send_stackpulse() {
   {
     "Node" : "${host}",
     "Chart" : "${chart}",
+    "OldValue" : ${old_value},
     "Value" : ${value},
+    "Units" : "${units}",
+    "OldStatus" : "${old_value}",
     "Status" : "${status}",
     "Alarm" : "${name}",
     "Date": ${when},
-    "Description" : "${status_message}, ${info}"
+    "Duration": ${duration},
+    "NonClearDuration": ${non_clear_duration},
+    "Description" : "${status_message}, ${info}",
+    "CalcExpression" : "${calc_expression}",
+    "CalcParamValues" : "${calc_param_values}",
+    "TotalWarnings" : "${total_warnings}",
+    "TotalCritical" : "${total_critical}",
     "ID" : ${alarm_id}
   }
 EOF
@@ -2053,7 +2062,7 @@ EOF
   if [ "${httpcode}" = "200" ]; then
     info "sent stackpulse notification for: ${host} ${chart}.${name} is ${status}"
   else
-    error "failed to send stackpulse notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
+    error "failed to send stackpulse notification for: ${host} ${chart}.${name} is ${status}, with HTTP response status code ${httpcode}."
   fi
 
   return 0
