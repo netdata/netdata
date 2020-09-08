@@ -6,7 +6,9 @@
 
 #include "../../daemon/common.h"
 //#include "../rrd.h"
+#ifdef ENABLE_DBENGINE
 #include "../engine/global_uuid_map//global_uuid_map.h"
+#endif
 
 #define NETDATA_PLUGIN_HOOK_SQLITE \
     { \
@@ -67,7 +69,9 @@ extern void sql_store_page_info(uuid_t temp_id, int valid_page, int page_length,
 //extern void sql_add_metric_page_from_extent(struct rrdeng_page_descr *descr);
 extern struct sqlite3_blob *sql_open_metric_blob(uuid_t *dim_uuid);
 
+#ifdef ENABLE_DBENGINE
 GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size);
+#endif
 extern int sql_store_host(char *guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone, char *tags);
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb, size_t *dimensions_count, size_t *memory_used);
 

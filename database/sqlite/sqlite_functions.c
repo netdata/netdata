@@ -1438,6 +1438,7 @@ time_t sql_rrdset_last_entry_t(RRDSET *st)
     return tim;
 }
 
+#ifdef ENABLE_DBENGINE
 GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size)
 {
     static sqlite3_stmt *res = NULL;
@@ -1505,6 +1506,7 @@ GUID_TYPE sql_add_dimension_guid(uuid_t *uuid, uuid_t *chart)
     sqlite3_reset(res);
     return guid_type;
 }
+#endif
 
 #define SELECT_CHART "select chart_uuid, id, name, type, family, context, title, priority, plugin, module, unit, chart_type, update_every from chart where host_uuid = @host_uuid and chart_uuid not in (select chart_uuid from chart_active) order by chart_uuid asc;"
 //#define SELECT_DIMENSION "select d.chart_uuid, d.id, d.name, d.multiplier, d.divisor, d.algorithm from chart c, dimension d where c.host_uuid = @host_uuid and c.chart_uuid = d.chart_uuid order by c.chart_uuid asc;"
