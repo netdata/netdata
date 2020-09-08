@@ -203,4 +203,4 @@ jobs:
             ./netdata-installer.sh --dont-wait --dont-start-it --enable-backend-kinesis
         run: |
           docker run -w /netdata test \
-            /bin/sh -c $RUNCMD
+            /bin/sh -c "$RUNCMD"
