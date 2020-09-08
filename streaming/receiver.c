@@ -127,15 +127,15 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
             return PARSER_RC_OK;
         }
     }
-
-    if (st->state->window_start < st->last_updated.tv_sec + st->update_every) {
+    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+    if (st->state->window_start < expected_t) {
         debug(D_REPLICATION, "Ignoring stale replication on %s block %ld-%ld, last_updated=%ld",
               st->name, (long)st->state->window_start, (long)st->state->window_end,
               st->last_updated.tv_sec);
         st->state->ignore_block = 1;
         return PARSER_RC_OK;
     }
-    time_t expected_t = st->last_updated.tv_sec + st->update_every;
+
     if (st->state->window_start > expected_t) {
         time_t gap_end   = st->state->window_end;
         time_t gap_points = (gap_end - expected_t) / st->update_every;
@@ -146,19 +146,22 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
             // TODO - put a test scenario in to capture this, triggers a problem in the dbengine
             debug(D_REPLICATION, "Gap detected on %s: expected %ld, block %ld-%ld. Exceeds max_gap %u, ignoring...",
                   st->name, (long)expected_t, (long)st->state->window_start, (long)st->state->window_end, rpt->max_gap);
-            skip_gap(st, expected_t, st->state->window_end - st->update_every);
+            skip_gap(st, expected_t, gap_first - st->update_every);
         } else {
-            if (gap_first > expected_t)
-                skip_gap(st, expected_t, gap_first - st->update_every);
             debug(D_REPLICATION, "Gap detected on %s: expected %ld, block %ld-%ld. Requesting %ld-%ld",
                   st->name, (long)expected_t, (long)st->state->window_start, (long)st->state->window_end,
                   (long)gap_first, (long)gap_end);
+            if (gap_first > expected_t)
+                skip_gap(st, expected_t, gap_first - st->update_every);
             send_replication_req(user->host, st->id, gap_first, gap_end);
             st->state->ignore_block = 1;
             return PARSER_RC_OK;
         }
     }
-    user->st->last_updated.tv_sec = user->st->state->window_first;
+    else
+        if (st->state->window_first > st->state->window_start)
+            skip_gap(st, st->state->window_start, st->state->window_first - st->update_every);
+
     user->st->state->ignore_block = 0;
     debug(D_REPLICATION, "Replication on %s @ %ld, block %ld-%ld last_update=%ld", st->name, now,
                          user->st->state->window_start, user->st->state->window_end, st->last_updated.tv_sec);
