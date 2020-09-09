@@ -14,7 +14,7 @@ a single pane of glass.
 ## Invite new members
 
 Invite new users by clicking on your Space's name in the top navigation, and then **Invite more users**, to open the
-invitation pane.
+invitation pane. Admins manage user permissions and have control over who can access specific Spaces and War Rooms.
 
 ![Opening and navigating the invitation
 panel](https://user-images.githubusercontent.com/1153921/92025596-a618e680-ed14-11ea-9c1f-a61fdcb8aa4e.png)
@@ -27,7 +27,7 @@ Choose which War Rooms you want to add this user to, then click the plus **+** b
 When you're ready to send the new invitations you created, hit the **Send** button. Netdata Cloud sends these
 invitations and moves them to the **Invitations awaiting response** category.
 
-Your team will receive their invitations momentarily and prompt them to sign in to join your Space.
+Your team will receive their email invitations momentarily with a prompt to sign in to join your Space.
 
 ## Collaboration with Netdata Cloud
 
@@ -41,7 +41,8 @@ additional charts/text.
 
 Let's say you get an alert from your nodes about an excess of 500-type errors in your Nginx logs. Your team can hop on a
 Slack call to begin working together. While one engineer handles creating a new dashboard with a half-dozen relevant
-Nginx log metrics, another can dive into the real-time node dashboard investigate correlated charts in granular detail.
+Nginx log metrics, another can dive into the real-time node dashboard and investigate correlated charts in granular
+detail.
 
 ## What's next?
 
@@ -51,6 +52,7 @@ Cloud in our [FAQ](https://learn.netdata.cloud/docs/cloud/faq-glossary).
 
 Next, we recommend you learn the [basics of node configuration](/docs/configure/nodes.md). While the Netdata Agent is
 proudly zero-configuration in most cases, you should understand how to tweak its settings to give you the best Netdata,
-for example, to increase metrics retention and improve security.
+for example, to [increase metrics retention](/docs/store/change-metrics-retention.md) and [improve
+security](/docs/configure/secure-nodes.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Finvite-collaborate&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
