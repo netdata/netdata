@@ -416,6 +416,28 @@ if [ "${use_fqdn}" = "YES" ] && [ "${host}" = "$(hostname -s 2>/dev/null)" ]; th
 	host="$(hostname -f 2>/dev/null)"
 fi
 
+
+# -----------------------------------------------------------------------------
+# migrate old Microsoft Teams configuration keys after loading configuration
+
+SEND_MSTEAMS=${SEND_MSTEAM:-$SEND_MSTEAMS}
+DEFAULT_RECIPIENT_MSTEAMS=${DEFAULT_RECIPIENT_MSTEAM:-$DEFAULT_RECIPIENT_MSTEAMS}
+MSTEAMS_WEBHOOK_URL=${MSTEAM_WEBHOOK_URL:-$MSTEAMS_WEBHOOK_URL}
+MSTEAMS_ICON_DEFAULT=${MSTEAM_ICON_DEFAULT:-$MSTEAMS_ICON_DEFAULT}
+MSTEAMS_ICON_CLEAR=${MSTEAM_ICON_CLEAR:-$MSTEAMS_ICON_CLEAR}
+MSTEAMS_ICON_WARNING=${MSTEAM_ICON_WARNING:-$MSTEAMS_ICON_WARNING}
+MSTEAMS_ICON_CRITICAL=${MSTEAM_ICON_CRITICAL:-$MSTEAMS_ICON_CRITICAL}
+MSTEAMS_COLOR_DEFAULT=${MSTEAM_COLOR_DEFAULT:-$MSTEAMS_COLOR_DEFAULT}
+MSTEAMS_COLOR_CLEAR=${MSTEAM_COLOR_CLEAR:-$MSTEAMS_COLOR_CLEAR}
+MSTEAMS_COLOR_WARNING=${MSTEAM_COLOR_WARNING:-$MSTEAMS_COLOR_WARNING}
+MSTEAMS_COLOR_CRITICAL=${MSTEAM_COLOR_CRITICAL:-$MSTEAMS_COLOR_CRITICAL}
+
+# migrate role specific recipients:
+for key in "${!role_recipients_msteam[@]}"
+do
+  role_recipients_msteams["$key"]="${role_recipients_msteam["$key"]}"
+done
+
 # -----------------------------------------------------------------------------
 # filter a recipient based on alarm event severity
 
