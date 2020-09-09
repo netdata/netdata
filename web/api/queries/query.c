@@ -573,6 +573,12 @@ static inline void do_dimension_fixedstep(
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
         storage_number n = rd->state->query_ops.next_metric(&handle, &db_now);
+        if(unlikely(db_now > before_wanted)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+            r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
+#endif
+            break;
+        }
         for ( ; now <= db_now ; now += dt) {
             calculated_number value = NAN;
             if(likely(now >= db_now && does_storage_number_exist(n))) {
