@@ -1,7 +1,7 @@
 <!--
 title: "Infrastructure monitoring with Netdata"
 sidebar_label: "Infrastructure monitoring"
-description: "Build a robust, infinitely-scalable infrastructure monitoring solution with Netdata. "
+description: "Build a robust, infinitely scalable infrastructure monitoring solution with Netdata. Any number of nodes and every available metric."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/infrastructure.md
 -->
 
@@ -10,14 +10,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/
 Together, the Netdata Agent and Netdata Cloud create a powerful, infinitely-scalable infrastructure monitoring solution.
 
 The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly.
-The distributed data model lets you monitor everything at a fraction of the cost compared to centralized metrics
-databases. Netdata Cloud unifies all the metrics from these distributed nodes on customizable, interactive, and
-real-time visualizations.
+The distributed data model lets you monitor everything without a slow and troublesome centralized data lake for your
+infrastructure's metrics, reducing the resources you need to invest in metrics retention. Netdata Cloud unifies all the
+metrics from these distributed nodes on customizable, interactive, and real-time visualizations.
 
 In this quickstart guide, you'll learn how to see key metrics from all your nodes in one interface and build your first
 dashboard for aggregating like metrics from many distributed nodes. You'll then take a peek into configuring individual
-nodes, in addition to helpful pointers about collecting all the metrics from every critical application in your
-infrastructure.
+nodes and get helpful pointers about collecting all the metrics from every critical application in your infrastructure.
 
 > This quickstart assumes you've installed the Netdata Agent on more than one node in your infrastructure, and claimed
 > that node to your Space in Netdata Cloud. If you haven't yet, see the [_Get Netdata_ doc](/docs/get/README.md) for
@@ -28,7 +27,7 @@ infrastructure.
 To see all your nodes from a single pane of glass, first [sign in](https://app.netdata.cloud) to Netdata Cloud. As you
 sign in, Netdata Cloud pings each claimed node to start on-demand streaming from your nodes to your browser. When
 Netdata Cloud loads your War Room's **Nodes** view, you'll immediately see key metrics from your nodes, streamed in
-real-time, in a single interface.
+real time, in a single interface.
 
 ![Animated GIF of Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
@@ -54,7 +53,7 @@ issues by aggregating correlated charts from any number of nodes.
 
 To build your first dashboard, click on the **Nodes** dropdown, then select **+ Add**. Enter a name to assign to this
 dashboard. Click on either of the **Add chart** buttons, then select the node you want to add a chart from. Select the
-context, which are Netdata's way to organize charts, and then click **Add chart**.
+context, which os Netdata's way to organize charts, and then click **Add chart**.
 
 Once you added a few charts, you can move them around, resize them, and add text. Make sure you click the **Save**
 button before you navigate away.
@@ -83,7 +82,7 @@ After you've learned the basics, you should [secure your infrastructure's nodes]
 one of our recommended methods. These security best practices ensure no untrusted parties gain access to the metrics
 collected on any of your nodes.
 
-## Collect metrics from your system and applications
+## Collect metrics from your systems and applications
 
 Netdata has [300+ pre-installed collectors](/docs/collectors/COLLECTORS.md) that gather thousands of metrics with zero
 configuration. Collectors search each of your nodes in default locations and ports to find running applications and
@@ -105,7 +104,7 @@ collect from across your infrastructure with Netdata.
 
 ## What's next?
 
-Netdata has many features that help you monitor the health of your node and troubleshoot complex performance problems.
+Netdata has many features that help you monitor the health of your nodes and troubleshoot complex performance problems.
 Once you have a handle on configuration and are collecting all the right metrics, try out some of Netdata's other
 infrastructure-focused features:
 

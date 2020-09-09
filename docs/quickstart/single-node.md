@@ -14,13 +14,13 @@ In this quickstart guide, you'll learn how to access your single node's metrics 
 to your liking, and make sure the Netdata Agent is collecting metrics from the applications or containers you're running
 on your node.
 
-> This quickstart assumes you installed the Netdaat Agent on your node. If you haven't yet, see the [_Get Netdata_
+> This quickstart assumes you have installed the Netdata Agent on your node. If you haven't yet, see the [_Get Netdata_
 > doc](/docs/get/README.md) for details on installation. In addition, this quickstart mentions features available only
 > through Netdata Cloud, which requires you to [claim your node](/docs/get/README.md#claim-your-node-on-netdata-cloud).
 
 ## See your node's metrics
 
-To see your node's real-time metric, you need to access its dashboard. You can either view the local dashboard, which
+To see your node's real-time metrics, you need to access its dashboard. You can either view the local dashboard, which
 runs on the node itself, or see the dashboard through Netdata Cloud. Both methods feature real-time, interactive, and
 synchronized charts, with the same metrics, and use the same UI.
 
@@ -82,7 +82,7 @@ Netdata has many features that help you monitor the health of your node and trou
 Once you understand configuration, and are certain Netdata is collecting all the important metrics from your node, try
 out some of Netdata's other visualization and health monitoring features:
 
--   [Build new dashboards](/docs/visualize/create-dashboards.md) to put disparate-but-relevant metrics onto a single
+-   [Build new dashboards](/docs/visualize/create-dashboards.md) to put disparate but relevant metrics onto a single
     interface.
 -   [Create new alarms](/docs/monitor/configure-alarms.md), or tweak some of the pre-configured alarms, to stay on top
     of anomalies.
