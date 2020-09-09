@@ -221,6 +221,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     ctx = handle->ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
+    uint32_t new_page_length = descr->page_length;
 
     if (descr) {
         /* Make alignment decisions */
@@ -249,10 +250,24 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             error("Attempt to store older/duplicate point in db: %llu < %llu", point_in_time, descr->end_time);
             return;
         }
+        // Respecting the API
         if (descr->page_length >= sizeof(number)*2) {
             usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number) - 1);
             if (0 != ((point_in_time - descr->end_time) % tf_spacing))
                 tf_alignment_change = 1;
+            else {
+                if (point_in_time != descr->end_time + tf_spacing) {
+                    usec_t gap_in_points = (point_in_time - descr->end_time) / tf_spacing;
+                    if (gap_in_points * sizeof(number) + descr->page_length >= RRDENG_BLOCK_SIZE)
+                        tf_alignment_change = 1;
+                    else {
+                        for (size_t i=0; i<gap_in_points-1; i++) {
+                            page[new_page_length / sizeof(number)] = SN_EMPTY_SLOT;
+                            new_page_length += sizeof(number);
+                        }
+                    }
+                }
+            }
         }
     }
     if (unlikely(NULL == descr ||
@@ -265,6 +280,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         fatal_assert(page);
 
         handle->descr = descr;
+        new_page_length = descr->page_length;
 
         handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
@@ -274,8 +290,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         }
     }
     page = descr->pg_cache_descr->page;
-    page[descr->page_length / sizeof(number)] = number;
-    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + sizeof(number));
+    page[new_page_length / sizeof(number)] = number;
+    new_page_length += sizeof(number);
+    pg_cache_atomic_set_pg_info(descr, point_in_time, new_page_length);
 
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;
