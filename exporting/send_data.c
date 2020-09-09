@@ -12,6 +12,7 @@
  * @return Always returns 0.
  */
 int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
+#if NETDATA_INTERNAL_CHECKS
     char sample[1024];
     const char *s = buffer_tostring(buffer);
     char *d = sample, *e = &sample[sizeof(sample) - 1];
@@ -23,11 +24,16 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
     }
     *d = '\0';
 
-    info(
+    debug(
+        D_BACKEND,
         "EXPORTING: received %zu bytes from %s connector instance. Ignoring them. Sample: '%s'",
         buffer_strlen(buffer),
         instance->config.name,
         sample);
+#else
+    UNUSED(instance);
+#endif /* NETDATA_INTERNAL_CHECKS */
+
     buffer_flush(buffer);
     return 0;
 }
