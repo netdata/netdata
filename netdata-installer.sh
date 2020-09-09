@@ -700,7 +700,7 @@ build_judy() {
 }
 
 copy_judy() {
-  target_dir="${PWD}/externaldeps/libjudy"
+  target_dir="${PWD}/externaldeps/libJudy"
 
   run mkdir -p "${target_dir}" || return 1
 
