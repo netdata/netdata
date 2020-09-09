@@ -1,6 +1,6 @@
 <!--
 title: "How Netdata's metrics collectors work"
-description: ""
+description: "When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately begins collecting metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/how-collectors-work.md
 -->
 
@@ -12,10 +12,10 @@ collecting per-second metrics.
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
 when you [install the Netdata Agent](/docs/get/README.md#).
 
-A collector's primary job is simple: Look at a pre- or user-defined endpoint to find exposed metrics. If the collector
-finds compatible metrics exposed on that endpoint, it begins a per-second collection job. The Netdata Agent gathers
-these metrics, sends to them to the [database engine for storage](/docs/store/change-metrics-retention.md), and
-immediately [visualizes them meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
+A collector's primary job to look for exposed metrics at a pre- or user-defined endpoint. If the collector finds
+compatible metrics exposed on that endpoint, it begins a per-second collection job. The Netdata Agent gathers these
+metrics, sends to them to the [database engine for storage](/docs/store/change-metrics-retention.md), and immediately
+[visualizes them meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
 can be a URL and port, a socket, a file, a web page, and more.
@@ -28,9 +28,38 @@ access log files on Linux systems.
 
 The endpoint is user-configurable, as are many other specifics of what a given collector does.
 
+## What can Netdata collect?
+
+To quickly find your answer, see our [list of supported collectors](/collectors/COLLECTORS.md).
+
+Generally, Netdata's collectors can be grouped into three types:
+
+-   [Systems](/docs/collect/system-metrics.md): Monitor CPU, memory, disk, networking, systemd, eBPF, and much more.
+    Every metric exposed by `/proc`, `/sys` and other Linux kernel sources.
+-   [Containers](/docs/collect/container-metrics.md): Gather metrics from container agents, like `dockerd` or `kubectl`,
+    along with the resource usage of containers and the applications they run.
+-   [Applications](/docs/collect/application-metrics.md): Collect per-second metrics from web servers, databases, logs,
+    message brokers, APM tools, email servers, and much more.
+
+## Collector architecture and terminology
+
+**Collector** is a catch-all term for any Netdata process that gathers metrics from an endpoint. 
+
+While we use collector most often in documentation, release notes, and educational content, you may encounter other
+terms related to collecting metrics.
+
+-   **Modules** are a type of collector.
+-   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
+    The Go orchestator is in active development.
+-   **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
+    processes that communicate with the Netdata daemon via pipes.
+-   **Internal plugins** gather metrics from `/proc`, `/sys` and other Linux kernel sources. They are written in `C`,
+    and run as threads within the Netdata daemon.
+
 ## What's next?
 
-[Enable or configure a collector](/docs/collect/enable-configure.md) 
+[Enable or configure a collector](/docs/collect/enable-configure.md) if the default settings are not compatible with
+your infrastructure.
 
 See our [collectors reference](/collectors/REFERENCE.md) for detailed information on Netdata's collector architecture,
 how to troubleshoot a collector, develop a custom collector, and more.
