@@ -221,7 +221,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     ctx = handle->ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
-    uint32_t new_page_length = descr->page_length;
+    uint32_t new_page_length;
 
     if (descr) {
         /* Make alignment decisions */
@@ -250,6 +250,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             error("Attempt to store older/duplicate point in db: %llu < %llu", point_in_time, descr->end_time);
             return;
         }
+        new_page_length = descr->page_length;
         // Respecting the API
         if (descr->page_length >= sizeof(number)*2) {
             usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number) - 1);
@@ -261,6 +262,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
                     if (gap_in_points * sizeof(number) + descr->page_length >= RRDENG_BLOCK_SIZE)
                         tf_alignment_change = 1;
                     else {
+                        page = descr->pg_cache_descr->page;
                         for (size_t i=0; i<gap_in_points-1; i++) {
                             page[new_page_length / sizeof(number)] = SN_EMPTY_SLOT;
                             new_page_length += sizeof(number);
