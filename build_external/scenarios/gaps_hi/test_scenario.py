@@ -229,6 +229,26 @@ def ChildLongRestart(state):
     # TODO: expect difference in charts - test validity check
     state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
 
+def ChildLongerRestart(state):
+    state.start("parent")
+    state.wait_up("parent")
+    time.sleep(4)
+    state.start("child")
+    state.wait_up("child")
+    state.wait_connected("child", "parent")
+    time.sleep(10)
+    state.kill("child")
+    time.sleep(90)
+    state.restart("child")
+    state.wait_isparent("parent")
+    time.sleep(30)
+    # pylint: disable-msg=W0622
+    state.end_checks.append( lambda: state.check_sync("child","parent") )
+    # pylint: disable-msg=W0108
+    state.post_checks.append( lambda: state.check_rep() )
+    # TODO: expect difference in charts - test validity check
+    state.nodes['parent'].parser = state.parser2    # Suppress DNS errors
+
 def ParentShortDisconnect(state):
     state.start("parent")
     state.wait_up("parent")
@@ -514,6 +534,7 @@ cases = [
     ChildDropOverParentReconnect,
     ChildLongDisconnect,
     ChildLongRestart,
+    ChildLongerRestart,
     ChildRestartDuringParentReconnect,
     ChildShortDisconnect,
     ChildShortRestart,
