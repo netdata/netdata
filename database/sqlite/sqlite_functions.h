@@ -13,7 +13,7 @@
 #define NETDATA_PLUGIN_HOOK_SQLITE \
     { \
         .name = "SQLITE", \
-        .config_section = CONFIG_SECTION_PLUGINS, \
+        .config_section = CONFIG_SECTION_GLOBAL , \
         .config_name = "sqlite_stats", \
         .enabled = 1, \
         .thread = NULL, \
@@ -21,7 +21,19 @@
         .start_routine = sqlite_stats_main \
     },
 
+#define NETDATA_PLUGIN_HOOK_SQLITE_ROTATION \
+    { \
+        .name = "SQLITE", \
+        .config_section = CONFIG_SECTION_GLOBAL, \
+        .config_name = "sqlite_rotation", \
+        .enabled = 1, \
+        .thread = NULL, \
+        .init_routine = NULL, \
+        .start_routine = sqlite_rotation_main \
+    },
+
 extern void *sqlite_stats_main(void *ptr);
+extern void *sqlite_rotation_main(void *ptr);
 
 typedef struct dimension {
     uuid_t  dim_uuid;

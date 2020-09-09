@@ -529,7 +529,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 #ifdef SQLITE_POC
     freez(rd->state->metric_uuid);
 #endif
-    freez(rd->state);
+    //freez(rd->state);
 
     if(rd == st->dimensions)
         st->dimensions = rd->next;

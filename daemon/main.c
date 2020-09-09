@@ -87,6 +87,7 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_STATSD
 
     NETDATA_PLUGIN_HOOK_SQLITE
+    NETDATA_PLUGIN_HOOK_SQLITE_ROTATION
 
 #ifdef ENABLE_ACLK
     NETDATA_ACLK_HOOK
