@@ -178,8 +178,8 @@ void simple_connector_send_buffer(
     if(written != -1 && (size_t)written == (header_len + buffer_len)) {
         // we sent the data successfully
         stats->transmission_successes++;
+        stats->sent_metrics += buffered_metrics;
         stats->sent_bytes += written;
-        stats->sent_metrics = buffered_metrics;
 
         // reset the failures count
         *failures = 0;
@@ -251,18 +251,6 @@ void simple_connector_worker(void *instance_p)
             uv_mutex_unlock(&instance->mutex);
             break;
         }
-
-        // reset the monitoring chart counters
-        stats->received_bytes =
-        stats->sent_bytes =
-        stats->sent_metrics =
-        stats->lost_metrics =
-        stats->receptions =
-        stats->transmission_successes =
-        stats->transmission_failures =
-        stats->data_lost_events =
-        stats->lost_bytes =
-        stats->reconnects = 0;
 
         BUFFER *header = connector_specific_data->first_buffer->header;
         BUFFER *buffer = connector_specific_data->first_buffer->buffer;
@@ -365,16 +353,16 @@ void simple_connector_worker(void *instance_p)
             failures++;
         }
 
-        if (failures > instance->config.buffer_on_failures) {
-            stats->lost_bytes += buffer_strlen(buffer);
-            error(
-                "EXPORTING: connector instance %s reached %d exporting failures. "
-                "Flushing buffers to protect this host - this results in data loss on server '%s'",
-                instance->config.name, failures, instance->config.destination);
-            buffer_flush(buffer);
-            failures = 0;
+        if (failures) {
+            uv_mutex_lock(&instance->mutex);
             stats->data_lost_events++;
-            stats->lost_metrics = buffered_metrics;
+            stats->lost_metrics += buffered_metrics;
+            stats->lost_bytes += buffered_bytes;
+            uv_mutex_unlock(&instance->mutex);
+
+            buffer_flush(buffer);
+
+            failures = 0;
         }
 
         if (unlikely(instance->engine->exit))
@@ -382,14 +370,25 @@ void simple_connector_worker(void *instance_p)
 
         uv_mutex_lock(&instance->mutex);
 
-        stats->buffered_metrics = buffered_metrics;
+        stats->buffered_metrics = connector_specific_data->total_buffered_metrics;
 
         send_internal_metrics(instance);
 
-        connector_specific_data->total_buffered_metrics -= buffered_metrics;
-
         stats->buffered_metrics = 0;
-        stats->buffered_bytes -= buffered_bytes;
+
+        // reset the internal monitoring chart counters
+        connector_specific_data->total_buffered_metrics =
+        stats->buffered_bytes =
+        stats->receptions =
+        stats->received_bytes =
+        stats->sent_metrics =
+        stats->sent_bytes =
+        stats->transmission_successes =
+        stats->transmission_failures =
+        stats->reconnects =
+        stats->data_lost_events =
+        stats->lost_metrics =
+        stats->lost_bytes = 0;
 
         uv_mutex_unlock(&instance->mutex);
 

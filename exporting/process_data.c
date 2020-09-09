@@ -384,8 +384,13 @@ int simple_connector_end_batch(struct instance *instance)
     if (buffer_strlen(last_buffer->buffer)) {
         // ring buffer is full, reuse the oldest element
         simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
+
         simple_connector_data->total_buffered_metrics -= last_buffer->buffered_metrics;
         stats->buffered_bytes -= buffer_strlen(last_buffer->buffer);
+
+        stats->data_lost_events++;
+        stats->lost_metrics += last_buffer->buffered_metrics;
+        stats->lost_bytes += buffer_strlen(last_buffer->buffer);
     }
 
     // swap buffers
@@ -405,17 +410,17 @@ int simple_connector_end_batch(struct instance *instance)
     if (instance->prepare_header)
         instance->prepare_header(instance);
 
-    size_t buffered_metrics = (size_t)stats->buffered_metrics;
-
     // The stats->buffered_metrics is used in the simple connector batch formatting as a variable for the number
     // of metrics, added in the current iteration, so we are clearing it here. We will use the
     // simple_connector_data->total_buffered_metrics in the worker to show the statistics.
+    size_t buffered_metrics = (size_t)stats->buffered_metrics;
     stats->buffered_metrics = 0;
-    simple_connector_data->total_buffered_metrics += buffered_metrics;
-
-    stats->buffered_bytes += buffer_strlen(last_buffer->buffer);
 
     last_buffer->buffered_metrics = buffered_metrics;
+
+    simple_connector_data->total_buffered_metrics += buffered_metrics;
+    stats->buffered_bytes += buffer_strlen(last_buffer->buffer);
+
     simple_connector_data->last_buffer = simple_connector_data->last_buffer->next;
 
     return 0;
