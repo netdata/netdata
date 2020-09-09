@@ -110,10 +110,8 @@ void simple_connector_init(struct instance *instance)
     // create a ring buffer
     struct simple_connector_buffer *first_buffer = NULL;
 
-    if (instance->config.buffer_on_failures < 2)
+    if (instance->config.buffer_on_failures < 1)
         instance->config.buffer_on_failures = 1;
-    else
-        instance->config.buffer_on_failures -= 1;
 
     for (int i = 0; i < instance->config.buffer_on_failures; i++) {
         struct simple_connector_buffer *current_buffer = callocz(1, sizeof(struct simple_connector_buffer));

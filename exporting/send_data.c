@@ -229,22 +229,23 @@ void simple_connector_worker(void *instance_p)
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
 
     int sock = -1;
-    struct timeval timeout = {.tv_sec = (instance->config.timeoutms * 1000) / 1000000,
-                              .tv_usec = (instance->config.timeoutms * 1000) % 1000000};
+    struct timeval timeout = { .tv_sec = (instance->config.timeoutms * 1000) / 1000000,
+                               .tv_usec = (instance->config.timeoutms * 1000) % 1000000 };
     int failures = 0;
 
-    BUFFER *empty_header = buffer_create(0);
-    BUFFER *empty_buffer = buffer_create(0);
+    BUFFER *spare_header = buffer_create(0);
+    BUFFER *spare_buffer = buffer_create(0);
 
-    while(!instance->engine->exit) {
+    while (!instance->engine->exit) {
         struct stats *stats = &instance->stats;
+        int send_stats = 0;
 
         uv_mutex_lock(&instance->mutex);
-        if (!connector_specific_data->first_buffer->buffer ||
-            !buffer_strlen(connector_specific_data->first_buffer->buffer)) {
+        if (!connector_specific_data->first_buffer->used || failures) {
             while (!instance->data_is_ready)
                 uv_cond_wait(&instance->cond_var, &instance->mutex);
             instance->data_is_ready = 0;
+            send_stats = 1;
         }
 
         if (unlikely(instance->engine->exit)) {
@@ -252,43 +253,58 @@ void simple_connector_worker(void *instance_p)
             break;
         }
 
-        BUFFER *header = connector_specific_data->first_buffer->header;
-        BUFFER *buffer = connector_specific_data->first_buffer->buffer;
-        size_t buffered_metrics = connector_specific_data->first_buffer->buffered_metrics;
-        size_t buffered_bytes = buffer_strlen(buffer);
+        // ------------------------------------------------------------------------
+        // detach buffer
 
-        connector_specific_data->first_buffer->header = empty_header;
-        empty_header = header;
-        connector_specific_data->first_buffer->buffer = empty_buffer;
-        empty_buffer = buffer;
-        connector_specific_data->first_buffer->buffered_metrics = 0;
-        connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
+        BUFFER *header;
+        BUFFER *buffer;
+        size_t buffered_metrics;
+
+        if (!connector_specific_data->previous_buffer ||
+            (connector_specific_data->previous_buffer == connector_specific_data->first_buffer &&
+             connector_specific_data->first_buffer->used == 1)) {
+            connector_specific_data->header = connector_specific_data->first_buffer->header;
+            connector_specific_data->buffer = connector_specific_data->first_buffer->buffer;
+            connector_specific_data->buffered_metrics = connector_specific_data->first_buffer->buffered_metrics;
+            connector_specific_data->buffered_bytes = connector_specific_data->first_buffer->buffered_bytes;
+
+            header = connector_specific_data->header;
+            buffer = connector_specific_data->buffer;
+            buffered_metrics = connector_specific_data->buffered_metrics;
+
+            buffer_flush(spare_header);
+            connector_specific_data->first_buffer->header = spare_header;
+            spare_header = header;
+
+            buffer_flush(spare_buffer);
+            connector_specific_data->first_buffer->buffer = spare_buffer;
+            spare_buffer = buffer;
+        } else {
+            header = connector_specific_data->header;
+            buffer = connector_specific_data->buffer;
+            buffered_metrics = connector_specific_data->buffered_metrics;
+        }
 
         uv_mutex_unlock(&instance->mutex);
 
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
 
-        if(likely(sock != -1))
+        if (likely(sock != -1))
             simple_connector_receive_response(&sock, instance);
 
         // ------------------------------------------------------------------------
         // if we are not connected, connect to a data collecting server
 
-        if(unlikely(sock == -1)) {
+        if (unlikely(sock == -1)) {
             size_t reconnects = 0;
 
             sock = connect_to_one_of(
-                instance->config.destination,
-                connector_specific_config->default_port,
-                &timeout,
-                &reconnects,
-                NULL,
-                0);
+                instance->config.destination, connector_specific_config->default_port, &timeout, &reconnects, NULL, 0);
 #ifdef ENABLE_HTTPS
-            if(instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && sock != -1) {
+            if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && sock != -1) {
                 if (netdata_exporting_ctx) {
-                    if ( sock_delnonblock(sock) < 0 )
+                    if (sock_delnonblock(sock) < 0)
                         error("Exporting cannot remove the non-blocking flag from socket %d", sock);
 
                     if (connector_specific_data->conn == NULL) {
@@ -311,37 +327,39 @@ void simple_connector_worker(void *instance_p)
                             int err = SSL_connect(connector_specific_data->conn);
                             if (err != 1) {
                                 err = SSL_get_error(connector_specific_data->conn, err);
-                                error("SSL cannot connect with the server:  %s ",
-                                      ERR_error_string((long)SSL_get_error(connector_specific_data->conn, err), NULL));
+                                error(
+                                    "SSL cannot connect with the server:  %s ",
+                                    ERR_error_string((long)SSL_get_error(connector_specific_data->conn, err), NULL));
                                 connector_specific_data->flags = NETDATA_SSL_NO_HANDSHAKE;
                             } else {
                                 info("Exporting established a SSL connection.");
 
                                 struct timeval tv;
-                                tv.tv_sec = timeout.tv_sec /4;
+                                tv.tv_sec = timeout.tv_sec / 4;
                                 tv.tv_usec = 0;
 
                                 if (!tv.tv_sec)
                                     tv.tv_sec = 2;
 
-                                if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)))
+                                if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv)))
                                     error("Cannot set timeout to socket %d, this can block communication", sock);
-
                             }
                         }
                     }
                 }
-
             }
 #endif
 
             stats->reconnects += reconnects;
         }
 
-        if(unlikely(instance->engine->exit)) break;
+        if (unlikely(instance->engine->exit))
+            break;
 
         // ------------------------------------------------------------------------
         // if we are connected, send our buffer to the data collecting server
+
+        failures = 0;
 
         if (likely(sock != -1)) {
             simple_connector_send_buffer(&sock, &failures, instance, header, buffer, buffered_metrics);
@@ -353,44 +371,32 @@ void simple_connector_worker(void *instance_p)
             failures++;
         }
 
-        if (failures) {
-            uv_mutex_lock(&instance->mutex);
-            stats->data_lost_events++;
-            stats->lost_metrics += buffered_metrics;
-            stats->lost_bytes += buffered_bytes;
-            uv_mutex_unlock(&instance->mutex);
-
-            buffer_flush(buffer);
-
-            failures = 0;
+        if (!failures) {
+            connector_specific_data->first_buffer->buffered_metrics =
+                connector_specific_data->first_buffer->buffered_bytes = connector_specific_data->first_buffer->used = 0;
+            connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
         }
 
         if (unlikely(instance->engine->exit))
             break;
 
-        uv_mutex_lock(&instance->mutex);
+        if (send_stats) {
+            uv_mutex_lock(&instance->mutex);
 
-        stats->buffered_metrics = connector_specific_data->total_buffered_metrics;
+            stats->buffered_metrics = connector_specific_data->total_buffered_metrics;
 
-        send_internal_metrics(instance);
+            send_internal_metrics(instance);
 
-        stats->buffered_metrics = 0;
+            stats->buffered_metrics = 0;
 
-        // reset the internal monitoring chart counters
-        connector_specific_data->total_buffered_metrics =
-        stats->buffered_bytes =
-        stats->receptions =
-        stats->received_bytes =
-        stats->sent_metrics =
-        stats->sent_bytes =
-        stats->transmission_successes =
-        stats->transmission_failures =
-        stats->reconnects =
-        stats->data_lost_events =
-        stats->lost_metrics =
-        stats->lost_bytes = 0;
+            // reset the internal monitoring chart counters
+            connector_specific_data->total_buffered_metrics = stats->buffered_bytes = stats->receptions =
+                stats->received_bytes = stats->sent_metrics = stats->sent_bytes = stats->transmission_successes =
+                    stats->transmission_failures = stats->reconnects = stats->data_lost_events = stats->lost_metrics =
+                        stats->lost_bytes = 0;
 
-        uv_mutex_unlock(&instance->mutex);
+            uv_mutex_unlock(&instance->mutex);
+        }
 
 #ifdef UNIT_TESTING
         return;

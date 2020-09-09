@@ -381,16 +381,13 @@ int simple_connector_end_batch(struct instance *instance)
         last_buffer->buffer = buffer_create(0);
     }
 
-    if (buffer_strlen(last_buffer->buffer)) {
+    if (last_buffer->used) {
         // ring buffer is full, reuse the oldest element
         simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
 
-        simple_connector_data->total_buffered_metrics -= last_buffer->buffered_metrics;
-        stats->buffered_bytes -= buffer_strlen(last_buffer->buffer);
-
         stats->data_lost_events++;
         stats->lost_metrics += last_buffer->buffered_metrics;
-        stats->lost_bytes += buffer_strlen(last_buffer->buffer);
+        stats->lost_bytes += last_buffer->buffered_bytes;
     }
 
     // swap buffers
@@ -416,10 +413,14 @@ int simple_connector_end_batch(struct instance *instance)
     size_t buffered_metrics = (size_t)stats->buffered_metrics;
     stats->buffered_metrics = 0;
 
+    size_t buffered_bytes = buffer_strlen(last_buffer->buffer);
+
     last_buffer->buffered_metrics = buffered_metrics;
+    last_buffer->buffered_bytes = buffered_bytes;
+    last_buffer->used++;
 
     simple_connector_data->total_buffered_metrics += buffered_metrics;
-    stats->buffered_bytes += buffer_strlen(last_buffer->buffer);
+    stats->buffered_bytes += buffered_bytes;
 
     simple_connector_data->last_buffer = simple_connector_data->last_buffer->next;
 
