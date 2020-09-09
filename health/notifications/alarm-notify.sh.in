@@ -2032,17 +2032,21 @@ EOF
 # Stackpulse sender
 
 send_stackpulse() {
-  local payload httpcode
+  local payload httpcode oldv currv
   [ "${SEND_STACKPULSE}" != "YES" ] && return 1
+
+  # We are sending null when values are nan to avoid errors while JSON is parsed
+  [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
+  [ "${value}" != "nan" ] && currv="${value}" || currv="null"
 
   payload=$(cat <<EOF
   {
     "Node" : "${host}",
     "Chart" : "${chart}",
-    "OldValue" : ${old_value},
-    "Value" : ${value},
+    "OldValue" : ${oldv},
+    "Value" : ${currv},
     "Units" : "${units}",
-    "OldStatus" : "${old_value}",
+    "OldStatus" : "${oldv}",
     "Status" : "${status}",
     "Alarm" : "${name}",
     "Date": ${when},
