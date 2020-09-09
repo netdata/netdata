@@ -87,6 +87,8 @@ static void skip_gap(RRDSET *st, time_t first_t, time_t last_t) {
         }
         rrdset_unlock(st);
     }
+    else
+        debug(D_REPLICATION, "dbengine on %s skipping gap %ld-%ld.", st->name, (long)first_t, (long)last_t);
     st->last_updated.tv_sec = last_t;
 }
 
@@ -163,8 +165,9 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
             skip_gap(st, st->state->window_start, st->state->window_first - st->update_every);
 
     user->st->state->ignore_block = 0;
-    debug(D_REPLICATION, "Replication on %s @ %ld, block %ld-%ld last_update=%ld", st->name, now,
-                         user->st->state->window_start, user->st->state->window_end, st->last_updated.tv_sec);
+    debug(D_REPLICATION, "Replication on %s @ %ld, block %ld/%ld-%ld last_update=%ld", st->name, now,
+                         st->state->window_start, st->state->window_first, st->state->window_end,
+                         st->last_updated.tv_sec);
 
     return PARSER_RC_OK;
 disable:

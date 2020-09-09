@@ -781,6 +781,8 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
     else
         buffer_sprintf(s->build, "REPBEGIN %s %ld %ld %ld\n", st->id, start_time, window_start, window_end);
 
+    rrdset_dump_debug_state(st);
+
     size_t num_points = 0;
     rrddim_foreach_read(rd, st) {
         // Send the intersection of this dimension and the time-window on the chart
@@ -794,8 +796,8 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
             rd_end = MIN(rd_end,   window_end);
 
             rd->state->query_ops.init(rd, &handle, rd_oldest, rd_end);
-            debug(D_REPLICATION, "Fill replication with %s.%s @%ld-%ld rd@%ld-%ld", st->id, rd->id, window_start,
-                                 window_end, rd_oldest, rd_end);
+            debug(D_REPLICATION, "Fill replication with %s.%s window=%ld-%ld data=%ld-%ld query=%ld-%ld",
+                  st->id, rd->id, window_start, window_end, rd_oldest, rd_end, handle.start_time, handle.end_time);
 
             for (time_t metric_t = rd_oldest; metric_t < rd_end; ) {
 
