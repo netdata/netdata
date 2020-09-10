@@ -45,6 +45,10 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
 
         case RRD_MEMORY_MODE_DBENGINE:
             return RRD_MEMORY_MODE_DBENGINE_NAME;
+
+        case RRD_MEMORY_MODE_SQLITE:
+            return RRD_MEMORY_MODE_SQLITE_NAME;
+
     }
 
     return RRD_MEMORY_MODE_SAVE_NAME;
@@ -65,6 +69,9 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
 
     else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_DBENGINE_NAME)))
         return RRD_MEMORY_MODE_DBENGINE;
+
+    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_SQLITE_NAME)))
+        return RRD_MEMORY_MODE_SQLITE;
 
     return RRD_MEMORY_MODE_SAVE;
 }

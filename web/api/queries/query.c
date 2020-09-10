@@ -567,12 +567,11 @@ static inline void do_dimension_fixedstep(
         // read the value from the database
         //storage_number n = rd->values[slot];
 #ifdef NETDATA_INTERNAL_CHECKS
-#ifndef SQLITE_POC
-        if ((rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
+
+        if ((rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && rd->rrd_memory_mode != RRD_MEMORY_MODE_SQLITE) &&
             (rrdset_time2slot(st, now) != (long unsigned)handle.slotted.slot)) {
             error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)handle.slotted.slot, rrdset_time2slot(st, now));
         }
-#endif
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
         //info("Query %s -- step %d (%d - %d)", handle.rd->id, handle.slotted.slot, handle.slotted.last_slot);
@@ -1574,12 +1573,7 @@ RRDR *rrd2rrdr(
         first_entry_t = rrddim_first_entry_t(temp_rd);
         last_entry_t = rrddim_last_entry_t(temp_rd);
     } else {
-#ifdef SQLITE_POC
-        first_entry_t = st->state->first_entry_t;
-        //info("SQLITE: Online available first entry = %d -- SQLITE available = %d",  rrdset_first_entry_t(st),first_entry_t );
-#else
-        first_entry_t = rrdset_first_entry_t(st);
-#endif
+        first_entry_t = rrdset_first_entry_t(st);   // Handles SQLITE mode
         last_entry_t = rrdset_last_entry_t(st);
     }
 

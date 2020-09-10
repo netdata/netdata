@@ -220,16 +220,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                           collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
                           int is_archived) {
     RRDDIM *rd = NULL;
-    // SPECIAL case create transient
-#ifdef SQLITE_POC1   //TODO: remove
-    // If we attempt to create archived dimension then send it to the SQLITE
-    if (is_archived == 1) {
-        int rc = sql_store_dimension(dim_uuid, chart_uuid, id, name, multiplier, divisor, algorithm);
-        return NULL;
-    }
-//    if (dim_uuid)
-//        sql_dimension_archive(dim_uuid, 0);
-#endif
 
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
@@ -349,11 +339,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         }
     }
 
-    if(unlikely(!rd)) {
+    if (unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE || memory_mode == RRD_MEMORY_MODE_SQLITE)
+            rd->rrd_memory_mode = memory_mode;
         else
             rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
@@ -404,7 +394,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->rrdset = st;
     rd->state = mallocz(sizeof(*rd->state));
 
-    rd->state->metric_uuid = sql_find_dim_uuid(st, rd->id, rd->name, multiplier, divisor, algorithm);
+    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        rd->state->metric_uuid = sql_find_dim_uuid(st, rd->id, rd->name, multiplier, divisor, algorithm);
 //    rd->state->active_count = 0;
 //    rd->state->first_entry_t = LONG_MAX;
 //    rd->state->last_entry_t = 0;
@@ -429,18 +420,18 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
-    } else {
-#ifdef SQLITE_POC
-        rd->state->collect_ops.init         = rrddim_sql_collect_init;
+    } else if (memory_mode == RRD_MEMORY_MODE_SQLITE) {
+        rd->state->collect_ops.init = rrddim_sql_collect_init;
         rd->state->collect_ops.store_metric = rrddim_sql_collect_store_metric;
-        rd->state->collect_ops.finalize     = rrddim_sql_collect_finalize;
-        rd->state->query_ops.init           = rrddim_sql_query_init;
-        rd->state->query_ops.next_metric    = rrddim_sql_query_next_metric;
-        rd->state->query_ops.is_finished    = rrddim_sql_query_is_finished;
-        rd->state->query_ops.finalize       = rrddim_sql_query_finalize;
-        rd->state->query_ops.latest_time    = rrddim_sql_query_latest_time;
-        rd->state->query_ops.oldest_time    = rrddim_sql_query_oldest_time;
-#else
+        rd->state->collect_ops.finalize = rrddim_sql_collect_finalize;
+        rd->state->query_ops.init = rrddim_sql_query_init;
+        rd->state->query_ops.next_metric = rrddim_sql_query_next_metric;
+        rd->state->query_ops.is_finished = rrddim_sql_query_is_finished;
+        rd->state->query_ops.finalize = rrddim_sql_query_finalize;
+        rd->state->query_ops.latest_time = rrddim_sql_query_latest_time;
+        rd->state->query_ops.oldest_time = rrddim_sql_query_oldest_time;
+    }
+    else {
         rd->state->collect_ops.init         = rrddim_collect_init;
         rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
         rd->state->collect_ops.finalize     = rrddim_collect_finalize;
@@ -450,7 +441,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.finalize       = rrddim_query_finalize;
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
-#endif
     }
     if (is_archived)
         rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
@@ -526,9 +516,9 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 #endif
         }
     }
-#ifdef SQLITE_POC
-    freez(rd->state->metric_uuid);
-#endif
+    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        freez(rd->state->metric_uuid);
+
     //freez(rd->state);
 
     if(rd == st->dimensions)

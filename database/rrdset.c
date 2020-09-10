@@ -272,11 +272,12 @@ void rrdset_reset(RRDSET *st) {
         }
 #endif
 
-#ifdef SQLITE_POC
-        info("Flushing metrics for %s due to CHART %s reset", rd->id, st->id);
-        rrddim_sql_collect_finalize(rd);
-#endif
+        if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+            info("Flushing metrics for %s due to CHART %s reset", rd->id, st->id);
+            rrddim_sql_collect_finalize(rd);
+        }
     }
+
 }
 
 // ----------------------------------------------------------------------------
@@ -381,9 +382,8 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_title);
     freez(st->state->old_family);
     freez(st->state->old_context);
-#ifdef SQLITE_POC
-    freez(st->chart_uuid);
-#endif
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        freez(st->chart_uuid);
     freez(st->state);
 
     switch(st->rrd_memory_mode) {
@@ -397,6 +397,7 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
         case RRD_MEMORY_MODE_DBENGINE:
+        case RRD_MEMORY_MODE_SQLITE:
 #ifdef ENABLE_DBENGINE
             if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 free_uuid(st->chart_uuid);
@@ -513,32 +514,25 @@ RRDSET *rrdset_create_custom(
         , RRD_MEMORY_MODE memory_mode
         , long history_entries
         , int is_archived
-) {
-    if(!type || !type[0]) {
-        fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
-              , (id && *id)?id:"<unset>"
-              , (name && *name)?name:"<unset>"
-              , (family && *family)?family:"<unset>"
-              , (context && *context)?context:"<unset>"
-              , (title && *title)?title:"<unset>"
-              , (units && *units)?units:"<unset>"
-              , (plugin && *plugin)?plugin:"<unset>"
-              , (module && *module)?module:"<unset>"
-        );
+)
+{
+    if (!type || !type[0]) {
+        fatal(
+            "Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'.",
+            (id && *id) ? id : "<unset>", (name && *name) ? name : "<unset>", (family && *family) ? family : "<unset>",
+            (context && *context) ? context : "<unset>", (title && *title) ? title : "<unset>",
+            (units && *units) ? units : "<unset>", (plugin && *plugin) ? plugin : "<unset>",
+            (module && *module) ? module : "<unset>");
         return NULL;
     }
 
-    if(!id || !id[0]) {
-        fatal("Cannot create rrd stats without an id: type '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
-              , type
-              , (name && *name)?name:"<unset>"
-              , (family && *family)?family:"<unset>"
-              , (context && *context)?context:"<unset>"
-              , (title && *title)?title:"<unset>"
-              , (units && *units)?units:"<unset>"
-              , (plugin && *plugin)?plugin:"<unset>"
-              , (module && *module)?module:"<unset>"
-        );
+    if (!id || !id[0]) {
+        fatal(
+            "Cannot create rrd stats without an id: type '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'.",
+            type, (name && *name) ? name : "<unset>", (family && *family) ? family : "<unset>",
+            (context && *context) ? context : "<unset>", (title && *title) ? title : "<unset>",
+            (units && *units) ? units : "<unset>", (plugin && *plugin) ? plugin : "<unset>",
+            (module && *module) ? module : "<unset>");
         return NULL;
     }
 
@@ -563,7 +557,7 @@ RRDSET *rrdset_create_custom(
              *old_title_v = NULL, *old_family_v = NULL, *old_context_v = NULL;
         int rc;
 
-        if(unlikely(name))
+        if (unlikely(name))
             rc = rrdset_set_name(st, name);
         else
             rc = rrdset_set_name(st, id);
@@ -643,8 +637,7 @@ RRDSET *rrdset_create_custom(
             if (netdata_cloud_setting) {
                 if (mark_rebuild & META_CHART_ACTIVATED) {
                     aclk_add_collector(host->hostname, st->plugin_name, st->module_name);
-                }
-                else {
+                } else {
                     if (mark_rebuild & (META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
                         aclk_del_collector(
                             host->hostname, mark_rebuild & META_PLUGIN_UPDATED ? old_plugin : st->plugin_name,
@@ -683,14 +676,16 @@ RRDSET *rrdset_create_custom(
     rrdhost_wrlock(host);
 
     st = rrdset_find_on_create(host, fullid);
-    if(st) {
+    if (st) {
         if (changed_from_archived_to_active) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-            rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
-            rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(
+                st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(
+                st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
+            rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
             rrdsetcalc_link_matching(st);
             rrdcalctemplate_link_matching(st);
         }
@@ -703,22 +698,13 @@ RRDSET *rrdset_create_custom(
         return st;
     }
 
-#ifdef SQLITE_POC1     //TODO:REMOVE
-    // If we attempt to create archived chart then send it to the SQLITE
-    if (is_archived == 1) {
-        int rc = sql_store_chart(chart_uuid, &host->host_uuid, type, id, name, family, context, title, units, plugin, module, priority, update_every, (int ) chart_type, (int ) memory_mode, history_entries);
-        rrdhost_unlock(host);
-        return NULL;
-    }
-#endif
-
     char fullfilename[FILENAME_MAX + 1];
 
     // ------------------------------------------------------------------------
     // compose the config_section for this chart
 
     char config_section[RRD_ID_LENGTH_MAX + 1];
-    if(host == localhost)
+    if (host == localhost)
         strcpy(config_section, fullid);
     else
         snprintfz(config_section, RRD_ID_LENGTH_MAX, "%s/%s", host->machine_guid, fullid);
@@ -727,23 +713,21 @@ RRDSET *rrdset_create_custom(
     // get the options from the config, we need to create it
 
     long entries;
-    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         // only sets it the first time
         entries = config_get_number(config_section, "history", 5);
     } else {
         long rentries = config_get_number(config_section, "history", history_entries);
         entries = align_entries_to_pagesize(memory_mode, rentries);
-        if (entries != rentries) entries = config_set_number(config_section, "history", entries);
+        if (entries != rentries)
+            entries = config_set_number(config_section, "history", entries);
 
         if (memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
             entries = config_set_number(config_section, "history", 10);
     }
     int enabled = config_get_boolean(config_section, "enabled", 1);
-    if(!enabled) entries = 5;
-
-#ifdef SQLITE_POC
-    //entries = 30;
-#endif
+    if (!enabled)
+        entries = 5;
 
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
@@ -756,16 +740,13 @@ RRDSET *rrdset_create_custom(
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM) {
-        st = (RRDSET *) mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
-                , size
-                , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
-                , 0
-        );
+    if (memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
+        memory_mode == RRD_MEMORY_MODE_RAM) {
+        st = (RRDSET *)mymmap(
+            (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename, size,
+            ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0);
 
-        if(st) {
+        if (st) {
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
             memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
@@ -791,39 +772,35 @@ RRDSET *rrdset_create_custom(
             st->flags = 0x00000000;
             st->exporting_flags = NULL;
 
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
+            if (memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);
-            }
-            else {
-                if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
+            } else {
+                if (strcmp(st->magic, RRDSET_MAGIC) != 0) {
                     info("Initializing file %s.", fullfilename);
                     memset(st, 0, size);
-                }
-                else if(strcmp(st->id, fullid) != 0) {
+                } else if (strcmp(st->id, fullid) != 0) {
                     error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
                     // munmap(st, size);
                     // st = NULL;
                     memset(st, 0, size);
-                }
-                else if(st->memsize != size || st->entries != entries) {
+                } else if (st->memsize != size || st->entries != entries) {
                     error("File %s does not have the desired size. Clearing it.", fullfilename);
                     memset(st, 0, size);
-                }
-                else if(st->update_every != update_every) {
+                } else if (st->update_every != update_every) {
                     error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
                     memset(st, 0, size);
-                }
-                else if((now - st->last_updated.tv_sec) > update_every * entries) {
+                } else if ((now - st->last_updated.tv_sec) > update_every * entries) {
                     info("File %s is too old. Clearing it.", fullfilename);
                     memset(st, 0, size);
-                }
-                else if(st->last_updated.tv_sec > now + update_every) {
-                    error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now));
+                } else if (st->last_updated.tv_sec > now + update_every) {
+                    error(
+                        "File %s refers to the future by %zd secs. Resetting it to now.", fullfilename,
+                        (ssize_t)(st->last_updated.tv_sec - now));
                     st->last_updated.tv_sec = now;
                 }
 
                 // make sure the database is aligned
-                if(st->last_updated.tv_sec) {
+                if (st->last_updated.tv_sec) {
                     st->update_every = update_every;
                     last_updated_time_align(st);
                 }
@@ -835,18 +812,18 @@ RRDSET *rrdset_create_custom(
         }
     }
 
-    if(unlikely(!st)) {
+    if (unlikely(!st)) {
         st = callocz(1, size);
-        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE || memory_mode == RRD_MEMORY_MODE_SQLITE)
+            st->rrd_memory_mode = memory_mode;
         else
             st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
     if (is_archived)
         rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
 
-    st->plugin_name = plugin?strdupz(plugin):NULL;
-    st->module_name = module?strdupz(module):NULL;
+    st->plugin_name = plugin ? strdupz(plugin) : NULL;
+    st->module_name = module ? strdupz(module) : NULL;
 
     st->config_section = strdupz(config_section);
     st->rrdhost = host;
@@ -854,7 +831,8 @@ RRDSET *rrdset_create_custom(
     st->entries = entries;
     st->update_every = update_every;
 
-    if(st->current_entry >= st->entries) st->current_entry = 0;
+    if (st->current_entry >= st->entries)
+        st->current_entry = 0;
 
     strcpy(st->cache_filename, fullfilename);
     strcpy(st->magic, RRDSET_MAGIC);
@@ -865,23 +843,23 @@ RRDSET *rrdset_create_custom(
     st->cache_dir = cache_dir;
 
     st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
-    st->type       = config_get(st->config_section, "type", type);
+    st->type = config_get(st->config_section, "type", type);
 
     st->state = callocz(1, sizeof(*st->state));
-    st->family     = config_get(st->config_section, "family", family?family:st->type);
+    st->family = config_get(st->config_section, "family", family ? family : st->type);
     st->state->old_family = strdupz(st->family);
     json_fix_string(st->family);
 
-    st->units      = config_get(st->config_section, "units", units?units:"");
+    st->units = config_get(st->config_section, "units", units ? units : "");
     json_fix_string(st->units);
 
-    st->context    = config_get(st->config_section, "context", context?context:st->id);
+    st->context = config_get(st->config_section, "context", context ? context : st->id);
     st->state->old_context = strdupz(st->context);
     json_fix_string(st->context);
     st->hash_context = simple_hash(st->context);
 
     st->priority = config_get_number(st->config_section, "priority", priority);
-    if(enabled)
+    if (enabled)
         rrdset_flag_set(st, RRDSET_FLAG_ENABLED);
     else
         rrdset_flag_clear(st, RRDSET_FLAG_ENABLED);
@@ -910,7 +888,7 @@ RRDSET *rrdset_create_custom(
     st->counter_done = 0;
     st->rrddim_page_alignment = 0;
 
-    st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
+    st->gap_when_lost_iterations_above = (int)(gap_when_lost_iterations_above + 2);
 
     st->last_accessed_time = 0;
     st->upstream_resync_time = 0;
@@ -920,7 +898,7 @@ RRDSET *rrdset_create_custom(
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
-    if(name && *name && rrdset_set_name(st, name))
+    if (name && *name && rrdset_set_name(st, name))
         // we did set the name
         ;
     else
@@ -936,15 +914,17 @@ RRDSET *rrdset_create_custom(
     st->next = host->rrdset_root;
     host->rrdset_root = st;
 
-    if(host->health_enabled && !is_archived) {
-        rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
+    if (host->health_enabled && !is_archived) {
+        rrdsetvar_create(
+            st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(
+            st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
     }
 
-    if(unlikely(rrdset_index_add(host, st) != st))
+    if (unlikely(rrdset_index_add(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
 
     if (!is_archived) {
@@ -952,15 +932,15 @@ RRDSET *rrdset_create_custom(
         rrdcalctemplate_link_matching(st);
     }
 
-#ifdef SQLITE_POC
-    st->chart_uuid = sql_find_chart_uuid(host, st->id, st->name, type, family, context, title, units, plugin, module, priority,
-                              update_every, chart_type, memory_mode, history_entries);
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+        st->chart_uuid = sql_find_chart_uuid(
+            host, st->id, st->name, type, family, context, title, units, plugin, module, priority, update_every,
+            chart_type, memory_mode, history_entries);
 
-    st->state->first_entry_t = LONG_MAX;
-    st->state->last_entry_t = 0;
-    sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
-
-#endif
+        st->state->first_entry_t = LONG_MAX;
+        st->state->last_entry_t = 0;
+        sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
+    }
 
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {

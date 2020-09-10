@@ -87,12 +87,6 @@ PARSER_RC metalog_pluginsd_host_action(
         , 1     // archived
     );
 
-//#ifdef SQLITE_POC
-//    ((PARSER_USER_OBJECT *)user)->host = host;
-//    //uuid_clear(state->uuid);
-//    return PARSER_RC_OK;
-//#endif
-
 write_replay:
     if (host) { /* It's a valid object */
         struct metalog_record record;
@@ -131,11 +125,6 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         plugin, module, priority, update_every,
         chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid, host_uuid);
 
-#ifdef SQLITE_POC
-    ((PARSER_USER_OBJECT *)user)->st = st;
-    uuid_clear(state->uuid);
-    return PARSER_RC_OK;
-#endif
     rrdset_isnot_obsolete(st); /* archived charts cannot be obsolete */
     if (options && *options) {
         if (strstr(options, "detail"))
@@ -188,11 +177,7 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 
     RRDDIM *rd =
         rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1, dim_uuid, chart_uuid);
-#ifdef SQLITE_POC
-    sql_dimension_options(dim_uuid, options);
-    uuid_clear(state->uuid);
-    return PARSER_RC_OK;
-#else
+
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
     rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
@@ -213,7 +198,6 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
         uuid_clear(state->uuid); /* Consume UUID */
     }
     return PARSER_RC_OK;
-#endif
 }
 
 PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)

@@ -85,7 +85,8 @@ typedef enum rrd_memory_mode {
     RRD_MEMORY_MODE_MAP  = 2,
     RRD_MEMORY_MODE_SAVE = 3,
     RRD_MEMORY_MODE_ALLOC = 4,
-    RRD_MEMORY_MODE_DBENGINE = 5
+    RRD_MEMORY_MODE_DBENGINE = 5,
+    RRD_MEMORY_MODE_SQLITE = 6
 } RRD_MEMORY_MODE;
 
 #define RRD_MEMORY_MODE_NONE_NAME "none"
@@ -94,6 +95,7 @@ typedef enum rrd_memory_mode {
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
 #define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
 #define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
+#define RRD_MEMORY_MODE_SQLITE_NAME "sqlite"
 
 extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
@@ -352,8 +354,6 @@ struct rrddim_volatile {
     time_t db_last_entry_t;        // Last entry in the SQLite database (inclusive)
     struct rrddim_metric_page *metric_page_last;
     struct rrddim_metric_page *metric_page;
-//    size_t active_count;
-//    storage_number *values;        // Store the values here
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
@@ -1091,6 +1091,8 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
         return first_entry_t;
     }
 #endif
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        return st->state->first_entry_t;
     return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
 }
 

@@ -1456,9 +1456,9 @@ int main(int argc, char **argv) {
     init_global_guid_map();
 #endif
 
-#ifdef SQLITE_POC
-    sql_init_database();
-#endif
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        sql_init_database();
+
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 

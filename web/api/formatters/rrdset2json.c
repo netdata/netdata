@@ -4,16 +4,21 @@
 
 // generate JSON for the /api/v1/chart API call
 
-void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
+void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile)
+{
     rrdset_rdlock(st);
 
-#ifdef SQLITE_POC
-    time_t first_entry_t = st->state->first_entry_t;
-    time_t last_entry_t = rrdset_last_entry_t(st);
-#else
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t  = rrdset_last_entry_t(st);
-#endif
+    time_t first_entry_t;
+    time_t last_entry_t;
+
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+         first_entry_t = st->state->first_entry_t;
+         last_entry_t = rrdset_last_entry_t(st);
+    } else {
+         first_entry_t = rrdset_first_entry_t(st);
+         last_entry_t = rrdset_last_entry_t(st);
+    }
+
 
     buffer_sprintf(wb,
             "\t\t{\n"
@@ -88,50 +93,6 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
         dimensions++;
     }
-
-#ifdef SQLITE_POC
-     if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-//         char sql[512];
-//        struct dimension *dimension_list = NULL, *tmp_dimension_list;
-//        int from_row, to_row;
-//        if (st->state->to) {
-//            from_row = st->state->from;
-//            to_row = st->state->to;
-//            int max_rows = sql_select_dimension(st->chart_uuid, &dimension_list, NULL, NULL);
-//        }
-//        else {
-//            int max_rows = sql_select_dimension(st->chart_uuid, &dimension_list, &from_row, &to_row);
-//            st->state->from = from_row;
-//            st->state->to = to_row;
-//        }
-        int old_dimensions = dimensions;
-        int duration = sql_load_one_chart_dimension(st->chart_uuid, wb, &dimensions);
-
-
-//        while (dimension_list) {
-//            if (dimensions)
-//                buffer_strcat(wb, ",\n\t\t\t\t\"");
-//            else
-//                buffer_strcat(wb, "\t\t\t\t\"");
-//            buffer_strcat_jsonescape(wb, dimension_list->id);
-//            buffer_strcat(wb, "\": { \"name\": \"");
-//            buffer_strcat_jsonescape(wb, dimension_list->name);
-//            buffer_strcat(wb, " (");
-//            buffer_strcat(wb, dimension_list->dim_str);
-//            buffer_strcat(wb, ")");
-//            buffer_strcat(wb, "\" }");
-//
-//            tmp_dimension_list = dimension_list->next;
-//            freez(dimension_list->id);
-//            freez(dimension_list->name);
-//            freez(dimension_list);
-//            dimension_list = tmp_dimension_list;
-//            dimensions++;
-//        }
-//        freez(dimension_list);
-        //info("SQLITE: Processed %d dimensions in %d usec", dimensions - old_dimensions, duration);
-    }
-#endif
 
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;
