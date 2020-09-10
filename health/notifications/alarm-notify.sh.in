@@ -298,6 +298,9 @@ SLACK_WEBHOOK_URL=
 # Microsoft Teams configs
 MSTEAMS_WEBHOOK_URL=
 
+# Legacy Microsoft Teams configs for backwards compatability:
+declare -A role_recipients_msteam
+
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
 
@@ -433,9 +436,14 @@ MSTEAMS_COLOR_WARNING=${MSTEAM_COLOR_WARNING:-$MSTEAMS_COLOR_WARNING}
 MSTEAMS_COLOR_CRITICAL=${MSTEAM_COLOR_CRITICAL:-$MSTEAMS_COLOR_CRITICAL}
 
 # migrate role specific recipients:
-for key in "${!role_recipients_msteam[@]}"
-do
-  role_recipients_msteams["$key"]="${role_recipients_msteam["$key"]}"
+for key in "${!role_recipients_msteam[@]}"; do
+    # Disable check, if role_recipients_msteams is ever used:
+    # The role_recipients_$method are created and used programmatically
+    # by iterating over $methods. shellcheck therefore doesn't realize
+    # that role_recipients_msteams is actually used in the block
+    # "find the recipients' addresses per method".
+    # shellcheck disable=SC2034
+    role_recipients_msteams["$key"]="${role_recipients_msteam["$key"]}"
 done
 
 # -----------------------------------------------------------------------------
