@@ -567,7 +567,7 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
             debug(D_ACLK, "EXECUTING a chart update command");
             if (!host)
                 fatal("Pointer to host compulsory");
-            aclk_send_single_chart(host->hostname, this_query->query);
+            aclk_send_single_chart(host, this_query->query);
             break;
 
         case ACLK_CMD_CHARTDEL:

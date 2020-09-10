@@ -1523,17 +1523,11 @@ void aclk_alarm_reload()
 }
 //rrd_stats_api_v1_chart(RRDSET *st, BUFFER *buf)
 
-int aclk_send_single_chart(char *hostname, char *chart)
+int aclk_send_single_chart(RRDHOST *host, char *chart)
 {
-    RRDHOST *target_host;
-
-    target_host = rrdhost_find_by_hostname(hostname, 0);
-    if (!target_host)
-        return 1;
-
-    RRDSET *st = rrdset_find(target_host, chart);
+    RRDSET *st = rrdset_find(host, chart);
     if (!st)
-        st = rrdset_find_byname(target_host, chart);
+        st = rrdset_find_byname(host, chart);
     if (!st) {
         info("FAILED to find chart %s", chart);
         return 1;

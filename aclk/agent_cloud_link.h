@@ -73,7 +73,7 @@ void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
 
-int aclk_send_single_chart(char *host, char *chart);
+int aclk_send_single_chart(RRDHOST *host, char *chart);
 int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us, int version);
