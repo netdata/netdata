@@ -46,10 +46,12 @@ typedef enum exporting_options {
 typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_UNKNOWN,                 // Invalid type
     EXPORTING_CONNECTOR_TYPE_GRAPHITE,                // Send plain text to Graphite
-    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET,   // Send data to OpenTSDB using telnet API
-    EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP,     // Send data to OpenTSDB using HTTP API
-    EXPORTING_CONNECTOR_TYPE_JSON,                    // Stores the data using JSON.
-    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // The user selected to use Prometheus backend
+    EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP,           // Send data to Graphite using HTTP API
+    EXPORTING_CONNECTOR_TYPE_JSON,                    // Send data in JSON format
+    EXPORTING_CONNECTOR_TYPE_JSON_HTTP,               // Send data in JSON format using HTTP API
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB,                // Send data to OpenTSDB using telnet API
+    EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP,           // Send data to OpenTSDB using HTTP API
+    EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // User selected to use Prometheus backend
     EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
     EXPORTING_CONNECTOR_TYPE_PUBSUB,                  // Send message to Google Cloud Pub/Sub
     EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection

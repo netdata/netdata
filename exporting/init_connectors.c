@@ -40,15 +40,23 @@ int init_connectors(struct engine *engine)
                 if (init_graphite_instance(instance) != 0)
                     return 1;
                 break;
+            case EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP:
+                if (init_graphite_instance(instance) != 0)
+                    return 1;
+                break;
             case EXPORTING_CONNECTOR_TYPE_JSON:
                 if (init_json_instance(instance) != 0)
                     return 1;
                 break;
-            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET:
+            case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
+                if (init_json_instance(instance) != 0)
+                    return 1;
+                break;
+            case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
                 if (init_opentsdb_telnet_instance(instance) != 0)
                     return 1;
                 break;
-            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP:
+            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP:
                 if (init_opentsdb_http_instance(instance) != 0)
                     return 1;
                 break;

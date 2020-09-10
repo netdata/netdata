@@ -3,6 +3,21 @@
 #include "exporting_engine.h"
 
 /**
+ * Check if TLS is enabled in the configuration
+ *
+ * @param type buffer with response data.
+ * @param options an instance data structure.
+ * @return Returns 1 if TLS should be enabled, 0 otherwise.
+ */
+static int exporting_tsl_is_enabled(EXPORTING_CONNECTOR_TYPE type, EXPORTING_OPTIONS options) {
+    return (type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP ||
+            type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP ||
+            type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP ||
+            type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) &&
+           options & EXPORTING_OPTION_USE_TLS;
+}
+
+/**
  * Discard response
  *
  * Discards a response received by an exporting connector instance after logging a sample of it to error.log
@@ -67,8 +82,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 
         ssize_t r;
 #ifdef ENABLE_HTTPS
-        if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
-            options & EXPORTING_OPTION_USE_TLS &&
+        if (exporting_tsl_is_enabled(instance->config.type, options) &&
             connector_specific_data->conn &&
             connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
             r = (ssize_t)SSL_read(connector_specific_data->conn,
@@ -160,8 +174,7 @@ void simple_connector_send_buffer(
     size_t buffer_len = buffer_strlen(buffer);
 
 #ifdef ENABLE_HTTPS
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP &&
-        options & EXPORTING_OPTION_USE_TLS &&
+    if (exporting_tsl_is_enabled(instance->config.type, options) &&
         connector_specific_data->conn &&
         connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
@@ -302,7 +315,7 @@ void simple_connector_worker(void *instance_p)
             sock = connect_to_one_of(
                 instance->config.destination, connector_specific_config->default_port, &timeout, &reconnects, NULL, 0);
 #ifdef ENABLE_HTTPS
-            if (instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && sock != -1) {
+            if (exporting_tsl_is_enabled(instance->config.type, options) && sock != -1) {
                 if (netdata_exporting_ctx) {
                     if (sock_delnonblock(sock) < 0)
                         error("Exporting cannot remove the non-blocking flag from socket %d", sock);

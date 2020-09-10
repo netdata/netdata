@@ -17,6 +17,8 @@ int init_graphite_instance(struct instance *instance)
     connector_specific_config->default_port = 2003;
 
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = connector_specific_data;
+
 #ifdef ENABLE_HTTPS
     connector_specific_data->flags = NETDATA_SSL_START;
     connector_specific_data->conn = NULL;
@@ -24,7 +26,6 @@ int init_graphite_instance(struct instance *instance)
         security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
     }
 #endif
-    instance->connector_specific_data = connector_specific_data;
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_graphite_plaintext;
