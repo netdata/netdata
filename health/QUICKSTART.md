@@ -125,9 +125,15 @@ To make any changes to your health configuration live, you must reload Netdata's
 without restarting all of Netdata, run the following:
 
 ```bash
-killall -USR2 netdata
+netdatacli reload-health
 ```
 
+If you receive an error like `command not found`, this means that `netdatacli` is not installed in your `$PATH`. In that 
+ case, you can reload only the health component by sending a `SIGUSR2` to Netdata:
+
+```bash
+killall -USR2 netdata
+```
 ## What's next?
 
 To learn about all of Netdata's health configuration options, view the [reference guide](/health/REFERENCE.md) and

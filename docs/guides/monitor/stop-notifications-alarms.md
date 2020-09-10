@@ -72,8 +72,8 @@ To silence this alarm, change `sysadmin` to `silent`.
  to: silent
 ```
 
-Use `killall -USR2 netdata` to reload your health configuration and ensure you get no more notifications about that
-alarm.
+Use one of the available [methods](/health/QUICKSTART.md#reload-health-configuration) to reload your health configuration 
+ and ensure you get no more notifications about that alarm**.
 
 You can add `to: silent` to any alarm you'd rather not bother you with notifications.
 
