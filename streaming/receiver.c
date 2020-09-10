@@ -259,6 +259,8 @@ PARSER_RC streaming_rep_end(char **words, void *user_v, PLUGINSD_ACTION *plugins
 
     struct rrdset_volatile *state = user->st->state;
     user->st->last_updated.tv_sec = state->window_end - user->st->update_every;
+    user->st->last_collected_time.tv_sec = user->st->last_updated.tv_sec;
+    user->st->last_collected_time.tv_usec = USEC_PER_SEC/2;
     if (num_points > 0) {
         long advance = (state->window_end - state->window_first) / user->st->update_every;
         user->st->counter       += advance;
