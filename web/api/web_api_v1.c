@@ -397,7 +397,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     , *before_str = NULL
     , *after_str = NULL
     , *group_time_str = NULL
-    , *points_str = NULL;
+    , *points_str = NULL
+    , *context = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
@@ -415,6 +416,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
         // name and value are now the parameters
         // they are not null and not empty
+
+        if(!strcmp(name, "context")) context = value;
 
         if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
@@ -482,18 +485,51 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     fix_google_param(responseHandler);
     fix_google_param(outFileName);
 
-    if(!chart || !*chart) {
-        buffer_sprintf(w->response.data, "No chart id is given at the request.");
+    RRDSET *st = NULL;
+
+    if((!chart || !*chart) && (!context)) {
+        buffer_sprintf(w->response.data, "No chart0 id is given at the request.");
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
-    if(!st) {
-        buffer_strcat(w->response.data, "Chart is not found: ");
-        buffer_strcat_htmlescape(w->response.data, chart);
-        ret = HTTP_RESP_NOT_FOUND;
-        goto cleanup;
+    if (context) {
+        st = NULL;
+        // TODO: Scan all charts of host
+        rrdhost_rdlock(localhost);
+        RRDSET *st1;
+        rrdset_foreach_read(st1, localhost) {
+            if (strcmp(st1->context, context) == 0) {
+                st = st1;
+                break;
+            }
+        }
+        rrdhost_unlock(localhost);
+    }
+
+//    if (!st) {
+//        buffer_sprintf(w->response.data, "No chart1 id is given at the request.");
+//        goto cleanup;
+//    }
+
+//    if(!st !chart || !*chart) {
+//        buffer_sprintf(w->response.data, "No chart2 id is given at the request.");
+//        goto cleanup;
+//    }
+
+    if (!st) {
+        if (!chart || !*chart) {
+            buffer_sprintf(w->response.data, "No chart2 id is given at the request.");
+            goto cleanup;
+        }
+        st = rrdset_find(host, chart);
+        if (!st)
+            st = rrdset_find_byname(host, chart);
+        if (!st) {
+            buffer_strcat(w->response.data, "Chart is not found: ");
+            buffer_strcat_htmlescape(w->response.data, chart);
+            ret = HTTP_RESP_NOT_FOUND;
+            goto cleanup;
+        }
     }
     st->last_accessed_time = now_realtime_sec();
 
@@ -540,7 +576,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-                                 , options, &last_timestamp_in_data);
+                                 , options, &last_timestamp_in_data, context);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)

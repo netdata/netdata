@@ -100,6 +100,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
 
         buffer_strcat(wb, pre_label);
         buffer_strcat(wb, rd->name);
+        buffer_strcat(wb, ".");
+        buffer_strcat(wb, rd->rrdset->name);
         buffer_strcat(wb, post_label);
         i++;
     }
