@@ -5,6 +5,7 @@
 netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 
 int aclk_disable_runtime = 0;
+int aclk_kill_link = 0;
 
 struct aclk_shared_state aclk_shared_state = {
     .metadata_submitted = ACLK_METADATA_REQUIRED,

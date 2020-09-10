@@ -28,6 +28,8 @@
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
+#define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
+
 struct aclk_request {
     char *type_id;
     char *msg_id;
@@ -52,6 +54,7 @@ void *aclk_main(void *ptr);
       .start_routine = aclk_main },
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
+extern int aclk_send_message_bin(char *sub_topic, const void *message, size_t len, char *msg_id);
 
 extern char *is_agent_claimed(void);
 extern void aclk_lws_wss_mqtt_layer_disconect_notif();

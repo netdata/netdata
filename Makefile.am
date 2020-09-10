@@ -535,6 +535,8 @@ ACLK_FILES += \
     aclk/aclk_query.h \
     aclk/mqtt.c \
     aclk/mqtt.h \
+    aclk/aclk_rx_msgs.c \
+    aclk/aclk_rx_msgs.h \
     aclk/aclk_lws_wss_client.c \
     aclk/aclk_lws_wss_client.h \
     aclk/aclk_lws_https_client.c \
