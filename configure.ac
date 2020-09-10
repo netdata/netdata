@@ -328,7 +328,6 @@ AC_CHECK_LIB(
 )
 
 
-
 # -----------------------------------------------------------------------------
 # zlib
 
@@ -704,6 +703,7 @@ AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 AC_MSG_CHECKING([if apps.plugin should be enabled])
 if test "${build_target}" != "macos"; then
+    AC_DEFINE([ENABLE_APPS_PLUGIN], [1], [apps.plugin])
     enable_plugin_apps="yes"
 else
     enable_plugin_apps="no"
@@ -971,6 +971,7 @@ AC_CHECK_HEADER(
 
 AC_MSG_CHECKING([if perf.plugin should be enabled])
 if test "${build_target}" == "linux" -a "${have_perf_event}" = "yes"; then
+    AC_DEFINE([ENABLE_PERF_PLUGIN], [1], [perf.plugin])
     enable_plugin_perf="yes"
 else
     enable_plugin_perf="no"
@@ -1022,6 +1023,7 @@ AM_CONDITIONAL([ENABLE_PLUGIN_EBPF], [test "${enable_ebpf}" = "yes"])
 
 AC_MSG_CHECKING([if slabinfo.plugin should be enabled])
 if test "${build_target}" == "linux"; then
+    AC_DEFINE([ENABLE_SLABINFO], [1], [slabinfo plugin])
     enable_plugin_slabinfo="yes"
 else
     enable_plugin_slabinfo="no"

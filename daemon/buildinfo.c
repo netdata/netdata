@@ -75,6 +75,12 @@
 
 // Optional plugins
 
+#ifdef ENABLE_APPS_PLUGIN
+#define FEAT_APPS_PLUGIN "YES"
+#else
+#define FEAT_APPS_PLUGIN "NO"
+#endif
+
 #ifdef HAVE_FREEIPMI
 #define FEAT_IPMI "YES"
 #else
@@ -115,6 +121,18 @@
 #define FEAT_CGROUP_NET "YES"
 #else
 #define FEAT_CGROUP_NET "NO"
+#endif
+
+#ifdef ENABLE_PERF_PLUGIN
+#define FEAT_PERF "YES"
+#else
+#define FEAT_PERF "NO"
+#endif
+
+#ifdef ENABLE_SLABINFO
+#define FEAT_SLABINFO "YES"
+#else
+#define FEAT_SLABINFO "NO"
 #endif
 
 // Optional Exporters
@@ -165,11 +183,14 @@ void print_build_info() {
     printf("	zlib: %s\n", FEAT_ZLIB);
 
     printf("Plugins:\n");
+    printf("	apps: %s\n", FEAT_APPS_PLUGIN);
     printf("	cgroup Network Tracking: %s\n", FEAT_CGROUP_NET);
     printf("	CUPS: %s\n", FEAT_CUPS);
     printf("	EBPF: %s\n", FEAT_EBPF);
     printf("	IPMI: %s\n", FEAT_IPMI);
     printf("	NFACCT: %s\n", FEAT_NFACCT);
+    printf("	perf: %s\n", FEAT_PERF);
+    printf("	slabinfo: %s\n", FEAT_SLABINFO);
     printf("	Xen: %s\n", FEAT_XEN);
     printf("	Xen VBD Error Tracking: %s\n", FEAT_XEN_VBD_ERROR);
 
