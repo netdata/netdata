@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "opentsdb.h"
+#include "../json/json.h"
 
 /**
  * Initialize OpenTSDB telnet connector instance
