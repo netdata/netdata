@@ -450,11 +450,11 @@ void aclk_update_next_child_to_popcorn()
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        if (unlikely( host == localhost || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED )))
+        if (unlikely(host == localhost || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)))
             continue;
 
         rrdhost_aclk_state_lock(host);
-        if (!ACLK_HOST_POPCORNING(host)) {
+        if (!ACLK_HOST_POPCORNING(host) || !host->aclk_state.t_last_popcorn_update) {
             rrdhost_aclk_state_unlock(host);
             continue;
         }
@@ -467,8 +467,7 @@ void aclk_update_next_child_to_popcorn()
             continue;
         }
 
-        time_t t_exp = host->aclk_state.t_last_popcorn_update + ACLK_STABLE_TIMEOUT;
-        if (aclk_shared_state.next_popcorn_host->aclk_state.t_last_popcorn_update > t_exp)
+        if (aclk_shared_state.next_popcorn_host->aclk_state.t_last_popcorn_update > host->aclk_state.t_last_popcorn_update)
             aclk_shared_state.next_popcorn_host = host;
 
         rrdhost_aclk_state_unlock(host);
@@ -533,7 +532,7 @@ static void aclk_start_host_popcorning(RRDHOST *host)
  * Add a new collector to the list
  * If it exists, update the chart count
  */
-void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name)
+void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct _collector *tmp_collector;
     if (unlikely(!netdata_ready)) {
@@ -542,7 +541,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_LOCK;
 
-    tmp_collector = _add_collector(hostname, plugin_name, module_name);
+    tmp_collector = _add_collector(host->hostname, plugin_name, module_name);
 
     if (unlikely(tmp_collector->count != 1)) {
         COLLECTOR_UNLOCK;
@@ -551,10 +550,10 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_UNLOCK;
 
-    if(aclk_popcorn_check_bump(localhost))
+    if(aclk_popcorn_check_bump(host))
         return;
 
-    if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
+    if (unlikely(aclk_queue_query("collector", host, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
         debug(D_ACLK, "ACLK failed to queue on_connect command on collector addition");
 }
 
@@ -566,7 +565,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
  * This function will release the memory used and schedule
  * a cloud update
  */
-void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name)
+void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct _collector *tmp_collector;
     if (unlikely(!netdata_ready)) {
@@ -575,7 +574,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_LOCK;
 
-    tmp_collector = _del_collector(hostname, plugin_name, module_name);
+    tmp_collector = _del_collector(host->hostname, plugin_name, module_name);
 
     if (unlikely(!tmp_collector || tmp_collector->count)) {
         COLLECTOR_UNLOCK;
@@ -590,10 +589,10 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     _free_collector(tmp_collector);
 
-    if (aclk_popcorn_check_bump(localhost))
+    if (aclk_popcorn_check_bump(host))
         return;
 
-    if (unlikely(aclk_queue_query("collector", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
+    if (unlikely(aclk_queue_query("collector", host, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT)))
         debug(D_ACLK, "ACLK failed to queue on_connect command on collector deletion");
 }
 
@@ -1374,7 +1373,7 @@ void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted)
  *    /api/v1/info
  *    charts
  */
-int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted)
+int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted, RRDHOST *host)
 {
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
@@ -1395,11 +1394,11 @@ int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted)
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
-    web_client_api_request_v1_info_fill_buffer(localhost, local_buffer);
+    web_client_api_request_v1_info_fill_buffer(host, local_buffer);
     debug(D_ACLK, "Metadata %s with info has %zu bytes", msg_id, local_buffer->len);
 
     buffer_sprintf(local_buffer, ", \n\t \"charts\" : ");
-    charts2json(localhost, local_buffer, 1, 0);
+    charts2json(host, local_buffer, 1, 0);
     buffer_sprintf(local_buffer, "\n}\n}");
     debug(D_ACLK, "Metadata %s with chart has %zu bytes", msg_id, local_buffer->len);
 
@@ -1490,11 +1489,11 @@ void aclk_send_stress_test(size_t size)
 
 // Send info metadata message to the cloud if the link is established
 // or on request
-int aclk_send_metadata(ACLK_METADATA_STATE state)
+int aclk_send_metadata(ACLK_METADATA_STATE state, RRDHOST *host)
 {
-
-    aclk_send_info_metadata(state);
-    aclk_send_alarm_metadata(state);
+    aclk_send_info_metadata(state, host);
+    if(host != localhost)
+        aclk_send_alarm_metadata(state);
 
     return 0;
 }
@@ -1515,7 +1514,7 @@ void aclk_alarm_reload()
     if (unlikely(aclk_host_initializing(localhost)))
         return;
 
-    if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
+    if (unlikely(aclk_queue_query("on_connect", localhost, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
         if (likely(aclk_connected)) {
             errno = 0;
             error("ACLK failed to queue on_connect command on alarm reload");
@@ -1571,7 +1570,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (!netdata_cloud_setting)
         return 0;
 
-    if (host != localhost)
+    if (aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE && host != localhost)
         return 0;
 
     if (ACLK_HOST_POPCORNING(localhost))
@@ -1580,7 +1579,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (unlikely(aclk_disable_single_updates))
         return 0;
 
-    if (aclk_popcorn_check_bump(localhost))
+    if (aclk_popcorn_check_bump(host))
         return 0;
 
     if (unlikely(aclk_queue_query("_chart", host, NULL, chart_name, 0, 1, aclk_cmd))) {

@@ -546,15 +546,24 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
-            debug(D_ACLK, "EXECUTING on connect metadata command");
-            rrdhost_aclk_state_lock(localhost);
-            meta_state = localhost->aclk_state.metadata;
-            localhost->aclk_state.metadata = ACLK_METADATA_SENT;
-            rrdhost_aclk_state_unlock(localhost);
-            aclk_send_metadata(meta_state);
+            if (!host)
+                fatal("ACLK_CMD_ONCONNECT needs host pointer");
+
+            debug(D_ACLK, "EXECUTING on connect metadata command for host \"%s\" GUID \"%s\"",
+                host->hostname,
+                host->machine_guid);
+
+            rrdhost_aclk_state_lock(host);
+            meta_state = host->aclk_state.metadata;
+            host->aclk_state.metadata = ACLK_METADATA_SENT;
+            rrdhost_aclk_state_unlock(host);
+            aclk_send_metadata(meta_state, host);
             break;
 
         case ACLK_CMD_CHART:
+            if (!host)
+                fatal("ACLK_CMD_CHART needs host pointer");
+
             debug(D_ACLK, "EXECUTING a chart update command");
             if (!host)
                 fatal("Pointer to host compulsory");
@@ -562,9 +571,12 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
             break;
 
         case ACLK_CMD_CHARTDEL:
+            if (!host)
+                fatal("ACLK_CMD_CHARTDEL needs host pointer");
+
             debug(D_ACLK, "EXECUTING a chart delete command");
             //TODO: This send the info metadata for now
-            aclk_send_info_metadata(ACLK_METADATA_SENT);
+            aclk_send_info_metadata(ACLK_METADATA_SENT, host);
             break;
 
         case ACLK_CMD_ALARM:
@@ -660,6 +672,11 @@ ACLK_POPCORNING_STATE aclk_host_popcorning(RRDHOST *host)
         return ret;
     }
 
+    if (!host->aclk_state.t_last_popcorn_update){
+        rrdhost_aclk_state_unlock(host);
+        return ret;
+    }
+
     time_t t_diff = now_realtime_sec() - host->aclk_state.t_last_popcorn_update;
 
     if (t_diff >= ACLK_STABLE_TIMEOUT) {
@@ -719,7 +736,7 @@ void *aclk_query_main_thread(void *ptr)
 
         rrdhost_aclk_state_lock(localhost);
         if (unlikely(localhost->aclk_state.metadata == ACLK_METADATA_REQUIRED)) {
-            if (unlikely(aclk_queue_query("on_connect", NULL, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
+            if (unlikely(aclk_queue_query("on_connect", localhost, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
                 ACLK_SHARED_STATE_UNLOCK;
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
@@ -729,6 +746,14 @@ void *aclk_query_main_thread(void *ptr)
             localhost->aclk_state.metadata = ACLK_METADATA_CMD_QUEUED;
         }
         rrdhost_aclk_state_unlock(localhost);
+
+        ACLK_SHARED_STATE_LOCK;
+        if (aclk_shared_state.next_popcorn_host && aclk_host_popcorning(aclk_shared_state.next_popcorn_host) == ACLK_HOST_STABLE) {
+            aclk_queue_query("on_connect", aclk_shared_state.next_popcorn_host, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
+            aclk_shared_state.next_popcorn_host = NULL;
+            aclk_update_next_child_to_popcorn();
+        }
+        ACLK_SHARED_STATE_UNLOCK;
 
         while (aclk_process_query(info)) {
             // Process all commands
