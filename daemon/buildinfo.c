@@ -67,6 +67,12 @@
 #define FEAT_LWS "YES"
 #endif
 
+#ifdef NETDATA_WITH_ZLIB
+#define FEAT_ZLIB "YES"
+#else
+#define FEAT_ZLIB "NO"
+#endif
+
 // Optional plugins
 
 #ifdef HAVE_FREEIPMI
@@ -156,6 +162,7 @@ void print_build_info() {
     printf("	LWS: %s\n", FEAT_LWS);
     printf("	mosquitto: %s\n", FEAT_MOSQUITTO);
     printf("	tcalloc: %s\n", FEAT_TCMALLOC);
+    printf("	zlib: %s\n", FEAT_ZLIB);
 
     printf("Plugins:\n");
     printf("	cgroup Network Tracking: %s\n", FEAT_CGROUP_NET);
