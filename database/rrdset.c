@@ -1388,10 +1388,10 @@ void rrdset_done(RRDSET *st) {
             first_entry = 0;        // boolean: 1 = this is the first entry seen for this chart, 0 = all other entries
 
     usec_t
-            last_collect_ut,        // the timestamp in microseconds, of the last collected value
-            now_collect_ut,         // the timestamp in microseconds, of this collected value (this is NOW)
-            last_stored_ut,         // the timestamp in microseconds, of the last stored entry in the db
-            next_store_ut,          // the timestamp in microseconds, of the next entry to store in the db
+            last_collect_ut = 0,    // the timestamp in microseconds, of the last collected value
+            now_collect_ut = 0,     // the timestamp in microseconds, of this collected value (this is NOW)
+            last_stored_ut = 0,     // the timestamp in microseconds, of the last stored entry in the db
+            next_store_ut = 0,      // the timestamp in microseconds, of the next entry to store in the db
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
     netdata_thread_disable_cancelability();
