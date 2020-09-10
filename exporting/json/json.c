@@ -39,7 +39,11 @@ int init_json_instance(struct instance *instance)
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = simple_connector_end_batch;
 
-    instance->prepare_header = NULL;
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP)
+        instance->prepare_header = json_http_prepare_header;
+    else
+        instance->prepare_header = NULL;
+
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -244,4 +248,27 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         (unsigned long long)last_t);
 
     return 0;
+}
+
+/**
+ * Ppepare HTTP header
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+void json_http_prepare_header(struct instance *instance)
+{
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
+
+    buffer_sprintf(
+        simple_connector_data->last_buffer->header,
+        "POST /api/put HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %lu\r\n"
+        "\r\n",
+        instance->config.destination,
+        buffer_strlen(simple_connector_data->last_buffer->buffer));
+
+    return;
 }
