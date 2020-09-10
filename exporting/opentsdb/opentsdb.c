@@ -17,6 +17,8 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     connector_specific_config->default_port = 4242;
 
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = connector_specific_data;
+
 #ifdef ENABLE_HTTPS
     connector_specific_data->flags = NETDATA_SSL_START;
     connector_specific_data->conn = NULL;
@@ -24,7 +26,6 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
     }
 #endif
-    instance->connector_specific_data = connector_specific_data;
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_telnet;
@@ -82,7 +83,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 #endif
     instance->connector_specific_data = connector_specific_data;
 
-    instance->start_batch_formatting = open_batch_opentsdb_http;
+    instance->start_batch_formatting = open_batch_json_http;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
     instance->start_chart_formatting = NULL;
 
@@ -93,7 +94,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = close_batch_opentsdb_http;
+    instance->end_batch_formatting = close_batch_json_http;
 
     instance->prepare_header = opentsdb_http_prepare_header;
     instance->check_response = exporting_discard_response;
@@ -276,32 +277,6 @@ void opentsdb_http_prepare_header(struct instance *instance)
         buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;
-}
-
-/**
- * Open a JSON list for a bach
- *
- * @param instance an instance data structure.
- * @return Always returns 0.
- */
-int open_batch_opentsdb_http(struct instance *instance){
-    buffer_strcat(instance->buffer, "[\n");
-
-    return 0;
-}
-
-/**
- * Close a JSON list for a bach and update buffered bytes counter
- *
- * @param instance an instance data structure.
- * @return Always returns 0.
- */
-int close_batch_opentsdb_http(struct instance *instance){
-    buffer_strcat(instance->buffer, "\n]\n");
-
-    simple_connector_end_batch(instance);
-
-    return 0;
 }
 
 /**

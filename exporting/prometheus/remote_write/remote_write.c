@@ -113,6 +113,8 @@ int init_prometheus_remote_write_instance(struct instance *instance)
         return 1;
 
     struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = simple_connector_data;
+
 #ifdef ENABLE_HTTPS
     simple_connector_data->flags = NETDATA_SSL_START;
     simple_connector_data->conn = NULL;
@@ -120,7 +122,6 @@ int init_prometheus_remote_write_instance(struct instance *instance)
         security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
     }
 #endif
-    instance->connector_specific_data = simple_connector_data;
 
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));

@@ -49,7 +49,7 @@ int init_connectors(struct engine *engine)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
-                if (init_json_instance(instance) != 0)
+                if (init_json_http_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
