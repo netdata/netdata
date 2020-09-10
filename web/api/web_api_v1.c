@@ -488,7 +488,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     RRDSET *st = NULL;
 
     if((!chart || !*chart) && (!context)) {
-        buffer_sprintf(w->response.data, "No chart0 id is given at the request.");
+        buffer_sprintf(w->response.data, "No chart id is given at the request.");
         goto cleanup;
     }
 
@@ -506,19 +506,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         rrdhost_unlock(localhost);
     }
 
-//    if (!st) {
-//        buffer_sprintf(w->response.data, "No chart1 id is given at the request.");
-//        goto cleanup;
-//    }
-
-//    if(!st !chart || !*chart) {
-//        buffer_sprintf(w->response.data, "No chart2 id is given at the request.");
-//        goto cleanup;
-//    }
-
     if (!st) {
         if (!chart || !*chart) {
-            buffer_sprintf(w->response.data, "No chart2 id is given at the request.");
+            buffer_sprintf(w->response.data, "No chart id is given at the request.");
             goto cleanup;
         }
         st = rrdset_find(host, chart);
