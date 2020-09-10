@@ -43,7 +43,6 @@ AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 
-
 # -----------------------------------------------------------------------------
 # configurable options
 
@@ -1458,6 +1457,14 @@ TEST_LIBS="${CMOCKA_LIBS}"
 
 AC_SUBST([TEST_CFLAGS])
 AC_SUBST([TEST_LIBS])
+
+# -----------------------------------------------------------------------------
+# save configure options for build info
+AC_DEFINE_UNQUOTED(
+    [CONFIGURE_COMMAND],
+    ["$ac_configure_args"],
+    [options passed to configure script]
+)
 
 AC_CONFIG_FILES([
     Makefile
