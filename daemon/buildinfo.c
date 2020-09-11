@@ -73,6 +73,18 @@
 #define FEAT_ZLIB "NO"
 #endif
 
+#ifdef STORAGE_WITH_MATH
+#define FEAT_LIBM "YES"
+#else
+#define FEAT_LIBM "NO"
+#endif
+
+#ifdef HAVE_CRYPTO
+#define FEAT_CRYPTO "YES"
+#else
+#define FEAT_CRYPTO "NO"
+#endif
+
 // Optional plugins
 
 #ifdef ENABLE_APPS_PLUGIN
@@ -177,6 +189,8 @@ void print_build_info() {
     printf("    jemalloc:  %s\n", FEAT_JEMALLOC);
     printf("    JSON-C:    %s\n", FEAT_JSONC);
     printf("    libcap:    %s\n", FEAT_LIBCAP);
+    printf("    libcrypto: %s\n", FEAT_CRYPTO);
+    printf("    libm:      %s\n", FEAT_LIBM);
     printf("    LWS:       %s\n", FEAT_LWS);
     printf("    mosquitto: %s\n", FEAT_MOSQUITTO);
     printf("    tcalloc:   %s\n", FEAT_TCMALLOC);

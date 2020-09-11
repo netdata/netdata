@@ -380,6 +380,9 @@ AC_CHECK_LIB(
     [ssl_host_validation="no"]
 )
 
+test -z "${SSL_LIBS}" || \
+    AC_DEFINE([HAVE_TLS], [1], [libcrypto availability])
+
 if test "${ssl_host_validation}" = "no"; then
     AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [0], [ssl host validation])
     AC_MSG_WARN([DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.])
