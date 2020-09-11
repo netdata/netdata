@@ -973,6 +973,7 @@ void *aclk_main(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     struct aclk_query_threads query_threads;
     struct aclk_stats_thread *stats_thread = NULL;
+    time_t last_periodic_query_wakeup = 0;
 
     query_threads.thread_list = NULL;
 
@@ -1129,6 +1130,14 @@ void *aclk_main(void *ptr)
 
         if (unlikely(!query_threads.thread_list)) {
             aclk_query_threads_start(&query_threads);
+        }
+
+        time_t now = now_monotonic_sec();
+        if(aclk_connected && last_periodic_query_wakeup < now) {
+            // to make `aclk_queue_query()` param `run_after` work
+            // also makes per child popcorning work
+            last_periodic_query_wakeup = now;
+            QUERY_THREAD_WAKEUP;
         }
     } // forever
 exited:
