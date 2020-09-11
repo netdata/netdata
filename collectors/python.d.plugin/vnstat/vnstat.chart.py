@@ -150,6 +150,31 @@ class Service(ExecutableService):
         self.definitions = DYNAMIC_CHARTS
         self.command = VNSTAT_BASE_COMMAND
 
+        try:
+            self.hours_limit = int(self.configuration.get("hours_limit", 0))
+            self.days_limit = int(self.configuration.get("days_limit", 0))
+            self.months_limit = int(self.configuration.get("months_limit", 0))
+            self.years_limit = int(self.configuration.get("years_limit", 0))
+        except ValueError:
+            self.hours_limit = 0
+            self.days_limit = 0
+            self.months_limit = 0
+            self.years_limit = 0
+
+        try:
+            self.data_representation = int(self.configuration.get("data_representation", 1))
+            if not (-1 < self.data_representation < 3):
+                self.data_representation = 1
+        except ValueError:
+            self.data_representation = 1
+
+        try:
+            self.charts_enabled = int(self.configuration.get("enable_charts", 0))
+            if not (self.charts_enabled == 1 and len(interfaces) == 1):
+                self.charts_enabled = 0
+        except ValueError:
+            self.charts_enabled = 0
+
     def add_chart_dimension(self, chart_name, line_to_add):
         try:
             self.charts[chart_name].add_dimension(line_to_add)
@@ -163,36 +188,11 @@ class Service(ExecutableService):
         order = []
         data = dict()
 
-        try:
-            hours_limit = int(self.configuration.get("hours_limit", 0))
-            days_limit = int(self.configuration.get("days_limit", 0))
-            months_limit = int(self.configuration.get("months_limit", 0))
-            years_limit = int(self.configuration.get("years_limit", 0))
-        except ValueError:
-            hours_limit = 0
-            days_limit = 0
-            months_limit = 0
-            years_limit = 0
-
-        try:
-            data_representation = int(self.configuration.get("data_representation", 1))
-            if not (-1 < data_representation < 3):
-                data_representation = 1
-        except ValueError:
-            data_representation = 1
-
-        try:
-            charts_enabled = int(self.configuration.get("enable_charts", 0))
-            if not (charts_enabled == 1 and len(interfaces) == 1):
-                charts_enabled = 0
-        except ValueError:
-            charts_enabled = 0
-
         index = 0
         for interface in interfaces:
 
             interface_or_chart = interface
-            if charts_enabled == 1:
+            if self.charts_enabled == 1:
                 interface_or_chart = "chart"
 
             charts["now_vs_day_" + interface_or_chart] = {
@@ -227,8 +227,8 @@ class Service(ExecutableService):
             data["now_vs_day_" + interface + "_current"] = data_points[index][2]
             data["now_vs_day_" + interface + "_yesterday"] = data_points[index][3]
 
-            if hours_limit != 0:
-                if (data_representation == 0 or data_representation == 2):
+            if self.hours_limit != 0:
+                if (self.data_representation == 0 or self.data_representation == 2):
                     charts["hours_average_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -243,7 +243,7 @@ class Service(ExecutableService):
 
                     order.append("hours_average_" + interface_or_chart)
 
-                if (data_representation == 0 or data_representation == 1):
+                if (self.data_representation == 0 or self.data_representation == 1):
                     charts[("hours_total_" + interface_or_chart)] = {
                         "options": [
                             None,
@@ -258,11 +258,11 @@ class Service(ExecutableService):
 
                     order.append("hours_total_" + interface_or_chart)
 
-                start_at = len(data_points[index][4]) - hours_limit
-                if (hours_limit == -1 or start_at < 0):
+                start_at = len(data_points[index][4]) - self.hours_limit
+                if (self.hours_limit == -1 or start_at < 0):
                     start_at = 0
                 for hour in data_points[index][4][start_at:]:
-                    if (data_representation == 0 or data_representation == 2):
+                    if (self.data_representation == 0 or self.data_representation == 2):
                         total_amount = hour[1]
                         average_amount = ((total_amount * 8) / 1000) / 3600
                         new_line = [
@@ -292,7 +292,7 @@ class Service(ExecutableService):
                             )
                         ] = average_amount
 
-                    if (data_representation == 0 or data_representation == 1):
+                    if (self.data_representation == 0 or self.data_representation == 1):
                         new_line = [
                             (
                                 "hours_total_"
@@ -320,8 +320,8 @@ class Service(ExecutableService):
                             )
                         ] = hour[1]
 
-            if days_limit != 0:
-                if (data_representation == 0 or data_representation == 2):
+            if self.days_limit != 0:
+                if (self.data_representation == 0 or self.data_representation == 2):
                     charts["days_average_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -336,7 +336,7 @@ class Service(ExecutableService):
 
                     order.append("days_average_" + interface_or_chart)
 
-                if (data_representation == 0 or data_representation == 1):
+                if (self.data_representation == 0 or self.data_representation == 1):
                     charts["days_total_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -351,11 +351,11 @@ class Service(ExecutableService):
 
                     order.append("days_total_" + interface_or_chart)
 
-                start_at = len(data_points[index][5]) - days_limit
-                if (days_limit == -1 or start_at < 0):
+                start_at = len(data_points[index][5]) - self.days_limit
+                if (self.days_limit == -1 or start_at < 0):
                     start_at = 0
                 for day in data_points[index][5][start_at:]:
-                    if (data_representation == 0 or data_representation == 2):
+                    if (self.data_representation == 0 or self.data_representation == 2):
                         total_amount = day[1]
                         average_amount = ((total_amount * 8) / 1000) / 86400
                         new_line = [
@@ -385,7 +385,7 @@ class Service(ExecutableService):
                             )
                         ] = average_amount
 
-                    if (data_representation == 0 or data_representation == 1):
+                    if (self.data_representation == 0 or self.data_representation == 1):
                         new_line = [
                             (
                                 "days_total_"
@@ -408,8 +408,8 @@ class Service(ExecutableService):
                             ("days_total_" + interface + "_day" + str(hash(day[0]))[1:])
                         ] = day[1]
 
-            if months_limit != 0:
-                if (data_representation == 0 or data_representation == 2):
+            if self.months_limit != 0:
+                if (self.data_representation == 0 or self.data_representation == 2):
                     charts["months_average_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -424,7 +424,7 @@ class Service(ExecutableService):
 
                     order.append("months_average_" + interface_or_chart)
 
-                if (data_representation == 0 or data_representation == 1):
+                if (self.data_representation == 0 or self.data_representation == 1):
                     charts["months_total_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -439,11 +439,11 @@ class Service(ExecutableService):
 
                     order.append("months_total_" + interface_or_chart)
 
-                start_at = len(data_points[index][6]) - months_limit
-                if (months_limit == -1 or start_at < 0):
+                start_at = len(data_points[index][6]) - self.months_limit
+                if (self.months_limit == -1 or start_at < 0):
                     start_at = 0
                 for month in data_points[index][6][start_at:]:
-                    if (data_representation == 0 or data_representation == 2):
+                    if (self.data_representation == 0 or self.data_representation == 2):
                         total_amount = month[1]
                         number_of_days = monthrange(
                             int(month[0].split("/")[1]), int(month[0].split("/")[0])
@@ -476,7 +476,7 @@ class Service(ExecutableService):
                             )
                         ] = average_amount
 
-                    if (data_representation == 0 or data_representation == 1):
+                    if (self.data_representation == 0 or self.data_representation == 1):
                         new_line = [
                             (
                                 "months_total_"
@@ -504,8 +504,8 @@ class Service(ExecutableService):
                             )
                         ] = month[1]
 
-            if years_limit != 0:
-                if (data_representation == 0 or data_representation == 2):
+            if self.years_limit != 0:
+                if (self.data_representation == 0 or self.data_representation == 2):
                     charts["years_average_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -520,7 +520,7 @@ class Service(ExecutableService):
 
                     order.append("years_average_" + interface_or_chart)
 
-                if (data_representation == 0 or data_representation == 1):
+                if (self.data_representation == 0 or self.data_representation == 1):
                     charts["years_total_" + interface_or_chart] = {
                         "options": [
                             None,
@@ -535,11 +535,11 @@ class Service(ExecutableService):
 
                     order.append("years_total_" + interface_or_chart)
 
-                start_at = len(data_points[index][7]) - years_limit
-                if (years_limit == -1 or start_at < 0):
+                start_at = len(data_points[index][7]) - self.years_limit
+                if (self.years_limit == -1 or start_at < 0):
                     start_at = 0
                 for year in data_points[index][7][start_at:]:
-                    if (data_representation == 0 or data_representation == 2):
+                    if (self.data_representation == 0 or self.data_representation == 2):
                         total_amount = year[1]
                         number_of_days = 365
                         if monthrange(int(year[0]), 2)[1] == 29:
@@ -572,7 +572,7 @@ class Service(ExecutableService):
                             )
                         ] = average_amount
 
-                    if (data_representation == 0 or data_representation == 1):
+                    if (self.data_representation == 0 or self.data_representation == 1):
                         new_line = [
                             (
                                 "years_total_"
@@ -663,11 +663,11 @@ class Service(ExecutableService):
             )
             current_data_rate = ((current_amount * 8) / 1000) / 300
             # If no data is present for yesterday, then today's values will be chosen automatically:
-            yesterdayAmount = (
+            yesterday_amount = float(
                 traffic["day"][(len(traffic["day"]) - 2)]["rx"]
                 + traffic["day"][(len(traffic["day"]) - 2)]["tx"]
             )
-            yesterday_data_rate = ((yesterdayAmount * 8) / 1000) / 86400
+            yesterday_data_rate = ((yesterday_amount * 8) / 1000) / 86400
 
             hours_total_data = []
             for hour in traffic["hour"]:
