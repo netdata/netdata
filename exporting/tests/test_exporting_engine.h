@@ -116,6 +116,8 @@ int __mock_end_chart_formatting(struct instance *instance, RRDSET *st);
 int __mock_end_host_formatting(struct instance *instance, RRDHOST *host);
 int __mock_end_batch_formatting(struct instance *instance);
 
+int __wrap_simple_connector_end_batch(struct instance *instance);
+
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
 void *__real_init_write_request();
 void *__wrap_init_write_request();

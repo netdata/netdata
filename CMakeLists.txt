@@ -1270,6 +1270,7 @@ endif()
         -Wl,--wrap=connect_to_one_of
         -Wl,--wrap=create_main_rusage_chart
         -Wl,--wrap=send_main_rusage
+        -Wl,--wrap=simple_connector_end_batch
         ${PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS}
         ${KINESIS_LINK_OPTIONS}
         ${PUBSUB_LINK_OPTIONS}
