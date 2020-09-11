@@ -122,7 +122,6 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(instance->metric_formatting, format_dimension_collected_graphite_plaintext);
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
-    assert_ptr_equal(instance->end_batch_formatting, simple_connector_update_buffered_bytes);
 
     BUFFER *buffer = instance->buffer;
     assert_ptr_not_equal(buffer, NULL);
@@ -583,10 +582,13 @@ static void test_simple_connector_send_buffer(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
     struct stats *stats = &instance->stats;
-    BUFFER *buffer = instance->buffer;
+    BUFFER *instance_buffer = instance->buffer;
 
     int sock = 1;
     int failures = 3;
+    size_t buffered_metrics = 0;
+    BUFFER *header = buffer_create(0);
+    BUFFER *buffer = buffer_create(0);
 
     __real_mark_scheduled_instances(engine);
 
@@ -605,13 +607,13 @@ static void test_simple_connector_send_buffer(void **state)
 
     expect_function_call(__wrap_send);
     expect_value(__wrap_send, sockfd, 1);
-    expect_value(__wrap_send, buf, buffer_tostring(buffer));
+    expect_value(__wrap_send, buf, buffer_tostring(instance_buffer));
     expect_string(
         __wrap_send, buf, "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
     expect_value(__wrap_send, len, 84);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
-    simple_connector_send_buffer(&sock, &failures, instance);
+    simple_connector_send_buffer(&sock, &failures, instance, header, buffer, buffered_metrics);
 
     assert_int_equal(failures, 0);
     assert_int_equal(stats->transmission_successes, 1);
@@ -1159,7 +1161,7 @@ static void test_init_prometheus_remote_write_instance(void **state)
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, NULL);
     assert_ptr_equal(instance->end_batch_formatting, format_batch_prometheus_remote_write);
-    assert_ptr_equal(instance->prepare_header, prometheus_remote_write_send_header);
+    assert_ptr_equal(instance->prepare_header, prometheus_remote_write_prepare_header);
     assert_ptr_equal(instance->check_response, process_prometheus_remote_write_response);
 
     assert_ptr_not_equal(instance->buffer, NULL);
@@ -1173,11 +1175,10 @@ static void test_init_prometheus_remote_write_instance(void **state)
     freez(instance->connector_specific_data);
 }
 
-static void test_prometheus_remote_write_send_header(void **state)
+static void test_prometheus_remote_write_prepare_header(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
-    int sock = 1;
 
     struct prometheus_remote_write_specific_config *connector_specific_config =
         callocz(1, sizeof(struct prometheus_remote_write_specific_config));
@@ -1199,8 +1200,6 @@ static void test_prometheus_remote_write_send_header(void **state)
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
     expect_value(__wrap_send, len, 167);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
-
-    assert_int_equal(prometheus_remote_write_send_header(&sock, instance),0);
 
     free(connector_specific_config->remote_write_path);
 }
@@ -1884,7 +1883,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_init_prometheus_remote_write_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
-            test_prometheus_remote_write_send_header, setup_initialized_engine, teardown_initialized_engine),
+            test_prometheus_remote_write_prepare_header, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_process_prometheus_remote_write_response),
         cmocka_unit_test_setup_teardown(
             test_format_host_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),
