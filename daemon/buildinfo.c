@@ -182,7 +182,7 @@ void print_build_info() {
     printf("Features:\n");
     printf("    dbengine:                %s\n", FEAT_DBENGINE);
     printf("    Native HTTPS:            %s\n", FEAT_NATIVE_HTTPS);
-    printf("    Netdata CLoud:           %s\n", FEAT_CLOUD);
+    printf("    Netdata Cloud:           %s\n", FEAT_CLOUD);
     printf("    TLS Host Verification:   %s\n", FEAT_TLS_HOST_VERIFY);
 
     printf("Libraries:\n");
