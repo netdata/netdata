@@ -287,7 +287,7 @@ inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
     if(unlikely(entries < 5)) entries = 5;
     if(unlikely(entries > RRD_HISTORY_ENTRIES_MAX)) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_ALLOC))
+    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_ALLOC || mode == RRD_MEMORY_MODE_SQLITE))
         return entries;
 
     long page = (size_t)sysconf(_SC_PAGESIZE);
@@ -933,13 +933,15 @@ RRDSET *rrdset_create_custom(
     }
 
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
-        st->chart_uuid = sql_find_chart_uuid(
-            host, st->id, st->name, type, family, context, title, units, plugin, module, priority, update_every,
-            chart_type, memory_mode, history_entries);
+        st->chart_uuid = sql_find_chart_uuid(host, st);//, st->name, type, family, context, title, units, plugin, module, priority, update_every,
+            //chart_type, memory_mode, history_entries);
 
         st->state->first_entry_t = LONG_MAX;
         st->state->last_entry_t = 0;
         sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
+        st->state->uuid_cache = NULL;
+        int rc = sql_cache_chart_dimensions(st);
+        info("Cached %ld dimensions for chart %s", rc, st->id);
     }
 
 #ifdef ENABLE_DBENGINE

@@ -2,6 +2,7 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+#include "sqlite/sqlite_functions.h"
 
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
@@ -134,10 +135,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_legacy = 1;
 #endif
 
-    //if (is_archived || is_localhost) {
+    if (memory_mode == RRD_MEMORY_MODE_SQLITE)
         sql_store_host(guid, hostname, registry_hostname, update_every, os, timezone, tags);
-        //return NULL;
-    //}
     rrd_check_wrlock();
 
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
@@ -335,6 +334,12 @@ RRDHOST *rrdhost_create(const char *hostname,
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
+    }
+
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+        host->uuid_cache = NULL;
+        int rc = sql_cache_host_charts(host);
+        info("Cached %ld dimensions for chart %s", rc, host->hostname);
     }
 
     // ------------------------------------------------------------------------

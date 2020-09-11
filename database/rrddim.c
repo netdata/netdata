@@ -395,7 +395,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state = mallocz(sizeof(*rd->state));
 
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
-        rd->state->metric_uuid = sql_find_dim_uuid(st, rd->id, rd->name, multiplier, divisor, algorithm);
+        rd->state->metric_uuid = sql_find_dim_uuid(st, rd);
 //    rd->state->active_count = 0;
 //    rd->state->first_entry_t = LONG_MAX;
 //    rd->state->last_entry_t = 0;

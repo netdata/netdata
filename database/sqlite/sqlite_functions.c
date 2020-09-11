@@ -12,11 +12,10 @@ sqlite3 *dbmem = NULL;
 int metrics_read=0, metrics_write = 0;
 
 static netdata_mutex_t sqlite_flush = NETDATA_MUTEX_INITIALIZER;
-static netdata_mutex_t sqlite_find_uuid = NETDATA_MUTEX_INITIALIZER;
+//static netdata_mutex_t sqlite_find_uuid = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t sqlite_add_page = NETDATA_MUTEX_INITIALIZER;
 
 int sqlite_disk_quota_mb = 64;
-
 
 struct sqlite_page_flush {
     uint32_t    page_count;               // Number of pages to flush
@@ -24,6 +23,93 @@ struct sqlite_page_flush {
     struct rrddim_metric_page *tail;    // Add head
 } sqlite_page_flush_list = { .page_count=0, .head=NULL, .tail=NULL};
 
+static inline void add_in_uuid_cache(struct uuid_cache **uuid_cache, void *object, uuid_t *uuid, const char *id, const char *name)
+{
+    //struct uuid_cache **temp_uuid_cache = uuid_cache;
+    struct uuid_cache *item;
+
+    item = mallocz(sizeof(*item));
+    uuid_copy(item->uuid, *uuid);
+    item->object = object;
+    item->id = id?strdupz(id):NULL;
+    item->name = name?strdupz(name):NULL;
+
+    item->next = *uuid_cache;
+    item->count = *uuid_cache?(*uuid_cache)->count+1:0;
+    //info("Adding to UUID cache %p %s %s (count = %d)", object, id, name, item->count);
+    *uuid_cache = item;
+    return;
+}
+
+//static void add_chart_uuidCache(RRDHOST *host, RRDSET *st, uuid_t *uuid, char *id, char *name)
+//{
+//    struct uuid_cache *temp_uuid_cache;
+//
+//    if (!st && (!id || !name))
+//        return;
+//
+//    add_in_uuid_cache(&host->uuid_cache, st, uuid, id, name);
+////    temp_uuid_cache = mallocz(sizeof(*temp_uuid_cache));
+////    temp_uuid_cache->next = host->uuid_cache;
+////    uuid_copy(temp_uuid_cache->uuid, *uuid);
+////    temp_uuid_cache->object = st;
+////    if (!st) {
+////        temp_uuid_cache->id = strdupz(id);
+////        temp_uuid_cache->name = strdupz(name);
+////    } else {
+////        temp_uuid_cache->id = NULL;
+////        temp_uuid_cache->name = NULL;
+////    }
+////    host->uuid_cache = temp_uuid_cache;
+//    return;
+//}
+
+//static void add_dim_uuidCache(RRDSET *st, RRDDIM *rd, uuid_t *uuid, char *id, char *name)
+//{
+//    struct uuid_cache *temp_uuid_cache;
+//
+//    if (!rd && (!id || !name))
+//        return;
+//
+//    add_in_uuid_cache(&st->state->uuid_cache, rd, uuid, id, name);
+//
+////    temp_uuid_cache = mallocz(sizeof(*temp_uuid_cache));
+////    temp_uuid_cache->next = st->state->uuid_cache;
+////    uuid_copy(temp_uuid_cache->uuid, *uuid);
+////    temp_uuid_cache->object = rd;
+////    if (!rd) {
+////        temp_uuid_cache->id = strdupz(id);
+////        temp_uuid_cache->name = strdupz(name);
+////    } else {
+////        temp_uuid_cache->id = NULL;
+////        temp_uuid_cache->name = NULL;
+////    }
+////    st->state->uuid_cache = temp_uuid_cache;
+//    return;
+//}
+
+uuid_t *find_in_uuid_cache(struct uuid_cache **uuid_cache, char *id, char *name)
+{
+    //struct uuid_cache **temp_uuid_cache = uuid_cache;
+    struct uuid_cache *item;
+    uuid_t  *uuid = NULL;
+
+    while ((item = *uuid_cache)) {
+        if (!item->object && (!strcmp(item->id, id)) &&
+            (!strcmp(item->name, name))) {
+            uuid = mallocz(sizeof(uuid_t));
+            uuid_copy(*uuid, item->uuid);
+            *uuid_cache = item->next;
+            //info("Removed item (%s %s) from list %d remain after this", item->id, item->name, item->count);
+            freez(item->id);
+            freez(item->name);
+            freez(item);
+            break;
+        }
+        uuid_cache = &(item)->next;
+    }
+    return uuid;
+}
 
 /*
  * Flush a single page (lock is needed)
@@ -439,7 +525,7 @@ void sql_backup_database()
 
     char sql[512];
 
-    sprintf(sql,"VACUUM into '/tmp/database.%lu'", time(NULL));
+    sprintf(sql,"VACUUM into '/tmp/database.%ld'", time(NULL));
 
     int rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
 
@@ -457,9 +543,11 @@ int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, co
     char  dim_str[37], chart_str[37];
     int rc;
 
-    if (!db)
+    if (!db) {
+        errno = 0;
+        error("Database has not been initialized");
         return 1;
-
+    }
     // FIRST WAY TO DO IT
     uuid_unparse_lower(*dim_uuid, dim_str);
     uuid_unparse_lower(*chart_uuid, chart_str);
@@ -612,7 +700,7 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
 
 #define INSERT_HOST "insert or replace into host (host_uuid,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
 int sql_store_host(
-    char *guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone, char *tags)
+    char *guid, char *hostname, char *registry_hostname, int update_every, const char *os, const char *timezone, char *tags)
 {
     sqlite3_stmt *res;
     int rc;
@@ -691,11 +779,11 @@ RRDDIM *sql_load_chart_dimensions(RRDSET *st, int temp)
     char *err_msg = NULL;
 
     if (!db)
-        return 1;
+        return NULL;
 
     struct dimension *dimension_list = NULL, *tmp_dimension_list;
 
-    uuid_unparse_lower(st->chart_uuid, chart_str);
+    uuid_unparse_lower(*st->chart_uuid, chart_str);
     sprintf(sql, "select h2u(dim_uuid), id, name from dimension where chart_uuid = u2h('%s') and archived = 1;", chart_str);
 
     rc = sqlite3_exec(db, sql, dim_callback, &dimension_list, &err_msg);
@@ -726,11 +814,11 @@ RRDDIM *sql_load_chart_dimensions(RRDSET *st, int temp)
 
 int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions)
 {
-    char *err_msg = NULL;
+//    char *err_msg = NULL;
     char sql[1024];
     char chart_str[37];
     int rc;
-    static sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     if (!db)
         return 1;
@@ -740,39 +828,32 @@ int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions
     if (!res) {
         sprintf(sql, "select h2u(dim_uuid), id, name from dimension where chart_uuid = @chart and archived = 1;");
         rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+        if (rc != SQLITE_OK) {
+            error("Failed to prepare statement");
+            return 1;
+        }
     }
 
-    int param = sqlite3_bind_parameter_index(res, "@chart");
-    rc = sqlite3_bind_blob(res, param, chart_uuid, 16, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, 16, SQLITE_TRANSIENT);
 
-    //rc = sqlite3_exec(db, sql, dim_callback, dimension_list, &err_msg);
-    //if (rc != SQLITE_OK) {
-      //  error("SQL error: %s", err_msg);
-        //sqlite3_free(err_msg);
-    //}
     //unsigned long long start = now_realtime_usec();
-    //unsigned long long dur = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
-        //unsigned long long end = now_realtime_usec();
-        //info("SQLITE: Query result in %llu usec", end - start);
         if (*dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
             buffer_strcat(wb, "\t\t\t\t\"");
-        buffer_strcat_jsonescape(wb, sqlite3_column_text(res, 1));
+        buffer_strcat_jsonescape(wb, (char *) sqlite3_column_text(res, 1));
         buffer_strcat(wb, "\": { \"name\": \"");
-        buffer_strcat_jsonescape(wb, sqlite3_column_text(res, 2));
+        buffer_strcat_jsonescape(wb, (char *) sqlite3_column_text(res, 2));
         buffer_strcat(wb, " (");
-        buffer_strcat(wb, sqlite3_column_text(res, 0));
+        buffer_strcat(wb, (char *) sqlite3_column_text(res, 0));
         buffer_strcat(wb, ")");
         buffer_strcat(wb, "\" }");
         (*dimensions)++;
     }
     //unsigned long long end = now_realtime_usec();
-    //dur = dur + (end - start);
     //info("SQLITE: Chart %s generated in %llu usec", chart_str, end - start);
-    //sqlite3_finalize(row_res);
-    sqlite3_reset(res);
+    sqlite3_finalize(res);
     return 0;
 }
 
@@ -867,12 +948,18 @@ int sql_select_dimension(uuid_t *chart_uuid, struct dimension_list **dimension_l
     return 0;
 }
 
-char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm)
+char *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)  //, char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm)
 {
     sqlite3_stmt *res = NULL;
     sqlite3_stmt *res1 = NULL;
     uuid_t *uuid = NULL;
     int rc;
+
+    //info("LOOKUP Dim %s in chart %s", rd->id, st->id);
+    uuid = find_in_uuid_cache(&st->state->uuid_cache, rd->id, rd->name);
+
+    if (uuid)
+        goto found;
 
     //netdata_mutex_lock(&sqlite_find_uuid);
     if (!res) {
@@ -890,8 +977,8 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multi
     int name_id = sqlite3_bind_parameter_index(res, "@name");
 
     rc = sqlite3_bind_blob(res, dim_id, st->chart_uuid, 16, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_text(res, id_id, id, -1, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_text(res, name_id, name, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, id_id, rd->id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, name_id, rd->name, -1, SQLITE_TRANSIENT);
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid = malloc(sizeof(uuid_t));
@@ -899,16 +986,19 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multi
         break;
     }
 
-    // Dimension does is not known, create it
+    // Dimension is not known, create it
     if (uuid == NULL) {
         uuid = malloc(sizeof(uuid_t));
-        //info("SQLite: Generating uuid for dimension %s under chart %s", id, st->name);
-
         uuid_generate(*uuid);
-        sql_store_dimension(uuid, st->chart_uuid, id, name, multiplier, divisor, algorithm);
+
+        //add_dim_uuidCache(st, rd, *uuid, NULL, NULL);
+        add_in_uuid_cache(&st->state->uuid_cache, rd, uuid, NULL, NULL);
+        sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
     }
     sqlite3_reset(res);
     sqlite3_finalize(res);
+
+found:
 
 //    if (uuid) {
 //        rc = sqlite3_prepare_v2(
@@ -933,14 +1023,22 @@ char *sql_find_dim_uuid(RRDSET *st, char *id, char *name, collected_number multi
     return uuid;
 }
 
-uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *type, const char *family,
-        const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
-        int update_every, int chart_type, int memory_mode, long history_entries)
+uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st) // char *id, char *name, const char *type, const char *family,
+        //const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
+        //int update_every, int chart_type, int memory_mode, long history_entries)
 {
     sqlite3_stmt *res = NULL;
     sqlite3_stmt *res1 = NULL;
     uuid_t *uuid = NULL;
     int rc;
+
+    //Check in the CHART cache first
+    struct uuid_cache *temp_uuid_cache = host->uuid_cache;
+
+    uuid = find_in_uuid_cache(&host->uuid_cache, st->id, st->name);
+
+    if (uuid)
+        goto found;
 
     //netdata_mutex_lock(&sqlite_find_uuid);
 
@@ -959,8 +1057,8 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *typ
     int name_id = sqlite3_bind_parameter_index(res, "@name");
 
     rc = sqlite3_bind_blob(res, dim_id, &host->host_uuid, 16, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_text(res, id_id, id, -1, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_text(res, name_id, name, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, id_id, st->id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, name_id, st->name, -1, SQLITE_TRANSIENT);
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         uuid = mallocz(sizeof(uuid_t));
@@ -973,16 +1071,20 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *typ
         uuid_generate(*uuid);
         char uuid_str[37];
         uuid_unparse_lower(*uuid, uuid_str);
-        info("SQLite: Generating uuid [%s] for chart %s under host %s", uuid_str, id, host->hostname);
+        info("SQLite: Generating uuid [%s] for chart %s under host %s", uuid_str, st->id, host->hostname);
+        //add_chart_uuidCache(host, st, st->chart_uuid, NULL, NULL);
+        add_in_uuid_cache(&host->uuid_cache, st, uuid, NULL, NULL);
         sql_store_chart(
-            uuid, &host->host_uuid, type, id, name, family, context, title, units, plugin, module, priority,
-            update_every, chart_type, memory_mode, history_entries);
+            uuid, &host->host_uuid, st->type, st->id, st->name, st->family, st->context, st->title, st->units, st->plugin_name, st->module_name, st->priority,
+            st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
     }
     //char uuid_str[37];
     //uuid_unparse_lower(*uuid, uuid_str);
     //info("SQLite: Returning uuid [%s] for chart %s under host %s", uuid_str, id, host->hostname);
     sqlite3_reset(res);
     sqlite3_finalize(res);
+
+found:
 
 //    if (uuid) {
 //        rc = sqlite3_prepare_v2(
@@ -1266,72 +1368,72 @@ sqlite3_blob *sql_open_metric_blob(uuid_t *dim_uuid)
     return blob;
 }
 
-void sql_store_page_info(uuid_t dim_uuid, int valid_page, int page_length, usec_t  start_time, usec_t end_time, int fileno, size_t offset, size_t size)
-{
-    char sql[512];
-    char *err_msg = NULL;
-    static sqlite3_stmt *res = NULL;
-    static int last_fileno = 0;
-    static int last_offset = 0;
-    static char *buf = NULL;
-    static char *uncompressed_buf = NULL;
-    static void *compressed_buf = NULL;
-    static int max_compressed_size = 0;
-
-    //return;
-
-    if (!res) {
-        int rc = sqlite3_prepare_v2(
-            db,
-            "INSERT OR REPLACE into page (dim_uuid, page , page_size, start_date, end_date, fileno, offset, size) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);",
-            -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            info("SQLITE: Failed to prepare statement for metric page");
-            return;
-        }
-    }
-
-//    if (last_fileno != fileno || last_offset != offset) {
-//        freez(buf);
-//        freez(uncompressed_buf);
-//        freez(compressed_buf);
-//        //buf = malloc(size);
-//        size_t old_pos = lseek(fileno, 0, SEEK_CUR);
-//        int new_pos = lseek(fileno, offset, SEEK_SET);
-//        posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size));
-//        int rc = read(fileno, buf, size);
-//        if (rc < 0)
-//                error("Cant ready the extent");
-//        lseek(fileno, old_pos, SEEK_SET);
-//        uncompressed_buf = malloc(64 * page_length + 128);
-//        int ret = LZ4_decompress_safe((char *) buf, (char *) uncompressed_buf, size, 64 * page_length);
-//        info("Read %d bytes -- Uncompressed extent, new size = %d (old file pos %llu , new file pos %llu)", rc, ret, old_pos, new_pos);
-//        max_compressed_size = LZ4_compressBound(page_length);
-//        compressed_buf = mallocz(max_compressed_size);
-//        last_fileno = fileno;
-//        last_offset = offset;
-//    }
-//    // Uncompress it
+//void sql_store_page_info(uuid_t dim_uuid, int valid_page, int page_length, usec_t  start_time, usec_t end_time, int fileno, size_t offset, size_t size)
+//{
+//    char sql[512];
+//    char *err_msg = NULL;
+//    static sqlite3_stmt *res = NULL;
+//    static int last_fileno = 0;
+//    static int last_offset = 0;
+//    static char *buf = NULL;
+//    static char *uncompressed_buf = NULL;
+//    static void *compressed_buf = NULL;
+//    static int max_compressed_size = 0;
 //
-//    int compressed_size = LZ4_compress_default(uncompressed_buf+valid_page * page_length, compressed_buf, page_length, max_compressed_size);
-//    info("Compressed size for page %d = %d", valid_page, compressed_size);
-
-    int rc = sqlite3_bind_blob(res, 1  , dim_uuid, 16, SQLITE_TRANSIENT);
-    rc = sqlite3_bind_int(res, 2, valid_page);
-    rc = sqlite3_bind_int(res, 3, page_length);
-    rc = sqlite3_bind_int64(res, 4, start_time);
-    rc = sqlite3_bind_int64(res, 5, end_time);
-    rc = sqlite3_bind_int(res, 6, fileno);
-    rc = sqlite3_bind_int64(res, 7, offset);
-    rc = sqlite3_bind_int64(res, 8, size);
-    //rc = sqlite3_bind_blob(res, 9, compressed_buf, compressed_size, SQLITE_TRANSIENT);
-
-    //free(compressed_buf);
-
-    sqlite3_step(res);
-    sqlite3_reset(res);
-    return;
-}
+//    //return;
+//
+//    if (!res) {
+//        int rc = sqlite3_prepare_v2(
+//            db,
+//            "INSERT OR REPLACE into page (dim_uuid, page , page_size, start_date, end_date, fileno, offset, size) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);",
+//            -1, &res, 0);
+//        if (rc != SQLITE_OK) {
+//            info("SQLITE: Failed to prepare statement for metric page");
+//            return;
+//        }
+//    }
+//
+////    if (last_fileno != fileno || last_offset != offset) {
+////        freez(buf);
+////        freez(uncompressed_buf);
+////        freez(compressed_buf);
+////        //buf = malloc(size);
+////        size_t old_pos = lseek(fileno, 0, SEEK_CUR);
+////        int new_pos = lseek(fileno, offset, SEEK_SET);
+////        posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size));
+////        int rc = read(fileno, buf, size);
+////        if (rc < 0)
+////                error("Cant ready the extent");
+////        lseek(fileno, old_pos, SEEK_SET);
+////        uncompressed_buf = malloc(64 * page_length + 128);
+////        int ret = LZ4_decompress_safe((char *) buf, (char *) uncompressed_buf, size, 64 * page_length);
+////        info("Read %d bytes -- Uncompressed extent, new size = %d (old file pos %llu , new file pos %llu)", rc, ret, old_pos, new_pos);
+////        max_compressed_size = LZ4_compressBound(page_length);
+////        compressed_buf = mallocz(max_compressed_size);
+////        last_fileno = fileno;
+////        last_offset = offset;
+////    }
+////    // Uncompress it
+////
+////    int compressed_size = LZ4_compress_default(uncompressed_buf+valid_page * page_length, compressed_buf, page_length, max_compressed_size);
+////    info("Compressed size for page %d = %d", valid_page, compressed_size);
+//
+//    int rc = sqlite3_bind_blob(res, 1  , dim_uuid, 16, SQLITE_TRANSIENT);
+//    rc = sqlite3_bind_int(res, 2, valid_page);
+//    rc = sqlite3_bind_int(res, 3, page_length);
+//    rc = sqlite3_bind_int64(res, 4, start_time);
+//    rc = sqlite3_bind_int64(res, 5, end_time);
+//    rc = sqlite3_bind_int(res, 6, fileno);
+//    rc = sqlite3_bind_int64(res, 7, offset);
+//    rc = sqlite3_bind_int64(res, 8, size);
+//    //rc = sqlite3_bind_blob(res, 9, compressed_buf, compressed_size, SQLITE_TRANSIENT);
+//
+//    //free(compressed_buf);
+//
+//    sqlite3_step(res);
+//    sqlite3_reset(res);
+//    return;
+//}
 //
 //    sql_store_page_info(temp_id, valid_page, descr->page_length, descr->start_time, descr->end_time, extent->datafile->file, extent->offset);
 
@@ -1688,8 +1790,8 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb, size_t *dimensions_count, size_t
             sqlite3_column_text(res_chart, 6), id //sqlite3_column_text(res_chart, 2)
             ,
             sqlite3_column_int(res_chart, 7),
-            sqlite3_column_text(res_chart, 8) ? sqlite3_column_text(res_chart, 8) : "",
-            sqlite3_column_text(res_chart, 9) ? sqlite3_column_text(res_chart, 9) : "", "false",
+            sqlite3_column_text(res_chart, 8) ? sqlite3_column_text(res_chart, 8) : (char *) "",
+            sqlite3_column_text(res_chart, 9) ? sqlite3_column_text(res_chart, 9) : (char *) "", (char *) "false",
             sqlite3_column_text(res_chart, 10), id //sqlite3_column_text(res_chart, 2)
             ,
             rrdset_type_name(sqlite3_column_int(res_chart, 11)));
@@ -2139,4 +2241,64 @@ void *sqlite_rotation_main(void *ptr)
 
     netdata_thread_cleanup_pop(1);
     return NULL;
+}
+
+int sql_cache_host_charts(RRDHOST *host)
+{
+    int rc;
+    sqlite3_stmt *res = NULL;
+
+    if (!db)
+        return 0;
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(db, "select chart_uuid, id, name from chart where host_uuid = @host;", -1, &res, 0);
+        if (rc != SQLITE_OK)
+            return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, 16, SQLITE_TRANSIENT);
+    int count = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        add_in_uuid_cache(&host->uuid_cache, NULL, sqlite3_column_blob(res, 0), sqlite3_column_text(res,1), sqlite3_column_text(res,2));
+        count++;
+    }
+    sqlite3_finalize(res);
+    return count;
+}
+
+int sql_cache_chart_dimensions(RRDSET *st)
+{
+    int rc;
+    sqlite3_stmt *res = NULL;
+
+    if (!db) {
+        errno = 0;
+        error("Database has not been initialized");
+        return 0;
+    }
+
+    if (!res) {
+        rc = sqlite3_prepare_v2(db, "select dim_uuid, id, name from dimension where chart_uuid = @chart;", -1, &res, 0);
+        if (rc != SQLITE_OK) {
+            errno = 0;
+            error("Failed to prepare statement to find chart dimensions");
+            return 0;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        errno = 0;
+        error("Failed to bind chart_uuid to find chart dimensions");
+        sqlite3_finalize(res);
+        return 0;
+    }
+    int count = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        add_in_uuid_cache(&st->state->uuid_cache, NULL, sqlite3_column_blob(res, 0), sqlite3_column_text(res,1), sqlite3_column_text(res,2));
+        count++;
+    }
+    sqlite3_finalize(res);
+    return count;
 }

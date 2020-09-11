@@ -392,6 +392,15 @@ struct rrddim_volatile {
     } query_ops;
 };
 
+struct uuid_cache {
+    uuid_t   uuid;
+    char    *id;
+    char    *name;
+    void    *object;          // Parent object -- either rd or chart if not null it needs to go to the database
+    uint32_t count;
+    struct uuid_cache *next;
+};
+
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
@@ -403,6 +412,7 @@ struct rrdset_volatile {
     time_t first_entry_t;       // First entry in SQLite database (init LONG_MAX)
     time_t last_entry_t;        // Last entry in SQLite database (init 0)
     int transaction;
+    struct uuid_cache *uuid_cache;
 };
 
 // ----------------------------------------------------------------------------
@@ -849,6 +859,7 @@ struct rrdhost {
 #endif
 #ifdef SQLITE_POC
     uuid_t  host_uuid;                              // Global GUID for this host
+    struct uuid_cache *uuid_cache;
 #endif
 
 #ifdef ENABLE_HTTPS
