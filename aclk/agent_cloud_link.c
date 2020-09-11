@@ -528,6 +528,28 @@ static void aclk_start_host_popcorning(RRDHOST *host)
     aclk_popcorn_check_bump(host);
 }
 
+static void aclk_stop_host_popcorning(RRDHOST *host)
+{
+    ACLK_SHARED_STATE_LOCK;
+    rrdhost_aclk_state_lock(host);
+    if (!ACLK_HOST_POPCORNING(host)) {
+        rrdhost_aclk_state_unlock(host);
+        ACLK_SHARED_STATE_UNLOCK;
+        return;
+    }
+    
+    info("Host Disconnected before ACLK popcorning finished. Canceling. Host \"%s\" GUID:\"%s\"", host->hostname, host->machine_guid);
+    host->aclk_state.t_last_popcorn_update = 0;
+    host->aclk_state.metadata = ACLK_METADATA_REQUIRED;
+    rrdhost_aclk_state_unlock(host);
+
+    if(host == aclk_shared_state.next_popcorn_host) {
+        aclk_shared_state.next_popcorn_host = NULL;
+        aclk_update_next_child_to_popcorn(host);
+    }
+    ACLK_SHARED_STATE_UNLOCK;
+}
+
 /*
  * Add a new collector to the list
  * If it exists, update the chart count
@@ -1470,6 +1492,7 @@ void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd)
             break;
         case ACLK_CMD_CHILD_DISCONNECT:
             debug(D_ACLK, "Child Disconnected %s %s.", host->hostname, host->machine_guid);
+            aclk_stop_host_popcorning(host);
             aclk_queue_query("del_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_DISCONNECT);
             break;
         default:
