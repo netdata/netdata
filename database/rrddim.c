@@ -596,6 +596,8 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE))
+        rd->updated = 0;
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
