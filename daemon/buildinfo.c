@@ -180,21 +180,21 @@ void print_build_info() {
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
 
     printf("Features:\n");
-    printf("    dbengine:              %s\n", FEAT_DBENGINE);
-    printf("    Native HTTPS:          %s\n", FEAT_NATIVE_HTTPS);
-    printf("    Netdata CLoud:         %s\n", FEAT_CLOUD);
-    printf("    TLS Host Verification: %s\n", FEAT_TLS_HOST_VERIFY);
+    printf("    dbengine:                %s\n", FEAT_DBENGINE);
+    printf("    Native HTTPS:            %s\n", FEAT_NATIVE_HTTPS);
+    printf("    Netdata CLoud:           %s\n", FEAT_CLOUD);
+    printf("    TLS Host Verification:   %s\n", FEAT_TLS_HOST_VERIFY);
 
     printf("Libraries:\n");
-    printf("    jemalloc:  %s\n", FEAT_JEMALLOC);
-    printf("    JSON-C:    %s\n", FEAT_JSONC);
-    printf("    libcap:    %s\n", FEAT_LIBCAP);
-    printf("    libcrypto: %s\n", FEAT_CRYPTO);
-    printf("    libm:      %s\n", FEAT_LIBM);
-    printf("    LWS:       %s\n", FEAT_LWS);
-    printf("    mosquitto: %s\n", FEAT_MOSQUITTO);
-    printf("    tcalloc:   %s\n", FEAT_TCMALLOC);
-    printf("    zlib:      %s\n", FEAT_ZLIB);
+    printf("    jemalloc:                %s\n", FEAT_JEMALLOC);
+    printf("    JSON-C:                  %s\n", FEAT_JSONC);
+    printf("    libcap:                  %s\n", FEAT_LIBCAP);
+    printf("    libcrypto:               %s\n", FEAT_CRYPTO);
+    printf("    libm:                    %s\n", FEAT_LIBM);
+    printf("    LWS:                     %s\n", FEAT_LWS);
+    printf("    mosquitto:               %s\n", FEAT_MOSQUITTO);
+    printf("    tcalloc:                 %s\n", FEAT_TCMALLOC);
+    printf("    zlib:                    %s\n", FEAT_ZLIB);
 
     printf("Plugins:\n");
     printf("    apps:                    %s\n", FEAT_APPS_PLUGIN);
