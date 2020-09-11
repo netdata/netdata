@@ -49,16 +49,16 @@ void simple_connector_cleanup(struct instance *instance)
         (struct simple_connector_data *)instance->connector_specific_data;
 
     buffer_free(instance->buffer);
+    buffer_free(simple_connector_data->buffer);
+    buffer_free(simple_connector_data->header);
 
     struct simple_connector_buffer *next_buffer = simple_connector_data->first_buffer;
     for (int i = 0; i < instance->config.buffer_on_failures; i++) {
         struct simple_connector_buffer *current_buffer = next_buffer;
         next_buffer = next_buffer->next;
 
-        if (current_buffer->header)
-            buffer_free(current_buffer->header);
-        if (current_buffer->buffer)
-            buffer_free(current_buffer->buffer);
+        buffer_free(current_buffer->header);
+        buffer_free(current_buffer->buffer);
         freez(current_buffer);
     }
 
