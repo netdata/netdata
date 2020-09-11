@@ -22,7 +22,7 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
     struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
 
     buffer_sprintf(
-        simple_connector_data->first_buffer->header,
+        simple_connector_data->last_buffer->header,
         "POST %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Accept: */*\r\n"
@@ -31,7 +31,7 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
         connector_specific_config->remote_write_path,
         instance->config.destination,
-        buffer_strlen(simple_connector_data->first_buffer->buffer));
+        buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;
 }
