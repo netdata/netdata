@@ -1796,6 +1796,7 @@ after_first_database_work:
             , storage_flags
     );
 
+after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
     rrddim_foreach_read(rd, st) {
@@ -1859,8 +1860,7 @@ after_first_database_work:
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
-after_second_database_work:
-    ;
+
     // find if there are any obsolete dimensions
     time_t now = now_realtime_sec();
 
