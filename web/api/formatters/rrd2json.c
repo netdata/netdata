@@ -152,6 +152,7 @@ int rrdset2anything_api_v1(
 
                 // Loop the dimensions of the chart
                 RRDDIM  *rd1;
+                rrdset_rdlock(st1);
                 rrddim_foreach_read(rd1, st1) {
                     RRDDIM *rd = mallocz(rd1->memsize);
                     memcpy(rd, rd1, rd1->memsize);
@@ -172,6 +173,7 @@ int rrdset2anything_api_v1(
                     rd->next = temp_rd;
                     temp_rd = rd;
                 }
+                rrdset_unlock(st1);
             }
         }
         rrdhost_unlock(st->rrdhost);
