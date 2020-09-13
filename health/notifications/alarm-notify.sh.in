@@ -2035,7 +2035,7 @@ send_stackpulse() {
   local payload httpcode oldv currv
   [ "${SEND_STACKPULSE}" != "YES" ] && return 1
 
-  # We are sending null when values are nan to avoid errors while JSON is parsed
+  # We are sending null when values are nan to avoid errors while JSON message is parsed
   [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
   [ "${value}" != "nan" ] && currv="${value}" || currv="null"
 
