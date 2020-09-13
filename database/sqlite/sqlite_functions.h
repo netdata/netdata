@@ -62,6 +62,7 @@ extern RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp);
 extern RRDDIM *sql_load_chart_dimensions(RRDSET *st, int temp);
 extern void sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number number);
 extern void sql_add_metric_page(uuid_t *dim_uuid, storage_number *metric, size_t entries, time_t start_time, time_t end_time);
+extern void sql_add_metric_page_nolock(uuid_t *dim_uuid, storage_number *metric, size_t entries, time_t start_time, time_t end_time);
 
 extern int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions);
 extern char *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd); //char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm);

@@ -718,12 +718,16 @@ RRDSET *rrdset_create_custom(
         entries = config_get_number(config_section, "history", 5);
     } else {
         long rentries = config_get_number(config_section, "history", history_entries);
-        entries = align_entries_to_pagesize(memory_mode, rentries);
-        if (entries != rentries)
-            entries = config_set_number(config_section, "history", entries);
+        if (memory_mode == RRD_MEMORY_MODE_SQLITE)
+            entries = config_get_number(config_section, "history", 1024);
+        else {
+            entries = align_entries_to_pagesize(memory_mode, rentries);
+            if (entries != rentries)
+                entries = config_set_number(config_section, "history", entries);
 
-        if (memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
-            entries = config_set_number(config_section, "history", 10);
+            if (memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
+                entries = config_set_number(config_section, "history", 10);
+        }
     }
     int enabled = config_get_boolean(config_section, "enabled", 1);
     if (!enabled)
@@ -941,7 +945,7 @@ RRDSET *rrdset_create_custom(
         sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
         st->state->uuid_cache = NULL;
         int rc = sql_cache_chart_dimensions(st);
-        info("Cached %ld dimensions for chart %s", rc, st->id);
+        //info("Cached %ld dimensions for chart %s", rc, st->id);
     }
 
 #ifdef ENABLE_DBENGINE

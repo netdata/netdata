@@ -348,7 +348,9 @@ struct rrddim_volatile {
     uint32_t compaction_id;              // The last metadata log compaction procedure that has processed this object.
 #endif
 #ifdef SQLITE_POC
+#ifndef ENABLE_DBENGINE
     uuid_t *metric_uuid;
+#endif
     uint8_t gap_checked;
     time_t db_first_entry_t;       // First entry in the SQLite database
     time_t db_last_entry_t;        // Last entry in the SQLite database (inclusive)
@@ -858,7 +860,9 @@ struct rrdhost {
                                                     // this object.
 #endif
 #ifdef SQLITE_POC
+#ifndef ENABLE_DBENGINE
     uuid_t  host_uuid;                              // Global GUID for this host
+#endif
     struct uuid_cache *uuid_cache;
 #endif
 

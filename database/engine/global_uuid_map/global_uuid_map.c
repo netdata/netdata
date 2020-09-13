@@ -283,7 +283,6 @@ void init_global_guid_map()
 
     init = 1;
     info("Configuring locking mechanism for global GUID map");
-    sql_init_database();
     fatal_assert(0 == uv_rwlock_init(&guid_lock));
     fatal_assert(0 == uv_rwlock_init(&object_lock));
     fatal_assert(0 == uv_rwlock_init(&global_lock));
