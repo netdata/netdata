@@ -210,9 +210,10 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
 
     if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
     {
-        rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
-        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s", value, timestamp, user->st->id, id);
-        rd->last_stored_value = value;
+        if (value != SN_EMPTY_SLOT)
+            rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+        debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s (last_val=%p)", value, timestamp, 
+              user->st->id, id, &rd->last_stored_value);
     }
     else
     {
