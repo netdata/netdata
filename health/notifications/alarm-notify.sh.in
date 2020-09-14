@@ -2046,7 +2046,7 @@ send_stackpulse() {
     "OldValue" : ${oldv},
     "Value" : ${currv},
     "Units" : "${units}",
-    "OldStatus" : "${oldv}",
+    "OldStatus" : "${old_status}",
     "Status" : "${status}",
     "Alarm" : "${name}",
     "Date": ${when},
