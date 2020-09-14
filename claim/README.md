@@ -293,6 +293,8 @@ You will still be able to see this node in your War Rooms in an **unreachable** 
 If you want to reclaim this node into a different Space, you need to create a new identity by adding `-id=$(uuidgen)` to
 the claiming script parameters. For example, using the default claiming script:
 
+**Tip:** Make sure that you have the `uuidgen-runtime` packagen installed, as it is used to run the command `uuidgen`.
+
 ```bash
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud -id=$(uuidgen)
 ```
