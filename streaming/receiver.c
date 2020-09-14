@@ -502,8 +502,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rpt->use_replication = appconfig_get_number(&stream_config, rpt->key, "enable replication", rpt->use_replication);
     rpt->use_replication = appconfig_get_number(&stream_config, rpt->machine_guid, "enable replication", rpt->use_replication);
 
-    if (stream_version == VERSION_GAP_FILLING && !rpt->use_replication)
-        stream_version = VERSION_GAP_FILLING - 1;
+    if (rpt->stream_version == VERSION_GAP_FILLING && !rpt->use_replication)
+        rpt->stream_version = VERSION_GAP_FILLING - 1;
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
