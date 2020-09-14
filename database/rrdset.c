@@ -1099,7 +1099,8 @@ void rrdset_dump_debug_state(RRDSET *st) {
                                  rd->collections_counter, rd->collected_volume,
                                  rd->stored_volume, rd->last_collected_time.tv_sec, rd->last_collected_time.tv_usec);
             #ifdef ENABLE_DBENGINE
-            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && rd->state->handle.rrdeng.descr) {
+            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && !rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED) &&
+                rd->state->handle.rrdeng.descr) {
                 // This is safe but do not do this from production code. (The debugging points that call this are
                 // on the collector thread and this is the hot-page so it cannot be flushed during execution).
                 uv_rwlock_rdlock(&rd->state->handle.rrdeng.ctx->pg_cache.pg_cache_rwlock);
