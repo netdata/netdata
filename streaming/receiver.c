@@ -212,7 +212,6 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     {
         if (value != SN_EMPTY_SLOT) {
             rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
-            rd->last_stored_value = value;
         }
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s (last_val=%p)", value, timestamp, 
               user->st->id, id, &rd->last_stored_value);
@@ -226,9 +225,13 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         rd->values[(rd->rrdset->current_entry + offset) % rd->entries] = value;
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld = %ld + %zu for %s.%s (last_val=%p)", value, timestamp,
               rd->rrdset->current_entry, offset, user->st->id, id, &rd->last_stored_value);
-        rd->last_stored_value = value;
     }
+    rd->last_stored_value = unpack_storage_number(value);
     rd->collections_counter++;
+    rd->collected_value = rd->last_collected_value = unpack_storage_number(value) / (calculated_number)rd->multiplier *
+                                                     (calculated_number)rd->divisor;
+    rd->last_collected_time.tv_sec = timestamp;
+    rd->last_collected_time.tv_usec = 0;
 
     return PARSER_RC_OK;
 disable:
