@@ -82,7 +82,7 @@ struct receiver_state {
     int update_every;
     uint32_t stream_version;
     time_t last_msg_t;
-    uint32_t max_gap, gap_history;
+    uint32_t max_gap, gap_history, use_replication;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
 #ifdef ENABLE_HTTPS

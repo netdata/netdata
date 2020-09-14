@@ -210,8 +210,10 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
 
     if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
     {
-        if (value != SN_EMPTY_SLOT)
+        if (value != SN_EMPTY_SLOT) {
             rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
+            rd->last_stored_value = value;
+        }
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s (last_val=%p)", value, timestamp, 
               user->st->id, id, &rd->last_stored_value);
     }
@@ -224,8 +226,8 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         rd->values[(rd->rrdset->current_entry + offset) % rd->entries] = value;
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld = %ld + %zu for %s.%s (last_val=%p)", value, timestamp,
               rd->rrdset->current_entry, offset, user->st->id, id, &rd->last_stored_value);
+        rd->last_stored_value = value;
     }
-    rd->last_stored_value = value;
     rd->collections_counter++;
 
     return PARSER_RC_OK;
@@ -497,6 +499,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rpt->max_gap = appconfig_get_number(&stream_config, rpt->key, "max gap replication", rpt->max_gap);
     rpt->max_gap = appconfig_get_number(&stream_config, rpt->machine_guid, "max gap replication", rpt->max_gap);
 
+    rpt->use_replication = appconfig_get_number(&stream_config, rpt->key, "enable replication", rpt->use_replication);
+    rpt->use_replication = appconfig_get_number(&stream_config, rpt->machine_guid, "enable replication", rpt->use_replication);
+
+    if (stream_version == VERSION_GAP_FILLING && !rpt->use_replication)
+        stream_version = VERSION_GAP_FILLING - 1;
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
