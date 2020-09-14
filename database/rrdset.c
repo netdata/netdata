@@ -719,7 +719,7 @@ RRDSET *rrdset_create_custom(
     } else {
         long rentries = config_get_number(config_section, "history", history_entries);
         if (memory_mode == RRD_MEMORY_MODE_SQLITE)
-            entries = config_get_number(config_section, "history", 1024);
+            entries = config_get_number(config_section, "history", 600);
         else {
             entries = align_entries_to_pagesize(memory_mode, rentries);
             if (entries != rentries)
@@ -832,7 +832,10 @@ RRDSET *rrdset_create_custom(
     st->config_section = strdupz(config_section);
     st->rrdhost = host;
     st->memsize = size;
-    st->entries = entries;
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+        entries = 600;
+        st->entries = entries;
+    }
     st->update_every = update_every;
 
     if (st->current_entry >= st->entries)
@@ -945,7 +948,6 @@ RRDSET *rrdset_create_custom(
         sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
         st->state->uuid_cache = NULL;
         int rc = sql_cache_chart_dimensions(st);
-        //info("Cached %ld dimensions for chart %s", rc, st->id);
     }
 
 #ifdef ENABLE_DBENGINE
@@ -1521,7 +1523,6 @@ void rrdset_done(RRDSET *st) {
     last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
-    // TODO: SQLite Check/Fix this
     if(unlikely(!st->counter_done)) {
         // if we have not collected metrics this session (st->counter_done == 0)
         // and we have collected metrics for this chart in the past (st->counter != 0)
@@ -1817,7 +1818,7 @@ after_first_database_work:
     if(unlikely(now_collect_ut < next_store_ut)) {
         // this is collected in the same interpolation point
         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-        info("INTERNAL CHECK: host '%s', chart '%s' is collected in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
+        info("INTERNAL CHECK: host '%s', chart '%s' is collected     in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
     }
 #endif
 

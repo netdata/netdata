@@ -328,9 +328,9 @@ struct rrddim_query_handle {
 
 struct rrddim_metric_page {
     RRDDIM *rd;
-    uint8_t stored;
+    uint8_t stored;                     // 0x01, 0x2 can be deleted
     time_t first_entry_t;               // First entry in active_page
-    time_t last_entry_t;                // Last entry in the active_page
+    time_t last_entry_t;                // Last entry in the active_page  (TODO: Use last collected from RD)
     size_t entries;                     // Total entries allocated in *values;
     size_t active_count;                // Total entries stored
     storage_number *values;             // Actual metrics go here
@@ -353,9 +353,9 @@ struct rrddim_volatile {
 #endif
     uint8_t gap_checked;
     time_t db_first_entry_t;       // First entry in the SQLite database
-    time_t db_last_entry_t;        // Last entry in the SQLite database (inclusive)
+    time_t db_last_entry_t;        // Last entry in the SQLite database (inclusive) TODO: maybe we dont need it
     struct rrddim_metric_page *metric_page_last;
-    struct rrddim_metric_page *metric_page;
+    struct rrddim_metric_page *metric_page;     // This is the ACTIVE page
 #endif
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------

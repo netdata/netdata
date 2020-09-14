@@ -401,11 +401,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 //    rd->state->last_entry_t = 0;
     rd->state->db_first_entry_t = LONG_MAX;
     rd->state->db_last_entry_t = 0;
-//    rd->state->gap_checked = 0;
+    rd->state->gap_checked = 1;     //TODO: Check if we need actually gap filling
     // TODO: Get a full structure with page info from a recycled list
     //rd->state->values = mallocz(st->entries * sizeof(storage_number));      // Allocate pointer
-    rd->state->metric_page = rrddim_init_metric_page(rd);
-    rd->state->metric_page_last = rd->state->metric_page;
+    rd->state->metric_page = rrddim_init_metric_page(rd);   // Active collect page
+    rd->state->metric_page_last = rd->state->metric_page;   // This will link from the past -> active via prev
 
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE

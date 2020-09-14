@@ -10,6 +10,13 @@
 #include "../engine/global_uuid_map//global_uuid_map.h"
 #endif
 
+#define SQLITE_GET_PAGE_SEQFRACTION1 "CREATE TEMP TABLE s(rowid INTEGER PRIMARY KEY, pageno INT);"\
+                                     "INSERT INTO s(pageno) SELECT pageno FROM dbstat ORDER BY path;"
+#define SQLITE_GET_PAGE_SEQFRACTION2 "SELECT cast(sum(s1.pageno+1==s2.pageno)*100.0/count(*) as 'int') "\
+                                    "FROM s AS s1, s AS s2 "\
+                                    "WHERE s1.rowid+1=s2.rowid;"
+
+
 #define NETDATA_PLUGIN_HOOK_SQLITE \
     { \
         .name = "SQLITE", \
@@ -102,9 +109,9 @@ extern int rrddim_sql_query_is_finished(struct rrddim_query_handle *handle);
 extern void rrddim_sql_query_finalize(struct rrddim_query_handle *handle);
 extern time_t rrddim_sql_query_latest_time(RRDDIM *rd);
 extern time_t rrddim_sql_query_oldest_time(RRDDIM *rd);
-extern time_t sql_rrdset_first_entry_t(RRDSET *st, time_t *first, time_t *last);
+extern void sql_rrdset_first_entry_t(RRDSET *st, time_t *first, time_t *last);
 extern time_t sql_rrdset_last_entry_t(RRDSET *st);
-extern time_t sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last);
+extern void sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last);
 extern int sql_cache_chart_dimensions(RRDSET *st);
 extern int sql_cache_host_charts(RRDHOST *host);
 
