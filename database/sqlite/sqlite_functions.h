@@ -76,7 +76,7 @@ extern char *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd); //char *id, char *name, 
 //extern uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *type, const char *family,
 //                                 const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
 //                                 int update_every, int chart_type, int memory_mode, long history_entries);
-extern uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st);
+extern uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const char *id, const char *name);
 extern int sql_store_chart(
     uuid_t *chart_uuid, uuid_t *host_uuid, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
@@ -116,6 +116,16 @@ extern int sql_cache_chart_dimensions(RRDSET *st);
 extern int sql_cache_host_charts(RRDHOST *host);
 
 extern struct rrddim_metric_page *rrddim_init_metric_page(RRDDIM *rd);
+
+extern RRDHOST *sql_create_host_by_name(char *hostname);
+extern RRDSET *sql_create_chart_by_name(RRDHOST *host, char *chart);
+
+extern RRDHOST *rrdhost_create(
+    const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
+    const char *tags, const char *program_name, const char *program_version, int update_every, long entries,
+    RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled, char *rrdpush_destination,
+    char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
+    int is_localhost, int is_archived);
 
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -273,7 +273,7 @@ void rrdset_reset(RRDSET *st) {
 #endif
 
         if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
-            info("Flushing metrics for %s due to CHART %s reset", rd->id, st->id);
+            //info("Flushing metrics for %s due to CHART %s reset", rd->id, st->id);
             rrddim_sql_collect_finalize(rd);
         }
     }
@@ -940,7 +940,7 @@ RRDSET *rrdset_create_custom(
     }
 
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
-        st->chart_uuid = sql_find_chart_uuid(host, st);//, st->name, type, family, context, title, units, plugin, module, priority, update_every,
+        st->chart_uuid = sql_find_chart_uuid(host, st, type, id, name);//, st->name, type, family, context, title, units, plugin, module, priority, update_every,
             //chart_type, memory_mode, history_entries);
 
         st->state->first_entry_t = LONG_MAX;

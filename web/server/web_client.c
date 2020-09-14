@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <database/sqlite/sqlite_functions.h>
 #include "web_client.h"
 
 // this is an async I/O implementation of the web server request parser
@@ -1370,6 +1371,13 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         host = rrdhost_find_by_hostname(tok, hash);
         if(!host) host = rrdhost_find_by_guid(tok, hash);
 
+#ifdef SQLITE_POC
+        // Check if the host is known but looks offline
+        if (!host)
+            host = sql_create_host_by_name(tok);
+#endif
+
+
         if(host) return web_client_process_url(host, w, url);
     }
 
@@ -1457,7 +1465,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 if(!st) st = rrdset_find(host, tok);
                 if(!st) {
                     w->response.data->contenttype = CT_TEXT_HTML;
-                    buffer_strcat(w->response.data, "Chart is not found: ");
+                    buffer_strcat(w->response.data, "Chart is not found3: ");
                     buffer_strcat_htmlescape(w->response.data, tok);
                     debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
                     return HTTP_RESP_NOT_FOUND;

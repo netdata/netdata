@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <database/sqlite/sqlite_functions.h>
 #include "web_api_v1.h"
 
 char *api_secret;
@@ -325,7 +326,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     RRDSET *st = rrdset_find(host, chart);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
-        buffer_strcat(w->response.data, "Chart is not found: ");
+        buffer_strcat(w->response.data, "Chart is not found1: ");
         buffer_strcat_htmlescape(w->response.data, chart);
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
@@ -501,8 +502,15 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 //        st->compaction_id = -1;
 //    }
 
+    //TODO: Lets see if it is archived chart
+    if (!st && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        info("Trying to create chart %s under host %s", chart, host->hostname);
+        st = sql_create_chart_by_name(host, chart);
+    }
+
+
     if(!st) {
-        buffer_strcat(w->response.data, "Chart is not found: ");
+        buffer_strcat(w->response.data, "Chart is not found2: ");
         buffer_strcat_htmlescape(w->response.data, chart);
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;

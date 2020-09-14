@@ -397,6 +397,7 @@ struct rrddim_volatile {
 struct uuid_cache {
     uuid_t   uuid;
     char    *id;
+    char    *type;
     char    *name;
     void    *object;          // Parent object -- either rd or chart if not null it needs to go to the database
     uint32_t count;

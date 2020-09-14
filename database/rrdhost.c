@@ -135,7 +135,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_legacy = 1;
 #endif
 
-    if (memory_mode == RRD_MEMORY_MODE_SQLITE)
+    if (memory_mode == RRD_MEMORY_MODE_SQLITE && !is_archived)
         sql_store_host(guid, hostname, registry_hostname, update_every, os, timezone, tags);
     rrd_check_wrlock();
 
