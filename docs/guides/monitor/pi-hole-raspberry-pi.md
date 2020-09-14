@@ -90,9 +90,9 @@ Netdata dashboard or load it up again in a new tab, you'll see a new entry in th
 
 By the time you've reached this point in the guide, Netdata has already collected a ton of valuable data about your
 Raspberry Pi, Pi-hole, and any other apps/services you might be running. Even a few minutes of collecting 1,500 metrics
-per second adds up quick.
+per second adds up quickly.
 
-You can now use Netdata's synchronized charts to zoom, highlight, scrub through time, and intuit how an anomaly in one
+You can now use Netdata's synchronized charts to zoom, highlight, scrub through time, and discern how an anomaly in one
 part of your system might affect another.
 
 ![The Netdata dashboard in
