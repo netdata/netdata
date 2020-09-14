@@ -239,7 +239,6 @@
 - installer: update go.d.plugin version to v0.19.0 [\#9294](https://github.com/netdata/netdata/pull/9294) ([ilyam8](https://github.com/ilyam8))
 - dashboard\_info.js: ebpf: fix close code block [\#9293](https://github.com/netdata/netdata/pull/9293) ([ilyam8](https://github.com/ilyam8))
 - Add guide to exporting metrics to Graphite [\#9285](https://github.com/netdata/netdata/pull/9285) ([joelhans](https://github.com/joelhans))
-- update\_apps\_groups: Bring imunify and lsphp to apps groups [\#9284](https://github.com/netdata/netdata/pull/9284) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
