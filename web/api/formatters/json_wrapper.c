@@ -93,7 +93,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             "   %schart_ids%s: [",
             kq, kq);
 
-        for (c = 0, i = 0, rd = temp_rd ? temp_rd : r->st->dimensions; rd && c < r->d; c++, rd = rd->next) {
+        for (c = 0, i = 0, rd = temp_rd ; rd && c < r->d; c++, rd = rd->next) {
             if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
                 continue;
             if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
