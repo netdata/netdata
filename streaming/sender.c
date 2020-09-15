@@ -730,7 +730,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // protection from overflow
-        if (s->overflow) {
+        if (s->overflow && s->version < VERSION_GAP_FILLING) {
             errno = 0;
             error("STREAM %s [send to %s]: buffer full (%zu-bytes) after %zu bytes. Restarting connection",
                   s->host->hostname, s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);

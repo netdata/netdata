@@ -191,8 +191,6 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         goto disable;
     }
 
-    if (user->st->state->ignore_block)
-        return PARSER_RC_OK;
 
     if (!id || !time_txt || !value_txt)
         goto disable;
@@ -207,6 +205,12 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
         error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
         return PARSER_RC_OK;
     }
+
+    // The sending side sends chart and dimension metadata before replication blocks so it should not be possible
+    // to receive a block on an archived dimension. But if the dimension is archived then the dbengine ctx will be
+    // uninitialized.
+    if (user->st->state->ignore_block || rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
+        return PARSER_RC_OK;
 
     if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
     {
