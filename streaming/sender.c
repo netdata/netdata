@@ -369,6 +369,12 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
+    if (version == VERSION_GAP_FILLING && host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)
+    {
+        version = VERSION_GAP_FILLING - 1;
+        info("STREAM %s [send to %s]: dropping back to streaming-mode, memory mode none does not support replication",
+             host->hostname, s->connected_to);
+    }
     s->version = version;
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
