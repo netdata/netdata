@@ -102,12 +102,11 @@ int rrdset2value_api_v1(
     *n = rrdr2value(r, i, options, value_is_null);
 
     if (temp_rd) {
-        info("SQLITE: Free 1");
         RRDDIM *t;
         while(temp_rd) {
             t = temp_rd->next;
-            freez(temp_rd->id);
-            freez(temp_rd->name);
+            freez((char *) temp_rd->id);
+            freez((char *) temp_rd->name);
 #ifdef ENABLE_DBENGINE
             freez(temp_rd->state->metric_uuid);
 #endif
@@ -359,8 +358,8 @@ int rrdset2anything_api_v1(
         RRDDIM *t;
         while(temp_rd) {
             t = temp_rd->next;
-            freez(temp_rd->id);
-            freez(temp_rd->name);
+            freez((char *) temp_rd->id);
+            freez((char *) temp_rd->name);
 #ifdef ENABLE_DBENGINE
             freez(temp_rd->state->metric_uuid);
 #endif
