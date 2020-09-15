@@ -42,9 +42,6 @@ STACKPULSE_WEBHOOK="https://hooks.stackpulse.io/v1/webhooks/YOUR_UNIQUE_ID"
 
 4.  Now [restart Netdata](/docs/getting-started.md#start-stop-and-restart-netdata). When your node creates an alarm, you
     can see the associated notification on your StackPulse Administration Portal 
-    
-![The StackPulse Administration Portal with a Netdata
-alarm](https://user-images.githubusercontent.com/49162938/93208199-bfc22100-f74b-11ea-83c4-728be23dcf4d.png) 
 
 ## React to alarms with playbooks
 
@@ -54,6 +51,8 @@ cleaning up storage partitions with dynamic data.
 
 ![image](https://user-images.githubusercontent.com/49162938/93207961-4c201400-f74b-11ea-94d1-42a29d007b62.png)
  
+![The StackPulse Administration Portal with a Netdata
+alarm](https://user-images.githubusercontent.com/49162938/93208199-bfc22100-f74b-11ea-83c4-728be23dcf4d.png) 
 ### Create Playbooks for Netdata alarms
 
 To create a Playbook, you need to access the StackPulse Administration Portal. After the initial setup, you need to
