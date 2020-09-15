@@ -17,7 +17,7 @@
 #define FEAT_DBENGINE "NO"
 #endif
 
-#if HAVE_X509_VERIFY_PARAM_set1_host
+#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 1
 #define FEAT_TLS_HOST_VERIFY "YES"
 #else
 #define FEAT_TLS_HOST_VERIFY "NO"
