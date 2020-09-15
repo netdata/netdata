@@ -140,24 +140,17 @@ int rrdset2anything_api_v1(
     RRDDIM *temp_rd = NULL;
 
     if (context) {
-        info("COMBOCHARTS: Requested context %s", context);
-
-        // TODO: Scan all charts of host
         rrdhost_rdlock(st->rrdhost);
         RRDSET *st1;
         rrdset_foreach_read(st1, st->rrdhost) {
             if (strcmp(st1->context, context) == 0) {
-                info("COMBOCHARTS: Chart %s has context %s [%s]", st1->id, st1->context, context);
-
                 // Loop the dimensions of the chart
                 RRDDIM  *rd1;
                 rrdset_rdlock(st1);
                 rrddim_foreach_read(rd1, st1) {
                     RRDDIM *rd = mallocz(rd1->memsize);
                     memcpy(rd, rd1, rd1->memsize);
-                    char wstr[512];
-                    sprintf(wstr,"%s.%s", rd1->id, rd1->rrdset->id);
-                    rd->id = strdupz(rd1->id);
+                    rd->id = strdupz(rd1->id);s
                     rd->name = strdupz(rd1->name);
                     rd->state = mallocz(sizeof(*rd->state));
                     memcpy(rd->state, rd1->state, sizeof(*rd->state));
@@ -165,7 +158,7 @@ int rrdset2anything_api_v1(
                     memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
 #ifdef ENABLE_DBENGINE
                     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                        rd->state->metric_uuid = mallocz(16);
+                        rd->state->metric_uuid = mallocz(sizeof(uuid_t));
                         uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
                     }
 #endif
