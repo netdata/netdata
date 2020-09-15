@@ -8,9 +8,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 # Send notifications to StackPulse
 
 [StackPulse](https://stackpulse.com/) is a software-as-a-service platform for site reliablility engineering.
-StackPulse says its platform is designed to "help SREs, DevOps Engineers and Software Developers reduce toil and alert
-fatigue while improving reliability of software services by managing, analyzing and automating incident response
-activities."
+StackPulse is a Software-as-a-Service platform for Site Reliablility Engineering. It helps SREs, DevOps Engineers and 
+Software Developers reduce toil and alert fatigue while improving reliability of software services by managing, 
+analyzing and automating incident response activities.
 
 Sending Netdata alarm notifications to StackPulse allows you to create smart automated response workflows 
 (StackPulse playbooks) that will help you drive down your MTTD and MTTR by performing any of the following:
@@ -44,14 +44,14 @@ STACKPULSE_WEBHOOK="https://hooks.stackpulse.io/v1/webhooks/YOUR_UNIQUE_ID"
     can see the associated notification on your StackPulse Administration Portal: 
     
 ![The StackPulse Administration Portal with a Netdata
-alarm](https://user-images.githubusercontent.com/49162938/93023407-5244b200-f5de-11ea-84fe-4f85ad1d1ba1.png) 
+alarm](https://user-images.githubusercontent.com/49162938/93207961-4c201400-f74b-11ea-94d1-42a29d007b62.png) 
 
 ## Organize alarms with Playbooks
 
 StackPulse allow users to create `Playbooks` giving additional information about events that happen in specific 
 scenarios. For example, you could create a Playbook that display only specific alarm status like Warning , or all alarms.
 
-![image](https://user-images.githubusercontent.com/49162938/93146503-899a8800-f6de-11ea-9493-b920b444b846.png)
+![image](https://user-images.githubusercontent.com/49162938/93208199-bfc22100-f74b-11ea-83c4-728be23dcf4d.png)
  
 ### Create Playbooks for Netdata alarms
 
