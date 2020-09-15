@@ -143,6 +143,12 @@ This allows the information to be passed into `docker-compose` using:
 VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
 
+#### Files inside systemd volumes
+
+If a volume is used by systemd service, some files can be removed during 
+[reinitialization](https://github.com/netdata/netdata/issues/9916). To avoid this, you need to add
+`RuntimeDirectoryPreserve=yes` to the service file.
+
 ### Docker container names resolution
 
 There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to
