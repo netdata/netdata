@@ -158,7 +158,7 @@ jobs:
               -f packaging/Dockerfile.packager \
               --build-arg DISTRO=${{ matrix.distro }} \
               --build-arg DISTRO_VERSION=${{ matrix.version }} \
-              --build-arg VERSION=$PKG_VERSION \
+              --build-arg PKG_VERSION=$PKG_VERSION \
               -t local/package-builder:${{ matrix.distro }}${{ matrix.version }}
           mkdir -p artifacts
           docker run -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
