@@ -89,6 +89,7 @@ services:
       - /etc/os-release:/host/etc/os-release:ro
 
 volumes:
+  netdataconfig:
   netdatalib:
   netdatacache:
 ```
