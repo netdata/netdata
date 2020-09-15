@@ -46,15 +46,15 @@ Netdata](https://user-images.githubusercontent.com/1153921/90447745-c8fe9600-e09
 Let's start by installing Netdata first so that it can start collecting system metrics as soon as possible for the most
 possible historic data.
 
-We recommend installing Netdata with the one-line kickstart script on Raspbian systems. Check out our [install
-docs](/packaging/installer/README.md) if you want to try a different method.
+> ⚠️ Don't install Netdata using `apt` and the default package available in Raspbian. The Netdata team does not maintain
+> this package, and can't guarantee it works properly.
+
+On Raspberry Pis running Raspbian, the best way to install Netdata is our one-line kickstart script. This script asks
+you to install dependencies, then compiles Netdata from source via [GitHub](https://github.com/netdata/netdata).
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
-
-The installer asks you to install dependencies, then compiles Netdata from source via
-[GitHub](https://github.com/netdata/netdata).
 
 Once installed on a Raspberry Pi 4 with no accessories, Netdata starts collecting roughly 1,500 metrics every second and
 populates its dashboard with more than 250 charts.
@@ -83,8 +83,9 @@ As far as configuring Netdata to monitor Pi-hole metrics, there's nothing you ac
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pihole) will autodetect the new service
 running on your Raspberry Pi and immediately start collecting metrics every second.
 
-Restart Netdata with `sudo service netdata restart` to spin up the Pi-hole collector again. When you refresh your
-Netdata dashboard or load it up again in a new tab, you'll see a new entry in the menu for **Pi-hole** metrics.
+Restart Netdata with `sudo service netdata restart` to start Netdata, which will then recognize that Pi-hole is running
+and start a per-second collection job. When you refresh your Netdata dashboard or load it up again in a new tab, you'll
+see a new entry in the menu for **Pi-hole** metrics.
 
 ## Use Netdata to explore and monitor your Raspberry Pi and Pi-hole
 
@@ -103,8 +104,15 @@ walkthrough of all its features. For a more expedited tour, see the [get started
 
 ### Enable temperature sensor monitoring
 
-You need to manually enable Netdata's built-in temperature sensor collector because the default Python version isn't
-compatible with a Raspberry Pi's sensors. First, open the `charts.d.conf` file for editing.
+You need to manually enable Netdata's built-in [temperature sensor
+collector](https://learn.netdata.cloud/docs/agent/collectors/charts.d.plugin/sensors) to start collecting metrics.
+
+> Netdata uses a few plugins to manage its [collectors](/collectors/REFERENCE.md), each using a different lanaguge: Go,
+> Python, Node.js, and Bash. While our Go collectors are undergoing the most active development, we still support the
+> other languages. In this case, you need to enable a temperature sensor collector that's written in Bash.
+
+First, open the `charts.d.conf` file for editing. You should always use the `edit-config` script to edit Netdata's
+configuration files, as it ensures your settings persist across updates to the Netdata Agent.
 
 ```bash
 cd /etc/netdata
@@ -147,5 +155,8 @@ Most importantly, you can always install additional services and instantly colle
 
 Or, head over to [our guides](https://learn.netdata.cloud/guides/) for even more experiments and insights into
 troubleshooting the health of your systems and services.
+
+If you have any questions about using Netdata to monitor your Raspberry Pi, Pi-hole, or any other applications, head on
+over to our [community forum](https://community.netdata.cloud/).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fpi-hole-raspberry-pi.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
