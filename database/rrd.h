@@ -4,7 +4,7 @@
 #define NETDATA_RRD_H 1
 
 #define SQLITE_POC
-#include <sqlite3.h>
+#include "database/sqlite/sqlite3.h"
 
 // forward typedefs
 typedef struct rrdhost RRDHOST;
