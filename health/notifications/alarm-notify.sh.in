@@ -2067,6 +2067,7 @@ EOF
     info "sent stackpulse notification for: ${host} ${chart}.${name} is ${status}"
   else
     error "failed to send stackpulse notification for: ${host} ${chart}.${name} is ${status}, with HTTP response status code ${httpcode}."
+    return 1
   fi
 
   return 0
@@ -2621,8 +2622,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_SYSLOG}" \
 	"${SENT_SMS}" \
 	"${SENT_MSTEAM}" \
-  "${SENT_DYNATRACE}" \
-  "${SENT_STACKPULSE}"; do
+	"${SENT_DYNATRACE}" \
+	"${SENT_STACKPULSE}" ; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something
 		exit 0
