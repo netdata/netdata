@@ -1,13 +1,13 @@
 <!--
 title: "How Netdata's metrics collectors work"
-description: "When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately begins collecting metrics."
+description: "When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects per-second metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/how-collectors-work.md
 -->
 
 # How Netdata's metrics collectors work
 
-When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately begins
-collecting per-second metrics.
+When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects
+per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
 when you [install the Netdata Agent](/docs/get/README.md#).
@@ -18,7 +18,7 @@ Every collector has two primary jobs:
 -   Gather exposed metrics and use additional logic to build meaningful, interactive visualizations.
 
 If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
-Netdata Agent gathers these metrics, sends to them to the [database engine for
+Netdata Agent gathers these metrics, sends them to the [database engine for
 storage](/docs/store/change-metrics-retention.md), and immediately [visualizes them
 meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
 
@@ -40,7 +40,7 @@ To quickly find your answer, see our [list of supported collectors](/collectors/
 Generally, Netdata's collectors can be grouped into three types:
 
 -   [Systems](/docs/collect/system-metrics.md): Monitor CPU, memory, disk, networking, systemd, eBPF, and much more.
-    Every metric exposed by `/proc`, `/sys` and other Linux kernel sources.
+    Every metric exposed by `/proc`, `/sys`, and other Linux kernel sources.
 -   [Containers](/docs/collect/container-metrics.md): Gather metrics from container agents, like `dockerd` or `kubectl`,
     along with the resource usage of containers and the applications they run.
 -   [Applications](/docs/collect/application-metrics.md): Collect per-second metrics from web servers, databases, logs,
@@ -66,7 +66,7 @@ terms related to collecting metrics.
         `node.js`.
 -   **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
     processes that communicate with the Netdata daemon via pipes.
--   **Internal plugins** gather metrics from `/proc`, `/sys` and other Linux kernel sources. They are written in `C`,
+-   **Internal plugins** gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C`,
     and run as threads within the Netdata daemon.
 
 ## What's next?
@@ -75,6 +75,6 @@ terms related to collecting metrics.
 your infrastructure.
 
 See our [collectors reference](/collectors/REFERENCE.md) for detailed information on Netdata's collector architecture,
-how to troubleshoot a collector, develop a custom collector, and more.
+troubleshooting a collector, developing a custom collector, and more.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fcollect%2Fhow-collectors-work&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -35,9 +35,9 @@ Netdata has robust Docker monitoring thanks to the aforementioned
 visualizations about the CPU, memory, disk, and network utilization of all running containers on the host system with
 zero configuration.
 
-Netdata also collects metrics from applications running inside of Docker containers. Let's say you created a MySQL
-database container using `docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:tag`. By default,
-this container exposes metrics on port 3306. You can configure the [MySQL
+Netdata also collects metrics from applications running inside of Docker containers. For example, if you create a MySQL
+database container using `docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:tag`, it exposes
+metrics on port 3306. You can configure the [MySQL
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql) to look at `127.0.0.0:3306` for
 MySQL metrics:
 
@@ -50,12 +50,17 @@ jobs:
 Netdata then collects metrics from the container itself, but also dozens [MySQL-specific
 metrics](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql#charts) as well.
 
-You could use this technique to monitor an entire infrastructure run on Docker containers. The same [enable and
-configure](/docs/collect/enable-configure.md) techniques apply whether an application runs on the host system or inside
-of a container. You just need to configure the exposed endpoint if it's not set to the application's default.
+### Collect metrics from applications running in Docker containers
+
+You could use this technique to monitor an entire infrastructure of Docker containers. The same [enable and
+configure](/docs/collect/enable-configure.md) procedures apply whether an application runs on the host system or inside
+a container. You may need to configure the target endpoint if it's not the application's default.
 
 Netdata can even [run in a Docker container](/packaging/docker/README.md) itself, and then collect metrics about the
 host system, its own container with cgroups, and any applications you want to monitor.
+
+See our [application metrics doc](/docs/collect/application-metrics.md) for details about Netdata's application metrics
+collection capabilities.
 
 ## Collect Kubernetes metrics
 
@@ -78,13 +83,13 @@ your k8s infrastructure.
 -   A [cgroups collector](/collectors/cgroups.plugin/README.md), which collects CPU, memory, and bandwidth metrics for
     each container running on your k8s cluster.
 
-For a holistic view into Netdata's Kubernetes monitoring capabilities, see our guide: [_Monitor a Kubernetes (k8s)
-cluster with Netdata_](https://learn.netdata.cloud/guides/monitor/kubernetes-k8s-netdata).
+For a holistic view of Netdata's Kubernetes monitoring capabilities, see our guide: [_Monitor a Kubernetes (k8s) cluster
+with Netdata_](https://learn.netdata.cloud/guides/monitor/kubernetes-k8s-netdata).
 
 ## What's next?
 
 Netdata is capable of collecting metrics from hundreds of applications, such as web servers, databases, messaging
-brokers, and much more. See more in the [application metrics doc](/docs/collect/application-metrics.md).
+brokers, and more. See more in the [application metrics doc](/docs/collect/application-metrics.md).
 
 If you already have all the information you need about collecting metrics, move into Netdata's meaningful visualizations
 with [viewing all nodes at a glance](/docs/visualize/view-all-nodes.md).

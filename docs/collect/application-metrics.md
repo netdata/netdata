@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/app
 
 Netdata instantly collects per-second metrics from many different types of applications running on your systems, such as
 web servers, databases, message brokers, email servers, search platforms, and much more. Metrics collectors are
-pre-installated with every Netdata Agent and usually require zero configuration. Netdata also collects and visualizes
+pre-installed with every Netdata Agent and usually require zero configuration. Netdata also collects and visualizes
 resource utilization per application on Linux systems using `apps.plugin`.
 
 [**apps.plugin**](/collectors/apps.plugin/README.md) looks at the Linux process tree every second, much like `top` or
@@ -28,7 +28,7 @@ Our most popular application collectors:
     Tail access logs and provide very detailed web server performance statistics. This module is able to parse 200k+
     rows in less than half a second.
 -   [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
-    replication and per user statistics.
+    replication, and per-user statistics.
 -   [Redis](/collectors/python.d.plugin/redis/): Monitor database status by reading the server's response to the `INFO`
     command.
 -   [Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web
@@ -41,21 +41,21 @@ Our most popular application collectors:
 -   [PHP-FPM](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
     summary and processes health metrics by scraping the status page (`/status?full`).
 
-Our [supported collectors list](/collectors/COLLECTORS.md#service-and-application-collectors) shows all of Netdata's
+Our [supported collectors list](/collectors/COLLECTORS.md#service-and-application-collectors) shows all Netdata's
 application metrics collectors, including those for containers/k8s clusters.
 
 ## Collect metrics from applications running on Windows
 
 Netdata is fully capable of collecting and visualizing metrics from applications running on Windows systems. The only
-caveat is that because there is no native Windows version of the Netdata Agent, you must [install the
-Agent](/packaging/installer/README.md) on a separate system, or a compatible VM.
+caveat is that you must [install the Agent](/packaging/installer/README.md) on a separate system or a compatible VM
+because there is no native Windows version of the Netdata Agent.
 
 Once you have the Agent running on that separate system, you can follow the [enable and configure
-doc](/docs/collect/enable-configure.md) to tell the collector to look for exposed metrics on the IP address or hostname
-of the Windows system, plus the applicable port.
+doc](/docs/collect/enable-configure.md) to tell the collector to look for exposed metrics on the Windows system's IP
+address or hostname, plus the applicable port.
 
-For example, let's say you have an MySQL database with a root password of `my-secret-pw` running on a Windows system
-with the IP address 203.0.113.0. you can configure the [MySQL
+For example, you have a MySQL database with a root password of `my-secret-pw` running on a Windows system with the IP
+address 203.0.113.0. you can configure the [MySQL
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql) to look at `203.0.113.0:3306`:
 
 ```yml
@@ -65,7 +65,7 @@ jobs:
 ```
 
 This same logic applies to any application in our [supported collectors
-list](/collectors/COLLECTORS.md#service-and-application-collectors) list that can run on Windows.
+list](/collectors/COLLECTORS.md#service-and-application-collectors) that can run on Windows.
 
 ## What's next?
 

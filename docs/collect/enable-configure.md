@@ -6,9 +6,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/ena
 
 # Enable or configure a collector
 
-While collectors start collect metrics right away if they find exposed metrics on their default endpoint, not all
-infrastructures use standard ports, paths, files, or naming conventions. In this case, you may need to enable or
-configure a collector to gather all available metrics from your systems, containers, or applications.
+While collectors start colleting right away if they find exposed metrics on their default endpoint, not all
+infrastructures use standard ports, paths, files, or naming conventions. You may need to enable or configure a collector
+to gather all available metrics from your systems, containers, or applications.
 
 ## Enable a collector or its orchestrator
 
@@ -19,12 +19,13 @@ Use `edit-config` from your [Netdata config directory](/docs/configure/nodes.md#
 the orchestrator's primary configuration file:
 
 ```bash
-./edit-config go.d.conf
+cd /etc/netdata
+sudo ./edit-config go.d.conf
 ```
 
 Within this file, you can either disable the orchestrator entirely (`enabled: yes`), or find a specific collector and
-enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure it's read by the Netdata deamon
-on start.
+enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata deamon reads it on
+start.
 
 After you make your changes, restart the Agent with `service netdata restart`.
 
@@ -41,9 +42,9 @@ collector's configuration file. For example, edit the Nginx collector with the f
 ```
 
 Each configuration file describes every available option and offers examples to help you tweak Netdata's settings
-according to your needs. In addition, every collector's documentation shows the exact command you need to run in order
-to configure that collector. Uncomment any line you change to ensure it's read by the collector's orchestrator or the
-Netdata daemon itself on start.
+according to your needs. In addition, every collector's documentation shows the exact command you need to run to
+configure that collector. Uncomment any line you change to ensure the collector's orchestrator or the Netdata daemon
+read it on start.
 
 After you make your changes, restart the Agent with `service netdata restart`.
 
