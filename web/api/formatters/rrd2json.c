@@ -2,6 +2,25 @@
 
 #include "web/api/web_api_v1.h"
 
+static inline void free_temp_rrddim(RRDDIM *temp_rd)
+{
+    if (unlikely(!temp_rd))
+        return;
+
+    RRDDIM *t;
+    while (temp_rd) {
+        t = temp_rd->next;
+        freez((char *)temp_rd->id);
+        freez((char *)temp_rd->name);
+#ifdef ENABLE_DBENGINE
+        freez(temp_rd->state->metric_uuid);
+#endif
+        freez(temp_rd->state);
+        freez(temp_rd);
+        temp_rd = t;
+    }
+}
+
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
@@ -101,21 +120,7 @@ int rrdset2value_api_v1(
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
 
-    if (temp_rd) {
-        RRDDIM *t;
-        while(temp_rd) {
-            t = temp_rd->next;
-            freez((char *) temp_rd->id);
-            freez((char *) temp_rd->name);
-#ifdef ENABLE_DBENGINE
-            freez(temp_rd->state->metric_uuid);
-#endif
-            //freez(rd->state->page_index);
-            freez(temp_rd->state);
-            freez(temp_rd);
-            temp_rd = t;
-        }
-    }
+    free_temp_rrddim(temp_rd);
 
     rrdr_free(r);
     return HTTP_RESP_OK;
@@ -347,21 +352,8 @@ int rrdset2anything_api_v1(
         break;
     }
 
-    if (temp_rd) {
-        RRDDIM *t;
-        while(temp_rd) {
-            t = temp_rd->next;
-            freez((char *) temp_rd->id);
-            freez((char *) temp_rd->name);
-#ifdef ENABLE_DBENGINE
-            freez(temp_rd->state->metric_uuid);
-#endif
-            //freez(rd->state->page_index);
-            freez(temp_rd->state);
-            freez(temp_rd);
-            temp_rd = t;
-        }
-    }
+    free_temp_rrddim(temp_rd);
+
     rrdr_free(r);
     return HTTP_RESP_OK;
 }
