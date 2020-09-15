@@ -381,7 +381,7 @@ AC_CHECK_LIB(
 )
 
 test -z "${SSL_LIBS}" || \
-    AC_DEFINE([HAVE_TLS], [1], [libcrypto availability])
+    AC_DEFINE([HAVE_CRYPTO], [1], [libcrypto availability])
 
 if test "${ssl_host_validation}" = "no"; then
     AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [0], [ssl host validation])
