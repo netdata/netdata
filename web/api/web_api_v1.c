@@ -418,8 +418,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         // they are not null and not empty
 
         if(!strcmp(name, "context")) context = value;
-
-        if(!strcmp(name, "chart")) chart = value;
+        else if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
             if(!dimensions) dimensions = buffer_create(100);
             buffer_strcat(dimensions, "|");
