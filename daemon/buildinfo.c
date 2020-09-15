@@ -174,7 +174,7 @@
 #endif
 
 
-void print_build_info() {
+void print_build_info(void) {
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
 
     printf("Features:\n");
