@@ -175,8 +175,6 @@
 
 
 void print_build_info() {
-    int i;
-
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
 
     printf("Features:\n");
