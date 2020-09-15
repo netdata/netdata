@@ -150,7 +150,7 @@ int rrdset2anything_api_v1(
                 rrddim_foreach_read(rd1, st1) {
                     RRDDIM *rd = mallocz(rd1->memsize);
                     memcpy(rd, rd1, rd1->memsize);
-                    rd->id = strdupz(rd1->id);s
+                    rd->id = strdupz(rd1->id);
                     rd->name = strdupz(rd1->name);
                     rd->state = mallocz(sizeof(*rd->state));
                     memcpy(rd->state, rd1->state, sizeof(*rd->state));
