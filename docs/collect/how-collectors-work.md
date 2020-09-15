@@ -12,10 +12,15 @@ collecting per-second metrics.
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
 when you [install the Netdata Agent](/docs/get/README.md#).
 
-A collector's primary job to look for exposed metrics at a pre- or user-defined endpoint. If the collector finds
-compatible metrics exposed on that endpoint, it begins a per-second collection job. The Netdata Agent gathers these
-metrics, sends to them to the [database engine for storage](/docs/store/change-metrics-retention.md), and immediately
-[visualizes them meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
+Every collector has two primary jobs:
+
+-   Look for exposed metrics at a pre- or user-defined endpoint.
+-   Gather exposed metrics and use additional logic to build meaningful, interactive visualizations.
+
+If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
+Netdata Agent gathers these metrics, sends to them to the [database engine for
+storage](/docs/store/change-metrics-retention.md), and immediately [visualizes them
+meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
 can be a URL and port, a socket, a file, a web page, and more.
@@ -51,6 +56,14 @@ terms related to collecting metrics.
 -   **Modules** are a type of collector.
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
     The Go orchestator is in active development.
+    -   [go.d.plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/): An orchestrator for data
+        collection modules written in `go`.
+    -   [python.d.plugin](/collectors/python.d.plugin/README.md): An orchestrator for data collection modules written in
+        `python` v2/v3.
+    -   [charts.d.plugin](/collectors/charts.d.plugin/README.md): An orchestrator for data collection modules written in
+        `bash` v4+.
+    -   [node.d.plugin](/collectors/node.d.plugin/README.md): An orchestrator for data collection modules written in
+        `node.js`.
 -   **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
     processes that communicate with the Netdata daemon via pipes.
 -   **Internal plugins** gather metrics from `/proc`, `/sys` and other Linux kernel sources. They are written in `C`,
