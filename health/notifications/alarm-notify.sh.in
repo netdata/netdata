@@ -716,8 +716,8 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_SYSLOG}" \
 	"${SEND_SMS}" \
 	"${SEND_MSTEAM}" \
-  "${SEND_DYNATRACE}" \
-  "${SEND_STACKPULSE}"; do
+	"${SEND_DYNATRACE}" \
+	"${SEND_STACKPULSE}" ; do
 	
 	if [ "${method}" == "YES" ]; then
 		proceed=1
