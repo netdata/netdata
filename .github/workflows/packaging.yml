@@ -125,15 +125,19 @@ jobs:
             if ( echo "${{ github.event.ref }}" | grep -Eq '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+-[[:digit:]]{8}.*$' ) && ( git branch --contains tags/${{ github.event.ref }} | grep -q master ) ; then
                 echo ::set-env name=tagtpe::nightly
                 echo ::set-env name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}-edge
+                echo ::set-env name=pkg_version::"$(echo ${{ github.event.ref }})"
             elif ( echo "${{ github.event.ref }}" | grep -Eq '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$' ) && ( git branch --contains tags/${{ github.event.ref }} | grep -q master ) ; then
                 echo ::set-env name=tagtype::release
                 echo ::set-env name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}
+                echo ::set-env name=pkg_version::"$(echo ${{ github.event.ref }})"
             else
                 echo ::set-env name=tagtype::normal
                 echo ::set-env name=repo::${{ secrets.PACKAGE_CLOUD_REPO }}-devel
+                echo ::set-env name=pkg_version::"$(echo ${{ github.event.ref }}-devel)"
             fi
           else
             echo ::set-env name=taggedrun::0
+            echo ::set-env name=pkg_version::"$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')"
           fi
       - name: Prepare Docker Images
         if: github.event_name == 'pull_request' || env.taggedrun == 1
@@ -147,18 +151,12 @@ jobs:
         if: github.event_name == 'pull_request' || env.taggedrun == 1
         shell: bash
         run: |
-          # Figure out the package version.
-          PKG_VERSION="$(cut -d '-' -f 1 packaging/version)"
-          last_commit="$(git log -1 --pretty=format:"%s")"
-          if [ "${{ env.taggedrun }}" -eq 1 ] ; then
-            PKG_VERSION="$(cut -d '-' -f 1 packaging/version | sed -e 's/-/./g').latest"
-          fi
           # Actually build the package.
           docker build . \
               -f packaging/Dockerfile.packager \
               --build-arg DISTRO=${{ matrix.distro }} \
               --build-arg DISTRO_VERSION=${{ matrix.version }} \
-              --build-arg PKG_VERSION=$PKG_VERSION \
+              --build-arg PKG_VERSION=${{ env.pkg_version }} \
               -t local/package-builder:${{ matrix.distro }}${{ matrix.version }}
           mkdir -p artifacts
           docker run -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
