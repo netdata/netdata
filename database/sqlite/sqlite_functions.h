@@ -5,6 +5,7 @@
 #define NETDATA_SQLITE_FUNCTIONS_H
 
 #include "../../daemon/common.h"
+#include "sqlite3.h"
 //#include "../rrd.h"
 #ifdef ENABLE_DBENGINE
 #include "../engine/global_uuid_map//global_uuid_map.h"

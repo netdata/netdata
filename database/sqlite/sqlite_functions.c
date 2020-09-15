@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <sqlite3.h>
 #include "sqlite_functions.h"
 #include <lz4.h>
 
@@ -528,10 +527,10 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
-    //sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
-    //sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
-    sqlite3_create_function(db, "u2h", 1, SQLITE_ANY , 0, _uuid_parse, 0, 0);
-    sqlite3_create_function(db, "h2u", 1, SQLITE_ANY , 0, _uuid_unparse, 0, 0);
+    sqlite3_create_function(db, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_parse, 0, 0);
+    sqlite3_create_function(db, "h2u", 1, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, _uuid_unparse, 0, 0);
+//    sqlite3_create_function(db, "u2h", 1, SQLITE_ANY , 0, _uuid_parse, 0, 0);
+//    sqlite3_create_function(db, "h2u", 1, SQLITE_ANY , 0, _uuid_unparse, 0, 0);
     sqlite3_create_function(db, "uncompress", 1, SQLITE_ANY , 0, _uncompress, 0, 0);
 
 
@@ -746,7 +745,7 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
 
     uuid_parse(dim_str, dim_uuid);
 
-    //sprintf(sql, "select id, name, multiplier, divisor , algorithm, options from dimension where dim_uuid = u2h('%s') and archived = 1;", dim_str);
+    //sprintf(sql, "select id, name, multiplier, divisor , algorithm, o ptions from dimension where dim_uuid = u2h('%s') and archived = 1;", dim_str);
     rc = sqlite3_prepare_v2(db, SQL_SELECT_DIMENSION, -1, &res, 0);
     if (rc != SQLITE_OK)
         return NULL;
@@ -766,7 +765,7 @@ RRDDIM *sql_create_dimension(char *dim_str, RRDSET *st, int temp)
             sqlite3_column_int(res, 2), sqlite3_column_int(res, 3), sqlite3_column_int(res, 4), st->rrd_memory_mode,
             temp);
 
-        if (temp != 2) {
+        if (temp != 1) {
             rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
             rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
@@ -960,11 +959,11 @@ RRDDIM *sql_load_chart_dimensions(RRDSET *st, int temp)
         freez(dimension_list->name);
         freez(dimension_list);
         dimension_list = tmp_dimension_list;
-        temp_rd->next = rd;
-        rd = temp_rd;
+        //temp_rd->next = rd;
+        //rd = temp_rd;
     }
 
-    return rd;
+    return st->dimensions;
 }
 
 int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions)
@@ -2049,8 +2048,11 @@ void rrddim_sql_collect_init(RRDDIM *rd)
     rd->state->db_first_entry_t = LONG_MAX;
     rd->state->db_last_entry_t = 0;
     sql_rrddim_first_last_entry_t(rd, &rd->state->db_first_entry_t, &rd->state->db_last_entry_t);
-    rd->state->metric_page->first_entry_t = LONG_MAX;
-    rd->state->metric_page->last_entry_t = 0;
+    if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+       info("SQLITE: Fetch ARCHIVED RD %s (value = %ld  - %ld)", rd->id,  rd->state->db_first_entry_t, rd->state->db_last_entry_t);
+       rd->state->metric_page->first_entry_t = rd->state->db_last_entry_t;
+       rd->state->metric_page->last_entry_t = rd->state->db_last_entry_t;
+    }
     rd->state->metric_page->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
 }
 
@@ -2154,7 +2156,7 @@ void rrddim_sql_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_
     handle->slotted.finished = 0;
     handle->slotted.init = 0;
 //    info("Request (%d - %d) - BUFFER has (%d - %d) SQLite (%d to %d)", start_time, end_time,
-//         metric_page->first_entry_t, metric_page->last_entry_t, rd->state->db_first_entry_t, rd->state->db_last_entry_t);
+ //        metric_page->first_entry_t, metric_page->last_entry_t, rd->state->db_first_entry_t, rd->state->db_last_entry_t);
 
     if (start_time < metric_page->first_entry_t) {
 //        info(

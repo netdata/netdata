@@ -374,6 +374,8 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
+    database/sqlite/sqlite3.c \
+    database/sqlite/sqlite3.h \
     database/sqlite/carray.c \
     $(NULL)
 
@@ -693,7 +695,6 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
-    $(OPTIONAL_SQLITE_LIBS) \
     $(NULL)
 
 if LINK_STATIC_JSONC

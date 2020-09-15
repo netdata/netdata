@@ -320,21 +320,6 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 
 # -----------------------------------------------------------------------------
-# libsqlite3 multi-platform support library with a focus on asynchronous I/O
-
-AC_CHECK_LIB(
-    [sqlite3],
-    [sqlite3_open],
-    [SQLITE_LIBS="-lsqlite3"]
-    [SQLITE_FLAGS=""]
-)
-test -z "${SQLITE_LIBS}" && \
-    AC_MSG_ERROR([libsqlite3 required but not found. Try installing 'libsqlite3'.])
-OPTIONAL_SQLITE_CFLAGS="${SQLITE_FLAGS}"
-OPTIONAL_SQLITE_LIBS="${SQLITE_LIBS}"
-
-
-# -----------------------------------------------------------------------------
 # lz4 Extremely Fast Compression algorithm
 
 AC_CHECK_LIB(
@@ -1447,7 +1432,6 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
-AC_SUBST([OPTIONAL_SQLITE_LIBS])
 
 
 # -----------------------------------------------------------------------------

@@ -139,7 +139,7 @@ int rrdset2anything_api_v1(
 
     RRDDIM *temp_rd = NULL;
     if (!st->dimensions)
-        temp_rd = sql_load_chart_dimensions(st, 1);
+        (void ) sql_load_chart_dimensions(st, 1);
 
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, temp_rd);
     if(!r) {

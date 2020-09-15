@@ -444,8 +444,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     }
     if (is_archived)
         rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-    else
-        rd->state->collect_ops.init(rd); // only initialize if a collector created this dimension
+    //else
+    rd->state->collect_ops.init(rd); // only initialize if a collector created this dimension
     // append this dimension
     if(!st->dimensions)
         st->dimensions = rd;
@@ -470,6 +470,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
         for(; td->next; td = td->next) ;
         td->next = rd;
+        if (rrdset_flag_check(rd->rrdset, RRDSET_FLAG_ARCHIVED))
+            rd->rrdset->state->last_entry_t = MAX(rd->rrdset->state->last_entry_t, rd->state->db_last_entry_t);
     }
 
     if(host->health_enabled && !is_archived) {
