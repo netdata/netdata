@@ -376,7 +376,7 @@ static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
  * @return number of regions with different data collection intervals.
  */
 unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
-                                         struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp)
+                                         struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, RRDDIM *temp_rd)
 {
     struct pg_cache_page_index *page_index;
     struct rrdengine_instance *ctx;
@@ -397,7 +397,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     page_info_array = NULL;
 
     rrdset_rdlock(st);
-    for(rd_iter = st->dimensions, rd = NULL, min_time = (usec_t)-1 ; rd_iter ; rd_iter = rd_iter->next) {
+    for(rd_iter = temp_rd?temp_rd:st->dimensions, rd = NULL, min_time = (usec_t)-1 ; rd_iter ; rd_iter = rd_iter->next) {
         /*
          * Choose oldest dimension as reference. This is not equivalent to the union of all dimensions
          * but it is a best effort approximation with a bias towards older metrics in a chart. It
