@@ -2227,6 +2227,7 @@ EOF
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
     error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
+    return 1
   fi
 
   return 0;
@@ -2239,6 +2240,7 @@ opsgenie_close_alarm() {
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
     error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
+    return 1
   fi
 }
 
