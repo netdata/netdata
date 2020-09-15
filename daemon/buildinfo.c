@@ -23,7 +23,7 @@
 #define FEAT_TLS_HOST_VERIFY "NO"
 #endif
 
-#ifdef ENABLE_HTPS
+#ifdef ENABLE_HTTPS
 #define FEAT_NATIVE_HTTPS "YES"
 #else
 #define FEAT_NATIVE_HTTPS "NO"
