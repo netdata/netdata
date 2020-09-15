@@ -13,7 +13,8 @@ static inline void free_temp_rrddim(RRDDIM *temp_rd)
         freez((char *)temp_rd->id);
         freez((char *)temp_rd->name);
 #ifdef ENABLE_DBENGINE
-        freez(temp_rd->state->metric_uuid);
+        if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            freez(temp_rd->state->metric_uuid);
 #endif
         freez(temp_rd->state);
         freez(temp_rd);
