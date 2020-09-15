@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.25.0](https://github.com/netdata/netdata/tree/v1.25.0) (2020-09-15)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.24.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.24.0...v1.25.0)
 
 **Merged pull requests:**
 
@@ -238,7 +238,6 @@
 - Add frontmatter to Matrix notifications doc [\#9295](https://github.com/netdata/netdata/pull/9295) ([joelhans](https://github.com/joelhans))
 - installer: update go.d.plugin version to v0.19.0 [\#9294](https://github.com/netdata/netdata/pull/9294) ([ilyam8](https://github.com/ilyam8))
 - dashboard\_info.js: ebpf: fix close code block [\#9293](https://github.com/netdata/netdata/pull/9293) ([ilyam8](https://github.com/ilyam8))
-- Add guide to exporting metrics to Graphite [\#9285](https://github.com/netdata/netdata/pull/9285) ([joelhans](https://github.com/joelhans))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
