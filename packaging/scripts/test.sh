@@ -10,9 +10,11 @@ wait_for() {
   host="${1}"
   port="${2}"
   name="${3}"
-  timeout="${4:-30}"
+  timeout="30"
 
   printf "Waiting for %s on %s:%s ... " "${name}" "${host}" "${port}"
+
+  sleep 30
 
   i=0
   while ! nc -z "${host}" "${port}"; do
