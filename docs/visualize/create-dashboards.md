@@ -8,16 +8,16 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/c
 
 With Netdata Cloud, you can build new dashboards that put key metrics from any number of distributed systems in one
 place for a bird's eye view of your infrastructure. You can create more [meaningful
-visualizations](/docs/troubleshooting/README.md) for troubleshooting, or keep a watchful eye on the most meaningful
-metrics in your infrastructure without moving from node to node.
+visualizations](/docs/troubleshooting/README.md) for troubleshooting or keep a watchful eye on your infrastructure's
+most meaningful metrics without moving from node to node.
 
-Beginning in the War Room you want to monitor with this dashboard, click on your War Room's dropdown, then click on the
-green **+ Add** button next to **Dashboards**. In the panel, give your new dashboard a name, and click **+ Add**.
+In the War Room you want to monitor with this dashboard, click on your War Room's dropdown, then click on the green **+
+Add** button next to **Dashboards**. In the panel, give your new dashboard a name, and click **+ Add**.
 
-Dashboards are made out of chart and text cards. Click the **Add Chart** button to add your first chart. From the
-dropdown, select the node you want to add the chart from, then the context. Netdata Cloud shows you a preview of the
-chart before you finish adding it. The **Add Text** button helps you add descriptive text, or document internally, the
-meaning and purpose of a particular dashboard.
+Click the **Add Chart** button to add your first chart card. From the dropdown, select the node you want to add the
+chart from, then the context. Netdata Cloud shows you a preview of the chart before you finish adding it. The **Add
+Text** button helps you add a text card, which you can use to describe or document the meaning and purpose of a
+particular dashboard.
 
 ![An example multi-node dashboard for system CPU
 metrics](https://user-images.githubusercontent.com/1153921/93399129-c1661480-f831-11ea-9570-a5bd401f54db.png)
@@ -25,8 +25,8 @@ metrics](https://user-images.githubusercontent.com/1153921/93399129-c1661480-f83
 Charts in dashboards are [fully interactive](/docs/visualize/interact-dashboards-charts.md) and synchronized. You can
 pan through time, zoom, highlight specific timeframes, and more.
 
-Move any card by clicking on their top panel and dragging them to new a location. Other cards re-sort to the grid system
-automatically. You can also resize any card by grabbing the bottom-right corner and dragging to its new size.
+Move any card by clicking on their top panel and dragging them to a new location. Other cards re-sort to the grid system
+automatically. You can also resize any card by grabbing the bottom-right corner and dragging it to its new size.
 
 Hit the **Save** button to finalize your dashboard. Any other member of the War Room can now access it and make changes.
 
@@ -36,9 +36,9 @@ While dashboards help you associate essential charts from distributed nodes on a
 more detail when troubleshooting an issue. Quickly jump to any node's dashboard by clicking the 3-dot icon in the corner
 of any card to open a menu. Hit the **Go to Chart** item.
 
-Netdata Cloud takes you to the exact same chart on that node's dashboard. You can now navigate all that node's metrics
-and [interact with charts](/docs/visualize/interact-dashboards-charts.md) to further investigate anomalies or
-troubleshoot complex performance problems.
+Netdata Cloud takes you to the same chart on that node's dashboard. You can now navigate all that node's metrics and
+[interact with charts](/docs/visualize/interact-dashboards-charts.md) to further investigate anomalies or troubleshoot
+complex performance problems.
 
 When viewing a single-node Cloud dashboard, you can also click on the add to dashboard icon <img
 src="https://user-images.githubusercontent.com/1153921/87587846-827fdb00-c697-11ea-9f31-aed0b8c6afba.png" alt="Dashboard
@@ -46,7 +46,7 @@ icon" class="image-inline" /> to quickly add that chart to a new or existing das
 
 ## What's next?
 
-While it's useful to see real-time metrics on flexible dashboards, you need ways to know exactly when anomaly strikes.
+While it's useful to see real-time metrics on flexible dashboards, you need ways to know precisely when anomaly strikes.
 Every Netdata Agent comes with a health watchdog that uses [alarms](/docs/monitor/configure-alarms.md) and
 [notifications](/docs/monitor/enable-notifications.md) to notify you of issues seconds after they strike.
 
