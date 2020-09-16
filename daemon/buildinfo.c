@@ -8,7 +8,11 @@
 #ifdef ENABLE_ACLK
 #define FEAT_CLOUD "YES"
 #else
+#ifdef DISABLE_CLOUD
+#define FEAT_CLOUD "NO (by user request e.g. '--disable-cloud')"
+#else
 #define FEAT_CLOUD "NO"
+#endif
 #endif
 
 #ifdef ENABLE_DBENGINE
@@ -181,14 +185,6 @@ void print_build_info(void) {
     printf("    dbengine:                %s\n", FEAT_DBENGINE);
     printf("    Native HTTPS:            %s\n", FEAT_NATIVE_HTTPS);
     printf("    Netdata Cloud:           %s\n", FEAT_CLOUD);
-#ifndef ENABLE_ACLK
-#ifdef DISABLE_CLOUD
-    printf("        Cloud Disabled By User Request (e.g. installer flag --disable-cloud)\n");
-#else
-    printf("        Usable Libwebsockets:       %s\n", FEAT_LWS);
-    printf("        Usable Mosquitto:           %s\n", FEAT_MOSQUITTO);
-#endif
-#endif
     printf("    TLS Host Verification:   %s\n", FEAT_TLS_HOST_VERIFY);
 
     printf("Libraries:\n");
