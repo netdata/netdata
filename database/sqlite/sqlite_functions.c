@@ -27,7 +27,9 @@ static uv_rwlock_t sqlite_flush;
 static uv_rwlock_t sqlite_add_page;
 static int pending_page_inserts = 0;
 
-int sqlite_disk_quota_mb = 64;
+int sqlite_disk_quota_mb;
+int page_cache_mb;
+int db_wal_size;
 
 struct sqlite_page_flush {
     uint32_t    page_count;               // Number of pages to flush
@@ -342,13 +344,17 @@ int sql_init_database()
     fatal_assert(0 == uv_rwlock_init(&sqlite_add_page));
 
     sqlite_disk_quota_mb =  config_get_number(CONFIG_SECTION_GLOBAL, "database disk space", 64);
+    page_cache_mb =  config_get_number(CONFIG_SECTION_GLOBAL, "database page cache", 2);
+    db_wal_size =  config_get_number(CONFIG_SECTION_GLOBAL, "database wal size", 16 * 1024 * 1024);
 
     snprintfz(sqlite_database, FILENAME_MAX, "%s/sqlite", netdata_configured_cache_dir);
 
     int rc = sqlite3_open(sqlite_database, &db);
     info("SQLite Database initialized at %s (rc = %d), database quota set to %d (action %d)", sqlite_database, rc, sqlite_disk_quota_mb, (int) (sqlite_disk_quota_mb));
 
-    rc = sqlite3_exec(db, "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=16777216; PRAGMA cache_size=-4000; PRAGMA temp_store=MEMORY;", 0, 0, &err_msg);
+    sprintf(wstr, "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=%d; PRAGMA cache_size=-%d; PRAGMA temp_store=MEMORY;", db_wal_size, page_cache_mb);
+
+    rc = sqlite3_exec(db, wstr, 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
@@ -572,7 +578,11 @@ int sql_close_database()
     return 0;
 }
 
-void sql_compact_database()
+/*
+ * Return the database size in MiB
+ *
+ */
+int sql_database_size()
 {
     char *err_msg = NULL;
     sqlite3_stmt *res;
@@ -582,7 +592,7 @@ void sql_compact_database()
 
     rc = sqlite3_prepare_v2(db, "pragma page_count;", -1, &res, 0);
     if (rc != SQLITE_OK)
-        return;
+        return 0;
 
     if (sqlite3_step(res) == SQLITE_ROW)
         page_count = sqlite3_column_int(res, 0);
@@ -592,7 +602,7 @@ void sql_compact_database()
     if (unlikely(!page_size)) {
         rc = sqlite3_prepare_v2(db, "pragma page_size;", -1, &res, 0);
         if (rc != SQLITE_OK)
-            return;
+            return 0;
 
         if (sqlite3_step(res) == SQLITE_ROW)
             page_size = sqlite3_column_int(res, 0);
@@ -600,11 +610,24 @@ void sql_compact_database()
         sqlite3_finalize(res);
     }
 
-    if ((page_count * page_size / (1024 * 1024)) > (int)(sqlite_disk_quota_mb * 0.95)) {
-        info("Database size = %d MiB, limit is %d (pages %d, page size = %d)", (page_count * page_size / (1024 * 1024)), sqlite_disk_quota_mb, page_count, page_size);
-        rc = sqlite3_exec(
-            db_page, "delete from metric_page order by start_date limit 10000; pragma incremental_vacuum(1000);", 0, 0,
-            &err_msg);
+    return (page_count / 1024) * (page_size / 1024);
+}
+
+void sql_compact_database(int database_size)
+{
+    char *err_msg = NULL;
+    int rc;
+
+    if (database_size <= (int)(sqlite_disk_quota_mb * 0.95))
+        return;
+
+    info("Database size = %d MiB, limit is %d", database_size, sqlite_disk_quota_mb);
+
+    rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 10000; pragma incremental_vacuum(1000);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error during database rotation %s", err_msg);
+        sqlite3_free(err_msg);
     }
 }
 
@@ -2534,12 +2557,12 @@ void *sqlite_rotation_main(void *ptr)
 //        uv_rwlock_wrlock(&sqlite_flush);
         if (items_to_commit) {
             ram_vacuumed = 0;
-            int rc = sqlite3_exec(db, "delete from ram.chart limit 500;", 0, 0, &err_msg);
+            int rc = sqlite3_exec(db, "delete from ram.chart limit 5000;", 0, 0, &err_msg);
             if (rc == SQLITE_OK) {
                 items_to_commit = sqlite3_changes(db);
                 info("Committed %d charts", items_to_commit);
                 if (!items_to_commit) {
-                    rc = sqlite3_exec(db, "delete from ram.dimension limit 3500;", 0, 0, &err_msg);
+                    rc = sqlite3_exec(db, "delete from ram.dimension limit 35000;", 0, 0, &err_msg);
                     if (rc == SQLITE_OK) {
                         items_to_commit = sqlite3_changes(db);
                         info("Committed %d dimensions", items_to_commit);
@@ -2558,8 +2581,11 @@ void *sqlite_rotation_main(void *ptr)
         } else {
             if (!ram_vacuumed) {
                 ram_vacuumed = 1;
-                info("RAM vacuum");
-                sqlite3_exec(db, "VACUUM ram;", 0, 0, &err_msg);
+                if (sqlite3_exec(db, "VACUUM ram;", 0, 0, &err_msg) != SQLITE_OK) {
+                    errno = 0;
+                    error("SQL error during RAM vacuum : %s", err_msg);
+                    sqlite3_free(err_msg);
+                }
                 info("No items to commit");
             }
         }
@@ -2587,9 +2613,14 @@ void *sqlite_rotation_main(void *ptr)
         //info("Flash loop = %d",flush_count);
 
         // Check if we have pending transactions for a while
+
+        int database_size = sql_database_size();
+
         uv_rwlock_wrlock(&sqlite_add_page);
-        //if (last_pending_page_inserts && last_pending_page_inserts == pending_page_inserts) {
-        {
+        if (database_size > (int)(sqlite_disk_quota_mb * 0.95))
+            last_pending_page_inserts = pending_page_inserts;
+
+        if (last_pending_page_inserts && last_pending_page_inserts == pending_page_inserts) {
             //info("Ending METRIC transaction (last count = %d same as current)", last_pending_page_inserts);
             sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
             pending_page_inserts = 0;
@@ -2598,11 +2629,9 @@ void *sqlite_rotation_main(void *ptr)
 
         count++;
         if (count % 15 == 0) // && !pending_page_inserts)
-            sql_compact_database();
+            sql_compact_database(database_size);
 
         uv_rwlock_wrunlock(&sqlite_add_page);
-
-//        uv_rwlock_wrunlock(&sqlite_flush);
     }
     info("Writing %d dirty pages to the database due to shutdown", sqlite_page_flush_list.page_count);
     while (sqlite_page_flush_list.page_count) {
