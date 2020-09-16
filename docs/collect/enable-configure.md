@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/ena
 
 # Enable or configure a collector
 
-While collectors start colleting right away if they find exposed metrics on their default endpoint, not all
+While collectors start collecting right away if they find exposed metrics on their default endpoint, not all
 infrastructures use standard ports, paths, files, or naming conventions. You may need to enable or configure a collector
 to gather all available metrics from your systems, containers, or applications.
 

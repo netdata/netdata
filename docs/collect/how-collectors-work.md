@@ -50,7 +50,7 @@ Generally, Netdata's collectors can be grouped into three types:
 
 **Collector** is a catch-all term for any Netdata process that gathers metrics from an endpoint. 
 
-While we use collector most often in documentation, release notes, and educational content, you may encounter other
+While we use _collector_ most often in documentation, release notes, and educational content, you may encounter other
 terms related to collecting metrics.
 
 -   **Modules** are a type of collector.

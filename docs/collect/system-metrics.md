@@ -11,7 +11,7 @@ Netdata collects thousands of metrics directly the operating systems of physical
 and [containers](/docs/collect/container-metrics.md) with zero configuration.
 
 To gather system metrics, Netdata uses roughly a dozen plugins, each of which has one or more collectors for very
-specific metrics exposed by the host. Most metrics Netdata users interface with most for health monitoring and
+specific metrics exposed by the host. The system metrics Netdata users interact with most for health monitoring and
 performance troubleshooting are collected and visualized by `proc.plugin`, `cgroups.plugin`, and `ebpf.plugin`.
 
 [**proc.plugin**](/collectors/proc.plugin/README.md) gathers metrics from the `/proc` and `/sys` folders in Linux
