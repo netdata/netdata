@@ -26,7 +26,7 @@ wait_for() {
   printf "OK\n"
 }
 
-netdata -D > ./netdata.log 2>&1 &
+/usr/sbin/netdata -D > ./netdata.log 2>&1 &
 
 wait_for localhost 19999 netdata || exit 1
 
