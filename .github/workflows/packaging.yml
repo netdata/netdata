@@ -30,6 +30,7 @@ jobs:
           - fedora31
           - fedora32
           - opensuse15.1
+          - opensuse15.2
         include:
           - platform: debian9
             distro: debian
@@ -99,6 +100,13 @@ jobs:
             version: "15.1"
             pkgclouddistro: Fedora
             pkgcloudversion: "15.1"
+            format: rpm
+            base_image: opensuse/leap
+          - platform: opensuse15.2
+            distro: opensuse
+            version: "15.2"
+            pkgclouddistro: Fedora
+            pkgcloudversion: "15.2"
             format: rpm
             base_image: opensuse/leap
       # We intentiaonally disable the fail-fast behavior so that a
