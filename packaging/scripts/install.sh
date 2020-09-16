@@ -54,7 +54,7 @@ install_suse_like() {
 
   # Install testing tools
   zypper install -y --no-recommends \
-    curl netcat jq
+    curl gnu-netcat jq
 }
 
 case "${DISTRO}" in
