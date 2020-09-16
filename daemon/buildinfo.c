@@ -8,7 +8,11 @@
 #ifdef ENABLE_ACLK
 #define FEAT_CLOUD "YES"
 #else
+#ifdef DISABLE_CLOUD
+#define FEAT_CLOUD "NO (by user request e.g. '--disable-cloud')"
+#else
 #define FEAT_CLOUD "NO"
+#endif
 #endif
 
 #ifdef ENABLE_DBENGINE
