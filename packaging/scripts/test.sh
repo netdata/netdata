@@ -1,5 +1,11 @@
 #!/bin/sh
 
+dump_log() {
+  cat ./netdata.log
+}
+
+trap dump_log EXIT
+
 wait_for() {
   host="${1}"
   port="${2}"
@@ -20,8 +26,14 @@ wait_for() {
   printf "OK\n"
 }
 
-netdata -D > netdata.log 2>&1 &
+netdata -D > ./netdata.log 2>&1 &
 
-wait_for localhost 19999 netdata
+wait_for localhost 19999 netdata || exit 1
 
-curl -sS http://127.0.0.1:19999/api/v1/info | jq '.version'
+curl -sS http://127.0.0.1:19999/api/v1/info > ./response || exit 1
+
+cat ./response
+
+jq '.version' ./response || exit 1
+
+trap - EXIT
