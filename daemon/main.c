@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "buildinfo.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
@@ -1254,6 +1255,11 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
                             /* will trigger a claiming attempt when the agent is initialized */
                             claiming_pending_arguments = optarg + strlen(claim_string);
+                        }
+                        else if(strcmp(optarg, "buildinfo") == 0) {
+                            printf("Version: %s %s\n", program_name, program_version);
+                            print_build_info();
+                            return 0;
                         }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
