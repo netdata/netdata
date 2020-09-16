@@ -157,6 +157,7 @@ To try Netdata in a Docker container, run this:
 ```sh
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdataconfig:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \

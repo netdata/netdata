@@ -32,13 +32,22 @@ directive, not a COMMAND directive. Please adapt your execution scripts accordin
 ENTRYPOINT vs COMMAND in the [Docker
 documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 
-## Run the Agent with the Docker command
+## Create a new Netdata Agent container
 
-Quickly start a new Agent with the `docker run` command.
+You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
+visit the Agent dashboard `http://NODE:19999`.
+
+Both methods create a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
+_within the container_ at `/etc/netdata`. See the [configuration section](#configure-agent-containers) for details. If
+you want to access the configuration files from your _host_ machine, see [host-editable
+configuration](#host-editable-configuration).
+
+**`docker run`**: Use the `docker run` command, along with the following options, to start a new container.
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdataconfig:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
@@ -52,12 +61,8 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-You can then access the dashboard at `http://localhost:19999`.
-
-## Run the Agent with Docker Compose
-
-The above can be converted to a `docker-compose.yml` file to use with [Docker
-Compose](https://docs.docker.com/compose/):
+**Docker Compose**: Copy the following code and paste into a new file called `docker-compose.yml`, then run
+`docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
 ```yaml
 version: '3'
@@ -74,6 +79,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
@@ -83,11 +89,10 @@ services:
       - /etc/os-release:/host/etc/os-release:ro
 
 volumes:
+  netdataconfig:
   netdatalib:
   netdatacache:
 ```
-
-Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
 ## Health Checks
 
@@ -114,10 +119,85 @@ need to use a non-default configuration for health checks to work.
 
 ## Configure Agent containers
 
-You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. You should
-reference the [`docker run`](https://docs.docker.com/engine/reference/run/) and [Docker
-Compose](https://docs.docker.com/compose/) documentation for details, but we'll cover a few recommended configurations
-below, as well as those that are unique to Netdata Agent containers.
+If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container), you
+must first use `docker exec` to attach to the container. Replace `netdata` with the name of your Agent container in the
+first command below.
+
+```bash
+docker exec -it netdata bash
+cd /etc/netdata
+./edit-config netdata.conf
+```
+
+You need to restart the Agent to apply changes. Exit the container if you haven't already, then use the `docker` command
+to restart the container: `docker restart netdata`.
+
+### Host-editable configuration
+
+If you want to make your container's configuration directory accessible from the host system, you need to use a
+[volume](https://docs.docker.com/storage/bind-mounts/) rather than a bind mount. The following commands create a
+temporary `netdata_tmp` container, which is used to populate a `netdataconfig` directory, which is then mounted inside
+the container at `/etc/netdata`.
+
+```bash
+mkdir netdataconfig
+docker run -d --name netdata_tmp netdata/netdata
+docker cp netdata_tmp:/etc/netdata netdataconfig/
+docker rm -f netdata_tmp
+```
+
+**`docker run`**: Use the `docker run` command, along with the following options, to start a new container. Note the
+changed `-v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \` line from the recommended example above.
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata
+```
+
+**Docker Compose**: Copy the following code and paste into a new file called `docker-compose.yml`, then run
+`docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container. Note the changed
+`./netdataconfig/netdata:/etc/netdata:ro` line from the recommended example above.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./netdataconfig/netdata:/etc/netdata:ro
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
+```
 
 ### Add or remove other volumes
 
