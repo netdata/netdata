@@ -603,7 +603,7 @@ void sql_compact_database()
     if ((page_count * page_size / (1024 * 1024)) > (int)(sqlite_disk_quota_mb * 0.95)) {
         info("Database size = %d MiB, limit is %d (pages %d, page size = %d)", (page_count * page_size / (1024 * 1024)), sqlite_disk_quota_mb, page_count, page_size);
         rc = sqlite3_exec(
-            db_page, "delete from metric_page order by start_date limit (select value from agent_configuration where key = 'rotation_rows'); pragma incremental_vacuum(32);", 0, 0,
+            db_page, "delete from metric_page order by start_date limit 10000; pragma incremental_vacuum(1000);", 0, 0,
             &err_msg);
     }
 }
@@ -2588,7 +2588,8 @@ void *sqlite_rotation_main(void *ptr)
 
         // Check if we have pending transactions for a while
         uv_rwlock_wrlock(&sqlite_add_page);
-        if (last_pending_page_inserts && last_pending_page_inserts == pending_page_inserts) {
+        //if (last_pending_page_inserts && last_pending_page_inserts == pending_page_inserts) {
+        {
             //info("Ending METRIC transaction (last count = %d same as current)", last_pending_page_inserts);
             sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
             pending_page_inserts = 0;
@@ -2596,7 +2597,7 @@ void *sqlite_rotation_main(void *ptr)
         last_pending_page_inserts = pending_page_inserts;
 
         count++;
-        if (count % 15 == 0 && !pending_page_inserts)
+        if (count % 15 == 0) // && !pending_page_inserts)
             sql_compact_database();
 
         uv_rwlock_wrunlock(&sqlite_add_page);
