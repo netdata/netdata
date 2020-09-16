@@ -2163,17 +2163,17 @@ opsgenie_create_alarm() {
   # The restrictions applied for each variable was defined according
   # the URL https://docs.opsgenie.com/docs/alert-api#create-alert on September 2nd, 2020.
 
-  opts+=("\"message\": \"netdata on ${host:0:129}\","$'\n')
+  opts+=("\"message\": \"Netdata on ${host:0:117}\","$'\n')
 
   # Add Optional fields
-  opts+=($'\t'"\"description\": \"${chart}.${name} ${status_message}, ${info}\","$'\n')
+  opts+=($'\t'"\"description\": \"${chart:0:1023}.${name:0:1023} ${status_message}, ${info:0:8192}\","$'\n')
   opts+=($'\t'"\"priority\": \"${priority}\","$'\n')
   opts+=($'\t'"\"alias\": \"${alarm_id}\"")
 
   # Commas are added to previous array element every time another optional value is necessary
   # Add Optional fields if user specified them
   idx=3
-  [ -n "${OPSGENIE_ENTITY}" ] && opts[2]="${opts[2]},"$'\n' && idx=4 && opts+=($'\t'"\"entity\": \"${OPSGENIE_ENTITY}\"")
+  [ -n "${OPSGENIE_ENTITY}" ] && opts[2]="${opts[2]},"$'\n' && idx=4 && opts+=($'\t'"\"entity\": \"${OPSGENIE_ENTITY:0:511}\"")
 
   if [ -n "${OPSGENIE_ACTIONS}" ] ; then
     opts[${idx}]="${opts[${idx}]},"$'\n'
