@@ -44,6 +44,17 @@ When viewing a single-node Cloud dashboard, you can also click on the add to das
 src="https://user-images.githubusercontent.com/1153921/87587846-827fdb00-c697-11ea-9f31-aed0b8c6afba.png" alt="Dashboard
 icon" class="image-inline" /> to quickly add that chart to a new or existing dashboard. You might find this useful when investigating an anomaly and want to quickly populate a dashboard with potentially correlated metrics.
 
+## Pin dashboards and navigate through Netdata Cloud
+
+Click on the **Pin** button in any dashboard to put those charts into a separate panel at the bottom of the screen. You
+can now navigate through Netdata Cloud freely, individual Cloud dashboards, the Nodes view, different War Rooms, or even
+different Spaces, and have those valuable metrics follow you.
+
+![Pinning a dashboard and navigate through Cloud](https://user-images.githubusercontent.com/1153921/93499810-4e5bad00-f8c8-11ea-9b3f-173d4ba0aaa7.gif)
+
+Pinning dashboards helps you correlate potentially related charts across your infrastructure and discover root causes
+faster.
+
 ## What's next?
 
 While it's useful to see real-time metrics on flexible dashboards, you need ways to know precisely when anomaly strikes.

@@ -17,7 +17,8 @@ metrics.
 Click on the hostname of any node to seamlessly navigate to that node's Cloud dashboard. From here, you will see all the
 same charts and real-time metrics as you would if you viewed the local dashboard at `http://NODE:19999`.
 
-**ADD GIF**
+![Moving from Nodes view to a single-node dashboard in
+Cloud](https://user-images.githubusercontent.com/1153921/93496402-02a70480-f8c4-11ea-82cc-9c81abfd5b98.gif)
 
 By combining Nodes view with Cloud dashboards, you and your team can view all nodes at a glance, immediately identify
 anomalies with auto-updating health statuses and key metrics, then dive into individual dashboards for discovering the
@@ -47,18 +48,26 @@ next to the **Last** label. **15m** will display the last 15 minutes of metrics 
 and so on.
 
 ![GIF showing how to change the timeframe in
-Nodes](https://user-images.githubusercontent.com/1153921/87457127-bf2ad400-c5bc-11ea-9f3b-9afa4e4f1855.gif)
+Nodes](https://user-images.githubusercontent.com/1153921/93496405-03d83180-f8c4-11ea-851a-d1bdede43483.gif)
 
 ## Filter and group your infrastructure
 
-Use the filter input next to the **Nodes** heading to filter your nodes based on your queries. You can enter a text
-query that filters by hostname, or use the dropdown that appears as you begin typing to filter by operating system or
-the service(s) that node provides.
+Use the filter input next to the Nodes heading to filter the nodes in a given War Room.
 
-Use the **Group by** dropdown to choose between no grouping, grouping by the node's alarm status (`critical`, `warning`,
-and `clear`), and grouping by the service each node provides.
+Use relational operators (==, !=, contains, and !contains) and logical operators (AND, OR), plus the name, OS, or
+services running on your nodes to quickly turn any War Room into a focused troubleshooting interface. See what services
+Netdata Cloud can filter by in the [supported collectors list](/docs/agent/collectors/collectors).
 
-See what services Netdata Cloud can filter by with [supported collectors list](/docs/agent/collectors/collectors).
+For example, name == centos OR os == debian filters any nodes by the exact name centos or has Debian as its operating
+system.
+
+You can also use parentheses around operators to create more sophisticated filters. (name contains aws AND os contains
+ubuntu) OR services == apache shows only nodes that have aws in the hostname and are Ubuntu-based, or any nodes that
+have an Apache webserver running on them.
+
+![Filter ](https://user-images.githubusercontent.com/1153921/93499808-4dc31680-f8c8-11ea-884d-e8fe8c3ee474.gif)
+
+If a filter is invalid or incomplete, Netdata Cloud shows a warning and will not run the filter until it's corrected.
 
 ## What's next?
 

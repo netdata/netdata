@@ -13,11 +13,11 @@ metrics, and you interact with both of them the same way.
 > If you're not sure which option is best for you, see our [single-node](/docs/quickstart/single-node.md) and
 > [infrastructure](/docs/quickstart/infrastructure.md) quickstart guides.
 
+![A single-node dashboard in Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/93500082-b01c1700-f8c8-11ea-920a-c490f05b50f5.gif)
+
 Netdata dashboards are a single, scrollable pages with many charts stacked on top of one another. As you scroll up or
 down, charts appearing in your browser's viewport automatically load and update every second.
-
-![A single-node dashboard in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/93402406-82d45800-f839-11ea-8bf0-b6faa9411567.png)
 
 The dashboard is broken up into multiple **sections**, such as **System Overview**, **CPU**, **Disk**, which are
 automatically generated based on which [collectors](/docs/collect/how-collectors-work.md) begin collecting metrics when
@@ -62,7 +62,7 @@ Whenever you use a chart in this way, Netdata synchronizes all the other charts 
 | **Zoom** in/out                                   | `SHIFT`/`ALT` + `mouse scrollwheel` | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) |
 
 ![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
-charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
+charts](https://user-images.githubusercontent.com/1153921/93497197-071fed00-f8c5-11ea-96ff-60e77ed952bd.gif)
 
 These interactions can also be triggered using the icons on the bottom-right corner of every chart. They are,
 respectively, `Pan Left`, `Reset`, `Pan Right`, `Zoom In`, and `Zoom Out`.
@@ -73,8 +73,8 @@ help you better discover exactly which aspect of your system is behaving strange
 You can resize any chart by clicking-and-dragging the icon on the bottom-right corner of any chart. To restore the chart
 to its original height, double-click the same icon.
 
-![Animated GIF of resizing a chart and resetting it to the default
-height](https://user-images.githubusercontent.com/1153921/80842459-7d41e280-8bb6-11ea-9488-1bc29f94d7f2.gif)
+![Resizing a chart and resetting it to the default
+height](https://user-images.githubusercontent.com/1153921/93497272-1acb5380-f8c5-11ea-851c-6cd5ac247e41.gif)
 
 ## What's next?
 
