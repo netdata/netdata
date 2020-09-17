@@ -350,7 +350,7 @@ int sql_init_database()
     snprintfz(sqlite_database, FILENAME_MAX, "%s/sqlite", netdata_configured_cache_dir);
 
     int rc = sqlite3_open(sqlite_database, &db);
-    info("SQLite Database initialized at %s (rc = %d), database quota set to %d (action %d)", sqlite_database, rc, sqlite_disk_quota_mb, (int) (sqlite_disk_quota_mb));
+    info("SQLite Database initialized at %s (rc = %d), database quota set to %d MiB, WAL file size set to %d bytes", sqlite_database, rc, sqlite_disk_quota_mb,  db_wal_size);
 
     sprintf(wstr, "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=%d; PRAGMA cache_size=-%d; PRAGMA temp_store=MEMORY;", db_wal_size, page_cache_mb);
 
@@ -360,6 +360,7 @@ int sql_init_database()
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
     }
+
 
     // TODO: Open a second connection to handle transactions (needs to open in shared mode)
     // Keep the db_page handle the same as db for now
@@ -520,6 +521,20 @@ int sql_init_database()
         sqlite3_free(err_msg);
     }
 
+    rc = sqlite3_exec(db, "create index if not exists ind_start on metric_page (start_date);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    rc = sqlite3_exec(db, "create index if not exists ind_se on metric_page (dim_uuid, start_date, end_date);", 0, 0, &err_msg);
+
+    if (rc != SQLITE_OK) {
+        error("SQL error: %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
     rc = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS metric_migrate(dim_uuid blob, entries int, start_date int, end_date int, metric blob);", 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
         error("SQL error: %s", err_msg);
@@ -543,8 +558,16 @@ int sql_init_database()
     // Determine the database page seq storage fraction
     sqlite3_stmt *res;
     int seqpc = 0;
-    rc = sqlite3_exec(db, SQLITE_GET_PAGE_SEQFRACTION1, 0, 0, NULL);
-    rc = sqlite3_prepare_v2(db, SQLITE_GET_PAGE_SEQFRACTION2, -1, &res, 0);
+    rc = sqlite3_exec(db, SQLITE_GET_PAGE_SEQFRACTION1, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        error("SQL error during database rotation %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+    rc = sqlite3_prepare_v2(db, SQLITE_GET_PAGE_SEQFRACTION2, -1, &res, &err_msg);
+    if (rc != SQLITE_OK) {
+        error("SQL error during database rotation %s", err_msg);
+        sqlite3_free(err_msg);
+    }
     if (rc == SQLITE_OK) {
         while (sqlite3_step(res) == SQLITE_ROW)
             seqpc = sqlite3_column_int(res, 0);
@@ -567,7 +590,7 @@ int sql_close_database()
         uv_rwlock_wrlock(&sqlite_add_page);
         if (pending_page_inserts) {
             info("Writing metrics due to shutdown %d", pending_page_inserts);
-            sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
+            sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0,NULL);
             pending_page_inserts = 0;
         }
         sqlite3_finalize(stmt_metric_page);
