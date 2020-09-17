@@ -7,8 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/sys
 
 # Collect system metrics with Netdata
 
-Netdata collects thousands of metrics directly the operating systems of physical and virtual systems, IoT/edge devices,
-and [containers](/docs/collect/container-metrics.md) with zero configuration.
+Netdata collects thousands of metrics directly from the operating systems of physical and virtual systems, IoT/edge
+devices, and [containers](/docs/collect/container-metrics.md) with zero configuration.
 
 To gather system metrics, Netdata uses roughly a dozen plugins, each of which has one or more collectors for very
 specific metrics exposed by the host. The system metrics Netdata users interact with most for health monitoring and
