@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - master
+      - develop
 jobs:
   build:
     name: Build / AMD64
