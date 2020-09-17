@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/i
 
 # Interact with dashboards and charts
 
-You can find Netdata's dashboards in two place: locally served at `http://NODE:19999` by the Netdata Agent, and in
+You can find Netdata's dashboards in two places: locally served at `http://NODE:19999` by the Netdata Agent, and in
 Netdata Cloud. While you access these dashboards differently, they have similar interfaces, identical charts and
 metrics, and you interact with both of them the same way.
 
@@ -21,8 +21,8 @@ down, charts appearing in your browser's viewport automatically load and update 
 
 The dashboard is broken up into multiple **sections**, such as **System Overview**, **CPU**, **Disk**, which are
 automatically generated based on which [collectors](/docs/collect/how-collectors-work.md) begin collecting metrics when
-Netdata starts up. These sections are also represented in the menu on the right-hand side of the dashboard, which also
-features submenus based on the contexts and families Netdata creates for your node.
+Netdata starts up. Sections also appear in the right-hand **menu**, along with submenus based on the contexts and
+families Netdata creates for your node.
 
 ## Charts, dimensions, families, and contexts
 

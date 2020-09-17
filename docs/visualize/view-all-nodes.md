@@ -24,26 +24,27 @@ By combining Nodes view with Cloud dashboards, you and your team can view all no
 anomalies with auto-updating health statuses and key metrics, then dive into individual dashboards for discovering the
 root cause.
 
-## Add and customize metrics columns
+## Add and edit key metrics
 
-Add more metrics columns by clicking the gear icon in the Nodes view. Choose the context you'd like to add, give it a
+Customize any War Room by adding new key metrics or editing the existing ones. These customizations appear for anyone
+else with access to that War Room so that your entire team can troubleshoot from the same platform.
+
+Add more key metrics by clicking the gear icon in the Nodes view. Choose the context you'd like to add, give it a
 relevant name, and select whether you want to see all dimensions (the default), or only the specific dimensions your
 team is interested in.
 
 ![GIF showing how to add new metrics to the Nodes
 view](https://user-images.githubusercontent.com/1153921/87456847-593e4c80-c5bc-11ea-8063-80c768d4cf6e.gif)
 
-You can also click the gear icon and hover over any existing charts, then click the pencil icon. This opens a panel to
-edit that chart. You can the context, its title, add or remove dimensions, or delete the chart altogether.
-
-These customizations appear for anyone else with access to that War Room.
+To edit existing key metrics, click the gear icon, then the pencil icon. Use the panel to edit that metric's context or
+title, add or remove dimension, or delete the chart altogether.
 
 ## Change the timeframe
 
 By default, the Nodes view shows the last 5 minutes of metrics data on every chart. The value displayed above the chart
 is the 5-minute average of those metrics.
 
-You can change the timeframe, and also change both the charts and the average value, by clicking on any of the buttons
+Change the timeframe, and also change both the charts and the average value, by clicking on any of the buttons
 next to the **Last** label. **15m** will display the last 15 minutes of metrics for each chart, **30m** for 30 minutes,
 and so on.
 
@@ -52,22 +53,20 @@ Nodes](https://user-images.githubusercontent.com/1153921/93496405-03d83180-f8c4-
 
 ## Filter and group your infrastructure
 
-Use the filter input next to the Nodes heading to filter the nodes in a given War Room.
+Use the filter input next to the Nodes heading to filter the nodes in a given War Room. The filtering feature supports
+relational operators (==, !=, contains, and !contains) and logical operators (AND, OR), plus the name, OS, or services
+running on your nodes to quickly turn any War Room into a focused troubleshooting interface. See what services Netdata
+Cloud can filter by in the [supported collectors list](/docs/agent/collectors/collectors).
 
-Use relational operators (==, !=, contains, and !contains) and logical operators (AND, OR), plus the name, OS, or
-services running on your nodes to quickly turn any War Room into a focused troubleshooting interface. See what services
-Netdata Cloud can filter by in the [supported collectors list](/docs/agent/collectors/collectors).
-
-For example, name == centos OR os == debian filters any nodes by the exact name centos or has Debian as its operating
+For example, `name == centos OR os == debian` filters any nodes by the exact name centos or has Debian as its operating
 system.
 
-You can also use parentheses around operators to create more sophisticated filters. (name contains aws AND os contains
-ubuntu) OR services == apache shows only nodes that have aws in the hostname and are Ubuntu-based, or any nodes that
+You can also use parentheses around operators to create more sophisticated filters. `(name contains aws AND os contains
+ubuntu) OR services == apache` shows only nodes that have aws in the hostname and are Ubuntu-based, or any nodes that
 have an Apache webserver running on them.
 
-![Filter ](https://user-images.githubusercontent.com/1153921/93499808-4dc31680-f8c8-11ea-884d-e8fe8c3ee474.gif)
-
-If a filter is invalid or incomplete, Netdata Cloud shows a warning and will not run the filter until it's corrected.
+![Filtering a War Room in Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/93499808-4dc31680-f8c8-11ea-884d-e8fe8c3ee474.gif)
 
 ## What's next?
 
