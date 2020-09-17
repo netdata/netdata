@@ -16,8 +16,8 @@ Add** button next to **Dashboards**. In the panel, give your new dashboard a nam
 
 Click the **Add Chart** button to add your first chart card. From the dropdown, select the node you want to add the
 chart from, then the context. Netdata Cloud shows you a preview of the chart before you finish adding it. The **Add
-Text** creates a new card with user-defined text, which you can use to describe or document a particular dashboard's
-meaning and purpose.
+Text** button creates a new card with user-defined text, which you can use to describe or document a particular
+dashboard's meaning and purpose.
 
 ![An example multi-node dashboard for system CPU
 metrics](https://user-images.githubusercontent.com/1153921/93399129-c1661480-f831-11ea-9570-a5bd401f54db.png)
