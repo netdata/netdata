@@ -1,5 +1,15 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.25.0...HEAD)
+
+**Merged pull requests:**
+
+- Unix socket docker [\#9927](https://github.com/netdata/netdata/pull/9927) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add persistent configuration details to Docker docs [\#9926](https://github.com/netdata/netdata/pull/9926) ([joelhans](https://github.com/joelhans))
+- Add guide for monitoring Pi-hole and Raspberry Pi [\#9770](https://github.com/netdata/netdata/pull/9770) ([joelhans](https://github.com/joelhans))
+
 ## [v1.25.0](https://github.com/netdata/netdata/tree/v1.25.0) (2020-09-15)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.24.0...v1.25.0)
@@ -230,14 +240,6 @@
 - Change streaming terminology to parent/child in docs [\#9312](https://github.com/netdata/netdata/pull/9312) ([joelhans](https://github.com/joelhans))
 - Added dummy `--enable-ebpf` flag to avoid breaking updates. [\#9310](https://github.com/netdata/netdata/pull/9310) ([Ferroin](https://github.com/Ferroin))
 - installer: update go.d.plugin version to v0.19.1 [\#9309](https://github.com/netdata/netdata/pull/9309) ([ilyam8](https://github.com/ilyam8))
-- Correct the repo in the docs for CentOS 8. [\#9308](https://github.com/netdata/netdata/pull/9308) ([Ferroin](https://github.com/Ferroin))
-- Fix consistency of kubernetes cgroup names [\#9303](https://github.com/netdata/netdata/pull/9303) ([cakrit](https://github.com/cakrit))
-- Fix remote write HTTP header [\#9302](https://github.com/netdata/netdata/pull/9302) ([vlvkobal](https://github.com/vlvkobal))
-- minor copy edits [\#9298](https://github.com/netdata/netdata/pull/9298) ([MeganBishopMoore](https://github.com/MeganBishopMoore))
-- Fix crash in \#9291 [\#9297](https://github.com/netdata/netdata/pull/9297) ([amoss](https://github.com/amoss))
-- Add frontmatter to Matrix notifications doc [\#9295](https://github.com/netdata/netdata/pull/9295) ([joelhans](https://github.com/joelhans))
-- installer: update go.d.plugin version to v0.19.0 [\#9294](https://github.com/netdata/netdata/pull/9294) ([ilyam8](https://github.com/ilyam8))
-- dashboard\_info.js: ebpf: fix close code block [\#9293](https://github.com/netdata/netdata/pull/9293) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
