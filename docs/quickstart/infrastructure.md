@@ -37,8 +37,8 @@ You can drill down into any node's full dashboard by clicking on that node's hos
 ![Screenshot of an embedded node
 dashboard](https://user-images.githubusercontent.com/1153921/87457036-9b678e00-c5bc-11ea-977d-ad561a73beef.png)
 
-You can use node dashboards to drill down on specific issues, scrub backward in time to investigate historical data, and
-see like metrics presented meaningfully to help you in [visual anomaly
+You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
+investigate historical data, and see like metrics presented meaningfully to help you in [visual anomaly
 detection](/docs/troubleshoot/visual-anomaly-detection.md). Learn about [interacting with dashboards and
 charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time metrics.
 
@@ -53,10 +53,10 @@ issues by aggregating correlated charts from any number of nodes.
 
 To build your first dashboard, click on the **Nodes** dropdown, then select **+ Add**. Enter a name to assign to this
 dashboard. Click on either of the **Add chart** buttons, then select the node you want to add a chart from. Select the
-context, which os Netdata's way to organize charts, and then click **Add chart**.
+context, which is Netdata's way to organize charts, and then click **Add chart**.
 
-Once you added a few charts, you can move them around, resize them, and add text. Make sure you click the **Save**
-button before you navigate away.
+Once you add a few charts, you can move them around, resize them, and add text. Make sure you click the **Save** button
+before you navigate away.
 
 Read more about [creating new dashboards](/docs/visualize/create-dashboard.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
