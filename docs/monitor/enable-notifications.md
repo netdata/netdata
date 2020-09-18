@@ -118,7 +118,7 @@ See the [Slack notifications](/health/notifications/slack/README.md) doc for mor
 
 Learn more about Netdata's notifications system in the [notification](/health/notifications/README.md) docs.
 
-Now that you have health entties configured to your infrastructure's needs, and notifications to inform you of
+Now that you have health entities configured to your infrastructure's needs, and notifications to inform you of
 anomalies, you have the tools you need to start troubleshooting with [visual anomaly
 detection](/docs/troubleshoot/visual-anomaly-detection.md) and [Metric
 Correlations](/docs/troubleshoot/metrics-correlation.md).

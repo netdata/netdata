@@ -7,8 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/con
 # Configure health alarms
 
 Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alarm templates, and
-more. You can tweak any of the existing alarms based on the topology of your infrastructure or your specific monitoring
-needs, or create new entities.
+more. You can tweak any of the existing alarms based on your infrastructure's topology or specific monitoring needs, or
+create new entities.
 
 You can use health alarms in conjunction with any of Netdata's [collectors](/docs/collect/how-collectors-work.md) (see
 the [supported collector list](/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
@@ -125,8 +125,8 @@ In human-readable format:
 > If the average RAM usage percentage over the last 1 minute is **more than 80%**, the entity triggers a warning alarm.
 > If the usage is **more than 90%**, the entity triggers a critical alarm.
 
-When finished writing a new health entity, [reload Netdata's health configuration](#reload-health-configuration) to see
-it live on the local dashboard or Netdata Cloud.
+When you finish writing this new health entity, [reload Netdata's health configuration](#reload-health-configuration) to
+see it live on the local dashboard or Netdata Cloud.
 
 ## Reload health configuration
 
@@ -136,7 +136,8 @@ without restarting all of Netdata, run `netdatacli reload-health` or `killall -U
 ## What's next?
 
 With your health entities configured properly, it's time to [enable
-notifications](/docs/monitor/enable-notifications.md) to get notified whenever a node reaches warning or critical state.
+notifications](/docs/monitor/enable-notifications.md) to get notified whenever a node reaches a warning or critical
+state.
 
 To build complex, dynamic alarms, read our guide on [dimension templates](/docs/guides/monitor/dimension-templates.md).
 
