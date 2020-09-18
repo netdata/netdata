@@ -16,7 +16,7 @@ metrics, and you interact with both of them the same way.
 ![A single-node dashboard in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/93500082-b01c1700-f8c8-11ea-920a-c490f05b50f5.gif)
 
-Netdata dashboards are a single, scrollable pages with many charts stacked on top of one another. As you scroll up or
+Netdata dashboards are single, scrollable pages with many charts stacked on top of one another. As you scroll up or
 down, charts appearing in your browser's viewport automatically load and update every second.
 
 The dashboard is broken up into multiple **sections**, such as **System Overview**, **CPU**, **Disk**, which are

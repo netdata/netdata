@@ -55,8 +55,8 @@ To build your first dashboard, click on the **Nodes** dropdown, then select **+ 
 dashboard. Click on either of the **Add chart** buttons, then select the node you want to add a chart from. Select the
 context, which is Netdata's way to organize charts, and then click **Add chart**.
 
-Once you added a few charts, you can move them around, resize them, and add text. Make sure you click the **Save**
-button before you navigate away.
+Once you add a few charts, you can move them around, resize them, and add text. Make sure you click the **Save** button
+before you navigate away.
 
 Read more about [creating new dashboards](/docs/visualize/create-dashboard.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
