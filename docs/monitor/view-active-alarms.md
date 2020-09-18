@@ -1,6 +1,6 @@
 <!--
 title: "View active health alarms"
-description: "View active alarms and their rich data to discover and resolved anomalies and performance issue across your infrastructure."
+description: "View active alarms and their rich data to discover and resolve anomalies and performance issues across your infrastructure."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/view-active-alarms.md
 -->
 
@@ -41,8 +41,8 @@ node if you want to tweak or disable the alarm to better suit your needs.
 
 ## View active alarms in the Netdata Agent
 
-Find the bell 🔔 icon in the top navigation bring up a modal that shows currently raised alarms, all running alarms, and
-the alarms log. Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
+Find the bell 🔔 icon in the top navigation to bring up a modal that shows currently raised alarms, all running alarms,
+and the alarms log. Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
 
 ![Animated GIF of looking at raised alarms and the alarm
 log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
@@ -53,7 +53,7 @@ And a static screenshot of the raised CPU alarm:
 alarm](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
 
 The alarm itself is named **system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
-shows the latest value the chart that triggered the alarm.
+shows the latest value of the chart that triggered the alarm.
 
 With the three icons beneath that and the **role** designation, you can:
 

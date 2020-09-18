@@ -83,7 +83,7 @@ To write a new health entity, use `edit-config` to create a new file inside of t
 sudo ./edit-config health.d/example.conf
 ```
 
-For example, here is a health entity that triggers an alarm a node's RAM usage rises above 80%:
+For example, here is a health entity that triggers an alarm when a node's RAM usage rises above 80%:
 
 ```yaml
  alarm: ram_usage

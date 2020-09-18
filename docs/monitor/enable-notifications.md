@@ -30,7 +30,7 @@ sudo ./edit-config health_alarm_notify.conf
 Look for the following lines:
 
 ```conf
-# if a role recipient is not configured, an email will be send to:
+# if a role recipient is not configured, an email will be sent to:
 DEFAULT_RECIPIENT_EMAIL="root"
 # to receive only critical alarms, set it to "root|critical"
 ```
@@ -113,10 +113,10 @@ You should receive three notifications in your Slack channel for each health sta
 `CLEAR`.
 
 See the [Slack notifications](/health/notifications/slack/README.md) doc for more options and information.
- 
+
 ## What's next?
 
-Learn more about Netdata's notifications system in the [notification](/health/notifications/README.md) docs.
+Learn more about Netdata's notifications system in the [notifications](/health/notifications/README.md) docs.
 
 Now that you have health entities configured to your infrastructure's needs, and notifications to inform you of
 anomalies, you have the tools you need to start troubleshooting with [visual anomaly
