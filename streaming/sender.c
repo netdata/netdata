@@ -764,8 +764,12 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
     time_t st_newest = st->last_updated.tv_sec;
     time_t window_start;
 
-    if (start_time == 0)
-        window_start = MAX((time_t)st->state->last_sent.tv_sec + st->update_every, first_t);
+    if (start_time == 0) {
+        if (st->state->last_sent.tv_sec)
+            window_start = MAX((time_t)st->state->last_sent.tv_sec + st->update_every, first_t);
+        else // It is the first time this agent streams this chart during its uptime
+            window_start = now_realtime_sec() - default_rrdpush_gap_history + 1;
+    }
     else
         window_start = MAX(start_time, first_t);
 

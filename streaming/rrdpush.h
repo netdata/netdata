@@ -94,6 +94,7 @@ struct receiver_state {
 
 
 extern unsigned int default_rrdpush_enabled;
+extern uint32_t default_rrdpush_gap_history;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
