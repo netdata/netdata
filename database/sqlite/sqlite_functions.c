@@ -30,6 +30,7 @@ static int pending_page_inserts = 0;
 int sqlite_disk_quota_mb;
 int page_cache_mb;
 int db_wal_size;
+int sqlite_disk_mode;
 
 struct sqlite_page_flush {
     uint32_t    page_count;               // Number of pages to flush
@@ -347,12 +348,23 @@ int sql_init_database()
     page_cache_mb =  config_get_number(CONFIG_SECTION_GLOBAL, "database page cache", 2);
     db_wal_size =  config_get_number(CONFIG_SECTION_GLOBAL, "database wal size", 16 * 1024 * 1024);
 
+    sqlite_disk_mode =  config_get_number(CONFIG_SECTION_GLOBAL, "sqlite mode disk", 1);
+
     snprintfz(sqlite_database, FILENAME_MAX, "%s/sqlite", netdata_configured_cache_dir);
 
-    int rc = sqlite3_open(sqlite_database, &db);
+    int rc;
+
+    if (sqlite_disk_mode)
+        rc = sqlite3_open(sqlite_database, &db);
+    else
+        rc =  sqlite3_open(":memory:", &db);
+
     info("SQLite Database initialized at %s (rc = %d), database quota set to %d MiB, WAL file size set to %d bytes", sqlite_database, rc, sqlite_disk_quota_mb,  db_wal_size);
 
-    sprintf(wstr, "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=%d; PRAGMA cache_size=-%d; PRAGMA temp_store=MEMORY;", db_wal_size, page_cache_mb);
+    if (sqlite_disk_mode)
+        sprintf(wstr, "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA journal_size_limit=%d; PRAGMA cache_size=-%d; PRAGMA temp_store=MEMORY;", db_wal_size, page_cache_mb);
+    else
+        sprintf(wstr, "PRAGMA synchronous=0 ; PRAGMA journal_mode=memory; PRAGMA journal_size_limit=%d; PRAGMA cache_size=-%d; PRAGMA temp_store=MEMORY;", db_wal_size, page_cache_mb);
 
     rc = sqlite3_exec(db, wstr, 0, 0, &err_msg);
 
@@ -646,7 +658,10 @@ void sql_compact_database(int database_size)
 
     info("Database size = %d MiB, limit is %d", database_size, sqlite_disk_quota_mb);
 
-    rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 10000; pragma incremental_vacuum(1000);", 0, 0, &err_msg);
+    if (sqlite_disk_mode)
+        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 10000; pragma incremental_vacuum(1000);", 0, 0, &err_msg);
+    else
+        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 100; pragma incremental_vacuum(100);", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error during database rotation %s", err_msg);
