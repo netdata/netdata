@@ -141,7 +141,8 @@ int rrdset2anything_api_v1(
         , time_t *latest_timestamp
         , char *context
 ) {
-    st->last_accessed_time = now_realtime_sec();
+    time_t last_accessed_time = now_realtime_sec();
+    st->last_accessed_time = last_accessed_time;
 
     RRDDIM *temp_rd = NULL;
 
@@ -153,6 +154,7 @@ int rrdset2anything_api_v1(
                 // Loop the dimensions of the chart
                 RRDDIM  *rd1;
                 rrdset_rdlock(st1);
+                st1->last_accessed_time = last_accessed_time;
                 rrddim_foreach_read(rd1, st1) {
                     RRDDIM *rd = mallocz(rd1->memsize);
                     memcpy(rd, rd1, rd1->memsize);
