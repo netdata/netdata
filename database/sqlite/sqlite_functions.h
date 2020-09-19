@@ -73,7 +73,7 @@ extern void sql_add_metric_page(uuid_t *dim_uuid, storage_number *metric, size_t
 extern void sql_add_metric_page_nolock(uuid_t *dim_uuid, storage_number *metric, size_t entries, time_t start_time, time_t end_time);
 
 extern int sql_load_one_chart_dimension(uuid_t *chart_uuid, BUFFER *wb, int *dimensions);
-extern char *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd); //char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm);
+extern uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd); //char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm);
 //extern uuid_t *sql_find_chart_uuid(RRDHOST *host, char *id, char *name, const char *type, const char *family,
 //                                 const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
 //                                 int update_every, int chart_type, int memory_mode, long history_entries);

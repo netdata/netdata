@@ -600,6 +600,10 @@ set(RRD_PLUGIN_FILES
         database/engine/metadata_log/compaction.h
         database/engine/global_uuid_map/global_uuid_map.c
         database/engine/global_uuid_map/global_uuid_map.h
+        database/sqlite/sqlite_functions.c
+        database/sqlite/sqlite_functions.h
+        database/sqlite/sqlite3.c
+        database/sqlite/sqlite3.h
         )
 
 set(WEB_PLUGIN_FILES
