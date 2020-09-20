@@ -83,7 +83,6 @@ extern int sql_store_chart(
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
     int update_every, int chart_type, int memory_mode, long history_entries);
 
-extern void sql_sync_ram_db();
 extern void sql_backup_database();
 extern void sql_compact_database();
 extern void sql_store_datafile_info(char *path, int fileno, size_t file_size);
@@ -94,7 +93,7 @@ extern struct sqlite3_blob *sql_open_metric_blob(uuid_t *dim_uuid);
 #ifdef ENABLE_DBENGINE
 GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size);
 #endif
-extern int sql_store_host(char *guid, char *hostname, char *registry_hostname, int update_every, const char *os, const char *timezone, char *tags);
+extern int sql_store_host(const char *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os, const char *timezone, const char *tags);
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb, size_t *dimensions_count, size_t *memory_used);
 
 extern time_t sql_rrdeng_metric_latest_time(RRDDIM *rd);

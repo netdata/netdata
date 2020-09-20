@@ -372,12 +372,17 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
-    database/sqlite/sqlite_functions.c \
-    database/sqlite/sqlite_functions.h \
-    database/sqlite/sqlite3.c \
-    database/sqlite/sqlite3.h \
-    database/sqlite/carray.c \
     $(NULL)
+
+if ENABLE_SQLITE
+    RRD_PLUGIN_FILES += \
+        database/sqlite/sqlite_functions.c \
+        database/sqlite/sqlite_functions.h \
+        database/sqlite/sqlite3.c \
+        database/sqlite/sqlite3.h \
+        database/sqlite/carray.c \
+        $(NULL)
+endif
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \

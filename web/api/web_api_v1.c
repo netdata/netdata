@@ -358,7 +358,6 @@ inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_cl
     (void)url;
     // measure the time a data collection needs
     unsigned long long start = now_realtime_usec();
-    //sql_sync_ram_db();
     buffer_flush(w->response.data);
     //buffer_increase(w->response.data, 5 * 1024 * 1024);
     w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -503,11 +502,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 //    }
 
     //TODO: Lets see if it is archived chart
+#ifdef ENABLE_SQLITE
     if (!st && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         info("Trying to create chart %s under host %s", chart, host->hostname);
         st = sql_create_chart_by_name(host, chart);
     }
-
+#endif
 
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found2: ");

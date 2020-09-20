@@ -162,6 +162,12 @@ AC_ARG_ENABLE(
     [enable_dbengine="detect"]
 )
 AC_ARG_ENABLE(
+    [sqlite],
+    [AS_HELP_STRING([--enable-sqlite], [enable sqlite memory mode @<:@default autodetect@:>@])],
+    ,
+    [enable_sqlite="detect"]
+)
+AC_ARG_ENABLE(
     [jsonc],
     [AS_HELP_STRING([--enable-jsonc], [Enable JSON-C support @<:@default autodetect@:>@])],
     ,
@@ -484,6 +490,30 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# SQLite supprt
+test "${enable_sqlite}" = "yes" -a -z "${LZ4_LIBS}" && \
+    AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
+
+test "${enable_sqlite}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+
+AC_MSG_CHECKING([if netdata sqlite should be used])
+if test "${enable_sqlite}" = "yes" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${SSL_LIBS}"; then
+    enable_sqlite="yes"
+    AC_DEFINE([ENABLE_SQLITE], [1], [netdata sqlite usability])
+    OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
+    OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+    OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+    OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+else
+    enable_sqlite="no"
+    OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+    OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
+fi
+AC_MSG_RESULT([${enable_sqlite}])
+AM_CONDITIONAL([ENABLE_SQLITE], [test "${enable_sqlite}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C

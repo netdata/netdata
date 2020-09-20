@@ -11,10 +11,13 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     time_t first_entry_t;
     time_t last_entry_t;
 
+#ifdef ENABLE_SQLITE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
          first_entry_t = st->state->first_entry_t;
          last_entry_t = rrdset_last_entry_t(st);
-    } else {
+    } else
+#endif
+    {
          first_entry_t = rrdset_first_entry_t(st);
          last_entry_t = rrdset_last_entry_t(st);
     }

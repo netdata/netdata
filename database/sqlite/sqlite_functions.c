@@ -892,7 +892,7 @@ RRDSET *sql_create_chart_by_name(RRDHOST *host, char *chart)
 
 #define INSERT_HOST "insert or replace into host (host_uuid,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
 int sql_store_host(
-    char *guid, char *hostname, char *registry_hostname, int update_every, const char *os, const char *tzone, char *tags)
+    const char *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os, const char *tzone, const char *tags)
 {
     sqlite3_stmt *res;
     int rc;
@@ -1295,19 +1295,6 @@ found:
     }
     //netdata_mutex_unlock(&sqlite_find_uuid);
     return uuid;
-}
-
-void sql_sync_ram_db()
-{
-    static int loaded = 0;
-
-    if (loaded == 1)
-            return;
-    sqlite3_exec(db, "delete from ram.chart_dim; insert into ram.chart_dim select chart_uuid,dim_uuid,id, name from dimension order by chart_uuid;", 0, 0, NULL);
-
-    sqlite3_exec(db, "delete from ram.chart_stat ; insert into ram.chart_stat select chart_uuid, min(rowid), max(rowid) from ram.chart_dim group by chart_uuid;", 0, 0, NULL);
-
-    loaded = 0;
 }
 
 void  sql_add_metric(uuid_t *dim_uuid, usec_t point_in_time, storage_number number)

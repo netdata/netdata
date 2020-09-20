@@ -253,7 +253,9 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
+#ifdef ENABLE_SQLITE
     sql_store_datafile_info(path, file, file_size);
+#endif
     info("Data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
     return 0;
 

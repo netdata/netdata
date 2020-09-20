@@ -272,10 +272,12 @@ void rrdset_reset(RRDSET *st) {
         }
 #endif
 
+#ifdef ENABLE_SQLITE
         if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
             //info("Flushing metrics for %s due to CHART %s reset", rd->id, st->id);
             rrddim_sql_collect_finalize(rd);
         }
+#endif
     }
 
 }
@@ -455,8 +457,10 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
         }
     }
 
+#ifdef ENABLE_SQLITE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
         free_uuid_cache(&st->state->uuid_cache);
+#endif
 
     recursively_delete_dir(st->cache_dir, "left-over chart");
 #ifdef ENABLE_ACLK
@@ -942,6 +946,7 @@ RRDSET *rrdset_create_custom(
         rrdcalctemplate_link_matching(st);
     }
 
+#ifdef ENABLE_SQLITE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
         st->chart_uuid = sql_find_chart_uuid(host, st, type, id, name);//, st->name, type, family, context, title, units, plugin, module, priority, update_every,
             //chart_type, memory_mode, history_entries);
@@ -952,6 +957,7 @@ RRDSET *rrdset_create_custom(
         st->state->uuid_cache = NULL;
         sql_cache_chart_dimensions(st);
     }
+#endif
 
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
@@ -1283,13 +1289,15 @@ static inline size_t rrdset_done_interpolate(
                     }
                     break;
             }
+
+#ifdef ENABLE_SQLITE
             // SQLITE: If we are about to store in position 0 flush the metrics first
-            if (st->current_entry == 0) {
+            if (st->current_entry == 0 && st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
                 if (rd->state->metric_page->active_count) {
-                    //info("Flushing chart %s (%s)", st->id, rd->id);
                     rrddim_sql_flush_metrics(rd);
                 }
             }
+#endif
 
             if(unlikely(!store_this_entry)) {
                 rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)

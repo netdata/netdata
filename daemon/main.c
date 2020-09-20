@@ -51,7 +51,9 @@ void netdata_cleanup_and_exit(int ret) {
 #ifdef ENABLE_DBENGINE
         rrdeng_exit(&multidb_ctx);
 #endif
+#ifdef ENABLE_SQLITE
         sql_close_database();
+#endif
     }
 
     // unlink the pid
@@ -86,8 +88,10 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
 
+#ifdef ENABLE_SQLITE
     NETDATA_PLUGIN_HOOK_SQLITE
     NETDATA_PLUGIN_HOOK_SQLITE_ROTATION
+#endif
 
 #ifdef ENABLE_ACLK
     NETDATA_ACLK_HOOK
@@ -565,6 +569,13 @@ static void get_netdata_configured_variables() {
     // get default memory mode for the database
 
     default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
+#ifndef ENABLE_SQLITE
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+        errno = 0;
+        error("The agent has been configured to use sqlite memory mode but sqlite is not enabled -- please install with --enable-sqlite");
+        exit(1);
+    }
+#endif
 
 #ifdef ENABLE_DBENGINE
     // ------------------------------------------------------------------------
@@ -1456,8 +1467,10 @@ int main(int argc, char **argv) {
     init_global_guid_map();
 #endif
 
+#ifdef ENABLE_SQLITE
     if (default_rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
         sql_init_database();
+#endif
 
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);

@@ -2,7 +2,10 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+
+#ifdef ENABLE_SQLITE
 #include "sqlite/sqlite_functions.h"
+#endif
 
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
@@ -135,8 +138,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_legacy = 1;
 #endif
 
+#ifdef ENABLE_SQLITE
     if (memory_mode == RRD_MEMORY_MODE_SQLITE && !is_archived)
         sql_store_host(guid, hostname, registry_hostname, update_every, os, timezone, tags);
+#endif
     rrd_check_wrlock();
 
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
@@ -175,7 +180,9 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
+#ifdef ENABLE_SQLITE
     uuid_parse(host->machine_guid, host->host_uuid);
+#endif
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone);
@@ -336,11 +343,12 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
     }
 
+#ifdef ENABLE_SQLITE
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
         host->uuid_cache = NULL;
-        int rc = sql_cache_host_charts(host);
-        info("Cached %ld dimensions for chart %s", rc, host->hostname);
+        sql_cache_host_charts(host);
     }
+#endif
 
     // ------------------------------------------------------------------------
     // link it and add it to the index
@@ -815,8 +823,10 @@ void rrdhost_free(RRDHOST *host) {
         rrdeng_prepare_exit(host->rrdeng_ctx);
 #endif
 
+#ifdef ENABLE_SQLITE
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
         free_uuid_cache(&host->uuid_cache);
+#endif
 
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);

@@ -2,7 +2,9 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
+#ifdef ENABLE_SQLITE
 #include "sqlite/sqlite_functions.h"
+#endif
 
 static inline void calc_link_to_rrddim(RRDDIM *rd)
 {
@@ -394,6 +396,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->rrdset = st;
     rd->state = mallocz(sizeof(*rd->state));
 
+#ifdef ENABLE_SQLITE
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
         rd->state->metric_uuid = sql_find_dim_uuid(st, rd);
 //    rd->state->active_count = 0;
@@ -406,6 +409,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     //rd->state->values = mallocz(st->entries * sizeof(storage_number));      // Allocate pointer
     rd->state->metric_page = rrddim_init_metric_page(rd);   // Active collect page
     rd->state->metric_page_last = rd->state->metric_page;   // This will link from the past -> active via prev
+#endif
 
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -420,7 +424,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
-    } else if (memory_mode == RRD_MEMORY_MODE_SQLITE) {
+#ifdef ENABLE_SQLITE
+        } else if (memory_mode == RRD_MEMORY_MODE_SQLITE) {
         rd->state->collect_ops.init = rrddim_sql_collect_init;
         rd->state->collect_ops.store_metric = rrddim_sql_collect_store_metric;
         rd->state->collect_ops.finalize = rrddim_sql_collect_finalize;
@@ -430,6 +435,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.finalize = rrddim_sql_query_finalize;
         rd->state->query_ops.latest_time = rrddim_sql_query_latest_time;
         rd->state->query_ops.oldest_time = rrddim_sql_query_oldest_time;
+#endif
     }
     else {
         rd->state->collect_ops.init         = rrddim_collect_init;
@@ -470,8 +476,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
         for(; td->next; td = td->next) ;
         td->next = rd;
+#ifdef ENABLE_SQLITE
         if (rrdset_flag_check(rd->rrdset, RRDSET_FLAG_ARCHIVED))
             rd->rrdset->state->last_entry_t = MAX(rd->rrdset->state->last_entry_t, rd->state->db_last_entry_t);
+#endif
     }
 
     if(host->health_enabled && !is_archived) {
@@ -518,6 +526,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 #endif
         }
     }
+#ifdef ENABLE_SQLITE
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
 
         struct rrddim_metric_page *old_metric_page = rd->state->metric_page_last;
@@ -529,9 +538,9 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
             freez(old_metric_page);
             old_metric_page = tmp_metric_page;
         }
-
         freez(rd->state->metric_uuid);
     }
+#endif
 
     //freez(rd->state);
 

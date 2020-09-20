@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <database/sqlite/sqlite_functions.h>
 #include "web/api/web_api_v1.h"
+#ifdef ENABLE_SQLITE
+#include <database/sqlite/sqlite_functions.h>
+#endif
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
@@ -71,8 +73,10 @@ int rrdset2value_api_v1(
         , int *value_is_null
 ) {
     RRDDIM *temp_rd = NULL;
+#ifdef ENABLE_SQLITE
     if (!st->dimensions)
         temp_rd = sql_load_chart_dimensions(st, 2);
+#endif
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, temp_rd);
 
     if(!r) {
@@ -103,20 +107,22 @@ int rrdset2value_api_v1(
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
 
+#ifdef ENABLE_SQLITE
     if (temp_rd) {
-        info("SQLITE: Free 1");
         RRDDIM *t;
         while(temp_rd) {
             t = temp_rd->next;
             freez(temp_rd->id);
             freez(temp_rd->name);
             freez(temp_rd->state->metric_uuid);
+
             //freez(rd->state->page_index);
             freez(temp_rd->state);
             freez(temp_rd);
             temp_rd = t;
         }
     }
+#endif
 
     rrdr_free(r);
     return HTTP_RESP_OK;
@@ -138,8 +144,10 @@ int rrdset2anything_api_v1(
     st->last_accessed_time = now_realtime_sec();
 
     RRDDIM *temp_rd = NULL;
+#ifdef ENABLE_SQLITE
     if (!st->dimensions)
         (void ) sql_load_chart_dimensions(st, 1);
+#endif
 
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, temp_rd);
     if(!r) {
@@ -317,6 +325,7 @@ int rrdset2anything_api_v1(
         break;
     }
 
+#ifdef ENABLE_SQLITE
     if (temp_rd) {
         RRDDIM *t;
         while(temp_rd) {
@@ -330,6 +339,7 @@ int rrdset2anything_api_v1(
             temp_rd = t;
         }
     }
+#endif
     rrdr_free(r);
     return HTTP_RESP_OK;
 }
