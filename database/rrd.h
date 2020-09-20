@@ -399,7 +399,6 @@ struct uuid_cache {
     char    *id;
     char    *type;
     char    *name;
-    void    *object;          // Parent object -- either rd or chart if not null it needs to go to the database
     uint32_t count;
     struct uuid_cache *next;
 };

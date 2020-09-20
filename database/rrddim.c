@@ -518,8 +518,20 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 #endif
         }
     }
-    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE) {
+
+        struct rrddim_metric_page *old_metric_page = rd->state->metric_page_last;
+        struct rrddim_metric_page *tmp_metric_page;
+
+        while (old_metric_page) {
+            tmp_metric_page = old_metric_page->prev;
+            freez(old_metric_page->values);
+            freez(old_metric_page);
+            old_metric_page = tmp_metric_page;
+        }
+
         freez(rd->state->metric_uuid);
+    }
 
     //freez(rd->state);
 
@@ -558,9 +570,12 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
 
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
+        case RRD_MEMORY_MODE_SQLITE:
         case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
-            freez((void *)rd->id);
+            if (rd->name != rd->id)
+                freez((void *) rd->name);
+            freez((void *) rd->id);
             freez(rd->cache_filename);
 #ifdef ENABLE_DBENGINE
             if (rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {

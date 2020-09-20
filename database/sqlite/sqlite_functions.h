@@ -128,5 +128,7 @@ extern RRDHOST *rrdhost_create(
     char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
     int is_localhost, int is_archived);
 
+extern void free_uuid_cache(struct uuid_cache **uuid_cache);
+extern void rrddim_sql_flush_metrics(RRDDIM *rd);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

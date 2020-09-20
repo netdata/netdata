@@ -814,6 +814,10 @@ void rrdhost_free(RRDHOST *host) {
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
         rrdeng_prepare_exit(host->rrdeng_ctx);
 #endif
+
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        free_uuid_cache(&host->uuid_cache);
+
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
 

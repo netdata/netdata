@@ -455,6 +455,9 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
         }
     }
 
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        free_uuid_cache(&st->state->uuid_cache);
+
     recursively_delete_dir(st->cache_dir, "left-over chart");
 #ifdef ENABLE_ACLK
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
@@ -947,7 +950,7 @@ RRDSET *rrdset_create_custom(
         st->state->last_entry_t = 0;
         sql_rrdset_first_entry_t(st, &st->state->first_entry_t, &st->state->last_entry_t);
         st->state->uuid_cache = NULL;
-        int rc = sql_cache_chart_dimensions(st);
+        sql_cache_chart_dimensions(st);
     }
 
 #ifdef ENABLE_DBENGINE
