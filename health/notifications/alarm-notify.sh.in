@@ -2124,6 +2124,15 @@ send_opsgenie() {
 EOF
 )
 
+  httpcode=$(docurl -X POST  -H "Authorization: GenieKey ${OPSGENIE_API_KEY}"  -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v2/alerts")
+  # https://docs.opsgenie.com/docs/alert-api#create-alert
+  if [ "${httpcode}" = "202" ]; then
+    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    return 1
+  fi
+
   return 0
 }
 
