@@ -903,10 +903,10 @@ safe_sha256sum() {
 }
 
 _get_scheduler_type() {
-  if issystemd ; then
-    echo 'systemd'
-  elif _get_intervaldir > /dev/null ; then
+  if _get_intervaldir > /dev/null ; then
     echo 'interval'
+  elif issystemd ; then
+    echo 'systemd'
   elif [ -d /etc/cron.d ] ; then
     echo 'crontab'
   else
