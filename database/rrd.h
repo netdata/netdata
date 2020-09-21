@@ -1053,6 +1053,19 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
     }
 }
 
+// get the timestamp of the last entry in the round robin database
+static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
+    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        return rd->state->query_ops.latest_time(rd);
+    return (time_t)rd->rrdset->last_updated.tv_sec;
+}
+
+static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
+    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        return rd->state->query_ops.oldest_time(rd);
+    return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
+}
+
 time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // get the last slot updated in the round robin database

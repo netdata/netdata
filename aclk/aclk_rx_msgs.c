@@ -104,8 +104,11 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
         return 1;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(data, cloud_to_agent)))
+    if (unlikely(aclk_v2_payload_get_query(data, cloud_to_agent))) {
+        error("Could not extract payload from query");
+        freez(data);
         return 1;
+    }
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
         error("Missing callback_topic");

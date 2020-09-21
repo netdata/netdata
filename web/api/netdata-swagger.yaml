@@ -881,6 +881,33 @@ components:
           example:
             - host1.example.com
             - host2.example.com
+        mirrored_hosts_status:
+          type: array
+          description: >-
+            List of details of hosts mirrored to this served (including self).
+            Indexes correspond to indexes in "mirrored_hosts".
+          items:
+            type: object
+            description: Host data
+            properties:
+              guid:
+                type: string
+                format: uuid
+                nullable: false
+                description: Host unique GUID from `netdata.public.unique.id`.
+                example: 245e4bff-3b34-47c1-a6e5-5c535a9abfb2
+              reachable:
+                type: boolean
+                nullable: false
+                description: Current state of streaming. Always true for localhost/self.
+              claim_id:
+                type: string
+                format: uuid
+                nullable: true
+                description: >-
+                  Cloud GUID/identifier in case the host is claimed.
+                  If child status unknown or unclaimed this field is set to `null`
+                example: c3b2a66a-3052-498c-ac52-7fe9e8cccb0c
         os_name:
           type: string
           description: Operating System Name.

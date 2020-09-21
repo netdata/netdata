@@ -2,7 +2,7 @@
 
 #include "json_wrapper.h"
 
-void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value) {
+void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value, RRDDIM *temp_rd) {
     rrdset_check_rdlock(r->st);
 
     long rows = rrdr_rows(r);
@@ -34,8 +34,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %safter%s: %u,\n"
                        "   %sdimension_names%s: ["
                    , kq, kq
-                   , kq, kq, sq, r->st->id, sq
-                   , kq, kq, sq, r->st->name, sq
+                   , kq, kq, sq, temp_rd?r->st->context:r->st->id, sq
+                   , kq, kq, sq, temp_rd?r->st->context:r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
                    , kq, kq, (uint32_t)rrdset_first_entry_t(r->st)
@@ -44,7 +44,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, (uint32_t)r->after
                    , kq, kq);
 
-    for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -68,7 +68,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sdimension_ids%s: ["
                    , kq, kq);
 
-    for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -85,11 +85,41 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         buffer_strcat(wb, sq);
     }
 
+    // Composite charts
+    if (temp_rd) {
+        buffer_sprintf(
+            wb,
+            "],\n"
+            "   %schart_ids%s: [",
+            kq, kq);
+
+        for (c = 0, i = 0, rd = temp_rd ; rd && c < r->d; c++, rd = rd->next) {
+            if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
+                continue;
+            if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
+                continue;
+
+            if (i)
+                buffer_strcat(wb, ", ");
+            buffer_strcat(wb, sq);
+            buffer_strcat(wb, rd->rrdset->name);
+            buffer_strcat(wb, sq);
+            i++;
+        }
+        if (!i) {
+            rows = 0;
+            buffer_strcat(wb, sq);
+            buffer_strcat(wb, "no data");
+            buffer_strcat(wb, sq);
+        }
+    }
+
+
     buffer_sprintf(wb, "],\n"
                        "   %slatest_values%s: ["
                    , kq, kq);
 
-    for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
@@ -125,7 +155,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
-            for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+            for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
                 calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
                 calculated_number n = cn[c];
 
@@ -138,7 +168,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             if(total == 0) total = 1;
         }
 
-        for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+        for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 

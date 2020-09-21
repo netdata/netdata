@@ -783,6 +783,8 @@ set(MONGODB_BACKEND_FILES
         )
 
 set(DAEMON_FILES
+        daemon/buildinfo.c
+        daemon/buildinfo.h
         daemon/common.c
         daemon/common.h
         daemon/daemon.c

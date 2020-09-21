@@ -456,6 +456,8 @@ rm_file /usr/lib/systemd/system/netdata.service
 rm_file /etc/init.d/netdata
 rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
+rm_file /etc/cron.d/netdata-updater
+
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
   rm_dir "${NETDATA_PREFIX}"

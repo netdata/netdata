@@ -898,23 +898,22 @@ safe_sha256sum() {
   fi
 }
 
-_get_crondir() {
+_get_scheduler_type() {
+  if _get_intervaldir > /dev/null ; then
+    echo 'interval'
+  elif [ -d /etc/cron.d ] ; then
+    echo 'crontab'
+  else
+    echo 'none'
+  fi
+}
+
+_get_intervaldir() {
   if [ -d /etc/cron.daily ]; then
     echo /etc/cron.daily
   elif [ -d /etc/periodic/daily ]; then
     echo /etc/periodic/daily
   else
-    echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
-    return 1
-  fi
-
-  return 0
-}
-
-_check_crondir_permissions() {
-  if [ "${UID}" -ne "0" ]; then
-    # We cant touch cron if we are not running as root
-    echo >&2 "You need to run the installer as root for auto-updating via cron"
     return 1
   fi
 
@@ -945,49 +944,68 @@ cleanup_old_netdata_updater() {
     rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
   fi
 
-  crondir="$(_get_crondir)" || return 1
-  _check_crondir_permissions "${crondir}" || return 1
+  if [ -d /etc/cron.daily ]; then
+    rm -f /etc/cron.daily/netdata-updater.sh
+    rm -f /etc/cron.daily/netdata-updater
+  fi
 
-  if [ -f "${crondir}/netdata-updater.sh" ]; then
-    echo >&2 "Removing incorrect netdata-updater filename in cron"
-    rm -f "${crondir}/netdata-updater.sh"
+  if [ -d /etc/periodic/daily ]; then
+    rm -f /etc/periodic/daily/netdata-updater.sh
+    rm -f /etc/periodic/daily/netdata-updater
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    rm -f /etc/cron.d/netdata-updater
   fi
 
   return 0
 }
 
 enable_netdata_updater() {
-  crondir="$(_get_crondir)" || return 1
-  _check_crondir_permissions "${crondir}" || return 1
+  case "$(_get_scheduler_type)" in
+    "interval")
+      ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_interval_dir)/netdata-updater"
 
-  echo >&2 "Adding to cron"
+      echo >&2 "Auto-updating has been enabled through cron, updater script linked to ${TPUT_RED}${TPUT_BOLD}$(_get_interval_dir)/netdata-updater${TPUT_RESET}"
+      echo >&2
+      echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
+      echo >&2 "Successful updates will not send an email."
+      echo >&2
+      ;;
+    "crontab")
+      cat "${NETDATA_SOURCE_DIR}/system/netdata.crontab" > "/etc/cron.d/netdata-updater"
 
-  rm -f "${crondir}/netdata-updater"
-  ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "${crondir}/netdata-updater"
-
-  echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
-  echo >&2
-  echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
-  echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
-  echo >&2
+      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata${TPUT_RESET}"
+      echo >&2
+      echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
+      echo >&2 "Successful updates will not send an email."
+      echo >&2
+      ;;
+    *)
+      echo >&2 "Unable to determine what type of auto-update scheduling to use, not enabling auto-updates."
+      echo >&2
+      return 1
+  esac
 
   return 0
 }
 
 disable_netdata_updater() {
-  crondir="$(_get_crondir)" || return 1
-  _check_crondir_permissions "${crondir}" || return 1
-
   echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
   echo >&2
 
-  if [ -f "${crondir}/netdata-updater" ]; then
-    echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
-    echo >&2
-    rm -f "${crondir}/netdata-updater"
-  else
-    echo >&2 "Did not find any cron entries to remove"
-    echo >&2
+  if [ -d /etc/cron.daily ]; then
+    rm -f /etc/cron.daily/netdata-updater.sh
+    rm -f /etc/cron.daily/netdata-updater
+  fi
+
+  if [ -d /etc/periodic/daily ]; then
+    rm -f /etc/periodic/daily/netdata-updater.sh
+    rm -f /etc/periodic/daily/netdata-updater
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    rm -f /etc/cron.d/netdata-updater
   fi
 
   return 0
