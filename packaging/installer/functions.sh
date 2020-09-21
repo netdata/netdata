@@ -979,7 +979,15 @@ cleanup_old_netdata_updater() {
 }
 
 enable_netdata_updater() {
-  case "$(_get_scheduler_type)" in
+  local updater_type
+
+  if [ -z "${1}" ] ; then
+    updater_type="${1}"
+  else
+    updater_type="$(_get_scheduler_type)"
+  fi
+
+  case "${updater_type}" in
     "systemd")
       systemctl enable netdata-updater.timer
 
