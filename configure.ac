@@ -1074,46 +1074,45 @@ PKG_CHECK_MODULES(
     [have_libcurl=no]
 )
 
-AC_CHECK_LIB(
+PKG_CHECK_MODULES(
+    [AWS_CPP_SDK_CORE],
     [aws-cpp-sdk-core],
-    [cJSON_free],
-    [have_libaws_cpp_sdk_core=yes],
-    [have_libaws_cpp_sdk_core=no],
-    [${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}]
+    [AC_CHECK_LIB(
+        [aws-cpp-sdk-core],
+        [cJSON_free],
+        [have_libaws_cpp_sdk_core=yes],
+        [have_libaws_cpp_sdk_core=no]
+    )],
+    [have_libaws_cpp_sdk_core=no]
 )
 
-AC_MSG_CHECKING([for Aws::Kinesis::Model::PutRecordRequest in -laws-cpp-sdk-kinesis])
+PKG_CHECK_MODULES(
+    [AWS_CPP_SDK_KINESIS],
+    [aws-cpp-sdk-kinesis],
+    [have_libaws_cpp_sdk_kinesis=yes],
+    [have_libaws_cpp_sdk_kinesis=no]
+)
 
-if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a "${have_libssl}" = "yes" -a "${have_libcurl}" = "yes"; then
-    AC_LANG_SAVE
-    AC_LANG_CPLUSPLUS
-    save_LIBS="${LIBS}"
-    LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
-    save_CXXFLAGS="${CXXFLAGS}"
-    CXXFLAGS="${CXXFLAGS} -std=c++11"
+AC_CHECK_LIB(
+    [aws-checksums],
+    [aws_checksums_crc32],
+    [have_libaws_checksums=yes],
+    [have_libaws_checksums=no]
+)
 
-    AC_TRY_LINK(
-        [
-            #include <aws/core/Aws.h>
-            #include <aws/core/client/ClientConfiguration.h>
-            #include <aws/core/auth/AWSCredentials.h>
-            #include <aws/core/utils/Outcome.h>
-            #include <aws/kinesis/KinesisClient.h>
-            #include <aws/kinesis/model/PutRecordRequest.h>
-        ],
-        [Aws::Kinesis::Model::PutRecordRequest request;],
-        [have_libaws_cpp_sdk_kinesis=yes],
-        [have_libaws_cpp_sdk_kinesis=no]
-    )
+AC_CHECK_LIB(
+    [aws-c-common],
+    [aws_default_allocator],
+    [have_libaws_c_common=yes],
+    [have_libaws_c_common=no]
+)
 
-    LIBS="${save_LIBS}"
-    CXXFLAGS="${save_CXXFLAGS}"
-    AC_LANG_RESTORE
-else
-    have_libaws_cpp_sdk_kinesis=no
-fi
-
-AC_MSG_RESULT([${have_libaws_cpp_sdk_kinesis}])
+AC_CHECK_LIB(
+    [aws-c-event-stream],
+    [aws_event_stream_library_init],
+    [have_libaws_c_event_stream=yes],
+    [have_libaws_c_event_stream=no]
+)
 
 test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_kinesis}" != "yes" && \
     AC_MSG_ERROR([libaws-cpp-sdk-kinesis required but not found. try installing AWS C++ SDK])
@@ -1130,14 +1129,26 @@ test "${enable_backend_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
 test "${enable_backend_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
     AC_MSG_ERROR([libcrypto required but not found])
 
+test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_checksums}" != "yes" \
+                                         -a "${have_libaws_c_common}" != "yes" \
+                                         -a "${have_libaws_c_event_stream}" != "yes" && \
+    AC_MSG_ERROR([AWS SKD third party dependencies required but not found])
+
 AC_MSG_CHECKING([if kinesis backend should be enabled])
-if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" = "yes" \
-                                            -a "${have_libcurl}" = "yes" -a "${have_libssl}" = "yes" -a "${have_libcrypto}" = "yes"; then
+if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" \
+                                            -a "${have_libaws_cpp_sdk_core}" = "yes" \
+                                            -a "${have_libaws_checksums}" = "yes" \
+                                            -a "${have_libaws_c_common}" = "yes" \
+                                            -a "${have_libaws_c_event_stream}" = "yes" \
+                                            -a "${have_libcurl}" = "yes" \
+                                            -a "${have_libssl}" = "yes" \
+                                            -a "${have_libcrypto}" = "yes"; then
     enable_backend_kinesis="yes"
     AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
     OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${LIBCURL_CFLAGS}"
-    CXX11FLAG="-std=c++11"
-    OPTIONAL_KINESIS_LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
+    CXX11FLAG="${AWS_CPP_SDK_KINESIS_CFLAGS} ${AWS_CPP_SDK_CORE_CFLAGS}"
+    OPTIONAL_KINESIS_LIBS="${AWS_CPP_SDK_KINESIS_LIBS} ${AWS_CPP_SDK_CORE_LIBS} \
+                           ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
 else
     enable_backend_kinesis="no"
 fi

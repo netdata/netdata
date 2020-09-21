@@ -108,7 +108,7 @@ jobs:
           RMJSONC: ${{ matrix.rmjsonc }}
         run: |
           echo $PRE > ./prep-cmd.sh
-          echo $RMJSONC > ./rmjsonc.sh
+          echo $RMJSONC > ./rmjsonc.sh && chmod +x ./rmjsonc.sh
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
       - name: Regular build on ${{ matrix.distro }}
         run: |
@@ -124,3 +124,83 @@ jobs:
         run: |
           docker run -w /netdata test \
               /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+  aws-kinesis-build:
+    name: With AWS Kinesis SDK
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          # XXX: CentOS 8.x is broken (libjudy)
+          # - 'centos:8'
+          - 'debian:buster'
+          - 'fedora:32'
+          - 'ubuntu:20.04'
+        include:
+          #- distro: 'centos:8'
+          #  pre: >-
+          #    yum -y update &&
+          #    yum -y groupinstall 'Development Tools' &&
+          #    yum -y install libcurl-devel openssl-devel libuuid-devel
+          #  build_kinesis: >-
+          #    git clone https://github.com/aws/aws-sdk-cpp.git &&
+          #    cmake -DCMAKE_INSTALL_PREFIX=/usr
+          #    -DBUILD_ONLY=kinesis
+          #    ./aws-sdk-cpp &&
+          #    make &&
+          #    make install
+          - distro: 'debian:buster'
+            pre: >-
+              apt-get update &&
+              apt-get install -y build-essential &&
+              apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
+            build_kinesis: >-
+              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
+          - distro: 'fedora:32'
+            pre: >-
+              dnf -y update &&
+              dnf -y groupinstall 'Development Tools' &&
+              dnf -y install libcurl-devel openssl-devel libuuid-devel
+            build_kinesis: >-
+              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
+          - distro: 'ubuntu:20.04'
+            pre: >-
+              apt-get update &&
+              apt-get install -y build-essential &&
+              apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
+            build_kinesis: >-
+              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: install-required-packages.sh on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
+          BUILD_KINESIS: ${{ matrix.build_kinesis }}
+        run: |
+          echo $PRE > ./prep-cmd.sh
+          echo $BUILD_KINESIS > ./build-kinesis.sh && chmod +x ./build-kinesis.sh
+          docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
+      - name: Build on ${{ matrix.distro }}
+        env:
+          RUNCMD: >-
+            ./build-kinesis.sh &&
+            ./netdata-installer.sh --dont-wait --dont-start-it --enable-backend-kinesis
+        run: |
+          docker run -w /netdata test \
+            /bin/sh -c "$RUNCMD"
