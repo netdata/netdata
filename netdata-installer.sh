@@ -1619,7 +1619,7 @@ progress "Install netdata at system init"
 # By default we assume the shutdown/startup of the Netdata Agent are effectively
 # without any system supervisor/init like SystemD or SysV. So we assume the most
 # basic startup/shutdown commands...
-NETDATA_STOP_CMD="${NETDATA_PREFIX}/usr/bin/netdatacli shutdown-agent"
+NETDATA_STOP_CMD="${NETDATA_PREFIX}/usr/sbin/netdatacli shutdown-agent"
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
