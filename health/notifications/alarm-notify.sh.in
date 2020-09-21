@@ -36,6 +36,7 @@
 #  - RocketChat notifications by @Hermsi1337 #3777
 #  - Google Hangouts Chat notifications by @EnzoAkira and @hendrikhofstadt
 #  - Dynatrace Event by @illumine
+#  - Stackpulse Event by @thiagoftsm
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -382,6 +383,8 @@ DYNATRACE_ANNOTATION_TYPE=
 DYNATRACE_EVENT=
 SEND_DYNATRACE=
 
+# stackpulse configs
+STACKPULSE_WEBHOOK=
 
 # load the stock and user configuration files
 # these will overwrite the variables above
@@ -532,6 +535,9 @@ filter_recipient_by_criticality() {
 # check matrix
 { [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
+# check stackpulse
+[ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
+
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_SLACK}" = "YES" ] ||
 	[ "${SEND_ROCKETCHAT}" = "YES" ] ||
@@ -552,7 +558,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_MATRIX}" = "YES" ] ||
 	[ "${SEND_CUSTOM}" = "YES" ] ||
 	[ "${SEND_MSTEAM}" = "YES" ] ||
-	[ "${SEND_DYNATRACE}" = "YES" ]; then
+	[ "${SEND_DYNATRACE}" = "YES" ] ||
+	[ "${SEND_STACKPULSE}" = "YES" ]; then
 	# if we need curl, check for the curl command
 	if [ -z "${curl}" ]; then
 		curl="$(command -v curl 2>/dev/null)"
@@ -580,6 +587,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_MATRIX="NO"
 		SEND_CUSTOM="NO"
 		SEND_DYNATRACE="NO"
+		SEND_STACKPULSE="NO"
 	fi
 fi
 
@@ -708,7 +716,8 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_SYSLOG}" \
 	"${SEND_SMS}" \
 	"${SEND_MSTEAM}" \
-    "${SEND_DYNATRACE}"; do
+	"${SEND_DYNATRACE}" \
+	"${SEND_STACKPULSE}" ; do
 	
 	if [ "${method}" == "YES" ]; then
 		proceed=1
@@ -1968,8 +1977,10 @@ EOF
 
 	return 1
 }
+
 # -----------------------------------------------------------------------------
 # Dynatrace sender
+
 send_dynatrace() {
   [ "${SEND_DYNATRACE}" != "YES" ] && return 1
 
@@ -2016,6 +2027,51 @@ EOF
   fi
 }
 
+
+# -----------------------------------------------------------------------------
+# Stackpulse sender
+
+send_stackpulse() {
+  local payload httpcode oldv currv
+  [ "${SEND_STACKPULSE}" != "YES" ] && return 1
+
+  # We are sending null when values are nan to avoid errors while JSON message is parsed
+  [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
+  [ "${value}" != "nan" ] && currv="${value}" || currv="null"
+
+  payload=$(cat <<EOF
+  {
+    "Node" : "${host}",
+    "Chart" : "${chart}",
+    "OldValue" : ${oldv},
+    "Value" : ${currv},
+    "Units" : "${units}",
+    "OldStatus" : "${old_status}",
+    "Status" : "${status}",
+    "Alarm" : "${name}",
+    "Date": ${when},
+    "Duration": ${duration},
+    "NonClearDuration": ${non_clear_duration},
+    "Description" : "${status_message}, ${info}",
+    "CalcExpression" : "${calc_expression}",
+    "CalcParamValues" : "${calc_param_values}",
+    "TotalWarnings" : "${total_warnings}",
+    "TotalCritical" : "${total_critical}",
+    "ID" : ${alarm_id}
+  }
+EOF
+)
+
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" ${STACKPULSE_WEBHOOK})
+  if [ "${httpcode}" = "200" ]; then
+    info "sent stackpulse notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send stackpulse notification for: ${host} ${chart}.${name} is ${status}, with HTTP response status code ${httpcode}."
+    return 1
+  fi
+
+  return 0
+}
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
 
@@ -2535,6 +2591,11 @@ SENT_DYNATRACE=$?
 
 
 # -----------------------------------------------------------------------------
+# send the EVENT to Dynatrace
+send_stackpulse
+SENT_STACKPULSE=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
 	"${SENT_PUSHOVER}" \
@@ -2561,7 +2622,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_SYSLOG}" \
 	"${SENT_SMS}" \
 	"${SENT_MSTEAM}" \
-    "${SENT_DYNATRACE}"; do	
+	"${SENT_DYNATRACE}" \
+	"${SENT_STACKPULSE}" ; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something
 		exit 0
