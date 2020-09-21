@@ -3,10 +3,6 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-#ifdef ENABLE_SQLITE
-#include "sqlite/sqlite_functions.h"
-#endif
-
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;

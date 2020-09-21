@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <database/sqlite/sqlite_functions.h>
 #include "charts2json.h"
 
 // generate JSON for the /api/v1/charts API call

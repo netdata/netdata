@@ -3,9 +3,6 @@
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
-//#define SQLITE_POC
-#include "database/sqlite/sqlite3.h"
-
 // forward typedefs
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
@@ -306,7 +303,7 @@ struct rrddim_query_handle {
             long last_slot;
             uint8_t finished;
 #ifdef ENABLE_SQLITE
-            sqlite3_stmt *query;
+            void *query;
             time_t local_start_time;       // Expected data range from DB
             time_t local_end_time;
             size_t entries;
@@ -1329,6 +1326,13 @@ extern RRDHOST *rrdhost_create(
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
+#endif
+
+// ----------------------------------------------------------------------------
+// SQLite declarations
+
+#ifdef ENABLE_SQLITE
+#include "sqlite/sqlite_functions.h"
 #endif
 
 #endif /* NETDATA_RRD_H */

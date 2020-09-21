@@ -2,9 +2,6 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
-#ifdef ENABLE_SQLITE
-#include "sqlite/sqlite_functions.h"
-#endif
 
 static inline void calc_link_to_rrddim(RRDDIM *rd)
 {

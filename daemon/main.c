@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "../database/sqlite/sqlite_functions.h"
+//#include "../database/sqlite/sqlite_functions.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;

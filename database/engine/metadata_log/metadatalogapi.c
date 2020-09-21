@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define NETDATA_RRD_INTERNALS
 
-#include <database/sqlite/sqlite_functions.h>
 #include "metadatalog.h"
 
 static inline struct metalog_instance *get_metalog_ctx(RRDHOST *host)
