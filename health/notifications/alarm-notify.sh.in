@@ -2085,167 +2085,8 @@ EOF
 # -----------------------------------------------------------------------------
 # Opsgenie sender
 
-create_opsgenie_array() {
-  local counter=0 values="$1" max=$2 message
-
-  message="[ "
-  for value in ${values} ; do
-    if [ "$counter" != "0" ] ; then
-      message+=", "
-    fi
-
-    message+=" \"${value:0:49}\""
-    counter=$((counter + 1))
-
-    if [ "$counter" == "$max" ] ; then
-      break;
-    fi
-  done
-  message+=" ]"$'\n'
-
-  echo "$message"
-}
-
-create_opsgenie_list() {
-  local counter=0 values types="$2" field=$3 max=$4
-
-  # Convert values to array
-  separator=' ' read -r -a values <<< "$1"
-
-  message=" "
-  # The type is a mandatory field, so we are using it to main loop
-  for t in ${types} ; do
-    if [ "$counter" != "0" ] ; then
-      message+=", "
-    fi
-
-    if [ -n "${values[$counter]}" ] ; then
-      message+="{ \"${field}\": \"${values[$counter]}\", \"type\": \"${t}\" }"
-    fi
-
-    counter=$((counter + 1))
-    if [ "$counter" == "$max" ] ; then
-      break;
-    fi
-  done
-
-  echo "$message"
-}
-
-create_opsgenie_lists() {
-  local message=""
-
-  if [ -n "${1}" ] &&  [ -n "${2}" ] ; then
-    message+="$(create_opsgenie_list "${1}" "${2}" "id" 50)"
-  fi
-
-  if [ -n "${3}" ] &&  [ -n "${4}" ] ; then
-    if [ -n "${message}" ]; then
-      message+=", "
-    fi
-
-    message+="$(create_opsgenie_list "${3}" "${4}" "username" 50)"
-  fi
-
-  if [ -n "${5}" ] &&  [ -n "${6}" ] ; then
-    if [ -n "${message}" ]; then
-      message+=", "
-    fi
-
-    message+="$(create_opsgenie_list "${5}" "${6}" "name" 50)"
-  fi
-
-  echo "$message"
-}
-
-opsgenie_create_alarm() {
-  local opts=() message idx priority=$1
-  # The restrictions applied for each variable was defined according
-  # the URL https://docs.opsgenie.com/docs/alert-api#create-alert on September 2nd, 2020.
-
-  opts+=("\"message\": \"Netdata on ${host:0:117}\","$'\n')
-
-  # Add Optional fields
-  opts+=($'\t'"\"description\": \"${chart:0:1023}.${name:0:1023} ${status_message}, ${info:0:8192}\","$'\n')
-  opts+=($'\t'"\"priority\": \"${priority}\","$'\n')
-  opts+=($'\t'"\"alias\": \"${alarm_id}\"")
-
-  # Commas are added to previous array element every time another optional value is necessary
-  # Add Optional fields if user specified them
-  idx=3
-  [ -n "${OPSGENIE_ENTITY}" ] && opts[2]="${opts[2]},"$'\n' && idx=4 && opts+=($'\t'"\"entity\": \"${OPSGENIE_ENTITY:0:511}\"")
-
-  if [ -n "${OPSGENIE_ACTIONS}" ] ; then
-    opts[${idx}]="${opts[${idx}]},"$'\n'
-    idx=$((idx + 1))
-
-    message="$(create_opsgenie_array "${OPSGENIE_ACTIONS}" 10)"
-
-    opts+=($'\t'"\"actions\": ${message}")
-  fi
-
-  if [ -n "${OPSGENIE_TAGS}" ] ; then
-    opts[${idx}]="${opts[${idx}]},"$'\n'
-    idx=$((idx + 1))
-
-    message="$(create_opsgenie_array "${OPSGENIE_TAGS}" 20)"
-
-    opts+=($'\t'"\"tags\": ${message}")
-  fi
-
-  message="$(create_opsgenie_lists "${OPSGENIE_RESPONDERS_IDS}" "${OPSGENIE_RESPONDERS_IDS_TYPES}"\
-   "${OPSGENIE_RESPONDERS_USERNAMES}" "${OPSGENIE_RESPONDERS_USERNAMES_TYPES}"\
-    "${OPSGENIE_RESPONDERS_NAMES}" "${OPSGENIE_RESPONDERS_NAMES_TYPES}")"
-  if [ -n "${message}" ] ; then
-    opts[${idx}]="${opts[${idx}]},"$'\n'
-    idx=$((idx + 1))
-
-    opts+=($'\t'"\"responders\": [ ${message} ]")
-  fi
-
-  message="$(create_opsgenie_lists "${OPSGENIE_VISIBLE_IDS}" "${OPSGENIE_VISIBLE_IDS_TYPES}"\
-   "${OPSGENIE_VISIBLE_USERNAMES}" "${OPSGENIE_VISIBLE_USERNAMES_TYPES}"\
-    "${OPSGENIE_VISIBLE_NAMES}" "${OPSGENIE_VISIBLE_NAMES_TYPES}")"
-  if [ -n "${message}" ] ; then
-    opts[${idx}]="${opts[${idx}]},"$'\n'
-
-    opts+=($'\t'"\"visibleTo\": [ ${message} ]")
-  fi
-
-  # Fill payload with obligatory fields
-  payload="$(
-    cat <<EOF
-    {
-      ${opts[@]}
-    }
-EOF
-    )"
-
-  httpcode=$(docurl -X POST -H "Authorization: GenieKey ${OPSGENIE_API_KEY}" -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v2/alerts")
-  # https://docs.opsgenie.com/docs/alert-api#create-alert
-  if [ "${httpcode}" = "202" ]; then
-    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
-  else
-    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
-    return 1
-  fi
-
-  return 0;
-}
-
-opsgenie_close_alarm() {
-  # https://docs.opsgenie.com/docs/alert-api#close-alert
-  httpcode=$(docurl -X POST -H "Authorization: GenieKey ${OPSGENIE_API_KEY}" -H "Content-Type: application/json" -d "{ }" "https://api.opsgenie.com/v2/alerts/${alarm_id}/close?type=alias")
-  if [ "${httpcode}" = "202" ]; then
-    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
-  else
-    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP response code ${httpcode}."
-    return 1
-  fi
-}
-
 send_opsgenie() {
-  local priority
+  local payload httpcode oldv currv
   [ "${SEND_OPSGENIE}" != "YES" ] && return 1
 
   if [ -z "${OPSGENIE_API_KEY}" ] ; then
@@ -2253,20 +2094,37 @@ send_opsgenie() {
     return 1
   fi
 
-  case "${status}" in
-    WARNING) priority="P3" ;;
-    CRITICAL) priority="P1" ;;
-    CLEAR) priority="P4" ;;
-    *) priority="P5" ;;
-  esac
+  # We are sending null when values are nan to avoid errors while JSON message is parsed
+  [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
+  [ "${value}" != "nan" ] && currv="${value}" || currv="null"
 
-  if [ "${status}" != CLEAR ] ; then
-    ret=$(opsgenie_create_alarm "${priority}")
-  else
-    opsgenie_close_alarm
-  fi
+  payload=$(cat <<EOF
+  {
+    "host" : "${host}",
+    "unique_id" : "${unique_id}",
+    "alarmId" : ${alarm_id},
+    "eventId" : ${event_id},
+    "chart" : "${chart}",
+    "when": ${when},
+    "name" : "${name}",
+    "family" : "${family}",
+    "status" : "${status}",
+    "old_status" : "${old_status}",
+    "value" : ${currv},
+    "old_value" : ${oldv},
+    "duration": ${duration},
+    "non_clear_duration": ${non_clear_duration},
+    "units" : "${units}",
+    "info" : "${status_message}, ${info}",
+    "calc_expression" : "${calc_expression}",
+    "total_warnings" : "${total_warnings}",
+    "total_critical" : "${total_critical}",
+    "src" : "${src}"
+  }
+EOF
+)
 
-  return $ret
+  return 0
 }
 
 # -----------------------------------------------------------------------------
