@@ -972,7 +972,7 @@ cleanup_old_netdata_updater() {
   fi
 
   if [ -d /etc/cron.d ]; then
-    rm -f /etc/cron.d/netdata
+    rm -f /etc/cron.d/netdata-updater
   fi
 
   return 0
@@ -1009,7 +1009,7 @@ enable_netdata_updater() {
     "crontab")
       cat "${NETDATA_SOURCE_DIR}/system/netdata.crontab" > "/etc/cron.d/netdata-updater"
 
-      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata${TPUT_RESET}"
+      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata-updater${TPUT_RESET}"
       echo >&2
       echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
       echo >&2 "Successful updates will not send an email."
