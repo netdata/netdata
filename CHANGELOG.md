@@ -6,9 +6,22 @@
 
 **Merged pull requests:**
 
+- Fix Stackpulse doc [\#9968](https://github.com/netdata/netdata/pull/9968) ([thiagoftsm](https://github.com/thiagoftsm))
+- Stackpulse integration [\#9965](https://github.com/netdata/netdata/pull/9965) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix typo inside netdata-installer.sh [\#9962](https://github.com/netdata/netdata/pull/9962) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fixed chart's last accessed time during context queries [\#9952](https://github.com/netdata/netdata/pull/9952) ([stelfrag](https://github.com/stelfrag))
+- adds missing file netdata.crontab to gitignore [\#9946](https://github.com/netdata/netdata/pull/9946) ([underhood](https://github.com/underhood))
+- Updated RPM spec file to use automatic dependency list generation. [\#9937](https://github.com/netdata/netdata/pull/9937) ([Ferroin](https://github.com/Ferroin))
+- adds ACLK DISABLE\_CLOUD to -W buildinfo [\#9936](https://github.com/netdata/netdata/pull/9936) ([underhood](https://github.com/underhood))
+- Fix resource leak in case of malformed cloud request [\#9934](https://github.com/netdata/netdata/pull/9934) ([underhood](https://github.com/underhood))
+- Added context parameter to the data endpoint [\#9931](https://github.com/netdata/netdata/pull/9931) ([stelfrag](https://github.com/stelfrag))
 - Add notice to Docker docs about systemd volumes [\#9927](https://github.com/netdata/netdata/pull/9927) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add persistent configuration details to Docker docs [\#9926](https://github.com/netdata/netdata/pull/9926) ([joelhans](https://github.com/joelhans))
+- Added a way to get build configuration info from the agent. [\#9913](https://github.com/netdata/netdata/pull/9913) ([Ferroin](https://github.com/Ferroin))
+- add mirrored\_hosts\_status into OpenAPI of api/info [\#9867](https://github.com/netdata/netdata/pull/9867) ([underhood](https://github.com/underhood))
+- Fix build for the AWS Kinesis exporting connector [\#9823](https://github.com/netdata/netdata/pull/9823) ([vlvkobal](https://github.com/vlvkobal))
 - Add guide for monitoring Pi-hole and Raspberry Pi [\#9770](https://github.com/netdata/netdata/pull/9770) ([joelhans](https://github.com/joelhans))
+- Added support for using `/etc/cron.d` for auto-updates. [\#9598](https://github.com/netdata/netdata/pull/9598) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.25.0](https://github.com/netdata/netdata/tree/v1.25.0) (2020-09-15)
 
@@ -226,9 +239,6 @@
 - Add guide for troubleshooting with eBPF metrics [\#9352](https://github.com/netdata/netdata/pull/9352) ([joelhans](https://github.com/joelhans))
 - dashboard v1.0.14\_2 [\#9350](https://github.com/netdata/netdata/pull/9350) ([jacekkolasa](https://github.com/jacekkolasa))
 - Revert "Override linker and include paths for static builds." [\#9343](https://github.com/netdata/netdata/pull/9343) ([Ferroin](https://github.com/Ferroin))
-- installer: update go.d.plugin version to v0.19.2 [\#9340](https://github.com/netdata/netdata/pull/9340) ([ilyam8](https://github.com/ilyam8))
-- Get netdata execution path early to avoid user permission issues [\#9339](https://github.com/netdata/netdata/pull/9339) ([mfundul](https://github.com/mfundul))
-- Fix issues on ebpf.plugin [\#9333](https://github.com/netdata/netdata/pull/9333) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
