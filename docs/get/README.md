@@ -106,6 +106,11 @@ Netdata Cloud.
 For more information on the claiming process, why we implemented it, and how it works, see the [claim](/claim/README.md)
 and [Agent-Cloud link](/aclk/README.md) reference docs.
 
+<details>
+<summary>Watch how claiming nodes works</summary>
+<iframe width="820" height="460" src="https://www.youtube.com/embed/UAzVvhMab8g" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</details>
+
 ## What's next?
 
 At this point, you set up your free Netdata Cloud account, installed the Agent, and claimed one or more nodes to your
