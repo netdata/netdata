@@ -2,64 +2,64 @@
 # This way we prevent modifications which will be overwriten by automation.
 
 # Global (default) code owner
-* @ktsaou @amoss @prologic
+* @ktsaou @prologic
 
 # Ownership by directory structure
-.travis/ @amoss @Ferroin @prologic
-.github/ @amoss @Ferroin @prologic
-aclk/ @stelfrag @underhood @amoss
+.travis/ @Ferroin @prologic
+.github/ @Ferroin @prologic
+aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @amoss @prologic
-contrib/debian @amoss @Ferroin @prologic
-collectors/ @vlvkobal @mfundul @amoss
-collectors/charts.d.plugin/ @ilyam8 @Ferroin @prologic @amoss
-collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @amoss
-collectors/ebpf.plugin/ @thiagoftsm @vlvkobal @amoss
-collectors/macos.plugin/ @vlvkobal @thiagoftsm @amoss
-collectors/node.d.plugin/ @jacekkolasa @amoss
-collectors/node.d.plugin/fronius/ @ccremer @amoss
-collectors/node.d.plugin/snmp/ @jacekkolasa @amoss
-collectors/node.d.plugin/stiebeleltron/ @ccremer @amoss
+build/ @prologic
+contrib/debian @Ferroin @prologic
+collectors/ @vlvkobal @mfundul
+collectors/charts.d.plugin/ @ilyam8 @Ferroin @prologic
+collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
+collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
+collectors/macos.plugin/ @vlvkobal @thiagoftsm
+collectors/node.d.plugin/ @jacekkolasa
+collectors/node.d.plugin/fronius/ @ccremer
+collectors/node.d.plugin/snmp/ @jacekkolasa
+collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @amoss
+collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
-daemon/ @thiagoftsm @mfundul @amoss
-database/ @mfundul @thiagoftsm @amoss
-docs/ @amoss @joelhans @shortpatti
-health/ @thiagoftsm @vlvkobal @amoss
-health/health.d/ @thiagoftsm @vlvkobal @amoss
-health/notifications/ @Ferroin @thiagoftsm @amoss
-libnetdata/ @thiagofsm @mfundul @amoss
-packaging/ @amoss @Ferroin @prologic
-registry/ @jacekkolasa @amoss
-streaming/ @thiagoftsm @vlvkobal @amoss
-system/ @prologic @Ferroin @amoss
-web/ @thiagoftsm @mfundul @vlvkobal @amoss
-web/gui/ @jacekkolasa @amoss
+daemon/ @thiagoftsm @mfundul
+database/ @mfundul @thiagoftsm
+docs/ @joelhans @shortpatti
+health/ @thiagoftsm @vlvkobal
+health/health.d/ @thiagoftsm @vlvkobal
+health/notifications/ @Ferroin @thiagoftsm
+libnetdata/ @thiagofsm @mfundul
+packaging/ @Ferroin @prologic
+registry/ @jacekkolasa
+streaming/ @thiagoftsm @vlvkobal
+system/ @prologic @Ferroin
+web/ @thiagoftsm @mfundul @vlvkobal
+web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @amoss @prologic
-*.md @amoss @joelhans @shortpatti
-Dockerfile* @Ferroin @prologic @amoss
+*.am @prologic
+*.md @joelhans @shortpatti
+Dockerfile* @Ferroin @prologic
 
 # Ownership of specific files
-.gitignore @amoss @Ferroin @prologic
-.travis.yml @amoss @Ferroin @prologic
-.lgtm.yml @amoss @Ferroin @prologic
-.eslintrc @amoss @Ferroin @prologic
-.eslintignore @amoss @Ferroin @prologic
-.csslintrc @amoss @Ferroin @prologic
-.codeclimate.yml @amoss @Ferroin @prologic
-.codacy.yml @amoss @Ferroin @prologic
-.yamllint.yml @amoss @Ferroin @prologic
-netdata.spec.in @amoss @Ferroin @prologic
-netdata-installer.sh @amoss @Ferroin @prologic
+.gitignore @Ferroin @prologic
+.travis.yml @Ferroin @prologic
+.lgtm.yml @Ferroin @prologic
+.eslintrc @Ferroin @prologic
+.eslintignore @Ferroin @prologic
+.csslintrc @Ferroin @prologic
+.codeclimate.yml @Ferroin @prologic
+.codacy.yml @Ferroin @prologic
+.yamllint.yml @Ferroin @prologic
+netdata.spec.in @Ferroin @prologic
+netdata-installer.sh @Ferroin @prologic
 package.json @jacekkolasa @prologic
 packaging/version @netdatabot @prologic
 
-LICENSE.md @amoss @joelhans @prologic
+LICENSE.md @joelhans @prologic
 CHANGELOG.md @netdatabot @prologic
