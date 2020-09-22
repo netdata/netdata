@@ -280,7 +280,7 @@ while [ -n "${1}" ]; do
     "--dont-wait") DONOTWAIT=1 ;;
     "--auto-update" | "-u") AUTOUPDATE=1 ;;
     "--auto-update-type")
-      AUTO_UPDATE_TYPE="${2}"
+      AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
       case "${AUTO_UPDATE_TYPE}" in
         systemd|interval|crontab)
           shift 1
