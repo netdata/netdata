@@ -151,8 +151,8 @@ jobs:
           - distro: 'debian:buster'
             pre: >-
               apt-get update &&
-              apt-get install -y build-essential &&
-              apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
+              DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential &&
+              DEBIAN_FRONTEND=noninteractive apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
@@ -175,8 +175,8 @@ jobs:
           - distro: 'ubuntu:20.04'
             pre: >-
               apt-get update &&
-              apt-get install -y build-essential &&
-              apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
+              DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential &&
+              DEBIAN_FRONTEND=noninteractive apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
             build_kinesis: >-
               git clone https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
