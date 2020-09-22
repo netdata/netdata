@@ -29,7 +29,7 @@ collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
 daemon/ @thiagoftsm @mfundul
 database/ @mfundul @thiagoftsm
-docs/ @joelhans @shortpatti
+docs/ @joelhans
 health/ @thiagoftsm @vlvkobal
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
@@ -43,7 +43,7 @@ web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @prologic
-*.md @joelhans @shortpatti
+*.md @joelhans
 Dockerfile* @Ferroin @prologic
 
 # Ownership of specific files
