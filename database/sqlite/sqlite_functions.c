@@ -14,7 +14,8 @@ sqlite3 *dbmem = NULL;
 
 #define SQLITE_MAINT_LOOP_DELAY     1000    // ms
 
-int metrics_read=0, metrics_write = 0;
+int metrics_read=0, metrics_write = 0, in_memory_metrics_read = 0;
+
 
 static int items_to_commit = 0;
 static sqlite3_stmt *row_res = NULL;
@@ -30,6 +31,8 @@ static uint32_t database_flush_transaction_count;
 static uint32_t database_size;
 static uint32_t page_size;
 static uint32_t page_count;
+static uint32_t free_page_count;
+static uint32_t delete_rows;
 
 
 /*
@@ -170,8 +173,8 @@ static void sqlite_flush_page(uint32_t count, struct rrddim_metric_page *target_
         return;
     }
 
-    uv_rwlock_wrlock(&sqlite_flush);
     uv_rwlock_wrlock(&sqlite_add_page);
+    uv_rwlock_wrlock(&sqlite_flush);
 
 //    int rc;
     int added = 0;
@@ -181,7 +184,6 @@ static void sqlite_flush_page(uint32_t count, struct rrddim_metric_page *target_
             rd = metric_page->rd;
             sql_add_metric_page_nolock(rd->state->metric_uuid, metric_page->values, metric_page->active_count, metric_page->first_entry_t,
                 metric_page->last_entry_t);
-
             // TODO: Check if we need this
             //rd->state->db_last_entry_t = metric_page->last_entry_t;
             metric_page->stored = 3;        // Stored and can be removed
@@ -190,12 +192,17 @@ static void sqlite_flush_page(uint32_t count, struct rrddim_metric_page *target_
         }
         sqlite_page_flush_list.page_count--;
         sqlite_page_flush_list.head = next_metric_page;
+        if (added % 10 == 0 && next_metric_page) {
+            uv_rwlock_wrunlock(&sqlite_flush);
+            uv_rwlock_wrlock(&sqlite_flush);
+        }
     }
     if (!sqlite_page_flush_list.head)
         sqlite_page_flush_list.tail = NULL;
 
-    uv_rwlock_wrunlock(&sqlite_add_page);
+
     uv_rwlock_wrunlock(&sqlite_flush);
+    uv_rwlock_wrunlock(&sqlite_add_page);
 }
 
 void sqlite_queue_page_to_flush(struct rrddim_metric_page *metric_page)
@@ -323,6 +330,7 @@ int sql_init_database()
 
     sqlite_disk_mode = config_get_boolean(CONFIG_SECTION_GLOBAL, "sqlite mode disk", 1);
     database_flush_transaction_count = (uint32_t) config_get_number(CONFIG_SECTION_GLOBAL, "database flush transaction count", 128);
+    delete_rows = (uint32_t) config_get_number(CONFIG_SECTION_GLOBAL, "database delete row count", 10000);
 
     snprintfz(sqlite_database, FILENAME_MAX, "%s/sqlite", netdata_configured_cache_dir);
 
@@ -616,6 +624,15 @@ int sql_database_size()
 
     sqlite3_finalize(res);
 
+    rc = sqlite3_prepare_v2(db, "pragma freelist_count;", -1, &res, 0);
+    if (rc != SQLITE_OK)
+        return 0;
+
+    if (sqlite3_step(res) == SQLITE_ROW)
+        free_page_count = sqlite3_column_int(res, 0);
+
+    sqlite3_finalize(res);
+
     if (unlikely(!page_size)) {
         rc = sqlite3_prepare_v2(db, "pragma page_size;", -1, &res, 0);
         if (rc != SQLITE_OK)
@@ -627,23 +644,41 @@ int sql_database_size()
         sqlite3_finalize(res);
     }
 
-    return (page_count / 1024) * (page_size / 1024);
+    return ((page_count - free_page_count) / 1024) * (page_size / 1024);
 }
 
-void sql_compact_database()
+void sql_compact_database(uint32_t rows)
 {
     char *err_msg = NULL;
+    char sql[512];
     int rc;
+    static int report_free = 0;
 
-    if (database_size <= (int)(sqlite_disk_quota_mb * 0.95))
+    if (database_size <= (uint32_t)(sqlite_disk_quota_mb * 0.95)) {
+        if (free_page_count > 0 && 0) {
+            if (!report_free) {
+                report_free = 1;
+                info("Database free page count %u, starting incremental vacuum", free_page_count);
+            }
+            rc = sqlite3_exec(db_page, "pragma incremental_vacuum(100);", 0, 0, &err_msg);
+        }
         return;
+    }
+    report_free = 0;
 
-    info("Database size = %u MiB, limit is %u", database_size, sqlite_disk_quota_mb);
+    info("Database size = %u MiB, limit is %u (total pages %u, free pages %u)", database_size, sqlite_disk_quota_mb, page_count, free_page_count);
 
-    if (sqlite_disk_mode)
-        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 10000; pragma incremental_vacuum(1000);", 0, 0, &err_msg);
+    if (sqlite_disk_mode) {
+        sprintf(sql,"delete from metric_page order by start_date limit %u;", rows);
+        rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
+        if (rc == SQLITE_OK) {
+            uint32_t new_database_size = sql_database_size();
+            // Calculate rate to achieve end goal of database quota in 1/10 of the cache size duration
+            info("Database rotation, deleting %u rows, freed %u MiB", rows, database_size - new_database_size);
+        }
+    }
     else
-        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 100; pragma incremental_vacuum(100);", 0, 0, &err_msg);
+        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 100;", 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
         error("SQL error during database rotation %s", err_msg);
@@ -1350,6 +1385,9 @@ void sql_add_metric_page_nolock(uuid_t *dim_uuid, storage_number *metric, size_t
     int compressed_size = 0;
     int max_compressed_size = sizeof(compressed_buf);
 
+    if (unlikely(start_time == LONG_MAX))
+        return;
+
     if (!stmt_metric_page) {
         rc = sqlite3_prepare_v2(db_page, "insert into metric_page (entries, dim_uuid, start_date, end_date, metric) values (@entries, @dim, @start_date, @end_date, @page);", -1, &stmt_metric_page, 0);
         if (rc != SQLITE_OK) {
@@ -1381,7 +1419,9 @@ void sql_add_metric_page_nolock(uuid_t *dim_uuid, storage_number *metric, size_t
             usleep(50 * USEC_PER_MS);
         }
         else {
-            info("SQLITE: Error on adding metric page nolock %d", rc);
+            char dim_str[37];
+            uuid_unparse_lower(*dim_uuid, dim_str);
+            info("SQLITE: Error on adding metric page nolock %d -- adding (%s, %ld)", rc, dim_str, start_time);
             break;
         }
     }
@@ -2224,7 +2264,7 @@ storage_number rrddim_sql_query_next_metric(struct rrddim_query_handle *handle, 
 {
     RRDDIM *rd = handle->rd;
     //long entries = rd->rrdset->entries;
-    long slot = handle->slotted.slot;
+    //long slot = handle->slotted.slot;
     (void)current_time;
     storage_number ret;
 
@@ -2361,8 +2401,8 @@ storage_number rrddim_sql_query_next_metric(struct rrddim_query_handle *handle, 
 //
 //    if (unlikely(slot >= entries))
 //        slot = 0;
-    handle->slotted.slot = slot;
-    metrics_read++;
+    //handle->slotted.slot = slot;
+    in_memory_metrics_read++;
     return n;
 }
 
@@ -2489,13 +2529,19 @@ void *sqlite_stats_main(void *ptr) {
     RRDSET *st1 = rrdset_create_localhost(
         "netdata", "SQLiteQueries", NULL, "SQLite", NULL, "SQLite metrics R/W", "Metrics", "sqlite.plugin", NULL,
         20001, SQLITE_STATS_UPDATE_EVERY, RRDSET_TYPE_LINE);
-    RRDDIM *rd_metrics_write = rrddim_add(st1, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_metrics_read = rrddim_add(st1, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_metrics_write = rrddim_add(st1, "generated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_metrics_read = rrddim_add(st1, "read db", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_in_memory_metrics_read = rrddim_add(st1, "read mem", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     RRDSET *st2 = rrdset_create_localhost(
         "netdata", "SQLitePages", NULL, "SQLite", NULL, "SQLite pages", "DirtyPages", "sqlite.plugin", NULL,
-        20001, SQLITE_STATS_UPDATE_EVERY, RRDSET_TYPE_LINE);
+        20002, SQLITE_STATS_UPDATE_EVERY, RRDSET_TYPE_LINE);
     RRDDIM *rd_pages_to_write = rrddim_add(st2, "pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDSET *st3 = rrdset_create_localhost(
+        "netdata", "SQLiteDiskPages", NULL, "SQLite", NULL, "SQLite pages", "Database (MiB)", "sqlite.plugin", NULL,
+        20003, SQLITE_STATS_UPDATE_EVERY, RRDSET_TYPE_LINE);
+    RRDDIM *rd_db_size = rrddim_add(st3, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -2510,6 +2556,7 @@ void *sqlite_stats_main(void *ptr) {
         rrdset_next(st);
         rrdset_next(st1);
         rrdset_next(st2);
+        rrdset_next(st3);
 
         int hit, miss, write, dummy;
 
@@ -2522,14 +2569,20 @@ void *sqlite_stats_main(void *ptr) {
         rrddim_set_by_pointer(st, rd_write, write);
 
         rrddim_set_by_pointer(st1, rd_metrics_read, metrics_read);
+        rrddim_set_by_pointer(st1, rd_in_memory_metrics_read, in_memory_metrics_read);
+
         //metrics_read = 0;
         rrddim_set_by_pointer(st1, rd_metrics_write, metrics_write);
         //metrics_write = 0;
         //rrddim_set_by_pointer(st, rd_avg, error_total / iterations);
         rrddim_set_by_pointer(st2, rd_pages_to_write, sqlite_page_flush_list.page_count);
+
+        rrddim_set_by_pointer(st3, rd_db_size, database_size);
+
         rrdset_done(st);
         rrdset_done(st1);
         rrdset_done(st2);
+        rrdset_done(st3);
     }
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -2556,6 +2609,7 @@ void *sqlite_rotation_main(void *ptr)
     int ram_vacuumed = 0;
     uint32_t flush_count = 1;
     netdata_thread_disable_cancelability();
+    time_t start_flushing = 0;
     while (1) {
         usleep(SQLITE_MAINT_LOOP_DELAY * USEC_PER_MS);
         if (netdata_exit)
@@ -2591,12 +2645,10 @@ void *sqlite_rotation_main(void *ptr)
         } else {
             if (!ram_vacuumed) {
                 ram_vacuumed = 1;
-                if (sqlite3_exec(db, "VACUUM ram;", 0, 0, &err_msg) != SQLITE_OK) {
-                    errno = 0;
-                    error("SQL error during RAM vacuum : %s", err_msg);
-                    sqlite3_free(err_msg);
-                }
-                info("No items to commit");
+                if (sqlite3_exec(db, "VACUUM ram;", 0, 0, NULL) != SQLITE_OK)
+                    ram_vacuumed = 0;
+                else
+                    info("No items to commit; RAM VACUUM");
             }
         }
 
@@ -2605,10 +2657,19 @@ void *sqlite_rotation_main(void *ptr)
 //        else
 //            flush_count = flush_count > 2 ? flush_count - 1 : flush_count;
 
-        flush_count = sqlite_page_flush_list.page_count / 60;
-        if (flush_count < database_flush_transaction_count)
-            flush_count = database_flush_transaction_count;
-        sqlite_flush_page(flush_count, NULL);
+        if (sqlite_page_flush_list.page_count) {
+            if (!start_flushing)
+                start_flushing = now_realtime_sec() + 5;
+        }
+        else
+            start_flushing = 0;
+
+        if (start_flushing && start_flushing < time(NULL)) {
+            flush_count = sqlite_page_flush_list.page_count / 60;
+            if (flush_count < database_flush_transaction_count)
+                flush_count = database_flush_transaction_count;
+            sqlite_flush_page(flush_count, NULL);
+        }
 
         database_size = sql_database_size();
 
@@ -2624,8 +2685,8 @@ void *sqlite_rotation_main(void *ptr)
         last_pending_page_inserts = pending_page_inserts;
 
         count++;
-        if (count % 15 == 0) // && !pending_page_inserts)
-            sql_compact_database();
+        if (count % 3 == 0) // && !pending_page_inserts)
+            sql_compact_database(delete_rows);
 
         uv_rwlock_wrunlock(&sqlite_add_page);
     }
