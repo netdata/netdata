@@ -353,7 +353,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->id = strdupz(id);
     rd->hash = simple_hash(rd->id);
 
-    rd->cache_filename = strdupz(fullfilename);
+    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
+        rd->cache_filename = NULL;
+    else
+        rd->cache_filename = strdupz(fullfilename);
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
     rd->name = config_get(st->config_section, varname, (name && *name)?name:rd->id);
@@ -396,9 +399,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef ENABLE_SQLITE
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_SQLITE)
         rd->state->metric_uuid = sql_find_dim_uuid(st, rd);
-//    rd->state->active_count = 0;
-//    rd->state->first_entry_t = LONG_MAX;
-//    rd->state->last_entry_t = 0;
     rd->state->db_first_entry_t = LONG_MAX;
     rd->state->db_last_entry_t = 0;
     rd->state->gap_checked = 1;     //TODO: Check if we need actually gap filling

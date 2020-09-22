@@ -38,7 +38,8 @@ static uint32_t delete_rows;
 /*
  * Database parameters
  */
-uint32_t sqlite_disk_quota_mb;
+uint32_t sqlite_disk_quota_mb;      // quota specified in the database
+uint32_t desired_pages = 0;
 uint32_t page_cache_mb;
 uint32_t db_wal_size;
 int sqlite_disk_mode;
@@ -642,6 +643,8 @@ int sql_database_size()
             page_size = (uint32_t) sqlite3_column_int(res, 0);
 
         sqlite3_finalize(res);
+        desired_pages = (sqlite_disk_quota_mb * 0.95) * (1024 * 1024 / page_size);
+        info("Database desired size is %u pages (page size is %u bytes). Current size is %u pages (includes %u free pages)", desired_pages, page_size, page_count, free_page_count);
     }
 
     return ((page_count - free_page_count) / 1024) * (page_size / 1024);
@@ -660,11 +663,11 @@ void sql_compact_database(uint32_t rows)
     if (database_size <= quota) {
         // Check if our actual size is over limit and trim if necessary
         // Compute quota pages
-        uint32_t target_pages_to_free = page_count - (quota * (1024 * 1024 / page_size));
-        if (target_pages_to_free > 0 && free_page_count) {
+        uint32_t desired_pages = quota * (1024 * 1024 / page_size);
+        if (page_count > desired_pages && free_page_count) {
             if (!report_free) {
                 report_free = 1;
-                info("Database free page count %u, starting incremental vacuum to shrink database by %u pages", free_page_count, target_pages_to_free);
+                info("Database free page count %u, starting incremental vacuum to shrink database by %u pages", free_page_count, page_count - desired_pages);
             }
             rc = sqlite3_exec(db_page, "pragma incremental_vacuum(100);", 0, 0, &err_msg);
         }
