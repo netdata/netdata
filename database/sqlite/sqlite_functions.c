@@ -654,11 +654,17 @@ void sql_compact_database(uint32_t rows)
     int rc;
     static int report_free = 0;
 
-    if (database_size <= (uint32_t)(sqlite_disk_quota_mb * 0.95)) {
-        if (free_page_count > 0 && 0) {
+    uint32_t quota = (uint32_t)(sqlite_disk_quota_mb * 0.95);
+
+    // Occupied size is within limit?
+    if (database_size <= quota) {
+        // Check if our actual size is over limit and trim if necessary
+        // Compute quota pages
+        uint32_t target_pages_to_free = page_count - (quota * (1024 * 1024 / page_size));
+        if (target_pages_to_free > 0 && free_page_count) {
             if (!report_free) {
                 report_free = 1;
-                info("Database free page count %u, starting incremental vacuum", free_page_count);
+                info("Database free page count %u, starting incremental vacuum to shrink database by %u pages", free_page_count, target_pages_to_free);
             }
             rc = sqlite3_exec(db_page, "pragma incremental_vacuum(100);", 0, 0, &err_msg);
         }
@@ -673,7 +679,7 @@ void sql_compact_database(uint32_t rows)
         rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
         if (rc == SQLITE_OK) {
             uint32_t new_database_size = sql_database_size();
-            // Calculate rate to achieve end goal of database quota in 1/10 of the cache size duration
+            // TODO: maybe calculate rate to achieve end goal of database quota in 1/10 of the cache size duration
             info("Database rotation, deleting %u rows, freed %u MiB", rows, database_size - new_database_size);
         }
     }
