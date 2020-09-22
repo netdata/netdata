@@ -7,14 +7,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/distr
 # Distributed data architecture
 
 Netdata uses a distributed data architecture to help you collect and store per-second metrics from any number of nodes.
-Every node in your infrastructure, whether it's one or a thousand, stores its own metrics. By storing metrics at the
-point where they are collected, or as close as possible, Netdata helps you maintain control of your data and control the
-costs of deploying infrastructure monitoring.
+Every node in your infrastructure, whether it's one or a thousand, stores the metrics it collects.
 
-Netdata Cloud bridges the gap between many distributed databases by centralizing the interface you use to query and
-visualize metrics from your nodes. When you look at charts in [Netdata
+Netdata Cloud bridges the gap between many distributed databases by _centralizing the interface you use_ to query and
+visualize your nodes' metrics. When you [look at charts in Netdata
 Cloud](/docs/visualize/interact-dashboards-charts.md), the metrics values are queried directly from that node's database
-and securely streamed to Netdata Cloud, where they are in turn proxied to your browser.
+and securely streamed to Netdata Cloud, which proxies them to your browser.
 
 Netdata's distributed data architecture has a number of benefits:
 
@@ -23,8 +21,8 @@ Netdata's distributed data architecture has a number of benefits:
     Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations).
 -   **Scalability**: As your infrastructure scales, install the Netdata Agent on every new node to immediately add it to
     your monitoring solution without adding cost or complexity.
--   **1-second granularity**: Without an expensive centralized data lake, you don't need to reduce the granularity of
-    retained metrics to keep costs down.
+-   **1-second granularity**: Without an expensive centralized data lake, you can store all of your nodes' per-second
+    metrics, for any period of time, while keeping costs down.
 -   **No filtering or selecting of metrics**: Because Netdata's distributed data architecture allows you to store all
     metrics, you don't have to configure which metrics you retain. Keep everything for full visibility during
     troubleshooting and root cause analysis.
@@ -33,20 +31,17 @@ Netdata's distributed data architecture has a number of benefits:
 
 ## Does Netdata Cloud store my metrics?
 
-Netdata Cloud does not store metrics values. To enable certain features, such as [viewing active
-alarms](/docs/monitor/view-active-alarms.md) or [filtering by
+Netdata Cloud does not store metric values. 
+
+To enable certain features, such as [viewing active alarms](/docs/monitor/view-active-alarms.md) or [filtering by
 service](/docs/visualize/view-all-nodes.md#filter-and-group-your-infrastructure), Netdata Cloud does store configured
 alarms, their status, and a list of active collectors.
-
-The benefits of Netdata's distributed data architecture are also explanations as to why Netdata Cloud does not store
-metrics values. If Netdata Cloud stored every metric from every node in a data lake, it would not be able to visualize
-those metrics efficiently and for free.
 
 Netdata does not and never will sell your personal data or data about your deployment.
 
 ## Long-term metrics storage with Netdata
 
-Any node running the Netdata Agent can store its own long-term metrics for any retention period, given you allocate the
+Any node running the Netdata Agent can store long-term metrics for any retention period, given you allocate the
 appropriate amount of RAM and disk space.
 
 Read our document on changing [how long Netdata stores metrics](/docs/store/change-metrics-storage.md) on your nodes for
@@ -54,14 +49,14 @@ details.
 
 ## Other options for your metrics data
 
-While a distributed data architecture is the default when monitoring an infrastructure with Netdata, you can also
-configure its behavior based on your needs or the type of infrastructure you manage.
+While a distributed data architecture is the default when monitoring infrastructure with Netdata, you can also configure
+its behavior based on your needs or the type of infrastructure you manage.
 
 To archive metrics to an external time-series database, such as InfluxDB, Graphite, OpenTSDB, Elasticsearch,
 TimescaleDB, and many others, see details on [integrating Netdata via exporting](/docs/export/integrate-exporting.md).
 
-You can also stream between nodes using [streaming](/docs/stream/README.md), which also allows you to replicate
-databases and create your own centralized data lake of metrics, if you choose to do so.
+You can also stream between nodes using [streaming](/docs/stream/README.md), allowing to replicate databases and create
+your own centralized data lake of metrics, if you choose to do so.
 
 When you use the database engine to store your metrics, you can always perform a quick backup of a node's
 `/var/cache/netdata/dbengine/` folder using the tool of your choice.

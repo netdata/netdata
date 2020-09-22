@@ -10,9 +10,9 @@ import { Calculator } from '../../src/components/agent/dbCalc/'
 
 The [database engine](/database/engine/README.md) uses RAM to store recent metrics. When metrics reach a certain age,
 and based on how much system RAM you allocate toward storing metrics in memory, they are compressed and "spilled" to
-disk for long-term storage. 
+disk for long-term storage.
 
-The default settings retain about two day's worth of metris on a system collecting 2,000 metrics every second, but the
+The default settings retain about two day's worth of metrics on a system collecting 2,000 metrics every second, but the
 Netdata Agent is highly configurable if you want your nodes to store days, weeks, or months worth of per-second data.
 
 The Netdata Agent uses two settings in `netdata.conf` to change the behavior of the database engine:
@@ -25,13 +25,14 @@ The Netdata Agent uses two settings in `netdata.conf` to change the behavior of 
 
 `page cache size` sets the maximum amount of RAM (in MiB) the database engine uses to cache and index recent metrics.
 `dbengine multihost disk space` sets the maximum disk space (again, in MiB) the database engine uses to store
-historical, compressed metrics.
+historical, compressed metrics. When the size of stored metrics exceeds the allocated disk space, the database engine
+removes the oldest metrics on a rolling basis.
 
 ## Calculate the system resources (RAM, disk space) needed to store metrics
 
-If you need to store more or less metrics using the database engine, we recommend you use the below calculator to find
-an appropriate value for `dbengine multihost disk space` based on how many metrics your node(s) collect, whether you are
-streaming metrics to a parent node, and more.
+You can store more or less metrics using the database engine by changing the allocated disk space. Use the calculator
+below to find an appropriate value for `dbengine multihost disk space` based on how many metrics your node(s) collect,
+whether you are streaming metrics to a parent node, and more.
 
 You do not need to edit the `page cache size` setting to store more metrics using the database engine. However, if you
 want to store more metrics _specifically in memory_, you can increase the cache size.
@@ -61,10 +62,10 @@ For more information about the database engine, see our [database reference doc]
 
 Storing metrics with the database engine is completely interoperable with [exporting to other time-series
 databases](/docs/export/integrate-exporting.md). With exporting, you can use the node's resources to surface metrics
-when [viewing dashboards](/docs/visualize/interact-dashboards-charts.md), while also archiving and preserving metrics
-elsewhere for further analysis, visualization, or correlation with other tools. 
+when [viewing dashboards](/docs/visualize/interact-dashboards-charts.md), while also archiving metrics elsewhere for
+further analysis, visualization, or correlation with other tools. 
 
-If you don't want to always store metrics on the node that collects them, or you run ephemeral nodes without dedicated
+If you don't want to always store metrics on the node that collects them or run ephemeral nodes without dedicated
 storage, you can use [streaming](/docs/stream/README.md). Streaming allows you to centralize your data, run Agents as
 headless collectors, replicate data, and more.
 
