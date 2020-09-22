@@ -392,7 +392,7 @@ issystemd() {
   return 1
 }
 
-systemd_unit_dir() {
+get_systemd_service_dir() {
   local SYSTEMD_DIRECTORY=""
   local key
   key="$(get_os_key)"
@@ -502,7 +502,7 @@ install_netdata_service() {
       NETDATA_STOP_CMD="systemctl stop netdata"
       NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
 
-      SYSTEMD_DIRECTORY="$(systemd_service_path)"
+      SYSTEMD_DIRECTORY="$(get_systemd_service_dir)"
 
       if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
         ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
@@ -935,9 +935,9 @@ install_netdata_updater() {
     cat "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
   fi
 
-  if issystemd && [ -n "$(systemd_service_dir)" ]; then
-    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.timer" > "$(systemd_service_dir)/netdata-updater.timer"
-    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.service" > "$(systemd_service_dir)/netdata-updater.service"
+  if issystemd && [ -n "$(get_systemd_service_dir)" ]; then
+    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.timer" > "$(get_systemd_service_dir)/netdata-updater.timer"
+    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.service" > "$(get_systemd_service_dir)/netdata-updater.service"
   fi
 
   sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
@@ -955,10 +955,10 @@ cleanup_old_netdata_updater() {
     rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
   fi
 
-  if issystemd && [ -n "$(systemd_service_dir)" ] ; then
+  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
     systemctl disable netdata-updater.timer
-    rm -f "$(systemd_service_dir)/netdata-updater.timer"
-    rm -f "$(systemd_service_dir)/netdata-updater.service"
+    rm -f "$(get_systemd_service_dir)/netdata-updater.timer"
+    rm -f "$(get_systemd_service_dir)/netdata-updater.service"
   fi
 
   if [ -d /etc/cron.daily ]; then
@@ -1028,7 +1028,7 @@ disable_netdata_updater() {
   echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
   echo >&2
 
-  if issystemd && [ -n "$(systemd_service_dir)" ] ; then
+  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
     systemctl disable netdata-updater.timer
   fi
 
