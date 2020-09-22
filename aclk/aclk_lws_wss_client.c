@@ -209,6 +209,7 @@ void aclk_lws_wss_client_destroy()
 #endif
 }
 
+#ifdef LWS_WITH_SOCKS5
 static int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
 {
     char *proxy = strstr(socks, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
@@ -223,6 +224,7 @@ static int aclk_wss_set_socks(struct lws_vhost *vhost, const char *socks)
 
     return lws_set_socks(vhost, proxy);
 }
+#endif
 
 void aclk_wss_set_proxy(struct lws_vhost *vhost)
 {
@@ -232,7 +234,9 @@ void aclk_wss_set_proxy(struct lws_vhost *vhost)
 
     proxy = aclk_get_proxy(&proxy_type);
 
+#ifdef LWS_WITH_SOCKS5
     lws_set_socks(vhost, ":");
+#endif
     lws_set_proxy(vhost, ":");
 
     if (proxy_type == PROXY_TYPE_UNKNOWN) {
@@ -247,9 +251,13 @@ void aclk_wss_set_proxy(struct lws_vhost *vhost)
         freez(log);
     }
     if (proxy_type == PROXY_TYPE_SOCKS5) {
+#ifdef LWS_WITH_SOCKS5
         if (aclk_wss_set_socks(vhost, proxy))
             error("LWS failed to accept socks proxy.");
         return;
+#else
+        fatal("We have no SOCKS5 support but we made it here. Programming error!");
+#endif
     }
     if (proxy_type == PROXY_TYPE_HTTP) {
         if (lws_set_proxy(vhost, proxy))
