@@ -1,6 +1,6 @@
 <!--
 title: "Distributed data architecture"
-description: ""
+description: "Netdata's distributed data architecture stores metrics on individual nodes for high performance and scalability using all your granular metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/distributed-data.md
 -->
 

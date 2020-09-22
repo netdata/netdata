@@ -33,19 +33,23 @@ If you need to store more or less metrics using the database engine, we recommen
 an appropriate value for `dbengine multihost disk space` based on how many metrics your node(s) collect, whether you are
 streaming metrics to a parent node, and more.
 
-> ⚠️ This calculator provides an estimate of disk and RAM usage. Real-life usage may vary based on the accuracy of the
-> values you enter below or due to changes in the compression ratio.
+You do not need to edit the `page cache size` setting to store more metrics using the database engine. However, if you
+want to store more metrics _specifically in memory_, you can increase the cache size.
+
+> ⚠️ This calculator provides an estimate of disk and RAM usage for **metrics storage**, along with its best
+> recommendation for the `dbengine multihost disk space` setting. Real-life usage may vary based on the accuracy of the
+> values you enter below, changes in the compression ratio, and the types of metrics stored.
 
 <Calculator />
 
-## Edit `dbengine multihost disk space` and `page cache size`
+## Edit `netdata.conf` with recommended database engine settings
 
 Now that you have a recommended setting for `dbengine multihost disk space`, open `netdata.conf` with
-[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-netdataconf) and 
+[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-netdataconf) and look for the `dbengine multihost disk
+space` setting. Change it to the value recommended above. For example:
 
 ```conf
 [global]
-    page cache size = 32
     dbengine multihost disk space = 1024
 ```
 
