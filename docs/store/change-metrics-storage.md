@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/chang
 
 # Change how long Netdata stores metrics
 
-import { Calculator } from '../../../src/components/agent/dbCalc/'
+import { Calculator } from '../../src/components/agent/dbCalc/'
 
 The [database engine](/database/engine/README.md) uses RAM to store recent metrics. When metrics reach a certain age,
 and based on how much system RAM you allocate toward storing metrics in memory, they are compressed and "spilled" to
