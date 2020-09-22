@@ -23,9 +23,9 @@ static sqlite3_stmt *stmt_metric_page = NULL;
 static sqlite3_stmt *res = NULL;
 static int db_initialized = 0;
 
-static uv_rwlock_t sqlite_lookup;
-static uv_rwlock_t sqlite_flush;
-static uv_rwlock_t sqlite_add_page;
+static uv_mutex_t sqlite_lookup;
+static uv_mutex_t sqlite_flush;
+static uv_mutex_t sqlite_add_page;
 static uint32_t pending_page_inserts = 0;
 static uint32_t database_flush_transaction_count;
 static uint32_t database_size;
@@ -145,15 +145,15 @@ static void sqlite_flush_page(uint32_t count, struct rrddim_metric_page *target_
     struct rrddim_metric_page *metric_page;
 
     if (unlikely(target_metric_page)) {
-        uv_rwlock_wrlock(&sqlite_flush);
-        uv_rwlock_wrlock(&sqlite_add_page);
+        uv_mutex_lock(&sqlite_flush);
+        uv_mutex_lock(&sqlite_add_page);
         metric_page = target_metric_page;
         while (metric_page) {
             sqlite_flush_page_single(metric_page);
             metric_page = metric_page->prev;
         }
-        uv_rwlock_wrunlock(&sqlite_add_page);
-        uv_rwlock_wrunlock(&sqlite_flush);
+        uv_mutex_unlock(&sqlite_add_page);
+        uv_mutex_unlock(&sqlite_flush);
         return;
     }
 
@@ -174,8 +174,8 @@ static void sqlite_flush_page(uint32_t count, struct rrddim_metric_page *target_
         return;
     }
 
-    uv_rwlock_wrlock(&sqlite_add_page);
-    uv_rwlock_wrlock(&sqlite_flush);
+    uv_mutex_lock(&sqlite_add_page);
+    uv_mutex_lock(&sqlite_flush);
 
 //    int rc;
     int added = 0;
@@ -194,21 +194,21 @@ static void sqlite_flush_page(uint32_t count, struct rrddim_metric_page *target_
         sqlite_page_flush_list.page_count--;
         sqlite_page_flush_list.head = next_metric_page;
         if (added % 10 == 0 && next_metric_page) {
-            uv_rwlock_wrunlock(&sqlite_flush);
-            uv_rwlock_wrlock(&sqlite_flush);
+            uv_mutex_unlock(&sqlite_flush);
+            uv_mutex_unlock(&sqlite_flush);
         }
     }
     if (!sqlite_page_flush_list.head)
         sqlite_page_flush_list.tail = NULL;
 
 
-    uv_rwlock_wrunlock(&sqlite_flush);
-    uv_rwlock_wrunlock(&sqlite_add_page);
+    uv_mutex_unlock(&sqlite_flush);
+    uv_mutex_unlock(&sqlite_add_page);
 }
 
 void sqlite_queue_page_to_flush(struct rrddim_metric_page *metric_page)
 {
-    uv_rwlock_wrlock(&sqlite_flush);
+    uv_mutex_lock(&sqlite_flush);
 
     metric_page->next = NULL;
     if (sqlite_page_flush_list.tail)
@@ -218,7 +218,7 @@ void sqlite_queue_page_to_flush(struct rrddim_metric_page *metric_page)
     sqlite_page_flush_list.tail = metric_page;
     sqlite_page_flush_list.page_count++;
 
-    uv_rwlock_wrunlock(&sqlite_flush);
+    uv_mutex_unlock(&sqlite_flush);
     return;
 }
 
@@ -321,9 +321,9 @@ int sql_init_database()
     char sqlite_database[FILENAME_MAX+1];
     char wstr[512];
 
-    fatal_assert(0 == uv_rwlock_init(&sqlite_flush));
-    fatal_assert(0 == uv_rwlock_init(&sqlite_lookup));
-    fatal_assert(0 == uv_rwlock_init(&sqlite_add_page));
+    fatal_assert(0 == uv_mutex_init(&sqlite_flush));
+    fatal_assert(0 == uv_mutex_init(&sqlite_lookup));
+    fatal_assert(0 == uv_mutex_init(&sqlite_add_page));
 
     sqlite_disk_quota_mb =  (uint32_t) config_get_number(CONFIG_SECTION_GLOBAL, "database disk space", 64);
     page_cache_mb =  (uint32_t) config_get_number(CONFIG_SECTION_GLOBAL, "database page cache", 2000);
@@ -590,7 +590,7 @@ int sql_close_database()
         while (sqlite_page_flush_list.page_count) {
             sqlite_flush_page(database_flush_transaction_count, NULL);
         }
-        uv_rwlock_wrlock(&sqlite_add_page);
+        uv_mutex_unlock(&sqlite_add_page);
         if (pending_page_inserts) {
             info("Writing final transactions %u", pending_page_inserts);
             sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
@@ -599,7 +599,7 @@ int sql_close_database()
         sqlite3_finalize(stmt_metric_page);
         sqlite3_finalize(row_res);
         sqlite3_finalize(res);
-        uv_rwlock_wrunlock(&sqlite_add_page);
+        uv_mutex_unlock(&sqlite_add_page);
         sqlite3_close(db);
         if (db != db_page)
             sqlite3_close(db_page);
@@ -1469,13 +1469,13 @@ void sql_add_metric_page(uuid_t *dim_uuid, storage_number *metric, size_t entrie
 //        date_id = sqlite3_bind_parameter_index(res, "@date");
 //    }
     //info("GET SQLITE_PAGE_LOCK");
-    uv_rwlock_wrlock(&sqlite_add_page);
+    uv_mutex_lock(&sqlite_add_page);
 
     if (!stmt_metric_page) {
         rc = sqlite3_prepare_v2(db_page, "insert into metric_page (entries, dim_uuid, start_date, end_date, metric) values (@entries, @dim, @start_date, @end_date, @page);", -1, &stmt_metric_page, 0);
         if (rc != SQLITE_OK) {
             info("SQLITE: Failed to prepare statement for metric page");
-            uv_rwlock_wrunlock(&sqlite_add_page);
+            uv_mutex_unlock(&sqlite_add_page);
             return;
         }
     }
@@ -1528,7 +1528,7 @@ void sql_add_metric_page(uuid_t *dim_uuid, storage_number *metric, size_t entrie
         pending_page_inserts = 0;
     }
 
-    uv_rwlock_wrunlock(&sqlite_add_page);
+    uv_mutex_unlock(&sqlite_add_page);
     //info("REL SQLITE_PAGE_LOCK");
 
     //sqlite3_finalize(res);
@@ -1837,13 +1837,13 @@ void sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last)
     if (!db)
         return;
 
-    uv_rwlock_wrlock(&sqlite_lookup);
+    uv_mutex_lock(&sqlite_lookup);
     if (!res) {
         rc = sqlite3_prepare_v2(
             db, "select min(m.start_date), max(m.end_date) from metric_page m where m.dim_uuid = @dim_uuid;", -1, &res,
             0);
         if (rc != SQLITE_OK) {
-            uv_rwlock_wrunlock(&sqlite_lookup);
+            uv_mutex_unlock(&sqlite_lookup);
             return;
         }
     }
@@ -1852,7 +1852,7 @@ void sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last)
     if (rc != SQLITE_OK) {
         //sqlite3_finalize(res);
         sqlite3_reset(res);
-        uv_rwlock_wrunlock(&sqlite_lookup);
+        uv_mutex_unlock(&sqlite_lookup);
         return;
     }
 
@@ -1868,7 +1868,7 @@ void sql_rrddim_first_last_entry_t(RRDDIM *rd, time_t *first, time_t *last)
 //    info("SQLITE: Fetch RD %s (%s) MIN/MAX in %llu usec (value = %ld  - %ld)", rd->id, dim_str, end - start, *first, *last);
     sqlite3_reset(res);
     //sqlite3_finalize(res);
-    uv_rwlock_wrunlock(&sqlite_lookup);
+    uv_mutex_unlock(&sqlite_lookup);
     return;
 }
 
@@ -2682,7 +2682,7 @@ void *sqlite_rotation_main(void *ptr)
 
         database_size = sql_database_size();
 
-        uv_rwlock_wrlock(&sqlite_add_page);
+        uv_mutex_lock(&sqlite_add_page);
         if (database_size > (uint32_t) (sqlite_disk_quota_mb * 0.95))
             last_pending_page_inserts = pending_page_inserts;
 
@@ -2697,7 +2697,7 @@ void *sqlite_rotation_main(void *ptr)
         if (count % 3 == 0) // && !pending_page_inserts)
             sql_compact_database(delete_rows);
 
-        uv_rwlock_wrunlock(&sqlite_add_page);
+        uv_mutex_unlock(&sqlite_add_page);
     }
 //    info("Writing %u dirty pages to the database due to shutdown", sqlite_page_flush_list.page_count);
 //    while (sqlite_page_flush_list.page_count) {
