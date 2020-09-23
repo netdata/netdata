@@ -13,6 +13,7 @@ typedef struct rrddimvar RRDDIMVAR;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
+typedef struct context_param CONTEXT_PARAM;
 
 // forward declarations
 struct rrddim_volatile;
