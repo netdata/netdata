@@ -40,6 +40,11 @@ Copy the script, paste it into your node's terminal, and hit `Enter`.
 
 Open your favorite browser and navigate to `http://localhost:19999` or `http://REMOTE-HOST:19999` to open the dashboard.
 
+<details>
+<summary>Watch how the one-line installer works</summary>
+<iframe width="820" height="460" src="https://www.youtube.com/embed/tVIp7ycK60A" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</details>
+
 ### Other operating systems/methods
 
 Want to install Netdata on a Kubernetes cluster, with Docker, or using a different method? Not a Linux user? Choose your
