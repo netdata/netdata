@@ -515,7 +515,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if (!st && !context_param_list) {
         if (context) {
             buffer_strcat(w->response.data, "Context is not found: ");
-            buffer_strcat_htmlescape(w->response.data, chart);
+            buffer_strcat_htmlescape(w->response.data, context);
         }
         else {
             buffer_strcat(w->response.data, "Chart is not found: ");
