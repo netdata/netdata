@@ -58,7 +58,6 @@ typedef struct context_param {
     time_t first_entry_t;
     time_t last_entry_t;
     time_t last_accessed_time;
-
 } CONTEXT_PARAM;
 
 extern int rrdset2anything_api_v1(

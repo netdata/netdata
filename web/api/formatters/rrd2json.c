@@ -24,7 +24,7 @@ static inline void free_temp_rrddim(RRDDIM *temp_rd)
 
 void free_context_param_list(struct context_param **param_list)
 {
-    if (unlikely(!param_list  || !*param_list))
+    if (unlikely(!param_list || !*param_list))
         return;
 
     free_temp_rrddim(((*param_list)->rd));
@@ -34,8 +34,6 @@ void free_context_param_list(struct context_param **param_list)
 
 void build_context_param_list (struct context_param **param_list, RRDSET *st)
 {
-    st->last_accessed_time = now_realtime_sec();
-
     if (unlikely(!param_list || !st))
         return;
 
@@ -49,8 +47,11 @@ void build_context_param_list (struct context_param **param_list, RRDSET *st)
 
     RRDDIM *rd1;
     rrdset_rdlock(st);
+
+    st->last_accessed_time = (*param_list)->last_accessed_time;
     (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
     (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
+
     rrddim_foreach_read(rd1, st) {
         RRDDIM *rd = mallocz(rd1->memsize);
         memcpy(rd, rd1, rd1->memsize);
@@ -68,8 +69,8 @@ void build_context_param_list (struct context_param **param_list, RRDSET *st)
 #endif
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
-        st->last_accessed_time = (*param_list)->last_accessed_time;
     }
+
     rrdset_unlock(st);
 }
 

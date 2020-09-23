@@ -501,13 +501,15 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 build_context_param_list(&context_param_list, st1);
         }
         rrdhost_unlock(localhost);
-        if (context_param_list)
+        if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
     }
     else {
         st = rrdset_find(host, chart);
         if (!st)
             st = rrdset_find_byname(host, chart);
+        if (likely(st))
+            st->last_accessed_time = now_realtime_sec();
     }
 
     if (!st && !context_param_list) {
@@ -522,8 +524,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
     }
-
-    st->last_accessed_time = now_realtime_sec();
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
