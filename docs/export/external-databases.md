@@ -32,20 +32,23 @@ connector](/docs/export/enable-connector.md) doc for details on enabling it.
 -   **AWS Kinesis**: [AWS Kinesis Data Streams](/exporting/aws_kinesis/README.md)
 -   **Azure Data Explorer**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **Azure Event Hubs**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **Blueflood**: Graphite
+-   **Blueflood**: [Graphite](/exporting/graphite/README.md)
 -   **Chronix**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **Cortex**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **CrateDB**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **ElasticSearch**: Graphite, [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
+-   **ElasticSearch**: [Graphite](/exporting/graphite/README.md), [Prometheus remote
+    write](/exporting/prometheus/remote_write/README.md)
 -   **Gnocchi**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **Google BigQuery**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **Google Cloud Pub/Sub**: [Google Cloud Pub/Sub Service](/exporting/pubsub/README.md)
--   **Graphite**: Graphite, [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **InfluxDB**: Graphite, [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
+-   **Graphite**: [Graphite](/exporting/graphite/README.md), [Prometheus remote
+    write](/exporting/prometheus/remote_write/README.md)
+-   **InfluxDB**: [Graphite](/exporting/graphite/README.md), [Prometheus remote
+    write](/exporting/prometheus/remote_write/README.md)
 -   **IRONdb**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **JSON**: JSON document databases
+-   **JSON**: [JSON document databases](/exporting/json/README.md)
 -   **Kafka**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
--   **KairosDB**: Graphite, [OpenTSDB](/exporting/opentsdb/README.md)
+-   **KairosDB**: [Graphite](/exporting/graphite/README.md), [OpenTSDB](/exporting/opentsdb/README.md)
 -   **M3DB**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **MetricFire**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **MongoDB**: [MongoDB](/exporting/mongodb/)

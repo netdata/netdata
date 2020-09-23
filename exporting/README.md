@@ -38,11 +38,11 @@ X seconds (though, it can send them per second if you need it to).
         format.
     -   [**Google Cloud Pub/Sub Service**](/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
         format.
-    -   **Graphite**: A plaintext interface. Metrics are sent to the database server as
+    -   [**Graphite**](/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
         `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
         also be configured). Learn more in our guide to [export and visualize Netdata metrics in
         Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
-    -   **JSON** document databases
+    -   [**JSON** document databases](/exporting/json/README.md)
     -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use either HTTP or HTTPS interfaces. Metrics are sent to OpenTSDB
         as `prefix.chart.dimension` with tag `host=hostname`.
     -   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
