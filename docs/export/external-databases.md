@@ -12,10 +12,10 @@ thirty](#supported-databases) supported databases, including InfluxDB, Prometheu
 more. 
 
 The exporting engine resamples Netdata's thousands of per-second metrics at a user-configurable interval, and can export
-metrics to multiple time-series databases at the same time.
+metrics to multiple time-series databases simultaneously.
 
 Based on your needs and resources you allocated to your external time-series database, you can configure the interval at
-which metrics are exported, or use export only certain charts with filtering. You can also choose whether metrics are
+which metrics are exported or export only certain charts with filtering. You can also choose whether metrics are
 exported as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
 
 Exporting is an important part of Netdata's effort to be [interoperable](/docs/overview/netdata-monitoring-stack.md)
@@ -24,9 +24,9 @@ analysis, or correlation with other tools, such as application tracing.
 
 ## Supported databases
 
-Netdata supports exporting metrics to the following databases through a number of connectors. Once you find the
-connector that works for your database, open its documentation and the [enabling a
-connector](/docs/export/enable-connector.md) doc for details on enabling it.
+Netdata supports exporting metrics to the following databases through several
+[connectors](/exporting/README.md#features). Once you find the connector that works for your database, open its
+documentation and the [enabling a connector](/docs/export/enable-connector.md) doc for details on enabling it.
 
 -   **AppOptics**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
 -   **AWS Kinesis**: [AWS Kinesis Data Streams](/exporting/aws_kinesis/README.md)
@@ -75,9 +75,10 @@ GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage
 
 We recommend you read our document on [enabling a connector](/docs/export/enable-connector.md) to learn about the
 process and discover important configuration options. If you would rather skip ahead, click on any of the above links to
-connectors for their reference documentation, which explains enabling and properly configuring the connector.
+connectors for their reference documentation, which outline any prerequisites to install for that connector, along with
+connector-specific configuration options.
 
-Read about one possible use cases for exporting metrics in our guide: [_Export and visualize Netdata metrics in
+Read about one possible use case for exporting metrics in our guide: [_Export and visualize Netdata metrics in
 Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md).
 
 ### Related reference documentation
