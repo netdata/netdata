@@ -174,6 +174,10 @@ AC_ARG_ENABLE(
 )
 
 # -----------------------------------------------------------------------------
+# Enforce building with C99, bail early if we can't.
+test "${ac_cv_prog_cc_c99}" = "no" && AC_MSG_ERROR([Netdata rquires a compiler that supports C99 to build])
+
+# -----------------------------------------------------------------------------
 # Check if cloud is enabled and if the functionality is available
 
 AC_ARG_ENABLE(
