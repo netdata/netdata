@@ -172,6 +172,12 @@ AC_ARG_ENABLE(
     ,
     [enable_ebpf="detect"]
 )
+AC_ARG_WITH(
+    [bundled-lws],
+    [AS_HELP_STRING([--without-bundled-lws], [use system Libwebsockets instead of version bundled by netdata installer @<:@default use bundled@:>@])],
+    ,
+    [with_bundled_lws="yes"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -651,15 +657,29 @@ if test "$enable_cloud" != "no"; then
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
 
-    AC_MSG_CHECKING([if libwebsockets static lib is present])
-    if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-        LWS_CFLAGS="-I externaldeps/libwebsockets/include"
-        HAVE_libwebsockets_a="yes"
+    if test "${with_bundled_lws}" = "yes"; then
+        AC_MSG_CHECKING([if libwebsockets static lib is present])
+        if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
+            LWS_CFLAGS="-I externaldeps/libwebsockets/include"
+            HAVE_libwebsockets="yes"
+            HAVE_STATIC_LWS="yes"
+        else
+            HAVE_libwebsockets="no"
+            AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
+        fi
+        AC_MSG_RESULT([${HAVE_libwebsockets}])
     else
-        HAVE_libwebsockets_a="no"
-        AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
+        AC_CHECK_LIB([websockets],
+            [lws_ring_create],
+            [
+                HAVE_libwebsockets="yes"
+                OPTIONAL_LWS_LIBS="-lwebsockets"
+            ],
+            [
+                AC_DEFINE([ACLK_NO_LWS], [1], [usable system libwebsockets was not found during build.])
+                AC_MSG_WARN([You have chosen to use systeb libwebsockets instead of bundled one. We can't find or use the system library. ACLK will be disabled.l])
+            ])
     fi
-    AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 
     if test "${build_target}" = "linux" -a "${enable_cloud}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
@@ -678,7 +698,7 @@ if test "$enable_cloud" != "no"; then
         AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets}" = "yes" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
@@ -704,6 +724,7 @@ if test "$enable_cloud" != "no"; then
 fi
 AC_SUBST([enable_cloud])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
+AM_CONDITIONAL([HAVE_STATIC_LWS], [test "${HAVE_STATIC_LWS}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -1452,6 +1473,7 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
+AC_SUBST([OPTIONAL_LWS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
