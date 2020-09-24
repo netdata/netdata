@@ -491,36 +491,39 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         goto cleanup;
     }
 
+    struct context_param  *context_param_list = NULL;
     if (context) {
-        st = NULL;
-        // TODO: Scan all charts of host
-        rrdhost_rdlock(localhost);
         RRDSET *st1;
+        uint32_t context_hash = simple_hash(context);
+        rrdhost_rdlock(localhost);
         rrdset_foreach_read(st1, localhost) {
-            if (strcmp(st1->context, context) == 0) {
-                st = st1;
-                break;
-            }
+            if (st1->hash_context == context_hash && !strcmp(st1->context, context))
+                build_context_param_list(&context_param_list, st1);
         }
         rrdhost_unlock(localhost);
+        if (likely(context_param_list && context_param_list->rd))  // Just set the first one
+            st = context_param_list->rd->rrdset;
     }
-
-    if (!st) {
-        if (!chart || !*chart) {
-            buffer_sprintf(w->response.data, "No chart id is given at the request.");
-            goto cleanup;
-        }
+    else {
         st = rrdset_find(host, chart);
         if (!st)
             st = rrdset_find_byname(host, chart);
-        if (!st) {
+        if (likely(st))
+            st->last_accessed_time = now_realtime_sec();
+    }
+
+    if (!st && !context_param_list) {
+        if (context) {
+            buffer_strcat(w->response.data, "Context is not found: ");
+            buffer_strcat_htmlescape(w->response.data, context);
+        }
+        else {
             buffer_strcat(w->response.data, "Chart is not found: ");
             buffer_strcat_htmlescape(w->response.data, chart);
-            ret = HTTP_RESP_NOT_FOUND;
-            goto cleanup;
         }
+        ret = HTTP_RESP_NOT_FOUND;
+        goto cleanup;
     }
-    st->last_accessed_time = now_realtime_sec();
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
@@ -565,7 +568,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-                                 , options, &last_timestamp_in_data, context);
+                                 , options, &last_timestamp_in_data, context_param_list);
+
+    free_context_param_list(&context_param_list);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)

@@ -53,6 +53,12 @@
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 
+typedef struct context_param {
+    RRDDIM *rd;
+    time_t first_entry_t;
+    time_t last_entry_t;
+} CONTEXT_PARAM;
+
 extern int rrdset2anything_api_v1(
           RRDSET *st
         , BUFFER *wb
@@ -65,7 +71,7 @@ extern int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
-        , char *context
+        , struct context_param *context_param_list
 );
 
 extern int rrdset2value_api_v1(
@@ -83,5 +89,8 @@ extern int rrdset2value_api_v1(
         , time_t *db_before
         , int *value_is_null
 );
+
+extern void build_context_param_list(struct context_param **param_list, RRDSET *st);
+extern void free_context_param_list(struct context_param **param_list);
 
 #endif /* NETDATA_RRD2JSON_H */

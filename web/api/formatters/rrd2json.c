@@ -22,6 +22,57 @@ static inline void free_temp_rrddim(RRDDIM *temp_rd)
     }
 }
 
+void free_context_param_list(struct context_param **param_list)
+{
+    if (unlikely(!param_list || !*param_list))
+        return;
+
+    free_temp_rrddim(((*param_list)->rd));
+    freez((*param_list));
+    *param_list = NULL;
+}
+
+void build_context_param_list(struct context_param **param_list, RRDSET *st)
+{
+    if (unlikely(!param_list || !st))
+        return;
+
+    if (unlikely(!(*param_list))) {
+        *param_list = mallocz(sizeof(struct context_param));
+        (*param_list)->first_entry_t = LONG_MAX;
+        (*param_list)->last_entry_t = 0;
+        (*param_list)->rd = NULL;
+    }
+
+    RRDDIM *rd1;
+    rrdset_rdlock(st);
+
+    st->last_accessed_time = now_realtime_sec();
+    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
+    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
+
+    rrddim_foreach_read(rd1, st) {
+        RRDDIM *rd = mallocz(rd1->memsize);
+        memcpy(rd, rd1, rd1->memsize);
+        rd->id = strdupz(rd1->id);
+        rd->name = strdupz(rd1->name);
+        rd->state = mallocz(sizeof(*rd->state));
+        memcpy(rd->state, rd1->state, sizeof(*rd->state));
+        memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
+        memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
+#ifdef ENABLE_DBENGINE
+        if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            rd->state->metric_uuid = mallocz(sizeof(uuid_t));
+            uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
+        }
+#endif
+        rd->next = (*param_list)->rd;
+        (*param_list)->rd = rd;
+    }
+
+    rrdset_unlock(st);
+}
+
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
@@ -89,9 +140,8 @@ int rrdset2value_api_v1(
         , time_t *db_before
         , int *value_is_null
 ) {
-    RRDDIM *temp_rd = NULL;
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, temp_rd);
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions, NULL);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;
@@ -121,8 +171,6 @@ int rrdset2value_api_v1(
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
 
-    free_temp_rrddim(temp_rd);
-
     rrdr_free(r);
     return HTTP_RESP_OK;
 }
@@ -139,47 +187,14 @@ int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
-        , char *context
+        , struct context_param *context_param_list
 ) {
     time_t last_accessed_time = now_realtime_sec();
     st->last_accessed_time = last_accessed_time;
 
-    RRDDIM *temp_rd = NULL;
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
-    if (context) {
-        rrdhost_rdlock(st->rrdhost);
-        RRDSET *st1;
-        rrdset_foreach_read(st1, st->rrdhost) {
-            if (strcmp(st1->context, context) == 0) {
-                // Loop the dimensions of the chart
-                RRDDIM  *rd1;
-                rrdset_rdlock(st1);
-                st1->last_accessed_time = last_accessed_time;
-                rrddim_foreach_read(rd1, st1) {
-                    RRDDIM *rd = mallocz(rd1->memsize);
-                    memcpy(rd, rd1, rd1->memsize);
-                    rd->id = strdupz(rd1->id);
-                    rd->name = strdupz(rd1->name);
-                    rd->state = mallocz(sizeof(*rd->state));
-                    memcpy(rd->state, rd1->state, sizeof(*rd->state));
-                    memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
-                    memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
-#ifdef ENABLE_DBENGINE
-                    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                        rd->state->metric_uuid = mallocz(sizeof(uuid_t));
-                        uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
-                    }
-#endif
-                    rd->next = temp_rd;
-                    temp_rd = rd;
-                }
-                rrdset_unlock(st1);
-            }
-        }
-        rrdhost_unlock(st->rrdhost);
-    }
-
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, temp_rd);
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -354,8 +369,6 @@ int rrdset2anything_api_v1(
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         break;
     }
-
-    free_temp_rrddim(temp_rd);
 
     rrdr_free(r);
     return HTTP_RESP_OK;
