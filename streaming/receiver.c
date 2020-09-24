@@ -199,7 +199,6 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
     storage_number value = str2ull(value_txt);
 
     RRDDIM *rd = rrddim_find(user->st, id);
-    //time_t st_last = rrdset_last_entry_t(user->st);  UNUSED?
     if (rd == NULL) {
         errno = 0;
         error("Unknown dimension \"%s\" on %s during replication - ignoring", id, user->st->name);
@@ -214,7 +213,7 @@ PARSER_RC streaming_rep_dim(char **words, void *user_v, PLUGINSD_ACTION *plugins
 
     if (user->st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
     {
-        if (value != SN_EMPTY_SLOT) {
+        if (value != SN_EMPTY_SLOT && timestamp > rrddim_last_entry_t(rd)) {
             rd->state->collect_ops.store_metric(rd, timestamp * USEC_PER_SEC, value);
         }
         debug(D_REPLICATION, "store " STORAGE_NUMBER_FORMAT "@%ld for %s.%s (last_val=%p)", value, timestamp, 
