@@ -584,6 +584,41 @@ int sql_init_database()
     return rc;
 }
 
+/*
+ * Do a metric rotation
+ */
+
+void do_metric_rotation()
+{
+    int rc;
+
+    if (unlikely(!rotation))
+        return;
+
+    /*
+     * Setup the statement for database rotation, it will delete as many records as added by a transcation
+     */
+    if (unlikely(!stmt_metric_page_rotation)) {
+        rc = sqlite3_prepare_v2(
+            db_page, "delete from metric_page order by start_date limit @rows;", -1, &stmt_metric_page_rotation, 0);
+        if (rc != SQLITE_OK)
+            info("SQLITE: Failed to prepare statement for metric page rotation");
+        rc = sqlite3_bind_int(stmt_metric_page_rotation, 1, database_flush_transaction_count);
+        if (rc != SQLITE_OK)
+            info("SQLITE: Failed to bind value in metric page rotation statement");
+        sqlite3_finalize(stmt_metric_page_rotation);
+        stmt_metric_page_rotation = NULL;
+        return;
+    }
+
+    rc = sqlite3_step(stmt_metric_page_rotation);
+    if (rc == SQLITE_OK)
+        return;
+
+   error("Error while deleting metric data for rotation %d", rc);
+   return;
+}
+
 int sql_close_database()
 {
     char *err_msg = NULL;
@@ -1469,13 +1504,7 @@ void sql_add_metric_page_nolock(uuid_t *dim_uuid, storage_number *metric, size_t
         }
     }
 
-    if (!stmt_metric_page_rotation) {
-        rc = sqlite3_prepare_v2(db_page, "delete from metric_page order by start_date limit 1;", -1, &stmt_metric_page_rotation, 0);
-        if (rc != SQLITE_OK) {
-            info("SQLITE: Failed to prepare statement for metric page");
-            return;
-        }
-    }
+
 
     if (unlikely(!pending_page_inserts)) {
         //info("Starting METRIC transaction");
@@ -1507,26 +1536,13 @@ void sql_add_metric_page_nolock(uuid_t *dim_uuid, storage_number *metric, size_t
         }
     }
 
-    while (rotation && (rc=sqlite3_step(stmt_metric_page_rotation)) != SQLITE_DONE) {
-        if (rc == SQLITE_BUSY) {
-            info("SQLITE: Reports busy on metric page rotation");
-            usleep(50 * USEC_PER_MS);
-        }
-        else {
-            char dim_str[37];
-            uuid_unparse_lower(*dim_uuid, dim_str);
-            info("SQLITE: Error on adding metric page nolock %d -- adding (%s, %ld)", rc, dim_str, start_time);
-            break;
-        }
-        info("Page deleted");
-    }
 
     pending_page_inserts++;
     sqlite3_reset(stmt_metric_page);
     sqlite3_reset(stmt_metric_page_rotation);
 
     if (pending_page_inserts == database_flush_transaction_count) {
-        //info("Ending METRIC transaction %d pages", pending_page_inserts);
+        do_metric_rotation();
         rc = sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
         pending_page_inserts = 0;
     }
@@ -1612,6 +1628,7 @@ void sql_add_metric_page(uuid_t *dim_uuid, storage_number *metric, size_t entrie
 
     if (pending_page_inserts == database_flush_transaction_count) {
         //info("Ending METRIC transaction %d pages", pending_page_inserts);
+        do_metric_rotation();
         rc = sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
         pending_page_inserts = 0;
     }
@@ -2776,6 +2793,7 @@ void *sqlite_rotation_main(void *ptr)
 
         if (last_pending_page_inserts && last_pending_page_inserts == pending_page_inserts) {
             //info("Ending METRIC transaction (last count = %d same as current)", last_pending_page_inserts);
+            do_metric_rotation();
             sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
             pending_page_inserts = 0;
         }
