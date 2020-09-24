@@ -787,9 +787,9 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
     // The start times are inclusive and the end time is exclusive, so if the requested window is 10..20 and the
     // chart contains data at times 15,16,17,18 then the response will be REPBEGIN 10 15 19
     if (start_time == 0)
-        buffer_sprintf(s->build, "REPBEGIN %s %ld %ld %ld\n", st->id, window_start, window_start, window_end);
+        buffer_sprintf(s->build, "REPBEGIN \"%s\" %ld %ld %ld\n", st->id, window_start, window_start, window_end);
     else
-        buffer_sprintf(s->build, "REPBEGIN %s %ld %ld %ld\n", st->id, start_time, window_start, window_end);
+        buffer_sprintf(s->build, "REPBEGIN \"%s\" %ld %ld %ld\n", st->id, start_time, window_start, window_end);
 
     rrdset_dump_debug_state(st);
 
