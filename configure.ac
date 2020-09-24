@@ -677,7 +677,7 @@ if test "$enable_cloud" != "no"; then
             ],
             [
                 AC_DEFINE([ACLK_NO_LWS], [1], [usable system libwebsockets was not found during build.])
-                AC_MSG_WARN([You have chosen to use systeb libwebsockets instead of bundled one. We can't find or use the system library. ACLK will be disabled.l])
+                AC_MSG_WARN([You have chosen to use system libwebsockets instead of bundled one. We can't find or use the system library. ACLK will be disabled.l])
             ])
     fi
 
