@@ -41,14 +41,13 @@ void build_context_param_list (struct context_param **param_list, RRDSET *st)
         *param_list = mallocz(sizeof(struct context_param));
         (*param_list)->first_entry_t = LONG_MAX;
         (*param_list)->last_entry_t = 0;
-        (*param_list)->last_accessed_time = now_realtime_sec();
         (*param_list)->rd = NULL;
     }
 
     RRDDIM *rd1;
     rrdset_rdlock(st);
 
-    st->last_accessed_time = (*param_list)->last_accessed_time;
+    st->last_accessed_time = now_realtime_sec();
     (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
     (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
 
