@@ -7,6 +7,10 @@
 #include "aclk_common.h"
 #include "aclk_stats.h"
 
+#ifdef ENABLE_ACLK
+#include <libwebsockets.h>
+#endif
+
 int aclk_shutting_down = 0;
 
 // Other global state
@@ -884,6 +888,16 @@ void *aclk_main(void *ptr)
     info("Killing ACLK thread -> cloud functionality has been disabled");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
+#endif
+
+#ifndef LWS_WITH_SOCKS5
+    ACLK_PROXY_TYPE proxy_type;
+    aclk_get_proxy(&proxy_type);
+    if(proxy_type == PROXY_TYPE_SOCKS5) {
+        error("Disabling ACLK due to requested SOCKS5 proxy.");
+        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return NULL;
+    }
 #endif
 
     info("Waiting for netdata to be ready");
