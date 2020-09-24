@@ -149,7 +149,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
 
     if (strcmp(proxy, ACLK_PROXY_ENV) == 0) {
         if (check_socks_enviroment(&proxy) == 0) {
-#ifdef LWS_WITH_SOCKS
+#ifdef LWS_WITH_SOCKS5
             *type = PROXY_TYPE_SOCKS5;
             return proxy;
 #else
