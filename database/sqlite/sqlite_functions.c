@@ -702,96 +702,91 @@ void sql_compact_database(uint32_t rows)
     char sql[512];
     int rc;
     static int report_free = 0;
-    static int init = 0;
 
     uint32_t quota = (uint32_t)(sqlite_disk_quota_mb * 0.95);
 
     uint32_t pages_to_vacuum;
     uint32_t rows_to_delete;
 
-    if (unlikely(!init)) {
-        init = 0;
-        pages_to_vacuum = free_page_count;
-        rows_to_delete = 0;
-        if (page_count > desired_pages) {
-            info(
-                "Required size = %d -- current size = %d (free pages = %d -- gap = %d)", desired_pages, page_count,
-                free_page_count, page_count - desired_pages - free_page_count);
-            if (free_page_count >= (page_count - desired_pages)) {
-                pages_to_vacuum = page_count - desired_pages;
-                rows_to_delete = 0;
-            } else {
-                pages_to_vacuum = free_page_count;
-                rows_to_delete = (page_count - desired_pages - free_page_count) * 6;
-            }
-            rotation = 1;
+    pages_to_vacuum = free_page_count;
+    rows_to_delete = 0;
+    if (page_count > desired_pages) {
+        info(
+            "Required size = %d -- current size = %d (free pages = %d -- gap = %d)", desired_pages, page_count,
+            free_page_count, page_count - desired_pages - free_page_count);
+        if (free_page_count >= (page_count - desired_pages)) {
+            pages_to_vacuum = page_count - desired_pages;
+            rows_to_delete = 0;
+        } else {
+            pages_to_vacuum = free_page_count;
+            rows_to_delete = (page_count - desired_pages - free_page_count) * 6;
         }
-        else
-            rotation = 0;
-
-        if (rows_to_delete) {
-            info("Deleting %u rows from metrics", rows_to_delete);
-            sprintf(sql, "delete from metric_page order by start_date limit %u", rows_to_delete);
-            rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
-            if (rc != SQLITE_OK) {
-                error("SQL error during database rotation %s", err_msg);
-                sqlite3_free(err_msg);
-            }
-        }
-        if (pages_to_vacuum) {
-            info("VACUUM incremental %u pages from metrics", pages_to_vacuum);
-            sprintf(sql, "pragma incremental_vacuum(%u)", pages_to_vacuum);
-            rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
-            if (rc != SQLITE_OK) {
-                error("SQL error during database rotation %s", err_msg);
-                sqlite3_free(err_msg);
-            }
-        }
-    }
-
-    return;
-
-    // Occupied size is within limit?
-    if (database_size <= quota) {
-        // Check if our actual size is over limit and trim if necessary
-        // Compute quota pages
-        //uint32_t desired_pages = quota * (1024 * 1024 / page_size);
-        if (page_count > desired_pages && free_page_count) {
-            if (!report_free) {
-                report_free = 1;
-                info(
-                    "Database free page count %u, starting incremental vacuum to shrink database by %u pages",
-                    free_page_count, page_count - desired_pages);
-            }
-            rc = sqlite3_exec(db_page, "pragma incremental_vacuum(100);", 0, 0, &err_msg);
-        }
-        rotation = 0;
-        return;
-    }
-    report_free = 0;
-    rotation = 1;
-
-    return;
-
-    info(
-        "Database size = %u MiB, limit is %u (total pages %u, free pages %u)", database_size, sqlite_disk_quota_mb,
-        page_count, free_page_count);
-
-    if (sqlite_disk_mode) {
-        sprintf(sql, "delete from metric_page order by start_date limit %u;", rows);
-        rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
-        if (rc == SQLITE_OK) {
-            uint32_t new_database_size = sql_database_size();
-            // TODO: maybe calculate rate to achieve end goal of database quota in 1/10 of the cache size duration
-            info("Database rotation, deleting %u rows, freed %u MiB", rows, database_size - new_database_size);
-        }
+        rotation = 1;
     } else
-        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 100;", 0, 0, &err_msg);
+        rotation = 0;
 
-    if (rc != SQLITE_OK) {
-        error("SQL error during database rotation %s", err_msg);
-        sqlite3_free(err_msg);
+    if (rows_to_delete) {
+        info("Deleting %u rows from metrics", rows_to_delete);
+        sprintf(sql, "delete from metric_page order by start_date limit %u", rows_to_delete);
+        rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error("SQL error during database rotation %s", err_msg);
+            sqlite3_free(err_msg);
+        }
     }
+    if (pages_to_vacuum) {
+        info("VACUUM incremental %u pages from metrics", pages_to_vacuum);
+        sprintf(sql, "pragma incremental_vacuum(%u)", pages_to_vacuum);
+        rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error("SQL error during database rotation %s", err_msg);
+            sqlite3_free(err_msg);
+        }
+    }
+
+    return;
+
+//    // Occupied size is within limit?
+//    if (database_size <= quota) {
+//        // Check if our actual size is over limit and trim if necessary
+//        // Compute quota pages
+//        //uint32_t desired_pages = quota * (1024 * 1024 / page_size);
+//        if (page_count > desired_pages && free_page_count) {
+//            if (!report_free) {
+//                report_free = 1;
+//                info(
+//                    "Database free page count %u, starting incremental vacuum to shrink database by %u pages",
+//                    free_page_count, page_count - desired_pages);
+//            }
+//            rc = sqlite3_exec(db_page, "pragma incremental_vacuum(100);", 0, 0, &err_msg);
+//        }
+//        rotation = 0;
+//        return;
+//    }
+//    report_free = 0;
+//    rotation = 1;
+//
+//    return;
+//
+//    info(
+//        "Database size = %u MiB, limit is %u (total pages %u, free pages %u)", database_size, sqlite_disk_quota_mb,
+//        page_count, free_page_count);
+//
+//    if (sqlite_disk_mode) {
+//        sprintf(sql, "delete from metric_page order by start_date limit %u;", rows);
+//        rc = sqlite3_exec(db_page, sql, 0, 0, &err_msg);
+//        if (rc == SQLITE_OK) {
+//            uint32_t new_database_size = sql_database_size();
+//            // TODO: maybe calculate rate to achieve end goal of database quota in 1/10 of the cache size duration
+//            info("Database rotation, deleting %u rows, freed %u MiB", rows, database_size - new_database_size);
+//        }
+//    } else
+//        rc = sqlite3_exec(db_page, "delete from metric_page order by start_date limit 100;", 0, 0, &err_msg);
+//
+//    if (rc != SQLITE_OK) {
+//        error("SQL error during database rotation %s", err_msg);
+//        sqlite3_free(err_msg);
+//    }
 }
 
 void sql_backup_database()
