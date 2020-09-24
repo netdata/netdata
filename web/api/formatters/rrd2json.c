@@ -32,7 +32,7 @@ void free_context_param_list(struct context_param **param_list)
     *param_list = NULL;
 }
 
-void build_context_param_list (struct context_param **param_list, RRDSET *st)
+void build_context_param_list(struct context_param **param_list, RRDSET *st)
 {
     if (unlikely(!param_list || !st))
         return;
@@ -170,8 +170,6 @@ int rrdset2value_api_v1(
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
-
-    //free_temp_rrddim(temp_rd);
 
     rrdr_free(r);
     return HTTP_RESP_OK;
@@ -371,8 +369,6 @@ int rrdset2anything_api_v1(
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         break;
     }
-
-    //free_temp_rrddim(temp_rd);
 
     rrdr_free(r);
     return HTTP_RESP_OK;
