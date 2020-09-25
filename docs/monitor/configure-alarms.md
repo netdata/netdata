@@ -27,7 +27,7 @@ directory, inside the `health.d/` directory. Use Netdata's `edit-config` script 
 For example, to edit the `cpu.conf` health configuration file, run:
 
 ```bash
-sudo ./edit-config health.d/cpu.conf`
+sudo ./edit-config health.d/cpu.conf
 ```
 
 Each health configuration file contains one or more health _entities_, which always begin with `alarm:` or `template:`.
