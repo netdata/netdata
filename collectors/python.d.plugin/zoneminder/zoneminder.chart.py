@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-# Description: zoneminder netdata python.d module 
+# Description: zoneminder netdata python.d module
 # Author: Jose Chapa
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Zoneminder API: https://zoneminder.readthedocs.io/en/stable/api.html
 
-import json, time, os.path
+import time, os.path
 
 try:
     import requests
@@ -18,7 +18,7 @@ from bases.FrameworkServices.SimpleService import SimpleService
 update_every = 10
 
 ORDER = [
-    'camera_fps', 
+    'camera_fps',
     'camera_bandwidth',
     'events',
     'disk_usage',
@@ -46,7 +46,7 @@ CHARTS = {
 }
 
 def zm_generate_refresh_token(zoneminder_url, zm_user, zm_password, connection_timeout):
-    try:    
+    try:
         post_data=dict()
         post_data["user"] = zm_user
         post_data["pass"] = zm_password
@@ -56,12 +56,12 @@ def zm_generate_refresh_token(zoneminder_url, zm_user, zm_password, connection_t
             try: 
                 token_file = open(os.path.expanduser("~/.zm_token.txt"),'w')
                 token_file.write("{}|{}".format(json_data["access_token"], json_data["refresh_token"]))
-                token_file.close()  
+                token_file.close()
             except IOError:
-                return ("<error>", "Error while writing .zm_token.txt file.")   
+                return ("<error>", "Error while writing .zm_token.txt file.")
             return ("ok", "{}|{}".format(json_data["access_token"], json_data["refresh_token"]))
         return ("<error>", "Invalid api response when trying to generate new access and refresh tokens: " + r.text)
-    except requests.exceptions.RequestException as e: 
+    except requests.exceptions.RequestException as e:
         return ("<error>", e)
 
 def zm_generate_access_token(zoneminder_url, refresh_token, connection_timeout):
@@ -90,7 +90,7 @@ class Service(SimpleService):
         self.zm_user = self.configuration.get("zm_user", "")
         self.zm_password = self.configuration.get("zm_pass", "")
         self.connection_timeout = self.configuration.get("timeout", 10)
-        
+
     def check(self):
         if not HAVE_DEPS:
             self.error("'requests' and 'PyJWT' python packages are needed.")
@@ -103,7 +103,7 @@ class Service(SimpleService):
         bool_login = True
         disk_space = 0
 
-        #if user is not defined, then do not attempt to login 
+        #if user is not defined, then do not attempt to login
         if not self.zm_user:
             bool_login = False
 
@@ -121,7 +121,7 @@ class Service(SimpleService):
                 self.debug("new access and refresh tokens were generated...")
                 access_token,refresh_token = output.split('|')
         
-            #get jwt information                             
+            #get jwt information
             jwt_access_data = jwt.decode(access_token, verify=False)
             jwt_refresh_data = jwt.decode(refresh_token, verify=False)
                 
@@ -145,12 +145,12 @@ class Service(SimpleService):
         #get data from monitors api call
         try:
             r = requests.get(self.zoneminder_url + '/api/monitors.json?token=' + access_token, timeout=self.connection_timeout, verify=False)
-            json_data = r.json()  
+            json_data = r.json()
         except requests.exceptions.RequestException as e: 
             self.debug(e)
             return None
 
-        if all (k in json_data for k in ("success","data")):        
+        if all (k in json_data for k in ("success","data")):
             if (json_data['success'] == False and 'Token revoked' in json_data['data']['name']):
                 self.debug("token was revoked, generating new tokens, will try to collect data in next run...")
                 result,output = zm_generate_refresh_token(self.zoneminder_url, self.zm_user, self.zm_password, self.connection_timeout)
@@ -159,10 +159,10 @@ class Service(SimpleService):
                 return None
                
         if ("monitors" in json_data):
-            for i, monitor in enumerate(json_data["monitors"]):    
+            for i, monitor in enumerate(json_data["monitors"]):
                 if ("Monitor" in monitor):
                     try:
-                        disk_space += float(monitor["Monitor"]["TotalEventDiskSpace"])           
+                        disk_space += float(monitor["Monitor"]["TotalEventDiskSpace"])
                     except Exception as e:
                         self.debug(e)
                     if (monitor["Monitor"]["Function"] == "None" or monitor["Monitor"]["Enabled"] == "0"):
