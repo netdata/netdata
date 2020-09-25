@@ -47,8 +47,8 @@ application metrics collectors, including those for containers/k8s clusters.
 ## Collect metrics from applications running on Windows
 
 Netdata is fully capable of collecting and visualizing metrics from applications running on Windows systems. The only
-caveat is that you must [install the Agent](/packaging/installer/README.md) on a separate system or a compatible VM
-because there is no native Windows version of the Netdata Agent.
+caveat is that you must [install the Agent](/docs/get/README.md) on a separate system or a compatible VM because there
+is no native Windows version of the Netdata Agent.
 
 Once you have the Agent running on that separate system, you can follow the [enable and configure
 doc](/docs/collect/enable-configure.md) to tell the collector to look for exposed metrics on the Windows system's IP

@@ -14,7 +14,7 @@ anomalies and discover root causes faster.
 We designed Netdata with interoperability in mind. The Agent collects thousands of metrics every second, and then what
 you do with them is up to you. You can [store metrics in the database engine](/docs/guides/longer-metrics-storage.md),
 or send them to another time series database for long-term storage or further analysis using Netdata's [exporting
-engine](/docs/export/README.md).
+engine](/docs/export/external-databases.md).
 
 In this guide, we'll show you how to export Netdata metrics to [Graphite](https://graphiteapp.org/) for long-term
 storage and further analysis. Graphite is a free open-source software (FOSS) tool that collects graphs numeric
