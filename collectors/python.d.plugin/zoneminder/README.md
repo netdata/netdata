@@ -3,17 +3,17 @@ Collector to monitor your zoneminder cameras.
 
 
 ## Requirements 
-1. requests python library: https://requests.readthedocs.io/en/master/
+1.  requests python library: https://requests.readthedocs.io/en/master/
     System wide installation of library is needed, i.e., run:
     ```
     sudo -H python -m pip install requests
     ```
-1. PyJWT python library: https://pyjwt.readthedocs.io/en/latest/
+2.  PyJWT python library: https://pyjwt.readthedocs.io/en/latest/
     System wide installation of library is needed, i.e., run:
     ```
     sudo -H python -m pip install pyjwt
     ```
-1. zoneminder: https://zoneminder.com/
+3.  zoneminder: https://zoneminder.com/
     You need to make sure zoneminder's api is enabled: https://zoneminder.readthedocs.io/en/stable/api.html#enabling-api
 
 ## Configuration
@@ -40,14 +40,14 @@ service netdata restart
 
 ## Charts
 This module generates 4 charts:
-1. FPS of each camera 
-1. Bandwidth of each camera
-1. Events of each camera
-1. Disk usage of all saved events 
+1.  FPS of each camera 
+2.  Bandwidth of each camera
+3.  Events of each camera
+4.  Disk usage of all saved events 
 
 ## Alarms
-1. Average FPS of last 5 minutes: by default this alarm sets "warn" level when average fps is less than 5 in the last 5 minutes, and "critical" level when average fps is less than 2 in the last 5 minutes. 
-1. Time since last successful data collection: "warn" when no data is collected for last 5 minutes, and "critical" when no data is collected for last 15 minutes. 
+1.  Average FPS of last 5 minutes: by default this alarm sets "warn" level when average fps is less than 5 in the last 5 minutes, and "critical" level when average fps is less than 2 in the last 5 minutes. 
+2.  Time since last successful data collection: "warn" when no data is collected for last 5 minutes, and "critical" when no data is collected for last 15 minutes. 
 
 To edit alarms:
 ```bash
