@@ -7,9 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/c
 # Create new dashboards
 
 With Netdata Cloud, you can build new dashboards that put key metrics from any number of distributed systems in one
-place for a bird's eye view of your infrastructure. You can create more [meaningful
-visualizations](/docs/troubleshooting/README.md) for troubleshooting or keep a watchful eye on your infrastructure's
-most meaningful metrics without moving from node to node.
+place for a bird's eye view of your infrastructure. You can create more meaningful visualizations for troubleshooting or
+keep a watchful eye on your infrastructure's most meaningful metrics without moving from node to node.
 
 In the War Room you want to monitor with this dashboard, click on your War Room's dropdown, then click on the green **+
 Add** button next to **Dashboards**. In the panel, give your new dashboard a name, and click **+ Add**.

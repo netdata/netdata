@@ -56,7 +56,7 @@ Nodes](https://user-images.githubusercontent.com/1153921/93496405-03d83180-f8c4-
 Use the filter input next to the Nodes heading to filter the nodes in a given War Room. The filtering feature supports
 relational operators (==, !=, contains, and !contains) and logical operators (AND, OR), plus the name, OS, or services
 running on your nodes to quickly turn any War Room into a focused troubleshooting interface. See what services Netdata
-Cloud can filter by in the [supported collectors list](/docs/agent/collectors/collectors).
+Cloud can filter by in the [supported collectors list](/collectors/COLLECTORS.md).
 
 For example, `name == centos OR os == debian` filters any nodes by the exact name centos or has Debian as its operating
 system.

@@ -65,10 +65,10 @@ health and performance of your organization's essential services.
 
 **Incident response**: You can also create new War Rooms as one of the first steps in your incident response process.
 For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes
-using the [Pulsar collector](/docs/agent/collectors/go.d.plugin/modules/pulsar) begins reporting a suspiciously low
-messages rate. You can create a War Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition
-to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for getting to resolution as fast
-as possible.
+using the [Pulsar collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pulsar) begins
+reporting a suspiciously low messages rate. You can create a War Room called `$year-$month-$day-pulsar-rate`, add all
+your Pulsar nodes in addition to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for
+getting to resolution as fast as possible.
 
 For example, here is a War Room based on the node's provider and physical location (**us-east-1**).
 

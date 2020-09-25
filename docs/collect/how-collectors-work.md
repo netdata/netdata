@@ -10,7 +10,7 @@ When Netdata starts, and with zero configuration, it auto-detects thousands of d
 per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you [install the Netdata Agent](/docs/get/README.md#).
+when you [install the Netdata Agent](/docs/get/README.md#install-the-netdata-agent).
 
 Every collector has two primary jobs:
 
@@ -19,7 +19,7 @@ Every collector has two primary jobs:
 
 If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
 Netdata Agent gathers these metrics, sends them to the [database engine for
-storage](/docs/store/change-metrics-retention.md), and immediately [visualizes them
+storage](/docs/store/change-metrics-storage.md), and immediately [visualizes them
 meaningfully](/docs/visualize/interact-dashboards-charts.md) on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
