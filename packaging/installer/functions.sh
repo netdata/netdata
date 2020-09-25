@@ -964,9 +964,9 @@ cleanup_old_netdata_updater() {
 enable_netdata_updater() {
   case "$(_get_scheduler_type)" in
     "interval")
-      ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_interval_dir)/netdata-updater"
+      ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_intervaldir)/netdata-updater"
 
-      echo >&2 "Auto-updating has been enabled through cron, updater script linked to ${TPUT_RED}${TPUT_BOLD}$(_get_interval_dir)/netdata-updater${TPUT_RESET}"
+      echo >&2 "Auto-updating has been enabled through cron, updater script linked to ${TPUT_RED}${TPUT_BOLD}$(_get_intervaldir)/netdata-updater${TPUT_RESET}"
       echo >&2
       echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
       echo >&2 "Successful updates will not send an email."
