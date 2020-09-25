@@ -74,7 +74,7 @@ def zm_generate_access_token(zoneminder_url, refresh_token, connection_timeout):
                 token_file.write("{}|{}".format(json_data["access_token"], refresh_token))
                 token_file.close()
             except IOError:
-                return ("<error>", "Error while writing .zm_token.txt file.")
+                return ("<error>", "Error while writing ~/.zm_token.txt file.")
             return ("ok", json_data["access_token"])
         return ("<error>", "Invalid api response when trying to generate new access token: " + r.text)
     except requests.exceptions.RequestException as e:
