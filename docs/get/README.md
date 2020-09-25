@@ -40,6 +40,11 @@ Copy the script, paste it into your node's terminal, and hit `Enter`.
 
 Open your favorite browser and navigate to `http://localhost:19999` or `http://REMOTE-HOST:19999` to open the dashboard.
 
+<details>
+<summary>Watch how the one-line installer works</summary>
+<iframe width="820" height="460" src="https://www.youtube.com/embed/tVIp7ycK60A" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</details>
+
 ### Other operating systems/methods
 
 Want to install Netdata on a Kubernetes cluster, with Docker, or using a different method? Not a Linux user? Choose your
@@ -106,11 +111,16 @@ Netdata Cloud.
 For more information on the claiming process, why we implemented it, and how it works, see the [claim](/claim/README.md)
 and [Agent-Cloud link](/aclk/README.md) reference docs.
 
+<details>
+<summary>Watch how claiming nodes works</summary>
+<iframe width="820" height="460" src="https://www.youtube.com/embed/UAzVvhMab8g" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</details>
+
 ## What's next?
 
-At this point, you set up your free Netdata Cloud account, installed the Agent, and claimed one or more nodes to your
-Space. You're ready to start monitoring, visualizing, and troubleshooting with Netdata. We have two quickstart guides
-based on the scope of what you need to monitor:
+At this point, you have set up your free Netdata Cloud account, installed the Agent, and claimed one or more nodes to
+your Space. You're ready to start monitoring, visualizing, and troubleshooting with Netdata. We have two quickstart
+guides based on the scope of what you need to monitor:
 
 Interested in monitoring a single node? Check out our [single-node monitoring
 quickstart](/docs/quickstart/single-node.md).

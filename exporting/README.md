@@ -7,23 +7,21 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/README
 
 # Exporting engine reference
 
-Welcome to the exporting engine reference guide.
+Welcome to the exporting engine reference guide. This guide contains comprehensive information about enabling,
+configuring, and monitoring Netdata's exporting engine, which allows you to send metrics to external time-series
+databases.
 
-This guide contains comprehensive information about enabling, configuring, and monitoring Netdata's exporting engine,
-which allows you to send metrics to more than 20 external time series databases.
+For a quick introduction to the exporting engine's features, read our doc on [exporting metrics to time-series
+databases](/docs/export/external-databases.md), or jump in to [enabling a connector](/docs/export/enable-connector.md).
 
-To learn the basics of locating and editing health configuration files, read up on [how to export
-metrics](/docs/export/README.md), and follow the [exporting
-quickstart](/docs/export/README.md#exporting-quickstart).
+The exporting engine has a modular structure and supports metric exporting via multiple exporting connector instances at
+the same time. You can have different update intervals and filters configured for every exporting connector instance. 
 
-The exporting engine is an update for the former [backends](/backends/README.md), which is deprecated and will be
-deleted soon. It has a modular structure and supports metric exporting via multiple exporting connector instances at the
-same time. You can have different update intervals and filters configured for every exporting connector instance. 
-
-The exporting engine has its own configuration file `exporting.conf`. Configuration is almost similar to
-[backends](/backends/README.md#configuration). The most important difference is that type of a connector should be
-specified in a section name before a colon and an instance name after the colon. Also, you can't use `host tags`
-anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in `netdata.conf`.
+The exporting engine has its own configuration file `exporting.conf`. The configuration is almost similar to the
+deprecated [backends](/backends/README.md#configuration) system. The most important difference is that type of a
+connector should be specified in a section name before a colon and an instance name after the colon. Also, you can't use
+`host tags` anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in
+`netdata.conf`.
 
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
@@ -33,51 +31,29 @@ X seconds (though, it can send them per second if you need it to).
 
 ## Features
 
-1.  Supported databases and services
+1.  The exporting engine uses a number of connectors to send Netdata metrics to external time-series databases. See our
+    [list of supported databases](/docs/export/external-databases.md#supported-databases) for information on which
+    connector to enable and configure for your database of choice.
 
-    -   **graphite** (`plaintext interface`, used by **Graphite**, **InfluxDB**, **KairosDB**, **Blueflood**,
-        **ElasticSearch** via logstash tcp input and the graphite codec, etc)
-
-        Metrics are sent to the database server as `prefix.hostname.chart.dimension`. `prefix` is configured below,
-        `hostname` is the hostname of the machine (can also be configured).
-
-        Learn more in our guide to [export and visualize Netdata metrics in
+    -   [**AWS Kinesis Data Streams**](/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
+        format.
+    -   [**Google Cloud Pub/Sub Service**](/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
+        format.
+    -   [**Graphite**](/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
+        `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
+        also be configured). Learn more in our guide to [export and visualize Netdata metrics in
         Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
-
-    -   **opentsdb** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc)
-
-        metrics are sent to OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
-
-    -   **json** document DBs
-
-        metrics are sent to a document DB, `JSON` formatted.
-
-    -   **prometheus** is described at [prometheus page](/exporting/prometheus/README.md) since it pulls data from
-        Netdata.
-
-    -   **prometheus remote write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
-        **Elasticsearch**, **Gnocchi**, **Graphite**, **InfluxDB**, **Kafka**, **OpenTSDB**, **PostgreSQL/TimescaleDB**,
-        **Splunk**, **VictoriaMetrics**, and a lot of other [storage
-        providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage))
-
-        metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
-        protocol](/exporting/prometheus/README.md). Notes on using the remote write connector are
-        [here](/exporting/prometheus/remote_write/README.md).
-
-    -   **TimescaleDB** via [community-built connector](/exporting/TIMESCALE.md) that takes JSON streams from a Netdata
-        client and writes them to a TimescaleDB table.
-
-    -   **AWS Kinesis Data Streams**
-
-        metrics are sent to the service in `JSON` format.
-
-    -   **Google Cloud Pub/Sub Service**
-
-        metrics are sent to the service in `JSON` format.
-
-    -   **MongoDB**
-
-        metrics are sent to the database in `JSON` format.
+    -   [**JSON** document databases](/exporting/json/README.md)
+    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext, HTTP, or HTTPS interfaces. Metrics are sent to
+        OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
+    -   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
+    -   [**Prometheus**](/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
+        from node using the Netdata API.
+    -   [**Prometheus remote write**](/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
+        buffer encoding over HTTP. Supports many [storage
+        providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
+    -   [**TimescaleDB**](/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
+        Netdata client and writes them to a TimescaleDB table.
 
 2.  Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
 
@@ -113,7 +89,11 @@ X seconds (though, it can send them per second if you need it to).
 
 ## Configuration
 
-In `/etc/netdata/exporting.conf` you should have something like this:
+Here are the configruation blocks for every supported connector. Your current `exporting.conf` file may look a little
+different. 
+
+You can configure each connector individually using the available [options](#options). The
+`[graphite:my_graphite_instance]` block contains examples of some of these additional options in action.
 
 ```conf
 [exporting:global]
@@ -123,9 +103,14 @@ In `/etc/netdata/exporting.conf` you should have something like this:
     update every = 10
 
 [prometheus:exporter]
-    send charts matching = system.processes
+    send names instead of ids = yes
+    send configured labels = yes
+    end automatic labels = no
+    send charts matching = *
+    send hosts matching = localhost *
+    prefix = netdata
 
-[graphite:my_instance_1]
+[graphite:my_graphite_instance]
     enabled = yes
     destination = localhost:2003
     data source = average
@@ -137,39 +122,65 @@ In `/etc/netdata/exporting.conf` you should have something like this:
     send charts matching = *
     send hosts matching = localhost *
     send names instead of ids = yes
+    send configured labels = yes
+    send automatic labels = yes
 
-[json:my_instance2]
+[prometheus_remote_write:my_prometheus_remote_write_instance]
+    enabled = yes
+    destination = localhost
+    remote write URL path = /receive
+
+[kinesis:my_kinesis_instance]
+    enabled = yes
+    destination = us-east-1
+    stream name = netdata
+    aws_access_key_id = my_access_key_id
+    aws_secret_access_key = my_aws_secret_access_key
+
+[pubsub:my_pubsub_instance]
+    enabled = yes
+    destination = pubsub.googleapis.com
+    credentials file = /etc/netdata/pubsub_credentials.json
+    project id = my_project
+    topic id = my_topic
+
+[mongodb:my_mongodb_instance]
+    enabled = yes
+    destination = localhost
+    database = my_database
+    collection = my_collection
+
+[json:my_json_instance]
     enabled = yes
     destination = localhost:5448
-    data source = as collected
-    update every = 2
-    send charts matching = system.active_processes
 
-[opentsdb:my_instance3]
+[opentsdb:my_opentsdb_plaintext_instance]
     enabled = yes
     destination = localhost:4242
-    data source = sum
-    update every = 10
-    send charts matching = system.cpu
 
-[opentsdb:http:my_instance4]
+[opentsdb:http:my_opentsdb_http_instance]
     enabled = yes
-    destination = localhost:4243
-    data source = average
-    update every = 3
-    send charts matching = system.active_processes
+    destination = localhost:4242
+
+[opentsdb:https:my_opentsdb_https_instance]
+    enabled = yes
+    destination = localhost:8082
 ```
 
-Sections:
-- `[exporting:global]` is a section where you can set your defaults for all exporting connectors
-- `[prometheus:exporter]` defines settings for Prometheus exporter API queries (e.g.:
-  `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`).
-- `[<type>:<name>]` keeps settings for a particular exporting connector instance, where:
-  - `type` selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http | opentsdb:https |
-    prometheus_remote_write | json | kinesis | pubsub | mongodb
-  - `name` can be arbitrary instance name you chose.
+### Sections
 
-Options:
+-   `[exporting:global]` is a section where you can set your defaults for all exporting connectors
+-   `[prometheus:exporter]` defines settings for Prometheus exporter API queries (e.g.:
+    `http://NODE:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`).
+-   `[<type>:<name>]` keeps settings for a particular exporting connector instance, where:
+  -   `type` selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http | opentsdb:https |
+      prometheus_remote_write | json | kinesis | pubsub | mongodb
+  -   `name` can be arbitrary instance name you chose.
+
+### Options
+
+Configure individual connectors and override any global settings with the following options.
+
 -   `enabled = yes | no`, enables or disables an exporting connector instance
 
 -   `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames, IPs (IPv4 and IPv6) and
