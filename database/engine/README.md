@@ -111,8 +111,9 @@ There are explicit memory requirements **per** DB engine **instance**:
 An important observation is that RAM usage depends on both the `page cache size` and the `dbengine multihost disk space`
 options.
 
-You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
-validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
+You can use our [database engine
+calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+to validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
 
 ### Disk space requirements
 

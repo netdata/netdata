@@ -7,8 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/README.
 
 # Metrics long term archiving
 
-> ⚠️ The backends system is now deprecated in favor of the [exporting engine](/exporting/README.md). Please see the
-> [migration guide](/docs/export/) for details on how to get started with exporting.
+> ⚠️ The backends system is now deprecated in favor of the [exporting engine](/exporting/README.md).
 
 Netdata supports backends for archiving the metrics, or providing long term dashboards, using Grafana or other tools,
 like this:
