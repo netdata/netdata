@@ -53,7 +53,7 @@ def zm_generate_refresh_token(zoneminder_url, zm_user, zm_password, connection_t
         r = requests.post(zoneminder_url + '/api/host/login.json', data=post_data, timeout=connection_timeout, verify=False)
         json_data = r.json()
         if all (k in json_data for k in ("access_token","refresh_token")):
-            try: 
+            try:
                 token_file = open(os.path.expanduser("~/.zm_token.txt"),'w')
                 token_file.write("{}|{}".format(json_data["access_token"], json_data["refresh_token"]))
                 token_file.close()
@@ -74,10 +74,10 @@ def zm_generate_access_token(zoneminder_url, refresh_token, connection_timeout):
                 token_file.write("{}|{}".format(json_data["access_token"], refresh_token))
                 token_file.close()
             except IOError:
-                return ("<error>", "Error while writing .zm_token.txt file.") 
+                return ("<error>", "Error while writing .zm_token.txt file.")
             return ("ok", json_data["access_token"])
         return ("<error>", "Invalid api response when trying to generate new access token: " + r.text)
-    except requests.exceptions.RequestException as e: 
+    except requests.exceptions.RequestException as e:
         return ("<error>", e)
 
 class Service(SimpleService):
@@ -120,7 +120,7 @@ class Service(SimpleService):
                     return None
                 self.debug("new access and refresh tokens were generated...")
                 access_token,refresh_token = output.split('|')
-        
+
             #get jwt information
             jwt_access_data = jwt.decode(access_token, verify=False)
             jwt_refresh_data = jwt.decode(refresh_token, verify=False)
@@ -159,7 +159,7 @@ class Service(SimpleService):
                 return None
                
         if ("monitors" in json_data):
-            for i, monitor in enumerate(json_data["monitors"]):
+            for monitor in json_data["monitors"]:
                 if ("Monitor" in monitor):
                     try:
                         disk_space += float(monitor["Monitor"]["TotalEventDiskSpace"])
