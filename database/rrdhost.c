@@ -1524,15 +1524,15 @@ restart_after_removal:
                 RRDDIM *rd, *last;
 
                 rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-                while(st->variables)  rrdsetvar_free(st->variables);
-                while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+                while (st->variables)  rrdsetvar_free(st->variables);
+                while (st->alarms)     rrdsetcalc_unlink(st->alarms);
                 rrdset_wrlock(st);
-                for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
+                for (rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
                         continue;
 
                     rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-                    while(rd->variables)
+                    while (rd->variables)
                         rrddimvar_free(rd->variables);
 
                     if (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
@@ -1543,7 +1543,7 @@ restart_after_removal:
                             /* This metric has no data and no references */
                             metalog_commit_delete_dimension(rd);
                             rrddim_free(st, rd);
-                            if(unlikely(!last)) {
+                            if (unlikely(!last)) {
                                 rd = st->dimensions;
                             }
                             else {
