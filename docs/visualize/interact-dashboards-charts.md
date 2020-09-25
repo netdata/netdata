@@ -43,7 +43,7 @@ A **context** groups several charts based on the types of metrics being collecte
 this context to create individual charts and then groups them by family. You can always see the context of any chart by
 looking at its name or hovering over the chart's date.
 
-See our [dashboard docs](/web/README.mdweb#charts-contexts-families) for more information about the above distinctions
+See our [dashboard docs](/web/README.md#charts-contexts-families) for more information about the above distinctions
 and how they're used across Netdata to meaningfully organize and present metrics.
 
 ## Interact with charts

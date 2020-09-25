@@ -38,13 +38,13 @@ You can drill down into any node's full dashboard by clicking on that node's hos
 dashboard](https://user-images.githubusercontent.com/1153921/87457036-9b678e00-c5bc-11ea-977d-ad561a73beef.png)
 
 You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
-investigate historical data, and see like metrics presented meaningfully to help you in [visual anomaly
-detection](/docs/troubleshoot/visual-anomaly-detection.md). Learn about [interacting with dashboards and
-charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time metrics.
+investigate historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
+Learn about [interacting with dashboards and charts](/docs/visualize/interact-dashboards-charts.md) to get the most from
+all of Netdata's real-time metrics.
 
 > If you want to monitor a Kubernetes cluster with Netdata, see our [k8s installation
 > doc](/packaging/installer/methods/kubernetes.md) for setup details, and then read our guide, [_Monitor a Kubernetes
-> cluster with Netdata_](/docs/guides/kubernetes-k8s-netdata.md).
+> cluster with Netdata_](/docs/guides/monitor/kubernetes-k8s-netdata.md).
 
 ## Build new dashboards for your infrastructure
 
@@ -58,7 +58,7 @@ context, which is Netdata's way to organize charts, and then click **Add chart**
 Once you add a few charts, you can move them around, resize them, and add text. Make sure you click the **Save** button
 before you navigate away.
 
-Read more about [creating new dashboards](/docs/visualize/create-dashboard.md) for more details about the process and
+Read more about [creating new dashboards](/docs/visualize/create-dashboards.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
 
 ## Configure your nodes
@@ -111,12 +111,12 @@ infrastructure-focused features:
 -   [Organize your nodes](/docs/configure/spaces-war-rooms.md) into **War Rooms** based on your preferred strategy.
 -   [Invite your team](/docs/configure/invite-collaborate.md) to collaborate on identifying anomalies or troubleshooting
     complex performance problems.
--   [Export metrics](/docs/export/enable-exporting.md) to an external time-series database to use Netdata alongside
+-   [Export metrics](/docs/export/external-databases.md) to an external time-series database to use Netdata alongside
     other monitoring and troubleshooting tools.
 
 To change how the Netdata Agent runs on each node, dig in to configuration files:
 
--   [Change how long nodes in your infrastructure retain metrics](/docs/store/change-metrics-retention.md) based on how
+-   [Change how long nodes in your infrastructure retain metrics](/docs/store/change-metrics-storage.md) based on how
     many metrics each node collects, your preferred retention period, and the resources you want to dedicate toward
     long-term metrics retention.
 -   [Create new alarms](/docs/monitor/configure-alarms.md), or tweak some of the pre-configured alarms, to stay on top

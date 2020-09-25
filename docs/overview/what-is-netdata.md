@@ -30,9 +30,10 @@ Cloud, you can view key metrics, insightful charts, and active alarms from all y
 When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar
 Netdata dashboard.
 
-**[Netdata Cloud is free](/docs/cloud/faq-glossary#how-much-does-netdata-cost-how-and-why-is-it-free)**! You can add an
-entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and alarms
-entirely for free.
+**[Netdata Cloud is
+free](https://learn.netdata.cloud/docs/cloud/faq-glossary#how-much-does-netdata-cost-how-and-why-is-it-free)**! You can
+add an entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and
+alarms entirely for free.
 
 While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or
 centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when
@@ -67,7 +68,7 @@ case:
 
 ## What's next?
 
-Learn more about [why you should use Netdata](/docs/overview/why-netdata), or [how Netdata works with your existing
-monitoring stack](/docs/overview/netdata-monitoring-stack).
+Learn more about [why you should use Netdata](/docs/overview/why-netdata.md), or [how Netdata works with your existing
+monitoring stack](/docs/overview/netdata-monitoring-stack.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Foverview%2Fwhat-is-netdata&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

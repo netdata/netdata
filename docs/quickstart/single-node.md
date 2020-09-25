@@ -70,7 +70,7 @@ many metrics as possible without you having to configure them individually.
 These metrics enrich both the local and Netdata Cloud dashboards.
 
 Most collectors work without configuring them, but you should read up on how [collector
-configuration](/docs/collect/configure.md) works.
+configuration](/docs/collect/enable-configure.md) works.
 
 In addition, find detailed information about which [system](/docs/collect/system-metrics.md),
 [container](/docs/collect/container-metrics.md), and [application](/docs/collect/application-metrics.md) metrics you can
@@ -87,10 +87,10 @@ out some of Netdata's other visualization and health monitoring features:
 -   [Create new alarms](/docs/monitor/configure-alarms.md), or tweak some of the pre-configured alarms, to stay on top
     of anomalies.
 -   [Enable notifications](/docs/monitor/enable-notifications.md) to Slack, PagerDuty, email, and 30+ other services.
--   [Change how long your node stores metrics](/docs/store/change-metrics-retention.md) based on how many metrics it
+-   [Change how long your node stores metrics](/docs/store/change-metrics-storage.md) based on how many metrics it
     collects, your preferred retention period, and the resources you want to dedicate toward long-term metrics
     retention.
--   [Export metrics](/docs/export/enable-exporting.md) to an external time-series database to use Netdata alongside
+-   [Export metrics](/docs/export/external-databases.md) to an external time-series database to use Netdata alongside
     other monitoring and troubleshooting tools.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fquickstart%2Fsingle-node&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

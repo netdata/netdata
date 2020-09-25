@@ -35,10 +35,10 @@ troubleshoot anomalies.
 Netdata can send its per-second metrics to external time-series databases, such as InfluxDB, Prometheus, Graphite,
 TimescaleDB, ElasticSearch, AWS Kinesis Data Streams, Google Cloud Pub/Sub Service, and many others.
 
-To [enable exporting](/docs/export/enable-exporting.md), you configure an _exporting connector_. These connectors
-support filtering and resampling for granular control over which metrics you export, and at what volume. You can export
-resampled metrics as collected, as averages, or the sum of interpolated values based on your needs and other monitoring
-tools.
+To [export metrics to external time-series databases](/docs/export/external-databases.md), you configure an [exporting
+_connector_](/docs/export/enable-connector.md). These connectors support filtering and resampling for granular control
+over which metrics you export, and at what volume. You can export resampled metrics as collected, as averages, or the
+sum of interpolated values based on your needs and other monitoring tools.
 
 Once you have Netdata's metrics in a secondary time-series database, you can use them however you'd like, such as
 additional visualization/dashboarding tools or aggregation of data from multiple sources.

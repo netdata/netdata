@@ -10,7 +10,7 @@ When Netdata starts, and with zero configuration, it auto-detects thousands of d
 per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you [install the Netdata Agent](/docs/get/README.md#).
+when you [install the Netdata Agent](/docs/get/README.md#install-the-netdata-agent).
 
 Every collector has two primary jobs:
 
