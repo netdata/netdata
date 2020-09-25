@@ -58,7 +58,7 @@ def zm_generate_refresh_token(zoneminder_url, zm_user, zm_password, connection_t
                 token_file.write("{}|{}".format(json_data["access_token"], json_data["refresh_token"]))
                 token_file.close()
             except IOError:
-                return ("<error>", "Error while writing .zm_token.txt file.")
+                return ("<error>", "Error while writing ~/.zm_token.txt file.")
             return ("ok", "{}|{}".format(json_data["access_token"], json_data["refresh_token"]))
         return ("<error>", "Invalid api response when trying to generate new access and refresh tokens: " + r.text)
     except requests.exceptions.RequestException as e:
@@ -124,7 +124,7 @@ class Service(SimpleService):
             #get jwt information
             jwt_access_data = jwt.decode(access_token, verify=False)
             jwt_refresh_data = jwt.decode(refresh_token, verify=False)
-                
+
             #get new refresh token if it expires in less than 30 minutes
             if ( ( jwt_refresh_data['exp'] - time.time() ) < 1800 ):
                 self.debug("generating new refresh token...")
@@ -133,7 +133,7 @@ class Service(SimpleService):
                     self.debug("error: " + output)
                     return None
                 access_token,refresh_token = output.split('|')
-                                  
+
             #get new access token if current token expires in less than 5 minutes
             if ( ( jwt_access_data['exp'] - time.time() ) < 300 ):
                 result,output = zm_generate_access_token(self.zoneminder_url, refresh_token, self.connection_timeout)
@@ -141,12 +141,12 @@ class Service(SimpleService):
                     self.debug("error: " + output)
                     return None
                 access_token = output
-        
+
         #get data from monitors api call
         try:
             r = requests.get(self.zoneminder_url + '/api/monitors.json?token=' + access_token, timeout=self.connection_timeout, verify=False)
             json_data = r.json()
-        except requests.exceptions.RequestException as e: 
+        except requests.exceptions.RequestException as e:
             self.debug(e)
             return None
 
@@ -157,7 +157,7 @@ class Service(SimpleService):
                 if ("<error>" in result):
                     self.debug("error: " + output)
                 return None
-               
+
         if ("monitors" in json_data):
             for monitor in json_data["monitors"]:
                 if ("Monitor" in monitor):
