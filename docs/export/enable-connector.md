@@ -29,7 +29,7 @@ Enable the exporting engine itself by setting `enabled` to `yes`:
     enabled = yes
 ```
 
-Save the file but keep it open&mdash;you'll need to continue editing it to enable specific connectors.
+Save the file but keep it open, as you will edit it again to enable specific connectors.
 
 ## Example: Enable the OpenTSDB connector
 
@@ -43,12 +43,6 @@ Use the following configuration as a starting point. Copy and paste it into `exp
 
 Replace `my_opentsdb_http_instance` with an instance name of your choice, and change the `destination` setting to the IP
 address or hostname of your OpenTSDB database.
-
-```conf
-[opentsdb:http:my_opentsdb_http_instance]
-    enabled = yes
-    destination = localhost:4242
-```
 
 Restart your Agent with `service netdata restart` to begin exporting to your OpenTSDB database. Because the
 Agent exports metrics as they're collected, you should start seeing data in your external database after only a few
@@ -81,7 +75,7 @@ See [exporting engine reference](/exporting/README.md#configuration) for details
 ## What's next?
 
 If you want to further configure your exporting connectors, see the [exporting engine
-reference](/exporting/README.md#configuration) for details on 
+reference](/exporting/README.md#configuration).
 
 For a comprehensive example of using the Graphite connector, read our guide: [_Export and visualize Netdata metrics in
 Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md). Or, start [using host

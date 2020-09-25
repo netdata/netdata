@@ -14,9 +14,9 @@ more.
 The exporting engine resamples Netdata's thousands of per-second metrics at a user-configurable interval, and can export
 metrics to multiple time-series databases simultaneously.
 
-Based on your needs and resources you allocated to your external time-series database, you can configure the interval at
-which metrics are exported or export only certain charts with filtering. You can also choose whether metrics are
-exported as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
+Based on your needs and resources you allocated to your external time-series database, you can configure the interval
+that metrics are exported or export only certain charts with filtering. You can also choose whether metrics are exported
+as-collected, a normalized average, or the sum/volume of metrics values over the configured interval.
 
 Exporting is an important part of Netdata's effort to be [interoperable](/docs/overview/netdata-monitoring-stack.md)
 with other monitoring software. You can use an external time-series database for long-term metrics retention, further

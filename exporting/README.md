@@ -17,10 +17,11 @@ databases](/docs/export/external-databases.md), or jump in to [enabling a connec
 The exporting engine has a modular structure and supports metric exporting via multiple exporting connector instances at
 the same time. You can have different update intervals and filters configured for every exporting connector instance. 
 
-The exporting engine has its own configuration file `exporting.conf`. Configuration is almost similar to
-[backends](/backends/README.md#configuration). The most important difference is that type of a connector should be
-specified in a section name before a colon and an instance name after the colon. Also, you can't use `host tags`
-anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in `netdata.conf`.
+The exporting engine has its own configuration file `exporting.conf`. The configuration is almost similar to the
+deprecated [backends](/backends/README.md#configuration) system. The most important difference is that type of a
+connector should be specified in a section name before a colon and an instance name after the colon. Also, you can't use
+`host tags` anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in
+`netdata.conf`.
 
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
@@ -43,15 +44,15 @@ X seconds (though, it can send them per second if you need it to).
         also be configured). Learn more in our guide to [export and visualize Netdata metrics in
         Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
     -   [**JSON** document databases](/exporting/json/README.md)
-    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use either HTTP or HTTPS interfaces. Metrics are sent to OpenTSDB
-        as `prefix.chart.dimension` with tag `host=hostname`.
+    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext, HTTP, or HTTPS interfaces. Metrics are sent to
+        OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
     -   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
     -   [**Prometheus**](/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
         from node using the Netdata API.
     -   [**Prometheus remote write**](/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
         buffer encoding over HTTP. Supports many [storage
         providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
-    -   [**TimescaleDB**](/exporting/TIMESCALE.md): Use acommunity-built connector that takes JSON streams from a
+    -   [**TimescaleDB**](/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
         Netdata client and writes them to a TimescaleDB table.
 
 2.  Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
@@ -89,7 +90,10 @@ X seconds (though, it can send them per second if you need it to).
 ## Configuration
 
 Here are the configruation blocks for every supported connector. Your current `exporting.conf` file may look a little
-different. You can configure each connector individually using the available [options](#options).
+different. 
+
+You can configure each connector individually using the available [options](#options). The
+`[graphite:my_graphite_instance]` block contains examples of some of these additional options in action.
 
 ```conf
 [exporting:global]
@@ -109,6 +113,17 @@ different. You can configure each connector individually using the available [op
 [graphite:my_graphite_instance]
     enabled = yes
     destination = localhost:2003
+    data source = average
+    prefix = Netdata
+    hostname = my-name
+    update every = 10
+    buffer on failures = 10
+    timeout ms = 20000
+    send charts matching = *
+    send hosts matching = localhost *
+    send names instead of ids = yes
+    send configured labels = yes
+    send automatic labels = yes
 
 [prometheus_remote_write:my_prometheus_remote_write_instance]
     enabled = yes
@@ -138,6 +153,10 @@ different. You can configure each connector individually using the available [op
 [json:my_json_instance]
     enabled = yes
     destination = localhost:5448
+
+[opentsdb:my_opentsdb_plaintext_instance]
+    enabled = yes
+    destination = localhost:4242
 
 [opentsdb:http:my_opentsdb_http_instance]
     enabled = yes
