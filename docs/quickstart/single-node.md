@@ -63,14 +63,14 @@ metrics.
 
 ## Collect metrics from your system and applications
 
-Netdata has [300+ pre-installed collectors](/docs/collectors/COLLECTORS.md) that gather thousands of metrics with zero
+Netdata has [300+ pre-installed collectors](/collectors/COLLECTORS.md) that gather thousands of metrics with zero
 configuration. Collectors search your node in default locations and ports to find running applications and gather as
 many metrics as possible without you having to configure them individually.
 
 These metrics enrich both the local and Netdata Cloud dashboards.
 
-Most collectors work without configuring them, but you should read up on how [collector
-configuration](/docs/collect/enable-configure.md) works.
+Most collectors work without configuration, but you should read up on [how collectors
+work](/docs/collect/how-collectors-work.md) and [how to enable/configure](/docs/collect/enable-configure.md) them.
 
 In addition, find detailed information about which [system](/docs/collect/system-metrics.md),
 [container](/docs/collect/container-metrics.md), and [application](/docs/collect/application-metrics.md) metrics you can

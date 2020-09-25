@@ -53,7 +53,7 @@ While a distributed data architecture is the default when monitoring infrastruct
 its behavior based on your needs or the type of infrastructure you manage.
 
 To archive metrics to an external time-series database, such as InfluxDB, Graphite, OpenTSDB, Elasticsearch,
-TimescaleDB, and many others, see details on [integrating Netdata via exporting](/docs/export/integrate-exporting.md).
+TimescaleDB, and many others, see details on [integrating Netdata via exporting](/docs/export/external-databases.md).
 
 You can also stream between nodes using [streaming](/streaming/README.md), allowing to replicate databases and create
 your own centralized data lake of metrics, if you choose to do so.
