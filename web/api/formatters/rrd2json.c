@@ -45,11 +45,11 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
     }
 
     RRDDIM *rd1;
-    rrdset_rdlock(st);
-
-    st->last_accessed_time = now_realtime_sec();
     (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
     (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
+
+    st->last_accessed_time = now_realtime_sec();
+    rrdset_rdlock(st);
 
     rrddim_foreach_read(rd1, st) {
         RRDDIM *rd = mallocz(rd1->memsize);
