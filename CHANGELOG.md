@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fixed typos in installer functions. [\#9992](https://github.com/netdata/netdata/pull/9992) ([Ferroin](https://github.com/Ferroin))
+- Fixed locking order to address CID\_362348 [\#9991](https://github.com/netdata/netdata/pull/9991) ([stelfrag](https://github.com/stelfrag))
+- Fix cleanup of obsolete charts [\#9985](https://github.com/netdata/netdata/pull/9985) ([mfundul](https://github.com/mfundul))
 - Added more stringent check for C99 support in configure script. [\#9982](https://github.com/netdata/netdata/pull/9982) ([Ferroin](https://github.com/Ferroin))
 - Improved the data query when using the context parameter [\#9978](https://github.com/netdata/netdata/pull/9978) ([stelfrag](https://github.com/stelfrag))
 - allow using LWS without SOCKS5 [\#9973](https://github.com/netdata/netdata/pull/9973) ([underhood](https://github.com/underhood))
@@ -238,7 +241,6 @@
 - Fix missing host variables on stream [\#9396](https://github.com/netdata/netdata/pull/9396) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix a bug in the simple exporting connector [\#9389](https://github.com/netdata/netdata/pull/9389) ([vlvkobal](https://github.com/vlvkobal))
 - Fixes the race-hazard in streaming during the shutdown sequence [\#9370](https://github.com/netdata/netdata/pull/9370) ([amoss](https://github.com/amoss))
-- Fixed ACLK shutdown sequence [\#9367](https://github.com/netdata/netdata/pull/9367) ([underhood](https://github.com/underhood))
 
 ## [v1.22.1](https://github.com/netdata/netdata/tree/v1.22.1) (2020-05-12)
 
