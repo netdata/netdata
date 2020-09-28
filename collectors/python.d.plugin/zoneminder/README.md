@@ -1,8 +1,8 @@
 # Netdata zoneminder collector
-Collector to monitor your zoneminder cameras. 
+Collector to monitor your zoneminder cameras.
 
 
-## Requirements 
+## Requirements
 1.  requests python library: https://requests.readthedocs.io/en/master/
     System wide installation of library is needed, i.e., run:
     ```
@@ -28,8 +28,8 @@ sudo ./edit-config python.d/zoneminder.conf
 
 Example:
 ```yaml
-zm_url: 'http://127.0.0.1/zm'   # the zoneminder URL 
-zm_user: ''                     # the zoneminder username to use 
+zm_url: 'http://127.0.0.1/zm'   # the zoneminder URL
+zm_user: ''                     # the zoneminder username to use
 zm_pass: ''                     # the zoneminder password to use
 ```
 
@@ -40,14 +40,14 @@ service netdata restart
 
 ## Charts
 This module generates 4 charts:
-1.  FPS of each camera 
+1.  FPS of each camera
 2.  Bandwidth of each camera
 3.  Events of each camera
-4.  Disk usage of all saved events 
+4.  Disk usage of all saved events
 
 ## Alarms
-1.  Average FPS of last 5 minutes: by default this alarm sets "warn" level when average fps is less than 5 in the last 5 minutes, and "critical" level when average fps is less than 2 in the last 5 minutes. 
-2.  Time since last successful data collection: "warn" when no data is collected for last 5 minutes, and "critical" when no data is collected for last 15 minutes. 
+1.  Average FPS of last 5 minutes: by default this alarm sets "warn" level when average fps is less than 5 in the last 5 minutes, and "critical" level when average fps is less than 2 in the last 5 minutes.
+2.  Time since last successful data collection: "warn" when no data is collected for last 5 minutes, and "critical" when no data is collected for last 15 minutes.
 
 To edit alarms:
 ```bash
