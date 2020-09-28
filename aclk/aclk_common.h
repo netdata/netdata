@@ -65,7 +65,7 @@ typedef struct aclk_rrdhost_state {
 #endif
 } aclk_rrdhost_state;
 
-#define ACLK_HOST_POPCORNING(host) (host->aclk_state.state == ACLK_HOST_INITIALIZING)
+#define ACLK_IS_HOST_POPCORNING(host) (host->aclk_state.state == ACLK_HOST_INITIALIZING)
 
 typedef struct rrdhost RRDHOST;
 
