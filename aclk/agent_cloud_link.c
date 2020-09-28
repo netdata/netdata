@@ -480,7 +480,7 @@ void aclk_update_next_child_to_popcorn()
 
 static int aclk_popcorn_check_bump(RRDHOST *host)
 {
-    time_t now = now_realtime_sec();
+    time_t now = now_monotonic_sec();
     int updated = 0;
     rrdhost_aclk_state_lock(host);
     if (unlikely(ACLK_HOST_POPCORNING(host))) {

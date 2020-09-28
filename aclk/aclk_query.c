@@ -677,7 +677,7 @@ ACLK_POPCORNING_STATE aclk_host_popcorning(RRDHOST *host)
         return ret;
     }
 
-    time_t t_diff = now_realtime_sec() - host->aclk_state.t_last_popcorn_update;
+    time_t t_diff = now_monotonic_sec() - host->aclk_state.t_last_popcorn_update;
 
     if (t_diff >= ACLK_STABLE_TIMEOUT) {
         host->aclk_state.state = ACLK_HOST_STABLE;
