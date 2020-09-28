@@ -663,7 +663,7 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads)
  * returns actual/updated popcorning state
  */
 
-ACLK_POPCORNING_STATE aclk_host_popcorning(RRDHOST *host)
+ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host)
 {
     rrdhost_aclk_state_lock(host);
     ACLK_POPCORNING_STATE ret = host->aclk_state.state;
@@ -704,7 +704,7 @@ void *aclk_query_main_thread(void *ptr)
     struct aclk_query_thread *info = ptr;
 
     while (!netdata_exit) {
-        if(aclk_host_popcorning(localhost) == ACLK_HOST_STABLE) {
+        if(aclk_host_popcorn_check(localhost) == ACLK_HOST_STABLE) {
 #ifdef ACLK_DEBUG
             _dump_collector_list();
 #endif
@@ -748,7 +748,7 @@ void *aclk_query_main_thread(void *ptr)
         rrdhost_aclk_state_unlock(localhost);
 
         ACLK_SHARED_STATE_LOCK;
-        if (aclk_shared_state.next_popcorn_host && aclk_host_popcorning(aclk_shared_state.next_popcorn_host) == ACLK_HOST_STABLE) {
+        if (aclk_shared_state.next_popcorn_host && aclk_host_popcorn_check(aclk_shared_state.next_popcorn_host) == ACLK_HOST_STABLE) {
             aclk_queue_query("on_connect", aclk_shared_state.next_popcorn_host, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT);
             aclk_shared_state.next_popcorn_host = NULL;
             aclk_update_next_child_to_popcorn();
