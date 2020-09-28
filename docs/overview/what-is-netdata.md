@@ -21,7 +21,8 @@ devices.
 You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms
 (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
 
-![agent-hero-overview](https://user-images.githubusercontent.com/1153921/91363069-9e0af500-e7b0-11ea-82f1-8cba692ca118.png)
+![The Netdata
+Agent](https://user-images.githubusercontent.com/1153921/94492596-72a86b00-019f-11eb-91ab-224e6ac9ea21.png)
 
 ## Netdata Cloud
 
@@ -39,7 +40,7 @@ While Netdata Cloud offers a centralized method of monitoring your Agents, your 
 centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when
 you're viewing the Netdata Cloud interface.
 
-![cloud-hero-overview](https://user-images.githubusercontent.com/1153921/91363071-9ea38b80-e7b0-11ea-87d9-28b91b360cd1.png)
+![Netdata Cloud]((https://user-images.githubusercontent.com/1153921/94492597-73410180-019f-11eb-9a9e-032420baa489.png)
 
 ## What you can do with Netdata
 
