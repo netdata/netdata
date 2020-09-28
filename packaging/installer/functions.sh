@@ -345,6 +345,19 @@ iscontainer() {
   return 1
 }
 
+get_os_key() {
+  if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release || return 1
+    echo "${ID}-${VERSION_ID}"
+
+  elif [ -f /etc/redhat-release ]; then
+    echo "$(< /etc/redhat-release)"
+  else
+    echo "unknown"
+  fi
+}
+
 issystemd() {
   local pids p myns ns systemctl
 
@@ -379,18 +392,31 @@ issystemd() {
   return 1
 }
 
+get_systemd_service_dir() {
+  local SYSTEMD_DIRECTORY=""
+  local key
+  key="$(get_os_key)"
+
+  if [ -w "/lib/systemd/system" ]; then
+    SYSTEMD_DIRECTORY="/lib/systemd/system"
+  elif [ -w "/usr/lib/systemd/system" ]; then
+    SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+  elif [ -w "/etc/systemd/system" ]; then
+    SYSTEMD_DIRECTORY="/etc/systemd/system"
+  fi
+
+  if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+    SYSTEMD_DIRECTORY="/etc/systemd/system"
+  fi
+
+  echo "${SYSTEMD_DIRECTORY}"
+}
+
 install_non_systemd_init() {
   [ "${UID}" != 0 ] && return 1
 
-  local key="unknown"
-  if [ -f /etc/os-release ]; then
-    # shellcheck disable=SC1091
-    source /etc/os-release || return 1
-    key="${ID}-${VERSION_ID}"
-
-  elif [ -f /etc/redhat-release ]; then
-    key=$(< /etc/redhat-release)
-  fi
+  local key
+  key="$(get_os_key)"
 
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
     if [[ ${key} =~ ^(gentoo|alpine).* ]]; then
@@ -438,16 +464,6 @@ install_netdata_service() {
   local uname
   uname="$(uname 2> /dev/null)"
 
-  local key="unknown"
-  if [ -f /etc/os-release ]; then
-    # shellcheck disable=SC1091
-    source /etc/os-release || return 1
-    key="${ID}-${VERSION_ID}"
-
-  elif [ -f /etc/redhat-release ]; then
-    key=$(< /etc/redhat-release)
-  fi
-
   if [ "${UID}" -eq 0 ]; then
     if [ "${uname}" = "Darwin" ]; then
 
@@ -486,19 +502,7 @@ install_netdata_service() {
       NETDATA_STOP_CMD="systemctl stop netdata"
       NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
 
-      SYSTEMD_DIRECTORY=""
-
-      if [ -w "/lib/systemd/system" ]; then
-        SYSTEMD_DIRECTORY="/lib/systemd/system"
-      elif [ -w "/usr/lib/systemd/system" ]; then
-        SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
-      elif [ -w "/etc/systemd/system" ]; then
-        SYSTEMD_DIRECTORY="/etc/systemd/system"
-      fi
-
-      if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
-        SYSTEMD_DIRECTORY="/etc/systemd/system"
-      fi
+      SYSTEMD_DIRECTORY="$(get_systemd_service_dir)"
 
       if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
         ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
@@ -901,6 +905,8 @@ safe_sha256sum() {
 _get_scheduler_type() {
   if _get_intervaldir > /dev/null ; then
     echo 'interval'
+  elif issystemd ; then
+    echo 'systemd'
   elif [ -d /etc/cron.d ] ; then
     echo 'crontab'
   else
@@ -929,6 +935,11 @@ install_netdata_updater() {
     cat "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
   fi
 
+  if issystemd && [ -n "$(get_systemd_service_dir)" ]; then
+    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.timer" > "$(get_systemd_service_dir)/netdata-updater.timer"
+    cat "${NETDATA_SOURCE_DIR}/system/netdata-updater.service" > "$(get_systemd_service_dir)/netdata-updater.service"
+  fi
+
   sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
 
   chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
@@ -942,6 +953,12 @@ cleanup_old_netdata_updater() {
   if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
     echo >&2 "Removing updater from deprecated location"
     rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
+  fi
+
+  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
+    systemctl disable netdata-updater.timer
+    rm -f "$(get_systemd_service_dir)/netdata-updater.timer"
+    rm -f "$(get_systemd_service_dir)/netdata-updater.service"
   fi
 
   if [ -d /etc/cron.daily ]; then
@@ -962,7 +979,24 @@ cleanup_old_netdata_updater() {
 }
 
 enable_netdata_updater() {
-  case "$(_get_scheduler_type)" in
+  local updater_type
+
+  if [ -z "${1}" ] ; then
+    updater_type="${1}"
+  else
+    updater_type="$(_get_scheduler_type)"
+  fi
+
+  case "${updater_type}" in
+    "systemd")
+      systemctl enable netdata-updater.timer
+
+      echo >&2 "Auto-updating has been enabled using a systemd timer unit."
+      echo >&2
+      echo >&2 "If the update process fails, the failure will be logged to the systemd journal just like a regular service failure."
+      echo >&2 "Successful updates should produce empty logs."
+      echo >&2
+      ;;
     "interval")
       ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "$(_get_intervaldir)/netdata-updater"
 
@@ -975,7 +1009,7 @@ enable_netdata_updater() {
     "crontab")
       cat "${NETDATA_SOURCE_DIR}/system/netdata.crontab" > "/etc/cron.d/netdata-updater"
 
-      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata${TPUT_RESET}"
+      echo >&2 "Auto-updating has been enabled through cron, using a crontab at ${TPUT_RED}${TPUT_BOLD}/etc/cron.d/netdata-updater${TPUT_RESET}"
       echo >&2
       echo >&2 "If the update process fails and you have email notifications set up correctly for cron on this system, you should receive an email notification of the failure."
       echo >&2 "Successful updates will not send an email."
@@ -993,6 +1027,10 @@ enable_netdata_updater() {
 disable_netdata_updater() {
   echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
   echo >&2
+
+  if issystemd && [ -n "$(get_systemd_service_dir)" ] ; then
+    systemctl disable netdata-updater.timer
+  fi
 
   if [ -d /etc/cron.daily ]; then
     rm -f /etc/cron.daily/netdata-updater.sh

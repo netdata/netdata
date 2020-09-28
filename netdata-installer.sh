@@ -205,6 +205,8 @@ USAGE: ${PROGRAM} [options]
   --dont-start-it            Do not (re)start netdata after installation
   --dont-wait                Run installation in non-interactive mode
   --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
+  --auto-update-type         Override the auto-update scheduling mechanism detection, currently supported types
+                             are: systemd, interval, crontab
   --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
                              This results in less frequent updates.
   --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
@@ -277,6 +279,18 @@ while [ -n "${1}" ]; do
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
     "--auto-update" | "-u") AUTOUPDATE=1 ;;
+    "--auto-update-type")
+      AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+      case "${AUTO_UPDATE_TYPE}" in
+        systemd|interval|crontab)
+          shift 1
+          ;;
+        *)
+          echo "Unrecognized value for --auto-update-type. Valid values are: systemd, interval, crontab"
+          exit 1
+          ;;
+      esac
+      ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
     "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi" ;;
@@ -1796,7 +1810,7 @@ install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
 progress "Check if we must enable/disable the netdata updater tool"
 if [ "${AUTOUPDATE}" = "1" ]; then
-  enable_netdata_updater || run_failed "Cannot enable netdata updater tool"
+  enable_netdata_updater ${AUTO_UPDATE_TYPE} || run_failed "Cannot enable netdata updater tool"
 else
   disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
 fi

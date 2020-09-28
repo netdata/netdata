@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily auto-updates for Netdata
+RefuseManualStart=no
+RefuseManualStop=no
+
+[Timer]
+Persistent=false
+OnCalendar=daily
+Unit=netdata-updater.service
+
+[Install]
+WantedBy=timers.target
