@@ -1214,7 +1214,7 @@ inline void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts
 
     buffer_sprintf(
         dest,
-        "\t{\"type\": \"%s\",\n"
+        "{\t\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
         "\t\"timestamp\": %ld,\n"
         "\t\"timestamp-offset-usec\": %llu,\n"
