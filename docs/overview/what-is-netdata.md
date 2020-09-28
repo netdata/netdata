@@ -40,7 +40,7 @@ While Netdata Cloud offers a centralized method of monitoring your Agents, your 
 centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when
 you're viewing the Netdata Cloud interface.
 
-![Netdata Cloud]((https://user-images.githubusercontent.com/1153921/94492597-73410180-019f-11eb-9a9e-032420baa489.png)
+![Netdata Cloud](https://user-images.githubusercontent.com/1153921/94492597-73410180-019f-11eb-9a9e-032420baa489.png)
 
 ## What you can do with Netdata
 
