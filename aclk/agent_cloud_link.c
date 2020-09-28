@@ -821,21 +821,36 @@ CLEANUP:
 
 static void aclk_try_to_connect(char *hostname, int port)
 {
+    int rc;
+
+// this is usefull for developers working on ACLK
+// allows connecting agent to any MQTT broker
+// for debugging, development and testing purposes
+#ifndef ACLK_DISABLE_CHALLENGE
     if (!aclk_private_key) {
-            error("Cannot try to establish the agent cloud link - no private key available!");
-            return;
+        error("Cannot try to establish the agent cloud link - no private key available!");
+        return;
     }
+#endif
+
     info("Attempting to establish the agent cloud link");
+#ifdef ACLK_DISABLE_CHALLENGE
+    if (aclk_password == NULL)
+        aclk_password = strdupz("anon");
+#else
     aclk_get_challenge(hostname, port);
     if (aclk_password == NULL)
         return;
-    int rc;
+#endif
+
     aclk_connecting = 1;
     create_publish_base_topic();
+
     ACLK_SHARED_STATE_LOCK;
     aclk_shared_state.version_neg = 0;
     aclk_shared_state.version_neg_wait_till = 0;
     ACLK_SHARED_STATE_UNLOCK;
+
     rc = mqtt_attempt_connection(hostname, port, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
