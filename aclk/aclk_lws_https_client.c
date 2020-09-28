@@ -147,7 +147,7 @@ static void simple_hcc_log_divert(int level, const char *line)
     error("Libwebsockets: %s", line);
 }
 
-int aclk_send_https_request(char *method, char *host, char *port, char *url, char *b, size_t b_size, char *payload)
+int aclk_send_https_request(char *method, char *host, int port, char *url, char *b, size_t b_size, char *payload)
 {
     info("%s %s", __func__, method);
 
@@ -198,7 +198,7 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
     i.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 #endif
 
-    i.port = atoi(port);
+    i.port = port;
     i.address = host;
     i.path = url;
 

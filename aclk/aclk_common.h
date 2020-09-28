@@ -81,7 +81,7 @@ const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type);
 ACLK_PROXY_TYPE aclk_verify_proxy(const char *string);
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
-int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port);
+int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
 
 #endif //ACLK_COMMON_H

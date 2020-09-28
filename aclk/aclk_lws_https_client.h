@@ -13,6 +13,6 @@
 #define SEND_HTTPS_REQUEST_TIMEOUT 30
 #endif
 
-int aclk_send_https_request(char *method, char *host, char *port, char *url, char *b, size_t b_size, char *payload);
+int aclk_send_https_request(char *method, char *host, int port, char *url, char *b, size_t b_size, char *payload);
 
 #endif /* NETDATA_LWS_HTTPS_CLIENT_H */
