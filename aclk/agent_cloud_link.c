@@ -835,6 +835,9 @@ static void aclk_try_to_connect(char *hostname, int port)
 
     info("Attempting to establish the agent cloud link");
 #ifdef ACLK_DISABLE_CHALLENGE
+    error("Agent built with ACLK_DISABLE_CHALLENGE. This is for testing "
+          "and development purposes only. Warranty void. Won't be able "
+          "to connect to Netdata Cloud.");
     if (aclk_password == NULL)
         aclk_password = strdupz("anon");
 #else
