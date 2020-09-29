@@ -814,10 +814,12 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         }
     }
 #endif /* NETDATA_WITH_ZLIB */
+#ifdef ENABLE_HTTPS
     else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
         if(strcasestr(v, "https"))
             w->ssl.flags |= NETDATA_SSL_PROXY_HTTPS;
     }
+#endif
     else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")){
         strncpyz(w->forwarded_host, v, ((size_t)(ve - v) < sizeof(w->server_host)-1 ? (size_t)(ve - v) : sizeof(w->server_host)-1));
     }
@@ -1352,7 +1354,11 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(!url) { //no delim found
             debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
             char *protocol, *url_host;
+#ifdef ENABLE_HTTPS
             protocol = ((w->ssl.conn && !w->ssl.flags) || w->ssl.flags & NETDATA_SSL_PROXY_HTTPS) ? "https" : "http";
+#else
+            protocol = "http";
+#endif
             url_host = (!w->forwarded_host[0])?w->server_host:w->forwarded_host;
             buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, w->last_url);
             buffer_strcat(w->response.data, "Permanent redirect");
