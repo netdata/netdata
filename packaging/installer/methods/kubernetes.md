@@ -11,9 +11,9 @@ will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to bootstr
 The Helm chart installs one parent pod for storing metrics and managing alarm notifications plus an additional child pod
 for every node in the cluster.
 
-Each child pod will collect metrics from the node it runs on, in addition to [23 specific
-services](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered by
-our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus),
+Each child pod will collect metrics from the node it runs on, in addition to [compatible
+applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered
+by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus),
 via [service discovery](https://github.com/netdata/agent-service-discovery/). Each child pod will also collect
 [cgroups](/collectors/cgroups.plugin/README.md),
 [Kubelet](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), and
@@ -85,9 +85,9 @@ metrics from the service they run. The Netdata Helm chart installs this service 
 
 Service discovery scans your cluster for pods exposed on certain ports and with certain image names. By default, it
 looks for its supported services on the ports they most commonly listen on, and using default image names. Service
-discovery currently supports [23 popular
-services](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered by
-our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
+discovery currently supports [popular
+applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered
+by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
 
 If you haven't changed listening ports or other defaults, service discovery should find your pods, create the proper
 configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
@@ -206,4 +206,4 @@ especially if you want to change any of the configuration settings for either th
 To futher configure Netdata for your cluster, see our [Helm chart repository](https://github.com/netdata/helmchart) and
 the [service discovery repository](https://github.com/netdata/agent-service-discovery/).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2Fmethods%2Fkubernetes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fkubernetes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
