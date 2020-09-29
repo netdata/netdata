@@ -83,7 +83,7 @@ patterns](/libnetdata/simple_pattern/README.md).
     allow connections from = example*
 ```
 
-The `allow connections from` setting is global and restricts acess to the dashboard, badges, streaming, API, and
+The `allow connections from` setting is global and restricts access to the dashboard, badges, streaming, API, and
 `netdata.conf`, but you can also set each of those access lists more granularly if you choose:
 
 ```conf
