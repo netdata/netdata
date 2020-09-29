@@ -512,6 +512,13 @@ cleanup:
     return retval;
 }
 
+#define ACLK_HOST_PTR_COMPULSORY(x) \
+    if (unlikely(!host)) { \
+        errno = 0; \
+        error(x " needs host pointer"); \
+        break; \
+    }
+
 /*
  * This function will fetch the next pending command and process it
  *
@@ -546,8 +553,7 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
 
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
-            if (!host)
-                fatal("ACLK_CMD_ONCONNECT needs host pointer");
+            ACLK_HOST_PTR_COMPULSORY("ACLK_CMD_ONCONNECT");
 
             debug(D_ACLK, "EXECUTING on connect metadata command for host \"%s\" GUID \"%s\"",
                 host->hostname,
@@ -561,18 +567,14 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
             break;
 
         case ACLK_CMD_CHART:
-            if (!host)
-                fatal("ACLK_CMD_CHART needs host pointer");
+            ACLK_HOST_PTR_COMPULSORY("ACLK_CMD_CHART");
 
             debug(D_ACLK, "EXECUTING a chart update command");
-            if (!host)
-                fatal("Pointer to host compulsory");
             aclk_send_single_chart(host, this_query->query);
             break;
 
         case ACLK_CMD_CHARTDEL:
-            if (!host)
-                fatal("ACLK_CMD_CHARTDEL needs host pointer");
+            ACLK_HOST_PTR_COMPULSORY("ACLK_CMD_CHARTDEL");
 
             debug(D_ACLK, "EXECUTING a chart delete command");
             //TODO: This send the info metadata for now
@@ -595,12 +597,11 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
 
         case ACLK_CMD_CHILD_CONNECT:
         case ACLK_CMD_CHILD_DISCONNECT:
+            ACLK_HOST_PTR_COMPULSORY("ACLK_CMD_CHILD_CONNECT/ACLK_CMD_CHILD_DISCONNECT");
+
             debug(
                 D_ACLK, "Execution Child %s command",
                 this_query->cmd == ACLK_CMD_CHILD_CONNECT ? "connect" : "disconnect");
-
-            if (!host)
-                fatal("ACLK_CMD_CHILD_CONNECT/DISCONNECT needs host pointer");
             aclk_send_info_child_connection(host, this_query->cmd);
             break;
 
