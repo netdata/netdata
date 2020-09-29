@@ -914,7 +914,9 @@ void *aclk_main(void *ptr)
         }
     }
 
-    query_threads.count = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", 2);
+    query_threads.count = MIN(processors/2, 6);
+    query_threads.count = MAX(query_threads.count, 2);
+    query_threads.count = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", query_threads.count);
     if(query_threads.count < 1) {
         error("You need at least one query thread. Overriding configured setting of \"%d\"", query_threads.count);
         query_threads.count = 1;
