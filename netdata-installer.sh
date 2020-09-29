@@ -1059,7 +1059,7 @@ run $make install || exit 1
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.logrotate -exec chmod 755 {} \;
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -exec chmod 755 {} \;
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
