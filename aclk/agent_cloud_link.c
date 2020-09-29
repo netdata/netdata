@@ -443,7 +443,7 @@ static struct _collector *_add_collector(const char *hostname, const char *plugi
  * (every time we need to check child popcorn expiry)
  * call with ACLK_SHARED_STATE_LOCK held
  */
-void aclk_update_next_child_to_popcorn()
+void aclk_update_next_child_to_popcorn(void)
 {
     RRDHOST *host;
     int any = 0;
@@ -545,7 +545,7 @@ static void aclk_stop_host_popcorning(RRDHOST *host)
 
     if(host == aclk_shared_state.next_popcorn_host) {
         aclk_shared_state.next_popcorn_host = NULL;
-        aclk_update_next_child_to_popcorn(host);
+        aclk_update_next_child_to_popcorn();
     }
     ACLK_SHARED_STATE_UNLOCK;
 }

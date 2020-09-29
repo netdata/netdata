@@ -88,6 +88,6 @@ void aclk_single_update_disable();
 
 void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd);
 int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd);
-void aclk_update_next_child_to_popcorn();
+void aclk_update_next_child_to_popcorn(void);
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
