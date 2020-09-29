@@ -51,9 +51,9 @@ the database engine to use. The higher those values, the more metrics Netdata wi
 512, respectively, the database engine should store about four day's worth of data on a system collecting 2,000 metrics
 every second.
 
-[**See our database engine calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to help you
-correctly set `dbengine disk space` based on your needs. The calculator gives an accurate estimate based on how many
-child nodes you have, how many metrics your Agent collects, and more.
+[**See our database engine calculator**](/docs/store/change-metrics-storage.md) to help you correctly set `dbengine disk
+space` based on your needs. The calculator gives an accurate estimate based on how many child nodes you have, how many
+metrics your Agent collects, and more.
 
 ```conf
 [global]

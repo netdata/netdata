@@ -492,7 +492,7 @@ this writing, Netdata supports:
 -   json document DBs
 -   all the compatibles to the above (e.g. kairosdb, influxdb, etc)
 
-Check the Netdata [exporting documentation](/docs/export/README.md) for configuring this.
+Check the Netdata [exporting documentation](/docs/export/external-databases.md) for configuring this.
 
 This is how such a solution will work:
 
