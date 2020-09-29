@@ -33,8 +33,8 @@ your k8s infrastructure.
     applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services) and any endpoints
     covered by our [generic Prometheus
     collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus). With these
-    configuration file, Netdata can monitor any of these applications as they run _inside_ of a pod. Service discovery
-    happens without manual intervention as pods are created, destroyed, or moved between nodes. 
+    configuration files, Netdata collects metrics from any compatible applications as they run _inside_ of a pod.
+    Service discovery happens without manual intervention as pods are created, destroyed, or moved between nodes. 
 -   A [Kubelet collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), which runs
     on each node in a k8s cluster to monitor the number of pods/containers, the volume of operations on each container,
     and more.
