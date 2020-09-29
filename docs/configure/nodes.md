@@ -79,8 +79,6 @@ USAGE:
 To edit `netdata.conf`, run `./edit-config netdata.conf`. You may need to elevate your privileges with `sudo` or another
 method for `edit-config` to write into the config directory. Use your `$EDITOR`, make your changes, and save the file.
 
-> You may need to use `sudo` or another method of elevating your privileges: `sudo ./edit-config netdata.conf`.
->
 > `edit-config` uses the `EDITOR` environment variable on your system to edit the file. On many systems, that is
 > defaulted to `vim` or `nano`. To change this variable for the current session (it will revert to the default when you
 > reboot), export a new value: `export EDITOR=nano`. Or, [make the change
