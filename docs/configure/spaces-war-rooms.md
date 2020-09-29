@@ -48,7 +48,7 @@ versus your homelab.
 War Rooms are granular containers for organizing nodes, viewing key metrics in real-time, and monitoring the health and
 alarm status of many nodes. 
 
-War Rooms organize the [at-a-glance Node view](/docs/visualize/view-all-nodes.md) and any new [new
+War Rooms organize the [at-a-glance Node view](/docs/visualize/view-all-nodes.md) and any [new
 dashboards](/docs/visualize/create-dashboards.md) you build.
 
 We recommend a few strategies for organizing your War Rooms.
