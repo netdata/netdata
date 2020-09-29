@@ -6,9 +6,14 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/ena
 
 # Enable or configure a collector
 
-While collectors start collecting right away if they find exposed metrics on their default endpoint, not all
-infrastructures use standard ports, paths, files, or naming conventions. You may need to enable or configure a collector
-to gather all available metrics from your systems, containers, or applications.
+When Netdata starts up, each collector searches for exposed metrics on the default endpoint established by that service
+or application's standard installation procedure. For example, the [Nginx
+collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) searches at
+`http://127.0.0.1/stub_status` for exposed metrics in the correct format. If an Nginx web server is running and exposes
+metrics on that endpoint, the collector begins gathering them.
+
+However, not every node or infrastructure uses standard ports, paths, files, or naming conventions. You may need to
+enable or configure a collector to gather all available metrics from your systems, containers, or applications.
 
 ## Enable a collector or its orchestrator
 

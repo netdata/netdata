@@ -31,7 +31,7 @@ Your team will receive their email invitations momentarily with a prompt to sign
 
 ## Collaboration with Netdata Cloud
 
-Netdata Cloud gives teams a single interface to view real-time metrics from across the entire infrastructure. Having all
+Netdata Cloud gives teams a single interface to view real-time metrics across their entire infrastructure. Having all
 the metrics, alarm statuses, dashboards, and people in one place is a powerful asset for any infrastructure monitoring
 team.
 
