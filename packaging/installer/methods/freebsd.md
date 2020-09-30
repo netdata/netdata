@@ -13,13 +13,13 @@ This is how to install the latest Netdata version on FreeBSD:
 Install required packages (**need root permission**):
 
 ```sh
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c cmake gmake
 ```
 
 Download Netdata:
 
 ```sh
-fetch https://github.com/netdata/netdata/releases/download/v1.22.1/netdata-v1.22.1.tar.gz
+fetch https://github.com/netdata/netdata/releases/download/v1.25.0/netdata-v1.25.0.tar.gz
 ```
 
 Unzip the downloaded file:
