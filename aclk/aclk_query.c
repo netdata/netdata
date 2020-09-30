@@ -554,6 +554,14 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
     switch (this_query->cmd) {
         case ACLK_CMD_ONCONNECT:
             ACLK_HOST_PTR_COMPULSORY("ACLK_CMD_ONCONNECT");
+#if ACLK_VERSION_MIN < ACLK_V_CHILDRENSTATE
+            if (host != localhost && aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE) {
+                error("We are not allowed to send connect message in ACLK version before %d", ACLK_V_CHILDRENSTATE);
+                break;
+            }
+#else
+#warning "This check became unnecessary. Remove"
+#endif
 
             debug(D_ACLK, "EXECUTING on connect metadata command for host \"%s\" GUID \"%s\"",
                 host->hostname,
