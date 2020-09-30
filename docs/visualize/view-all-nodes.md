@@ -54,15 +54,15 @@ Nodes](https://user-images.githubusercontent.com/1153921/93496405-03d83180-f8c4-
 ## Filter and group your infrastructure
 
 Use the filter input next to the Nodes heading to filter the nodes in a given War Room. The filtering feature supports
-relational operators (==, !=, contains, and !contains) and logical operators (AND, OR), plus the name, OS, or services
-running on your nodes to quickly turn any War Room into a focused troubleshooting interface. See what services Netdata
-Cloud can filter by in the [supported collectors list](/collectors/COLLECTORS.md).
+relational operators (`==`, `!=`, `contains`, and `!contains`) and logical operators (`AND`, `OR`), plus the name, OS,
+or services running on your nodes to quickly turn any War Room into a focused troubleshooting interface. See what
+services Netdata Cloud can filter by in the [supported collectors list](/collectors/COLLECTORS.md).
 
 For example, `name == centos OR os == debian` filters any nodes by the exact name centos or has Debian as its operating
 system.
 
 You can also use parentheses around operators to create more sophisticated filters. `(name contains aws AND os contains
-ubuntu) OR services == apache` shows only nodes that have aws in the hostname and are Ubuntu-based, or any nodes that
+ubuntu) OR services == apache` shows only nodes that have `aws` in the hostname and are Ubuntu-based, or any nodes that
 have an Apache webserver running on them.
 
 ![Filtering a War Room in Netdata

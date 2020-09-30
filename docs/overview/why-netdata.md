@@ -14,7 +14,7 @@ Netdata is:
 
 ## Simple to deploy
 
--   **One-line deployment** for Linux distributions, plus support for Kubernetes/Docker infrastructures
+-   **One-line deployment** for Linux distributions, plus support for Kubernetes/Docker infrastructures.
 -   **Zero configuration and maintenance** required to collect thousands of metrics, every second, from the underlying
     OS and running applications.
 -   **Prebuilt charts and alarms** alert you to common anomalies and performance issues without manual configuration.

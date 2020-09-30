@@ -70,11 +70,13 @@ your k8s infrastructure.
 
 -   A [Helm chart](https://github.com/netdata/helmchart), which bootstraps a Netdata Agent pod on every node in your
     cluster, plus an additional parent pod for storing metrics and managing alarm notifications.
--   A [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers and immediately
-    monitors 22 different services that might be running inside of your cluster's pods. Service discovery happens
-    without manual intervention as pods are created, destroyed, or moved between nodes. [Compatible
-    services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) include Nginx, Apache,
-    MySQL, CoreDNS, and much more.
+-   A [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers and creates
+    configuration files for [compatible
+    applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services) and any endpoints
+    covered by our [generic Prometheus
+    collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus). With these
+    configuration files, Netdata collects metrics from any compatible applications as they run _inside_ of a pod.
+    Service discovery happens without manual intervention as pods are created, destroyed, or moved between nodes. 
 -   A [Kubelet collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), which runs
     on each node in a k8s cluster to monitor the number of pods/containers, the volume of operations on each container,
     and more.

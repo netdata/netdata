@@ -40,16 +40,14 @@ Upon installation, the Netdata config directory contains a few files and directo
     `/usr/lib/netdata/conf.d`, as they are overwritten by updates to the Netdata Agent._
 -   `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-netdataconf).
 -   `go.d/`, `python.d/`, `charts.d/`, `node.d`/, and `custom-plugins.d/`, which are directories for each of Netdata's
-    [orchestrators](/collectors/plugins.d/README.md#external-plugins-overview). These directories can each contain
-    additional `.conf` files for configuring specific collectors.
+    [orchestrators](/collectors/plugins.d/README.md). These directories can each contain additional `.conf` files for
+    configuring specific collectors.
 
 ## Use `edit-config` to edit `netdata.conf`
 
-The best way to edit any configuration file is with `edit-config` script. This script opens existing Netdata
-configuration files using your system's `$EDITOR`. If the file doesn't yet exist in your config directory, the script
-copies the stock version from `/usr/lib/netdata/conf.d` and opens it for editing.
-
-`edit-config` is the recommended way to easily and safely edit Netdata's configuration.
+The **recommended way to easily and safely edit Netdata's configuration** is with the `edit-config` script. This script
+opens existing Netdata configuration files using your system's `$EDITOR`. If the file doesn't yet exist in your config
+directory, the script copies the stock version from `/usr/lib/netdata/conf.d` and opens it for editing.
 
 Run `edit-config` without any options to see details on its usage and a list of all the configuration files you can
 edit.

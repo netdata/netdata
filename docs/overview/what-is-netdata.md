@@ -10,7 +10,7 @@ Netdata helps sysadmins, SREs, DevOps engineers, and IT professionals collect al
 applications, visualize these metrics in real-time, and troubleshoot complex performance problems.
 
 Netdata's solution uses two components, the Netdata Agent and Netdata Cloud, to deliver real-time performance and health
-monitoring for both single nodes and entire infrastructures.
+monitoring for both single nodes and entire infrastructure.
 
 ## Netdata Agent
 
@@ -18,8 +18,9 @@ Netdata's distributed monitoring Agent collects thousands of metrics from system
 configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT
 devices.
 
-You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms
-(Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
+You can [install](/docs/get/README.md#install-the-netdata-agent) Netdata on most Linux distributions (Ubuntu, Debian,
+CentOS, and more), container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems
+(FreeBSD, macOS), with no `sudo` required.
 
 ![The Netdata
 Agent](https://user-images.githubusercontent.com/1153921/94492596-72a86b00-019f-11eb-91ab-224e6ac9ea21.png)
