@@ -454,7 +454,7 @@ void aclk_update_next_child_to_popcorn(void)
             continue;
 
         rrdhost_aclk_state_lock(host);
-        if (!ACLK_IS_HOST_POPCORNING(host) || !host->aclk_state.t_last_popcorn_update) {
+        if (!ACLK_IS_HOST_POPCORNING(host)) {
             rrdhost_aclk_state_unlock(host);
             continue;
         }
@@ -478,44 +478,53 @@ void aclk_update_next_child_to_popcorn(void)
     rrd_unlock();
 }
 
+/* If popcorning bump timer.
+ * If popcorning or initializing (host not stable) return 1
+ * Otherwise return 0
+ */
 static int aclk_popcorn_check_bump(RRDHOST *host)
 {
     time_t now = now_monotonic_sec();
-    int updated = 0;
+    int updated = 0, ret;
+    ACLK_SHARED_STATE_LOCK;
     rrdhost_aclk_state_lock(host);
+
+    ret = ACLK_IS_HOST_INITIALIZING(host);
     if (unlikely(ACLK_IS_HOST_POPCORNING(host))) {
         if(now != host->aclk_state.t_last_popcorn_update) {
             updated = 1;
-            info("%starting ACLK popcorn timer for host \"%s\" with GUID \"%s\"", (host->aclk_state.t_last_popcorn_update ? "Res" : "S"), host->hostname, host->machine_guid);
+            info("Restarting ACLK popcorn timer for host \"%s\" with GUID \"%s\"", host->hostname, host->machine_guid);
         }
-
         host->aclk_state.t_last_popcorn_update = now;
         rrdhost_aclk_state_unlock(host);
 
-        if (host != localhost && updated) {
-            ACLK_SHARED_STATE_LOCK;
+        if (host != localhost && updated)
             aclk_update_next_child_to_popcorn();
-            ACLK_SHARED_STATE_UNLOCK;
-        }
 
-        return 1;
+        ACLK_SHARED_STATE_UNLOCK;
+        return ret;
     }
+
     rrdhost_aclk_state_unlock(host);
-    return 0;
+    ACLK_SHARED_STATE_UNLOCK;
+    return ret;
 }
 
 inline static int aclk_host_initializing(RRDHOST *host)
 {
     rrdhost_aclk_state_lock(host);
-    int ret = ACLK_IS_HOST_POPCORNING(host);
+    int ret = ACLK_IS_HOST_INITIALIZING(host);
     rrdhost_aclk_state_unlock(host);
     return ret;
 }
 
 static void aclk_start_host_popcorning(RRDHOST *host)
 {
+    usec_t now = now_monotonic_sec();
+    info("Starting ACLK popcorn timer for host \"%s\" with GUID \"%s\"", host->hostname, host->machine_guid);
+    ACLK_SHARED_STATE_LOCK;
     rrdhost_aclk_state_lock(host);
-    if (host == localhost && host->aclk_state.state != ACLK_HOST_INITIALIZING) {
+    if (host == localhost && !ACLK_IS_HOST_INITIALIZING(host)) {
         errno = 0;
         error("Localhost is allowed to do popcorning only once after startup!");
         rrdhost_aclk_state_unlock(host);
@@ -524,8 +533,11 @@ static void aclk_start_host_popcorning(RRDHOST *host)
 
     host->aclk_state.state = ACLK_HOST_INITIALIZING;
     host->aclk_state.metadata = ACLK_METADATA_REQUIRED;
+    host->aclk_state.t_last_popcorn_update = now;
     rrdhost_aclk_state_unlock(host);
-    aclk_popcorn_check_bump(host);
+    if (host != localhost)
+        aclk_update_next_child_to_popcorn();
+    ACLK_SHARED_STATE_UNLOCK;
 }
 
 static void aclk_stop_host_popcorning(RRDHOST *host)
