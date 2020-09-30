@@ -319,24 +319,17 @@ static char *aclk_encode_response(char *src, size_t content_size, int keep_newli
 #pragma region ACLK_QUERY
 #endif
 
-static usec_t aclk_web_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
+static usec_t aclk_web_api_request_v1(RRDHOST *host, struct web_client *w, char *url, usec_t q_created)
 {
-    usec_t t;
+    usec_t t_db = now_monotonic_high_precision_usec();
+    aclk_metric_mat_update(&aclk_metrics_per_sample.cloud_q_recvd_to_processed, now_realtime_usec() - q_created);
 
-    t = now_monotonic_high_precision_usec();
     w->response.code = web_client_api_request_v1(host, w, url);
-    t = now_monotonic_high_precision_usec() - t;
+    t_db = now_monotonic_high_precision_usec() - t_db;
 
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.cloud_q_process_total += t;
-        aclk_metrics_per_sample.cloud_q_process_count++;
-        if (aclk_metrics_per_sample.cloud_q_process_max < t)
-            aclk_metrics_per_sample.cloud_q_process_max = t;
-        ACLK_STATS_UNLOCK;
-    }
+    aclk_metric_mat_update(&aclk_metrics_per_sample.cloud_q_db_query_time, t_db);
 
-    return t;
+    return t_db;
 }
 
 static int aclk_execute_query(struct aclk_query *this_query)
@@ -361,7 +354,7 @@ static int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop", this_query->created);
         now_realtime_timeval(&w->tv_ready);
         w->response.data->date = w->tv_ready.tv_sec;
         web_client_build_http_header(w);  // TODO: this function should offset from date, not tv_ready
@@ -427,7 +420,7 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     mysep = strrchr(this_query->query, '/');
 
     // execute the query
-    t = aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+    t = aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop", this_query->created);
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
