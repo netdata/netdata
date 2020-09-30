@@ -31,8 +31,8 @@ directly using a keyboard, mouse, and monitor.
 Netdata helps you monitor and troubleshoot all kinds of devices and the applications they run, including IoT devices
 like the Raspberry Pi and applications like Pi-hole.
 
-After a two-minute installation and with zero configuration, you'll be able all of Pi-hole's metrics, including the
-volume of queries, connected clients, DNS queries per type, top clients, top blocked domains, and more.
+After a two-minute installation and with zero configuration, you'll be able to seeall of Pi-hole's metrics, including
+the volume of queries, connected clients, DNS queries per type, top clients, top blocked domains, and more.
 
 With Netdata installed, you can also monitor system metrics and any other applications you might be running. By default,
 Netdata collects metrics on CPU usage, disk IO, bandwidth, per-application resource usage, and a ton more. With the
