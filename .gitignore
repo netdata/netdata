@@ -113,6 +113,7 @@ system/netdata-init-d
 system/netdata.logrotate
 system/netdata.service
 system/netdata.service.*
+system/netdata-updater.service
 !system/netdata.service.in
 !system/netdata.service.*.in
 system/netdata.plist
