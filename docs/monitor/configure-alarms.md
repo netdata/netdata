@@ -60,8 +60,8 @@ Save the file and [reload Netdata's health configuration](#reload-health-configu
 
 ### Silence an individual alarm
 
-Instead of disabling an alarm altogether, or even disabling _all_ alarms, can silence individual alarms by changing one
-line in a given health entity. To silence any single alarm, change the `to:` line in its entity to `silent`.
+Instead of disabling an alarm altogether, or even disabling _all_ alarms, you can silence individual alarms by changing
+one line in a given health entity. To silence any single alarm, change the `to:` line in its entity to `silent`.
 
 ```yaml
       to: silent

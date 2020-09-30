@@ -12,7 +12,7 @@ Together, the Netdata Agent and Netdata Cloud create a powerful, infinitely-scal
 The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly,
 and uses Netdata's [distributed data architecture](/docs/store/distributed-data-architecture.md) to store metrics
 locally. Without a slow and troublesome centralized data lake for your infrastructure's metrics, you reduce the
-resources you need to invest, and the complexity of, monitoring your infrastructure. 
+resources you need to invest in, and the complexity of, monitoring your infrastructure. 
 
 Netdata Cloud unifies monitoring your infrastructure by _centralizing the interface_ you use to query and visualize your
 nodes' metrics, not the data. By streaming metrics values to your browser, with Netdata Cloud acting as the secure proxy
