@@ -375,12 +375,12 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // Standard counters are mandatory
                 if (!counters_dir)
                     continue;
+                closedir(counters_dir);
 
-                // Nearly same with hardware counters
+                // Hardware Counters are optionnal, used later
                 char hwcounters_dirname[FILENAME_MAX + 1];
                 snprintfz(
                     hwcounters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "hw_counters");
-                DIR *hwcounters_dir = opendir(hwcounters_dirname);
 
                 // Get new or existing ibport
                 struct ibport *p = get_ibport(dev_dent->d_name, port_dent->d_name);
@@ -412,6 +412,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                     FOREACH_COUNTER(GEN_DO_COUNTER_NAME, p)
 
                     // Check HW Counters vendor dependent
+                    DIR *hwcounters_dir = opendir(hwcounters_dirname);
                     if (hwcounters_dir) {
                         // By default set standard
                         p->do_hwpackets = config_get_boolean_ondemand(buffer, "hwpackets", do_hwpackets);
@@ -442,6 +443,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                             p->do_hwpackets = CONFIG_BOOLEAN_NO;
                             p->do_hwerrors = CONFIG_BOOLEAN_NO;
                         }
+                        closedir(hwcounters_dir);
                     }
                 }
 
