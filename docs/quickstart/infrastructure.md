@@ -9,17 +9,22 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/
 
 Together, the Netdata Agent and Netdata Cloud create a powerful, infinitely-scalable infrastructure monitoring solution.
 
-The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly.
-The distributed data model lets you monitor everything without a slow and troublesome centralized data lake for your
-infrastructure's metrics, reducing the resources you need to invest in metrics retention. Netdata Cloud unifies all the
-metrics from these distributed nodes on customizable, interactive, and real-time visualizations.
+The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly,
+and uses Netdata's [distributed data architecture](/docs/store/distributed-data-architecture.md) to store metrics
+locally. Without a slow and troublesome centralized data lake for your infrastructure's metrics, you reduce the
+resources you need to invest in, and the complexity of, monitoring your infrastructure. 
+
+Netdata Cloud unifies monitoring your infrastructure by _centralizing the interface_ you use to query and visualize your
+nodes' metrics, not the data. By streaming metrics values to your browser, with Netdata Cloud acting as the secure proxy
+between them, you can monitor your infrastructure using customizable, interactive, and real-time visualizations from any
+numbe of distributed nodes.
 
 In this quickstart guide, you'll learn how to see key metrics from all your nodes in one interface and build your first
 dashboard for aggregating like metrics from many distributed nodes. You'll then take a peek into configuring individual
 nodes and get helpful pointers about collecting all the metrics from every critical application in your infrastructure.
 
 > This quickstart assumes you've installed the Netdata Agent on more than one node in your infrastructure, and claimed
-> that node to your Space in Netdata Cloud. If you haven't yet, see the [_Get Netdata_ doc](/docs/get/README.md) for
+> those nodes to your Space in Netdata Cloud. If you haven't yet, see the [_Get Netdata_ doc](/docs/get/README.md) for
 > details on installation and claiming.
 
 ## See your infrastructure's metrics

@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/distr
 Netdata uses a distributed data architecture to help you collect and store per-second metrics from any number of nodes.
 Every node in your infrastructure, whether it's one or a thousand, stores the metrics it collects.
 
-Netdata Cloud bridges the gap between many distributed databases by _centralizing the interface you use_ to query and
+Netdata Cloud bridges the gap between many distributed databases by _centralizing the interface_ you use to query and
 visualize your nodes' metrics. When you [look at charts in Netdata
 Cloud](/docs/visualize/interact-dashboards-charts.md), the metrics values are queried directly from that node's database
 and securely streamed to Netdata Cloud, which proxies them to your browser.

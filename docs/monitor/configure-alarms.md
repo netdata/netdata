@@ -60,10 +60,8 @@ Save the file and [reload Netdata's health configuration](#reload-health-configu
 
 ### Silence an individual alarm
 
-Many Netdata users don't need all the default alarms enabled. Instead of disabling any given alarm, or even _all_
-alarms, you can silence individual alarms by changing one line in a given health entity. 
-
-To silence any single alarm, change the `to:` line to `silent`.
+Instead of disabling an alarm altogether, or even disabling _all_ alarms, you can silence individual alarms by changing
+one line in a given health entity. To silence any single alarm, change the `to:` line in its entity to `silent`.
 
 ```yaml
       to: silent
@@ -72,7 +70,7 @@ To silence any single alarm, change the `to:` line to `silent`.
 ## Write a new health entity
 
 While tuning existing alarms may work in some cases, you may need to write entirely new health entities based on how
-your systems and applications work.
+your systems, containers, and applications work.
 
 Read Netdata's [health reference](/health/REFERENCE.md#health-entity-reference) for a full listing of the format,
 syntax, and functionality of health entities.

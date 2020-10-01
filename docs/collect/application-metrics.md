@@ -69,6 +69,10 @@ list](/collectors/COLLECTORS.md#service-and-application-collectors) that can run
 
 ## What's next?
 
+If you haven't yet seen the [supported collectors list](/collectors/COLLECTORS.md) give it a once-over for any
+additional applications you may want to monitor using Netdata's native collectors, or the [generic Prometheus
+collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
+
 Collecting all the available metrics on your nodes, and across your entire infrastructure, is just one piece of the
 puzzle. Next, learn more about Netdata's famous real-time visualizations by [viewing all your nodes at a
 glance](/docs/visualize/view-all-nodes.md).

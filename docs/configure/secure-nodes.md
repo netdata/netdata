@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/s
 
 # Secure your nodes
 
-Upon installation, the Netdata Agent serves the local dashboard at port `19999`. If the node is accessible to the
+Upon installation, the Netdata Agent serves the **local dashboard** at port `19999`. If the node is accessible to the
 internet at large, anyone can access the dashboard and your node's metrics at `http://NODE:19999`. We made this decision
 so that the local dashboard was immediately accessible to users, and so that we don't dictate how professionals set up
 and secure their infrastructures. 
@@ -27,9 +27,9 @@ Instead of dictating how to secure your infrastructure, we give you many options
 that align with your goals and your organization's standards.
 
 -   [Disable the local dashboard](#disable-the-local-dashboard): **Simplest and recommended method** for those who have
-    added nodes to Netdata Cloud and view metrics there.
--   [Restrict access to the local dashboard](#restrict-access-to-the-local-dashboard): Allow dashboard access from only
-    certain IP addresses, such as a trusted static IP or connections from behind a management LAN. Full support for
+    added nodes to Netdata Cloud and view dashboards and metrics there.
+-   [Restrict access to the local dashboard](#restrict-access-to-the-local-dashboard): Allow local dashboard access from
+    only certain IP addresses, such as a trusted static IP or connections from behind a management LAN. Full support for
     Netdata Cloud.
 -   [Use a reverse proxy](#use-a-reverse-proxy): Password-protect a local dashboard and enable TLS to secure it. Full
     support for Netdata Cloud.
@@ -39,13 +39,13 @@ that align with your goals and your organization's standards.
 This is the _recommended method for those who have claimed their nodes to Netdata Cloud_ and prefer viewing real-time
 metrics using the Nodes view and Cloud dashboards.
 
-You can disable the local dashboard entirely but retain the encrypted Agent-Cloud link ([ACLK](/aclk/README.md)) that
+You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link ([ACLK](/aclk/README.md)) that
 allows you to stream metrics on demand from your nodes via the Netdata Cloud interface. This change mitigates all
 concerns about revealing metrics and system design to the internet at large, while keeping all the functionality you
-need to view metrics and troubleshoot issues.
+need to view metrics and troubleshoot issues with Netdata Cloud.
 
 Open `netdata.conf` with `./edit-config netdata.conf`. Scroll down to the `[web]` section, and find the `mode =
-static-threaded` setting. To disable the local dashboard, change this setting to `none`.
+static-threaded` setting, and change it to `none`.
 
 ```conf
 [web]
@@ -97,7 +97,8 @@ The `allow connections from` setting is global and restricts access to the dashb
 ```
 
 See the [web server](/web/server/README.md#access-lists) docs for additional details about access lists. You can take
-access lists one step further by [enabling SSL](/web/server/README.md#enabling-tls-support) to encrypt data in transit.
+access lists one step further by [enabling SSL](/web/server/README.md#enabling-tls-support) to encrypt data from local
+dashboard in transit. The connection to Netdata Cloud is always secured with TLS.
 
 ## Use a reverse proxy
 

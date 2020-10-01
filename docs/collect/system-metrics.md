@@ -39,9 +39,12 @@ collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules
 [windows_exporter](https://github.com/prometheus-community/windows_exporter), a small Go-based binary that you can run
 on Windows systems. The WMI collector then gathers metrics from an endpoint created by windows_exporter.
 
-First, [install
-windows_exporter](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#configuration) and run it:
-`windows_exporter-0.13.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon"`.
+First, [download windows_exporter](https://github.com/prometheus-community/windows_exporter#installation) and run it
+with the following collectors enabled, changing `0.14.0` to the version you downloaded.
+
+```powershell
+windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_disk,os,system,logon"
+```
 
 Next, [configure the WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#configuration) to point to the URL
