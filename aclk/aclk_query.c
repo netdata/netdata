@@ -321,9 +321,10 @@ static char *aclk_encode_response(char *src, size_t content_size, int keep_newli
 
 static usec_t aclk_web_api_request_v1(RRDHOST *host, struct web_client *w, char *url, usec_t q_created)
 {
-    usec_t t_db = now_monotonic_high_precision_usec();
+    usec_t t_db;
     aclk_metric_mat_update(&aclk_metrics_per_sample.cloud_q_recvd_to_processed, now_realtime_usec() - q_created);
 
+    t_db = now_monotonic_high_precision_usec();
     w->response.code = web_client_api_request_v1(host, w, url);
     t_db = now_monotonic_high_precision_usec() - t_db;
 
