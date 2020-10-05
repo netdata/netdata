@@ -460,7 +460,7 @@ Here is a quick list of notable documents:
 | [`collectors`](/collectors/README.md)                 | Information about data collection plugins.                                                                            |
 | [`health`](/health/README.md)                         | How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods. |
 | [`streaming`](/streaming/README.md)                   | How to build hierarchies of Netdata servers, by streaming metrics between them.                                       |
-| [`exporting`](/docs/export/README.md)                 | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
+| [`exporting`](/docs/export/external-databases.md)                 | Long term archiving of metrics to industry-standard time-series databases, like `prometheus`, `graphite`, `opentsdb`. |
 | [`web/api`](/web/api/README.md)                       | Learn how to query the Netdata API and the queries it supports.                                                       |
 | [`web/api/badges`](/web/api/badges/README.md)         | Learn how to generate badges (SVG images) from live data.                                                             |
 | [`web/gui/custom`](/web/gui/custom/README.md)         | Learn how to create custom Netdata dashboards.                                                                        |
