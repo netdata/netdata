@@ -2265,6 +2265,106 @@ netdataDashboard.context = {
             '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
     },
 
+     // ------------------------------------------------------------------------
+    // go web_log
+
+    'web_log.type_requests': {
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="success"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Successful"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="redirect"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Redirects"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="bad"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Bad Requests"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="error"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Server Errors"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'web_log.request_processing_time': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="avg"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Average Response Time"'
+                    + ' data-units="milliseconds"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
     // ------------------------------------------------------------------------
     // Fronius Solar Power
 
