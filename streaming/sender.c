@@ -22,6 +22,24 @@ void sender_commit(struct sender_state *s) {
     netdata_mutex_unlock(&s->mutex);
 }
 
+// Collector thread finishing a transmission
+// Returns 0 on success, 1 on overflow or if more than 50% of the send buffer is filled
+int sender_commit_no_overflow(struct sender_state *s) {
+    int ret = 0;
+
+    size_t len = cbuffer_len_unsafe(s->host->sender->buffer);
+    // check if 50% of the send buffer is filled
+    if (s->host->sender->build->len + len >= s->host->sender->buffer->max_size / 2)
+        ret = 1;
+    // check if an overflow occured
+    if(cbuffer_add_unsafe(s->host->sender->buffer, buffer_tostring(s->host->sender->build),
+                      s->host->sender->build->len))
+        ret = 1;
+    buffer_flush(s->build);
+    netdata_mutex_unlock(&s->mutex);
+
+    return ret;
+}
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     host->rrdpush_sender_connected = 0;
@@ -474,11 +492,15 @@ void attempt_to_send(struct sender_state *s) {
 }
 
 static void sender_attempt_read(struct sender_state *s) {
-int ret;
+    int ret, desired = sizeof(s->read_buffer) - s->read_len - 1;
+
+    if (!desired) {
+        debug(D_STREAM, "Cannot read any more bytes, read buffer is full, need to execute commands first.");
+        return;
+    }
 #ifdef ENABLE_HTTPS
     if (s->host->ssl.conn && !s->host->stream_ssl.flags) {
         ERR_clear_error();
-        int desired = sizeof(s->read_buffer) - s->read_len - 1;
         ret = SSL_read(s->host->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += ret;
@@ -498,8 +520,7 @@ int ret;
         return;
     }
 #endif
-    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,
-               MSG_DONTWAIT);
+    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, desired, MSG_DONTWAIT);
     if (ret>0) {
         s->read_len += ret;
         return;
@@ -515,9 +536,10 @@ int ret;
     rrdpush_sender_thread_close_socket(s->host);
 }
 
-static void sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t);
+static int sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t);
 static void sender_execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
+    int overflow;
     *end = 0;
     //debug(D_STREAM, "%s [send to %s] received command over connection (%d-bytes): %s", s->host->hostname,
     //      s->connected_to, s->read_len, start);
@@ -532,7 +554,11 @@ static void sender_execute_commands(struct sender_state *s) {
                     char *after;
                     long end_t = strtol(next+1, &after, 10);
                     if (after == newline) {
-                        sender_execute_replicate(s, start+10, start_t, end_t);
+                        overflow = sender_execute_replicate(s, start+10, start_t, end_t);
+                        if (overflow) {
+                            debug(D_STREAM, "Stopped executing commands because the send buffer is filling up.");
+                            break;
+                        }
                         start = after+1;
                         continue;
                     }
@@ -736,7 +762,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // protection from overflow
-        if (s->overflow && s->version < VERSION_GAP_FILLING) {
+        if (s->overflow) {
             errno = 0;
             error("STREAM %s [send to %s]: buffer full (%zu-bytes) after %zu bytes. Restarting connection",
                   s->host->hostname, s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
@@ -768,7 +794,7 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
         if (st->state->last_sent.tv_sec)
             window_start = MAX((time_t)st->state->last_sent.tv_sec + st->update_every, first_t);
         else // It is the first time this agent streams this chart during its uptime
-            window_start = now_realtime_sec() - default_rrdpush_gap_history + 1;
+            window_start = st_newest;
     }
     else
         window_start = MAX(start_time, first_t);
@@ -856,7 +882,10 @@ void sender_replicate(RRDSET *st) {
 }
 
 // Call-site for the sender thread (for explict requests)
-static void sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
+// Returns 1 if the send buffer would fill up (>= 50%) or overflow, 0 otherwise
+// Allow 50% of the send buffer to be available for commands that are not allowed to fail
+static int sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
+    int overflow;
     time_t now = now_realtime_sec();
     debug(D_REPLICATION, "Replication request started: %s %ld - %ld @ %ld", st_id, (long)start_t, (long)end_t, (long)now);
     RRDSET *st = rrdset_find(s->host, st_id);
@@ -866,9 +895,10 @@ static void sender_execute_replicate(struct sender_state *s, char *st_id, long s
     }
     else {
         rrdset_rdlock(st);
-        sender_start(s);         // Locks the sender buffer
+        sender_start(s);                    // Locks the sender buffer
         sender_fill_gap_nolock(s, st, start_t);
-        sender_commit(s);        // Releases the sender buffer
+        overflow = sender_commit_no_overflow(s); // Releases the sender buffer
         rrdset_unlock(st);
     }
+    return overflow;
 }

@@ -79,8 +79,8 @@ int rrdpush_init() {
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
     default_use_replication = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_use_replication);
     default_rrdpush_gap_block_size = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "gap replication block size", 60);
-    default_rrdpush_max_gap = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "history gap replication", 60);
-    default_rrdpush_gap_history = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "max gap replication", 60);
+    default_rrdpush_gap_history = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "history gap replication", 60);
+    default_rrdpush_max_gap = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "max gap replication", 60);
 
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
@@ -714,6 +714,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->max_gap           = default_rrdpush_max_gap;
     rpt->gap_history       = default_rrdpush_gap_history;
     rpt->use_replication   = default_use_replication;
+    fatal_assert(0 == uv_cond_init(&rpt->cmd_queue.cmd_cond));    // the rest of the cmd_queue fields should be zeroed
+    fatal_assert(0 == uv_mutex_init(&rpt->cmd_queue.cmd_mutex));  // on allocation
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');

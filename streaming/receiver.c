@@ -4,6 +4,111 @@
 
 extern struct config stream_config;
 
+static void receiver_tx_enq_cmd(struct receiver_state *rpt, struct replication_req *req)
+{
+    unsigned queue_size;
+
+    uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
+
+    /* wait for free space in queue */
+    while ((queue_size = rpt->cmd_queue.queue_size) == RECEIVER_CMD_Q_MAX_SIZE) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        char message[RRD_ID_LENGTH_MAX + 60];
+        snprintf(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld\n", req->st_id, req->start, req->end);
+        debug(D_STREAM, "Replicate command: \"%s\" blocked due to full command queue.", message);
+#endif
+        (void)sleep_usec(10000); /* 10 msec */
+    }
+    fatal_assert(queue_size < RRDENG_CMD_Q_MAX_SIZE);
+    /* enqueue command */
+    rpt->cmd_queue.cmd_array[rpt->cmd_queue.tail] = *req;
+    rpt->cmd_queue.tail = rpt->cmd_queue.tail != RECEIVER_CMD_Q_MAX_SIZE - 1 ?
+                          rpt->cmd_queue.tail + 1 : 0;
+    rpt->cmd_queue.queue_size = queue_size + 1;
+
+    if (0 == queue_size) {
+        /* if queue was empty wake up consumer */
+        uv_cond_signal(&rpt->cmd_queue.cmd_cond);
+    }
+    uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
+}
+
+static struct replication_req receiver_tx_deq_cmd(struct receiver_state *rpt)
+{
+    struct replication_req ret;
+    unsigned queue_size;
+
+    uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
+    queue_size = rpt->cmd_queue.queue_size;
+    while (0 == queue_size) {
+        uv_cond_wait(&rpt->cmd_queue.cmd_cond, &rpt->cmd_queue.cmd_mutex);
+    }
+    /* dequeue command */
+    ret = rpt->cmd_queue.cmd_array[rpt->cmd_queue.head];
+    if (queue_size == 1) {
+        rpt->cmd_queue.head = rpt->cmd_queue.tail = 0;
+    } else {
+        rpt->cmd_queue.head = rpt->cmd_queue.head != RECEIVER_CMD_Q_MAX_SIZE - 1 ?
+                              rpt->cmd_queue.head + 1 : 0;
+    }
+    rpt->cmd_queue.queue_size = queue_size - 1;
+    uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
+
+    return ret;
+}
+
+static void receiver_tx_thread_stop(struct receiver_state *rpt)
+{
+    struct replication_req flush_req;
+
+    uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
+    rpt->cmd_queue.stop_thread = 1;
+    uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
+
+    flush_req.host = NULL; /* mark this a no-op request to wake up the receiver tx thread */
+    receiver_tx_enq_cmd(rpt, &flush_req);
+
+    info("STREAM %s [receive from %s:%s]: waiting for the receiver TX thread to stop...", rpt->hostname, rpt->client_ip,
+         rpt->client_port);
+
+    netdata_thread_join(rpt->receiver_tx_thread, NULL);
+    info("STREAM %s [receive from %s:%s]: the receiver TX thread has exited.", rpt->hostname, rpt->client_ip,
+         rpt->client_port);
+}
+
+void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end);
+
+static void *receiver_tx_thread(void *ptr)
+{
+    struct receiver_state *rpt = (struct receiver_state *)ptr;
+    info("STREAM %s [%s]:%s: receiver TX thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port,
+         gettid());
+
+    struct replication_req req;
+
+    while (!rpt->cmd_queue.stop_thread) {
+        req = receiver_tx_deq_cmd(rpt);
+        if (!req.host)
+            continue; // no-op
+        fatal_assert(req.st_id);
+        send_replication_req(req.host, req.st_id, req.start, req.end);
+    }
+
+    return NULL;
+}
+
+static void receiver_tx_thread_spawn(struct receiver_state *rpt)
+{
+    char tag[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_RECV_TX[%s,[%s]:%s]", rpt->hostname, rpt->client_ip,
+              rpt->client_port);
+
+    if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_JOINABLE, receiver_tx_thread, (void *)rpt))
+        error("Failed to create new STREAM receive TX thread for client.");
+    else
+        rpt->receiver_tx_spawn = 1;
+}
+
 void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->key);
     freez(rpt->hostname);
@@ -27,9 +132,14 @@ void destroy_receiver_state(struct receiver_state *rpt) {
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
     static __thread int executed = 0;
+
     if(!executed) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
+
+        if (rpt->receiver_tx_spawn)
+            receiver_tx_thread_stop(rpt);
+
         // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
         // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
         if (netdata_exit && rpt->host) {
@@ -52,9 +162,21 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
 #include "collectors/plugins.d/pluginsd_parser.h"
 
+static void enqueue_replication_req(struct receiver_state *rpt, RRDHOST *host, char *st_id, time_t start, time_t end)
+{
+    struct replication_req req;
+
+    req.host = host;
+    req.st_id = st_id;
+    req.start = start;
+    req.end = end;
+    receiver_tx_enq_cmd(rpt, &req);
+}
+
+
 void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) {
     char message[RRD_ID_LENGTH_MAX+60];
-    sprintf(message,"REPLICATE %s %ld %ld\n", st_id, start, end);
+    snprintfz(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld\n", st_id, start, end);
     int ret;
     debug(D_STREAM, "Replicate command: %s",message);
 #ifdef ENABLE_HTTPS
@@ -62,10 +184,10 @@ void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) 
     if(conn && !host->stream_ssl.flags) {
         ret = SSL_write(conn, message, strlen(message));
     } else {
-        ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+        ret = send(host->receiver->fd, message, strlen(message), 0);
     }
 #else
-    ret = send(host->receiver->fd, message, strlen(message), MSG_DONTWAIT);
+    ret = send(host->receiver->fd, message, strlen(message), 0);
 #endif
     if (ret != (int)strlen(message))
         error("Failed to send replication request for %s!", st_id);
@@ -123,7 +245,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
         } else {
             debug(D_REPLICATION, "Initial data for %s, asking for history window=%ld..%ld",
                   st->name, (long)now - rpt->gap_history+1, now);
-            send_replication_req(user->host, st->id, now - rpt->gap_history + 1, now);
+            enqueue_replication_req(rpt, user->host, st->id, now - rpt->gap_history + 1, now);
             st->state->ignore_block = 1;
             st->last_updated.tv_sec = now - rpt->gap_history;
             return PARSER_RC_OK;
@@ -155,7 +277,7 @@ PARSER_RC streaming_rep_begin(char **words, void *user_v, PLUGINSD_ACTION *plugi
                   (long)gap_first, (long)gap_end);
             if (gap_first > expected_t)
                 skip_gap(st, expected_t, gap_first - st->update_every);
-            send_replication_req(user->host, st->id, gap_first, gap_end);
+            enqueue_replication_req(rpt, user->host, st->id, gap_first, gap_end);
             st->state->ignore_block = 1;
             return PARSER_RC_OK;
         }
@@ -680,6 +802,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_CONNECT);
 #endif
 
+    if (rpt->stream_version == VERSION_GAP_FILLING)
+        receiver_tx_thread_spawn(rpt);
     size_t count = streaming_parser(rpt, &cd, fp);
 
     log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->hostname,

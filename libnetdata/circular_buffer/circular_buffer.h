@@ -13,4 +13,8 @@ extern void cbuffer_free(struct circular_buffer *buf);
 extern int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len);
 extern void cbuffer_remove_unsafe(struct circular_buffer *buf, size_t num);
 extern size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start);
+static inline size_t cbuffer_len_unsafe(struct circular_buffer *buf)
+{
+    return (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
+}
 #endif

@@ -61,6 +61,26 @@ struct sender_state {
     int32_t version;
 };
 
+struct replication_req {
+    RRDHOST *host; // if this is NULL then the request is a no-op
+    char *st_id;
+    time_t start;
+    time_t end;
+};
+
+#define RECEIVER_CMD_Q_MAX_SIZE (2048)
+
+// The receiver main thread enqueues replication requests for a separate thread. Those replication requests are
+// transmitted back to the remote child host.
+struct receiver_tx_cmdqueue {
+    unsigned head, tail;
+    struct replication_req cmd_array[RECEIVER_CMD_Q_MAX_SIZE];
+    uv_mutex_t cmd_mutex;
+    uv_cond_t cmd_cond;
+    unsigned queue_size;
+    uint8_t stop_thread; // if set to 1 the thread should shut down
+};
+
 struct receiver_state {
     RRDHOST *host;
     netdata_thread_t thread;
@@ -90,6 +110,9 @@ struct receiver_state {
 #endif
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+    struct receiver_tx_cmdqueue cmd_queue;
+    netdata_thread_t receiver_tx_thread;
+    volatile unsigned int receiver_tx_spawn:1;   // 1 when the receiver TX thread has been spawned
 };
 
 
@@ -101,9 +124,10 @@ extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
-void sender_start(struct sender_state *s);
-void sender_commit(struct sender_state *s);
-void sender_replicate(RRDSET *st);
+extern void sender_start(struct sender_state *s);
+extern void sender_commit(struct sender_state *s);
+extern int sender_commit_no_overflow(struct sender_state *s);
+extern void sender_replicate(RRDSET *st);
 extern int rrdpush_init();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
