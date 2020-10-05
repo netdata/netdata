@@ -1,8 +1,3 @@
-#  /usr/libexec/netdata/python.d/rabbitmq.chart.py
-
-# doc for http api
-# https://cdn.rawgit.com/rabbitmq/rabbitmq-management/v3.8.8/priv/www/api/index.html
-
 # -*- coding: utf-8 -*-
 # Description: rabbitmq netdata python.d module
 # Author: ilyam8
