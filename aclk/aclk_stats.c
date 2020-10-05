@@ -49,7 +49,7 @@ struct aclk_mat_metrics aclk_mat_metrics = {
                                     .rd_total = NULL,
                                     .unit = "us",
                                     .title = "Time from receiving the Cloud Query until it was picked up "
-                                             "by query thread (just before passing the to database)." }
+                                             "by query thread (just before passing to the database)." }
 };
 
 void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement)
