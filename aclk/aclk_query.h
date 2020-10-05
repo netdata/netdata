@@ -25,6 +25,11 @@ struct aclk_query_threads {
     int count;
 };
 
+struct aclk_cloud_req_v2 {
+    char *data;
+    RRDHOST *host;
+};
+
 void *aclk_query_main_thread(void *ptr);
 int aclk_queue_query(char *token, void *data, char *msg_type, char *query, int run_after, int internal, ACLK_CMD cmd);
 

@@ -60,8 +60,11 @@ static void aclk_query_free(struct aclk_query *this_query)
     freez(this_query->topic);
     if (likely(this_query->query))
         freez(this_query->query);
-    if(this_query->data && this_query->cmd == ACLK_CMD_CLOUD_QUERY_2)
-        freez(this_query->data);
+    if(this_query->data && this_query->cmd == ACLK_CMD_CLOUD_QUERY_2) {
+        struct aclk_cloud_req_v2 *del = (struct aclk_cloud_req_v2 *)this_query->data;
+        freez(del->data);
+        freez(del);
+    }
     if (likely(this_query->msg_id))
         freez(this_query->msg_id);
     freez(this_query);
@@ -396,6 +399,7 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
+    struct aclk_cloud_req_v2 *cloud_req = (struct aclk_cloud_req_v2 *)this_query->data;
 
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
@@ -422,11 +426,11 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     mysep = strrchr(this_query->query, '/');
 
     // execute the query
-    t = aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop", this_query->created_boot_time);
+    t = aclk_web_api_request_v1(cloud_req->host, w, mysep ? mysep + 1 : "noop", this_query->created_boot_time);
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
-    if ((start = strstr((char *)this_query->data, WEB_HDR_ACCEPT_ENC))) {
+    if ((start = strstr(cloud_req->data, WEB_HDR_ACCEPT_ENC))) {
         start += strlen(WEB_HDR_ACCEPT_ENC);
         end = strstr(start, "\x0D\x0A");
         start = strstr(start, "gzip");
