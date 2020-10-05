@@ -1536,7 +1536,8 @@ void aclk_send_stress_test(size_t size)
 int aclk_send_metadata(ACLK_METADATA_STATE state, RRDHOST *host)
 {
     aclk_send_info_metadata(state, host);
-    if(host != localhost)
+
+    if(host == localhost)
         aclk_send_alarm_metadata(state);
 
     return 0;
