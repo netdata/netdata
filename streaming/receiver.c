@@ -19,7 +19,7 @@ static void receiver_tx_enq_cmd(struct receiver_state *rpt, struct replication_r
 #endif
         (void)sleep_usec(10000); /* 10 msec */
     }
-    fatal_assert(queue_size < RRDENG_CMD_Q_MAX_SIZE);
+    fatal_assert(queue_size < RECEIVER_CMD_Q_MAX_SIZE);
     /* enqueue command */
     rpt->cmd_queue.cmd_array[rpt->cmd_queue.tail] = *req;
     rpt->cmd_queue.tail = rpt->cmd_queue.tail != RECEIVER_CMD_Q_MAX_SIZE - 1 ?
