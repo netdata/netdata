@@ -1,3 +1,8 @@
+#  /usr/libexec/netdata/python.d/rabbitmq.chart.py
+
+# doc for http api
+# https://cdn.rawgit.com/rabbitmq/rabbitmq-management/v3.8.8/priv/www/api/index.html
+
 # -*- coding: utf-8 -*-
 # Description: rabbitmq netdata python.d module
 # Author: ilyam8
@@ -31,7 +36,14 @@ OVERVIEW_STATS = [
     'message_stats.ack',
     'message_stats.redeliver',
     'message_stats.deliver',
-    'message_stats.publish'
+    'message_stats.publish',
+    'churn_rates.connection_created_details.rate',
+    'churn_rates.connection_closed_details.rate',
+    'churn_rates.channel_created_details.rate',
+    'churn_rates.channel_closed_details.rate',
+    'churn_rates.queue_created_details.rate',
+    'churn_rates.queue_declared_details.rate',
+    'churn_rates.queue_deleted_details.rate'
 ]
 
 VHOST_MESSAGE_STATS = [
@@ -47,6 +59,7 @@ VHOST_MESSAGE_STATS = [
 
 ORDER = [
     'queued_messages',
+    'churn_rates',
     'message_rates',
     'global_counts',
     'file_descriptors',
@@ -102,6 +115,18 @@ CHARTS = {
             ['object_totals_connections', 'connections', 'absolute'],
             ['object_totals_queues', 'queues', 'absolute'],
             ['object_totals_exchanges', 'exchanges', 'absolute']
+        ]
+    },
+    'churn_rates': {
+        'options': [None, 'Churn Rates', 'changes/s', 'overview', 'rabbitmq.churn_rates', 'line'],
+        'lines': [
+            ['churn_rates_connection_created_details_rate', 'connections opened', 'absolute'],
+            ['churn_rates_connection_closed_details_rate', 'connections closed', 'absolute'],
+            ['churn_rates_channel_created_details_rate', 'channels opened', 'absolute'],
+            ['churn_rates_channel_closed_details_rate', 'channels closed', 'absolute'],
+            ['churn_rates_queue_created_details_rate', 'queues created', 'absolute'],
+            ['churn_rates_queue_declared_details_rate', 'queues declared', 'absolute'],
+            ['churn_rates_queue_deleted_details_rate', 'queues deleted', 'absolute']
         ]
     },
     'queued_messages': {
