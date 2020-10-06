@@ -37,8 +37,7 @@ static struct replication_req receiver_tx_deq_cmd(struct receiver_state *rpt)
     unsigned queue_size;
 
     uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
-    queue_size = rpt->cmd_queue.queue_size;
-    while (0 == queue_size) {
+    while (0 == (queue_size = rpt->cmd_queue.queue_size)) {
         uv_cond_wait(&rpt->cmd_queue.cmd_cond, &rpt->cmd_queue.cmd_mutex);
     }
     /* dequeue command */
