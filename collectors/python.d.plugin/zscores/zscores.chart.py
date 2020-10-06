@@ -27,6 +27,7 @@ TRAIN_N_SECS = 60*60*4
 OFFSET_N_SECS = 60*5
 TRAIN_EVERY_N = 60*5
 Z_SMOOTH_N = 5
+Z_SCORE_CLIP = 10
 
 ORDER = [
     'zscores',
@@ -88,12 +89,12 @@ class Service(SimpleService):
 
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
         df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
-        df_z['z'] = df_z['z'].fillna(0)
+        df_z['z'] = df_z['z'].fillna(0).clip(lower=-Z_SCORE_CLIP, upper=Z_SCORE_CLIP)
 
         self.df_z_history = self.df_z_history.append(df_z).tail(Z_SMOOTH_N)
 
         df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
-        df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) >= 3, 1, 0)
+        df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) >= 300, 1, 0)
         df_z_smooth.index = ['.'.join(reversed(x.replace('|', '.').split('.'))) + '_z' for x in df_z_smooth.index]
 
         data_dict_z = df_z_smooth['z'].to_dict()
