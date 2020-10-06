@@ -105,7 +105,8 @@ static void receiver_tx_thread_spawn(struct receiver_state *rpt)
     snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_RECV_TX[%s,[%s]:%s]", rpt->hostname, rpt->client_ip,
               rpt->client_port);
 
-    if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_JOINABLE, receiver_tx_thread, (void *)rpt))
+    if(netdata_thread_create(&rpt->receiver_tx_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, receiver_tx_thread,
+                              (void *)rpt))
         error("Failed to create new STREAM receive TX thread for client.");
     else
         rpt->receiver_tx_spawn = 1;
