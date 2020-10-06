@@ -11,6 +11,13 @@ var netdataDashboard = window.netdataDashboard || {};
 // Menus
 
 netdataDashboard.menu = {
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'Z scores scores relating to key system metrics.'
+    },
+
     'system': {
         title: 'System Overview',
         icon: '<i class="fas fa-bookmark"></i>',
