@@ -199,7 +199,7 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *type)
     return proxy;
 }
 
-int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
+int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port)
 {
     int pos = 0;
     if (!strncmp("https://", url, 8)) {
@@ -213,8 +213,8 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
         host_end++;
     if (url[host_end] == 0) {
         *aclk_hostname = strdupz(url + pos);
-        *aclk_port = strdupz("443");
-        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+        *aclk_port = 443;
+        info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
         return 0;
     }
     if (url[host_end] == ':') {
@@ -227,15 +227,13 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
             error("Port specified in %s is invalid", url);
             return 0;
         }
-        *aclk_port = callocz(port_end - host_end + 1, 1);
-        for (int i = host_end + 1; i < port_end; i++)
-            (*aclk_port)[i - host_end - 1] = url[i];
+        *aclk_port = atoi(&url[host_end+1]);
     }
     if (url[host_end] == '/') {
-        *aclk_port = strdupz("443");
+        *aclk_port = 443;
         *aclk_hostname = callocz(1, host_end - pos + 1);
         strncpy(*aclk_hostname, url+pos, host_end - pos);
     }
-    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+    info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
     return 0;
 }

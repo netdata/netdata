@@ -723,7 +723,7 @@ int private_decrypt(unsigned char * enc_data, int data_len, unsigned char *decry
     return result;
 }
 
-void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
+void aclk_get_challenge(char *aclk_hostname, int port)
 {
     char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     debug(D_ACLK, "Performing challenge-response sequence");
@@ -742,8 +742,8 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     }
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
-    info("Retrieving challenge from cloud: %s %s %s", aclk_hostname, aclk_port, url);
-    if(aclk_send_https_request("GET", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
+    info("Retrieving challenge from cloud: %s %d %s", aclk_hostname, port, url);
+    if(aclk_send_https_request("GET", aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
         error("Challenge failed: %s", data_buffer);
         goto CLEANUP;
@@ -780,7 +780,7 @@ void aclk_get_challenge(char *aclk_hostname, char *aclk_port)
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if(aclk_send_https_request("POST", aclk_hostname, aclk_port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
+    if(aclk_send_https_request("POST", aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
         error("Challenge-response failed: %s", data_buffer);
         goto CLEANUP;
@@ -819,24 +819,42 @@ CLEANUP:
 #pragma endregion
 #endif
 
-static void aclk_try_to_connect(char *hostname, char *port, int port_num)
+static void aclk_try_to_connect(char *hostname, int port)
 {
+    int rc;
+
+// this is usefull for developers working on ACLK
+// allows connecting agent to any MQTT broker
+// for debugging, development and testing purposes
+#ifndef ACLK_DISABLE_CHALLENGE
     if (!aclk_private_key) {
-            error("Cannot try to establish the agent cloud link - no private key available!");
-            return;
+        error("Cannot try to establish the agent cloud link - no private key available!");
+        return;
     }
+#endif
+
     info("Attempting to establish the agent cloud link");
+#ifdef ACLK_DISABLE_CHALLENGE
+    error("Agent built with ACLK_DISABLE_CHALLENGE. This is for testing "
+          "and development purposes only. Warranty void. Won't be able "
+          "to connect to Netdata Cloud.");
+    if (aclk_password == NULL)
+        aclk_password = strdupz("anon");
+#else
     aclk_get_challenge(hostname, port);
     if (aclk_password == NULL)
         return;
-    int rc;
+#endif
+
     aclk_connecting = 1;
     create_publish_base_topic();
+
     ACLK_SHARED_STATE_LOCK;
     aclk_shared_state.version_neg = 0;
     aclk_shared_state.version_neg_wait_till = 0;
     ACLK_SHARED_STATE_UNLOCK;
-    rc = mqtt_attempt_connection(hostname, port_num, aclk_username, aclk_password);
+
+    rc = mqtt_attempt_connection(hostname, port, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
@@ -936,8 +954,7 @@ void *aclk_main(void *ptr)
     }
 
     char *aclk_hostname = NULL; // Initializers are over-written but prevent gcc complaining about clobbering.
-    char *aclk_port = NULL;
-    uint32_t port_num = 0;
+    int port_num = 0;
     info("Waiting for netdata to be claimed");
     while(1) {
         char *agent_id = is_agent_claimed();
@@ -955,15 +972,10 @@ void *aclk_main(void *ptr)
             error("Do not move the cloud base url out of post_conf_load!!");
             goto exited;
         }
-        if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
+        if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &port_num))
             error("Agent is claimed but the configuration is invalid, please fix");
-        }
-        else
-        {
-            port_num = atoi(aclk_port);     // SSL library uses the string, MQTT uses the numeric value
-            if (!create_private_key() && !_mqtt_lib_init())
+        else if (!create_private_key() && !_mqtt_lib_init())
                 break;
-        }
 
         for (int i=0; i<60; i++) {
             if (netdata_exit)
@@ -998,7 +1010,7 @@ void *aclk_main(void *ptr)
         }
         if (unlikely(!netdata_exit && !aclk_connected && !aclk_force_reconnect)) {
             if (unlikely(!first_init)) {
-                aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
+                aclk_try_to_connect(aclk_hostname, port_num);
                 first_init = 1;
             } else {
                 if (aclk_connecting == 0) {
@@ -1009,7 +1021,7 @@ void *aclk_main(void *ptr)
                     }
                     if (now_realtime_usec() >= reconnect_expiry) {
                         reconnect_expiry = 0;
-                        aclk_try_to_connect(aclk_hostname, aclk_port, port_num);
+                        aclk_try_to_connect(aclk_hostname, port_num);
                     }
                     sleep_usec(USEC_PER_MS * 100);
                 }
@@ -1047,7 +1059,6 @@ exited:
     freez(aclk_username);
     freez(aclk_password);
     freez(aclk_hostname);
-    freez(aclk_port);
     if (aclk_private_key != NULL)
         RSA_free(aclk_private_key);
 
