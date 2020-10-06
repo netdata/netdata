@@ -17,7 +17,8 @@ from netdata_pandas.data import get_data, get_allmetrics
 priority = 2
 update_every = 1
 
-HOST = '127.0.0.1:19999'
+#HOST = '127.0.0.1:19999'
+HOST = 'london.my-netdata.io'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load'
 ]
