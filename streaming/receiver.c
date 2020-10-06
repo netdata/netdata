@@ -12,7 +12,7 @@ static void receiver_tx_enq_cmd(struct receiver_state *rpt, struct replication_r
     /* wait for free space in queue */
     while ((queue_size = rpt->cmd_queue.queue_size) == RECEIVER_CMD_Q_MAX_SIZE) {
         char message[RRD_ID_LENGTH_MAX + 60];
-        snprintf(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld", req->st_id, req->start, req->end);
+        snprintf(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE %s %ld %ld", req->st_id, req->start, req->end);
         error("Replicate command: \"%s\" blocked due to full recv TX command queue.", message);
 
         uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
