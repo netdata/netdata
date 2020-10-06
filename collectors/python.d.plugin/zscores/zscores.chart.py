@@ -65,26 +65,26 @@ class Service(SimpleService):
         now = int(datetime.now().timestamp())
         after = now - OFFSET_N_SECS - TRAIN_N_SECS
         before = now - OFFSET_N_SECS
-        self.debug(f'now={now}')
+        #self.debug(f'now={now}')
 
         if self.runs_counter <= 10 or self.runs_counter % TRAIN_EVERY_N == 0:
 
-            self.debug(f'begin training (runs_counter={self.runs_counter})')
+            #self.debug(f'begin training (runs_counter={self.runs_counter})')
             
             self.df_mean = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average')
             self.df_mean = self.df_mean.transpose()
             self.df_mean.columns = ['mean']
-            self.debug('self.df_mean')
-            self.debug(self.df_mean)
+            #self.debug('self.df_mean')
+            #self.debug(self.df_mean)
 
             self.df_std = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
             self.df_std = self.df_std.transpose()
             self.df_std.columns = ['std']
-            self.debug('self.df_std')
-            self.debug(self.df_std)
+            #self.debug('self.df_std')
+            #self.debug(self.df_std)
 
         df_allmetrics = get_allmetrics(HOST, charts=CHARTS_IN_SCOPE, wide=True).transpose()
-        self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
+        #self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
 
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
         df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
@@ -101,8 +101,8 @@ class Service(SimpleService):
 
         data_dict_3sig = df_z_smooth['3sig'].to_dict()
         data_dict = {**data_dict_z, **data_dict_3sig}
-        self.debug('data_dict')
-        self.debug(data_dict)
+        #self.debug('data_dict')
+        #self.debug(data_dict)
 
         for dim in data_dict_z:
             if dim not in self.charts['zscores']:
@@ -110,6 +110,6 @@ class Service(SimpleService):
         
         for dim in data_dict_3sig:
             if dim not in self.charts['zscores_3sigma']:
-                self.charts['zscores_3sigma'].add_dimension([dim, dim, 'absolute', 1, 100])
+                self.charts['zscores_3sigma'].add_dimension([dim, dim, 'absolute', 1, 1])
 
         return data_dict
