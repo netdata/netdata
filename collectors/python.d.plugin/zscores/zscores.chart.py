@@ -68,7 +68,7 @@ class Service(SimpleService):
         before = now - OFFSET_N_SECS
         #self.debug(f'now={now}')
 
-        if self.runs_counter <= 10 or self.runs_counter % TRAIN_EVERY_N == 0:
+        if self.runs_counter <= 5 or self.runs_counter % TRAIN_EVERY_N == 0:
 
             #self.debug(f'begin training (runs_counter={self.runs_counter})')
             
@@ -81,14 +81,14 @@ class Service(SimpleService):
             self.df_std = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
             self.df_std = self.df_std.transpose()
             self.df_std.columns = ['std']
+            self.df_std = self.df_std[self.df_std['std'] > 0]
             #self.debug('self.df_std')
             #self.debug(self.df_std)
 
         df_allmetrics = get_allmetrics(HOST, charts=CHARTS_IN_SCOPE, wide=True).transpose()
         #self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
 
-        df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
-        df_z = df_z[df_z['z'] != 0]
+        df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
         df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
         df_z['z'] = df_z['z'].fillna(0).clip(lower=-Z_SCORE_CLIP, upper=Z_SCORE_CLIP)
 
