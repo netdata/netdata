@@ -23,8 +23,8 @@ CHARTS_IN_SCOPE = [
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 
-TRAIN_N_SECS = 60*60*4
-OFFSET_N_SECS = 60*5
+TRAIN_N_SECS = 60*2
+OFFSET_N_SECS = 60
 TRAIN_EVERY_N = 60
 Z_SMOOTH_N = 5
 Z_SCORE_CLIP = 10
