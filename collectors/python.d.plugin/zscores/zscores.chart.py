@@ -17,10 +17,10 @@ from netdata_pandas.data import get_data, get_allmetrics
 priority = 2
 update_every = 1
 
-#HOST = '127.0.0.1:19999'
-HOST = 'london.my-netdata.io'
+HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
-    'system.cpu', 'system.load'
+    'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
+    'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
 ]
 
 TRAIN_N_SECS = 60*60*4
