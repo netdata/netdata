@@ -67,7 +67,7 @@ class Service(SimpleService):
         before = now - OFFSET_N_SECS
         self.debug(f'now={now}')
 
-        if self.runs_counter % TRAIN_EVERY_N == 0:
+        if self.runs_counter <= 10 or self.runs_counter % TRAIN_EVERY_N == 0:
 
             self.debug(f'begin training (runs_counter={self.runs_counter})')
             
