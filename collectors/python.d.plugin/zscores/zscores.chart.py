@@ -21,9 +21,6 @@ HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load'
 ]
-N = 60*5
-RECALC_EVERY = 60
-ZSCORE_CLIP = 10
 
 TRAIN_N_SECS = 60*60*4
 OFFSET_N_SECS = 60*5
@@ -48,12 +45,12 @@ CHARTS = {
 
 
 class Service(SimpleService):
+    
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
-        self.data = []
         self.df_mean = pd.DataFrame()
         self.df_std = pd.DataFrame()
         self.df_z_history = pd.DataFrame()
@@ -67,18 +64,26 @@ class Service(SimpleService):
         now = int(datetime.now().timestamp())
         after = now - OFFSET_N_SECS - TRAIN_N_SECS
         before = now - OFFSET_N_SECS
+        self.debug(f'now={now}')
 
         if self.runs_counter % TRAIN_EVERY_N == 0:
+
+            self.debug(f'begin training (runs_counter={self.runs_counter})')
             
             self.df_mean = get_data(HOST_PORT, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average')
             self.df_mean = self.df_mean.transpose()
             self.df_mean.columns = ['mean']
+            self.debug('self.df_mean')
+            self.debug(self.df_mean)
 
             self.df_std = get_data(HOST_PORT, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
             self.df_std = self.df_std.transpose()
             self.df_std.columns = ['std']
+            self.debug('self.df_std')
+            self.debug(self.df_std)
 
         df_allmetrics = get_allmetrics(HOST_PORT, charts=CHARTS_IN_SCOPE, wide=True).transpose()
+        self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
 
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
         df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
@@ -95,6 +100,8 @@ class Service(SimpleService):
 
         data_dict_3sig = df_z_smooth['3sig'].to_dict()
         data_dict = {**data_dict_z, **data_dict_3sig}
+        self.debug('data_dict')
+        self.debug(data_dict)
 
         for dim in data_dict_z:
             if dim not in self.charts['zscores']:
