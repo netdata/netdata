@@ -3,24 +3,32 @@
 # Author: andrewm4894
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from datetime import datetime
 from random import SystemRandom
 
 import requests
 import numpy as np
 import pandas as pd
+
 from bases.FrameworkServices.SimpleService import SimpleService
+from netdata_pandas.data import get_data, get_allmetrics
+
 
 priority = 2
 update_every = 1
 
 HOST_PORT = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
-    'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
-    'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
+    'system.cpu', 'system.load'
 ]
 N = 60*5
 RECALC_EVERY = 60
 ZSCORE_CLIP = 10
+
+TRAIN_N_SECS = 60*60*4
+OFFSET_N_SECS = 60*5
+TRAIN_EVERY_N = 60*5
+Z_SMOOTH_N = 5
 
 ORDER = [
     'zscores',
@@ -46,98 +54,54 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.random = SystemRandom()
         self.data = []
-        self.mean = dict()
-        self.sigma = dict()
-
+        self.df_mean = pd.DataFrame()
+        self.df_std = pd.DataFrame()
+        self.df_z_history = pd.DataFrame()
 
     @staticmethod
     def check():
         return True
 
-    @staticmethod
-    def get_allmetrics(host: str = '127.0.0.1:19999', charts: list = None) -> list:
-        """
-        Hits the allmetrics endpoint on `host` filters for `charts` of interest and saves data into a list
-        :param host: host to pull data from <str>
-        :param charts: charts to filter to <list>
-        :return: list of lists where each element is a metric from allmetrics <list>
-        """
-        if charts is None:
-            charts = ['system.cpu']
-        url = f'http://{host}/api/v1/allmetrics?format=json'
-        raw_data = requests.get(url).json()
-        data = []
-        for k in raw_data:
-            if k in charts:
-                time = raw_data[k]['last_updated']
-                dimensions = raw_data[k]['dimensions']
-                for dimension in dimensions:
-                    # [time, chart, name, value]
-                    data.append([time, k, f"{k}.{dimensions[dimension]['name']}", dimensions[dimension]['value']])
-        return data
-
-    @staticmethod
-    def data_to_df(data, mode='wide'):
-        """
-        Parses data list of list's from allmetrics and formats it as a pandas dataframe.
-        :param data: list of lists where each element is a metric from allmetrics <list>
-        :param mode: used to determine if we want pandas df to be long (row per metric) or wide (col per metric) format <str>
-        :return: pandas dataframe of the data <pd.DataFrame>
-        """
-        df = pd.DataFrame([item for sublist in data for item in sublist],
-                          columns=['time', 'chart', 'variable', 'value'])
-        if mode == 'wide':
-            df = df.drop_duplicates().pivot(index='time', columns='variable', values='value').ffill()
-        return df
-
-    def append_data(self, data):
-        self.data.append(data)
-
     def get_data(self):
 
-        # empty dict to collect data points into
-        data = dict()
+        now = int(datetime.now().timestamp())
+        after = now - OFFSET_N_SECS - TRAIN_N_SECS
+        before = now - OFFSET_N_SECS
 
-        # get latest data from allmetrics
-        latest_observations = self.get_allmetrics(host=HOST_PORT, charts=CHARTS_IN_SCOPE)
-        data_latest = self.data_to_df([latest_observations]).mean().to_dict()
+        if self.runs_counter % TRAIN_EVERY_N == 0:
+            
+            self.df_mean = get_data(HOST_PORT, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average')
+            self.df_mean = self.df_mean.transpose()
+            self.df_mean.columns = ['mean']
 
-        # limit size of data maintained to last n
-        self.data = self.data[-N:]
+            self.df_std = get_data(HOST_PORT, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
+            self.df_std = self.df_std.transpose()
+            self.df_std.columns = ['std']
 
-        # recalc if needed
-        if self.runs_counter % RECALC_EVERY == 0:
-            # pull data into a pandas df
-            df_data = self.data_to_df(self.data)
-            # update mean and sigma
-            self.mean = df_data.mean().to_dict()
-            self.sigma = df_data.std().to_dict()
+        df_allmetrics = get_allmetrics(HOST_PORT, charts=CHARTS_IN_SCOPE, wide=True).transpose()
 
-        # process each metric and add to data
-        for metric in data_latest.keys():
-            metric_rev = '.'.join(reversed(metric.split('.')))
-            metric_rev_3sigma = f'{metric_rev}_3sigma'
-            x = data_latest.get(metric, 0)
-            mu = self.mean.get(metric, 0)
-            sigma = self.sigma.get(metric, 0)
-            self.debug(f'metric={metric}, x={x}, mu={mu}, sigma={sigma}')
-            # calculate z score
-            if sigma == 0:
-                z = 0
-            else:
-                z = (x - mu) / sigma
-            # clip z score
-            z = np.clip(z, -ZSCORE_CLIP, ZSCORE_CLIP)
-            self.debug(f'z={z}')
-            if metric_rev not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([metric_rev, metric_rev, 'absolute', 1, 100])
-            if metric_rev_3sigma not in self.charts['zscores_3sigma']:
-                self.charts['zscores_3sigma'].add_dimension([metric_rev_3sigma, metric_rev_3sigma, 'absolute', 1, 1])
-            data[metric_rev] = z * 100
-            data[metric_rev_3sigma] = 1 if abs(z) > 3 else 0
+        df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
+        df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
+        df_z['z'] = df_z['z'].fillna(0)
 
-        # append latest data
-        self.append_data(latest_observations)
+        self.df_z_history = self.df_z_history.append(df_z).tail(Z_SMOOTH_N)
 
-        return data
+        df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
+        df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) >= 3, 1, 0)
+        df_z_smooth.index = ['.'.join(reversed(x.replace('|', '.').split('.'))) + '_z' for x in df_z_smooth.index]
 
+        data_dict_z = df_z_smooth['z'].to_dict()
+        df_z_smooth.index = [x[:-2] + '_3sig' for x in df_z_smooth.index]
+
+        data_dict_3sig = df_z_smooth['3sig'].to_dict()
+        data_dict = {**data_dict_z, **data_dict_3sig}
+
+        for dim in data_dict_z:
+            if dim not in self.charts['zscores']:
+                self.charts['zscores'].add_dimension([dim, dim, 'absolute', 1, 100])
+        
+        for dim in data_dict_3sig:
+            if dim not in self.charts['zscores_3sigma']:
+                self.charts['zscores_3sigma'].add_dimension([dim, dim, 'absolute', 1, 100])
+
+        return data_dict
