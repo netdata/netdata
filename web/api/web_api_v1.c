@@ -492,7 +492,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     struct context_param  *context_param_list = NULL;
-    if (context) {
+    if (context && !chart) {
         RRDSET *st1;
         uint32_t context_hash = simple_hash(context);
         rrdhost_rdlock(localhost);
@@ -513,7 +513,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     if (!st && !context_param_list) {
-        if (context) {
+        if (context && !chart) {
             buffer_strcat(w->response.data, "Context is not found: ");
             buffer_strcat_htmlescape(w->response.data, context);
         }
