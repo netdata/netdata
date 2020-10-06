@@ -18,6 +18,7 @@ priority = 2
 update_every = 1
 
 HOST = '127.0.0.1:19999'
+#HOST = 'london.my-netdata.io'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load', 'system.io', 'system.pgpgio', 'system.ram', 'system.net', 'system.ip', 'system.ipv6',
     'system.processes', 'system.ctxt', 'system.idlejitter', 'system.intr', 'system.softirqs', 'system.softnet_stat'
@@ -91,8 +92,9 @@ class Service(SimpleService):
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
         df_z['z'] = np.where(df_z['std'] > 0, (df_z['value'] - df_z['mean']) / df_z['std'], 0)
         df_z['z'] = df_z['z'].fillna(0).clip(lower=-Z_SCORE_CLIP, upper=Z_SCORE_CLIP)
+        df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
 
-        self.df_z_history = self.df_z_history.append(df_z).tail(Z_SMOOTH_N)
+        self.df_z_history = self.df_z_history.append(df_z_wide).tail(Z_SMOOTH_N)
 
         df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
@@ -103,7 +105,7 @@ class Service(SimpleService):
         df_z_smooth.index = [x[:-2] + '_3sig' for x in df_z_smooth.index]
         data_dict_3sig = df_z_smooth['3sig'].to_dict()
 
-        data_dict = {**data_dict_z, **data_dict_3sig}
+        data = {**data_dict_z, **data_dict_3sig}
         #self.debug('data_dict')
         #self.debug(data_dict)
 
@@ -115,4 +117,4 @@ class Service(SimpleService):
             if dim not in self.charts['zscores_3sigma']:
                 self.charts['zscores_3sigma'].add_dimension([dim, dim, 'absolute', 1, 1])
 
-        return data_dict
+        return data
