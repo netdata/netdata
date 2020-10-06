@@ -14,10 +14,12 @@ static void receiver_tx_enq_cmd(struct receiver_state *rpt, struct replication_r
     while ((queue_size = rpt->cmd_queue.queue_size) == RECEIVER_CMD_Q_MAX_SIZE) {
 #ifdef NETDATA_INTERNAL_CHECKS
         char message[RRD_ID_LENGTH_MAX + 60];
-        snprintf(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld\n", req->st_id, req->start, req->end);
+        snprintf(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld", req->st_id, req->start, req->end);
         debug(D_STREAM, "Replicate command: \"%s\" blocked due to full command queue.", message);
 #endif
+        uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
         (void)sleep_usec(10000); /* 10 msec */
+        uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
     }
     fatal_assert(queue_size < RECEIVER_CMD_Q_MAX_SIZE);
     /* enqueue command */
