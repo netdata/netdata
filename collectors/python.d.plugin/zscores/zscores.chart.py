@@ -94,7 +94,7 @@ class Service(SimpleService):
         df_z['z'] = df_z['z'].fillna(0).clip(lower=-Z_SCORE_CLIP, upper=Z_SCORE_CLIP)
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
 
-        self.df_z_history = self.df_z_history.append(df_z_wide).tail(Z_SMOOTH_N)
+        self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(Z_SMOOTH_N)
 
         df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
