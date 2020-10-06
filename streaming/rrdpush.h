@@ -56,7 +56,7 @@ struct sender_state {
     netdata_mutex_t mutex;
     struct circular_buffer *buffer;
     BUFFER *build;
-    char read_buffer[512];
+    char read_buffer[32768];
     int read_len;
     int32_t version;
 };

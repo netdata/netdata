@@ -885,7 +885,7 @@ void sender_replicate(RRDSET *st) {
 // Returns 1 if the send buffer would fill up (>= 50%) or overflow, 0 otherwise
 // Allow 50% of the send buffer to be available for commands that are not allowed to fail
 static int sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
-    int overflow;
+    int overflow = 0;
     time_t now = now_realtime_sec();
     debug(D_REPLICATION, "Replication request started: %s %ld - %ld @ %ld", st_id, (long)start_t, (long)end_t, (long)now);
     RRDSET *st = rrdset_find(s->host, st_id);
