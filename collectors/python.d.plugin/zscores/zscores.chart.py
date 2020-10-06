@@ -88,19 +88,21 @@ class Service(SimpleService):
         #self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
 
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
+        df_z = df_z[df_z['z'] != 0]
         df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
         df_z['z'] = df_z['z'].fillna(0).clip(lower=-Z_SCORE_CLIP, upper=Z_SCORE_CLIP)
 
         self.df_z_history = self.df_z_history.append(df_z).tail(Z_SMOOTH_N)
 
         df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
-        df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) >= 300, 1, 0)
+        df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
+        
         df_z_smooth.index = ['.'.join(reversed(x.replace('|', '.').split('.'))) + '_z' for x in df_z_smooth.index]
-
         data_dict_z = df_z_smooth['z'].to_dict()
+        
         df_z_smooth.index = [x[:-2] + '_3sig' for x in df_z_smooth.index]
-
         data_dict_3sig = df_z_smooth['3sig'].to_dict()
+
         data_dict = {**data_dict_z, **data_dict_3sig}
         #self.debug('data_dict')
         #self.debug(data_dict)
