@@ -17,7 +17,7 @@ from netdata_pandas.data import get_data, get_allmetrics
 priority = 2
 update_every = 1
 
-HOST_PORT = '127.0.0.1:19999'
+HOST = '127.0.0.1:19999'
 CHARTS_IN_SCOPE = [
     'system.cpu', 'system.load'
 ]
@@ -70,19 +70,19 @@ class Service(SimpleService):
 
             self.debug(f'begin training (runs_counter={self.runs_counter})')
             
-            self.df_mean = get_data(HOST_PORT, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average')
+            self.df_mean = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average')
             self.df_mean = self.df_mean.transpose()
             self.df_mean.columns = ['mean']
             self.debug('self.df_mean')
             self.debug(self.df_mean)
 
-            self.df_std = get_data(HOST_PORT, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
+            self.df_std = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
             self.df_std = self.df_std.transpose()
             self.df_std.columns = ['std']
             self.debug('self.df_std')
             self.debug(self.df_std)
 
-        df_allmetrics = get_allmetrics(HOST_PORT, charts=CHARTS_IN_SCOPE, wide=True).transpose()
+        df_allmetrics = get_allmetrics(HOST, charts=CHARTS_IN_SCOPE, wide=True).transpose()
         self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
 
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='outer').dropna()
