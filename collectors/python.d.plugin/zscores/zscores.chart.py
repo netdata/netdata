@@ -72,24 +72,23 @@ class Service(SimpleService):
 
             #self.debug(f'begin training (runs_counter={self.runs_counter})')
             
-            self.df_mean = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average')
+            self.df_mean = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='average', col_sep='.')
             self.df_mean = self.df_mean.transpose()
             self.df_mean.columns = ['mean']
             #self.debug('self.df_mean')
             #self.debug(self.df_mean)
 
-            self.df_std = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev')
+            self.df_std = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev', col_sep='.')
             self.df_std = self.df_std.transpose()
             self.df_std.columns = ['std']
-            self.df_std = self.df_std[self.df_std['std'] > 0]
             #self.debug('self.df_std')
             #self.debug(self.df_std)
 
-        df_allmetrics = get_allmetrics(HOST, charts=CHARTS_IN_SCOPE, wide=True).transpose()
+        df_allmetrics = get_allmetrics(HOST, charts=CHARTS_IN_SCOPE, wide=True, col_sep='.').transpose()
         #self.debug(f'df_allmetrics.shape={df_allmetrics.shape}')
 
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
-        df_z['z'] = (df_z['value'] - df_z['mean']) / df_z['std']
+        df_z['z'] = np.where(df_z['std'] > 0, (df_z['value'] - df_z['mean']) / df_z['std'], 0)
         df_z['z'] = df_z['z'].fillna(0).clip(lower=-Z_SCORE_CLIP, upper=Z_SCORE_CLIP)
 
         self.df_z_history = self.df_z_history.append(df_z).tail(Z_SMOOTH_N)
@@ -97,7 +96,7 @@ class Service(SimpleService):
         df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
-        df_z_smooth.index = ['.'.join(reversed(x.replace('|', '.').split('.'))) + '_z' for x in df_z_smooth.index]
+        df_z_smooth.index = ['.'.join(reversed(x.split('.'))) + '_z' for x in df_z_smooth.index]
         data_dict_z = df_z_smooth['z'].to_dict()
         
         df_z_smooth.index = [x[:-2] + '_3sig' for x in df_z_smooth.index]
