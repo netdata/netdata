@@ -9,14 +9,12 @@ static void receiver_tx_enq_cmd(struct receiver_state *rpt, struct replication_r
     unsigned queue_size;
 
     uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
-
     /* wait for free space in queue */
     while ((queue_size = rpt->cmd_queue.queue_size) == RECEIVER_CMD_Q_MAX_SIZE) {
-#ifdef NETDATA_INTERNAL_CHECKS
         char message[RRD_ID_LENGTH_MAX + 60];
         snprintf(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld", req->st_id, req->start, req->end);
-        debug(D_STREAM, "Replicate command: \"%s\" blocked due to full command queue.", message);
-#endif
+        error("Replicate command: \"%s\" blocked due to full recv TX command queue.", message);
+
         uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
         (void)sleep_usec(10000); /* 10 msec */
         uv_mutex_lock(&rpt->cmd_queue.cmd_mutex);
@@ -28,10 +26,8 @@ static void receiver_tx_enq_cmd(struct receiver_state *rpt, struct replication_r
                           rpt->cmd_queue.tail + 1 : 0;
     rpt->cmd_queue.queue_size = queue_size + 1;
 
-    if (0 == queue_size) {
-        /* if queue was empty wake up consumer */
-        uv_cond_signal(&rpt->cmd_queue.cmd_cond);
-    }
+    /* wake up consumer */
+    uv_cond_signal(&rpt->cmd_queue.cmd_cond);
     uv_mutex_unlock(&rpt->cmd_queue.cmd_mutex);
 }
 

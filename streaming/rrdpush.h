@@ -68,7 +68,7 @@ struct replication_req {
     time_t end;
 };
 
-#define RECEIVER_CMD_Q_MAX_SIZE (2048)
+#define RECEIVER_CMD_Q_MAX_SIZE (32768)
 
 // The receiver main thread enqueues replication requests for a separate thread. Those replication requests are
 // transmitted back to the remote child host.
