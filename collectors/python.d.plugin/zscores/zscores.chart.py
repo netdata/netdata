@@ -96,7 +96,8 @@ class Service(SimpleService):
 
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(Z_SMOOTH_N)
 
-        df_z_smooth = self.df_z_history.reset_index().groupby('index')[['z']].mean() * 100
+        df_z_history_long = df_z_wide.melt(value_name='z')
+        df_z_smooth = df_z_history_long.groupby('index')[['z']].mean() * 100
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
         df_z_smooth.index = ['.'.join(reversed(x.split('.'))) + '_z' for x in df_z_smooth.index]
