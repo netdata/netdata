@@ -68,7 +68,7 @@ class Service(SimpleService):
         before = now - OFFSET_N_SECS
         #self.debug(f'now={now}')
 
-        if self.runs_counter <= 5 or self.runs_counter % TRAIN_EVERY_N == 0:
+        if self.runs_counter <= 10 or self.runs_counter % TRAIN_EVERY_N == 0:
 
             #self.debug(f'begin training (runs_counter={self.runs_counter})')
             
@@ -81,6 +81,7 @@ class Service(SimpleService):
             self.df_std = get_data(HOST, charts=CHARTS_IN_SCOPE, after=after, before=before, points=1, group='stddev', col_sep='.')
             self.df_std = self.df_std.transpose()
             self.df_std.columns = ['std']
+            self.df_std = self.df_std[self.df_std['std']>0]
             #self.debug('self.df_std')
             #self.debug(self.df_std)
 
