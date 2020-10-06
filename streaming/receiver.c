@@ -174,7 +174,7 @@ static void enqueue_replication_req(struct receiver_state *rpt, RRDHOST *host, c
 
 void send_replication_req(RRDHOST *host, char *st_id, time_t start, time_t end) {
     char message[RRD_ID_LENGTH_MAX+60];
-    snprintfz(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE \"%s\" %ld %ld\n", st_id, start, end);
+    snprintfz(message, RRD_ID_LENGTH_MAX + 60, "REPLICATE %s %ld %ld\n", st_id, start, end);
     int ret;
     debug(D_STREAM, "Replicate command: %s",message);
 #ifdef ENABLE_HTTPS
