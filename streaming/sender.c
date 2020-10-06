@@ -778,7 +778,7 @@ extern time_t default_rrdpush_gap_block_size;
 /* start_time is set during an explicit replication request from the far end, or zero if we are pushing the latest
    data from the collector.
 */
-static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t start_time, time_t end_time)
+static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t start_time)
 {
     UNUSED(s);
     RRDDIM *rd;
@@ -790,23 +790,20 @@ static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t st
     time_t st_newest = st->last_updated.tv_sec;
     time_t window_start;
 
-    if (start_time == 0) { //this was pushed from a collector
+    if (start_time == 0) {
         if (st->state->last_sent.tv_sec)
             window_start = MAX((time_t)st->state->last_sent.tv_sec + st->update_every, first_t);
         else // It is the first time this agent streams this chart during its uptime
             window_start = st_newest;
-        end_time = st_newest;
     }
-    else { // this is an explicit replication request
+    else
         window_start = MAX(start_time, first_t);
-        fatal_assert(end_time && end_time > start_time);
-    }
 
     // Decide how much data to replicate from the beginning of the window
-    time_t unsent_points = (end_time - window_start) / st->update_every + 1;
+    time_t unsent_points = (st_newest - window_start) / st->update_every + 1;
     if (unsent_points > default_rrdpush_gap_block_size)
         unsent_points = default_rrdpush_gap_block_size;
-    time_t window_end = window_start + unsent_points * st->update_every;    // window_end <= end_time + update_every
+    time_t window_end = window_start + unsent_points * st->update_every;    // window_end <= st_newest + update_every
 
     // If we are responding to an explicit request then we may send empty windows, these communicate to the far end
     // that there is no data in the interval. There are times in the REPBEGIN:
@@ -876,7 +873,7 @@ void sender_replicate(RRDSET *st) {
     sender_start(host->sender);         // Locks the sender buffer
     if(need_to_send_chart_definition(st))
         rrdpush_send_chart_definition_nolock(st);
-    sender_fill_gap_nolock(host->sender, st, 0, 0);
+    sender_fill_gap_nolock(host->sender, st, 0);
     sender_commit(host->sender);        // Releases the sender buffer
 
     // signal the sender there are more data
@@ -899,7 +896,7 @@ static int sender_execute_replicate(struct sender_state *s, char *st_id, long st
     else {
         rrdset_rdlock(st);
         sender_start(s);                    // Locks the sender buffer
-        sender_fill_gap_nolock(s, st, start_t, end_t);
+        sender_fill_gap_nolock(s, st, start_t);
         overflow = sender_commit_no_overflow(s); // Releases the sender buffer
         rrdset_unlock(st);
     }
