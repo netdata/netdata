@@ -117,23 +117,23 @@ CHARTS = {
     'connection_churn_rates': {
         'options': [None, 'Connection Churn Rates', 'operations/s', 'overview', 'rabbitmq.connection_churn_rates', 'line'],
         'lines': [
-            ['churn_rates_connection_created_details_rate', 'connections opened', 'absolute'],
-            ['churn_rates_connection_closed_details_rate', 'connections closed', 'absolute']
+            ['churn_rates_connection_created_details_rate', 'created', 'absolute'],
+            ['churn_rates_connection_closed_details_rate', 'closed', 'absolute']
         ]
     },
     'channel_churn_rates': {
         'options': [None, 'Channel Churn Rates', 'operations/s', 'overview', 'rabbitmq.channel_churn_rates', 'line'],
         'lines': [
-            ['churn_rates_channel_created_details_rate', 'channels opened', 'absolute'],
-            ['churn_rates_channel_closed_details_rate', 'channels closed', 'absolute']
+            ['churn_rates_channel_created_details_rate', 'created', 'absolute'],
+            ['churn_rates_channel_closed_details_rate', 'closed', 'absolute']
         ]
     },
     'queue_churn_rates': {
         'options': [None, 'Queue Churn Rates', 'operations/s', 'overview', 'rabbitmq.queue_churn_rates', 'line'],
         'lines': [
-            ['churn_rates_queue_created_details_rate', 'queues created', 'absolute'],
-            ['churn_rates_queue_declared_details_rate', 'queues declared', 'absolute'],
-            ['churn_rates_queue_deleted_details_rate', 'queues deleted', 'absolute']
+            ['churn_rates_queue_created_details_rate', 'created', 'absolute'],
+            ['churn_rates_queue_declared_details_rate', 'declared', 'absolute'],
+            ['churn_rates_queue_deleted_details_rate', 'deleted', 'absolute']
         ]
     },
     'queued_messages': {
