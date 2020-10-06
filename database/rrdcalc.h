@@ -45,6 +45,13 @@ struct rrdcalc {
     char *chart;                    // the chart id this should be linked to
     uint32_t hash_chart;
 
+
+    char *plugin_match;             //the plugin name that should be linked to
+    SIMPLE_PATTERN *plugin_pattern;
+
+    char *module_match;             //the module name that should be linked to
+    SIMPLE_PATTERN *module_pattern;
+
     char *source;                   // the source of this alarm
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm
