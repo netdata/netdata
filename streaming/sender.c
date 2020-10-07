@@ -555,11 +555,11 @@ static void sender_execute_commands(struct sender_state *s) {
                     long end_t = strtol(next+1, &after, 10);
                     if (after == newline) {
                         overflow = sender_execute_replicate(s, start+10, start_t, end_t);
+                        start = after+1;
                         if (overflow) {
-                            debug(D_STREAM, "Stopped executing commands because the send buffer is filling up.");
+                            info("Stopped executing explicit replication commands because the send buffer is filling up.");
                             break;
                         }
-                        start = after+1;
                         continue;
                     }
                 }
