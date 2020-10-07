@@ -171,7 +171,8 @@ families: sda sdb
 The `module` line, filters which module within the context this alarm should apply to. The value is a space-separated 
 list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
 
-For example, you can create an alarm on the `isc_dhcpd.utilization` chart, but filter it to only the `isc_dhcpd` module:
+For example, you can create a template on the `isc_dhcpd.utilization` chart, but filter it to only the `isc_dhcpd` 
+module:
 
 ```yaml
 module: isc_dhcpd
@@ -182,7 +183,7 @@ module: isc_dhcpd
 The `plugin` line, filters which plugin within the context this alarm should apply to. The value is a space-separated 
 list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
 
-For example, you can create an alarm on the `isc_dhcpd.utilization` chart, but filter it to only the `python.d.plugin` 
+For example, you can create a template on the `isc_dhcpd.utilization` chart, but filter it to only the `python.d.plugin` 
 plugin:
 
 ```yaml
