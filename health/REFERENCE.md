@@ -60,9 +60,9 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
-| [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
-| [`module`](#alarm-line-module)                      | no              | Restrict alarm to only certain module.                                                |
 | [`plugin`](#alarm-line-plugin)                      | no              | Restrict alarm to only certain plugin.                                                |
+| [`module`](#alarm-line-module)                      | no              | Restrict alarm to only certain module.                                                |
+| [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
 | [`every`](#alarm-line-every)                        | no              | The frequency of the alarm.                                                           |
@@ -152,18 +152,16 @@ begin with `redis`.
 hosts: server1 server2 database* !redis3 redis*
 ```
 
-#### Alarm line `families`
+#### Alarm line `plugin`
 
-The `families` line, used only alongside templates, filters which families within the context this alarm should apply
-to. The value is a space-separated list.
+The `plugin` line, filters which plugin within the context this alarm should apply to. The value is a space-separated 
+list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
 
-The value is a space-separate list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for
-some examples.
-
-For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
+For example, you can create a template on the `isc_dhcpd.utilization` chart, but filter it to only the `python.d.plugin` 
+plugin:
 
 ```yaml
-families: sda sdb
+plugin: python.d.plugin
 ```
 
 #### Alarm line `module`
@@ -178,16 +176,18 @@ module:
 module: isc_dhcpd
 ```
 
-#### Alarm line `plugin`
+#### Alarm line `families`
 
-The `plugin` line, filters which plugin within the context this alarm should apply to. The value is a space-separated 
-list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
+The `families` line, used only alongside templates, filters which families within the context this alarm should apply
+to. The value is a space-separated list.
 
-For example, you can create a template on the `isc_dhcpd.utilization` chart, but filter it to only the `python.d.plugin` 
-plugin:
+The value is a space-separate list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for
+some examples.
+
+For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
 
 ```yaml
-plugin: python.d.plugin
+families: sda sdb
 ```
 
 #### Alarm line `lookup`
