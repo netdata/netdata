@@ -34,11 +34,11 @@ ORDER = [
 
 CHARTS = {
     'zscores': {
-        'options': [None, 'Z Scores', 'name.chart', 'zscores', 'zscores.zscores', 'line'],
+        'options': [None, 'Z Scores', 'zscores', 'zscore', 'zscores.zscores', 'line'],
         'lines': []
     },
     'zscores_3sigma': {
-        'options': [None, 'Z Scores >3 Sigma', 'name.chart', 'zscores', 'zscores.zscores_3sigma', 'stacked'],
+        'options': [None, 'Z Scores >3 Sigma', '3sig count', 'zscores', 'zscores.zscores_3sigma', 'stacked'],
         'lines': []
     },
 }
@@ -133,7 +133,7 @@ class Service(SimpleService):
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) for x in df_z_chart['dim'].str.split('.').to_list()]
-            data_dict_z = (df_z_chart.groupby('chart')['z'].mean()*100).astype(int).to_dict()
+            data_dict_z = (df_z_chart.groupby('chart')['z'].mean()*1000).astype(int).to_dict()
 
             df_3sig_chart = pd.DataFrame.from_dict(data_dict_3sig, orient='index').reset_index()
             df_3sig_chart.columns = ['dim', '3sig']
