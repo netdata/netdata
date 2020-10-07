@@ -61,6 +61,8 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
+| [`module`](#alarm-line-module)                      | no              | Restrict alarm to only certain module.                                                |
+| [`plugin`](#alarm-line-plugin)                      | no              | Restrict alarm to only certain plugin.                                                |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
 | [`every`](#alarm-line-every)                        | no              | The frequency of the alarm.                                                           |
@@ -162,6 +164,29 @@ For example, you can create a template on the `disk.io` context, but filter it t
 
 ```yaml
 families: sda sdb
+```
+
+#### Alarm line `module`
+
+The `module` line, filters which module within the context this alarm should apply to. The value is a space-separated 
+list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
+
+For example, you can create an alarm on the `isc_dhcpd.utilization` chart, but filter it to only the `isc_dhcpd` module:
+
+```yaml
+module: isc_dhcpd
+```
+
+#### Alarm line `plugin`
+
+The `plugin` line, filters which plugin within the context this alarm should apply to. The value is a space-separated 
+list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
+
+For example, you can create an alarm on the `isc_dhcpd.utilization` chart, but filter it to only the `python.d.plugin` 
+plugin:
+
+```yaml
+plugin: isc_dhcpd
 ```
 
 #### Alarm line `lookup`
