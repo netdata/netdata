@@ -18,13 +18,14 @@ priority = 50
 update_every = 1
 
 DEFAULT_HOST = '127.0.0.1:19999'
-DEFAULT_CHARTS_IN_SCOPE = ','.join([c for c in list(requests.get(f'https://{DEFAULT_HOST}/api/v1/charts').json()['charts'].keys()) if c.startswith('system.')])
+DEFAULT_CHARTS_IN_SCOPE = ','.join([c for c in list(requests.get(f'http://{DEFAULT_HOST}/api/v1/charts').json()['charts'].keys()) if c.startswith('system.')])
 DEFAULT_TRAIN_SECS = 60*60*4
 DEFAULT_OFFSET_SECS = 60*5
 DEFAULT_TRAIN_EVERY_N = 60
 DEFAULT_Z_SMOOTH_N = 10
 DEFAULT_Z_CLIP = 10
 DEFAULT_BURN_IN = 20
+DEFAULT_REVERSE_DIM_NAMES = True
 
 ORDER = [
     'zscores',
@@ -54,7 +55,8 @@ class Service(SimpleService):
         self.train_every_n = self.configuration.get('train_every_n', DEFAULT_TRAIN_EVERY_N)
         self.z_smooth_n = self.configuration.get('z_smooth_n', DEFAULT_Z_SMOOTH_N) 
         self.z_clip = self.configuration.get('z_clip', DEFAULT_Z_CLIP)
-        self.burn_in = self.configuration.get('burn_in', DEFAULT_BURN_IN) 
+        self.burn_in = self.configuration.get('burn_in', DEFAULT_BURN_IN)
+        self.reverse_dim_names = self.configuration.get('reverse_dim_names', DEFAULT_REVERSE_DIM_NAMES) 
         self.order = ORDER
         self.definitions = CHARTS
         self.random = SystemRandom()
@@ -116,11 +118,13 @@ class Service(SimpleService):
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
         # create data dict for z scores (with keys renamed)
-        df_z_smooth.index = ['.'.join(reversed(x.split('.'))) + '_z' for x in df_z_smooth.index]
+        dim_names_z = ['.'.join(reversed(x.split('.'))) + '_z' for x in df_z_smooth.index] if self.reverse_dim_names else ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
+        df_z_smooth.index = dim_names_z
         data_dict_z = df_z_smooth['z'].to_dict()
         
         # create data dict for 3sig flags (with keys renamed)
-        df_z_smooth.index = [x[:-2] + '_3sig' for x in df_z_smooth.index]
+        dim_names_3sig = [x[:-2] + '_3sig' for x in df_z_smooth.index]
+        df_z_smooth.index = dim_names_3sig
         data_dict_3sig = df_z_smooth['3sig'].to_dict()
 
         return data_dict_z, data_dict_3sig
