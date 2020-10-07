@@ -90,37 +90,23 @@ class Service(SimpleService):
             before=before, points=1, group='stddev', col_sep='.'
             ).transpose()
         self.df_std.columns = ['std']
-        self.df_std = self.df_std[self.df_std['std'] > 0]
 
     def create_data_dicts(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sig flags via some pandas manipulation.
         Returning two dictionarier of dimensions and measures, one for each chart.
         """
 
-        self.debug('self.df_mean')
-        self.debug(self.df_mean.head(5))
-        self.debug('self.df_std')
-        self.debug(self.df_std.head(5))
-        self.debug('df_allmetrics')
-        self.debug(df_allmetrics.head(5))
-
         # calculate clipped z score for each available metric
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
-        df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(lower=-self.z_clip, upper=self.z_clip)
-        self.debug('df_z')
-        self.debug(df_z.head(5))
+        df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(lower=-self.z_clip, upper=self.z_clip).fillna(0)
 
         # append last z_smooth_n rows of zscores to history table
-        df_z_wide = df_z[['z']].reset_index().pivot(values='z', columns='index')
-        self.debug('df_z_wide')
-        self.debug(df_z_wide.head(5))
+        df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
 
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
-        self.debug('self.df_z_history')
-        self.debug(self.df_z_history.head(5))
 
         # get average zscore for last z_smooth_n for each metric
-        df_z_smooth = pd.to_numeric(df_z_wide.melt(value_name='z')).groupby('index')[['z']].astype(float).mean() * 100
+        df_z_smooth = (df_z_wide.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
         # create data dict for z scores (with keys renamed)
@@ -138,13 +124,13 @@ class Service(SimpleService):
 
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
-            df_z_chart['chart'] = ['.'.join(x[0:2]) for x in df_z_chart['dim'].str.split('.').to_list()]
-            data_dict_z = pd.to_numeric(df_z_chart).groupby('chart')['z'].astype(float).mean().astype(int).to_dict()
+            df_z_chart['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_chart['dim'].str.split('.').to_list()]
+            data_dict_z = df_z_chart.groupby('chart')['z'].mean().astype(int).to_dict()
 
             df_3sig_chart = pd.DataFrame.from_dict(data_dict_3sig, orient='index').reset_index()
             df_3sig_chart.columns = ['dim', '3sig']
-            df_3sig_chart['chart'] = ['.'.join(x[0:2]) for x in df_3sig_chart['dim'].str.split('.').to_list()]
-            data_dict_3sig = pd.to_numeric(df_3sig_chart).groupby('chart')['3sig'].astype(float).sum().astype(int).to_dict()
+            df_3sig_chart['chart'] = ['.'.join(x[0:2]) + '_3sig' for x in df_3sig_chart['dim'].str.split('.').to_list()]
+            data_dict_3sig = df_3sig_chart.groupby('chart')['3sig'].sum().to_dict()
 
         return data_dict_z, data_dict_3sig
 
