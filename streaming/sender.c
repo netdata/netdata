@@ -617,7 +617,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 void sender_init(struct sender_state *s, RRDHOST *parent) {
     memset(s, 0, sizeof(*s));
     s->host = parent;
-    s->buffer = cbuffer_new(1024, 1024*1024);
+    s->buffer = cbuffer_new(1024, 1024);
     s->build = buffer_create(1);
     netdata_mutex_init(&s->mutex);
 }
