@@ -102,7 +102,7 @@ class Service(SimpleService):
         df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(lower=-self.z_clip, upper=self.z_clip)
         
         # append last z_smooth_n rows of zscores to history table
-        df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
+        df_z_wide = pd.to_numeric(df_z[['z']].reset_index().pivot_table(values='z', columns='index'))
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
 
         # get average zscore for last z_smooth_n for each metric
