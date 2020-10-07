@@ -25,7 +25,7 @@ DEFAULT_TRAIN_EVERY_N = 60
 DEFAULT_Z_SMOOTH_N = 10
 DEFAULT_Z_CLIP = 10
 DEFAULT_BURN_IN = 20
-DEFAULT_MODE = 'per_dim'
+DEFAULT_MODE = 'per_chart'
 
 ORDER = [
     'zscores',
@@ -102,8 +102,13 @@ class Service(SimpleService):
         df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(lower=-self.z_clip, upper=self.z_clip)
         
         # append last z_smooth_n rows of zscores to history table
-        df_z_wide = pd.to_numeric(df_z[['z']].reset_index().pivot_table(values='z', columns='index'))
+        df_z_wide = df_z[['z']].reset_index().pivot(values='z', columns='index')
+        self.debug('df_z_wide')
+        self.debug(df_z_wide.head(5))
+
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
+        self.debug('self.df_z_history')
+        self.debug(self.df_z_history.head(5))
 
         # get average zscore for last z_smooth_n for each metric
         df_z_smooth = pd.to_numeric(df_z_wide.melt(value_name='z')).groupby('index')[['z']].astype(float).mean() * 100
