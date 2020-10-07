@@ -18,7 +18,7 @@ priority = 50
 update_every = 1
 
 DEFAULT_HOST = '127.0.0.1:19999'
-DEFAULT_CHARTS_IN_SCOPE = 'system.cpu,system.load,system.io,system.pgpgio,system.ram,system.net,system.ip,system.ipv6,system.processes,system.ctxt,system.idlejitter,system.intr,system.softirqs,system.softnet_stat'
+DEFAULT_CHARTS_IN_SCOPE = ','.join([c for c in list(requests.get(f'https://{DEFAULT_HOST}/api/v1/charts').json()['charts'].keys()) if c.startswith('system.')])
 DEFAULT_TRAIN_SECS = 60*60*4
 DEFAULT_OFFSET_SECS = 60*5
 DEFAULT_TRAIN_EVERY_N = 60
@@ -76,7 +76,7 @@ class Service(SimpleService):
         before = now - self.offset_secs
 
         self.df_mean = get_data(
-                host=self.host, 
+                hosts=self.host, 
                 charts=self.charts_in_scope, 
                 after=after, 
                 before=before, 
@@ -87,7 +87,7 @@ class Service(SimpleService):
         self.df_mean.columns = ['mean']
 
         self.df_std = get_data(
-            host=self.host, 
+            hosts=self.host, 
             charts=self.charts_in_scope, 
             after=after, 
             before=before, 
@@ -98,7 +98,7 @@ class Service(SimpleService):
         self.df_std.columns = ['std']
         self.df_std = self.df_std[self.df_std['std'] > 0]
 
-    def create_data_dict(self, df_allmetrics):
+    def create_data_dicts(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sig flags via some pandas manipulation.
         Returning two dictionarier of dimensions and measures, one for each chart.
         """
