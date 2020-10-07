@@ -133,12 +133,12 @@ class Service(SimpleService):
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) for x in df_z_chart['dim'].str.split('.').to_list()]
-            data_dict_z = df_z_chart.groupby('chart')['z'].mean().to_dict()
+            data_dict_z = df_z_chart.groupby('chart')['z'].mean().astype(int).to_dict()
 
             df_3sig_chart = pd.DataFrame.from_dict(data_dict_3sig, orient='index').reset_index()
             df_3sig_chart.columns = ['dim', '3sig']
             df_3sig_chart['chart'] = ['.'.join(x[0:2]) for x in df_3sig_chart['dim'].str.split('.').to_list()]
-            data_dict_3sig = df_3sig_chart.groupby('chart')['3sig'].sum().to_dict()
+            data_dict_3sig = df_3sig_chart.groupby('chart')['3sig'].sum().astype(int).to_dict()
 
         return data_dict_z, data_dict_3sig
 
