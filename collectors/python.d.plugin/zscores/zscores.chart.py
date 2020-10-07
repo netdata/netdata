@@ -25,7 +25,6 @@ DEFAULT_TRAIN_EVERY_N = 60
 DEFAULT_Z_SMOOTH_N = 10
 DEFAULT_Z_CLIP = 10
 DEFAULT_BURN_IN = 20
-DEFAULT_REVERSE_DIM_NAMES = True
 DEFAULT_MODE = 'per_chart'
 
 ORDER = [
@@ -56,8 +55,7 @@ class Service(SimpleService):
         self.train_every_n = self.configuration.get('train_every_n', DEFAULT_TRAIN_EVERY_N)
         self.z_smooth_n = self.configuration.get('z_smooth_n', DEFAULT_Z_SMOOTH_N) 
         self.z_clip = self.configuration.get('z_clip', DEFAULT_Z_CLIP)
-        self.burn_in = self.configuration.get('burn_in', DEFAULT_BURN_IN)
-        self.reverse_dim_names = self.configuration.get('reverse_dim_names', DEFAULT_REVERSE_DIM_NAMES) 
+        self.burn_in = self.configuration.get('burn_in', DEFAULT_BURN_IN) 
         self.mode = self.configuration.get('mode', DEFAULT_MODE) 
         self.order = ORDER
         self.definitions = CHARTS
@@ -120,7 +118,6 @@ class Service(SimpleService):
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
         # create data dict for z scores (with keys renamed)
-        #dim_names_z = ['.'.join(reversed(x.split('.'))) + '_z' for x in df_z_smooth.index] if self.reverse_dim_names else ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
         dim_names_z = ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
         df_z_smooth.index = dim_names_z
         data_dict_z = df_z_smooth['z'].to_dict()
