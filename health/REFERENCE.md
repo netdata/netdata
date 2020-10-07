@@ -187,7 +187,7 @@ For example, you can create a template on the `isc_dhcpd.utilization` chart, but
 plugin:
 
 ```yaml
-plugin: isc_dhcpd
+plugin: python.d.plugin
 ```
 
 #### Alarm line `lookup`
