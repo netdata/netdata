@@ -15,7 +15,7 @@ from netdata_pandas.data import get_data, get_allmetrics
 
 
 priority = 50
-update_every = 1
+update_every = 2
 
 DEFAULT_HOST = '127.0.0.1:19999'
 DEFAULT_CHARTS_IN_SCOPE = ','.join([c for c in list(requests.get(f'http://{DEFAULT_HOST}/api/v1/charts').json()['charts'].keys()) if c.startswith('system.')])
