@@ -19,7 +19,7 @@ update_every = 2
 
 DEFAULT_HOST = '127.0.0.1:19999'
 DEFAULT_CHARTS_IN_SCOPE = ','.join([c for c in list(requests.get(f'http://{DEFAULT_HOST}/api/v1/charts').json()['charts'].keys()) if c.startswith('system.')])
-DEFAULT_TRAIN_SECS = 60*60*4
+DEFAULT_TRAIN_SECS = 60*60*1
 DEFAULT_OFFSET_SECS = 60*5
 DEFAULT_TRAIN_EVERY_N = 60
 DEFAULT_Z_SMOOTH_N = 10
