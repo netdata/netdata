@@ -159,14 +159,18 @@ class Service(SimpleService):
             #self.debug('data_dict_z')
             #self.debug(data_dict_z)
 
-            df_3sig_chart = pd.DataFrame.from_dict(data_dict_3sig, orient='index').reset_index()
-            df_3sig_chart.columns = ['dim', '3sig']
-            df_3sig_chart['chart'] = ['.'.join(x[0:2]) + '_3sig' for x in df_3sig_chart['dim'].str.split('.').to_list()]
+            data_dict_3sig = {}
+            for k in data_dict_z:
+                data_dict_3sig[k.replace('_z','_3sig')] = 1 if abs(data_dict_z[k]) > 300 else 0
+
+            #df_3sig_chart = pd.DataFrame.from_dict(data_dict_3sig, orient='index').reset_index()
+            #df_3sig_chart.columns = ['dim', '3sig']
+            #df_3sig_chart['chart'] = ['.'.join(x[0:2]) + '_3sig' for x in df_3sig_chart['dim'].str.split('.').to_list()]
 
             #self.debug('df_3sig_chart')
             #self.debug(df_3sig_chart.head(10))
 
-            data_dict_3sig = df_3sig_chart.groupby('chart')['3sig'].sum().to_dict()
+            #data_dict_3sig = df_3sig_chart.groupby('chart')['3sig'].sum().to_dict()
 
             #self.debug('data_dict_3sig')
             #self.debug(data_dict_3sig)
