@@ -97,10 +97,19 @@ class Service(SimpleService):
         Returning two dictionarier of dimensions and measures, one for each chart.
         """
 
+        self.debug('self.df_mean')
+        self.debug(self.df_mean.head(5))
+        self.debug('self.df_std')
+        self.debug(self.df_std.head(5))
+        self.debug('df_allmetrics')
+        self.debug(df_allmetrics.head(5))
+
         # calculate clipped z score for each available metric
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
         df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(lower=-self.z_clip, upper=self.z_clip)
-        
+        self.debug('df_z')
+        self.debug(df_z.head(5))
+
         # append last z_smooth_n rows of zscores to history table
         df_z_wide = df_z[['z']].reset_index().pivot(values='z', columns='index')
         self.debug('df_z_wide')
