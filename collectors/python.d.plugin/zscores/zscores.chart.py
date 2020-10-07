@@ -78,24 +78,14 @@ class Service(SimpleService):
         before = now - self.offset_secs
 
         self.df_mean = get_data(
-                hosts=self.host, 
-                charts=self.charts_in_scope, 
-                after=after, 
-                before=before, 
-                points=1, 
-                group='average', 
-                col_sep='.'
-                ).transpose()
+            hosts=self.host, charts=self.charts_in_scope, after=after, 
+            before=before, points=1, group='average', col_sep='.'
+            ).transpose()
         self.df_mean.columns = ['mean']
 
         self.df_std = get_data(
-            hosts=self.host, 
-            charts=self.charts_in_scope, 
-            after=after, 
-            before=before, 
-            points=1, 
-            group='stddev', 
-            col_sep='.'
+            hosts=self.host, charts=self.charts_in_scope, after=after, 
+            before=before, points=1, group='stddev', col_sep='.'
             ).transpose()
         self.df_std.columns = ['std']
         self.df_std = self.df_std[self.df_std['std'] > 0]
@@ -133,7 +123,7 @@ class Service(SimpleService):
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) for x in df_z_chart['dim'].str.split('.').to_list()]
-            data_dict_z = (df_z_chart.groupby('chart')['z'].mean()*1000).astype(int).to_dict()
+            data_dict_z = df_z_chart.groupby('chart')['z'].mean().astype(int).to_dict()
 
             df_3sig_chart = pd.DataFrame.from_dict(data_dict_3sig, orient='index').reset_index()
             df_3sig_chart.columns = ['dim', '3sig']
@@ -163,7 +153,7 @@ class Service(SimpleService):
         # validate relevant dims in charts
         for dim in data_dict_z:
             if dim not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([dim, dim, 'absolute', 1, 100])
+                self.charts['zscores'].add_dimension([dim, dim, 'absolute', 1, 1])
         for dim in data_dict_3sig:
             if dim not in self.charts['zscores_3sigma']:
                 self.charts['zscores_3sigma'].add_dimension([dim, dim, 'absolute', 1, 1])
