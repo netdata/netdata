@@ -377,6 +377,10 @@ RRD_PLUGIN_FILES = \
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
+        database/sqlite/sqlite_functions.c \
+        database/sqlite/sqlite_functions.h \
+        database/sqlite/sqlite3.c \
+        database/sqlite/sqlite3.h \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \
         database/engine/rrddiskprotocol.h \

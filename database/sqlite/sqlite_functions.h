@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_SQLITE_FUNCTIONS_H
+#define NETDATA_SQLITE_FUNCTIONS_H
+
+#endif //NETDATA_SQLITE_FUNCTIONS_H
