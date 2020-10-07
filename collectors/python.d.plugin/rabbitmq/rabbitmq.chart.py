@@ -31,7 +31,14 @@ OVERVIEW_STATS = [
     'message_stats.ack',
     'message_stats.redeliver',
     'message_stats.deliver',
-    'message_stats.publish'
+    'message_stats.publish',
+    'churn_rates.connection_created_details.rate',
+    'churn_rates.connection_closed_details.rate',
+    'churn_rates.channel_created_details.rate',
+    'churn_rates.channel_closed_details.rate',
+    'churn_rates.queue_created_details.rate',
+    'churn_rates.queue_declared_details.rate',
+    'churn_rates.queue_deleted_details.rate'
 ]
 
 VHOST_MESSAGE_STATS = [
@@ -47,6 +54,9 @@ VHOST_MESSAGE_STATS = [
 
 ORDER = [
     'queued_messages',
+    'connection_churn_rates',
+    'channel_churn_rates',
+    'queue_churn_rates',
     'message_rates',
     'global_counts',
     'file_descriptors',
@@ -102,6 +112,28 @@ CHARTS = {
             ['object_totals_connections', 'connections', 'absolute'],
             ['object_totals_queues', 'queues', 'absolute'],
             ['object_totals_exchanges', 'exchanges', 'absolute']
+        ]
+    },
+    'connection_churn_rates': {
+        'options': [None, 'Connection Churn Rates', 'operations/s', 'overview', 'rabbitmq.connection_churn_rates', 'line'],
+        'lines': [
+            ['churn_rates_connection_created_details_rate', 'created', 'absolute'],
+            ['churn_rates_connection_closed_details_rate', 'closed', 'absolute']
+        ]
+    },
+    'channel_churn_rates': {
+        'options': [None, 'Channel Churn Rates', 'operations/s', 'overview', 'rabbitmq.channel_churn_rates', 'line'],
+        'lines': [
+            ['churn_rates_channel_created_details_rate', 'created', 'absolute'],
+            ['churn_rates_channel_closed_details_rate', 'closed', 'absolute']
+        ]
+    },
+    'queue_churn_rates': {
+        'options': [None, 'Queue Churn Rates', 'operations/s', 'overview', 'rabbitmq.queue_churn_rates', 'line'],
+        'lines': [
+            ['churn_rates_queue_created_details_rate', 'created', 'absolute'],
+            ['churn_rates_queue_declared_details_rate', 'declared', 'absolute'],
+            ['churn_rates_queue_deleted_details_rate', 'deleted', 'absolute']
         ]
     },
     'queued_messages': {
