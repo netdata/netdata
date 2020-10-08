@@ -138,20 +138,21 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         if (rpt->receiver_tx_spawn)
             receiver_tx_thread_stop(rpt);
 
+        netdata_mutex_lock(&rpt->host->receiver_lock);
         // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
         // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
         if (netdata_exit && rpt->host) {
             rpt->exited = 1;
+            netdata_mutex_unlock(&rpt->host->receiver_lock);
             return;
         }
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if (!netdata_exit && rpt->host) {
-            netdata_mutex_lock(&rpt->host->receiver_lock);
             if (rpt->host->receiver == rpt)
                 rpt->host->receiver = NULL;
-            netdata_mutex_unlock(&rpt->host->receiver_lock);
         }
+        netdata_mutex_unlock(&rpt->host->receiver_lock);
 
         info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
         destroy_receiver_state(rpt);
