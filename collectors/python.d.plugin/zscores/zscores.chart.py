@@ -86,7 +86,7 @@ class Service(SimpleService):
         self.df_mean.columns = ['mean']
 
         # get sigmas
-        self.df_std = get_data(self.host, self.charts_in_scope, after, before, points=1, group='stddev', col_sep='.').transpose()
+        self.df_std = get_data(self.host, self.charts_in_scope, after, before, points=5, group='stddev', col_sep='.').mean().to_frame()
         self.df_std.columns = ['std']
 
     def create_data_dicts(self, df_allmetrics):
