@@ -19,13 +19,13 @@ update_every = 1
 
 DEFAULT_HOST = '127.0.0.1:19999'
 DEFAULT_CHARTS_IN_SCOPE = 'system.cpu,system.load,system.io,system.pgpgio,system.ram,system.net,system.ip,system.ipv6,system.processes,system.ctxt,system.idlejitter,system.intr,system.softirqs,system.softnet_stat'
-DEFAULT_TRAIN_SECS = 60*60*4
-DEFAULT_OFFSET_SECS = 60*5
-DEFAULT_TRAIN_EVERY_N = 60*5
-DEFAULT_Z_SMOOTH_N = 10
-DEFAULT_Z_CLIP = 10
-DEFAULT_BURN_IN = 20
-DEFAULT_MODE = 'per_chart'
+DEFAULT_TRAIN_SECS = 60*60*1 # use last 1 hour to work out the mean and sigma for the zscore
+DEFAULT_OFFSET_SECS = 60*5 # ignore last 5 minutes of data when calculating the mean and sigma
+DEFAULT_TRAIN_EVERY_N = 60*5 # recalculate mean and sigma every 5 minutes
+DEFAULT_Z_SMOOTH_N = 30 # take a rolling average of the last 30 zscore values to reduce sensitivity to temporary 'spikes'
+DEFAULT_Z_CLIP = 10 # cap each zscore at 10 so as to avoid really large individual zscores swamping any rolling average
+DEFAULT_BURN_IN = 20 # on startup of the collector continually update the mean and sigma incase any gaps or inital calculations fail to return
+DEFAULT_MODE = 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be averaged again to one zscore per chart per time step
 
 ORDER = [
     'zscores',
@@ -87,7 +87,7 @@ class Service(SimpleService):
         # get sigmas
         self.df_std = get_data(
             hosts=self.host, charts=self.charts_in_scope, after=after, 
-            before=before, points=10, group='stddev', col_sep='.'
+            before=before, points=1, group='stddev', col_sep='.'
             ).mean().to_frame()
         self.df_std.columns = ['std']
 
