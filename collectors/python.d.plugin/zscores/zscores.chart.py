@@ -67,6 +67,11 @@ class Service(SimpleService):
     def check():
         return True
 
+    def validate_charts(self, name, data, algorithm='absolute', multiplier=1, divisor=1):
+        for dim in data:
+            if dim not in self.charts[name]:
+                self.charts[name].add_dimension([dim, dim, algorithm, multiplier, divisor])
+
     def train_model(self):
         """Calculate the mean and sigma for all relevant metrics and 
         store them for use in calulcating z score at each timestep. 
@@ -114,12 +119,13 @@ class Service(SimpleService):
         # average to chart level if specified
         if self.mode == 'per_chart':
 
+            # average over all dim's in a chart to get chart level zscore
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_chart['dim'].str.split('.').to_list()]
-
             data_dict_z = df_z_chart.groupby('chart')['z'].mean().to_dict()
 
+            # create 3sig data based on if any chart level abs(zscores) > 3
             data_dict_3sig = {}
             for k in data_dict_z:
                 data_dict_3sig[k.replace('_z','_3sig')] = 1 if abs(data_dict_z[k]) > 300 else 0
@@ -144,12 +150,7 @@ class Service(SimpleService):
         data_dict_z, data_dict_3sig = self.create_data_dicts(df_allmetrics)
         data = {**data_dict_z, **data_dict_3sig}
 
-        # validate relevant dims in charts
-        for dim in data_dict_z:
-            if dim not in self.charts['zscores']:
-                self.charts['zscores'].add_dimension([dim, dim, 'absolute', 1, 100])
-        for dim in data_dict_3sig:
-            if dim not in self.charts['zscores_3sigma']:
-                self.charts['zscores_3sigma'].add_dimension([dim, dim, 'absolute', 1, 1])
+        self.validate_charts('zscores', data_dict_z, divisor=100)
+        self.validate_charts('zscores_3sigma', data_dict_3sig)
 
         return data
