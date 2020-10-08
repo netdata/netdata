@@ -82,7 +82,7 @@ class Service(SimpleService):
         before = now - self.offset_secs
 
         # get means
-        self.df_mean = get_data(self.host, self.charts_in_scope, after, before, points=1, group='average', col_sep='.').transpose()
+        self.df_mean = get_data(self.host, self.charts_in_scope, after, before, points=5, group='average', col_sep='.').mean().to_frame()
         self.df_mean.columns = ['mean']
 
         # get sigmas
