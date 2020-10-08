@@ -112,8 +112,8 @@ static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
     if((rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
         (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name))) {
         if ((!rc->module_match && !rc->plugin_match) ||
-            (rc->module_match && simple_pattern_matches(rc->module_pattern, st->module_name)) ||
-            (rc->plugin_match && simple_pattern_matches(rc->plugin_pattern, st->plugin_name)))
+            (rc->module_match && simple_pattern_matches(rc->module_pattern, st->module_name) &&
+            rc->plugin_match && simple_pattern_matches(rc->plugin_pattern, st->plugin_name)) )
             return 1;
     }
 
