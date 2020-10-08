@@ -59,10 +59,9 @@ class Service(SimpleService):
         self.mode = self.configuration.get('mode', DEFAULT_MODE) 
         self.order = ORDER
         self.definitions = CHARTS
-        self.random = SystemRandom()
-        self.df_mean = pd.DataFrame()
-        self.df_std = pd.DataFrame()
-        self.df_z_history = pd.DataFrame()
+        self.df_mean = pd.DataFrame() # used to store means for all metrics
+        self.df_std = pd.DataFrame() # used to store sigmas for all metrics
+        self.df_z_history = pd.DataFrame() # history of zscores per metric to be smoothed at each step
 
     @staticmethod
     def check():
@@ -78,22 +77,16 @@ class Service(SimpleService):
         before = now - self.offset_secs
 
         # get means
-        self.df_mean = get_data(
-            hosts=self.host, charts=self.charts_in_scope, after=after, 
-            before=before, points=1, group='average', col_sep='.'
-            ).transpose()
+        self.df_mean = get_data(self.host, self.charts_in_scope, after, before, points=1, group='average', col_sep='.').transpose()
         self.df_mean.columns = ['mean']
 
         # get sigmas
-        self.df_std = get_data(
-            hosts=self.host, charts=self.charts_in_scope, after=after, 
-            before=before, points=1, group='stddev', col_sep='.'
-            ).mean().to_frame()
+        self.df_std = get_data(self.host, self.charts_in_scope, after, before, points=1, group='stddev', col_sep='.').transpose()
         self.df_std.columns = ['std']
 
     def create_data_dicts(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sig flags via some pandas manipulation.
-        Returning two dictionarier of dimensions and measures, one for each chart.
+        Returning two dictionaries of dimensions and measures, one for each chart.
         """
 
         # calculate clipped z score for each available metric

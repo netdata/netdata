@@ -12,12 +12,6 @@ var netdataDashboard = window.netdataDashboard || {};
 
 netdataDashboard.menu = {
 
-    'zscores': {
-        title: 'Z-Scores',
-        icon: '<i class="fas fa-bomb"></i>',
-        info: 'Z scores relating to key system metrics.'
-    },
-
     'system': {
         title: 'System Overview',
         icon: '<i class="fas fa-bookmark"></i>',
@@ -570,6 +564,12 @@ netdataDashboard.menu = {
         title: 'Pulsar',
         icon: '<i class="fas fa-comments"></i>',
         info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
+    },
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-bomb"></i>',
+        info: 'Z scores relating to key system metrics.'
     },
 };
 
