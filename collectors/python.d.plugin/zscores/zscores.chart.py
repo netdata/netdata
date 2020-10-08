@@ -91,15 +91,14 @@ class Service(SimpleService):
 
         # calculate clipped z score for each available metric
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
-        df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(lower=-self.z_clip, upper=self.z_clip).fillna(0)
+        df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(-self.z_clip, self.z_clip).fillna(0)
 
         # append last z_smooth_n rows of zscores to history table
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
-
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
 
         # get average zscore for last z_smooth_n for each metric
-        df_z_smooth = (df_z_wide.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
+        df_z_smooth = (self.df_z_history.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
         df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
         # create data dict for z scores (with keys renamed)
