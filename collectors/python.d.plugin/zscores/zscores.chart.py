@@ -79,7 +79,7 @@ class Service(SimpleService):
         # get sigmas from rest api
         self.df_std = get_data(
             self.host, self.charts_in_scope, after, before, points=5, group='stddev', col_sep='.'
-            ).mean().to_frame().rename(columns={0: "mean"})
+            ).mean().to_frame().rename(columns={0: "std"})
 
     def create_data_dicts(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
