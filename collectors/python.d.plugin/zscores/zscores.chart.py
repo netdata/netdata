@@ -82,7 +82,7 @@ class Service(SimpleService):
             self.host, self.charts_in_scope, after, before, points=10, group='stddev', col_sep='.'
             ).mean().to_frame().rename(columns={0: "std"})
 
-    def create_data_dicts(self, df_allmetrics):
+    def create_data(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
         Returning two dictionaries of dimensions and measures, one for each chart.
         """
@@ -102,22 +102,22 @@ class Service(SimpleService):
         df_z_smooth['3sigma'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
 
         # create data dict for z scores
-        data_dict_z = df_z_smooth['z'].add_suffix('_z').to_dict()
+        data_z = df_z_smooth['z'].add_suffix('_z').to_dict()
 
         # aggregate to chart level if specified
         if self.mode == 'per_chart':
             df_z_smooth['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_smooth.index.str.split('.').to_list()]
             if self.per_chart_agg == 'absmax':
-                data_dict_z = list(df_z_smooth.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
+                data_z = list(df_z_smooth.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
             else:
-                data_dict_z = list(df_z_smooth.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
+                data_z = list(df_z_smooth.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
 
         # create data dict for 3sigma flags
-        data_dict_3sigma = {}
-        for k in data_dict_z:
-            data_dict_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_dict_z[k]) > 300 else 0
+        data_3sigma = {}
+        for k in data_z:
+            data_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_z[k]) > 300 else 0
 
-        return data_dict_z, data_dict_3sigma
+        return data_z, data_3sigma
 
     def get_data(self):
 
@@ -129,10 +129,10 @@ class Service(SimpleService):
         df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, col_sep='.').transpose()
 
         # create data dicts
-        data_dict_z, data_dict_3sigma = self.create_data_dicts(df_allmetrics)
-        data = {**data_dict_z, **data_dict_3sigma}
+        data_z, data_3sigma = self.create_data(df_allmetrics)
+        data = {**data_z, **data_3sigma}
 
-        self.validate_charts('z', data_dict_z, divisor=100)
-        self.validate_charts('3sigma', data_dict_3sigma)
+        self.validate_charts('z', data_z, divisor=100)
+        self.validate_charts('3sigma', data_3sigma)
 
         return data
