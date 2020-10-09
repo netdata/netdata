@@ -74,13 +74,13 @@ class Service(SimpleService):
 
         # get means from rest api
         self.df_mean = get_data(
-            self.host, self.charts_in_scope, after, before, points=5, group='average', col_sep='.'
+            self.host, self.charts_in_scope, after, before, points=10, group='average', col_sep='.'
             ).mean().to_frame().rename(columns={0: "mean"})
         self.debug(self.df_mean)
 
         # get sigmas from rest api
         self.df_std = get_data(
-            self.host, self.charts_in_scope, after, before, points=5, group='stddev', col_sep='.'
+            self.host, self.charts_in_scope, after, before, points=10, group='stddev', col_sep='.'
             ).mean().to_frame().rename(columns={0: "std"})
         self.debug(self.df_std)
 
