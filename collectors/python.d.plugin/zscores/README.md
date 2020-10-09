@@ -51,7 +51,7 @@ The default configuration should look something like this. Here you can see each
 ```bash
 # what host to pull data from
 host: '127.0.0.1:19999'
-# what charts to pull data for, if undefined will look for all system.* charts
+# what charts to pull data for
 charts_in_scope: 'system.cpu,system.load,system.io,system.pgpgio,system.ram,system.net,system.ip,system.ipv6,system.processes,system.ctxt,system.idlejitter,system.intr,system.softirqs,system.softnet_stat'
 # length of time to base calulcations off for mean and sigma
 train_secs: 3600 # use last 1 hour to work out the mean and sigma for the zscore
