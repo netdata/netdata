@@ -97,6 +97,8 @@ class Service(SimpleService):
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
 
+        self.debug(self.df_z_history)
+
         # get average zscore for last z_smooth_n for each metric
         df_z_smooth = (self.df_z_history.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
         df_z_smooth['3sigma'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
