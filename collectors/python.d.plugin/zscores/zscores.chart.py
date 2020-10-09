@@ -96,7 +96,7 @@ class Service(SimpleService):
 
         # get average zscore for last z_smooth_n for each metric
         df_z_smooth = (self.df_z_history.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
-        df_z_smooth['3sig'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
+        df_z_smooth['3sigma'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
         # create data dict for z scores (with keys renamed)
         dim_names_z = ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
