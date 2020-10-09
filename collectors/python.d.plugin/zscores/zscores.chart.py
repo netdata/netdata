@@ -125,7 +125,7 @@ class Service(SimpleService):
                 # 'vote' for the chart level z score based on the largest value of any dimension, regardless of sign
                 data_dict_z = df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict()
             else:
-                data_dict_z = df_z_chart.groupby('chart').agg({'z': [self.per_chart_agg]}).to_dict()
+                data_dict_z = df_z_chart.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict()
 
             # create 3sig data based on if any chart level abs(zscores) > 3
             data_dict_3sigma = {}
