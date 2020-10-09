@@ -82,7 +82,7 @@ pip install numpy pandas requests netdata-pandas
 
 ## Notes
 
-- Python 3 is required as the `[netdata-pandas](https://github.com/netdata/netdata-pandas)` package uses python async libraries to make asynchronous calls to the netdata rest api to get the required data for each chart when calculating the mean and sigma.
+- Python 3 is required as the [`netdata-pandas`](https://github.com/netdata/netdata-pandas) package uses python async libraries ([asks](https://pypi.org/project/asks/) and [trio](https://pypi.org/project/trio/)) to make asynchronous calls to the netdata rest api to get the required data for each chart when calculating the mean and sigma.
 - It may take a few hours or so for the collector to 'settle' into it's typical behaviour in terms of the scores you will see in the normal running of your system.
 - The zscores are clipped to a range of between -10 to +10 so you will never see any scores outside this range. 
 - The zscore you see for each chart when using `mode: 'per_chart'` as actually an average zscore accross all the dimensions on the underlying chart.
