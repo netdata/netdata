@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Z-Scores - basic anomaly detection for your key metrics and charts
 
-Generate smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts. 
+Smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts. 
 
 ## Charts
 
@@ -66,3 +66,21 @@ burn_in: 20 # on startup of the collector continually update the mean and sigma 
 # mode can be to get a zscore 'per_dim' or 'per_chart'
 mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be averaged again to one zscore per chart per time step
 ```
+
+## Requirements
+
+- This collector will only work with python 3 and requires the below python packages be installed.
+
+```bash
+# become netdata user
+sudo su -s /bin/bash netdata
+# install required packages
+pip install numpy pandas requests netdata-pandas
+```
+
+## Notes
+
+- Python 3 is required as the `[netdata-pandas](https://github.com/netdata/netdata-pandas)` package uses python async libraries to make asynchronous calls to the netdata rest api to get the required data for each chart when calculating the mean and sigma.
+- It may take a few hours or so for the collector to 'settle' into it's typical behaviour in terms of the scores you will see in the normal running of your system.
+- The zscores are clipped to a range of between -10 to +10 so you will never see any scores outside this range. 
+- The zscore you see for each chart when using `mode: 'per_chart'` as actually an average zscore accross all the dimensions on the underlying chart.   
