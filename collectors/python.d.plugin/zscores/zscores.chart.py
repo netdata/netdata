@@ -17,17 +17,17 @@ priority = 50
 update_every = 1
 
 ORDER = [
-    'zscores',
-    'zscores_3sigma'
+    'z',
+    '3sigma'
 ]
 
 CHARTS = {
-    'zscores': {
-        'options': [None, 'Z-Score', 'zscores', 'zscore', 'zscores.zscores', 'line'],
+    'z': {
+        'options': ['z', 'Z-Score', 'z', 'zscores', 'zscores.z', 'line'],
         'lines': []
     },
-    'zscores_3sigma': {
-        'options': [None, 'abb(Z-Score) > 3 Sigma', '3sig count', 'zscores', 'zscores.zscores_3sigma', 'stacked'],
+    '3sigma': {
+        'options': ['3sigma', 'Z-Score >3', 'count', 'zscores', 'zscores.3sigma', 'stacked'],
         'lines': []
     },
 }
@@ -139,7 +139,7 @@ class Service(SimpleService):
         data_dict_z, data_dict_3sig = self.create_data_dicts(df_allmetrics)
         data = {**data_dict_z, **data_dict_3sig}
 
-        self.validate_charts('zscores', data_dict_z, divisor=100)
-        self.validate_charts('zscores_3sigma', data_dict_3sig)
+        self.validate_charts('z', data_dict_z, divisor=100)
+        self.validate_charts('3sigma', data_dict_3sig)
 
         return data
