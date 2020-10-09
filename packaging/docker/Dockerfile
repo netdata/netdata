@@ -107,8 +107,8 @@ RUN \
 # Install any Python wheels
 RUN pip install /wheels/*
 
-ENV NETDATA_PORT 19999
-EXPOSE $NETDATA_PORT
+ENV NETDATA_LISTENER_PORT 19999
+EXPOSE $NETDATA_LISTENER_PORT
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
