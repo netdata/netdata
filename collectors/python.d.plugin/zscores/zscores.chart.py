@@ -44,6 +44,7 @@ class Service(SimpleService):
         self.train_every_n = self.configuration.get('train_every_n')
         self.z_smooth_n = self.configuration.get('z_smooth_n') 
         self.z_clip = self.configuration.get('z_clip')
+        self.z_abs = bool(self.configuration.get('z_abs'))
         self.burn_in = self.configuration.get('burn_in') 
         self.mode = self.configuration.get('mode')
         self.per_chart_agg = self.configuration.get('per_chart_agg', 'absmax') 
@@ -90,6 +91,9 @@ class Service(SimpleService):
         # calculate clipped z score for each available metric
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
         df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(-self.z_clip, self.z_clip).fillna(0)
+        if self.z_abs:
+            df_z['z'] = df_z['z'].abs()
+
 
         # append last z_smooth_n rows of zscores to history table
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
@@ -117,10 +121,12 @@ class Service(SimpleService):
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_chart['dim'].str.split('.').to_list()]
             
+            # how to aggregate from dimension to chart level
             if self.per_chart_agg == 'absmax':
+                # 'vote' for the chart level z score based on the largest value of any dimension, regardless of sign
                 data_dict_z = df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict()
             else:
-                data_dict_z = df_z_chart.groupby('chart')['z'].mean().to_dict()
+                data_dict_z = df_z_chart.groupby('chart').agg({'z': [per_chart_agg]}).to_dict()
 
             # create 3sig data based on if any chart level abs(zscores) > 3
             data_dict_3sigma = {}

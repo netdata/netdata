@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 Smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts. 
 
-This collector uses the netdata rest api to get the `mean` and `sigma` for each specified chart over a specified time range (defined by `train_secs` and `offset_secs`). For each dimension it will calculate a Z-Score as `z = (x - mean) / sigma` (clipped at `z_clip`). Scores are then smoothed over time (`z_smooth_n`) and, if `mode: 'per_chart'`, aggregated across dimensions (based on `per_chart_agg` function) to a smoothed, rolling chart level Z-Score at each time step.
+This collector uses the netdata rest api to get the `mean` and `sigma` for each dimension on specified charts over a time range (defined by `train_secs` and `offset_secs`). For each dimension it will calculate a Z-Score as `z = (x - mean) / sigma` (clipped at `z_clip`). Scores are then smoothed over time (`z_smooth_n`) and, if `mode: 'per_chart'`, aggregated across dimensions (based on `per_chart_agg` function) to a smoothed, rolling chart level Z-Score at each time step.
 
 ## Charts
 
