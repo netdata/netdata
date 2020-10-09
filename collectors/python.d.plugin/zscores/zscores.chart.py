@@ -50,9 +50,9 @@ class Service(SimpleService):
         self.per_chart_agg = self.configuration.get('per_chart_agg', 'absmax') 
         self.order = ORDER
         self.definitions = CHARTS
-        self.df_mean = pd.DataFrame() # used to store means for all metrics
-        self.df_std = pd.DataFrame() # used to store sigmas for all metrics
-        self.df_z_history = pd.DataFrame() # history of zscores per metric to be smoothed at each step
+        self.df_mean = pd.DataFrame()
+        self.df_std = pd.DataFrame()
+        self.df_z_history = pd.DataFrame()
 
     @staticmethod
     def check():
@@ -106,31 +106,23 @@ class Service(SimpleService):
         dim_names_z = ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
         df_z_smooth.index = dim_names_z
         data_dict_z = df_z_smooth['z'].to_dict()
-        
-        # create data dict for 3sig flags (with keys renamed)
-        dim_names_3sigma = [x[:-2] + '_3sigma' for x in df_z_smooth.index]
-        df_z_smooth.index = dim_names_3sigma
-        data_dict_3sigma = df_z_smooth['3sigma'].to_dict()
 
-        # average to chart level if specified
         if self.mode == 'per_chart':
 
-            # average over all dim's in a chart to get chart level zscore
+            # aggregate over all dim's in a chart to get chart level zscore
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_chart['dim'].str.split('.').to_list()]
             
             # how to aggregate from dimension to chart level
             if self.per_chart_agg == 'absmax':
-                # 'vote' for the chart level z score based on the largest value of any dimension, regardless of sign
                 data_dict_z = list(df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
             else:
                 data_dict_z = list(df_z_chart.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
 
-            # create 3sig data based on if any chart level abs(zscores) > 3
-            data_dict_3sigma = {}
-            for k in data_dict_z:
-                data_dict_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_dict_z[k]) > 300 else 0
+        data_dict_3sigma = {}
+        for k in data_dict_z:
+            data_dict_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_dict_z[k]) > 300 else 0
 
         return data_dict_z, data_dict_3sigma
 

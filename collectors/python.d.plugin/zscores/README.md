@@ -13,11 +13,11 @@ This collector uses the netdata rest api to get the `mean` and `sigma` for each 
 
 ## Charts
 
-Below is an example of the charts produced by this collector and a typical example of how they would look when things are 'normal' on the system. The zscores tend to bounce randomly around a range typically between -3 to +3, one or two might stay steady at a more constant value depending on your configuration and the typical workload on your system. 
+Below is an example of the charts produced by this collector and a typical example of how they would look when things are 'normal' on the system. The zscores tend to bounce randomly around a range typically between 0 to +3 (or -3 to +3 if `z_abs: 'false'`), one or two might stay steady at a more constant value depending on your configuration and the typical workload on your system. 
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal.jpg)
 
-If we then go onto the system and run a command like `stress-ng --matrix 2 -t 2m` to create some stress, we see some charts begin to have zscores that jump outside the typical range between -3 to +3. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first.
+If we then go onto the system and run a command like `stress-ng --matrix 2 -t 2m` to create some stress, we see some charts begin to have zscores that jump outside the typical range. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first.
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-abnormal.jpg)
 
@@ -63,10 +63,14 @@ train_every_n: 300 # recalculate mean and sigma every 5 minutes
 z_smooth_n: 15 # take a rolling average of the last 15 zscore values to reduce sensitivity to temporary 'spikes'
 # cap absolute value of zscore (before smoothing) as some value for better stability
 z_clip: 10 # cap each zscore at 10 so as to avoid really large individual zscores swamping any rolling average
+# set z_abs: 'true' to make all zscores by absolute values only.
+z_abs: 'true'
 # burn in period in which to initially calculate mean and sigma on every step
 burn_in: 20 # on startup of the collector continually update the mean and sigma incase any gaps or inital calculations fail to return
 # mode can be to get a zscore 'per_dim' or 'per_chart'
 mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be averaged again to one zscore per chart per time step
+# per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'
+per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all dimensions but will maintain the sign. 'mean' will just average.
 ```
 
 ## Requirements
