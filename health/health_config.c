@@ -47,11 +47,6 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
         return 0;
 
-    if ( (!rc->module_match && rc->plugin_match) || (rc->module_match && !rc->plugin_match)) {
-        error("Health configuration for alarm '%s.%s' has neither \"module\" nor \"plugin\", but it is necessary to define both. Ignoring it.", rc->chart, rc->name);
-        return 0;
-    }
-
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
@@ -99,11 +94,6 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
 
     if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
         error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
-        return 0;
-    }
-
-    if ( (!rt->module_match && rt->plugin_match) || (rt->module_match && !rt->plugin_match)) {
-        error("Health configuration for template '%s' has neither \"module\" or \"plugin\", but it is necessary to define both. Ignoring it.", rt->name);
         return 0;
     }
 
