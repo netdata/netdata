@@ -123,9 +123,9 @@ class Service(SimpleService):
             # how to aggregate from dimension to chart level
             if self.per_chart_agg == 'absmax':
                 # 'vote' for the chart level z score based on the largest value of any dimension, regardless of sign
-                data_dict_z = df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict()
+                data_dict_z = list(df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
             else:
-                data_dict_z = df_z_chart.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict()
+                data_dict_z = list(df_z_chart.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
 
             # create 3sig data based on if any chart level abs(zscores) > 3
             data_dict_3sigma = {}
