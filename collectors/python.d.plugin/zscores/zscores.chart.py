@@ -106,6 +106,8 @@ class Service(SimpleService):
         df_z_smooth.index = dim_names_z
         data_dict_z = df_z_smooth['z'].to_dict()
 
+        self.debug(df_z_smooth)
+
         if self.mode == 'per_chart':
 
             # aggregate over all dim's in a chart to get chart level zscore
