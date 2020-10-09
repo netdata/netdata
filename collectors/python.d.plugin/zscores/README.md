@@ -36,7 +36,7 @@ sudo ./edit-config python.d.conf
 sudo service netdata restart
 ```
 
-The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your system. Below are some sensible defaults to get you started. 
+The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your system. Out of the box, the config comes with some sane defaults to get you started. 
 
 Edit the `python.d/zscores.conf` configuration file using `edit-config` from the your agent's [config
 directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is usually at `/etc/netdata`.
