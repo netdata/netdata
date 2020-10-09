@@ -68,7 +68,7 @@ z_abs: 'true'
 # burn in period in which to initially calculate mean and sigma on every step
 burn_in: 20 # on startup of the collector continually update the mean and sigma in case any gaps or inital calculations fail to return
 # mode can be to get a zscore 'per_dim' or 'per_chart'
-mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be averaged again to one zscore per chart per time step
+mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be aggregated to one zscore per chart per time step
 # per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'
 per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all dimensions but will maintain the sign. 'mean' will just average.
 ```
