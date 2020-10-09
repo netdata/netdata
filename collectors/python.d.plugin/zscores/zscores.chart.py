@@ -109,14 +109,8 @@ class Service(SimpleService):
         if self.mode == 'per_chart':
 
             # aggregate over all dim's in a chart to get chart level zscore
-            #df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
-            #df_z_chart.columns = ['dim', 'z']
-            #df_z_chart['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_chart['dim'].str.split('.').to_list()]
             df_z_smooth['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_smooth.index.str.split('.').to_list()]
-
-            self.debug(df_z_smooth)
             
-            # how to aggregate from dimension to chart level
             if self.per_chart_agg == 'absmax':
                 data_dict_z = list(df_z_smooth.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
             else:
