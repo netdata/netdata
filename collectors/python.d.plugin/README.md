@@ -67,6 +67,8 @@ Depending on where Netdata was installed, execute one of the following commands 
 
 Where `[module]` is the directory name under <https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin> 
 
+**Note**: If you would like execute a collector in debug mode while it is still running by Netdata, you can pass the `nolock` CLI option to the above commands.
+
 ## How to write a new module
 
 Writing new python module is simple. You just need to remember to include 5 major things:
