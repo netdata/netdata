@@ -76,13 +76,11 @@ class Service(SimpleService):
         self.df_mean = get_data(
             self.host, self.charts_in_scope, after, before, points=10, group='average', col_sep='.'
             ).mean().to_frame().rename(columns={0: "mean"})
-        self.debug(self.df_mean)
 
         # get sigmas from rest api
         self.df_std = get_data(
             self.host, self.charts_in_scope, after, before, points=10, group='stddev', col_sep='.'
             ).mean().to_frame().rename(columns={0: "std"})
-        self.debug(self.df_std)
 
     def create_data_dicts(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
@@ -95,8 +93,6 @@ class Service(SimpleService):
         if self.z_abs:
             df_z['z'] = df_z['z'].abs()
 
-        self.debug(df_z)
-
         # append last z_smooth_n rows of zscores to history table
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
@@ -105,16 +101,15 @@ class Service(SimpleService):
         df_z_smooth = (self.df_z_history.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
         df_z_smooth['3sigma'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         
+
+        self.debug(df_z_smooth)
+
         # create data dict for z scores (with keys renamed)
-        dim_names_z = ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
-        df_z_smooth.index = dim_names_z
+        df_z_smooth.index = ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
         data_dict_z = df_z_smooth['z'].to_dict()
 
         if self.mode == 'per_chart':
-
-            # aggregate over all dim's in a chart to get chart level zscore
             df_z_smooth['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_smooth.index.str.split('.').to_list()]
-            
             if self.per_chart_agg == 'absmax':
                 data_dict_z = list(df_z_smooth.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
             else:
