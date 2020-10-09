@@ -17,7 +17,7 @@ Below is an example of the charts produced by this collector and a typical examp
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal.jpg)
 
-If we then go onto the system and run a command like `stress-ng --matrix 2 -t 1m` to create some stress, we see some charts begin to have zscores that jump outside the typical range between -3 to +3. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first.
+If we then go onto the system and run a command like `stress-ng --matrix 2 -t 2m` to create some stress, we see some charts begin to have zscores that jump outside the typical range between -3 to +3. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first.
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-abnormal.jpg)
 
