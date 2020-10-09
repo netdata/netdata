@@ -108,12 +108,24 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 }
 
+static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
+    if (!rc->module_match && !rc->plugin_match)
+        return 1;
+
+    if (rc->module_match && rc->plugin_match)
+        return (rc->module_match && simple_pattern_matches(rc->module_pattern, st->module_name) &&
+         rc->plugin_match && simple_pattern_matches(rc->plugin_pattern, st->plugin_name));
+
+    if (rc->module_match)
+        return simple_pattern_matches(rc->module_pattern, st->module_name);
+
+    return simple_pattern_matches(rc->plugin_pattern, st->plugin_name);
+}
+
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
-    if((rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
-        (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name))) {
-        if ((!rc->module_match && !rc->plugin_match) ||
-            (rc->module_match && simple_pattern_matches(rc->module_pattern, st->module_name) &&
-            rc->plugin_match && simple_pattern_matches(rc->plugin_pattern, st->plugin_name)) )
+    if(((rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
+        (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name))) &&
+        rrdcalc_test_additional_restriction(rc, st)) {
             return 1;
     }
 

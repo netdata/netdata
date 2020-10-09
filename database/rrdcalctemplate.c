@@ -44,6 +44,36 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
     return ret;
 }
 
+static inline int rrdcalctemplate_test_additional_restriction(RRDCALCTEMPLATE *rt, RRDSET *st) {
+    if (!rt->family_pattern && !rt->module_pattern && !rt->plugin_pattern)
+        return 1;
+
+    int test_family, test_module, test_plugin;
+
+    if (rt->family_pattern)
+        test_family = simple_pattern_matches(rt->family_pattern, st->family);
+    else
+        test_family = 1;
+
+    if (rt->module_match && rt->plugin_match) {
+        test_module = (simple_pattern_matches(rt->module_pattern, st->module_name) &&
+                           simple_pattern_matches(rt->plugin_pattern, st->plugin_name));
+        test_plugin = test_module;
+    } else {
+        if (rt->module_pattern)
+            test_module = simple_pattern_matches(rt->module_pattern, st->module_name);
+        else
+            test_module = 1;
+
+        if (rt->plugin_pattern)
+            test_plugin = simple_pattern_matches(rt->plugin_pattern, st->plugin_name);
+        else
+            test_plugin = 1;
+    }
+
+    return (test_module && test_family && test_plugin);
+}
+
 // RRDCALCTEMPLATE management
 /**
  * RRDCALC TEMPLATE LINK MATCHING
@@ -51,12 +81,9 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
  * @param rt is the template used to create the chart.
  * @param st is the chart where the alarm will be attached.
  */
-void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host ) {
+void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
     if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context) &&
-       ((!rt->family_pattern && !rt->module_pattern && !rt->plugin_pattern) ||
-       ((rt->family_pattern && simple_pattern_matches(rt->family_pattern, st->family)) ||
-       (rt->module_pattern && simple_pattern_matches(rt->module_pattern, st->module_name) &&
-        rt->plugin_pattern && simple_pattern_matches(rt->plugin_pattern, st->plugin_name)))) ) {
+        rrdcalctemplate_test_additional_restriction(rt, st) ) {
         if (!rrdcalctemplate_is_there_label_restriction(rt, host)) {
             RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
             if (unlikely(!rc))
