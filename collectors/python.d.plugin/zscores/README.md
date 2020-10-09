@@ -63,10 +63,10 @@ train_every_n: 300 # recalculate mean and sigma every 5 minutes
 z_smooth_n: 15 # take a rolling average of the last 15 zscore values to reduce sensitivity to temporary 'spikes'
 # cap absolute value of zscore (before smoothing) for better stability
 z_clip: 10 # cap each zscore at 10 so as to avoid really large individual zscores swamping any rolling average
-# set z_abs: 'true' to make all zscores by absolute values only.
+# set z_abs: 'true' to make all zscores be absolute values only.
 z_abs: 'true'
 # burn in period in which to initially calculate mean and sigma on every step
-burn_in: 20 # on startup of the collector continually update the mean and sigma incase any gaps or inital calculations fail to return
+burn_in: 20 # on startup of the collector continually update the mean and sigma in case any gaps or inital calculations fail to return
 # mode can be to get a zscore 'per_dim' or 'per_chart'
 mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be averaged again to one zscore per chart per time step
 # per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'
