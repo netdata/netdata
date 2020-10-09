@@ -104,8 +104,7 @@ class Service(SimpleService):
         # create data dict for z scores
         data_dict_z = df_z_smooth['z'].add_suffix('_z').to_dict()
 
-        self.debug(data_dict_z)
-
+        # aggregate to chart level if specified
         if self.mode == 'per_chart':
             df_z_smooth['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_smooth.index.str.split('.').to_list()]
             if self.per_chart_agg == 'absmax':
@@ -113,6 +112,7 @@ class Service(SimpleService):
             else:
                 data_dict_z = list(df_z_smooth.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
 
+        # create data dict for 3sigma flags
         data_dict_3sigma = {}
         for k in data_dict_z:
             data_dict_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_dict_z[k]) > 300 else 0
