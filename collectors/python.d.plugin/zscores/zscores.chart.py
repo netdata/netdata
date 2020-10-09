@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from datetime import datetime
-from random import SystemRandom
 
 import requests
 import numpy as np
@@ -17,16 +16,6 @@ from netdata_pandas.data import get_data, get_allmetrics
 priority = 50
 update_every = 1
 
-DEFAULT_HOST = '127.0.0.1:19999'
-DEFAULT_CHARTS_IN_SCOPE = 'system.cpu,system.load,system.io,system.pgpgio,system.ram,system.net,system.ip,system.ipv6,system.processes,system.ctxt,system.idlejitter,system.intr,system.softirqs,system.softnet_stat'
-DEFAULT_TRAIN_SECS = 60*60*1 # use last 1 hour to work out the mean and sigma for the zscore
-DEFAULT_OFFSET_SECS = 60*5 # ignore last 5 minutes of data when calculating the mean and sigma
-DEFAULT_TRAIN_EVERY_N = 60*5 # recalculate mean and sigma every 5 minutes
-DEFAULT_Z_SMOOTH_N = 15 # take a rolling average of the last 15 zscore values to reduce sensitivity to temporary 'spikes'
-DEFAULT_Z_CLIP = 10 # cap each zscore at 10 so as to avoid really large individual zscores swamping any rolling average
-DEFAULT_BURN_IN = 20 # on startup of the collector continually update the mean and sigma incase any gaps or inital calculations fail to return
-DEFAULT_MODE = 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be averaged again to one zscore per chart per time step
-
 ORDER = [
     'zscores',
     'zscores_3sigma'
@@ -34,11 +23,11 @@ ORDER = [
 
 CHARTS = {
     'zscores': {
-        'options': [None, 'Z Scores', 'zscores', 'zscore', 'zscores.zscores', 'line'],
+        'options': [None, 'Z-Score', 'zscores', 'zscore', 'zscores.zscores', 'line'],
         'lines': []
     },
     'zscores_3sigma': {
-        'options': [None, 'Z Scores >3 Sigma', '3sig count', 'zscores', 'zscores.zscores_3sigma', 'stacked'],
+        'options': [None, 'abb(Z-Score) > 3 Sigma', '3sig count', 'zscores', 'zscores.zscores_3sigma', 'stacked'],
         'lines': []
     },
 }
@@ -48,15 +37,15 @@ class Service(SimpleService):
     
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.host = self.configuration.get('host', DEFAULT_HOST)
-        self.charts_in_scope = self.configuration.get('charts_in_scope', DEFAULT_CHARTS_IN_SCOPE).split(',')
-        self.train_secs = self.configuration.get('train_secs', DEFAULT_TRAIN_SECS)
-        self.offset_secs = self.configuration.get('offset_secs', DEFAULT_OFFSET_SECS)
-        self.train_every_n = self.configuration.get('train_every_n', DEFAULT_TRAIN_EVERY_N)
-        self.z_smooth_n = self.configuration.get('z_smooth_n', DEFAULT_Z_SMOOTH_N) 
-        self.z_clip = self.configuration.get('z_clip', DEFAULT_Z_CLIP)
-        self.burn_in = self.configuration.get('burn_in', DEFAULT_BURN_IN) 
-        self.mode = self.configuration.get('mode', DEFAULT_MODE) 
+        self.host = self.configuration.get('host')
+        self.charts_in_scope = self.configuration.get('charts_in_scope').split(',')
+        self.train_secs = self.configuration.get('train_secs')
+        self.offset_secs = self.configuration.get('offset_secs')
+        self.train_every_n = self.configuration.get('train_every_n')
+        self.z_smooth_n = self.configuration.get('z_smooth_n') 
+        self.z_clip = self.configuration.get('z_clip')
+        self.burn_in = self.configuration.get('burn_in') 
+        self.mode = self.configuration.get('mode') 
         self.order = ORDER
         self.definitions = CHARTS
         self.df_mean = pd.DataFrame() # used to store means for all metrics

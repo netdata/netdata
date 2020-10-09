@@ -568,8 +568,8 @@ netdataDashboard.menu = {
 
     'zscores': {
         title: 'Z-Scores',
-        icon: '<i class="fas fa-bomb"></i>',
-        info: 'Z scores relating to key system metrics.'
+        icon: '<i class="fas fa-exclamation-triangle"></i>',
+        info: 'Z-Scores relating to key system metrics. You can read more about Z-scores on <a href="https://en.wikipedia.org/wiki/Standard_score">wikipedia</a> and about this implementation in the corresponding <a href="https://github.com/andrewm4894/netdata/tree/zscores-collector/collectors/python.d.plugin/zscores">zscore collector docs</a>.'
     },
 };
 
