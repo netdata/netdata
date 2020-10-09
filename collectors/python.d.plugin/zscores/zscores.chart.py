@@ -100,13 +100,11 @@ class Service(SimpleService):
         # get average zscore for last z_smooth_n for each metric
         df_z_smooth = (self.df_z_history.melt(value_name='z').groupby('index')['z'].mean() * 100).to_frame()
         df_z_smooth['3sigma'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
-        
 
-        self.debug(df_z_smooth)
+        # create data dict for z scores
+        data_dict_z = df_z_smooth['z'].add_suffix('_z').to_dict()
 
-        # create data dict for z scores (with keys renamed)
-        df_z_smooth.index = ['.'.join(x.split('.')) + '_z' for x in df_z_smooth.index]
-        data_dict_z = df_z_smooth['z'].to_dict()
+        self.debug(data_dict_z)
 
         if self.mode == 'per_chart':
             df_z_smooth['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_smooth.index.str.split('.').to_list()]
