@@ -94,7 +94,6 @@ class Service(SimpleService):
         if self.z_abs:
             df_z['z'] = df_z['z'].abs()
 
-
         # append last z_smooth_n rows of zscores to history table
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
@@ -126,7 +125,7 @@ class Service(SimpleService):
                 # 'vote' for the chart level z score based on the largest value of any dimension, regardless of sign
                 data_dict_z = df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict()
             else:
-                data_dict_z = df_z_chart.groupby('chart').agg({'z': [per_chart_agg]}).to_dict()
+                data_dict_z = df_z_chart.groupby('chart').agg({'z': [self.per_chart_agg]}).to_dict()
 
             # create 3sig data based on if any chart level abs(zscores) > 3
             data_dict_3sigma = {}
