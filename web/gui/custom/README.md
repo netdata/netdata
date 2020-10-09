@@ -183,14 +183,14 @@ by adding this fragment before loading it:
 
 ```html
 <script>var netdataDontStart = true;</script>
-`"
+```
 
 The above, will inform the `dashboard.js` to load everything, but not process the web page until you tell it to.
 You can tell it to start processing the page, by running this javascript code:
 
 ```js
 NETDATA.start();
-`"
+```
 
 Be careful not to call the `NETDATA.start()` multiple times. Each call to this
 function will spawn a new thread that will start refreshing the charts.
