@@ -63,23 +63,26 @@ class Service(SimpleService):
 
     def train_model(self):
         """Calculate the mean and sigma for all relevant metrics and 
-        store them for use in calulcating z score at each timestep. 
+        store them for use in calulcating zscore at each timestep. 
         """
 
+        # calculate the mean and sigma between the timestamps after to before
         now = int(datetime.now().timestamp())
-        after = now - self.offset_secs - self.train_secs
         before = now - self.offset_secs
+        after = before - self.train_secs
 
-        # get means
-        self.df_mean = get_data(self.host, self.charts_in_scope, after, before, points=5, group='average', col_sep='.').mean().to_frame()
-        self.df_mean.columns = ['mean']
+        # get means from rest api
+        self.df_mean = get_data(
+            self.host, self.charts_in_scope, after, before, points=5, group='average', col_sep='.'
+            ).mean().to_frame().rename(columns={0: "mean"})
 
-        # get sigmas
-        self.df_std = get_data(self.host, self.charts_in_scope, after, before, points=5, group='stddev', col_sep='.').mean().to_frame()
-        self.df_std.columns = ['std']
+        # get sigmas from rest api
+        self.df_std = get_data(
+            self.host, self.charts_in_scope, after, before, points=5, group='stddev', col_sep='.'
+            ).mean().to_frame().rename(columns={0: "mean"})
 
     def create_data_dicts(self, df_allmetrics):
-        """Use x, mean, sigma to generate z scores and 3sig flags via some pandas manipulation.
+        """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
         Returning two dictionaries of dimensions and measures, one for each chart.
         """
 
@@ -101,9 +104,9 @@ class Service(SimpleService):
         data_dict_z = df_z_smooth['z'].to_dict()
         
         # create data dict for 3sig flags (with keys renamed)
-        dim_names_3sig = [x[:-2] + '_3sig' for x in df_z_smooth.index]
-        df_z_smooth.index = dim_names_3sig
-        data_dict_3sig = df_z_smooth['3sig'].to_dict()
+        dim_names_3sigma = [x[:-2] + '_3sigma' for x in df_z_smooth.index]
+        df_z_smooth.index = dim_names_3sigma
+        data_dict_3sigma = df_z_smooth['3sigma'].to_dict()
 
         # average to chart level if specified
         if self.mode == 'per_chart':
@@ -115,11 +118,11 @@ class Service(SimpleService):
             data_dict_z = df_z_chart.groupby('chart')['z'].mean().to_dict()
 
             # create 3sig data based on if any chart level abs(zscores) > 3
-            data_dict_3sig = {}
+            data_dict_3sigma = {}
             for k in data_dict_z:
-                data_dict_3sig[k.replace('_z','_3sig')] = 1 if abs(data_dict_z[k]) > 300 else 0
+                data_dict_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_dict_z[k]) > 300 else 0
 
-        return data_dict_z, data_dict_3sig
+        return data_dict_z, data_dict_3sigma
 
     def get_data(self):
 
@@ -128,18 +131,13 @@ class Service(SimpleService):
             self.train_model()
 
         # get latest data
-        df_allmetrics = get_allmetrics(
-            host=self.host, 
-            charts=self.charts_in_scope, 
-            wide=True, 
-            col_sep='.'
-            ).transpose()
+        df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, col_sep='.').transpose()
 
         # create data dicts
-        data_dict_z, data_dict_3sig = self.create_data_dicts(df_allmetrics)
-        data = {**data_dict_z, **data_dict_3sig}
+        data_dict_z, data_dict_3sigma = self.create_data_dicts(df_allmetrics)
+        data = {**data_dict_z, **data_dict_3sigma}
 
         self.validate_charts('z', data_dict_z, divisor=100)
-        self.validate_charts('3sigma', data_dict_3sig)
+        self.validate_charts('3sigma', data_dict_3sigma)
 
         return data
