@@ -69,8 +69,7 @@ class Service(SimpleService):
         """
 
         # calculate the mean and sigma between the timestamps after to before
-        now = int(datetime.now().timestamp())
-        before = now - self.offset_secs
+        before = int(datetime.now().timestamp()) - self.offset_secs
         after = before - self.train_secs
 
         # get means from rest api
