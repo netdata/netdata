@@ -21,7 +21,7 @@ If we then go onto the system and run a command like `stress-ng --matrix 2 -t 2m
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-abnormal.jpg)
 
-Then as the issue passes the zscores should settle back down into their normal range again as they are calulcated in a rolling and smoothed way (as defined in your `zscores.conf` file). 
+Then as the issue passes the zscores should settle back down into their normal range again as they are calculated in a rolling and smoothed way (as defined by your `zscores.conf` file). 
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal-again.jpg)
 
