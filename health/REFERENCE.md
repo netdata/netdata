@@ -157,12 +157,7 @@ hosts: server1 server2 database* !redis3 redis*
 The `plugin` line, filters which plugin within the context this alarm should apply to. The value is a space-separated 
 list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
 
-For example, you can create a template on the `isc_dhcpd.utilization` chart, but filter it to only the `python.d.plugin` 
-plugin:
-
-```yaml
-plugin: python.d.plugin
-```
+This value is not applied independent of the option `module`, for more details see next option.
 
 #### Alarm line `module`
 
@@ -173,6 +168,7 @@ For example, you can create a template on the `isc_dhcpd.utilization` chart, but
 module:
 
 ```yaml
+plugin: python.d.plugin
 module: isc_dhcpd
 ```
 
