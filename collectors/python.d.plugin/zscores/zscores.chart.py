@@ -45,7 +45,8 @@ class Service(SimpleService):
         self.z_smooth_n = self.configuration.get('z_smooth_n') 
         self.z_clip = self.configuration.get('z_clip')
         self.burn_in = self.configuration.get('burn_in') 
-        self.mode = self.configuration.get('mode') 
+        self.mode = self.configuration.get('mode')
+        self.per_chart_agg = self.configuration.get('per_chart_agg', 'absmax') 
         self.order = ORDER
         self.definitions = CHARTS
         self.df_mean = pd.DataFrame() # used to store means for all metrics
@@ -115,7 +116,11 @@ class Service(SimpleService):
             df_z_chart = pd.DataFrame.from_dict(data_dict_z, orient='index').reset_index()
             df_z_chart.columns = ['dim', 'z']
             df_z_chart['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_chart['dim'].str.split('.').to_list()]
-            data_dict_z = df_z_chart.groupby('chart')['z'].mean().to_dict()
+            
+            if self.per_chart_agg == 'absmax':
+                data_dict_z = df_z_chart.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict()
+            else:
+                data_dict_z = df_z_chart.groupby('chart')['z'].mean().to_dict()
 
             # create 3sig data based on if any chart level abs(zscores) > 3
             data_dict_3sigma = {}
