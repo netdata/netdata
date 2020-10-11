@@ -120,14 +120,14 @@ static void netwireless_cleanup(struct timeval *timestamp)
     struct netwireless *previous = NULL;
     struct netwireless *current;
     // search it, from begining to the end
-    for(current = netwireless_root; current;) {
+    for (current = netwireless_root; current;) {
 
-        if(timercmp(&current->updated, timestamp, <)) {
+        if (timercmp(&current->updated, timestamp, <)) {
             struct netwireless *to_free = current;
             current = current->next;
             netwireless_free(to_free);
 
-            if(previous) {
+            if (previous) {
                 previous->next = current;
             } else {
                 netwireless_root = current;
@@ -153,9 +153,9 @@ static struct netwireless *find_or_create_wireless(const char *name)
     }
 
     // create a new one
-	wireless = callocz(1, sizeof(struct netwireless));
-	wireless->name = strdupz(name);
-	wireless->hash = hash;
+    wireless = callocz(1, sizeof(struct netwireless));
+    wireless->name = strdupz(name);
+    wireless->hash = hash;
 
     // link it to the end
     if (netwireless_root) {
@@ -169,8 +169,8 @@ static struct netwireless *find_or_create_wireless(const char *name)
     return wireless;
 }
 
-static bool configure_device(int do_status, int do_quality, int do_discarded_packets, int do_missed,
-							 struct netwireless *wireless_dev) {
+static void configure_device(int do_status, int do_quality, int do_discarded_packets, int do_missed,
+                             struct netwireless *wireless_dev) {
     wireless_dev->do_status = do_status;
     wireless_dev->do_quality = do_quality;
     wireless_dev->do_discarded_packets = do_discarded_packets;
@@ -196,13 +196,11 @@ static bool configure_device(int do_status, int do_quality, int do_discarded_pac
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
     wireless_dev->chart_id_net_missed_beacon = strdupz(buffer);
-
-	return true;
 }
 
 int do_proc_net_wireless(int update_every, usec_t dt)
 {
-	UNUSED(dt);
+    UNUSED(dt);
     static procfile *ff = NULL;
     static int do_status = -1, do_quality = -1, do_discarded_packets = -1, do_missed = -1;
     //static unsigned long long int dt_to_refresh_speed = 0;
@@ -232,11 +230,10 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         do_missed = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
                                                 "missed for all interfaces", CONFIG_BOOLEAN_AUTO);
 
-        /* KILLME: Check this
+        /* KILLME: Check the motive this variable was never used
         dt_to_refresh_speed = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-												"refresh interface speed every seconds", 10) * USEC_PER_SEC;
-												*/
-
+         "refresh interface speed every seconds", 10) * USEC_PER_SEC;
+        */
 	}
 
     if (unlikely(!ff)) {
@@ -291,7 +288,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             rrddim_set_by_pointer(wireless_dev->st_status, wireless_dev->rd_status,
                                   (collected_number)wireless_dev->status);
             rrdset_done(wireless_dev->st_status);
-		}
+        }
 
         if (likely(do_quality != CONFIG_BOOLEAN_NO)) {
             wireless_dev->link = str2kernel_uint_t(procfile_lineword(ff, l, 2));
@@ -381,7 +378,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->retry = str2kernel_uint_t(procfile_lineword(ff, l, 8));
             wireless_dev->misc = str2kernel_uint_t(procfile_lineword(ff, l, 9));
 
-
             if (unlikely(!wireless_dev->st_discarded_packets)) {
                 wireless_dev->st_discarded_packets = rrdset_create_localhost("ap_discarded",
                                                                              wireless_dev->chart_id_net_discarded_packets,
@@ -460,8 +456,8 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         }
 
         wireless_dev->updated = timestamp;
-	}
+    }
 
-	netwireless_cleanup(&timestamp);
-	return 0;
+    netwireless_cleanup(&timestamp);
+    return 0;
 }
