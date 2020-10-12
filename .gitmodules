@@ -1,0 +1,6 @@
+[submodule "c-rbuf"]
+	path = c-rbuf
+	url = https://github.com/underhood/c-rbuf.git
+[submodule "base64"]
+	path = base64
+	url = https://github.com/rafagafe/base64.git
