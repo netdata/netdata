@@ -40,7 +40,7 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
-unsigned int default_use_replication = 1;
+unsigned int default_use_replication = 0;
 time_t default_rrdpush_gap_block_size;
 uint32_t default_rrdpush_max_gap;
 uint32_t default_rrdpush_gap_history;
