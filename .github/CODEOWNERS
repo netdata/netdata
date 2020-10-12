@@ -5,16 +5,16 @@
 * @ktsaou @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin
-.github/ @Ferroin
+.travis/ @Ferroin @knatsakis
+.github/ @Ferroin @knatsakis
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @Ferroin
-contrib/debian @Ferroin
+build/ @Ferroin @knatsakis
+contrib/debian @Ferroin @knatsakis
 collectors/ @vlvkobal @mfundul
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
@@ -34,32 +34,32 @@ health/ @thiagoftsm @vlvkobal
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 libnetdata/ @thiagofsm @mfundul
-packaging/ @Ferroin
+packaging/ @Ferroin @knatsakis
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin
+system/ @Ferroin @knatsakis
 web/ @thiagoftsm @mfundul @vlvkobal
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin
+*.am @Ferroin @knatsakis
 *.md @joelhans
-Dockerfile* @Ferroin
+Dockerfile* @Ferroin @knatsakis
 
 # Ownership of specific files
-.gitignore @Ferroin
-.travis.yml @Ferroin
-.lgtm.yml @Ferroin
-.eslintrc @Ferroin
-.eslintignore @Ferroin
-.csslintrc @Ferroin
-.codeclimate.yml @Ferroin
-.codacy.yml @Ferroin
-.yamllint.yml @Ferroin
-netdata.spec.in @Ferroin
-netdata-installer.sh @Ferroin
-package.json @jacekkolasa @Ferroin
-packaging/version @netdatabot @Ferroin
+.gitignore @Ferroin @knatsakis
+.travis.yml @Ferroin @knatsakis
+.lgtm.yml @Ferroin @knatsakis
+.eslintrc @Ferroin @knatsakis
+.eslintignore @Ferroin @knatsakis
+.csslintrc @Ferroin @knatsakis
+.codeclimate.yml @Ferroin @knatsakis
+.codacy.yml @Ferroin @knatsakis
+.yamllint.yml @Ferroin @knatsakis
+netdata.spec.in @Ferroin @knatsakis
+netdata-installer.sh @Ferroin @knatsakis
+package.json @jacekkolasa @Ferroin @knatsakis
+packaging/version @netdatabot @Ferroin @knatsakis
 
 LICENSE.md @joelhans @Ferroin
 CHANGELOG.md @netdatabot @Ferroin
