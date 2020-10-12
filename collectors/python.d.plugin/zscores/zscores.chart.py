@@ -84,7 +84,6 @@ class Service(SimpleService):
         """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
         Returning two dictionaries of dimensions and measures, one for each chart.
         """
-        
         # calculate clipped z score for each available metric
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
         df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(-self.z_clip, self.z_clip).fillna(0)
