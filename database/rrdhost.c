@@ -811,8 +811,11 @@ void rrdhost_free(RRDHOST *host) {
                 netdata_thread_cancel(host->receiver->thread);
             netdata_mutex_unlock(&host->receiver_lock);
             struct receiver_state *rpt = host->receiver;
-            while (host->receiver && !rpt->exited)
+            int i;
+            for (i = 0 ; host->receiver && !rpt->exited && i < 20 ; ++i)
                 sleep_usec(50 * USEC_PER_MS);
+            if (20 == i)
+                info("Deadlock resolved during shutdown of streaming receiver context for host %s.", host->hostname);
             // If the receiver detached from the host then its thread will destroy the state
             if (host->receiver == rpt)
                 destroy_receiver_state(host->receiver);
