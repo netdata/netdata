@@ -1,3 +1,4 @@
 build/*
+!build/.keep
 libringbuffer.*
 test
