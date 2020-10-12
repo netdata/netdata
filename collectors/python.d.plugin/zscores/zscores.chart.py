@@ -33,7 +33,6 @@ CHARTS = {
 
 
 class Service(SimpleService):
-    
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.host = self.configuration.get('host')
@@ -41,12 +40,12 @@ class Service(SimpleService):
         self.train_secs = self.configuration.get('train_secs')
         self.offset_secs = self.configuration.get('offset_secs')
         self.train_every_n = self.configuration.get('train_every_n')
-        self.z_smooth_n = self.configuration.get('z_smooth_n') 
+        self.z_smooth_n = self.configuration.get('z_smooth_n')
         self.z_clip = self.configuration.get('z_clip')
         self.z_abs = bool(self.configuration.get('z_abs'))
-        self.burn_in = self.configuration.get('burn_in') 
+        self.burn_in = self.configuration.get('burn_in')
         self.mode = self.configuration.get('mode')
-        self.per_chart_agg = self.configuration.get('per_chart_agg', 'absmax') 
+        self.per_chart_agg = self.configuration.get('per_chart_agg', 'absmax')
         self.order = ORDER
         self.definitions = CHARTS
         self.df_mean = pd.DataFrame()
@@ -63,8 +62,8 @@ class Service(SimpleService):
                 self.charts[name].add_dimension([dim, dim, algorithm, multiplier, divisor])
 
     def train_model(self):
-        """Calculate the mean and sigma for all relevant metrics and 
-        store them for use in calulcating zscore at each timestep. 
+        """Calculate the mean and sigma for all relevant metrics and
+        store them for use in calulcating zscore at each timestep.
         """
 
         # calculate the mean and sigma between the timestamps after to before
