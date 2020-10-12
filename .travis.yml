@@ -48,6 +48,7 @@ notifications:
 stages:
   # Mandatory runs, we always want these executed
   - name: Build process
+    if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
 
     # Nightly operations
   - name: Nightly operations
@@ -163,7 +164,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
     - name: DEB package test
-      if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
       git:
         depth: false
       before_install:
@@ -186,7 +186,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata DEB package build check failed."
 
     - name: RPM package test
-      if: commit_message =~ /^((?!\[Package (amd64|arm64|i386) (DEB|RPM)( .*)?\]).)*$/
       git:
         depth: false
       before_install:
