@@ -4,3 +4,6 @@
 [submodule "base64"]
 	path = base64
 	url = https://github.com/rafagafe/base64.git
+[submodule "MQTT-C"]
+	path = MQTT-C
+	url = https://github.com/underhood/MQTT-C.git

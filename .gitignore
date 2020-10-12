@@ -1,0 +1,7 @@
+build/*
+!build/.keep
+test
+.vscode
+mqtt/mqtt.c
+mqtt/include/mqtt.h
+libmqttwebsockets.*

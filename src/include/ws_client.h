@@ -1,0 +1,101 @@
+// Copyright (C) 2020 Timotej Šiškovič
+// SPDX-License-Identifier: GPL-3.0-only
+//
+// This program is free software: you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with this program.
+// If not, see <https://www.gnu.org/licenses/>.
+
+#ifndef WS_CLIENT_H
+#define WS_CLIENT_H
+
+#include "ringbuffer.h"
+#include "mqtt_wss_log.h"
+
+#include <stdint.h>
+
+#define WS_CLIENT_NEED_MORE_BYTES  0x10
+#define WS_CLIENT_PARSING_DONE     0x11
+#define WS_CLIENT_PROTOCOL_ERROR  -0x10
+#define WS_CLIENT_BUFFER_FULL     -0x11
+
+enum websocket_client_conn_state {
+    WS_RAW = 0,
+    WS_HANDSHAKE,
+    WS_ESTABLISHED,
+    WS_ERROR        // connection has to be restarted if this is reached
+};
+
+enum websocket_client_hdr_parse_state {
+    WS_HDR_HTTP = 0,        // need to check HTTP/1.1
+    WS_HDR_RC,              // need to read HTTP code
+    WS_HDR_ENDLINE,         // need to read rest of the first line
+    WS_HDR_PARSE_HEADERS,   // rest of the header until CRLF CRLF
+    WS_HDR_PARSE_DONE,
+    WS_HDR_ALL_DONE
+};
+
+enum websocket_client_rx_ws_parse_state {
+    WS_FIRST_2BYTES = 0,
+    WS_PAYLOAD_EXTENDED_16,
+    WS_PAYLOAD_EXTENDED_64,
+    WS_PAYLOAD_DATA
+};
+
+enum websocket_opcode {
+    WS_OP_CONTINUATION_FRAME = 0x0,
+    WS_OP_TEXT_FRAME         = 0x1,
+    WS_OP_BINARY_FRAME       = 0x2,
+    WS_OP_CONNECTION_CLOSE   = 0x8,
+    WS_OP_PING               = 0x9,
+    WS_OP_PONG               = 0xA
+};
+
+typedef struct websocket_client {
+    enum websocket_client_conn_state state;
+
+    struct ws_handshake {
+        enum websocket_client_hdr_parse_state hdr_state;
+        char *nonce_reply;
+        int nonce_matched;
+        int http_code;
+        char *http_reply_msg;
+    } hs;
+
+    struct ws_rx {
+        enum websocket_client_rx_ws_parse_state parse_state;
+        enum websocket_opcode opcode;
+        uint64_t payload_length;
+        uint64_t payload_processed;
+    } rx;
+
+    rbuf_t buf_read;    // from SSL
+    rbuf_t buf_write;   // to SSL and then to socket
+    // TODO if ringbuffer gets multiple tail support
+    // we can work without buf_to_mqtt and thus reduce
+    // memory usage and remove one more memcpy buf_read->buf_to_mqtt
+    rbuf_t buf_to_mqtt; // RAW data for MQTT lib
+
+    int entropy_fd;
+
+    char **host;
+    mqtt_wss_log_ctx_t log;
+} ws_client;
+
+ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log);
+void ws_client_destroy(ws_client *client);
+
+int ws_client_start_handshake(ws_client *client);
+
+int ws_client_want_write(ws_client *client);
+
+int ws_client_process(ws_client *client);
+
+int ws_client_send(ws_client *client, const char *data, size_t size);
+
+#endif /* WS_CLIENT_H */
