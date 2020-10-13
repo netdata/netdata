@@ -203,7 +203,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
     UNUSED(dt);
     static procfile *ff = NULL;
     static int do_status = -1, do_quality = -1, do_discarded_packets = -1, do_missed = -1;
-    //static unsigned long long int dt_to_refresh_speed = 0;
     static char *proc_net_wireless_filename = NULL;
     static int enable_new_interfaces = -1;
 
@@ -229,11 +228,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
         do_missed = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
                                                 "missed for all interfaces", CONFIG_BOOLEAN_AUTO);
-
-        /* KILLME: Check the motive this variable was never used
-        dt_to_refresh_speed = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-         "refresh interface speed every seconds", 10) * USEC_PER_SEC;
-        */
 	}
 
     if (unlikely(!ff)) {
