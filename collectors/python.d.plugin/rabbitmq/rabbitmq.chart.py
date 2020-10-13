@@ -308,7 +308,7 @@ class Service(UrlService):
         stats = self.get_queues_stats()
         if stats:
             data.update(stats)
-        
+
         return data or None
 
     def get_overview_stats(self):
@@ -387,7 +387,7 @@ class Service(UrlService):
             if charts_initialized and self.queue.id() not in self.collected_queues:
                 self.collected_queues.add(self.queue.id())
                 self.add_queue_charts(self.queue.id())
-            
+
             data.update(self.queue.queue_stats())
 
         self.debug("number of queues: {0}, metrics: {1}".format(len(queues), len(data)))
