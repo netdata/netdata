@@ -154,18 +154,23 @@ hosts: server1 server2 database* !redis3 redis*
 
 #### Alarm line `plugin`
 
-The `plugin` line, filters which plugin within the context this alarm should apply to. The value is a space-separated 
-list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
+The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
+list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for details. For example,
+you can create a filter for an alarm that applies specifically to `python.d.plugin`:
 
-This value is not applied independent of the option `module`, for more details see next option.
+```yaml
+plugin: python.d.plugin
+```
+
+The `plugin` line is best used with other options like `module`. When used alone, the `plugin` line creates a very
+inclusive filter that is unlikely to be of much use in production. See [`module`](#alarm-line-module) for a
+comprehensive example using both.
 
 #### Alarm line `module`
 
-The `module` line, filters which module within the context this alarm should apply to. The value is a space-separated 
-list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for some examples.
-
-For example, you can create a template on the `isc_dhcpd.utilization` chart, but filter it to only the `isc_dhcpd` 
-module:
+The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
+list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for some examples. For
+example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
 
 ```yaml
 plugin: python.d.plugin
