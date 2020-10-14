@@ -439,7 +439,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                 rrdset_flag_set(wireless_dev->st_missed_beacon, RRDSET_FLAG_DETAIL);
 
                 wireless_dev->rd_missed_beacon = rrddim_add(wireless_dev->st_missed_beacon, "missed beacon",
-                                                            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                                                            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             } else {
                 rrdset_next(wireless_dev->st_missed_beacon);
             }
