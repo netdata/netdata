@@ -5,6 +5,7 @@
 
 from datetime import datetime
 
+import requests
 import numpy as np
 import pandas as pd
 
@@ -36,7 +37,10 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.host = self.configuration.get('host')
-        self.charts_in_scope = self.configuration.get('charts_in_scope').split(',')
+        if self.configuration.get('charts_in_scope') == 'system.*':
+            self.charts_in_scope = [c for c in requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys() if c.startswith('system.')]
+        else:
+            self.charts_in_scope = self.configuration.get('charts_in_scope').split(',')
         self.train_secs = self.configuration.get('train_secs')
         self.offset_secs = self.configuration.get('offset_secs')
         self.train_every_n = self.configuration.get('train_every_n')
