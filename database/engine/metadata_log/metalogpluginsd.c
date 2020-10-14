@@ -10,12 +10,12 @@ PARSER_RC metalog_pluginsd_host_action(
     void *user, char *machine_guid, char *hostname, char *registry_hostname, int update_every, char *os, char *timezone,
     char *tags)
 {
-    int history = 5;
-    RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
-    int rrdpush_enabled = default_rrdpush_enabled;
-    char *rrdpush_destination = default_rrdpush_destination;
-    char *rrdpush_api_key = default_rrdpush_api_key;
-    char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
+//    int history = 5;
+//    RRD_MEMORY_MODE mode = RRD_MEMORY_MODE_DBENGINE;
+ //   int rrdpush_enabled = default_rrdpush_enabled;
+  //  char *rrdpush_destination = default_rrdpush_destination;
+   // char *rrdpush_api_key = default_rrdpush_api_key;
+   // char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
 
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
 
@@ -45,53 +45,46 @@ PARSER_RC metalog_pluginsd_host_action(
     }
 
     // Fetch configuration options from streaming config
-    update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
-    if(update_every < 0) update_every = 1;
+//    update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
+//    if(update_every < 0) update_every = 1;
 
-    //rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rrdpush_enabled);
-    rrdpush_enabled = appconfig_get_boolean(&stream_config, machine_guid, "proxy enabled", rrdpush_enabled);
+//    rrdpush_enabled = appconfig_get_boolean(&stream_config, machine_guid, "proxy enabled", rrdpush_enabled);
+//    rrdpush_destination = appconfig_get(&stream_config, machine_guid, "proxy destination", rrdpush_destination);
+//    rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
+//    rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+    uuid_parse(machine_guid, state->host_uuid);
+    (void) sql_store_host(machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
 
-    //rrdpush_destination = appconfig_get(&stream_config, rpt->key, "default proxy destination", rrdpush_destination);
-    rrdpush_destination = appconfig_get(&stream_config, machine_guid, "proxy destination", rrdpush_destination);
-
-    //rrdpush_api_key = appconfig_get(&stream_config, rpt->key, "default proxy api key", rrdpush_api_key);
-    rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
-
-    //rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
-    rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
-
-
-    host = rrdhost_create(
-        hostname
-        , registry_hostname
-        , machine_guid
-        , os
-        , timezone
-        , tags
-        , NULL
-        , NULL
-        , update_every
-        , history   // entries
-        , mode
-        , 0    // health enabled
-        , rrdpush_enabled   // Push enabled
-        , rrdpush_destination  //destination
-        , rrdpush_api_key  // api key
-        , rrdpush_send_charts_matching  // charts matching
-        , callocz(1, sizeof(struct rrdhost_system_info))
-        , 0     // localhost
-        , 1     // archived
-    );
+//    host = rrdhost_create(
+//        hostname
+//        , registry_hostname
+//        , machine_guid
+//        , os
+//        , timezone
+//        , tags
+//        , NULL
+//        , NULL
+//        , update_every
+//        , history   // entries
+//        , mode
+//        , 0    // health enabled
+//        , rrdpush_enabled   // Push enabled
+//        , rrdpush_destination  //destination
+//        , rrdpush_api_key  // api key
+//        , rrdpush_send_charts_matching  // charts matching
+//        , callocz(1, sizeof(struct rrdhost_system_info))
+//        , 0     // localhost
+//    );
 
 write_replay:
-    if (host) { /* It's a valid object */
-        struct metalog_record record;
-        struct metadata_logfile *metalogfile = state->metalogfile;
-
-        uuid_copy(record.uuid, host->host_uuid);
-        mlf_record_insert(metalogfile, &record);
-    }
-    ((PARSER_USER_OBJECT *) user)->host = host;
+//    if (host) { /* It's a valid object */
+//        struct metalog_record record;
+//        struct metadata_logfile *metalogfile = state->metalogfile;
+//
+//        uuid_copy(record.uuid, host->host_uuid);
+//        mlf_record_insert(metalogfile, &record);
+//    }
+//    ((PARSER_USER_OBJECT *) user)->host = host;
     return PARSER_RC_OK;
 }
 
@@ -99,51 +92,55 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
                                         char *title, char *units, char *plugin, char *module, int priority,
                                         int update_every, RRDSET_TYPE chart_type, char *options)
 {
-    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    RRDSET *st = NULL;
-    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    uuid_t *chart_uuid;
+    UNUSED(options);
 
-    if (unlikely(!host)) {
+    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
+    //RRDSET *st = NULL;
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    //uuid_t *chart_uuid;
+
+    if (unlikely(uuid_is_null(state->host_uuid))) {
         debug(D_METADATALOG, "Ignoring chart belonging to missing or ignored host.");
         return PARSER_RC_OK;
     }
-    chart_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
-    st = rrdset_create_custom(
-        host, type, id, name, family, context, title, units,
+    //chart_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
+    uuid_copy(state->chart_uuid, state->uuid);
+    uuid_clear(state->uuid); /* Consume UUID */
+    (void) sql_store_chart(&state->chart_uuid, &state->host_uuid,
+        type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
-        chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries, 1, chart_uuid);
+        chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries);
 
-    rrdset_isnot_obsolete(st); /* archived charts cannot be obsolete */
-    if (options && *options) {
-        if (strstr(options, "detail"))
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-
-        if (strstr(options, "hidden"))
-            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
-
-        if (strstr(options, "store_first"))
-            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
-        else
-            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-    } else {
-        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
-    }
-    ((PARSER_USER_OBJECT *)user)->st = st;
-
-    if (chart_uuid) { /* It's a valid object */
-        struct metalog_record record;
-        struct metadata_logfile *metalogfile = state->metalogfile;
-
-        uuid_copy(record.uuid, state->uuid);
-        mlf_record_insert(metalogfile, &record);
-        uuid_clear(state->uuid); /* Consume UUID */
-    }
+//    rrdset_isnot_obsolete(st); /* archived charts cannot be obsolete */
+//    if (options && *options) {
+//        if (strstr(options, "detail"))
+//            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+//        else
+//            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+//
+//        if (strstr(options, "hidden"))
+//            rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+//        else
+//            rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
+//
+//        if (strstr(options, "store_first"))
+//            rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+//        else
+//            rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+//    } else {
+//        rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+//        rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+//    }
+//    ((PARSER_USER_OBJECT *)user)->st = st;
+//
+//    if (chart_uuid) { /* It's a valid object */
+//        struct metalog_record record;
+//        struct metadata_logfile *metalogfile = state->metalogfile;
+//
+//        uuid_copy(record.uuid, state->uuid);
+//        mlf_record_insert(metalogfile, &record);
+//        uuid_clear(state->uuid); /* Consume UUID */
+//    }
     return PARSER_RC_OK;
 }
 
@@ -152,36 +149,43 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
     UNUSED(user);
+    UNUSED(options);
     UNUSED(algorithm);
-    uuid_t *dim_uuid;
+    UNUSED(st);
+//    uuid_t *dim_uuid;
 
-    if (unlikely(!st)) {
+    if (unlikely(uuid_is_null(state->chart_uuid))) {
         debug(D_METADATALOG, "Ignoring dimension belonging to missing or ignored chart.");
         return PARSER_RC_OK;
     }
-    dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
+    //dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
+    //uuid_copy(state->dim_uuid, state->uuid);
+    uuid_clear(state->uuid); /* Consume UUID */
 
-    RRDDIM *rd = rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE, 1,
-                                   dim_uuid);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
-    if (options && *options) {
-        if (strstr(options, "hidden") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-        if (strstr(options, "noreset") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-        if (strstr(options, "nooverflow") != NULL)
-            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    }
-    if (dim_uuid) { /* It's a valid object */
-        struct metalog_record record;
-        struct metadata_logfile *metalogfile = state->metalogfile;
+    //TODO: Remove
+    (void) sql_store_dimension(&state->uuid, &state->chart_uuid, id, name, multiplier, divisor, algorithm_type);
+    uuid_clear(state->uuid); /* Consume UUID */
 
-        uuid_copy(record.uuid, state->uuid);
-        mlf_record_insert(metalogfile, &record);
-        uuid_clear(state->uuid); /* Consume UUID */
-    }
+//    RRDDIM *rd = rrddim_add_custom(st, id, name, multiplier, divisor, algorithm_type, RRD_MEMORY_MODE_DBENGINE);
+//    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+//    rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+//    rrddim_isnot_obsolete(st, rd); /* archived dimensions cannot be obsolete */
+//    if (options && *options) {
+//        if (strstr(options, "hidden") != NULL)
+//            rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+//        if (strstr(options, "noreset") != NULL)
+//            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+//        if (strstr(options, "nooverflow") != NULL)
+//            rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+//    }
+//    if (dim_uuid) { /* It's a valid object */
+//        struct metalog_record record;
+//        struct metadata_logfile *metalogfile = state->metalogfile;
+//
+//        uuid_copy(record.uuid, state->uuid);
+//        mlf_record_insert(metalogfile, &record);
+//        uuid_clear(state->uuid); /* Consume UUID */
+//    }
     return PARSER_RC_OK;
 }
 
@@ -202,6 +206,8 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     char object[49], chart_object[33], id_str[1024];
     uuid_t *chart_guid, *chart_char_guid;
     RRDHOST *host;
+    return PARSER_RC_OK;
+
 
     ret = find_object_by_guid(uuid, object, 49);
     switch (ret) {

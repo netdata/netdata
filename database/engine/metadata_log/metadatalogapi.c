@@ -174,6 +174,8 @@ void metalog_commit_update_chart(RRDSET *st)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
+    info("Commit update chart %s", st->name);
+    return;
 
     /* Metadata are only available with dbengine */
     if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
@@ -247,6 +249,8 @@ void metalog_commit_update_dimension(RRDDIM *rd)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
+    info("Commit update dimension %s", rd->id);
+    return;
 
     /* Metadata are only available with dbengine */
     if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)

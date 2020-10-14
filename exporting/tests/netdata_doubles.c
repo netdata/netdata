@@ -100,9 +100,7 @@ RRDSET *rrdset_create_custom(
     int update_every,
     RRDSET_TYPE chart_type,
     RRD_MEMORY_MODE memory_mode,
-    long history_entries,
-    int is_archived,
-    uuid_t *chart_uuid)
+    long history_entries
 {
     check_expected_ptr(host);
     check_expected_ptr(type);

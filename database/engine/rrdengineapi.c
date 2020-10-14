@@ -56,7 +56,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     uuid_t legacy_uuid;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
-    int replace_instead_of_generate = 0, is_multihost_child = 0;
+    int is_multihost_child = 0;
     RRDHOST *host = rd->rrdset->rrdhost;
 
     ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
@@ -67,7 +67,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    rd->state->metric_uuid = callocz(1, sizeof(uuid_t));
+    rd->state->metric_uuid = dim_uuid;
     if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
         is_multihost_child = 1;
 
@@ -81,22 +81,22 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
          * Drop legacy support, normal path */
 
-        if (NULL != dim_uuid) {
-            replace_instead_of_generate = 1;
-            uuid_copy(*rd->state->metric_uuid, *dim_uuid);
-        }
-        if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION,
-                                           replace_instead_of_generate))) {
-            errno = 0;
-            error("FAILED to reuse GUID for %s", rd->id);
-            if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION, 0))) {
-                errno = 0;
-                error("FAILED to generate GUID for %s", rd->id);
-                freez(rd->state->metric_uuid);
-                rd->state->metric_uuid = NULL;
-                fatal_assert(0);
-            }
-        }
+        //if (NULL != dim_uuid) {
+        //    replace_instead_of_generate = 1;
+        //    uuid_copy(*rd->state->metric_uuid, *dim_uuid);
+        //}
+//        if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION,
+//                                           replace_instead_of_generate))) {
+//            errno = 0;
+//            error("FAILED to reuse GUID for %s", rd->id);
+//            if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION, 0))) {
+//                errno = 0;
+//                error("FAILED to generate GUID for %s", rd->id);
+//                freez(rd->state->metric_uuid);
+//                rd->state->metric_uuid = NULL;
+//                fatal_assert(0);
+//            }
+//        }
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
         PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t));
@@ -122,13 +122,14 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         if (dim_uuid && uuid_compare(*rd->state->metric_uuid, *dim_uuid)) {
             error("Mismatch of metadata log DIMENSION GUID with dbengine metric GUID.");
         }
-        if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION, 1))) {
-            errno = 0;
-            error("FAILED to generate GUID for %s", rd->id);
-            freez(rd->state->metric_uuid);
-            rd->state->metric_uuid = NULL;
-            fatal_assert(0);
-        }
+        error("FATAL CHECK find_or_generate_guid");
+//        if (unlikely(find_or_generate_guid(rd, rd->state->metric_uuid, GUID_TYPE_DIMENSION, 1))) {
+//            errno = 0;
+//            error("FAILED to generate GUID for %s", rd->id);
+//            freez(rd->state->metric_uuid);
+//            rd->state->metric_uuid = NULL;
+//            fatal_assert(0);
+//        }
     }
     rd->state->rrdeng_uuid = &page_index->id;
     rd->state->page_index = page_index;

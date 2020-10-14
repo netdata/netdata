@@ -216,8 +216,10 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 }
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
-                          collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
-                          int is_archived, uuid_t *dim_uuid) {
+                          collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode)
+{
+    //,
+                          //int is_archived, uuid_t *dim_uuid) {
     RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
@@ -232,21 +234,21 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_algorithm(st, rd, algorithm);
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
-        if (!is_archived && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            rd->state->collect_ops.init(rd);
-            rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
-            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-            calc_link_to_rrddim(rd);
-        }
+//        if (!is_archived && rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+//            rd->state->collect_ops.init(rd);
+//            rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
+//            rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
+//            rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
+//            rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+//            calc_link_to_rrddim(rd);
+//        }
         // DBENGINE available and activated?
-#ifdef ENABLE_DBENGINE
-        if (likely(!is_archived && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && unlikely(rc)) {
-            debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
-            metalog_commit_update_dimension(rd);
-        }
-#endif
+//#ifdef ENABLE_DBENGINE
+//        if (likely(!is_archived && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && unlikely(rc)) {
+//            debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
+//            metalog_commit_update_dimension(rd);
+//        }
+//#endif
         rrdset_unlock(st);
         return rd;
     }
@@ -391,6 +393,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state = mallocz(sizeof(*rd->state));
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
+        uuid_t *dim_uuid = sql_find_dim_uuid(st, rd);
         rrdeng_metric_init(rd, dim_uuid);
         rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
@@ -413,9 +416,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
-    if (is_archived)
-        rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-    else
+    //if (is_archived)
+    //    rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
+    //else
         rd->state->collect_ops.init(rd); // only initialize if a collector created this dimension
     // append this dimension
     if(!st->dimensions)
@@ -443,7 +446,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         td->next = rd;
     }
 
-    if(host->health_enabled && !is_archived) {
+    if(host->health_enabled) { //} && !is_archived) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
@@ -452,7 +455,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    if (!is_archived)
+    //if (!is_archived)
         calc_link_to_rrddim(rd);
 
     rrdset_unlock(st);
