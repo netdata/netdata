@@ -41,10 +41,10 @@ class Service(SimpleService):
             self.charts_in_scope = [c for c in requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys() if c.startswith('system.')]
         else:
             self.charts_in_scope = self.configuration.get('charts_in_scope').split(',')
-        self.train_secs = self.configuration.get('train_secs')
-        self.offset_secs = self.configuration.get('offset_secs')
-        self.train_every_n = self.configuration.get('train_every_n')
-        self.z_smooth_n = self.configuration.get('z_smooth_n')
+        self.train_secs = self.configuration.get('train_secs', 14400)
+        self.offset_secs = self.configuration.get('offset_secs', 300)
+        self.train_every_n = self.configuration.get('train_every_n', 900)
+        self.z_smooth_n = self.configuration.get('z_smooth_n', 15)
         self.z_clip = self.configuration.get('z_clip')
         self.z_abs = bool(self.configuration.get('z_abs'))
         self.burn_in = self.configuration.get('burn_in')

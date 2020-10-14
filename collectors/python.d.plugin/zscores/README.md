@@ -73,14 +73,14 @@ The default configuration should look something like this. Here you can see each
 ```bash
 # what host to pull data from
 host: '127.0.0.1:19999'
-# what charts to pull data for. 'system.*' will use all available "System Overview" charts otherwise use a string like 'system.cpu,system.load,system.net' to define a specific list of charts you want to calculate zscores for.
+# what charts to pull data for. 'system.*' will use all system charts otherwise use a string like 'system.cpu,system.load,system.net'.
 charts_in_scope: 'system.*'
 # length of time to base calulcations off for mean and sigma
 train_secs: 14400 # use last 4 hours to work out the mean and sigma for the zscore
 # offset preceeding latest data to ignore when calculating mean and sigma
 offset_secs: 300 # ignore last 5 minutes of data when calculating the mean and sigma
 # recalculate the mean and sigma every n steps of the collector
-train_every_n: 300 # recalculate mean and sigma every 5 minutes
+train_every_n: 900 # recalculate mean and sigma every 15 minutes
 # smooth the z score by averaging it over last n values
 z_smooth_n: 15 # take a rolling average of the last 15 zscore values to reduce sensitivity to temporary 'spikes'
 # cap absolute value of zscore (before smoothing) for better stability
