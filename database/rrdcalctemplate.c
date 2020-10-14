@@ -45,33 +45,20 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
 }
 
 static inline int rrdcalctemplate_test_additional_restriction(RRDCALCTEMPLATE *rt, RRDSET *st) {
-    if (!rt->family_pattern && !rt->module_pattern && !rt->plugin_pattern)
-        return 1;
+    error("KILLME %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
+    if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, st->family))
+        return 0;
 
-    int test_family, test_module, test_plugin;
+    error("KILLME 1 %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
+    if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, st->module_name))
+        return 0;
 
-    if (rt->family_pattern)
-        test_family = simple_pattern_matches(rt->family_pattern, st->family);
-    else
-        test_family = 1;
+    error("KILLME 2 %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
+    if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, st->plugin_name))
+        return 0;
 
-    if (rt->module_match && rt->plugin_match) {
-        test_module = (simple_pattern_matches(rt->module_pattern, st->module_name) &&
-                           simple_pattern_matches(rt->plugin_pattern, st->plugin_name));
-        test_plugin = test_module;
-    } else {
-        if (rt->module_pattern)
-            test_module = simple_pattern_matches(rt->module_pattern, st->module_name);
-        else
-            test_module = 1;
-
-        if (rt->plugin_pattern)
-            test_plugin = simple_pattern_matches(rt->plugin_pattern, st->plugin_name);
-        else
-            test_plugin = 1;
-    }
-
-    return (test_module && test_family && test_plugin);
+    error("KILLME 3 %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
+    return 1;
 }
 
 // RRDCALCTEMPLATE management
