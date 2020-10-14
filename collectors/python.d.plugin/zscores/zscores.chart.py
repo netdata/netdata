@@ -117,5 +117,5 @@ class Service(SimpleService):
         data = {**data_z, **data_3sigma}
         self.validate_charts('z', data_z, divisor=100)
         self.validate_charts('3sigma', data_3sigma)
-        
+
         return data
