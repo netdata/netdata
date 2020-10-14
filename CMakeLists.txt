@@ -590,6 +590,7 @@ set(RRD_PLUGIN_FILES
         database/rrddimvar.h
         database/rrdfamily.c
         database/rrdhost.c
+        database/rrdlabels.c
         database/rrd.c
         database/rrd.h
         database/rrdset.c

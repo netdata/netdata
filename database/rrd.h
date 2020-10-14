@@ -185,12 +185,29 @@ struct label {
     struct label *next;
 };
 
+typedef enum strip_quotes {
+    DO_NOT_STRIP_QUOTES,
+    STRIP_QUOTES
+} STRIP_QUOTES_OPTION;
+
+typedef enum skip_escaped_characters {
+    DO_NOT_SKIP_ESCAPED_CHARACTERS,
+    SKIP_ESCAPED_CHARACTERS
+} SKIP_ESCAPED_CHARACTERS_OPTION;
+
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
 extern void replace_label_list(RRDHOST *host, struct label *new_labels);
-extern void free_host_labels(struct label *labels);
-void reload_host_labels();
+extern int is_valid_label_value(char *value);
+extern int is_valid_label_key(char *key);
+extern void free_label_list(struct label *labels);
+extern void strip_last_symbol(
+    char *str,
+    char symbol,
+    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters);
+extern char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters);
+void reload_host_labels(void);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
