@@ -84,6 +84,25 @@ If you plan to submit the module in a PR, make sure and go through the [PR check
 For a quick start, you can look at the [example
 plugin](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/example/example.chart.py).
 
+**Note**: If you are working 'locally' on a new collector and would like to run it in an already installed and running Netdata (as opposed to having to install Netdata from source again with your new changes) to can copy over the relevant file to where Netdata expects it and then either `sudo service netdata restart` to have it be picked up and used by Netdata or you can just run the updated collector in debug mode by following a process like below (this assumes you have [installed Netdata from a GitHub fork](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/manual) you have made to do your development on).
+
+```bash
+# clone your fork (done once at the start but shown here for clarity)
+#git clone --branch my-example-collector https://github.com/mygithubusername/netdata.git --depth=100
+# go into your netdata source folder
+cd netdata
+# git pull your latest changes (assuming you built from a fork you are using to develop on)
+git pull
+# instead of running the installer we can just copy over the updated collector files
+#sudo ./netdata-installer.sh --dont-wait
+# copy over the file you have updated locally (pretending we are working on the 'example' collector)
+sudo cp collectors/python.d.plugin/example/example.chart.py /usr/libexec/netdata/python.d/
+# become user netdata
+sudo su -s /bin/bash netdata
+# run your updated collector in debug mode to see if it works without having to reinstall netdata
+/usr/libexec/netdata/plugins.d/python.d.plugin example debug trace nolock
+```
+
 ### Global variables `ORDER` and `CHART`
 
 `ORDER` list should contain the order of chart ids. Example:
