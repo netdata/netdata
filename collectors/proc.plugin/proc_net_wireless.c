@@ -389,15 +389,15 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                 rrdset_flag_set(wireless_dev->st_discarded_packets, RRDSET_FLAG_DETAIL);
 
                 wireless_dev->rd_nwid = rrddim_add(wireless_dev->st_discarded_packets, "nwid", NULL, 1,
-                                                   1, RRD_ALGORITHM_ABSOLUTE);
+                                                   1, RRD_ALGORITHM_INCREMENTAL);
                 wireless_dev->rd_crypt = rrddim_add(wireless_dev->st_discarded_packets, "crypt", NULL, 1,
-                                                    1, RRD_ALGORITHM_ABSOLUTE);
+                                                    1, RRD_ALGORITHM_INCREMENTAL);
                 wireless_dev->rd_frag = rrddim_add(wireless_dev->st_discarded_packets, "frag", NULL, 1,
-                                                   1, RRD_ALGORITHM_ABSOLUTE);
+                                                   1, RRD_ALGORITHM_INCREMENTAL);
                 wireless_dev->rd_retry = rrddim_add(wireless_dev->st_discarded_packets, "retry", NULL, 1,
-                                                    1, RRD_ALGORITHM_ABSOLUTE);
+                                                    1, RRD_ALGORITHM_INCREMENTAL);
                 wireless_dev->rd_misc = rrddim_add(wireless_dev->st_discarded_packets, "misc", NULL, 1,
-                                                   1, RRD_ALGORITHM_ABSOLUTE);
+                                                   1, RRD_ALGORITHM_INCREMENTAL);
             } else {
                 rrdset_next(wireless_dev->st_discarded_packets);
             }
