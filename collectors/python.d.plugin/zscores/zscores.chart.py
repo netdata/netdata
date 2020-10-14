@@ -45,11 +45,11 @@ class Service(SimpleService):
         self.offset_secs = self.configuration.get('offset_secs', 300)
         self.train_every_n = self.configuration.get('train_every_n', 900)
         self.z_smooth_n = self.configuration.get('z_smooth_n', 15)
-        self.z_clip = self.configuration.get('z_clip')
-        self.z_abs = bool(self.configuration.get('z_abs'))
-        self.burn_in = self.configuration.get('burn_in')
-        self.mode = self.configuration.get('mode')
-        self.per_chart_agg = self.configuration.get('per_chart_agg', 'absmax')
+        self.z_clip = self.configuration.get('z_clip', 10)
+        self.z_abs = bool(self.configuration.get('z_abs', True))
+        self.burn_in = self.configuration.get('burn_in', 2)
+        self.mode = self.configuration.get('mode', 'per_chart')
+        self.per_chart_agg = self.configuration.get('per_chart_agg', 'mean')
         self.order = ORDER
         self.definitions = CHARTS
         self.df_mean = pd.DataFrame()
