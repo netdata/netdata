@@ -45,15 +45,24 @@ CPUSchedulingPolicy=idle
 #Nice=0
 
 # Capabilities
-CapabilityBoundingSet=CAP_DAC_OVERRIDE    # is required for freeipmi and slabinfo plugins
-CapabilityBoundingSet=CAP_DAC_READ_SEARCH # is required for apps plugin
-CapabilityBoundingSet=CAP_FOWNER          # is required for freeipmi plugin
-CapabilityBoundingSet=CAP_SETPCAP         # is required for apps, perf and slabinfo plugins
-CapabilityBoundingSet=CAP_SYS_ADMIN       # is required for perf plugin
-CapabilityBoundingSet=CAP_SYS_PTRACE      # is required for apps plugin
-CapabilityBoundingSet=CAP_SYS_RESOURCE    # is required for ebpf plugin
-CapabilityBoundingSet=CAP_NET_RAW         # is required for fping app
-CapabilityBoundingSet=CAP_SYS_CHROOT      # is required for cgroups plugin
+# is required for freeipmi and slabinfo plugins
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+# is required for apps plugin
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+# is required for freeipmi plugin
+CapabilityBoundingSet=CAP_FOWNER
+# is required for apps, perf and slabinfo plugins
+CapabilityBoundingSet=CAP_SETPCAP
+# is required for perf plugin
+CapabilityBoundingSet=CAP_SYS_ADMIN
+# is required for apps plugin
+CapabilityBoundingSet=CAP_SYS_PTRACE
+# is required for ebpf plugin
+CapabilityBoundingSet=CAP_SYS_RESOURCE
+# is required for fping app
+CapabilityBoundingSet=CAP_NET_RAW
+# is required for cgroups plugin
+CapabilityBoundingSet=CAP_SYS_CHROOT
 
 # Sandboxing
 ProtectSystem=full
