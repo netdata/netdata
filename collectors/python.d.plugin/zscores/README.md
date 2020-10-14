@@ -20,13 +20,13 @@ Two charts are produced:
 
 Below is an example of the charts produced by this collector and a typical example of how they would look when things are 'normal' on the system. Most of the zscores tend to bounce randomly around a range typically between 0 to +3 (or -3 to +3 if `z_abs: 'false'`), a few charts might stay steady at a more constant higher value depending on your configuration and the typical workload on your system (typically those charts that do not change that much have a smaller range of values on which to calculate a zscore and so tend to have a higher typical zscore).
 
-So really its a combination of the zscores values themselves plus, perhaps more importantly, how they change when something strange occurs on your system which can be most useful for giving you an idea of where to look first. 
+So really its a combination of the zscores values themselves plus, perhaps more importantly, how they change when something strange occurs on your system which can be most useful. 
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal.jpg)
 
 For example, if we go onto the system and run a command like [`stress-ng --all 2`](https://wiki.ubuntu.com/Kernel/Reference/stress-ng) to create some stress, we see many charts begin to have zscores that jump outside the typical range. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first (for more background information on why 3 sigma see [here](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule#:~:text=In%20the%20empirical%20sciences%20the,99.7%25%20probability%20as%20near%20certainty.)). 
 
-In the example below we basically took a sledge hammer to our system so its not suprising that lots of charts light up after we run the stress command. In a more realistic setting you might just see a handful of charts with different to normal zscores and that could be a good indication of where to look first.
+In the example below we basically took a sledge hammer to our system so its not suprising that lots of charts light up after we run the stress command. In a more realistic setting you might just see a handful of charts with strange zscores and that could be a good indication of where to look first.
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-abnormal.jpg)
 
@@ -36,18 +36,18 @@ Then as the issue passes the zscores should settle back down into their normal r
 
 ## Requirements
 
-- This collector will only work with python 3 and requires the below python packages be installed.
+- This collector will only work with Python 3 and requires the below packages be installed.
 
 ```bash
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages
-pip install numpy pandas requests netdata-pandas
+pip3 install numpy pandas requests netdata-pandas
 ```
 
 ## Configuration
 
-Enable the collector and restart Netdata.
+Install the underlying Python requirements, Enable the collector and restart Netdata.
 
 ```bash
 cd /etc/netdata/
@@ -56,9 +56,9 @@ sudo ./edit-config python.d.conf
 sudo service netdata restart
 ```
 
-The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your system. Out of the box, the config comes with some [sane defaults](https://www.netdata.cloud/blog/redefining-monitoring-netdata/) to get you started. 
+The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally. Out of the box, the config comes with some [sane defaults](https://www.netdata.cloud/blog/redefining-monitoring-netdata/) to get you started. 
 
-If you are unsure about any of the below configuration options then it's best to just ignore all this leave the `zscores.conf` files alone to begin with and return to it later if you would like to tune things a bit more once the collector is running.    
+If you are unsure about any of the below configuration options then it's best to just ignore all this and leave the `zscores.conf` files alone to begin with. Then you can return to it later if you would like to tune things a bit more once the collector is running for a while.    
 
 Edit the `python.d/zscores.conf` configuration file using `edit-config` from the your agent's [config
 directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is usually at `/etc/netdata`.
