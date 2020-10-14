@@ -36,7 +36,7 @@ Then as the issue passes the zscores should settle back down into their normal r
 
 ## Requirements
 
-- This collector will only work with Python 3 and requires the below packages be installed.
+This collector will only work with Python 3 and requires the below packages be installed.
 
 ```bash
 # become netdata user
@@ -100,4 +100,9 @@ per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all di
 - Python 3 is required as the [`netdata-pandas`](https://github.com/netdata/netdata-pandas) package uses python async libraries ([asks](https://pypi.org/project/asks/) and [trio](https://pypi.org/project/trio/)) to make asynchronous calls to the netdata rest api to get the required data for each chart when calculating the mean and sigma.
 - It may take a few hours or so for the collector to 'settle' into it's typical behaviour in terms of the scores you will see in the normal running of your system.
 - The zscore you see for each chart when using `mode: 'per_chart'` as actually an aggregated zscore accross all the dimensions on the underlying chart.
-- As this collector does some calculations itself in python you may want to try it out first on a test or development system to get a sense of its performance characteristics. Most of the work in calculating the mean and sigma will be pushed down to the underlying Netdata C libraries via the rest api. But some data wrangling and calculations are then done using [Pandas](https://pandas.pydata.org/) and [Numpy](https://numpy.org/) within the collector itself.      
+- If you set `mode: 'per_dim'` then you will see a zscore for each dimension on each chart as opposed to one per chart.
+- As this collector does some calculations itself in python you may want to try it out first on a test or development system to get a sense of its performance characteristics. Most of the work in calculating the mean and sigma will be pushed down to the underlying Netdata C libraries via the rest api. But some data wrangling and calculations are then done using [Pandas](https://pandas.pydata.org/) and [Numpy](https://numpy.org/) within the collector itself.
+- On a development n1-standard-2 (2 vCPUs, 7.5 GB memory) vm running Ubuntu 18.04 LTS and not doing any work some of the typical performance characteristics we saw from running this collector were:
+  - A runtime (`netdata.runtime_zscores`) of ~50ms when doing scoring and ~500ms when recalculating the mean and sigma.
+  - Typically 3%-3.5% cpu usage from scoring, jumping to ~35% for one second when recalculating the mean and sigma.
+  - About ~50mb of ram (`apps.mem`) being continually used by the `python.d.plugin`.
