@@ -106,3 +106,4 @@ per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all di
   - A runtime (`netdata.runtime_zscores`) of ~50ms when doing scoring and ~500ms when recalculating the mean and sigma.
   - Typically 3%-3.5% cpu usage from scoring, jumping to ~35% for one second when recalculating the mean and sigma.
   - About ~50mb of ram (`apps.mem`) being continually used by the `python.d.plugin`.
+- If you activate this collector on a fresh node, it might take a little while to build up enough data to calculate a proper zscore. So until you actually have `train_secs` of available data the mean and sigma calculated will be subject to more noise.
