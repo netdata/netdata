@@ -109,17 +109,13 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 }
 
 static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
-    if (!rc->module_match && !rc->plugin_match)
-        return 1;
+    if (rc->module_match && !simple_pattern_matches(rc->module_pattern, st->module_name))
+        return 0;
 
-    if (rc->module_match && rc->plugin_match)
-        return (rc->module_match && simple_pattern_matches(rc->module_pattern, st->module_name) &&
-         rc->plugin_match && simple_pattern_matches(rc->plugin_pattern, st->plugin_name));
+    if (rc->plugin_match && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
+        return 0;
 
-    if (rc->module_match)
-        return simple_pattern_matches(rc->module_pattern, st->module_name);
-
-    return simple_pattern_matches(rc->plugin_pattern, st->plugin_name);
+    return 1;
 }
 
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
