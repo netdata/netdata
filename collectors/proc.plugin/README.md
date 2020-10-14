@@ -332,7 +332,7 @@ The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]
     status for all interfaces = yes
     quality for all interfaces = yes
     discarded packets for all interfaces = yes
-    missed for all interfaces = yes
+    missed beacon = yes
 ```
 
 For all configuration options:

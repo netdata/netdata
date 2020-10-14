@@ -202,7 +202,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 {
     UNUSED(dt);
     static procfile *ff = NULL;
-    static int do_status = -1, do_quality = -1, do_discarded_packets = -1, do_missed = -1;
+    static int do_status = -1, do_quality = -1, do_discarded_packets = -1, do_beacon = -1;
     static char *proc_net_wireless_filename = NULL;
     static int enable_new_interfaces = -1;
 
@@ -226,8 +226,8 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                            "discarded packets for all interfaces",
                                                            CONFIG_BOOLEAN_AUTO);
 
-        do_missed = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-                                                "missed for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_beacon = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
+                                                "missed beacon", CONFIG_BOOLEAN_AUTO);
 	}
 
     if (unlikely(!ff)) {
@@ -252,7 +252,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         struct netwireless *wireless_dev = find_or_create_wireless(name);
 
         if (unlikely(!wireless_dev->configured)) {
-            configure_device(do_status, do_quality, do_discarded_packets, do_missed, wireless_dev);
+            configure_device(do_status, do_quality, do_discarded_packets, do_beacon, wireless_dev);
 		}
 
         if (likely(do_status != CONFIG_BOOLEAN_NO)) {
@@ -420,7 +420,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             rrdset_done(wireless_dev->st_discarded_packets);
         }
 
-        if (likely(do_missed)) {
+        if (likely(do_beacon)) {
             wireless_dev->missed_beacon = str2kernel_uint_t(procfile_lineword(ff, l, 10));
 
             if (unlikely(!wireless_dev->st_missed_beacon)) {
