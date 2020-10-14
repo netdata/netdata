@@ -66,8 +66,7 @@ class Service(SimpleService):
                 self.charts[name].add_dimension([dim, dim, algorithm, multiplier, divisor])
 
     def train_model(self):
-        """Calculate the mean and sigma for all relevant metrics and
-        store them for use in calulcating zscore at each timestep.
+        """Calculate the mean and sigma for all relevant metrics and store them for use in calulcating zscore at each timestep.
         """
 
         # calculate the mean and sigma between the timestamps after to before
@@ -87,13 +86,16 @@ class Service(SimpleService):
     def create_data(self, df_allmetrics):
         """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
         Returning two dictionaries of dimensions and measures, one for each chart.
+
+        :param df_allmetrics <pd.DataFrame>: pandas dataframe with latest data from api/v1/allmetrics.
+        :return: (<dict>,<dict>) tuple of dictionaries, one for  zscores and the other for a flag if abs(z)>3. 
         """
         # calculate clipped z score for each available metric
         df_z = pd.concat([self.df_mean, self.df_std, df_allmetrics], axis=1, join='inner')
         df_z['z'] = ((df_z['value'] - df_z['mean']) / df_z['std']).clip(-self.z_clip, self.z_clip).fillna(0)
         if self.z_abs:
             df_z['z'] = df_z['z'].abs()
-
+        
         # append last z_smooth_n rows of zscores to history table
         df_z_wide = df_z[['z']].reset_index().pivot_table(values='z', columns='index')
         self.df_z_history = self.df_z_history.append(df_z_wide, sort=True).tail(self.z_smooth_n)
@@ -121,19 +123,19 @@ class Service(SimpleService):
         return data_z, data_3sigma
 
     def get_data(self):
-
+        
         # train model if needed
         if self.runs_counter <= self.burn_in or self.runs_counter % self.train_every_n == 0:
             self.train_model()
-
+        
         # get latest data
         df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, col_sep='.').transpose()
-
+        
         # create data dicts
         data_z, data_3sigma = self.create_data(df_allmetrics)
         data = {**data_z, **data_3sigma}
-
+        
         self.validate_charts('z', data_z, divisor=100)
         self.validate_charts('3sigma', data_3sigma)
-
+        
         return data
